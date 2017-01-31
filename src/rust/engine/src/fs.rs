@@ -261,11 +261,28 @@ struct PathGlobsExpansion<T: Sized> {
   outputs: OrderMap<PathStat, ()>,
 }
 
+#[derive(Clone)]
+struct ProjectTree {
+  build_root: PathBuf,
+  // TODO
+  //ignore: Gitignore, 
+}
+
+impl FSContext<io::Error> for ProjectTree {
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+    future::result(link.0.read_link()).boxed()
+  }
+
+  fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
+
+  }
+}
+
 /**
  * A context for filesystem operations parameterized on an error type 'E'.
  */
 pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
-  fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, E>;
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
 
   /**
@@ -278,6 +295,14 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
     self.read_link(&link)
+      .map(|dest_path| {
+        // If the link destination can't be parsed as PathGlob(s), it is broken.
+        dest_path.to_str()
+          .and_then(|dest_str| {
+            PathGlob::create(&vec![dest_str.to_string()]).ok()
+          })
+          .unwrap_or_else(|| vec![])
+      })
       .and_then(move |link_globs| {
         context.expand_multi(link_globs)
       })
