@@ -65,6 +65,9 @@ pub struct Function(pub Id);
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
+/**
+ * Wraps a type id for use as a key in HashMaps and sets.
+ */
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Key {

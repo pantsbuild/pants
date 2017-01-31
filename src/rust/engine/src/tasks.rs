@@ -8,9 +8,13 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * Registry of tasks able to produce each type, along with a few fundamental python
  * types that the engine must be aware of.
  */
+#[derive(Clone)]
 pub struct Tasks {
+  // subject_type, selector -> list of tasks implementing it
   intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,
+  // any-subject, selector -> list of tasks implementing it
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
+  // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   pub externs: Externs,
   pub field_name: Field,
@@ -57,6 +61,36 @@ impl Tasks {
       type_has_variants: type_has_variants,
       preparing: None,
     }
+  }
+
+  pub fn all_product_types_for_subject_type(&self, subject_type: &TypeId) -> Vec<TypeId> {
+    vec![]
+  }
+
+  pub fn all_product_types(&self) -> Vec<TypeConstraint> {
+    let mut result: Vec<TypeConstraint> = Vec::new();
+    for tasks in self.singletons.values() {
+      for t in tasks {
+        result.push(t.product)
+      }
+    }
+    for tasks in self.intrinsics.values() {
+      for t in tasks {
+        result.push(t.product)
+      }
+    }
+    for tasks in self.tasks.values() {
+      for t in tasks {
+        result.push(t.product)
+      }
+    }
+
+    result
+  }
+
+
+  pub fn all_rules(&self) -> Vec<Task> {
+    vec![]
   }
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
