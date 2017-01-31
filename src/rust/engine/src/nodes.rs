@@ -1,6 +1,6 @@
 
 use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures::future::{BoxFuture, Future};
@@ -9,7 +9,7 @@ use futures::future;
 use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
-use fs::{self, Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
+use fs::{self, Dir, File, FSContext, Link, PathGlobs, PathStat, Stat};
 use graph::EntryId;
 use handles::maybe_drain_handles;
 use selectors::{self, Selector};
@@ -264,7 +264,7 @@ impl Context {
       })
   }
 
-  fn lift_read_link(&self, item: &Value) -> String {
+  fn lift_read_link(&self, item: &Value) -> PathBuf {
     self.core.externs.lift_read_link(item, &self.core.tasks.field_path)
   }
 
@@ -320,7 +320,7 @@ impl Context {
 }
 
 impl FSContext<Failure> for Context {
-  fn read_link(&self, link: &Link) -> BoxFuture<Vec<PathGlob>, Failure> {
+  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, Failure> {
     let context = self.clone();
     self
       .get(
@@ -337,10 +337,6 @@ impl FSContext<Failure> for Context {
           Err(failure) =>
             Err(context.was_required(failure)),
         }
-      })
-      .map(|dest_path| {
-        // If the link destination can't be parsed as PathGlob(s), it is broken.
-        PathGlob::create(&vec![dest_path]).unwrap_or_else(|_| vec![])
       })
       .boxed()
   }

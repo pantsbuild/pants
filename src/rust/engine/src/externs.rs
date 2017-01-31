@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
@@ -143,8 +143,10 @@ impl Externs {
     })
   }
 
-  pub fn lift_read_link(&self, item: &Value, field: &Field) -> String {
-    self.val_to_str(&self.project(item, field, field.0.type_id()))
+  pub fn lift_read_link(&self, item: &Value, field: &Field) -> PathBuf {
+    let path_val = self.project(item, field, field.0.type_id());
+    let path_buf = (self.val_to_str)(self.context, &path_val);
+    Path::new(path_buf.to_os_string().as_os_str()).to_owned()
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {
