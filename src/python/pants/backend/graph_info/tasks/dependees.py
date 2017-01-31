@@ -34,18 +34,15 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
     self._closed = self.get_options().closed
 
   def console_output(self, _):
-    address_mapper = self.context.address_mapper
-    build_graph = self.context.build_graph
-
     dependees_by_target = defaultdict(set)
-    for address in build_graph.inject_specs_closure([DescendantAddresses('')]):
-      target = build_graph.get_target(address)
+    for address in self.context.build_graph.inject_specs_closure([DescendantAddresses('')]):
+      target = self.context.build_graph.get_target(address)
       # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
       # user vs. targets created by pants at runtime.
-      target = self.get_concrete_target(target)
-      for dependency in target.dependencies:
+      concrete_target = self.get_concrete_target(target)
+      for dependency in concrete_target.dependencies:
         dependency = self.get_concrete_target(dependency)
-        dependees_by_target[dependency].add(target)
+        dependees_by_target[dependency].add(concrete_target)
 
     roots = set(self.context.target_roots)
     if self.get_options().output_format == 'json':
