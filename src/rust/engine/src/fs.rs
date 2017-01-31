@@ -38,15 +38,6 @@ pub struct Dir(pub PathBuf);
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct File(pub PathBuf);
 
-pub enum LinkExpansion {
-  // Successfully resolved to a File.
-  File(File),
-  // Successfully resolved to a Dir.
-  Dir(Dir),
-  // Link destination does not exist.
-  Broken,
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathStat {
   Dir {

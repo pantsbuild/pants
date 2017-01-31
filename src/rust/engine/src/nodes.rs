@@ -5,19 +5,16 @@ use std::sync::Arc;
 
 use futures::future::{BoxFuture, Future};
 use futures::future;
-use futures_cpupool::CpuPool;
 
 use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use fs::{Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
 use fs;
-use graph::{EntryId, Graph};
+use graph::EntryId;
 use handles::drain_handles;
 use selectors::Selector;
 use selectors;
-use tasks::Tasks;
-use types::Types;
 
 
 #[derive(Debug)]

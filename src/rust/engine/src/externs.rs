@@ -136,12 +136,6 @@ impl Externs {
     })
   }
 
-  pub fn project_multi_strs(&self, item: &Value, field: &Field) -> Vec<String> {
-    self.project_multi(item, field).iter()
-      .map(|v| self.val_to_str(v))
-      .collect()
-  }
-
   pub fn lift_read_link(&self, item: &Value, field: &Field) -> String {
     self.val_to_str(&self.project(item, field, field.0.type_id()))
   }
