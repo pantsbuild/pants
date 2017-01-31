@@ -8,7 +8,7 @@ use futures_cpupool::CpuPool;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use graph::{EntryId, Graph};
-use handles::drain_handles;
+use handles::maybe_drain_handles;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
@@ -681,7 +681,9 @@ impl Node {
 
   pub fn step(&self, context: Context) -> StepFuture {
     // TODO: Odd place for this... could do it periodically in the background?
-    context.tasks.externs.drop_handles(drain_handles());
+    maybe_drain_handles().map(|handles| {
+      context.tasks.externs.drop_handles(handles);
+    });
 
     match self {
       &Node::Select(ref n) => n.step(context),
