@@ -9,7 +9,6 @@ import pkg_resources
 from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.engine.objects import Mutable
 from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
@@ -316,7 +315,7 @@ class IdGenerator(object):
     self._obj_to_id = dict()
 
   def to_id(self, obj):
-    key = self._storage.put(obj) if type(obj) is Mutable else obj
+    key = self._storage.put(obj)
     new_id = self._next_id
     _id = self._obj_to_id.setdefault(key, new_id)
     if _id is not new_id:

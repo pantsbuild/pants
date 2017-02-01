@@ -11,8 +11,7 @@ from collections import MutableMapping, MutableSequence
 import six
 
 from pants.engine.addressable import SubclassesOf, SuperclassesOf, addressable, addressable_list
-from pants.engine.objects import (Mutable, Serializable, SerializableFactory,
-                                  Validatable, ValidationError)
+from pants.engine.objects import Serializable, SerializableFactory, Validatable, ValidationError
 from pants.util.meta import AbstractClass
 
 
@@ -25,7 +24,7 @@ def _normalize_utf8_keys(kwargs):
   return kwargs
 
 
-class Struct(Serializable, SerializableFactory, Validatable, Mutable):
+class Struct(Serializable, SerializableFactory, Validatable):
   """A serializable object.
 
   A Struct is composed of basic python builtin types and other high-level Structs.
