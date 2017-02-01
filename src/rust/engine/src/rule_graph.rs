@@ -3,14 +3,11 @@
 
 use core::{Key, TypeConstraint, TypeId, Value};
 
-use nodes::Node;
-
 use selectors::{Select, Selector, Task};
 
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
-use std::fmt::Debug;
 
 use tasks::Tasks;
 
@@ -87,7 +84,7 @@ impl Entry {
 
   fn new_unreachable(rule: &Task) -> Entry {
     Entry {
-      entry_type: EntryType::SubjectIsProduct,
+      entry_type: EntryType::Unreachable,
       subject_type: None,
       value: None,
       rule: Some(rule.clone()), // TODO decide on clone vs lifetimes
@@ -97,7 +94,7 @@ impl Entry {
   }
   fn new_literal(value: Key, product: TypeConstraint) -> Entry {
     Entry {
-      entry_type: EntryType::SubjectIsProduct,
+      entry_type: EntryType::Literal,
       subject_type: None,
       value: Some(value),
       rule: None,
