@@ -22,11 +22,12 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol):
   """Handles a single nailgun client session."""
 
-  def __init__(self, sock, in_fd, out_fd, err_fd):
+  def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
     self._sock = sock
     self._input_reader = NailgunStreamReader(in_fd, self._sock) if in_fd else None
     self._stdout = out_fd
     self._stderr = err_fd
+    self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
 
   def _maybe_start_input_reader(self):
@@ -59,8 +60,9 @@ class NailgunClientSession(NailgunProtocol):
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
     except (IOError, OSError) as e:
       # If a `Broken Pipe` is encountered during a stdio fd write, we're headless - bail.
-      if e.errno == errno.EPIPE:
+      if e.errno == errno.EPIPE and self._exit_on_broken_pipe:
         sys.exit()
+      # Otherwise, re-raise.
       raise
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
@@ -90,7 +92,7 @@ class NailgunClient(object):
   DEFAULT_NG_PORT = 2113
 
   def __init__(self, host=DEFAULT_NG_HOST, port=DEFAULT_NG_PORT, ins=sys.stdin, out=None, err=None,
-               workdir=None):
+               workdir=None, exit_on_broken_pipe=False):
     """Creates a nailgun client that can be used to issue zero or more nailgun commands.
 
     :param string host: the nailgun server to contact (defaults to '127.0.0.1')
@@ -101,6 +103,7 @@ class NailgunClient(object):
     :param file out: a stream to write command standard output to (defaults to stdout)
     :param file err: a stream to write command standard error to (defaults to stderr)
     :param string workdir: the default working directory for all nailgun commands (defaults to CWD)
+    :param bool exit_on_broken_pipe: whether or not to exit when `Broken Pipe` errors are encountered.
     """
     self._host = host
     self._port = port
@@ -108,6 +111,7 @@ class NailgunClient(object):
     self._stdout = out or sys.stdout
     self._stderr = err or sys.stderr
     self._workdir = workdir or os.path.abspath(os.path.curdir)
+    self._exit_on_broken_pipe = exit_on_broken_pipe
     self._session = None
 
   def try_connect(self):
@@ -147,7 +151,11 @@ class NailgunClient(object):
     # N.B. This can throw NailgunConnectionError (catchable via NailgunError).
     sock = self.try_connect()
 
-    self._session = NailgunClientSession(sock, self._stdin, self._stdout, self._stderr)
+    self._session = NailgunClientSession(sock,
+                                         self._stdin,
+                                         self._stdout,
+                                         self._stderr,
+                                         self._exit_on_broken_pipe)
     try:
       return self._session.execute(cwd, main_class, *args, **environment)
     except socket.error as e:
