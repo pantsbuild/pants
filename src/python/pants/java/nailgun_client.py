@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import errno
 import logging
 import os
 import signal
@@ -14,7 +15,6 @@ import sys
 from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket
-
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,11 @@ class NailgunClientSession(NailgunProtocol):
           self._maybe_start_input_reader()
         else:
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
+    except (IOError, OSError) as e:
+      # If a `Broken Pipe` is encountered during a stdio fd write, we're headless - bail.
+      if e.errno == errno.EPIPE:
+        sys.exit()
+      raise
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
       # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamReader is always stopped.
