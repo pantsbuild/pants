@@ -14,56 +14,40 @@ use std::fmt::Debug;
 
 use tasks::Tasks;
 
-// options.
-// 1. carefully box everything
-// 2. have a struct with optional fields
-
-// arg! I want to have a vec of RootEntry u InternalEntry
-// might be able to do it with boxing
-// ah, yep that's it
-// So, I need a trait
-// enum doesn't do it because all of the variants of an enum are typed with the enum
-
-// a rule graph entry is
-// the below would allow preventing all of the awkward boxing
+// I think I ought to be able to replace the below with a set of structs keyed by EntryType.
+// My first couple attempts failed.
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 enum EntryType {
   SubjectIsProduct,
+  // has subject_type
+  // can be dependency
+
   Root,
+  // has subject_type, selector/typeconstriant
+  // can have dependencies
+
   InnerEntry,
+  // has subject_type, rule
+  // can be dependency
+  // can have dependencies
+
   Literal,
-  // NB unreachable is an error type, it might be better to name it error
+  // has value
+  // can be dependency
+
   Unreachable
+  // has a reason for the failure and a rule
+  // NB: unreachable is an error type, it might be better to name it error, but currently
+  //     unreachable is the only error entry type.
 }
+
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct Entry {
   entry_type: EntryType,
-
-  // SubjectIsProduct
-  // can be
-  // - dependency
   subject_type: Option<TypeId>,
-
-  // Literal
-  // can be
-  // - dependency
- value: Option<Key>, // probably
-  // selector
-
-  // Inner
-  // can
-  // - be dependency
-  // - have dependencies
-  //subject_type: TypeId,
+  value: Option<Key>,
   rule: Option<Task>,
-
-  // Root
-  // can
-  // - have dependencies
-  //subject_type: TypeId,
   selector: Option<TypeConstraint>,
-
-  // Unreachable
   reason: Option<Diagnostic>
 }
 
@@ -84,7 +68,7 @@ impl Entry {
       entry_type: EntryType::InnerEntry,
       subject_type: Some(subject_type),
       value: None,
-      rule: Some(rule.clone()), // TODO clone, really?
+      rule: Some(rule.clone()), // TODO decide on clone vs lifetimes
       selector: None,
       reason: None,
     }
@@ -106,7 +90,7 @@ impl Entry {
       entry_type: EntryType::SubjectIsProduct,
       subject_type: None,
       value: None,
-      rule: Some(rule.clone()), // TODO clone vs lifetimes
+      rule: Some(rule.clone()), // TODO decide on clone vs lifetimes
       selector: None,
       reason: None,
     }
@@ -140,7 +124,7 @@ impl Entry {
   fn input_selectors(&self) -> Vec<Selector> {
     match self.rule {
       Some(ref task) => task.clause.clone(),
-      None => vec![] // or panic?
+      None => vec![] // Could also panic
     }
   }
 
@@ -161,48 +145,6 @@ impl Entry {
       EntryType::Root => false,
       EntryType::Unreachable => false,
     }
-  }
-}
-
-
-trait RuleGraphEntry: Debug + Sized {
-  fn rule(&self) -> &Task;
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct RootEntry {
-  pub rule: Task,
-  pub subject_type: TypeId,
-  pub product_constraint: TypeConstraint
-}
-
-impl RuleGraphEntry for RootEntry {
-  fn rule(&self) -> &Task {
-    &self.rule
-  }
-}
-
-
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct InternalEntry {
-  pub rule: Task
-}
-
-impl RuleGraphEntry for InternalEntry {
-  fn rule(&self) -> &Task {
-    &self.rule
-  }
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct RuleGraphSubjectIsProduct {
-  subject_type: TypeId
-}
-
-impl RuleGraphEntry for RuleGraphSubjectIsProduct {
-  // has no rule, but is a RuleGraphEntry
-  fn rule(&self) -> &Task {
-    unimplemented!()
   }
 }
 
@@ -264,6 +206,7 @@ impl<'a> GraphMaker<'a> {
         full_dependency_edges,
         full_unfulfillable_rules
       );
+
       // less than ideal, the copying
       full_root_rule_dependency_edges = constructed_graph.root_dependencies.clone();
       full_dependency_edges = constructed_graph.rule_dependency_edges.clone();
@@ -664,21 +607,8 @@ return root_rule_dependency_edges, rule_dependency_edges, unfulfillable_rules
   }
 }
 
-// entry types
-// lhs--CanHaveDependencies, rhs--CanBeDependencies
-// - subject is product - rhs only
-// - literal - rhs only
-// - task - lhs and rhs
-// - root - lhs only
-
-// unreachable rule {rule}
-
 #[derive(Debug)]
 pub struct RuleGraph {
-  // graph_maker
-  // root_subject_types
-  // rule_dependencies: Map<Entrys -> Edges> edges by entries
-  // unfulfillable_rules: Map<entries -> list<UnfulfillableReason>>
   root_dependencies: RootRuleDependencyEdges,
   rule_dependency_edges: RuleDependencyEdges,
   unfulfillable_rules: UnfulfillableRuleMap,
@@ -700,8 +630,10 @@ impl RuleGraph {
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RuleEdges {
-  /*current_node: Node,
+  /*
 
+  // components for noop elim
+  current_node: Node,
   current_node_is_rule_holder: bool,
   // the only node type in the branch w/o a rule is the RootNode RN, so
   // this may not be necessary
@@ -727,13 +659,22 @@ impl RuleEdges {
     //  selector_to_dependencies: HashMap::new()
     }
   }
-  pub fn add_edges_via(&mut self, selector: Vec<Selector>, new_dependencies: &Entries) {}
+  pub fn add_edges_via(&mut self, selector: Vec<Selector>, new_dependencies: &Entries) {
+    /*
+    if selector is None and new_dependencies:
+      raise ValueError("Cannot specify a None selector with non-empty dependencies!")
+    tupled_other_rules = tuple(new_dependencies)
+    self._selector_to_deps[selector] += tupled_other_rules
+    self._dependencies += tupled_other_rules
+
+    */
+  }
   pub fn has_edges_for(&self, selector: Vec<Selector>) -> bool {
+    /*
+        return selector in self._selector_to_deps
+    */
     false
   }
-  pub fn initial_state_for_selector() {}
-
-  //  pub fn get_state_for_selector(selector: Selector, subject: Blah, variants: Blah, get_state: Blah) {
-  //
-  //}
+  //pub fn initial_state_for_selector() {}
+  //pub fn get_state_for_selector(selector: Selector, subject: TypeId, variants: Blah, get_state: Blah) {}
 }

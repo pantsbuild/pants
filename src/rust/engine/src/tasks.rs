@@ -63,29 +63,8 @@ impl Tasks {
     }
   }
 
-  pub fn all_product_types_for_subject_type(&self, subject_type: &TypeId) -> Vec<TypeId> {
-    vec![]
-  }
-
   pub fn all_product_types(&self) -> Vec<TypeConstraint> {
-    let mut result: Vec<TypeConstraint> = Vec::new();
-    for tasks in self.singletons.values() {
-      for t in tasks {
-        result.push(t.product)
-      }
-    }
-    for tasks in self.intrinsics.values() {
-      for t in tasks {
-        result.push(t.product)
-      }
-    }
-    for tasks in self.tasks.values() {
-      for t in tasks {
-        result.push(t.product)
-      }
-    }
-
-    result
+    self.all_rules().iter().map(|t| t.product).collect()
   }
 
   pub fn is_singleton_task(&self, sought_task: &Task) -> bool {
@@ -97,7 +76,24 @@ impl Tasks {
   }
 
   pub fn all_rules(&self) -> Vec<Task> {
-    vec![]
+    let mut result: Vec<Task> = Vec::new();
+    for tasks in self.singletons.values() {
+      for t in tasks {
+        result.push(t.clone())
+      }
+    }
+    for tasks in self.intrinsics.values() {
+      for t in tasks {
+        result.push(t.clone())
+      }
+    }
+    for tasks in self.tasks.values() {
+      for t in tasks {
+        result.push(t.clone())
+      }
+    }
+
+    result
   }
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
