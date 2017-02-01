@@ -30,7 +30,9 @@ enum EntryType {
   SubjectIsProduct,
   Root,
   InnerEntry,
-  Literal
+  Literal,
+  // NB unreachable is an error type, it might be better to name it error
+  Unreachable
 }
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct Entry {
@@ -57,7 +59,10 @@ struct Entry {
   // can
   // - have dependencies
   //subject_type: TypeId,
-  selector: Option<TypeConstraint>
+  selector: Option<TypeConstraint>,
+
+  // Unreachable
+  reason: Option<Diagnostic>
 }
 
 impl Entry {
@@ -67,7 +72,8 @@ impl Entry {
       subject_type: Some(subject_type),
       //value: None,
       rule: None,
-      selector: Some(selector)
+      selector: Some(selector),
+      reason: None,
     }
   }
 
@@ -77,7 +83,8 @@ impl Entry {
       subject_type: Some(subject_type),
       //value: None,
       rule: Some(rule.clone()), // TODO clone, really?
-      selector: None
+      selector: None,
+      reason: None,
     }
   }
 
@@ -87,7 +94,19 @@ impl Entry {
       subject_type: Some(subject_type),
       //value: None,
       rule: None,
-      selector: None
+      selector: None,
+      reason: None,
+    }
+  }
+
+  fn new_unreachable(rule: &Task) -> Entry {
+    Entry {
+      entry_type: EntryType::SubjectIsProduct,
+      subject_type: None,
+      //value: None,
+      rule: Some(rule.clone()), // TODO clone vs lifetimes
+      selector: None,
+      reason: None,
     }
   }
 
@@ -118,7 +137,8 @@ impl Entry {
       EntryType::SubjectIsProduct => false,
       EntryType::Literal => false,
       EntryType::InnerEntry => true,
-      EntryType::Root => true
+      EntryType::Root => true,
+      EntryType::Unreachable => false,
     }
   }
   fn can_be_dependency(&self) -> bool {
@@ -126,7 +146,8 @@ impl Entry {
       EntryType::SubjectIsProduct => true,
       EntryType::Literal => true,
       EntryType::InnerEntry => true,
-      EntryType::Root => false
+      EntryType::Root => false,
+      EntryType::Unreachable => false,
     }
   }
 }
@@ -185,13 +206,7 @@ pub struct RootSubjectTypes<'a> {
   pub subject_types: &'a Vec<TypeId>
 }
 
-
-#[derive(Debug)]
-pub struct UnreachableRule {
-  rule: Rule
-}
-
-#[derive(Debug, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Diagnostic {
   subject_type: TypeId,
   reason: String
@@ -253,6 +268,12 @@ impl<'a> GraphMaker<'a> {
       .collect();
 
     for rule in unreachable_rules {
+      let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
+      let terrible_type = TypeId(0); // need to come up with something better.
+      // This is used to collate the error messages by subject. It could use either a well known
+      // special value or I could make the subject type an option and use None here.
+
+      diagnostics.push(Diagnostic{subject_type: terrible_type, reason:"Unreachable".to_string()});
       // can't do this because can't have a heterogeneous collection w/o wrapping w/ boxen
       //full_unfulfillable_rules.insert(UnreachableRule {rule: rule }, vec![Diagnostic{msg: "Unreachable"}]);
       println!("an unreachable rule!");
