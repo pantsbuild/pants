@@ -98,6 +98,14 @@ impl Entry {
       panic!("no subject type")
     }
   }
+
+  fn rule(&self) -> &Task {
+    if let Some(ref rule) = self.rule {
+      rule
+    } else {
+      panic!("no rule")
+    }
+  }
   fn input_selectors(&self) -> Vec<Selector> {
     match self.rule {
       Some(ref task) => task.clause.clone(),
@@ -234,20 +242,16 @@ impl<'a> GraphMaker<'a> {
       full_dependency_edges = constructed_graph.rule_dependency_edges.clone();
       full_unfulfillable_rules = constructed_graph.unfulfillable_rules.clone();
     }
-    let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule.clone()).collect();
-    let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules.keys().map(|f| f.rule.clone()).collect();
+    let rules_in_graph: HashSet<Task> = full_dependency_edges.keys().map(|f| f.rule().clone()).collect();
+    let unfulfillable_discovered_during_construction: HashSet<Task> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
     let declared_rules = self.tasks.all_rules();
-    let unreachable_rules = declared_rules;//.iter()
-    // unreachable rules = declared_rules \
-    // - rules_in_graph
-    //.filter(|r| )
-    //                                    - unfulfillable_discovered_during_construction
-    //.filter(|r| )
-    //                                    - singletons
-    //.filter(|r| )
-    //                                    - intrinsics
-    //.filter(|r| )
-    //.collect();
+    let unreachable_rules: HashSet<&Task> = declared_rules.iter()
+      .filter(|r| !rules_in_graph.contains(r))
+      .filter(|r| !unfulfillable_discovered_during_construction.contains(r))
+      .filter(|r| !self.tasks.is_singleton_task(r))
+      .filter(|r| !self.tasks.is_intrinsic_task(r))
+      .collect();
+
     for rule in unreachable_rules {
       // can't do this because can't have a heterogeneous collection w/o wrapping w/ boxen
       //full_unfulfillable_rules.insert(UnreachableRule {rule: rule }, vec![Diagnostic{msg: "Unreachable"}]);

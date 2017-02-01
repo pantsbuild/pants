@@ -88,6 +88,13 @@ impl Tasks {
     result
   }
 
+  pub fn is_singleton_task(&self, sought_task: &Task) -> bool {
+    self.singletons.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
+  }
+
+  pub fn is_intrinsic_task(&self, sought_task: &Task) -> bool {
+    self.intrinsics.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
+  }
 
   pub fn all_rules(&self) -> Vec<Task> {
     vec![]
