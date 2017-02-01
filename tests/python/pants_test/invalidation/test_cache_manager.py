@@ -36,8 +36,9 @@ class InvalidationCacheManagerTest(BaseTest):
     super(InvalidationCacheManagerTest, self).setUp()
     self._dir = tempfile.mkdtemp()
     self.cache_manager = InvalidationCacheManager(
+      results_dir_root=os.path.join(self._dir, 'results'),
       cache_key_generator=CacheKeyGenerator(),
-      build_invalidator_dir=self ._dir,
+      build_invalidator_dir=os.path.join(self._dir, 'build_invalidator'),
       invalidate_dependents=True,
     )
 
@@ -56,9 +57,26 @@ class InvalidationCacheManagerTest(BaseTest):
     return vt
 
   def task_execute(self, vt):
-    vt.create_results_dir(self._dir)
+    vt.create_results_dir()
     task_output = os.path.join(vt.results_dir, 'a_file')
     self.create_file(task_output, 'foo')
+
+  def test_creates_stable_result_dir_symlink(self):
+    vt = self.make_vt()
+    vt.create_results_dir()
+    parent, unstable_dir_name = os.path.split(vt._current_results_dir)
+    self.assertSetEqual({'current', unstable_dir_name}, set(os.listdir(parent)))
+    symlink = os.path.join(parent, 'current')
+    self.assertTrue(os.path.islink(symlink))
+    self.assertTrue(unstable_dir_name, os.readlink(symlink))
+    self.assertEquals(symlink, vt.results_dir)
+
+  def test_creates_stable_results_dir_prefix_symlink(self):
+    parent, unstable_dir_name = os.path.split(self.cache_manager._results_dir_prefix)
+    self.assertSetEqual({'current', unstable_dir_name}, set(os.listdir(parent)))
+    symlink = os.path.join(parent, 'current')
+    self.assertTrue(os.path.islink(symlink))
+    self.assertTrue(unstable_dir_name, os.readlink(symlink))
 
   def test_check_marks_all_as_invalid_by_default(self):
     a = self.make_target(':a', dependencies=[])
@@ -94,7 +112,7 @@ class InvalidationCacheManagerTest(BaseTest):
     vt.force_invalidate()
     self.assertFalse(self.is_empty(vt.results_dir))
 
-    vt.create_results_dir(self._dir)
+    vt.create_results_dir()
     self.assertTrue(self.has_symlinked_result_dir(vt))
     self.assertTrue(self.is_empty(vt.results_dir))
 
@@ -104,7 +122,7 @@ class InvalidationCacheManagerTest(BaseTest):
     self.assertFalse(self.is_empty(vt.results_dir))
     file_names = os.listdir(vt.results_dir)
 
-    vt.create_results_dir(self._dir)
+    vt.create_results_dir()
     self.assertFalse(self.is_empty(vt.results_dir))
     self.assertTrue(self.has_symlinked_result_dir(vt))
 
@@ -145,7 +163,7 @@ class InvalidationCacheManagerTest(BaseTest):
     # This only is caught here if the VT is still invalid for some reason, otherwise it's caught by the update() method.
     vt.force_invalidate()
     with self.assertRaisesRegexp(ValueError, r'Path for link.*overwrite an existing directory*'):
-      vt.create_results_dir(self._dir)
+      vt.create_results_dir()
 
   def test_raises_for_clobbered_symlink(self):
     vt = self.make_vt()
