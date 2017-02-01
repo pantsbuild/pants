@@ -450,7 +450,7 @@ pub extern fn run_validator(
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
                                         RootSubjectTypes { subject_types: subject_types });
       let graph = graph_maker.full_graph();
-      // should return a validation result of some kind
+      // I think this should should return a validation result of some kind
       if graph.has_errors() {
         println!("there were validation errors")
         //raw.scheduler.externs

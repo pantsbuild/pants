@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{Key, TypeConstraint, TypeId, Value};
+use core::{Key, TypeConstraint, TypeId};
 
 use selectors::{Select, Selector, Task};
 
@@ -119,9 +119,19 @@ impl Entry {
     }
   }
   fn input_selectors(&self) -> Vec<Selector> {
-    match self.rule {
-      Some(ref task) => task.clause.clone(),
-      None => vec![] // Could also panic
+    match self.entry_type {
+      EntryType::InnerEntry =>
+        match self.rule {
+          Some(ref task) => {
+            task.clause.clone()
+          },
+          None => vec![] // Could also panic
+        },
+      EntryType::Root => match self.selector {
+        Some(s) => vec![Selector::Select(Select { product: s, variant_key: None })],
+        None => vec![]
+      },
+      _ => panic!("this entry doesn't have selectors")
     }
   }
 
@@ -272,7 +282,6 @@ impl<'a> GraphMaker<'a> {
                           dep_rules: Entries) {
 
       {
-        let root_rule_deps: &RootRuleDependencyEdges = root_rule_dependency_edges;
         let rule_deps: &RuleDependencyEdges = rule_dependency_edges;
         let unseen_dep_rules = dep_rules.iter()
           .filter(|g| !rule_deps.contains_key(g))
@@ -289,7 +298,6 @@ impl<'a> GraphMaker<'a> {
           edges.add_edges_via(selector_path, &dep_rules);
         },
         _ => {
-
           let mut edges = rule_dependency_edges.entry(entry.clone()).or_insert(RuleEdges::new());
           if edges.has_edges_for(selector_path.clone()) {
             // This is an error that should only happen if there's a bug in the algorithm, but it
@@ -300,12 +308,7 @@ impl<'a> GraphMaker<'a> {
         }
       }
     }
-/*
-    rules_to_traverse = deque([beginning_rule])
-    root_rule_dependency_edges = dict() if root_rule_dependency_edges is None else root_rule_dependency_edges
-    rule_dependency_edges = dict() if rule_dependency_edges is None else rule_dependency_edges
-    unfulfillable_rules = dict() if unfulfillable_rules is None else unfulfillable_rules
-    */
+
     let mut rules_to_traverse: VecDeque<Entry> = VecDeque::new();
     rules_to_traverse.push_back(beginning_rule);
     while let Some(entry) = rules_to_traverse.pop_front() {
@@ -325,21 +328,16 @@ impl<'a> GraphMaker<'a> {
       for selector in entry.input_selectors() {
         match selector {
           Selector::Select(select) =>{
-            /*      # TODO, handle the Addresses / Variants case
-      rules_or_literals_for_selector = _find_rhs_for_select(entry.subject_type, selector)
-      if not rules_or_literals_for_selector:
-        mark_unfulfillable(entry, entry.subject_type, 'no matches for {}'.format(selector))
-        was_unfulfillable = True
-        continue
-      add_rules_to_graph(entry, selector, rules_or_literals_for_selector)
-*/
             // TODO, handle the Addresses / Variants case
-            let rules_or_literals_for_selector = rhs_for_select(&self.tasks, entry.subject_type(), &select);
+            let rules_or_literals_for_selector = rhs_for_select(&self.tasks,
+                                                                entry.subject_type(),
+                                                                &select);
             if rules_or_literals_for_selector.is_empty() {
               mark_unfulfillable(&mut unfulfillable_rules,
                                  &entry,
                                  entry.subject_type(),
-                                 format!("no matches for {:?}", select)); // might be better as {} with display derived
+                                 // might be better as {} with display derived
+                                 format!("no matches for {:?}", select));
               was_unfulfillable = true;
               continue
             }
@@ -351,13 +349,7 @@ impl<'a> GraphMaker<'a> {
                                vec![Selector::Select(select)],
                                rules_or_literals_for_selector);
           },
-          //SelectVariants => same as above
           Selector::SelectLiteral(select) =>{
-            /*
-                  add_rules_to_graph(entry,
-                         selector,
-                         (RuleGraphLiteral(selector.subject, selector.product),))
-            */
             add_rules_to_graph(&mut rules_to_traverse,
                                &mut rule_dependency_edges,
                                &mut unfulfillable_rules,
@@ -383,7 +375,7 @@ impl<'a> GraphMaker<'a> {
               continue
             }
             //let mut rules_for_dependencies = vec![];
-            // no field types in model yet, so this bit can't be converted. :/
+            // TODO port the rest of this after adding field types to the selectors
 
             /*
                   initial_selector = selector.input_product_selector
@@ -522,10 +514,9 @@ impl<'a> GraphMaker<'a> {
   }
 
   fn _remove_unfulfillable_rules_and_dependents(&self,
-                                                root_rule_dependency_edges: RootRuleDependencyEdges,
-                                                rule_dependency_edges: RuleDependencyEdges,
-                                                unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
-    RuleGraph::new()
+                                                rule_graph: RuleGraph) -> RuleGraph {
+    // TODO port this portion
+    rule_graph
   }
 
   fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Entries {
@@ -533,12 +524,11 @@ impl<'a> GraphMaker<'a> {
     for subj_type in self.root_subject_types.subject_types {
       for pt in product_types {
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
-          let mapped_tasks: Entries = tasks.iter().map(|t|
-            Entry::new_root(
+          if !tasks.is_empty() {
+            result.push(Entry::new_root(
               subj_type.clone(),
-              TypeConstraint(pt.0)
-          )).collect();
-          result.extend(mapped_tasks);
+              TypeConstraint(pt.0)));
+          }
         }
       }
     }
@@ -554,38 +544,14 @@ pub struct RuleGraph {
 }
 
 impl RuleGraph {
-  pub fn new() -> RuleGraph {
-    RuleGraph {
-      root_dependencies: HashMap::new(),
-      rule_dependency_edges: HashMap::new(),
-      unfulfillable_rules: HashMap::new()
-    }
-  }
-
   pub fn has_errors(&self) -> bool {
+    // self.unfulfillable_rules.iter().any(|kv| kv.0.entry_type != EntryType::Root && !kv.1.is_empty())
     false
   }
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges {
-  /*
-
-  // components for noop elim
-  current_node: Node,
-  current_node_is_rule_holder: bool,
-  // the only node type in the branch w/o a rule is the RootNode RN, so
-  // this may not be necessary
-  will_noop: bool,
-  noop_reason: String,
-
-  //edges -> dependencies defined by rule graph
-  // points to list of rules by selector-key
-  // selector key is a 1 or 2 element sequence of the form (selector, ....)
-  //   one element selectors are bare selectors without a projection
-  //   two element selectors are projected selectors that change the subject
-  //   could come up with a different scheme tho
-  */
   dependencies: Entries,
   selector_to_dependencies: HashMap<Vec<Selector>, Entries>
 }
@@ -614,6 +580,4 @@ impl RuleEdges {
   fn has_edges_for(&self, selector_path: Vec<Selector>) -> bool {
     self.selector_to_dependencies.contains_key(&selector_path)
   }
-  //pub fn initial_state_for_selector() {}
-  //pub fn get_state_for_selector(selector: Selector, subject: TypeId, variants: Blah, get_state: Blah) {}
 }
