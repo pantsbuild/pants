@@ -35,6 +35,7 @@ class NodeBundle(NodeTask):
   def product_types(cls):
     return ['node_bundles', 'deployable_archives']
 
+  @classmethod
   def prepare(cls, options, round_manager):
     super(NodeBundle, cls).prepare(options, round_manager)
     round_manager.require_data(NodePaths)
