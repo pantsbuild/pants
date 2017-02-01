@@ -52,10 +52,6 @@ impl Context {
     }
   }
 
-  pub fn pool(&self) -> &CpuPool {
-    &self.pool
-  }
-
   /**
    * Create Nodes for each Task that might be able to compute the given product for the
    * given subject and variants.

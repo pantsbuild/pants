@@ -7,6 +7,7 @@ mod scheduler;
 mod selectors;
 mod tasks;
 
+extern crate crossbeam;
 extern crate fnv;
 extern crate futures;
 extern crate futures_cpupool;
