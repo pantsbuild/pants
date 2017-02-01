@@ -39,7 +39,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     # Targets that are intended to fail
     negative_test_targets = [
       'testprojects/maven_layout/provided_patching/leaf:fail',
-      'testprojects/src/antlr/pants/backend/python/test:antlr_failure',
+      'testprojects/src/antlr/python/test:antlr_failure',
       'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files',
       'testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:fatal',
       'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target',
@@ -49,7 +49,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/missingdepswhitelist.*',
       'testprojects/src/java/org/pantsbuild/testproject/missingdirectdepswhitelist:missingdirectdepswhitelist',
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
-      'testprojects/src/python/antlr:test_antlr_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:fatal',
       'testprojects/src/thrift/org/pantsbuild/thrift_linter:',

@@ -22,11 +22,6 @@ from pants.util.memo import memoized_property
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):
-
-  # The type of target this codegen task acts on.
-  # E.g., JavaThriftLibrary, PythonThriftLibrary.
-  thrift_library_target_type = None
-
   # The name of the thrift generator to use. Subclasses must set.
   # E.g., java, py (see `thrift -help` for all available generators).
   thrift_generator = None
@@ -69,9 +64,6 @@ class ApacheThriftGenBase(SimpleCodegenTask):
         return self._service_deps
     return self._deps
 
-  def is_gentarget(self, target):
-    return isinstance(target, self.thrift_library_target_type)
-
   def execute_codegen(self, target, target_workdir):
     target_cmd = self._thrift_cmd[:]
 
@@ -109,7 +101,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
   @memoized_property
   def _deps(self):
     deps = self.get_options().deps
-    return list(self.resolve_deps(deps)) if deps else []
+    return list(self.resolve_deps(deps))
 
   @memoized_property
   def _service_deps(self):

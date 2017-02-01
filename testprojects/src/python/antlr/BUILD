@@ -1,7 +1,15 @@
-python_tests(
-  name = 'test_antlr_failure',
-  sources = ['donothing.py'],
+python_library(
+  name = 'eval',
+  sources = ['eval.py'],
   dependencies = [
-    'testprojects/src/antlr/pants/backend/python/test:antlr_failure',
+    'testprojects/src/antlr/python/test:eval',
+  ],
+)
+
+python_binary(
+  name = 'eval-bin',
+  entry_point = 'antlr.eval',
+  dependencies = [
+    ':eval',
   ],
 )

@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
+from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.base.deprecated import deprecated_module
 
 
 deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.antlr.java instead')
 
-AntlrGen = AntlrGen
+AntlrGen = AntlrJavaGen
