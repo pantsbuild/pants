@@ -583,33 +583,33 @@ class GraphMaker(object):
         return tuple(RuleGraphEntry(subject_type, rule)
                      for rule in self.rule_index.gen_rules(subject_type, selector.product))
 
-    def mark_unfulfillable(rule, subject_type, reason):
-      if rule not in unfulfillable_rules:
-        unfulfillable_rules[rule] = []
-      unfulfillable_rules[rule].append(Diagnostic(subject_type, reason))
+    def mark_unfulfillable(entry, subject_type, reason):
+      if entry not in unfulfillable_rules:
+        unfulfillable_rules[entry] = []
+      unfulfillable_rules[entry].append(Diagnostic(subject_type, reason))
 
-    def add_rules_to_graph(rule, selector_path, dep_rules):
+    def add_rules_to_graph(entry, selector_path, dep_rules):
       unseen_dep_rules = [g for g in dep_rules
                           if g not in rule_dependency_edges and
                           g not in unfulfillable_rules and
                           g not in root_rule_dependency_edges]
       rules_to_traverse.extend(unseen_dep_rules)
-      if type(rule) is RootRuleGraphEntry:
-        if rule in root_rule_dependency_edges:
-          root_rule_dependency_edges[rule].add_edges_via(selector_path, dep_rules)
+      if type(entry) is RootRuleGraphEntry:
+        if entry in root_rule_dependency_edges:
+          root_rule_dependency_edges[entry].add_edges_via(selector_path, dep_rules)
         else:
           new_edges = RuleEdges()
           new_edges.add_edges_via(selector_path, dep_rules)
-          root_rule_dependency_edges[rule] = new_edges
-      elif rule not in rule_dependency_edges:
+          root_rule_dependency_edges[entry] = new_edges
+      elif entry not in rule_dependency_edges:
         new_edges = RuleEdges()
         new_edges.add_edges_via(selector_path, dep_rules)
-        rule_dependency_edges[rule] = new_edges
+        rule_dependency_edges[entry] = new_edges
       else:
-        existing_deps = rule_dependency_edges[rule]
+        existing_deps = rule_dependency_edges[entry]
         if existing_deps.has_edges_for(selector_path):
           raise ValueError("rule {} already has dependencies set for selector {}"
-                           .format(rule, selector_path))
+            .format(entry, selector_path))
 
         existing_deps.add_edges_via(selector_path, dep_rules)
 
