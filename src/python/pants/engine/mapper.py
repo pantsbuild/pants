@@ -190,7 +190,7 @@ class AddressMapper(object):
     :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
     :param parser_cls: The BUILD file parser cls to use.
     :type parser_cls: A :class:`pants.engine.parser.Parser`.
-    :param tuple build_patterns: A tuple of fnmatch-compatible pattern for identifying BUILD files
+    :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
                                  used to resolve addresses.
     :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.

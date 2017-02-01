@@ -241,21 +241,12 @@ def filter_build_dirs(address_mapper, build_files):
   return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
-def _pattern_yielder(pattern):
-  yield pattern
-  yield join('**', pattern)
-
-
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files.
 
   This allows us to limit our AddressFamily requests to directories that contain build files.
   """
-  patterns = [
-    pattern
-    for build_pattern in address_mapper.build_patterns
-    for pattern in _pattern_yielder(build_pattern)
-  ]
+  patterns = [join('**', pattern) for pattern in address_mapper.build_patterns]
   return PathGlobs.create_from_specs(descendant_addresses.directory, patterns)
 
 
