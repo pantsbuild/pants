@@ -61,6 +61,23 @@ class InvalidationCacheManagerTest(BaseTest):
     task_output = os.path.join(vt.results_dir, 'a_file')
     self.create_file(task_output, 'foo')
 
+  def test_creates_stable_result_dir_symlink(self):
+    vt = self.make_vt()
+    vt.create_results_dir()
+    parent, unstable_dir_name = os.path.split(vt._current_results_dir)
+    self.assertSetEqual({'current', unstable_dir_name}, set(os.listdir(parent)))
+    symlink = os.path.join(parent, 'current')
+    self.assertTrue(os.path.islink(symlink))
+    self.assertTrue(unstable_dir_name, os.readlink(symlink))
+    self.assertEquals(symlink, vt.results_dir)
+
+  def test_creates_stable_results_dir_prefix_symlink(self):
+    parent, unstable_dir_name = os.path.split(self.cache_manager._results_dir_prefix)
+    self.assertSetEqual({'current', unstable_dir_name}, set(os.listdir(parent)))
+    symlink = os.path.join(parent, 'current')
+    self.assertTrue(os.path.islink(symlink))
+    self.assertTrue(unstable_dir_name, os.readlink(symlink))
+
   def test_check_marks_all_as_invalid_by_default(self):
     a = self.make_target(':a', dependencies=[])
     b = self.make_target(':b', dependencies=[a])
