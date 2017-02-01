@@ -58,7 +58,9 @@ class CacheKeyGenerator(object):
     cache_key_gen_version - If provided, added to all cache keys. Allows you to invalidate
       all cache keys in a single pants repo, by changing this value in config.
     """
-
+    # TODO: Qualify the BuildInvalidator root with the cache_key_gen_version, instead of mixing
+    # it into the key, for uniformity with other qualifiers like the fprint strategy and the
+    # transitivity setting.
     self._cache_key_gen_version = '_'.join([cache_key_gen_version or '',
                                             GLOBAL_CACHE_KEY_GEN_VERSION])
 
@@ -123,10 +125,6 @@ class BuildInvalidator(object):
     :param cache_key: A CacheKey object (typically returned by CacheKeyGenerator.key_for()).
     """
     self._write_sha(cache_key)
-
-  def force_invalidate_all(self):
-    """Force-invalidates all cached items."""
-    safe_mkdir(self._root, clean=True)
 
   def force_invalidate(self, cache_key):
     """Force-invalidate the cached item."""

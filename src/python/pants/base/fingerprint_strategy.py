@@ -39,6 +39,8 @@ class FingerprintStrategy(AbstractClass):
   def fingerprint_target(self, target):
     """Consumers of subclass instances call this to get a fingerprint labeled with the name"""
     fingerprint = self.compute_fingerprint(target)
+    # TODO: We probably don't need to qualify the fingerprint with the strategy name any more,
+    # since the BuildInvalidator root is now qualified by it.
     if fingerprint:
       return '{fingerprint}-{name}'.format(fingerprint=fingerprint, name=type(self).__name__)
     else:

@@ -110,7 +110,6 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     :returns: The prepared Task instance.
     """
     task = self.create_task(context)
-    task.invalidate()
 
     # Bootstrap the tools needed by the task under test.
     # We need the bootstrap task's workdir to be under the test's .pants.d, so that it can

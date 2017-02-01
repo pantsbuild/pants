@@ -269,7 +269,10 @@ class InvalidationCacheManager(object):
     self._task_name = task_name or 'UNKNOWN'
     self._task_version = task_version or 'Unknown_0'
     self._invalidate_dependents = invalidate_dependents
-    self._invalidator = BuildInvalidator(build_invalidator_dir)
+    build_invalidator_root = os.path.join(build_invalidator_dir,
+                                          type(fingerprint_strategy).__name__,
+                                          '{}invalidate_dependents'.format('' if invalidate_dependents else 'no'))
+    self._invalidator = BuildInvalidator(build_invalidator_root)
     self._fingerprint_strategy = fingerprint_strategy
     self._artifact_write_callback = artifact_write_callback
     self.invalidation_report = invalidation_report
