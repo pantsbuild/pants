@@ -284,8 +284,8 @@ impl<'a> GraphMaker<'a> {
 
   fn _construct_graph(&self,
                       beginning_rule: Entry, // Root Entry
-                      root_rule_dependency_edges: RootRuleDependencyEdges,
-                      rule_dependency_edges: RuleDependencyEdges,
+                      mut root_rule_dependency_edges: RootRuleDependencyEdges,
+                      mut rule_dependency_edges: RuleDependencyEdges,
                       mut unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
 
     fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
@@ -320,7 +320,7 @@ impl<'a> GraphMaker<'a> {
     }
 
 
-    fn add_rules_to_graph(mut rules_to_traverse: VecDeque<Entry>,
+    fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
                           rule_dependency_edges: &mut RuleDependencyEdges,
                           unfulfillable_rules: &mut UnfulfillableRuleMap,
                           root_rule_dependency_edges: &mut RootRuleDependencyEdges,
@@ -449,28 +449,17 @@ impl<'a> GraphMaker<'a> {
 
           },
           //SelectVariants => same as above
-          Selector::SelectLiteral(select) =>{},
-          Selector::SelectDependencies(select) =>{},
-          Selector::SelectProjection(select) =>{},
-          Selector::Task(select) =>{} // TODO, not sure what task is in this context exactly
-        }
-
-      }
-
-    }
-    /*
-while rules_to_traverse:
-  entry = rules_to_traverse.popleft()
-
-
-  for selector in entry.input_selectors:
-    if type(selector) in (Select, SelectVariant):
-    elif type(selector) is SelectLiteral:
-      add_rules_to_graph(entry,
+          Selector::SelectLiteral(select) =>{
+            /*
+                  add_rules_to_graph(entry,
                          selector,
                          (RuleGraphLiteral(selector.subject, selector.product),))
-    elif type(selector) is SelectDependencies:
-      initial_selector = selector.input_product_selector
+            */
+
+          },
+          Selector::SelectDependencies(select) =>{
+            /*
+                  initial_selector = selector.input_product_selector
       initial_rules_or_literals = _find_rhs_for_select(entry.subject_type, initial_selector)
       if not initial_rules_or_literals:
         mark_unfulfillable(entry,
@@ -500,8 +489,12 @@ while rules_to_traverse:
       add_rules_to_graph(entry,
                          (selector, selector.projected_product_selector),
                          tuple(rules_for_dependencies))
-    elif type(selector) is SelectProjection:
-      # TODO, could validate that input product has fields
+                         */
+
+          },
+          Selector::SelectProjection(select) =>{
+            /*
+                  # TODO, could validate that input product has fields
       initial_rules_or_literals = _find_rhs_for_select(entry.subject_type,
                                                        selector.input_product_selector)
       if not initial_rules_or_literals:
@@ -528,11 +521,19 @@ while rules_to_traverse:
       add_rules_to_graph(entry,
                          (selector, selector.projected_product_selector),
                          projected_rules)
-    else:
-      raise TypeError('Unexpected type of selector: {}'.format(selector))
+            */
 
-  if type(entry.rule) is SnapshottedProcess:
-    # TODO, this is a copy of the SelectDependencies with some changes
+          },
+          Selector::Task(select) =>{
+
+            /*raise TypeError('Unexpected type of selector: {}'.format(selector))*/
+          } // TODO, not sure what task is in this context exactly
+        }
+      }
+
+      // if rule is a snapshot rule
+      /*
+          # TODO, this is a copy of the SelectDependencies with some changes
     # Need to come up with a better approach here, but this fixes things
     # It's also not tested explicitly.
     snapshot_selector = entry.rule.snapshot_selector
@@ -565,12 +566,40 @@ while rules_to_traverse:
         add_rules_to_graph(entry,
                            (snapshot_selector, snapshot_selector.projected_product_selector),
                            tuple(rules_for_dependencies))
-
-
-  if not was_unfulfillable:
+      */
+      if !was_unfulfillable {
+        /*
+          if not was_unfulfillable:
     # NB: In this case, there are no selectors.
     add_rules_to_graph(entry, None, tuple())
 
+        */
+        // NB: In this case there were no selectors
+        add_rules_to_graph(&mut rules_to_traverse,
+                           &mut rule_dependency_edges,
+                           &mut unfulfillable_rules,
+                           &mut root_rule_dependency_edges,
+                           entry,
+                           vec![],
+                           vec![])
+      }
+
+    }
+    /*
+while rules_to_traverse:
+  entry = rules_to_traverse.popleft()
+
+
+  for selector in entry.input_selectors:
+    if type(selector) in (Select, SelectVariant):
+    elif type(selector) is SelectLiteral:
+    elif type(selector) is SelectDependencies:
+    elif type(selector) is SelectProjection:
+    else:
+
+
+  if type(entry.rule) is SnapshottedProcess:
+    ...
 return root_rule_dependency_edges, rule_dependency_edges, unfulfillable_rules
 */
 
