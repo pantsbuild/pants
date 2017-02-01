@@ -1,16 +1,17 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::TypeId;
-use core::Value;
-use core::TypeConstraint;
+use core::{Key, TypeConstraint, TypeId, Value};
+
 use nodes::Node;
 
 use selectors::{Select, Selector, Task};
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::fmt::Debug;
+
 use tasks::Tasks;
 
 // options.
@@ -46,7 +47,8 @@ struct Entry {
   // Literal
   // can be
   // - dependency
- // value: Option<Value>, // probably
+ value: Option<Key>, // probably
+  // selector
 
   // Inner
   // can
@@ -70,7 +72,7 @@ impl Entry {
     Entry {
       entry_type: EntryType::Root,
       subject_type: Some(subject_type),
-      //value: None,
+      value: None,
       rule: None,
       selector: Some(selector),
       reason: None,
@@ -81,7 +83,7 @@ impl Entry {
     Entry {
       entry_type: EntryType::InnerEntry,
       subject_type: Some(subject_type),
-      //value: None,
+      value: None,
       rule: Some(rule.clone()), // TODO clone, really?
       selector: None,
       reason: None,
@@ -92,7 +94,7 @@ impl Entry {
     Entry {
       entry_type: EntryType::SubjectIsProduct,
       subject_type: Some(subject_type),
-      //value: None,
+      value: None,
       rule: None,
       selector: None,
       reason: None,
@@ -103,9 +105,19 @@ impl Entry {
     Entry {
       entry_type: EntryType::SubjectIsProduct,
       subject_type: None,
-      //value: None,
+      value: None,
       rule: Some(rule.clone()), // TODO clone vs lifetimes
       selector: None,
+      reason: None,
+    }
+  }
+  fn new_literal(value: Key, product: TypeConstraint) -> Entry {
+    Entry {
+      entry_type: EntryType::SubjectIsProduct,
+      subject_type: None,
+      value: Some(value),
+      rule: None,
+      selector: Some(product),
       reason: None,
     }
   }
@@ -274,12 +286,13 @@ impl<'a> GraphMaker<'a> {
       // special value or I could make the subject type an option and use None here.
 
       diagnostics.push(Diagnostic{subject_type: terrible_type, reason:"Unreachable".to_string()});
-      // can't do this because can't have a heterogeneous collection w/o wrapping w/ boxen
-      //full_unfulfillable_rules.insert(UnreachableRule {rule: rule }, vec![Diagnostic{msg: "Unreachable"}]);
-      println!("an unreachable rule!");
     }
 
-    RuleGraph::new()
+    RuleGraph {
+      root_dependencies: full_root_rule_dependency_edges,
+      rule_dependency_edges: full_dependency_edges,
+      unfulfillable_rules: full_unfulfillable_rules
+    }
   }
 
   fn _construct_graph(&self,
@@ -324,7 +337,7 @@ impl<'a> GraphMaker<'a> {
                           rule_dependency_edges: &mut RuleDependencyEdges,
                           unfulfillable_rules: &mut UnfulfillableRuleMap,
                           root_rule_dependency_edges: &mut RootRuleDependencyEdges,
-                          entry: Entry,
+                          entry: &Entry,
                           selector_path: Vec<Selector>,
                           dep_rules: Entries) {
       // DONE
@@ -360,7 +373,7 @@ impl<'a> GraphMaker<'a> {
             root_rule_dependency_edges[rule] = new_edges
 
 */
-          let mut edges = root_rule_dependency_edges.entry(entry).or_insert(RuleEdges::new());
+          let mut edges = root_rule_dependency_edges.entry(entry.clone()).or_insert(RuleEdges::new());
           edges.add_edges_via(selector_path, &dep_rules);
 
         },
@@ -439,14 +452,23 @@ impl<'a> GraphMaker<'a> {
         continue
       add_rules_to_graph(entry, selector, rules_or_literals_for_selector)
 */
+            // TODO, handle the Addresses / Variants case
             let rules_or_literals_for_selector = rhs_for_select(&self.tasks, entry.subject_type(), &select);
             if rules_or_literals_for_selector.is_empty() {
               mark_unfulfillable(&mut unfulfillable_rules,
                                  &entry,
                                  entry.subject_type(),
-                                 format!("no matches for {:?}", select)) // might be better as {} with display derived
+                                 format!("no matches for {:?}", select)); // might be better as {} with display derived
+              was_unfulfillable = true;
+              continue
             }
-
+            add_rules_to_graph(&mut rules_to_traverse,
+                               &mut rule_dependency_edges,
+                               &mut unfulfillable_rules,
+                               &mut root_rule_dependency_edges,
+                               &entry,
+                               vec![Selector::Select(select)],
+                               rules_or_literals_for_selector);
           },
           //SelectVariants => same as above
           Selector::SelectLiteral(select) =>{
@@ -455,6 +477,15 @@ impl<'a> GraphMaker<'a> {
                          selector,
                          (RuleGraphLiteral(selector.subject, selector.product),))
             */
+            add_rules_to_graph(&mut rules_to_traverse,
+                               &mut rule_dependency_edges,
+                               &mut unfulfillable_rules,
+                               &mut root_rule_dependency_edges,
+                               &entry,
+                               vec![Selector::SelectLiteral(select.clone())],
+                               vec![Entry::new_literal(select.subject.clone(),
+                                                       select.product.clone())]);
+
 
           },
           Selector::SelectDependencies(select) =>{
@@ -568,7 +599,7 @@ impl<'a> GraphMaker<'a> {
                            tuple(rules_for_dependencies))
       */
       if !was_unfulfillable {
-        /*
+        /*DONE
           if not was_unfulfillable:
     # NB: In this case, there are no selectors.
     add_rules_to_graph(entry, None, tuple())
@@ -579,7 +610,7 @@ impl<'a> GraphMaker<'a> {
                            &mut rule_dependency_edges,
                            &mut unfulfillable_rules,
                            &mut root_rule_dependency_edges,
-                           entry,
+                           &entry,
                            vec![],
                            vec![])
       }
@@ -602,8 +633,10 @@ while rules_to_traverse:
     ...
 return root_rule_dependency_edges, rule_dependency_edges, unfulfillable_rules
 */
-
-    RuleGraph::new()
+//root_dependencies: RootRuleDependencyEdges,
+    //rule_dependency_edges: RuleDependencyEdges,
+    //unfulfillable_rules: UnfulfillableRuleMap,
+    RuleGraph {root_dependencies: root_rule_dependency_edges, rule_dependency_edges: rule_dependency_edges, unfulfillable_rules: unfulfillable_rules}
   }
 
   fn _remove_unfulfillable_rules_and_dependents(&self,
