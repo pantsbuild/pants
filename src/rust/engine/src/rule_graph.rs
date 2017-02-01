@@ -6,7 +6,7 @@ use core::Value;
 use core::TypeConstraint;
 use nodes::Node;
 
-use selectors::{Selector, Task};
+use selectors::{Select, Selector, Task};
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -286,17 +286,17 @@ impl<'a> GraphMaker<'a> {
                       beginning_rule: Entry, // Root Entry
                       root_rule_dependency_edges: RootRuleDependencyEdges,
                       rule_dependency_edges: RuleDependencyEdges,
-                      unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
+                      mut unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
 
-    fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, selector: Selector) -> Entries {
+    fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
       // technically, selector here is always a Select. I could adapt ^^ to ensure that
 
       //let subject_type = TypeConstraint(subject_type.0);
 
-      if tasks.externs.satisfied_by(&selector.product(), &subject_type) {
+      if tasks.externs.satisfied_by(&select.product, &subject_type) {
         vec![ Entry::new_subject_is_product(subject_type)]
       } else {
-        match tasks.gen_tasks(&subject_type, &selector.product()) {
+        match tasks.gen_tasks(&subject_type, &select.product) {
           Some(ref matching_tasks) => {
             matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t) ).collect()
           }
@@ -313,20 +313,21 @@ impl<'a> GraphMaker<'a> {
       */
     }
 
-    fn mark_unfulfillable(mut unfulfillable_rules: UnfulfillableRuleMap, entry: Entry, subject_type: TypeId, reason: &str) {
+    fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
       // instead of being modifiable, this could return a UnfulfillableRuleMap that then gets merged.
-      let mut diagnostics_for_entry = unfulfillable_rules.entry(entry).or_insert(vec![]);
-      diagnostics_for_entry.push(Diagnostic { subject_type: subject_type, reason: reason.to_string() });
+      let ref mut diagnostics_for_entry = *unfulfillable_rules.entry(entry.clone()).or_insert(vec![]);
+      diagnostics_for_entry.push(Diagnostic { subject_type: subject_type, reason: reason });
     }
 
 
     fn add_rules_to_graph(mut rules_to_traverse: VecDeque<Entry>,
                           rule_dependency_edges: &mut RuleDependencyEdges,
-                          unfulfillable_rules: &UnfulfillableRuleMap,
+                          unfulfillable_rules: &mut UnfulfillableRuleMap,
                           root_rule_dependency_edges: &mut RootRuleDependencyEdges,
                           entry: Entry,
                           selector_path: Vec<Selector>,
                           dep_rules: Entries) {
+      // DONE
       /*
   unseen_dep_rules = [g for g in dep_rules
                       if g not in rule_dependency_edges and
@@ -399,6 +400,21 @@ impl<'a> GraphMaker<'a> {
     rules_to_traverse.push_back(beginning_rule);
     while let Some(entry) = rules_to_traverse.pop_front() {
       traversal_ct += 1;
+
+      /*
+      if isinstance(entry, CanBeDependency) and not isinstance(entry, CanHaveDependencies):
+    continue
+  if not isinstance(entry, CanHaveDependencies):
+    raise TypeError("Cannot determine dependencies of entry not of type CanHaveDependencies: {}"
+                    .format(entry))
+  if entry in unfulfillable_rules:
+    continue
+
+  if entry in rule_dependency_edges:
+    continue
+
+  was_unfulfillable = False
+      */
       if entry.can_be_dependency() && !entry.can_have_dependencies() {
         continue
       }
@@ -413,35 +429,42 @@ impl<'a> GraphMaker<'a> {
       }
       let mut was_unfulfillable = false;
       for selector in entry.input_selectors() {
-        let rules_or_literals_for_selector = rhs_for_select(&self.tasks, entry.subject_type(), selector);
-      }
-
-    }
-    /*
-while rules_to_traverse:
-  entry = rules_to_traverse.popleft()
-  if isinstance(entry, CanBeDependency) and not isinstance(entry, CanHaveDependencies):
-    continue
-  if not isinstance(entry, CanHaveDependencies):
-    raise TypeError("Cannot determine dependencies of entry not of type CanHaveDependencies: {}"
-                    .format(entry))
-  if entry in unfulfillable_rules:
-    continue
-
-  if entry in rule_dependency_edges:
-    continue
-
-  was_unfulfillable = False
-
-  for selector in entry.input_selectors:
-    if type(selector) in (Select, SelectVariant):
-      # TODO, handle the Addresses / Variants case
+        match selector {
+          Selector::Select(select) =>{
+            /*      # TODO, handle the Addresses / Variants case
       rules_or_literals_for_selector = _find_rhs_for_select(entry.subject_type, selector)
       if not rules_or_literals_for_selector:
         mark_unfulfillable(entry, entry.subject_type, 'no matches for {}'.format(selector))
         was_unfulfillable = True
         continue
       add_rules_to_graph(entry, selector, rules_or_literals_for_selector)
+*/
+            let rules_or_literals_for_selector = rhs_for_select(&self.tasks, entry.subject_type(), &select);
+            if rules_or_literals_for_selector.is_empty() {
+              mark_unfulfillable(&mut unfulfillable_rules,
+                                 &entry,
+                                 entry.subject_type(),
+                                 format!("no matches for {:?}", select)) // might be better as {} with display derived
+            }
+
+          },
+          //SelectVariants => same as above
+          Selector::SelectLiteral(select) =>{},
+          Selector::SelectDependencies(select) =>{},
+          Selector::SelectProjection(select) =>{},
+          Selector::Task(select) =>{} // TODO, not sure what task is in this context exactly
+        }
+
+      }
+
+    }
+    /*
+while rules_to_traverse:
+  entry = rules_to_traverse.popleft()
+
+
+  for selector in entry.input_selectors:
+    if type(selector) in (Select, SelectVariant):
     elif type(selector) is SelectLiteral:
       add_rules_to_graph(entry,
                          selector,
