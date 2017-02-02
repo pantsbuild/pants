@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -8,16 +8,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from copy import copy
 
+import shutil
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address
+from pants.build_graph.resources import Resources
+from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.util.dirutil import safe_rmtree
 
 
 class WrappedPEX(object):
@@ -27,6 +32,11 @@ class WrappedPEX(object):
   """
 
   def __init__(self, pex, extra_pex_paths, interpreter):
+    """
+    :param pex: The main pex we wrap.
+    :param extra_pex_paths: Other pexes, to "merge" in via the PEX_PATH mechanism.
+    :param interpreter: The interpreter the main pex will run on.
+    """
     self._pex = pex
     self._extra_pex_paths = extra_pex_paths
     self._interpreter = interpreter
@@ -66,25 +76,56 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return []
 
-  def create_pex(self, path, pex_info):
+  def create_pex(self, pex_info):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
-    interpreter = self.context.products.get_data(PythonInterpreter)
-    builder = PEXBuilder(path, interpreter, pex_info=pex_info)
-    builder.freeze()
+    with self.invalidated(self.context.targets(
+        lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)))) as invalidation_check:
 
-    pexes = [
-      self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES)
-    ]
+      # If there are no relevant targets, we still go through the motions of resolving
+      # an empty set of requirements, to prevent downstream tasks from having to check
+      # for this special case.
+      if invalidation_check.all_vts:
+        target_set_id = VersionedTargetSet.from_versioned_targets(
+          invalidation_check.all_vts).cache_key.hash
+      else:
+        target_set_id = 'no_targets'
 
-    if self.extra_requirements():
-      extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]
-      addr = Address.parse('{}_extra_reqs'.format(self.__class__.__name__))
-      self.context.build_graph.inject_synthetic_target(
-        addr, PythonRequirementLibrary, requirements=extra_reqs)
-      # Add the extra requirements first, so they take precedence over any colliding version
-      # in the target set's dependency closure.
-      pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
+      interpreter = self.context.products.get_data(PythonInterpreter)
+      path = os.path.join(self.workdir, str(interpreter.identity), target_set_id)
+      extra_pex_paths_file_path = path + '.extra_pex_paths'
+      extra_pex_paths = None
 
-    extra_pex_paths = os.pathsep.join([pex.path() for pex in pexes])
-    return WrappedPEX(PEX(path, interpreter), extra_pex_paths, interpreter)
+      # Note that we check for the existence of the directory, instead of for invalid_vts, to cover the empty case.
+      if not os.path.isdir(path):
+        pexes = [
+          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
+        ]
+
+        if self.extra_requirements():
+          extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]
+          addr = Address.parse('{}_extra_reqs'.format(self.__class__.__name__))
+          self.context.build_graph.inject_synthetic_target(
+            addr, PythonRequirementLibrary, requirements=extra_reqs)
+          # Add the extra requirements first, so they take precedence over any colliding version
+          # in the target set's dependency closure.
+          pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
+
+        extra_pex_paths = os.pathsep.join([pex.path() for pex in pexes])
+
+        path_tmp = path + '.tmp'
+        safe_rmtree(path_tmp)
+        builder = PEXBuilder(path_tmp, interpreter, pex_info=pex_info)
+        builder.freeze()
+        safe_rmtree(path)
+        shutil.move(path_tmp, path)
+
+        with open(extra_pex_paths_file_path, 'w') as outfile:
+          for epp in extra_pex_paths:
+            outfile.write(epp)
+            outfile.write(b'\n')
+
+    if extra_pex_paths is None:
+      with open(extra_pex_paths_file_path, 'r') as infile:
+        extra_pex_paths = [p.strip() for p in infile.readlines()]
+    return WrappedPEX(PEX(os.path.realpath(path), interpreter), extra_pex_paths, interpreter)

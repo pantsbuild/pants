@@ -1,11 +1,9 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
-
-import tempfile
 
 from pex.pex_info import PexInfo
 
@@ -13,10 +11,10 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.task.repl_task_mixin import ReplTaskMixin
-from pants.util.dirutil import safe_rmtree
 
 
 class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
+  """Launch an interactive Python interpreter session."""
 
   @classmethod
   def register_options(cls, register):
@@ -41,17 +39,15 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
       return []
 
   def setup_repl_session(self, targets):
-    tmpdir = tempfile.mkdtemp()
     if self.get_options().ipython:
       entry_point = self.get_options().ipython_entry_point
     else:
       entry_point = 'code:interact'
     pex_info = PexInfo.default()
     pex_info.entry_point = entry_point
-    return self.create_pex(tmpdir, pex_info)
+    return self.create_pex(pex_info)
 
   # NB: **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
     po = pex.run(blocking=False, **pex_run_kwargs)
     po.wait()
-    safe_rmtree(pex.path())

@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -17,25 +17,9 @@ from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
-from pants.base.fingerprint_strategy import (DefaultFingerprintHashingMixin,
-                                             TaskIdentityFingerprintStrategy)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
-
-
-class PythonRequirementFingerprintStrategy(DefaultFingerprintHashingMixin,
-                                           TaskIdentityFingerprintStrategy):
-
-  def compute_fingerprint(self, req_lib):
-    hash_elements_for_target = []
-    hash_elements_for_target.extend([req.cache_key() for req in req_lib.requirements])
-    if not hash_elements_for_target:
-      return None
-    hasher = self._build_hasher(req_lib)
-    for element in hash_elements_for_target:
-      hasher.update(element)
-    return hasher.hexdigest()
 
 
 class ResolveRequirementsTaskBase(Task):
@@ -55,8 +39,7 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
 
   def resolve_requirements(self, req_libs):
-    fs = PythonRequirementFingerprintStrategy(task=self)
-    with self.invalidated(req_libs, fingerprint_strategy=fs) as invalidation_check:
+    with self.invalidated(req_libs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
       # for this special case.
@@ -68,6 +51,8 @@ class ResolveRequirementsTaskBase(Task):
 
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.join(self.workdir, str(interpreter.identity), target_set_id)
+
+      # Note that we check for the existence of the directory, instead of for invalid_vts, to cover the empty case.
       if not os.path.isdir(path):
         path_tmp = path + '.tmp'
         safe_rmtree(path_tmp)
@@ -98,7 +83,7 @@ class ResolveRequirementsTaskBase(Task):
         if req.repository:
           find_links.add(req.repository)
       else:
-        self.context.log.debug('Skipping {} based on version filter'.format(req))
+        self.context.log.debug('  Skipping {} based on version filter'.format(req))
 
     # Resolve the requirements into distributions.
     distributions = self._resolve_multi(interpreter, reqs_to_build, find_links)
