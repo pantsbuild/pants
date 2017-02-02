@@ -10,6 +10,7 @@ from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRe
 
 
 class ResolveRequirements(ResolveRequirementsTaskBase):
+  """Resolve external Python requirements."""
   REQUIREMENTS_PEX = 'python_requirements_pex'
 
   @classmethod

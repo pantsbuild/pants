@@ -15,6 +15,7 @@ from pants.util.strutil import safe_shlex_split
 
 
 class PythonRun(PythonExecutionTaskBase):
+  """Run a Python executable."""
 
   @classmethod
   def register_options(cls, register):
