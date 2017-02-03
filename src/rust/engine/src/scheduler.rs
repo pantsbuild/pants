@@ -65,7 +65,7 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&Complete>)> {
     self.roots.iter()
       .map(|root| {
-        let state = self.graph.entry(root).and_then(|e| e.state());
+        let state = self.graph.entry(root).and_then(|e| e.state().as_ref());
         (root.subject(), root.product(), state)
       })
       .collect()
@@ -102,14 +102,34 @@ impl Scheduler {
    * Attempt to run a step with the currently available dependencies of the given Node. If
    * a step runs, the new State of the Node will be returned.
    */
-  fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
+  fn attempt_step(&mut self, id: EntryId) -> Option<State> {
     if !self.graph.is_ready_entry(id) {
       return None;
     }
 
     // Run a step.
-    let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks))
+    // NB: Needing to clone the Node here is unfortunate, but allows the Node to be borrowed
+    // immutably while the graph is borrowed mutably for the declaration of new dependencies.
+    let node = self.graph.entry_for_id(id).node().clone();
+    Some(node.step(&mut self.graph.context(id), &self.tasks))
+  }
+
+  /**
+   * Collects incomplete deps into the candidates list, asserting that there is at least one.
+   */
+  fn collect_candidates(graph: &Graph, candidates: &mut VecDeque<EntryId>, entry_id: EntryId) {
+    let mut incomplete_deps =
+      graph.entry_for_id(entry_id).dependencies().iter()
+        .map(|&d| graph.entry_for_id(d))
+        .filter(|e| !e.is_complete())
+        .map(|e| e.id())
+        .peekable();
+    assert!(
+      incomplete_deps.peek().is_some(),
+      "Node {:?} returned `Waiting` without declaring dependencies.",
+      graph.entry_for_id(entry_id),
+    );
+    candidates.extend(incomplete_deps);
   }
 
   /**
@@ -144,27 +164,18 @@ impl Scheduler {
           self.outstanding.insert(entry_id);
         },
         Some(State::Complete(s)) => {
-          // Node completed statically; mark any dependents of the Node as candidates.
-          self.graph.complete(entry_id, s);
-          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
-        },
-        Some(State::Waiting(w)) => {
-          // Add the new dependencies.
-          self.graph.add_dependencies(entry_id, w);
-          let ref graph = self.graph;
-          let mut incomplete_deps =
-            self.graph.entry_for_id(entry_id).dependencies().iter()
-              .map(|&d| graph.entry_for_id(d))
-              .filter(|e| !e.is_complete())
-              .map(|e| e.id())
-              .peekable();
-          if incomplete_deps.peek().is_some() {
-            // Mark incomplete deps as candidates for steps.
-            self.candidates.extend(incomplete_deps);
+          if self.graph.is_ready_entry(entry_id) {
+            // Node completed statically; mark any dependents of the Node as candidates.
+            self.graph.complete(entry_id, s);
+            self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
           } else {
-            // All newly declared deps are already completed: still a candidate.
-            self.candidates.push_front(entry_id);
+            // Node cannot complete until its dependencies do.
+            Scheduler::collect_candidates(&self.graph, &mut self.candidates, entry_id);
           }
+        },
+        Some(State::Waiting) => {
+          // Node cannot complete until its dependencies do.
+          Scheduler::collect_candidates(&self.graph, &mut self.candidates, entry_id);
         },
         None =>
           // Not ready to step.

@@ -50,8 +50,8 @@ impl Entry {
     &self.node
   }
 
-  pub fn state(&self) -> Option<&Complete> {
-    self.state.as_ref()
+  pub fn state(&self) -> &Option<Complete> {
+    &self.state
   }
 
   pub fn dependencies(&self) -> &DepSet {
@@ -96,7 +96,7 @@ pub struct Graph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
-  cyclic_singleton: Complete,
+  cyclic_singleton: Option<Complete>,
 }
 
 impl Graph {
@@ -105,16 +105,23 @@ impl Graph {
       id_generator: 0,
       nodes: HashMap::default(),
       entries: HashMap::default(),
-      cyclic_singleton: Complete::Noop("Dep would be cyclic.", None),
+      cyclic_singleton: Some(Complete::Noop("Dep would be cyclic.", None)),
     }
   }
 
-  pub fn cyclic_singleton(&self) -> &Complete {
+  pub fn cyclic_singleton(&self) -> &Option<Complete> {
     &(self.cyclic_singleton)
   }
 
   pub fn len(&self) -> usize {
     self.entries.len()
+  }
+
+  pub fn context(&mut self, entry_id: EntryId) -> GraphContext {
+    GraphContext {
+      entry_id: entry_id,
+      graph: self,
+    }
   }
 
   pub fn is_complete_entry(&self, id: EntryId) -> bool {
@@ -193,38 +200,41 @@ impl Graph {
   }
 
   /**
-   * Adds the given dst Nodes as dependencies of the src Node, and returns true if any of them
-   * were cyclic.
+   * In the context of the given src Node, declare a dependency on the given dst Node and
+   * immediately return its State if possible.
    *
    * Preserves the invariant that completed Nodes may only depend on other completed Nodes.
    */
-  pub fn add_dependencies(&mut self, src_id: EntryId, dst_nodes: Vec<Node>) {
+  pub fn get(&mut self, src_id: EntryId, dst_node: &Node) -> &Option<Complete> {
     assert!(
       !self.is_complete_entry(src_id),
       "Node {:?} is already completed, and may not have new dependencies added: {:?}",
       src_id,
-      dst_nodes,
+      dst_node,
     );
 
-    let dsts: Vec<EntryId> = dst_nodes.into_iter().map(|n| self.ensure_entry(n)).collect();
+    // Get or create the destination.
+    let dst_id =
+      self.entry(dst_node)
+        .map(|e| e.id())
+        .unwrap_or_else(|| self.ensure_entry(dst_node.clone()));
 
-    // Determine whether each awaited dep is cyclic.
-    let (deps, cyclic_deps): (DepSet, DepSet) = {
-      let src = self.entry_for_id(src_id);
-      dsts.into_iter()
-        .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
-        .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
-    };
-
-    // Add the source as a dependent of each non-cyclic dep.
-    for &dep in &deps {
-      self.entry_for_id_mut(dep).dependents.push(src_id);
+    if self.entry_for_id(src_id).dependencies().contains(&dst_id) {
+      // Declared and valid.
+      self.entry_for_id(dst_id).state()
+    } else if self.entry_for_id(src_id).cyclic_dependencies().contains(&dst_id) {
+      // Declared but cyclic.
+      self.cyclic_singleton()
+    } else if self.detect_cycle(src_id, dst_id) {
+      // Undeclared but cyclic.
+      self.entry_for_id_mut(src_id).cyclic_dependencies.push(dst_id);
+      self.cyclic_singleton()
+    } else {
+      // Undeclared and valid.
+      self.entry_for_id_mut(src_id).dependencies.push(dst_id);
+      self.entry_for_id_mut(dst_id).dependents.push(src_id);
+      self.entry_for_id(dst_id).state()
     }
-
-    // Finally, add all deps to the source.
-    let src = self.entry_for_id_mut(src_id);
-    src.dependencies.extend(deps);
-    src.cyclic_dependencies.extend(cyclic_deps);
   }
 
   /**
@@ -239,10 +249,18 @@ impl Graph {
       return false;
     }
 
+    // Search either forward from the dst, or backward from the src.
+    let (root, needle, dependents) =
+      if self.entry_for_id(dst_id).dependencies().len() < self.entry_for_id(src_id).dependents().len() {
+        (dst_id, src_id, false)
+      } else {
+        (src_id, dst_id, true)
+      };
+
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
-    roots.push_back(dst_id);
-    self.walk(roots, { |e| !e.is_complete() }, false).any(|e| e.id == src_id)
+    roots.push_back(root);
+    self.walk(roots, { |e| !e.is_complete() }, dependents).any(|e| e.id == needle)
   }
 
   /**
@@ -259,10 +277,10 @@ impl Graph {
     }
   }
 
-/**
- *  Begins a topological walk from the given roots. Provides both the current entry as well as the
- *  depth from the root.
- */
+  /**
+   * Begins a topological walk from the given roots. Provides both the current entry as well as the
+   * depth from the root.
+   */
   fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
     where P: Fn(&Entry, Level) -> bool {
     let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
@@ -465,6 +483,21 @@ impl Graph {
 }
 
 /**
+ * Represents a view of the graph from the context of a particular source Node. Helps to
+ * lower the surface area of the API that is exposed to running Nodes.
+ */
+pub struct GraphContext<'g> {
+  entry_id: EntryId,
+  graph: &'g mut Graph,
+}
+
+impl<'g> GraphContext<'g> {
+  pub fn get(&mut self, node: &Node) -> &Option<Complete> {
+    self.graph.get(self.entry_id, node)
+  }
+}
+
+/**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
@@ -505,6 +538,7 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
 }
 
 type Level = u32;
+
 /**
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
