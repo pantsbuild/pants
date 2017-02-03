@@ -135,7 +135,7 @@ ZIP = ZipArchiver(ZIP_DEFLATED, archive_extensions['zip'])
 _ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, zip=ZIP)
 
 TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
-TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset('zip')
+TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 

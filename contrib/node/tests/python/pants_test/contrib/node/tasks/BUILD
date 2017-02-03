@@ -1,38 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name='all',
-  dependencies=[
-    ':integration',
-    ':unit',
-  ]
-)
-
-target(
-  name='integration',
-  dependencies=[
-    ':node_bundle_integration',
-    ':node_repl_integration',
-    ':node_run_integration',
-    ':node_test_integration',
-    ':node_resolve_integration',
-  ]
-)
-
-target(
-  name='unit',
-  dependencies=[
-    ':node_bundle',
-    ':node_task',
-    ':node_resolve',
-  ]
-)
-
 python_tests(
   name='node_bundle',
   sources=['test_node_bundle.py'],
   dependencies=[
+    'contrib/node/src/python/pants/contrib/node/targets:node_bundle',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/tasks:node_bundle',
     'src/python/pants/build_graph',
@@ -49,6 +22,7 @@ python_tests(
     'src/python/pants/util:contextutil',
   ],
   timeout=120,
+  tags={'integration'},
 )
 
 python_tests(
