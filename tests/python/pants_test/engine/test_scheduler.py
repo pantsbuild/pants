@@ -9,7 +9,7 @@ import os
 import unittest
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import Addresses
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return, Throw
@@ -186,8 +186,8 @@ class SchedulerTest(unittest.TestCase):
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm::')
-    selector = SelectDependencies(Address, Addresses, field_types=(Address,))
-    build_request = self.scheduler.selection_request([(selector,spec)])
+    selector = SelectDependencies(BuildFileAddress, Addresses, field_types=(Address,))
+    build_request = self.scheduler.selection_request([(selector, spec)])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
@@ -202,7 +202,7 @@ class SchedulerTest(unittest.TestCase):
   def test_sibling_specs(self):
     """Test that sibling Addresses are parsed in the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm:')
-    selector = SelectDependencies(Address, Addresses, field_types=(Address,))
+    selector = SelectDependencies(BuildFileAddress, Addresses, field_types=(Address,))
     build_request = self.scheduler.selection_request([(selector,spec)])
     ((subject, _), root), = self.build(build_request)
 

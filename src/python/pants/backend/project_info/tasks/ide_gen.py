@@ -10,6 +10,7 @@ import os
 import shutil
 from collections import defaultdict
 
+
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from twitter.common.collections.orderedset import OrderedSet
@@ -23,6 +24,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
+from pants.base.project_tree_factory import get_project_tree
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.resources import Resources
 from pants.util import desktop
@@ -605,13 +607,14 @@ class Project(object):
         if not isinstance(target.address, BuildFileAddress):
           return []  # Siblings only make sense for BUILD files.
         candidates = OrderedSet()
-        build_file = target.address.build_file
-        dir_relpath = os.path.dirname(build_file.relpath)
-        for descendant in BuildFile.scan_build_files(build_file.project_tree, dir_relpath,
+
+        dir_relpath = target.address.spec_path
+        project_tree = get_project_tree(self.context.options.for_global_scope())
+        for descendant in BuildFile.scan_build_files(project_tree, dir_relpath,
                                                      build_ignore_patterns=self.build_ignore_patterns):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):
-          ancestors = self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
+          ancestors = self._collect_ancestor_build_files(project_tree, os.path.dirname(dir_relpath),
                                                          self.build_ignore_patterns)
           for ancestor in ancestors:
             candidates.update(self.target_util.get_all_addresses(ancestor))

@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
@@ -80,8 +80,10 @@ class LocalScheduler(object):
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
     select_product = lambda product: Select(product)
+
     root_selector_fns = {
       Address: select_product,
+      BuildFileAddress: select_product,
       AscendantAddresses: select_product,
       DescendantAddresses: select_product,
       PathGlobs: select_product,

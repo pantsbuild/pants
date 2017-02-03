@@ -12,7 +12,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import Addresses, SubclassesOf, addressable_list
 from pants.engine.build_files import UnhydratedStruct, create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
@@ -247,7 +247,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    select = SelectDependencies(UnhydratedStruct, Addresses, field_types=(Address,))
+    select = SelectDependencies(UnhydratedStruct, Addresses, field_types=(Address, BuildFileAddress))
     request = self.scheduler.selection_request([(select, spec)])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:

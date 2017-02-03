@@ -14,7 +14,7 @@ from pants.util.memo import memoized
 @memoized
 def get_project_tree(options):
   """Creates the project tree for build files for use in a given pants run."""
-  pants_ignore = options.pants_ignore or []
+  pants_ignore = options.pants_ignore if hasattr(options, 'pants_ignore') else []
   if options.build_file_rev:
     return ScmProjectTree(get_buildroot(), get_scm(), options.build_file_rev, pants_ignore)
   else:
