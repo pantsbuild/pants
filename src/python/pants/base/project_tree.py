@@ -10,8 +10,8 @@ import os
 from abc import abstractmethod, abstractproperty
 
 import six
-from pathspec.gitignore import GitIgnorePattern
 from pathspec.pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
@@ -38,7 +38,7 @@ class ProjectTree(AbstractClass):
           'ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
     logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
-    self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
+    self.ignore = PathSpec.from_lines(GitWildMatchPattern, ignore_patterns if ignore_patterns else [])
 
   @abstractmethod
   def _glob1_raw(self, dir_relpath, glob):
@@ -164,8 +164,7 @@ class ProjectTree(AbstractClass):
     relpath = self._relpath_no_dot(relpath)
     if directory:
       relpath = self._append_trailing_slash(relpath)
-    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
-    return any(True for _ in self.ignore.match_files([relpath]))
+    return self.ignore.match_file(relpath)
 
   def _filter_ignored(self, entries, selector=None):
     """Given an opaque entry list, filter any ignored entries.

@@ -261,26 +261,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """Invalidates all targets for this task."""
     BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
 
-  def create_cache_manager(self, invalidate_dependents, fingerprint_strategy=None):
-    """Creates a cache manager that can be used to invalidate targets on behalf of this task.
-
-    Use this if you need to check for invalid targets but can't use the contextmanager created by
-    invalidated(), e.g., because you don't want to mark the targets as valid when done.
-
-    invalidate_dependents:   If True then any targets depending on changed targets are invalidated.
-    fingerprint_strategy:    A FingerprintStrategy instance, which can do per task, finer grained
-                             fingerprinting of a given Target.
-    """
-
-    return InvalidationCacheManager(self._cache_key_generator,
-                                    self._build_invalidator_dir,
-                                    invalidate_dependents,
-                                    fingerprint_strategy=fingerprint_strategy,
-                                    invalidation_report=self.context.invalidation_report,
-                                    task_name=type(self).__name__,
-                                    task_version=self.implementation_version_str(),
-                                    artifact_write_callback=self.maybe_write_artifact)
-
   @property
   def create_target_dirs(self):
     """Whether to create a results_dir per VersionedTarget in the workdir of the Task.
@@ -357,8 +337,15 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
 
     fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
-    cache_manager = self.create_cache_manager(invalidate_dependents,
-                                              fingerprint_strategy=fingerprint_strategy)
+    cache_manager = InvalidationCacheManager(self.workdir,
+                                             self._cache_key_generator,
+                                             self._build_invalidator_dir,
+                                             invalidate_dependents,
+                                             fingerprint_strategy=fingerprint_strategy,
+                                             invalidation_report=self.context.invalidation_report,
+                                             task_name=type(self).__name__,
+                                             task_version=self.implementation_version_str(),
+                                             artifact_write_callback=self.maybe_write_artifact)
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
@@ -452,7 +439,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """If `cache_target_dirs`, create results_dirs for the given versioned targets."""
     if self.create_target_dirs:
       for vt in vts:
-        vt.create_results_dir(self.workdir)
+        vt.create_results_dir()
 
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
