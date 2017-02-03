@@ -30,6 +30,7 @@ use externs::{
   Externs,
   IdToStrExtern,
   InvokeRunnable,
+  LogExtern,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
@@ -134,6 +135,7 @@ impl RawNodes {
 #[no_mangle]
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
+  log: LogExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -157,6 +159,7 @@ pub extern fn scheduler_create(
   let externs =
     Externs::new(
       ext_context,
+      log,
       key_for,
       val_for,
       clone_val,

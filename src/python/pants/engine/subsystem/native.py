@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import threading
 
 import pkg_resources
@@ -16,6 +17,9 @@ from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 _FFI = FFI()
@@ -69,6 +73,7 @@ _FFI.cdef(
 
     typedef void ExternContext;
 
+    typedef void             (*extern_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
     typedef Value            (*extern_val_for)(ExternContext*, Key*);
     typedef Value            (*extern_clone_val)(ExternContext*, Value*);
@@ -104,6 +109,7 @@ _FFI.cdef(
     } RawNodes;
 
     RawScheduler* scheduler_create(ExternContext*,
+                                   extern_log,
                                    extern_key_for,
                                    extern_val_for,
                                    extern_clone_val,
@@ -155,6 +161,21 @@ _FFI.cdef(
     void nodes_destroy(RawNodes*);
     '''
   )
+
+
+@_FFI.callback("void(ExternContext*, uint8_t, uint8_t*, uint64_t)")
+def extern_log(context_handle, level, msg_ptr, msg_len):
+  """Given a log level and utf8 message string, log it."""
+  c = _FFI.from_handle(context_handle)
+  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  if level == 0:
+    logger.debug(msg)
+  elif level == 1:
+    logger.info(msg)
+  elif level == 2:
+    logger.warn(msg)
+  else:
+    logger.critical(msg)
 
 
 @_FFI.callback("Key(ExternContext*, Value*)")
@@ -477,6 +498,7 @@ class Native(object):
     variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
 
     scheduler = self.lib.scheduler_create(self.context.handle,
+                                          extern_log,
                                           extern_key_for,
                                           extern_val_for,
                                           extern_clone_val,
