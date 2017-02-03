@@ -20,7 +20,6 @@ use tasks::Tasks;
 pub struct Scheduler {
   pub graph: Arc<Graph>,
   pub tasks: Arc<Tasks>,
-  pool: CpuPool,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Node>,
 }
@@ -33,7 +32,6 @@ impl Scheduler {
     Scheduler {
       graph: Arc::new(graph),
       tasks: Arc::new(tasks),
-      pool: CpuPool::new_num_cpus(),
       roots: Vec::new(),
     }
   }
@@ -94,16 +92,11 @@ impl Scheduler {
    * Starts running a Node, and returns a Future that will succeed regardless of the
    * success of the node.
    */
-  fn launch(&self, node: Node) -> CpuFuture<(), ()> {
-    let context =
-      BootstrapContextFactory {
-        graph: self.graph.clone(),
-        tasks: self.tasks.clone(),
-        pool: self.pool.clone(),
-      };
-    self.pool.spawn_fn(move || context.graph.create(node, &context)
-      .then::<_, Result<(), ()>>(|_| Ok(()))
-    )
+  fn launch(&self, context_factory: BootstrapContextFactory, node: Node) -> CpuFuture<(), ()> {
+    context_factory.pool.clone().spawn_fn(move || {
+      context_factory.graph.create(node, &context_factory)
+        .then::<_, Result<(), ()>>(|_| Ok(()))
+    })
   }
 
   /**
@@ -114,12 +107,23 @@ impl Scheduler {
     let runnable_count = 0;
     let scheduling_iterations = 0;
 
+    // We create a new pool per-execution to avoid worrying about re-initializing them
+    // if the daemon has forked.
+    let context_factory =
+      BootstrapContextFactory {
+        graph: self.graph.clone(),
+        tasks: self.tasks.clone(),
+        pool: CpuPool::new_num_cpus(),
+      };
+
     // Bootstrap tasks for the roots, and then wait for all of them.
     self.tasks.externs.log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
     let roots_res =
       future::join_all(
         self.roots.iter()
-          .map(|root| self.launch(root.clone()))
+          .map(|root| {
+            self.launch(context_factory.clone(), root.clone())
+          })
           .collect::<Vec<_>>()
       );
 
@@ -134,6 +138,7 @@ impl Scheduler {
   }
 }
 
+#[derive(Clone)]
 struct BootstrapContextFactory {
   graph: Arc<Graph>,
   tasks: Arc<Tasks>,
