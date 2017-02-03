@@ -166,7 +166,6 @@ _FFI.cdef(
 @_FFI.callback("void(ExternContext*, uint8_t, uint8_t*, uint64_t)")
 def extern_log(context_handle, level, msg_ptr, msg_len):
   """Given a log level and utf8 message string, log it."""
-  c = _FFI.from_handle(context_handle)
   msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
   if level == 0:
     logger.debug(msg)
