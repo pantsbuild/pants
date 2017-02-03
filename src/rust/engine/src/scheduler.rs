@@ -58,7 +58,7 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
     self.roots.iter()
       .map(|root| {
-        (root.subject(), root.product(), self.graph.wait(root, &self.tasks.externs))
+        (root.subject(), root.product(), self.graph.peek(root, &self.tasks.externs))
       })
       .collect()
   }

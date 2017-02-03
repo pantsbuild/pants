@@ -121,8 +121,8 @@ impl Entry {
   /**
    * Waits for the Future for this Node to have completed and returns a clone of its value.
    */
-  fn wait(&self, externs: &Externs) -> NodeResult {
-    match self.state().get().wait() {
+  fn peek(&self, externs: &Externs) -> Option<NodeResult> {
+    self.state().get().peek().map(|state_opt| match state_opt {
       Ok(ref v) => Ok(externs.clone_val(v)),
       Err(shared_err) => {
         match *shared_err {
@@ -130,7 +130,7 @@ impl Entry {
           Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
         }
       },
-    }
+    })
   }
 
   fn dependencies(&self) -> &DepSet {
@@ -147,10 +147,11 @@ impl Entry {
 
   fn format(&self, externs: &Externs) -> String {
     let state =
-      match self.wait(externs) {
-        Ok(ref v) => externs.val_to_str(v),
-        Err(Failure::Throw(ref v)) => externs.val_to_str(v),
-        Err(ref x) => format!("{:?}", x),
+      match self.peek(externs) {
+        Some(Ok(ref v)) => externs.val_to_str(v),
+        Some(Err(Failure::Throw(ref v))) => externs.val_to_str(v),
+        Some(Err(ref x)) => format!("{:?}", x),
+        None => "<None>".to_string(),
       };
     format!(
       "{}:{}:{} == {}",
@@ -350,10 +351,10 @@ impl InnerGraph {
     let viz_max_colors = 12;
     let mut format_color =
       |entry: &Entry| {
-        match entry.wait(externs) {
-          Err(Failure::Noop(_, _)) => "white".to_string(),
-          Err(Failure::Throw(_)) => "tomato".to_string(),
-          Ok(_) => {
+        match entry.peek(externs) {
+          None | Some(Err(Failure::Noop(_, _))) => "white".to_string(),
+          Some(Err(Failure::Throw(_))) => "tomato".to_string(),
+          Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.selector().product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
@@ -400,10 +401,10 @@ impl InnerGraph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.wait(externs) {
-        Ok(_) => true,
-        Err(Failure::Throw(_)) => false,
-        Err(Failure::Noop(..)) => true,
+      match entry.peek(externs) {
+        None | Some(Err(Failure::Noop(..))) => true,
+        Some(Err(Failure::Throw(_))) => false,
+        Some(Ok(_)) => true,
       }
     };
 
@@ -431,10 +432,11 @@ impl InnerGraph {
                            externs.id_to_str(entry.node.product().0),
                            externs.id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.wait(externs) {
-          Ok(ref x) => format!("Return({})", externs.val_to_str(x)),
-          Err(Failure::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
-          Err(Failure::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
+        let state_str = match entry.peek(externs) {
+          None => "<None>".to_string(),
+          Some(Ok(ref x)) => format!("Return({})", externs.val_to_str(x)),
+          Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs.val_to_str(x)),
+          Some(Err(Failure::Noop(ref x, ref opt_node))) => format!("Noop({:?}, {:?})", x, opt_node),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -486,11 +488,11 @@ impl Graph {
   }
 
   /**
-   * Returns a clone of the state of the given Node.
+   * If the given Node has completed, returns a clone of its state.
    */
-  pub fn wait(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
+  pub fn peek(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
     let inner = self.inner.read().unwrap();
-    inner.entry(node).map(|e| e.wait(externs))
+    inner.entry(node).and_then(|e| e.peek(externs))
   }
 
   /**

@@ -12,6 +12,6 @@ crate-type = ["dylib"]
 [dependencies]
 crossbeam = "0.2.10"
 fnv = "1.0.5"
-futures = "0.1.10"
-futures-cpupool = "0.1"
+futures = { git = "https://github.com/stuhood/futures-rs", branch = "stuhood/shared-peek" }
+futures-cpupool = { git = "https://github.com/stuhood/futures-rs", branch = "stuhood/shared-peek" }
 lazy_static = "0.2.2"
