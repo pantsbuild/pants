@@ -13,157 +13,132 @@ use tasks::Tasks;
 
 // I think I ought to be able to replace the below with a set of structs keyed by EntryType.
 // My first couple attempts failed.
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
 enum EntryType {
-  SubjectIsProduct,
-  // has subject_type
-  // can be dependency
+  SubjectIsProduct {
+    subject_type: TypeId
+  },
 
-  Root,
-  // has subject_type, selector/typeconstriant
-  // can have dependencies
+  Root(RootEntry),
 
-  InnerEntry,
-  // has subject_type, rule
-  // can be dependency
-  // can have dependencies
+  InnerEntry(InnerEntry),
 
-  Literal,
-  // has value
-  // can be dependency
+  Literal {
+    value: Key,
+    product: TypeConstraint
+  },
 
-  Unreachable
-  // has a reason for the failure and a rule
-  // NB: unreachable is an error type, it might be better to name it error, but currently
-  //     unreachable is the only error entry type.
+  Unreachable {
+    // NB: unreachable is an error type, it might be better to name it error, but currently
+    //     unreachable is the only error entry type.
+    rule: Task,
+    reason: Diagnostic
+  }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct Entry {
-  entry_type: EntryType,
-  subject_type: Option<TypeId>,
-  value: Option<Key>,
-  rule: Option<Task>,
-  selector: Option<TypeConstraint>,
-  reason: Option<Diagnostic>
+struct RootEntry {
+  subject_type: TypeId,
+  selector: TypeConstraint,
 }
 
-impl Entry {
-  fn new_root(subject_type: TypeId, selector: TypeConstraint) -> Entry {
-    Entry {
-      entry_type: EntryType::Root,
-      subject_type: Some(subject_type),
-      value: None,
-      rule: None,
-      selector: Some(selector),
-      reason: None,
+impl RootEntry {
+  fn as_entry_type(&self) -> EntryType {
+    EntryType::Root(self.clone())
+  }
+}
+
+#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+struct InnerEntry {
+  subject_type: TypeId,
+  rule: Task
+}
+
+impl EntryType {
+
+  fn new_inner(subject_type: TypeId, rule: &Task) -> EntryType {
+    EntryType::InnerEntry(InnerEntry {
+      subject_type: subject_type,
+      rule: rule.clone(),
+    })
+  }
+
+  fn new_subject_is_product(subject_type: TypeId) -> EntryType {
+    EntryType::SubjectIsProduct {
+      subject_type: subject_type,
+
     }
   }
 
-  fn new_inner(subject_type: TypeId, rule: &Task) -> Entry {
-    Entry {
-      entry_type: EntryType::InnerEntry,
-      subject_type: Some(subject_type),
-      value: None,
-      rule: Some(rule.clone()),
-      selector: None,
-      reason: None,
+  fn new_unreachable(rule: &Task) -> EntryType {
+    EntryType::Unreachable {
+      rule: rule.clone(),
+      reason: Diagnostic { subject_type: TypeId(0), reason: "".to_string() },
     }
   }
 
-  fn new_subject_is_product(subject_type: TypeId) -> Entry {
-    Entry {
-      entry_type: EntryType::SubjectIsProduct,
-      subject_type: Some(subject_type),
-      value: None,
-      rule: None,
-      selector: None,
-      reason: None,
-    }
-  }
-
-  fn new_unreachable(rule: &Task) -> Entry {
-    Entry {
-      entry_type: EntryType::Unreachable,
-      subject_type: None,
-      value: None,
-      rule: Some(rule.clone()),
-      selector: None,
-      reason: None,
-    }
-  }
-
-  fn new_literal(value: Key, product: TypeConstraint) -> Entry {
-    Entry {
-      entry_type: EntryType::Literal,
-      subject_type: None,
-      value: Some(value),
-      rule: None,
-      selector: Some(product),
-      reason: None,
-    }
-  }
-
-  fn subject_type(&self) -> TypeId {
-    if let Some(subject_type) = self.subject_type {
-      subject_type
-    } else {
-      panic!("no subject type")
-    }
-  }
-
-  fn rule(&self) -> &Task {
-    if let Some(ref rule) = self.rule {
-      rule
-    } else {
-      panic!("no rule")
-    }
-  }
-
-  fn input_selectors(&self) -> Vec<Selector> {
-    match self.entry_type {
-      EntryType::InnerEntry =>
-        match self.rule {
-          Some(ref task) => {
-            task.clause.clone()
-          },
-          None => vec![] // Could also panic
-        },
-      EntryType::Root => match self.selector {
-        Some(s) => vec![Selector::Select(Select { product: s, variant_key: None })],
-        None => vec![]
-      },
-      _ => panic!("this entry doesn't have selectors")
+  fn new_literal(value: Key, product: TypeConstraint) -> EntryType {
+    EntryType::Literal {
+      value: value,
+      product: product
     }
   }
 
   fn can_have_dependencies(&self) -> bool {
-    match self.entry_type {
-      EntryType::SubjectIsProduct => false,
-      EntryType::Literal => false,
-      EntryType::InnerEntry => true,
-      EntryType::Root => true,
-      EntryType::Unreachable => false,
+    match self {
+      &EntryType::SubjectIsProduct {..} => false,
+      &EntryType::Literal { .. } => false,
+      &EntryType::InnerEntry(_) => true,
+      &EntryType::Root(_) => true,
+      &EntryType::Unreachable { .. } => false,
     }
   }
 
   fn can_be_dependency(&self) -> bool {
-    match self.entry_type {
-      EntryType::SubjectIsProduct => true,
-      EntryType::Literal => true,
-      EntryType::InnerEntry => true,
-      EntryType::Root => false,
-      EntryType::Unreachable => false,
+    match self {
+      &EntryType::SubjectIsProduct { .. } => true,
+      &EntryType::Literal { .. } => true,
+      &EntryType::InnerEntry(_) => true,
+      &EntryType::Root(_) => false,
+      &EntryType::Unreachable { .. } => false,
+    }
+  }
+
+  fn input_selectors(&self) -> Vec<Selector> {
+    match self {
+      &EntryType::InnerEntry(ref inner) => {inner.rule.clause.clone()},
+      &EntryType::Root(ref root) => {
+        vec![Selector::Select(Select { product: root.selector, variant_key: None })]
+      },
+      _ => panic!("this entry type doesn't have selectors")
+    }
+  }
+
+  fn subject_type(&self) -> TypeId {
+    match self {
+      &EntryType::InnerEntry(ref inner) => inner.subject_type,
+      &EntryType::Root(ref root) => root.subject_type,
+      &EntryType::SubjectIsProduct { subject_type, .. } => subject_type,
+      _ => panic!("has no subject type"),
+
+    }
+  }
+
+  fn rule(&self) -> &Task {
+    match self {
+      &EntryType::InnerEntry(ref inner) => &inner.rule,
+      &EntryType::Unreachable { ref rule, .. } => rule,
+      _ => panic!("no rule"),
     }
   }
 }
 
-type Entries = Vec<Entry>;
-type RootRuleDependencyEdges = HashMap<Entry, RuleEdges>; // Root -> InternalEntry
+type Entries = Vec<EntryType>;
+type RootRuleDependencyEdges = HashMap<RootEntry, RuleEdges>;
 type Rule = Task;
-type RuleDependencyEdges = HashMap<Entry, RuleEdges>; // InternalEntry -> InternalEntry
+type RuleDependencyEdges = HashMap<InnerEntry, RuleEdges>;
 type RuleDiagnostics = Vec<Diagnostic>;
-type UnfulfillableRuleMap = HashMap<Entry, RuleDiagnostics>;
+type UnfulfillableRuleMap = HashMap<EntryType, RuleDiagnostics>;
 
 #[derive(Debug)]
 pub struct RootSubjectTypes {
@@ -210,7 +185,7 @@ impl GraphMaker {
       full_dependency_edges = constructed_graph.rule_dependency_edges.clone();
       full_unfulfillable_rules = constructed_graph.unfulfillable_rules.clone();
     }
-    let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule().clone()).collect();
+    let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule.clone()).collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
     let declared_rules = self.tasks.all_rules();
     let unreachable_rules: HashSet<_> = declared_rules.iter()
@@ -222,7 +197,7 @@ impl GraphMaker {
       .collect();
 
     for rule in unreachable_rules {
-      let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
+      let diagnostics = full_unfulfillable_rules.entry(EntryType::new_unreachable(rule)).or_insert(vec![]);
       let terrible_type = TypeId(0); // need to come up with something better.
       // This is used to collate the error messages by subject. It could use either a well known
       // special value or I could make the subject type an option and use None here.
@@ -238,7 +213,7 @@ impl GraphMaker {
   }
 
   fn _construct_graph(&self,
-                      beginning_rule: Entry, // Root Entry
+                      beginning_rule: RootEntry,
                       mut root_rule_dependency_edges: RootRuleDependencyEdges,
                       mut rule_dependency_edges: RuleDependencyEdges,
                       mut unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
@@ -246,60 +221,68 @@ impl GraphMaker {
     fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
       if tasks.externs.satisfied_by(&select.product, &subject_type) {
         // NB a matching subject is always picked first
-        vec![ Entry::new_subject_is_product(subject_type)]
+        vec![ EntryType::new_subject_is_product(subject_type)]
       } else {
         match tasks.gen_tasks(&subject_type, &select.product) {
           Some(ref matching_tasks) => {
-            matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t) ).collect()
+            matching_tasks.iter().map(|t| EntryType::new_inner(subject_type, t) ).collect()
           }
           None => vec![]
         }
       }
     }
 
-    fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
+    fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &EntryType, subject_type: TypeId, reason: String) {
       // instead of being modifiable, this could return a UnfulfillableRuleMap that then gets merged.
       let ref mut diagnostics_for_entry = *unfulfillable_rules.entry(entry.clone()).or_insert(vec![]);
       diagnostics_for_entry.push(Diagnostic { subject_type: subject_type, reason: reason });
     }
 
 
-    fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
+    fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<EntryType>,
                           rule_dependency_edges: &mut RuleDependencyEdges,
                           unfulfillable_rules: &mut UnfulfillableRuleMap,
                           root_rule_dependency_edges: &mut RootRuleDependencyEdges,
-                          entry: &Entry,
+                          entry: &EntryType,
                           selector_path: Vec<Selector>,
                           dep_rules: Entries) {
 
       {
         let rule_deps: &RuleDependencyEdges = rule_dependency_edges;
         let unseen_dep_rules = dep_rules.iter()
-          .filter(|g| !rule_deps.contains_key(g))
           .filter(|g| !unfulfillable_rules.contains_key(g))
-          .filter(|g| !root_rule_dependency_edges.contains_key(g))
+          .filter(|g| match *g {
+            &EntryType::InnerEntry(ref r) => !rule_deps.contains_key(&r),
+            &EntryType::Root(ref r) => !root_rule_dependency_edges.contains_key(&r),
+            _ => true
+          })
           .map(|g| g.clone());
         rules_to_traverse.extend(unseen_dep_rules);
       }
-      match entry.entry_type {
-        EntryType::Root => {
-          let mut edges = root_rule_dependency_edges.entry(entry.clone()).or_insert(RuleEdges::new());
+      match entry {
+        &EntryType::Root(ref root_entry) => {
+          let mut edges = root_rule_dependency_edges.entry(root_entry.clone()).or_insert(RuleEdges::new());
           edges.add_edges_via(selector_path, &dep_rules);
         },
-        _ => {
-          let mut edges = rule_dependency_edges.entry(entry.clone()).or_insert(RuleEdges::new());
+        &EntryType::InnerEntry(ref inner_entry) => {
+          let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(RuleEdges::new());
           if edges.has_edges_for(selector_path.clone()) {
             // This is an error that should only happen if there's a bug in the algorithm, but it
             // might make sense to expose it in a more friendly way.
             panic!("Rule {:?} already has dependencies set for selector {:?}", entry, selector_path)
           }
           edges.add_edges_via(selector_path, &dep_rules);
+        },
+        _ => {
+          // these should have already been filtered out before this was called.
+          // TODO enforce ^^ more clearly
+          panic!("TODO")
         }
       }
     }
 
     let mut rules_to_traverse = VecDeque::new();
-    rules_to_traverse.push_back(beginning_rule);
+    rules_to_traverse.push_back(beginning_rule.as_entry_type());
     while let Some(entry) = rules_to_traverse.pop_front() {
       if entry.can_be_dependency() && !entry.can_have_dependencies() {
         continue
@@ -310,8 +293,10 @@ impl GraphMaker {
       if unfulfillable_rules.contains_key(&entry) {
         continue
       }
-      if rule_dependency_edges.contains_key(&entry) {
-        continue
+      if let EntryType::InnerEntry(ref inner_entry) = entry {
+        if rule_dependency_edges.contains_key(inner_entry) {
+          continue
+        }
       }
       let mut was_unfulfillable = false;
       for selector in entry.input_selectors() {
@@ -345,7 +330,7 @@ impl GraphMaker {
                                &mut root_rule_dependency_edges,
                                &entry,
                                vec![Selector::SelectLiteral(select.clone())],
-                               vec![Entry::new_literal(select.subject.clone(),
+                               vec![EntryType::new_literal(select.subject.clone(),
                                                        select.product.clone())]);
 
 
@@ -506,15 +491,15 @@ impl GraphMaker {
     rule_graph
   }
 
-  fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Entries {
-    let mut result: Entries = Vec::new();
+  fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
+    let mut result: Vec<RootEntry> = Vec::new();
     for subj_type in self.root_subject_types.subject_types.iter() {
       for pt in product_types {
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
           if !tasks.is_empty() {
-            result.push(Entry::new_root(
-              subj_type.clone(),
-              TypeConstraint(pt.0)));
+            result.push(
+              RootEntry { subject_type: subj_type.clone(), selector: TypeConstraint(pt.0) }
+            );
           }
         }
       }
