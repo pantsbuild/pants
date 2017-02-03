@@ -8,6 +8,7 @@ use futures::future;
 use futures_cpupool::{CpuPool, CpuFuture};
 
 use core::{Field, Key, TypeConstraint};
+use externs::LogLevel;
 use graph::{EntryId, Graph};
 use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
@@ -114,6 +115,7 @@ impl Scheduler {
     let scheduling_iterations = 0;
 
     // Bootstrap tasks for the roots, and then wait for all of them.
+    self.tasks.externs.log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
     let roots_res =
       future::join_all(
         self.roots.iter()

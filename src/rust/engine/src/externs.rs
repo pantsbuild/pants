@@ -184,6 +184,8 @@ pub type StoreListExtern =
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
 
+// Not all log levels are always in use.
+#[allow(dead_code)]
 #[repr(u8)]
 pub enum LogLevel {
   Debug = 0,
