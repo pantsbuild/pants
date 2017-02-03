@@ -77,13 +77,13 @@ class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', '
 class RulesetValidator(object):
   """Validates that the rule index has no missing tasks."""
 
-  def __init__(self, rule_index, goal_to_product, root_subject_fns):
-    if not root_subject_fns:
-      raise ValueError('root_subject_fns must not be empty')
+  def __init__(self, rule_index, goal_to_product, root_subject_types):
+    if not root_subject_types:
+      raise ValueError('root_subject_types must not be empty')
     self._goal_to_product = goal_to_product
 
 
-    self._graph = GraphMaker(rule_index, root_subject_fns).full_graph()
+    self._graph = GraphMaker(rule_index, root_subject_types).full_graph()
 
   def validate(self):
     """ Validates that all tasks can be executed based on the declared product types and selectors.

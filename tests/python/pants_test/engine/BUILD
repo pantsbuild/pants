@@ -177,6 +177,7 @@ python_tests(
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
   ]
 )
 
