@@ -13,7 +13,7 @@ use tasks::Tasks;
 
 // I think I ought to be able to replace the below with a set of structs keyed by EntryType.
 // My first couple attempts failed.
-#[derive(Eq, Hash, PartialEq, Clone, Debug)]
+#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
 enum EntryType {
   SubjectIsProduct,
   // has subject_type
@@ -65,7 +65,7 @@ impl Entry {
       entry_type: EntryType::InnerEntry,
       subject_type: Some(subject_type),
       value: None,
-      rule: Some(rule.clone()), // TODO decide on clone vs lifetimes
+      rule: Some(rule.clone()),
       selector: None,
       reason: None,
     }
@@ -87,11 +87,12 @@ impl Entry {
       entry_type: EntryType::Unreachable,
       subject_type: None,
       value: None,
-      rule: Some(rule.clone()), // TODO decide on clone vs lifetimes
+      rule: Some(rule.clone()),
       selector: None,
       reason: None,
     }
   }
+
   fn new_literal(value: Key, product: TypeConstraint) -> Entry {
     Entry {
       entry_type: EntryType::Literal,
@@ -118,6 +119,7 @@ impl Entry {
       panic!("no rule")
     }
   }
+
   fn input_selectors(&self) -> Vec<Selector> {
     match self.entry_type {
       EntryType::InnerEntry =>
@@ -144,6 +146,7 @@ impl Entry {
       EntryType::Unreachable => false,
     }
   }
+
   fn can_be_dependency(&self) -> bool {
     match self.entry_type {
       EntryType::SubjectIsProduct => true,
@@ -163,8 +166,8 @@ type RuleDiagnostics = Vec<Diagnostic>;
 type UnfulfillableRuleMap = HashMap<Entry, RuleDiagnostics>;
 
 #[derive(Debug)]
-pub struct RootSubjectTypes<'a> {
-  pub subject_types: &'a Vec<TypeId>
+pub struct RootSubjectTypes {
+  pub subject_types: Vec<TypeId>
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -177,13 +180,13 @@ pub struct Diagnostic {
  * Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
  * to be found statically rather than dynamically.
  */
-pub struct GraphMaker<'a> {
+pub struct GraphMaker {
     tasks: Tasks,
-    root_subject_types: RootSubjectTypes<'a>
+    root_subject_types: RootSubjectTypes
 }
 
-impl<'a> GraphMaker<'a> {
-  pub fn new(tasks: &Tasks, root_subject_types: RootSubjectTypes<'a>) -> GraphMaker<'a> {
+impl GraphMaker {
+  pub fn new(tasks: &Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker {
     let cloned_tasks = tasks.clone();
     GraphMaker { tasks: cloned_tasks, root_subject_types: root_subject_types }
   }
@@ -192,9 +195,7 @@ impl<'a> GraphMaker<'a> {
     let mut full_root_rule_dependency_edges: RootRuleDependencyEdges = HashMap::new();
     let mut full_dependency_edges: RuleDependencyEdges = HashMap::new();
     let mut full_unfulfillable_rules: UnfulfillableRuleMap = HashMap::new();
-    // for root_subj_type, selectorfn in root_subj_selector_fn.items():...
 
-    //let product_types = self.tasks.all_product_types(&beginning_root.subject_type);
     let product_types = self.tasks.all_product_types();
     for beginning_root in self.gen_root_entries(&product_types) {
       let constructed_graph = self._construct_graph(
@@ -209,14 +210,15 @@ impl<'a> GraphMaker<'a> {
       full_dependency_edges = constructed_graph.rule_dependency_edges.clone();
       full_unfulfillable_rules = constructed_graph.unfulfillable_rules.clone();
     }
-    let rules_in_graph: HashSet<Task> = full_dependency_edges.keys().map(|f| f.rule().clone()).collect();
-    let unfulfillable_discovered_during_construction: HashSet<Task> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
+    let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule().clone()).collect();
+    let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
     let declared_rules = self.tasks.all_rules();
-    let unreachable_rules: HashSet<&Task> = declared_rules.iter()
+    let unreachable_rules: HashSet<_> = declared_rules.iter()
       .filter(|r| !rules_in_graph.contains(r))
       .filter(|r| !unfulfillable_discovered_during_construction.contains(r))
       .filter(|r| !self.tasks.is_singleton_task(r))
       .filter(|r| !self.tasks.is_intrinsic_task(r))
+      .map(|&r| r)
       .collect();
 
     for rule in unreachable_rules {
@@ -242,11 +244,8 @@ impl<'a> GraphMaker<'a> {
                       mut unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
 
     fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
-      // technically, selector here is always a Select. I could adapt ^^ to ensure that
-
-      //let subject_type = TypeConstraint(subject_type.0);
-
       if tasks.externs.satisfied_by(&select.product, &subject_type) {
+        // NB a matching subject is always picked first
         vec![ Entry::new_subject_is_product(subject_type)]
       } else {
         match tasks.gen_tasks(&subject_type, &select.product) {
@@ -256,14 +255,6 @@ impl<'a> GraphMaker<'a> {
           None => vec![]
         }
       }
-      /*
-      if selector.type_constraint.satisfied_by_type(subject_type):
-        # NB a matching subject is always picked first
-        return (RuleGraphSubjectIsProduct(subject_type),)
-      else:
-        return tuple(InternalEntry(subject_type, rule)
-                     for rule in self.rule_index.gen_rules(subject_type, selector.product))
-      */
     }
 
     fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
@@ -288,9 +279,7 @@ impl<'a> GraphMaker<'a> {
           .filter(|g| !unfulfillable_rules.contains_key(g))
           .filter(|g| !root_rule_dependency_edges.contains_key(g))
           .map(|g| g.clone());
-        for unseen_rule in unseen_dep_rules {
-          rules_to_traverse.push_back(unseen_rule);
-        }
+        rules_to_traverse.extend(unseen_dep_rules);
       }
       match entry.entry_type {
         EntryType::Root => {
@@ -309,7 +298,7 @@ impl<'a> GraphMaker<'a> {
       }
     }
 
-    let mut rules_to_traverse: VecDeque<Entry> = VecDeque::new();
+    let mut rules_to_traverse = VecDeque::new();
     rules_to_traverse.push_back(beginning_rule);
     while let Some(entry) = rules_to_traverse.pop_front() {
       if entry.can_be_dependency() && !entry.can_have_dependencies() {
@@ -374,7 +363,6 @@ impl<'a> GraphMaker<'a> {
               was_unfulfillable = true;
               continue
             }
-            //let mut rules_for_dependencies = vec![];
             // TODO port the rest of this after adding field types to the selectors
 
             /*
@@ -458,7 +446,6 @@ impl<'a> GraphMaker<'a> {
           Selector::Task(select) =>{
             // TODO, not sure what task is in this context exactly
             panic!("Unexpected type of selector: {:?}", select)
-            /*raise TypeError('Unexpected type of selector: {}'.format(selector))*/
           }
         }
       }
@@ -521,7 +508,7 @@ impl<'a> GraphMaker<'a> {
 
   fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Entries {
     let mut result: Entries = Vec::new();
-    for subj_type in self.root_subject_types.subject_types {
+    for subj_type in self.root_subject_types.subject_types.iter() {
       for pt in product_types {
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
           if !tasks.is_empty() {
@@ -571,7 +558,6 @@ impl RuleEdges {
     }
     let mut deps_for_selector = self.selector_to_dependencies.entry(selector_path).or_insert(vec![]);
     for d in new_dependencies {
-      // TODO replace clones with lifetimes
       deps_for_selector.push(d.clone());
       self.dependencies.push(d.clone());
     }

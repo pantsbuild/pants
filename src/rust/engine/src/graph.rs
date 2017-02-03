@@ -35,7 +35,6 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  // RGTODO: add a rule edges attr
   state: Option<Complete>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
@@ -216,7 +215,6 @@ impl Graph {
       let src = self.entry_for_id(src_id);
       dsts.into_iter()
         .filter(|dst_id| !(src.dependencies.contains(dst_id) || src.cyclic_dependencies.contains(dst_id)))
-        // RGTODO add filter that removes deps if they will noop based on their rule edges
         .partition(|&dst_id| !self.detect_cycle(src_id, dst_id))
     };
 

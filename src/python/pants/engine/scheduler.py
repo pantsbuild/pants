@@ -102,7 +102,7 @@ class LocalScheduler(object):
   def _validate_ruleset(self, root_subject_types):
     listed = list(TypeId(self._to_id(t)) for t in root_subject_types)
 
-    self._native.lib.run_validator(self._scheduler, listed, len(listed))
+    self._native.lib.validator_run(self._scheduler, listed, len(listed))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)

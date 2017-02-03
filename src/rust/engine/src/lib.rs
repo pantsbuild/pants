@@ -440,7 +440,7 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
-pub extern fn run_validator(
+pub extern fn validator_run(
   scheduler_ptr: *mut RawScheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
@@ -448,12 +448,11 @@ pub extern fn run_validator(
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
-                                        RootSubjectTypes { subject_types: subject_types });
+                                        RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
-      // I think this should should return a validation result of some kind
       if graph.has_errors() {
+        // NB This is just the initial validation message.
         println!("there were validation errors")
-        //raw.scheduler.externs
       }
     })
   })

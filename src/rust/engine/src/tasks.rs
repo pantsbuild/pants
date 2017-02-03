@@ -8,6 +8,7 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * Registry of tasks able to produce each type, along with a few fundamental python
  * types that the engine must be aware of.
  */
+// TODO remove Clone https://github.com/pantsbuild/pants/issues/4236
 #[derive(Clone)]
 pub struct Tasks {
   // subject_type, selector -> list of tasks implementing it
@@ -75,25 +76,12 @@ impl Tasks {
     self.intrinsics.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
   }
 
-  pub fn all_rules(&self) -> Vec<Task> {
-    let mut result: Vec<Task> = Vec::new();
-    for tasks in self.singletons.values() {
-      for t in tasks {
-        result.push(t.clone())
-      }
-    }
-    for tasks in self.intrinsics.values() {
-      for t in tasks {
-        result.push(t.clone())
-      }
-    }
-    for tasks in self.tasks.values() {
-      for t in tasks {
-        result.push(t.clone())
-      }
-    }
-
-    result
+  pub fn all_rules(&self) -> Vec<&Task> {
+    self.singletons.values()
+      .chain(self.intrinsics.values())
+      .chain(self.tasks.values())
+      .flat_map(|tasks| tasks)
+      .collect()
   }
 
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
