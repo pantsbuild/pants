@@ -13,3 +13,8 @@ node_test(
     ':preinstalled-project'
   ]
 )
+
+node_bundle(
+  name='preinstalled-project-bundle',
+  node_module=':preinstalled-project'
+)
