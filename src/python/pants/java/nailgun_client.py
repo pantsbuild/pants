@@ -38,19 +38,30 @@ class NailgunClientSession(NailgunProtocol):
     if self._input_reader:
       self._input_reader.stop()
 
+  def _write_flush(self, fd, payload=None):
+    """Write a payload to a given fd (if provided) and flush the fd."""
+    try:
+      if payload:
+        fd.write(payload)
+      fd.flush()
+    except (IOError, OSError) as e:
+      # If a `Broken Pipe` is encountered during a stdio fd write, we're headless - bail.
+      if e.errno == errno.EPIPE and self._exit_on_broken_pipe:
+        sys.exit()
+      # Otherwise, re-raise.
+      raise
+
   def _process_session(self):
     """Process the outputs of the nailgun session."""
     try:
       for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True):
         if chunk_type == ChunkType.STDOUT:
-          self._stdout.write(payload)
-          self._stdout.flush()
+          self._write_flush(self._stdout, payload)
         elif chunk_type == ChunkType.STDERR:
-          self._stderr.write(payload)
-          self._stderr.flush()
+          self._write_flush(self._stderr, payload)
         elif chunk_type == ChunkType.EXIT:
-          self._stdout.flush()
-          self._stderr.flush()
+          self._write_flush(self._stdout)
+          self._write_flush(self._stderr)
           return int(payload)
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
@@ -58,12 +69,6 @@ class NailgunClientSession(NailgunProtocol):
           self._maybe_start_input_reader()
         else:
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
-    except (IOError, OSError) as e:
-      # If a `Broken Pipe` is encountered during a stdio fd write, we're headless - bail.
-      if e.errno == errno.EPIPE and self._exit_on_broken_pipe:
-        sys.exit()
-      # Otherwise, re-raise.
-      raise
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
       # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamReader is always stopped.
