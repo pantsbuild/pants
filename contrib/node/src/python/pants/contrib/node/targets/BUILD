@@ -16,6 +16,7 @@ python_library(
   dependencies=[
     ':node_module',
     'src/python/pants/base:payload',
+    'src/python/pants/fs',
   ],
 )
 
