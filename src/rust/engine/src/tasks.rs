@@ -130,7 +130,6 @@ impl Tasks {
   /**
    * The following methods define the Task registration lifecycle.
    */
-
   pub fn task_add(&mut self, func: Function, product: TypeConstraint) {
     assert!(
       self.preparing.is_none(),
