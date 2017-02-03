@@ -300,22 +300,28 @@ class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw'])):
   """Corresponds to the native object of the same name."""
 
 
-class IdGenerator(object):
+class ObjectIdMap(object):
   """In the native context, assign and memoize python objects an unique unsigned-integer Id.
 
-  The id is uniquely derived from the digest computed when an object is stored via storage.py,
-  because object's content could change.
+  Underlying, the id is uniquely derived from object's digest instead of using its hash code
+  because the content may change and object's hash function could be overridden. In order not
+  to return the stale object we trade performance for correctness.
+
+  In the future, we could improve performance by only computing digests for mutable objects.
+  For this reason referring an implementation-independent id instead of the digest in the native
+  context is more flexible.
   """
 
   def __init__(self):
-    self._storage = Storage.create()
+    # objects indexed by their keys, i.e, content digests
+    self._objects = Storage.create(in_memory=True)
     # Memoized object Ids.
-    self._next_id = 0
     self._id_to_key = dict()
     self._key_to_id = dict()
+    self._next_id = 0
 
-  def to_id(self, obj):
-    key = self._storage.put(obj)
+  def put(self, obj):
+    key = self._objects.put(obj)
     new_id = self._next_id
     _id = self._key_to_id.setdefault(key, new_id)
     if _id is not new_id:
@@ -327,8 +333,8 @@ class IdGenerator(object):
     self._next_id += 1
     return _id
 
-  def from_id(self, id_):
-    return self._storage.get(self._id_to_key[id_])
+  def get(self, id_):
+    return self._objects.get(self._id_to_key[id_])
 
 
 class ExternContext(object):
@@ -336,7 +342,7 @@ class ExternContext(object):
 
   def __init__(self):
     # Memoized object Ids.
-    self._id_generator = IdGenerator()
+    self._object_id_map = ObjectIdMap()
 
     # Outstanding FFI object handles.
     self._handles = set()
@@ -384,10 +390,10 @@ class ExternContext(object):
 
   def put(self, obj):
     # If we encounter an existing id, return it.
-    return self._id_generator.to_id(obj)
+    return self._object_id_map.put(obj)
 
   def get(self, id_):
-    return self._id_generator.from_id(id_)
+    return self._object_id_map.get(id_)
 
   def to_id(self, typ):
     return self.put(typ)
