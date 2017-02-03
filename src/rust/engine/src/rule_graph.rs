@@ -39,7 +39,7 @@ enum EntryType {
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct RootEntry {
   subject_type: TypeId,
-  selector: TypeConstraint,
+  clause: Vec<Selector>,
 }
 
 impl RootEntry {
@@ -101,16 +101,6 @@ impl EntryType {
       &EntryType::InnerEntry(_) => true,
       &EntryType::Root(_) => false,
       &EntryType::Unreachable { .. } => false,
-    }
-  }
-
-  fn input_selectors(&self) -> Vec<Selector> {
-    match self {
-      &EntryType::InnerEntry(ref inner) => {inner.rule.clause.clone()},
-      &EntryType::Root(ref root) => {
-        vec![Selector::Select(Select { product: root.selector, variant_key: None })]
-      },
-      _ => panic!("this entry type doesn't have selectors")
     }
   }
 
@@ -299,142 +289,145 @@ impl GraphMaker {
         }
       }
       let mut was_unfulfillable = false;
-      for selector in entry.input_selectors() {
-        match selector {
-          Selector::Select(select) =>{
-            // TODO, handle the Addresses / Variants case
-            let rules_or_literals_for_selector = rhs_for_select(&self.tasks,
-                                                                entry.subject_type(),
-                                                                &select);
-            if rules_or_literals_for_selector.is_empty() {
-              mark_unfulfillable(&mut unfulfillable_rules,
-                                 &entry,
-                                 entry.subject_type(),
-                                 // might be better as {} with display derived
-                                 format!("no matches for {:?}", select));
-              was_unfulfillable = true;
-              continue
+      match entry {
+        EntryType::InnerEntry(InnerEntry { rule: Task { ref clause, .. }, .. }) |
+        EntryType::Root(RootEntry { ref clause, .. }) => {
+          for selector in clause {
+            match selector {
+              &Selector::Select(ref select) =>{
+                // TODO, handle the Addresses / Variants case
+                let rules_or_literals_for_selector = rhs_for_select(&self.tasks,
+                                                                    entry.subject_type(),
+                                                                    &select);
+                if rules_or_literals_for_selector.is_empty() {
+                  mark_unfulfillable(&mut unfulfillable_rules,
+                                     &entry,
+                                     entry.subject_type(),
+                                     // might be better as {} with display derived
+                                     format!("no matches for {:?}", select));
+                  was_unfulfillable = true;
+                  continue
+                }
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![Selector::Select(select.clone())],
+                                   rules_or_literals_for_selector);
+              },
+              &Selector::SelectLiteral(ref select) =>{
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![Selector::SelectLiteral(select.clone())],
+                                   vec![EntryType::new_literal(select.subject.clone(),
+                                                               select.product.clone())]);
+              },
+              &Selector::SelectDependencies(ref select) => {
+                let initial_selector = select.dep_product;
+                let initial_rules_or_literals = rhs_for_select(&self.tasks,
+                                                               entry.subject_type(),
+                                                               &Select { product: initial_selector, variant_key: None });
+                if initial_rules_or_literals.is_empty() {
+                  mark_unfulfillable(&mut unfulfillable_rules,
+                                     &entry,
+                                     entry.subject_type(),
+                                     format!("no matches for {:?} when resolving {:?}", entry.subject_type(), initial_selector)); // might be better as {} with display derived
+                  was_unfulfillable = true;
+                  continue
+                }
+                // TODO port the rest of this after adding field types to the selectors
+
+                /*
+                      initial_selector = selector.input_product_selector
+          initial_rules_or_literals = _find_rhs_for_select(entry.subject_type, initial_selector)
+          if not initial_rules_or_literals:
+            mark_unfulfillable(entry,
+                               entry.subject_type,
+                               'no matches for {} when resolving {}'
+                               .format(initial_selector, selector))
+            was_unfulfillable = True
+            continue
+
+          rules_for_dependencies = []
+          for field_type in selector.field_types:
+            rules_for_field_subjects = _find_rhs_for_select(field_type,
+                                                            selector.projected_product_selector)
+            rules_for_dependencies.extend(rules_for_field_subjects)
+
+          if not rules_for_dependencies:
+            mark_unfulfillable(entry,
+                               selector.field_types,
+                               'no matches for {} when resolving {}'
+                               .format(selector.projected_product_selector, selector))
+            was_unfulfillable = True
+            continue
+
+          add_rules_to_graph(entry,
+                             (selector, selector.input_product_selector),
+                             initial_rules_or_literals)
+          add_rules_to_graph(entry,
+                             (selector, selector.projected_product_selector),
+                             tuple(rules_for_dependencies))
+                             */
+
+              },
+              &Selector::SelectProjection(ref select) =>{
+                let initial_selector = select.input_product;
+                let initial_rules_or_literals = rhs_for_select(&self.tasks,
+                                                               entry.subject_type(),
+                                                               &Select { product: initial_selector, variant_key: None });
+                if initial_rules_or_literals.is_empty() {
+                  mark_unfulfillable(&mut unfulfillable_rules,
+                                     &entry,
+                                     entry.subject_type(),
+                                     format!("no matches for {:?} when resolving {:?}", initial_selector, initial_selector)); // might be better as {} with display derived
+                  was_unfulfillable = true;
+                  continue
+                }
+                /*
+                      # TODO, could validate that input product has fields
+          initial_rules_or_literals = _find_rhs_for_select(entry.subject_type,
+                                                           selector.input_product_selector)
+          if not initial_rules_or_literals:
+            mark_unfulfillable(entry,
+                               entry.subject_type,
+                               'no matches for {} when resolving {}'
+                               .format(selector.input_product_selector, selector))
+            was_unfulfillable = True
+            continue
+
+          projected_rules = _find_rhs_for_select(selector.projected_subject,
+                                                 selector.projected_product_selector)
+          if not projected_rules:
+            mark_unfulfillable(entry,
+                               selector.projected_subject,
+                               'no matches for {} when resolving {}'
+                               .format(selector.projected_product_selector, selector))
+            was_unfulfillable = True
+            continue
+
+          add_rules_to_graph(entry,
+                             (selector, selector.input_product_selector),
+                             initial_rules_or_literals)
+          add_rules_to_graph(entry,
+                             (selector, selector.projected_product_selector),
+                             projected_rules)
+                */
+
+              },
+              &Selector::Task(ref select) =>{
+                // TODO, not sure what task is in this context exactly
+                panic!("Unexpected type of selector: {:?}", select)
+              }
             }
-            add_rules_to_graph(&mut rules_to_traverse,
-                               &mut rule_dependency_edges,
-                               &mut unfulfillable_rules,
-                               &mut root_rule_dependency_edges,
-                               &entry,
-                               vec![Selector::Select(select)],
-                               rules_or_literals_for_selector);
-          },
-          Selector::SelectLiteral(select) =>{
-            add_rules_to_graph(&mut rules_to_traverse,
-                               &mut rule_dependency_edges,
-                               &mut unfulfillable_rules,
-                               &mut root_rule_dependency_edges,
-                               &entry,
-                               vec![Selector::SelectLiteral(select.clone())],
-                               vec![EntryType::new_literal(select.subject.clone(),
-                                                       select.product.clone())]);
-
-
-          },
-          Selector::SelectDependencies(select) => {
-            let initial_selector = select.dep_product;
-            let initial_rules_or_literals = rhs_for_select(&self.tasks,
-                                                           entry.subject_type(),
-                                                           &Select { product: initial_selector, variant_key: None });
-            if initial_rules_or_literals.is_empty() {
-              mark_unfulfillable(&mut unfulfillable_rules,
-                                 &entry,
-                                 entry.subject_type(),
-                                 format!("no matches for {:?} when resolving {:?}", entry.subject_type(), initial_selector)); // might be better as {} with display derived
-              was_unfulfillable = true;
-              continue
-            }
-            // TODO port the rest of this after adding field types to the selectors
-
-            /*
-                  initial_selector = selector.input_product_selector
-      initial_rules_or_literals = _find_rhs_for_select(entry.subject_type, initial_selector)
-      if not initial_rules_or_literals:
-        mark_unfulfillable(entry,
-                           entry.subject_type,
-                           'no matches for {} when resolving {}'
-                           .format(initial_selector, selector))
-        was_unfulfillable = True
-        continue
-
-      rules_for_dependencies = []
-      for field_type in selector.field_types:
-        rules_for_field_subjects = _find_rhs_for_select(field_type,
-                                                        selector.projected_product_selector)
-        rules_for_dependencies.extend(rules_for_field_subjects)
-
-      if not rules_for_dependencies:
-        mark_unfulfillable(entry,
-                           selector.field_types,
-                           'no matches for {} when resolving {}'
-                           .format(selector.projected_product_selector, selector))
-        was_unfulfillable = True
-        continue
-
-      add_rules_to_graph(entry,
-                         (selector, selector.input_product_selector),
-                         initial_rules_or_literals)
-      add_rules_to_graph(entry,
-                         (selector, selector.projected_product_selector),
-                         tuple(rules_for_dependencies))
-                         */
-
-          },
-          Selector::SelectProjection(select) =>{
-            let initial_selector = select.input_product;
-            let initial_rules_or_literals = rhs_for_select(&self.tasks,
-                                                           entry.subject_type(),
-                                                           &Select { product: initial_selector, variant_key: None });
-            if initial_rules_or_literals.is_empty() {
-              mark_unfulfillable(&mut unfulfillable_rules,
-                                 &entry,
-                                 entry.subject_type(),
-                                 format!("no matches for {:?} when resolving {:?}", initial_selector, initial_selector)); // might be better as {} with display derived
-              was_unfulfillable = true;
-              continue
-            }
-            /*
-                  # TODO, could validate that input product has fields
-      initial_rules_or_literals = _find_rhs_for_select(entry.subject_type,
-                                                       selector.input_product_selector)
-      if not initial_rules_or_literals:
-        mark_unfulfillable(entry,
-                           entry.subject_type,
-                           'no matches for {} when resolving {}'
-                           .format(selector.input_product_selector, selector))
-        was_unfulfillable = True
-        continue
-
-      projected_rules = _find_rhs_for_select(selector.projected_subject,
-                                             selector.projected_product_selector)
-      if not projected_rules:
-        mark_unfulfillable(entry,
-                           selector.projected_subject,
-                           'no matches for {} when resolving {}'
-                           .format(selector.projected_product_selector, selector))
-        was_unfulfillable = True
-        continue
-
-      add_rules_to_graph(entry,
-                         (selector, selector.input_product_selector),
-                         initial_rules_or_literals)
-      add_rules_to_graph(entry,
-                         (selector, selector.projected_product_selector),
-                         projected_rules)
-            */
-
-          },
-          Selector::Task(select) =>{
-            // TODO, not sure what task is in this context exactly
-            panic!("Unexpected type of selector: {:?}", select)
           }
-        }
+        },
+        _ => { panic!("TODO") }
       }
-
       // if rule is a snapshot rule
       /*
           # TODO, this is a copy of the SelectDependencies with some changes
@@ -497,9 +490,13 @@ impl GraphMaker {
       for pt in product_types {
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
           if !tasks.is_empty() {
-            result.push(
-              RootEntry { subject_type: subj_type.clone(), selector: TypeConstraint(pt.0) }
-            );
+            result.push(RootEntry {
+              subject_type: subj_type.clone(),
+              clause: vec![Selector::Select(Select {
+                product: TypeConstraint(pt.0),
+                variant_key: None
+              })]
+            });
           }
         }
       }
