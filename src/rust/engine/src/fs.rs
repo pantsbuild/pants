@@ -563,8 +563,10 @@ impl Snapshots {
    */
   fn tar_create(dest: &Path, paths: &Vec<PathStat>, relative_to: &Dir) -> Result<(), String> {
     let dest_file =
-      fs::File::create(dest)
-        .map_err(|e| format!("Failed to create destination file: {:?}", e))?;
+      io::BufWriter::new(
+        fs::File::create(dest)
+          .map_err(|e| format!("Failed to create destination file: {:?}", e))?
+      );
     let mut tar_builder = tar::Builder::new(dest_file);
     let mut head = tar::Header::new_ustar();
     for path in paths {
