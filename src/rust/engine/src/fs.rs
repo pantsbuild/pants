@@ -1,10 +1,10 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::{fmt, fs, io};
 
-use futures::future::{BoxFuture, Future};
-use futures::future;
+use futures::future::{self, BoxFuture, Future};
 
 use glob::{Pattern, PatternError};
 use ordermap::OrderMap;
@@ -465,7 +465,34 @@ pub struct Snapshot {
   pub path_stats: Vec<PathStat>,
 }
 
-impl Snapshot {
+/**
+ * A facade for the snapshot directory, which is currently thrown away at the end of
+ * each run.
+ */
+struct SnapshotsInner {
+  next_temp_id: usize,
+  temp_dir: TempDir,
+}
+
+pub struct Snapshots {
+  inner: Mutex<SnapshotsInner>,
+}
+
+impl Snapshots {
+  pub fn new() -> Result<Snapshots, io::Error> {
+    Ok(
+      Snapshots {
+        inner:
+          Mutex::new(
+            SnapshotsInner {
+              next_temp_id: 0,
+              temp_dir: TempDir::new("snapshots")?
+            }
+          ),
+      }
+    )
+  }
+
   /**
    * Fingerprint the given path or return an error string.
    */
@@ -542,7 +569,7 @@ impl Snapshot {
     let mut head = tar::Header::new_ustar();
     for path in paths {
       // Populate the header for the File or Dir.
-      Snapshot::tar_header_populate(&mut head, &path, relative_to)?;
+      Snapshots::tar_header_populate(&mut head, &path, relative_to)?;
       // And append.
       match path {
         &PathStat::File { ref stat, .. } => {
@@ -564,21 +591,28 @@ impl Snapshot {
     Ok(())
   }
 
-  pub fn create(snapshot_root: &Dir, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
+  /**
+   * Returns the next temporary path, and the destination path prefix for Snapshots.
+   */
+  fn next_paths(&self) -> (PathBuf, PathBuf) {
+    let (temp_id, temp_dir) = {
+      let mut inner = self.inner.lock().unwrap();
+      inner.next_temp_id += 1;
+      (inner.next_temp_id, inner.temp_dir.path().to_owned())
+    };
+
+    (temp_dir.join(format!("{}.tar.tmp", temp_id)), temp_dir)
+  }
+
+  pub fn create(&self, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
-    let temp_dir =
-      fs::create_dir_all(snapshot_root.0.as_path())
-        .and_then(|_| {
-          TempDir::new_in(snapshot_root.0.as_path(), ".create")
-        })
-        .map_err(|e| format!("Failed to create tempdir: {:?}", e))?;
-    let temp_path = temp_dir.path().join("snapshot.tar");
-    Snapshot::tar_create(temp_path.as_path(), &paths, build_root)?;
+    let (temp_path, mut dest_path) = self.next_paths();
+    Snapshots::tar_create(temp_path.as_path(), &paths, build_root)?;
 
     // Fingerprint the tar file and then rename it to create the Snapshot.
-    let fingerprint = Snapshot::fingerprint(temp_path.as_path())?;
-    let final_path = snapshot_root.0.join(format!("{:}.tar", Snapshot::hex(&fingerprint)));
-    fs::rename(temp_path, final_path)
+    let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;
+    dest_path.push(format!("{:}.tar", Snapshots::hex(&fingerprint)));
+    fs::rename(temp_path, dest_path)
       .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
     Ok(
       Snapshot {

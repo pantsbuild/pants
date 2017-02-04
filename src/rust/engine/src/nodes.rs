@@ -3,8 +3,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use futures::future::{BoxFuture, Future};
-use futures::future;
+use futures::future::{self, BoxFuture, Future};
 
 use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
@@ -227,11 +226,6 @@ impl Context {
     self.core.externs.project_multi(item, field).iter()
       .map(|v| self.core.externs.val_to_str(v))
       .collect()
-  }
-
-  fn snapshot_root(&self) -> Dir {
-    // TODO
-    Dir(Path::new(".snapshot").to_owned())
   }
 
   fn build_root(&self) -> Dir {
@@ -730,8 +724,7 @@ impl Snapshot {
       .and_then(move |path_stats| {
         // And then create a Snapshot.
         let snapshot_res =
-          fs::Snapshot::create(
-            &context.snapshot_root(),
+          context.core.snapshots.create(
             &context.build_root(),
             path_stats
           );

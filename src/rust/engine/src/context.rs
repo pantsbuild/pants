@@ -3,6 +3,7 @@ use externs::Externs;
 use graph::Graph;
 use tasks::Tasks;
 use types::Types;
+use fs::Snapshots;
 
 
 /**
@@ -16,4 +17,5 @@ pub struct Core {
   pub tasks: Tasks,
   pub types: Types,
   pub externs: Externs,
+  pub snapshots: Snapshots,
 }

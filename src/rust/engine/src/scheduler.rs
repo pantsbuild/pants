@@ -10,6 +10,7 @@ use futures_cpupool::{CpuPool, CpuFuture};
 use context::Core;
 use core::{Field, Key, TypeConstraint};
 use externs::{Externs, LogLevel};
+use fs::Snapshots;
 use graph::{EntryId, Graph};
 use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
@@ -41,6 +42,10 @@ impl Scheduler {
           tasks: tasks,
           types: types,
           externs: externs,
+          snapshots: Snapshots::new()
+            .unwrap_or_else(|e| {
+              panic!("Could not initialize Snapshot directory: {:?}", e);
+            }),
         }
       ),
       roots: Vec::new(),
