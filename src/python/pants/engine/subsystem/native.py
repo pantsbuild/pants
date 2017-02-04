@@ -5,7 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+import threading
+
 import pkg_resources
+import six
 from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
@@ -13,6 +17,9 @@ from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 _FFI = FFI()
@@ -46,13 +53,15 @@ _FFI.cdef(
     typedef Key Field;
 
     typedef struct {
-      char*    str_ptr;
-      uint64_t str_len;
-    } UTF8Buffer;
+      uint8_t*  bytes_ptr;
+      uint64_t  bytes_len;
+      Value     handle_;
+    } Buffer;
 
     typedef struct {
       Value*     values_ptr;
       uint64_t   values_len;
+      Value      handle_;
     } ValueBuffer;
 
     typedef struct {
@@ -64,12 +73,13 @@ _FFI.cdef(
 
     typedef void ExternContext;
 
+    typedef void             (*extern_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
     typedef Value            (*extern_val_for)(ExternContext*, Key*);
     typedef Value            (*extern_clone_val)(ExternContext*, Value*);
     typedef void             (*extern_drop_handles)(ExternContext*, Handle*, uint64_t);
-    typedef UTF8Buffer       (*extern_id_to_str)(ExternContext*, Id);
-    typedef UTF8Buffer       (*extern_val_to_str)(ExternContext*, Value*);
+    typedef Buffer           (*extern_id_to_str)(ExternContext*, Id);
+    typedef Buffer           (*extern_val_to_str)(ExternContext*, Value*);
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
@@ -87,10 +97,8 @@ _FFI.cdef(
     typedef struct {
       Key             subject;
       TypeConstraint  product;
-      uint8_t         union_tag;
-      Value*          union_return;
-      Value*          union_throw;
-      bool            union_noop;
+      uint8_t         state_tag;
+      Value           state_value;
     } RawNode;
 
     typedef struct {
@@ -101,6 +109,7 @@ _FFI.cdef(
     } RawNodes;
 
     RawScheduler* scheduler_create(ExternContext*,
+                                   extern_log,
                                    extern_key_for,
                                    extern_val_for,
                                    extern_clone_val,
@@ -126,7 +135,7 @@ _FFI.cdef(
 
     void task_add(RawScheduler*, Function, TypeConstraint);
     void task_add_select(RawScheduler*, TypeConstraint);
-    void task_add_select_variant(RawScheduler*, TypeConstraint, UTF8Buffer);
+    void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
     void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
@@ -152,6 +161,20 @@ _FFI.cdef(
     void nodes_destroy(RawNodes*);
     '''
   )
+
+
+@_FFI.callback("void(ExternContext*, uint8_t, uint8_t*, uint64_t)")
+def extern_log(context_handle, level, msg_ptr, msg_len):
+  """Given a log level and utf8 message string, log it."""
+  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  if level == 0:
+    logger.debug(msg)
+  elif level == 1:
+    logger.info(msg)
+  elif level == 2:
+    logger.warn(msg)
+  else:
+    logger.critical(msg)
 
 
 @_FFI.callback("Key(ExternContext*, Value*)")
@@ -184,18 +207,18 @@ def extern_drop_handles(context_handle, handles_ptr, handles_len):
   c.drop_handles(handles)
 
 
-@_FFI.callback("UTF8Buffer(ExternContext*, Id)")
+@_FFI.callback("Buffer(ExternContext*, Id)")
 def extern_id_to_str(context_handle, id_):
   """Given an Id for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  return c.utf8_buf(str(c.from_id(id_)))
+  return c.utf8_buf(six.text_type(c.from_id(id_)))
 
 
-@_FFI.callback("UTF8Buffer(ExternContext*, Value*)")
+@_FFI.callback("Buffer(ExternContext*, Value*)")
 def extern_val_to_str(context_handle, val):
   """Given a Value for `obj`, write str(obj) and return it."""
   c = _FFI.from_handle(context_handle)
-  return c.utf8_buf(str(c.from_value(val)))
+  return c.utf8_buf(six.text_type(c.from_value(val)))
 
 
 @_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
@@ -246,8 +269,7 @@ def extern_project_multi(context_handle, val, field):
   obj = c.from_value(val)
   field_name = c.from_key(field)
 
-  projected = tuple(c.to_value(p) for p in getattr(obj, field_name))
-  return (c.vals_buf(projected), len(projected))
+  return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
 
 @_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
@@ -309,42 +331,35 @@ class ExternContext(object):
   """
 
   def __init__(self):
+    # A handle to this object to ensure that the native wrapper survives at least as
+    # long as this object.
+    self.handle = _FFI.new_handle(self)
+
+    # The native code will invoke externs concurrently, so locking is needed around
+    # datastructures in this context.
+    self._lock = threading.RLock()
+
     # Memoized object Ids.
     self._id_generator = 0
     self._id_to_obj = dict()
     self._obj_to_id = dict()
 
+    # An anonymous Id for Values that keep *Buffers alive.
+    self.anon_id = TypeId(self.to_id(int))
+
     # Outstanding FFI object handles.
     self._handles = set()
 
-    # Buffers for transferring strings and arrays of Keys.
-    self._resize_utf8(256)
-    self._resize_keys(64)
-
-    # Finally, create a handle to this object to ensure that the native wrapper survives
-    # at least as long as this object.
-    self.handle = _FFI.new_handle(self)
-
-  def _resize_utf8(self, size):
-    self._utf8_cap = size
-    self._utf8_buf = _FFI.new('char[]', self._utf8_cap)
-
-  def _resize_keys(self, size):
-    self._keys_cap = size
-    self._vals_buf = _FFI.new('Value[]', self._keys_cap)
+  def buf(self, bytestring):
+    buf = _FFI.new('uint8_t[]', bytestring)
+    return (buf, len(bytestring), self.to_value(buf, type_id=self.anon_id))
 
   def utf8_buf(self, string):
-    utf8 = string.encode('utf-8')
-    if self._utf8_cap < len(utf8):
-      self._resize_utf8(max(len(utf8), 2 * self._utf8_cap))
-    self._utf8_buf[0:len(utf8)] = utf8
-    return (self._utf8_buf, len(utf8))
+    return self.buf(string.encode('utf-8'))
 
   def vals_buf(self, keys):
-    if self._keys_cap < len(keys):
-      self._resize_keys(max(len(keys), 2 * self._keys_cap))
-    self._vals_buf[0:len(keys)] = keys
-    return self._vals_buf
+    buf = _FFI.new('Value[]', keys)
+    return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
 
   def to_value(self, obj, type_id=None):
     handle = _FFI.new_handle(obj)
@@ -359,17 +374,18 @@ class ExternContext(object):
     self._handles -= set(handles)
 
   def put(self, obj):
-    # If we encounter an existing id, return it.
-    new_id = self._id_generator
-    _id = self._obj_to_id.setdefault(obj, new_id)
-    if _id is not new_id:
-      # Object already existed.
-      return _id
+    with self._lock:
+      # If we encounter an existing id, return it.
+      new_id = self._id_generator
+      _id = self._obj_to_id.setdefault(obj, new_id)
+      if _id is not new_id:
+        # Object already existed.
+        return _id
 
-    # Object is new/unique.
-    self._id_to_obj[_id] = obj
-    self._id_generator += 1
-    return _id
+      # Object is new/unique.
+      self._id_to_obj[_id] = obj
+      self._id_generator += 1
+      return _id
 
   def get(self, id_):
     return self._id_to_obj[id_]
@@ -481,6 +497,7 @@ class Native(object):
     variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
 
     scheduler = self.lib.scheduler_create(self.context.handle,
+                                          extern_log,
                                           extern_key_for,
                                           extern_val_for,
                                           extern_clone_val,
