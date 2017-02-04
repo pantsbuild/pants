@@ -144,13 +144,14 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       root = os.path.join(workdir, 'compile', 'zinc')
 
-      versioned_root = os.path.join(root, os.listdir(root)[0])
-      self.assertEqual(len(os.listdir(root)), 1, 'Expected 1 task version.')
+      task_versions = [p for p in os.listdir(root) if p != 'current']
+      self.assertEqual(len(task_versions), 1, 'Expected 1 task version.')
+      versioned_root = os.path.join(root, task_versions[0])
 
-      target_root = os.path.join(root, os.listdir(root)[0])
-      self.assertEqual(len(os.listdir(target_root)), 1, 'Expected 1 target.')
+      per_target_dirs = os.listdir(versioned_root)
+      self.assertEqual(len(per_target_dirs), 1, 'Expected 1 target.')
+      target_workdir_root = os.path.join(versioned_root, per_target_dirs[0])
 
-      target_workdir_root = os.path.join(versioned_root, os.listdir(versioned_root)[0])
       target_workdirs = os.listdir(target_workdir_root)
       self.assertEqual(len(target_workdirs), 3, 'Expected 3 workdirs (current, and two versioned).')
       self.assertIn('current', target_workdirs)

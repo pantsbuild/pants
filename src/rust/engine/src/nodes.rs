@@ -1,6 +1,14 @@
-use graph::{Entry, Graph};
+
+use std::sync::Arc;
+
+use futures::future::{BoxFuture, Future};
+use futures::future;
+use futures_cpupool::CpuPool;
+
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
+use graph::{EntryId, Graph};
+use handles::maybe_drain_handles;
 use selectors::Selector;
 use selectors;
 use tasks::Tasks;
@@ -8,46 +16,42 @@ use tasks::Tasks;
 
 #[derive(Debug)]
 pub struct Runnable {
-  func: Function,
-  args: Vec<Value>,
-  cacheable: bool,
-}
-
-impl Runnable {
-  pub fn func(&self) -> &Function {
-    &self.func
-  }
-
-  pub fn args(&self) -> &Vec<Value> {
-    &self.args
-  }
-
-  pub fn cacheable(&self) -> bool {
-    self.cacheable
-  }
+  pub func: Function,
+  pub args: Vec<Value>,
+  pub cacheable: bool,
 }
 
 #[derive(Debug)]
-pub enum State<T> {
-  Waiting(Vec<T>),
-  Complete(Complete),
-  Runnable(Runnable),
-}
-
-#[derive(Debug)]
-pub enum Complete {
+pub enum Failure {
   Noop(&'static str, Option<Node>),
-  Return(Value),
   Throw(Value),
 }
 
-pub struct StepContext<'g, 't> {
-  entry: &'g Entry,
-  graph: &'g Graph,
-  tasks: &'t Tasks,
+pub type NodeResult = Result<Value, Failure>;
+
+pub type StepFuture = BoxFuture<Value, Failure>;
+
+// Because multiple callers may wait on the same Node, the Future for a Node must be shareable.
+pub type NodeFuture = future::Shared<StepFuture>;
+
+#[derive(Clone)]
+pub struct Context {
+  entry_id: EntryId,
+  graph: Arc<Graph>,
+  tasks: Arc<Tasks>,
+  pool: CpuPool,
 }
 
-impl<'g, 't> StepContext<'g, 't> {
+impl Context {
+  pub fn new(entry_id: EntryId, graph: Arc<Graph>, tasks: Arc<Tasks>, pool: CpuPool) -> Context {
+    Context {
+      entry_id: entry_id,
+      graph: graph,
+      tasks: tasks,
+      pool: pool,
+    }
+  }
+
   /**
    * Create Nodes for each Task that might be able to compute the given product for the
    * given subject and variants.
@@ -73,21 +77,11 @@ impl<'g, 't> StepContext<'g, 't> {
       .unwrap_or_else(|| Vec::new())
   }
 
-  fn get(&self, node: &Node) -> Option<&Complete> {
-    self.graph.entry(node).and_then(|dep_entry| {
-      // The entry exists. If it's a declared dep, return it immediately.
-      if self.entry.dependencies().contains(&dep_entry.id()) {
-        dep_entry.state()
-      } else if self.entry.cyclic_dependencies().contains(&dep_entry.id()) {
-        // Declared, but cyclic.
-        Some(self.graph.cyclic_singleton())
-      } else {
-        // Undeclared. In theory we could still immediately return the dep here, but unfortunately
-        // that occasionally allows Nodes to finish executing before all of their declared deps are
-        // available.
-        None
-      }
-    })
+  /**
+   * Get the future value for the given Node.
+   */
+  fn get(&self, node: &Node) -> NodeFuture {
+    self.graph.get(self.entry_id, self, node)
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -158,8 +152,68 @@ impl<'g, 't> StepContext<'g, 't> {
   /**
    * Creates a Throw state with the given exception message.
    */
-  fn throw(&self, msg: String) -> Complete {
-    Complete::Throw(self.tasks.externs.create_exception(msg))
+  fn throw(&self, msg: &str) -> Failure {
+    Failure::Throw(self.tasks.externs.create_exception(msg))
+  }
+
+  fn invoke_runnable(&self, runnable: Runnable) -> Result<Value, Failure> {
+    self.tasks.externs.invoke_runnable(&runnable)
+      .map_err(|v| Failure::Throw(v))
+  }
+
+  /**
+   * A helper to take ownership of the given Failure, while indicating that the value
+   * represented by the Failure was an optional value.
+   */
+  fn was_optional(&self, failure: future::SharedError<Failure>, msg: &'static str) -> Failure {
+    match *failure {
+      Failure::Noop(..) =>
+        Failure::Noop(msg, None),
+      Failure::Throw(ref msg) =>
+        Failure::Throw(self.clone_val(msg)),
+    }
+  }
+
+  /**
+   * A helper to take ownership of the given Failure, while indicating that the value
+   * represented by the Failure was required, and thus fatal if not present.
+   */
+  fn was_required(&self, failure: future::SharedError<Failure>) -> Failure {
+    match *failure {
+      Failure::Noop(..) =>
+        self.throw("No source of required dependencies"),
+      Failure::Throw(ref msg) =>
+        Failure::Throw(self.clone_val(msg)),
+    }
+  }
+
+  fn ok(&self, value: Value) -> StepFuture {
+    future::ok(value).boxed()
+  }
+
+  fn err(&self, failure: Failure) -> StepFuture {
+    future::err(failure).boxed()
+  }
+}
+
+pub trait ContextFactory {
+  fn create(&self, entry_id: EntryId) -> Context;
+}
+
+impl ContextFactory for Context {
+  /**
+   * Clones this Context for a new EntryId. Because all of the members of the context
+   * are Arcs (CpuPool internally), this is a shallow clone.
+   *
+   * TODO: Consider reducing to a single Arc to hold the shareable portion of the context.
+   */
+  fn create(&self, entry_id: EntryId) -> Context {
+    Context {
+      entry_id: entry_id,
+      graph: self.graph.clone(),
+      tasks: self.tasks.clone(),
+      pool: self.pool.clone(),
+    }
   }
 }
 
@@ -167,7 +221,7 @@ impl<'g, 't> StepContext<'g, 't> {
  * Defines executing a single step for the given context.
  */
 trait Step {
-  fn step(&self, context: StepContext) -> State<Node>;
+  fn step(&self, context: Context) -> StepFuture;
 }
 
 /**
@@ -192,15 +246,15 @@ impl Select {
 
   fn select_literal_single<'a>(
     &self,
-    context: &StepContext,
+    context: &Context,
     candidate: &'a Value,
-    variant_value: Option<&str>
+    variant_value: &Option<String>
   ) -> bool {
     if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
       return false;
     }
     return match variant_value {
-      Some(vv) if context.field_name(candidate) != *vv =>
+      &Some(ref vv) if context.field_name(candidate) != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
@@ -215,9 +269,9 @@ impl Select {
    */
   fn select_literal(
     &self,
-    context: &StepContext,
+    context: &Context,
     candidate: Value,
-    variant_value: Option<&str>
+    variant_value: &Option<String>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if self.select_literal_single(context, &candidate, variant_value) {
@@ -236,75 +290,96 @@ impl Select {
     }
     return None;
   }
+
+  /**
+   * Given the results of configured Task nodes, select a single successful value, or fail.
+   */
+  fn choose_task_result(
+    &self,
+    context: Context,
+    results: Vec<Result<future::SharedItem<Value>, future::SharedError<Failure>>>,
+    variant_value: &Option<String>,
+  ) -> Result<Value, Failure> {
+    let mut matches = Vec::new();
+    for result in results {
+      match result {
+        Ok(ref value) => {
+          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
+            matches.push(v);
+          }
+        },
+        Err(err) => {
+          match *err {
+            Failure::Noop(_, _) =>
+              continue,
+            Failure::Throw(ref msg) =>
+              return Err(Failure::Throw(context.clone_val(msg))),
+          }
+        },
+      }
+    }
+
+    if matches.len() > 1 {
+      // TODO: Multiple successful tasks are not currently supported. We should allow for this
+      // by adding support for "mergeable" products. see:
+      //   https://github.com/pantsbuild/pants/issues/2526
+      return Err(context.throw("Conflicting values produced for subject and type."));
+    }
+
+    match matches.pop() {
+      Some(matched) =>
+        // Exactly one value was available.
+        Ok(matched),
+      None =>
+        Err(
+          Failure::Noop("No task was available to compute the value.", None)
+        ),
+    }
+  }
 }
 
 impl Step for Select {
-  fn step(&self, context: StepContext) -> State<Node> {
+  fn step(&self, context: Context) -> StepFuture {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
-    let variants = &self.variants;
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
-    let variant_value: Option<&str> =
+    let variant_value: Option<String> =
       match self.selector.variant_key {
         Some(ref variant_key) => {
-          let variant_value = variants.find(variant_key);
+          let variant_value = self.variants.find(variant_key);
           if variant_value.is_none() {
-            return State::Complete(
-              Complete::Noop("A matching variant key was not configured in variants.", None)
-            )
+            return context.err(
+              Failure::Noop("A matching variant key was not configured in variants.", None)
+            );
           }
-          variant_value
+          variant_value.map(|v| v.to_string())
         },
         None => None,
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), variant_value) {
-      return State::Complete(Complete::Return(literal_value));
+    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), &variant_value) {
+      return context.ok(literal_value);
     }
 
-    // Else, attempt to use a configured task to compute the value.
-    let mut dependencies = Vec::new();
-    let mut matches: Vec<Value> = Vec::new();
-    for dep_node in context.gen_nodes(&self.subject, self.product(), &self.variants) {
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) => {
-          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
-            matches.push(v);
-          }
-        },
-        Some(&Complete::Noop(_, _)) =>
-          continue,
-        Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
-
-    // If any dependencies were unavailable, wait for them; otherwise, determine whether
-    // a value was successfully selected.
-    if !dependencies.is_empty() {
-      // A dependency has not run yet.
-      return State::Waiting(dependencies);
-    } else if matches.len() > 1 {
-      // TODO: Multiple successful tasks are not currently supported. We should allow for this
-      // by adding support for "mergeable" products. see:
-      //   https://github.com/pantsbuild/pants/issues/2526
-      return State::Complete(
-        context.throw(format!("Conflicting values produced for subject and type."))
+    // Else, attempt to use the configured tasks to compute the value.
+    let deps_future =
+      future::join_all(
+        context.gen_nodes(&self.subject, self.product(), &self.variants).iter()
+          .map(|task_node| {
+            // Attempt to get the value of each task Node, but don't fail the join if one fails.
+            context.get(&task_node).then(|r| future::ok(r))
+          })
+          .collect::<Vec<_>>()
       );
-    }
 
-    match matches.pop() {
-      Some(matched) =>
-        // Statically completed!
-        State::Complete(Complete::Return(matched)),
-      None =>
-        State::Complete(
-          Complete::Noop("No task was available to compute the value.", None)
-        ),
-    }
+    let variant_value = variant_value.map(|s| s.to_string());
+    let node = self.clone();
+    deps_future
+      .and_then(move |dep_results| {
+        future::result(node.choose_task_result(context, dep_results, &variant_value))
+      })
+      .boxed()
   }
 }
 
@@ -316,8 +391,8 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: StepContext) -> State<Node> {
-    State::Complete(Complete::Return(context.val_for(&self.selector.subject)))
+  fn step(&self, context: Context) -> StepFuture {
+    context.ok(context.val_for(&self.selector.subject))
   }
 }
 
@@ -338,31 +413,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_product<'a>(&self, context: &'a StepContext) -> Result<&'a Value, State<Node>> {
-    // Request the product we need in order to request dependencies.
-    let dep_product_node =
-      Node::create(
-        Selector::select(self.selector.dep_product),
-        self.subject.clone(),
-        self.variants.clone()
-      );
-    match context.get(&dep_product_node) {
-      Some(&Complete::Return(ref value)) =>
-        Ok(value),
-      Some(&Complete::Noop(_, _)) =>
-        Err(
-          State::Complete(
-            Complete::Noop("Could not compute {} to determine deps.", Some(dep_product_node))
-          )
-        ),
-      Some(&Complete::Throw(ref msg)) =>
-        Err(State::Complete(Complete::Throw(context.clone_val(msg)))),
-      None =>
-        Err(State::Waiting(vec![dep_product_node])),
-    }
-  }
-
-  fn dep_node(&self, context: &StepContext, dep_subject: &Value) -> Node {
+  fn dep_node(&self, context: &Context, dep_subject: &Value) -> Node {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
@@ -382,7 +433,7 @@ impl SelectDependencies {
     }
   }
 
-  fn store(&self, context: &StepContext, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
+  fn store(&self, context: &Context, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
     if self.selector.transitive && context.satisfied_by(&self.selector.product, dep_product.type_id())  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
@@ -399,44 +450,51 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: StepContext) -> State<Node> {
-    // Select the product holding the dependency list.
-    let dep_product =
-      match self.dep_product(&context) {
-        Ok(dep_product) => dep_product,
-        Err(state) => return state,
-      };
+  fn step(&self, context: Context) -> StepFuture {
+    let node = self.clone();
 
-    // The product and its dependency list are available.
-    let mut dependencies = Vec::new();
-    let mut dep_values: Vec<&Value> = Vec::new();
-    for dep_subject in context.project_multi(&dep_product, &self.selector.field) {
-      let dep_node = self.dep_node(&context, &dep_subject);
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            context.throw(
-              format!(
-                "No source of explicit dep {}",
-                dep_node.format(&context.tasks.externs)
-              )
-            )
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
-
-    if dependencies.len() > 0 {
-      State::Waiting(dependencies)
-    } else {
-      State::Complete(Complete::Return(self.store(&context, &dep_product, dep_values)))
-    }
+    context
+      .get(
+        // Select the product holding the dependency list.
+        &Node::create(
+          Selector::select(self.selector.dep_product),
+          self.subject.clone(),
+          self.variants.clone()
+        )
+      )
+      .then(move |dep_product_res| {
+        match dep_product_res {
+          Ok(dep_product) => {
+            // The product and its dependency list are available: project them.
+            let deps =
+              future::join_all(
+                context.project_multi(&dep_product, &node.selector.field).iter()
+                  .map(|dep_subject| {
+                    context.get(&node.dep_node(&context, &dep_subject))
+                  })
+                  .collect::<Vec<_>>()
+              );
+            deps
+              .then(move |dep_values_res| {
+                // Finally, store the resulting values.
+                match dep_values_res {
+                  Ok(dep_values) => {
+                    // TODO: cloning to go from a `SharedValue` list to a list of values...
+                    // there ought to be a better way.
+                    let dv: Vec<Value> = dep_values.iter().map(|v| context.clone_val(v)).collect();
+                    Ok(node.store(&context, &dep_product, dv.iter().collect()))
+                  },
+                  Err(failure) =>
+                    Err(context.was_required(failure)),
+                }
+              })
+              .boxed()
+          },
+          Err(failure) =>
+            context.err(context.was_optional(failure, "No source of input product.")),
+        }
+      })
+      .boxed()
   }
 }
 
@@ -448,61 +506,50 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: StepContext) -> State<Node> {
-    // Request the product we need to compute the subject.
-    let input_node =
-      Node::create(
-        Selector::select(self.selector.input_product),
-        self.subject.clone(),
-        self.variants.clone()
-      );
-    let dep_product =
-      match context.get(&input_node) {
-        Some(&Complete::Return(ref value)) =>
-          value,
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Noop("Could not compute {} to project its field.", Some(input_node))
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          return State::Waiting(vec![input_node]),
-      };
+  fn step(&self, context: Context) -> StepFuture {
+    let node = self.clone();
 
-    // The input product is available: use it to construct the new Subject.
-    let projected_subject =
-      context.project(
-        dep_product,
-        &self.selector.field,
-        &self.selector.projected_subject
-      );
-
-    // When the output product is available, return it.
-    let output_node =
-      Node::create(
-        Selector::select(self.selector.product),
-        context.key_for(&projected_subject),
-        self.variants.clone()
-      );
-    match context.get(&output_node) {
-      Some(&Complete::Return(ref value)) =>
-        State::Complete(Complete::Return(context.clone_val(value))),
-      Some(&Complete::Noop(_, _)) =>
-        State::Complete(
-          context.throw(
-            format!(
-              "No source of projected dependency {}",
-              output_node.format(&context.tasks.externs)
-            )
-          )
-        ),
-      Some(&Complete::Throw(ref msg)) =>
-        // NB: propagate thrown exception directly.
-        State::Complete(Complete::Throw(context.clone_val(msg))),
-      None =>
-        State::Waiting(vec![output_node]),
-    }
+    context
+      .get(
+        // Request the product we need to compute the subject.
+        &Node::create(
+          Selector::select(self.selector.input_product),
+          self.subject.clone(),
+          self.variants.clone()
+        )
+      )
+      .then(move |dep_product_res| {
+        match dep_product_res {
+          Ok(dep_product) => {
+            // And then project the relevant field.
+            let projected_subject =
+              context.project(
+                &dep_product,
+                &node.selector.field,
+                &node.selector.projected_subject
+              );
+            context
+              .get(
+                &Node::create(
+                  Selector::select(node.selector.product),
+                  context.key_for(&projected_subject),
+                  node.variants.clone()
+                )
+              )
+              .then(move |output_res| {
+                // If the output product is available, return it.
+                match output_res {
+                  Ok(output) => Ok(context.clone_val(&output)),
+                  Err(failure) => Err(context.was_required(failure)),
+                }
+              })
+              .boxed()
+          },
+          Err(failure) =>
+            context.err(context.was_optional(failure, "No source of input product.")),
+        }
+      })
+      .boxed()
   }
 }
 
@@ -515,43 +562,33 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: StepContext) -> State<Node> {
-    // Compute dependencies for the Node, or determine whether it is a Noop.
-    let mut dependencies = Vec::new();
-    let mut dep_values: Vec<&Value> = Vec::new();
-    for selector in &self.selector.clause {
-      let dep_node =
-        Node::create(
-          selector.clone(),
-          self.subject.clone(),
-          self.variants.clone()
-        );
-      match context.get(&dep_node) {
-        Some(&Complete::Return(ref value)) =>
-          dep_values.push(&value),
-        Some(&Complete::Noop(_, _)) =>
-          return State::Complete(
-            Complete::Noop("Was missing (at least) input {}.", Some(dep_node))
-          ),
-        Some(&Complete::Throw(ref msg)) =>
-          // NB: propagate thrown exception directly.
-          return State::Complete(Complete::Throw(context.clone_val(msg))),
-        None =>
-          dependencies.push(dep_node),
-      }
-    }
+  fn step(&self, context: Context) -> StepFuture {
+    let deps =
+      future::join_all(
+        self.selector.clause.iter()
+          .map(|selector| {
+            context.get(&Node::create(selector.clone(), self.subject.clone(), self.variants.clone()))
+          })
+          .collect::<Vec<_>>()
+      );
 
-    if !dependencies.is_empty() {
-      // A clause was still waiting on dependencies.
-      State::Waiting(dependencies)
-    } else {
-      // Ready to run!
-      State::Runnable(Runnable {
-        func: self.selector.func,
-        args: dep_values.iter().map(|v| context.clone_val(v)).collect(),
-        cacheable: self.selector.cacheable,
+    let selector = self.selector.clone();
+    deps
+      .then(move |deps_result| {
+        match deps_result {
+          Ok(deps) =>
+            context.invoke_runnable(
+              Runnable {
+                func: selector.func,
+                args: deps.iter().map(|v| context.clone_val(v)).collect(),
+                cacheable: selector.cacheable,
+              }
+            ),
+          Err(err) =>
+            Err(context.was_optional(err, "Missing at least one input.")),
+        }
       })
-    }
+      .boxed()
   }
 }
 
@@ -642,13 +679,12 @@ impl Node {
     }
   }
 
-  pub fn step(&self, entry: &Entry, graph: &Graph, tasks: &Tasks) -> State<Node> {
-    let context =
-      StepContext {
-        entry: entry,
-        graph: graph,
-        tasks: tasks,
-      };
+  pub fn step(&self, context: Context) -> StepFuture {
+    // TODO: Odd place for this... could do it periodically in the background?
+    maybe_drain_handles().map(|handles| {
+      context.tasks.externs.drop_handles(handles);
+    });
+
     match self {
       &Node::Select(ref n) => n.step(context),
       &Node::SelectDependencies(ref n) => n.step(context),

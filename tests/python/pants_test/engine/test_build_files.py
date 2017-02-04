@@ -92,11 +92,11 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     super(GraphTestBase, self).setUp()
 
-  def create(self, build_pattern=None, parser_cls=None):
+  def create(self, build_patterns=None, parser_cls=None):
     symbol_table_cls = TestTable
 
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   build_pattern=build_pattern,
+                                   build_patterns=build_patterns,
                                    parser_cls=parser_cls)
 
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
@@ -105,7 +105,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     return scheduler
 
   def create_json(self):
-    return self.create(build_pattern='*.BUILD.json', parser_cls=JsonParser)
+    return self.create(build_patterns=('*.BUILD.json',), parser_cls=JsonParser)
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
@@ -169,12 +169,12 @@ class InlinedGraphTest(GraphTestBase):
     self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    scheduler = self.create(build_pattern='*.BUILD.python',
+    scheduler = self.create(build_patterns=('*.BUILD.python',),
                             parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    scheduler = self.create(build_pattern='*.BUILD',
+    scheduler = self.create(build_patterns=('*.BUILD',),
                             parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(scheduler)
 
@@ -330,11 +330,11 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.do_test_codegen_simple(scheduler)
 
   def test_python_lazy(self):
-    scheduler = self.create(build_pattern='*.BUILD.python',
+    scheduler = self.create(build_patterns=('*.BUILD.python',),
                             parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic_lazy(self):
-    scheduler = self.create(build_pattern='*.BUILD',
+    scheduler = self.create(build_patterns=('*.BUILD',),
                             parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(scheduler)

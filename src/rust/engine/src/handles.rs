@@ -3,6 +3,8 @@ use std::sync::Mutex;
 
 pub type Handle = *const raw::c_void;
 
+const MIN_DRAIN_HANDLES: usize = 256;
+
 // A sendable wrapper around a Handle.
 struct SendableHandle(Handle);
 
@@ -30,10 +32,14 @@ pub fn enqueue_drop_handle(handle: Handle) {
 }
 
 /**
- * Take all Handles that have been queued to be dropped.
+ * If an appreciable number of Handles have been queued, drain them.
  */
-pub fn drain_handles() -> Vec<Handle> {
+pub fn maybe_drain_handles() -> Option<Vec<Handle>> {
   let mut q = DROPPING_HANDLES.lock().unwrap();
-  let handles: Vec<_> = q.drain(..).collect();
-  handles.iter().map(|sh| sh.0).collect()
+  if q.len() > MIN_DRAIN_HANDLES {
+    let handles: Vec<_> = q.drain(..).collect();
+    Some(handles.iter().map(|sh| sh.0).collect())
+  } else {
+    None
+  }
 }

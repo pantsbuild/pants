@@ -233,7 +233,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
-                                   build_pattern='*.BUILD.json')
+                                   build_patterns=('*.BUILD.json',))
     tasks = create_graph_tasks(address_mapper, symbol_table_cls)
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
