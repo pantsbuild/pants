@@ -313,7 +313,7 @@ class ObjectIdMap(object):
   """
 
   def __init__(self):
-    # objects indexed by their keys, i.e, content digests
+    # Objects indexed by their keys, i.e, content digests
     self._objects = Storage.create(in_memory=True)
     # Memoized object Ids.
     self._id_to_key = dict()
@@ -323,18 +323,18 @@ class ObjectIdMap(object):
   def put(self, obj):
     key = self._objects.put(obj)
     new_id = self._next_id
-    _id = self._key_to_id.setdefault(key, new_id)
-    if _id is not new_id:
+    oid = self._key_to_id.setdefault(key, new_id)
+    if oid is not new_id:
       # Object already existed.
-      return _id
+      return oid
 
     # Object is new/unique.
-    self._id_to_key[_id] = key
+    self._id_to_key[oid] = key
     self._next_id += 1
-    return _id
+    return oid
 
-  def get(self, id_):
-    return self._objects.get(self._id_to_key[id_])
+  def get(self, oid):
+    return self._objects.get(self._id_to_key[oid])
 
 
 class ExternContext(object):
