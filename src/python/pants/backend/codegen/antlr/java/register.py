@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
+from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -20,4 +20,4 @@ def build_file_aliases():
 
 
 def register_goals():
-  task(name='antlr', action=AntlrGen).install('gen')
+  task(name='antlr-java', action=AntlrJavaGen).install('gen')

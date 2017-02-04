@@ -1,6 +1,4 @@
 
-use futures_cpupool::CpuPool;
-
 use externs::Externs;
 use graph::Graph;
 use tasks::Tasks;
@@ -18,5 +16,4 @@ pub struct Core {
   pub tasks: Tasks,
   pub types: Types,
   pub externs: Externs,
-  pub pool: CpuPool,
 }

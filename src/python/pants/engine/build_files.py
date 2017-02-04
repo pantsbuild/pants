@@ -42,11 +42,14 @@ class BuildFiles(datatype('BuildFiles', ['files'])):
 
 
 def filter_buildfile_paths(address_mapper, directory_listing):
-  build_pattern = address_mapper.build_pattern
   def match(stat):
-    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
-    ignored = any(True for _ in address_mapper.build_ignore_patterns.match_files([stat.path]))
-    return (not ignored) and type(stat) is File and fnmatch(basename(stat.path), build_pattern)
+    # Short circuit for ignored paths.
+    if address_mapper.build_ignore_patterns.match_file(stat.path):
+      return False
+
+    return (type(stat) is File and any(fnmatch(basename(stat.path), pattern)
+                                       for pattern in address_mapper.build_patterns))
+
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -219,14 +222,14 @@ def filter_build_dirs(address_mapper, snapshot):
 
 def single_or_sib_addresses_to_globs(address_mapper, single_or_sib_addresses):
   """Given a SiblingAddresses or SingleAddress object, return a PathGlobs object for relevant build files."""
-  pattern = address_mapper.build_pattern
-  return PathGlobs.create(single_or_sib_addresses.directory, include=[pattern], exclude=[])
+  patterns = address_mapper.build_patterns
+  return PathGlobs.create(single_or_sib_addresses.directory, include=patterns, exclude=[])
 
 
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files."""
-  pattern = address_mapper.build_pattern
-  return PathGlobs.create(descendant_addresses.directory, include=[pattern, join(b'**', pattern)], exclude=[])
+  patterns = [join('**', pattern) for pattern in address_mapper.build_patterns]
+  return PathGlobs.create(descendant_addresses.directory, include=patterns, exclude=[])
 
 
 def _recursive_dirname(f):
@@ -246,8 +249,11 @@ def _recursive_dirname(f):
 
 def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
   """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
-  pattern = address_mapper.build_pattern
-  patterns = [join(f, pattern) for f in _recursive_dirname(ascendant_addresses.directory)]
+  patterns = [
+    join(f, pattern)
+    for pattern in address_mapper.build_patterns
+    for f in _recursive_dirname(ascendant_addresses.directory)
+  ]
   return PathGlobs.create('', include=patterns, exclude=[])
 
 

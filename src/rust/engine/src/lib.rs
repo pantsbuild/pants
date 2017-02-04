@@ -10,10 +10,11 @@ mod selectors;
 mod tasks;
 mod types;
 
+extern crate crossbeam;
 extern crate fnv;
-extern crate glob;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate glob;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
@@ -38,6 +39,7 @@ use externs::{
   Externs,
   IdToStrExtern,
   InvokeRunnable,
+  LogExtern,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
@@ -144,6 +146,7 @@ impl RawNodes {
 #[no_mangle]
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
+  log: LogExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -214,6 +217,7 @@ pub extern fn scheduler_create(
           },
           Externs::new(
             ext_context,
+            log,
             key_for,
             val_for,
             clone_val,

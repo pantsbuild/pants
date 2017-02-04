@@ -9,12 +9,10 @@ use futures::future;
 use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
-use fs::{Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
-use fs;
+use fs::{self, Dir, File, FSContext, Link, PathGlobs, PathGlob, PathStat, Stat};
 use graph::EntryId;
 use handles::maybe_drain_handles;
-use selectors::Selector;
-use selectors;
+use selectors::{self, Selector};
 
 
 #[derive(Debug)]
@@ -45,10 +43,6 @@ impl Context {
       entry_id: entry_id,
       core: core,
     }
-  }
-
-  pub fn core(&self) -> &Arc<Core> {
-    &self.core
   }
 
   /**

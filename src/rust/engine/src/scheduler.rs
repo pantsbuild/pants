@@ -9,7 +9,7 @@ use futures_cpupool::{CpuPool, CpuFuture};
 
 use context::Core;
 use core::{Field, Key, TypeConstraint};
-use externs::Externs;
+use externs::{Externs, LogLevel};
 use graph::{EntryId, Graph};
 use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
@@ -41,7 +41,6 @@ impl Scheduler {
           tasks: tasks,
           types: types,
           externs: externs,
-          pool: CpuPool::new_num_cpus(),
         }
       ),
       roots: Vec::new(),
@@ -69,7 +68,7 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
     self.roots.iter()
       .map(|root| {
-        (root.subject(), root.product(), self.core.graph.wait(root, &self.core.externs))
+        (root.subject(), root.product(), self.core.graph.peek(root, &self.core.externs))
       })
       .collect()
   }
@@ -104,11 +103,11 @@ impl Scheduler {
    * Starts running a Node, and returns a Future that will succeed regardless of the
    * success of the node.
    */
-  fn launch(&self, node: Node) -> CpuFuture<(), ()> {
-    let core = self.core.clone();
-    self.core.pool.spawn_fn(move || core.graph.create(node, &core)
-      .then::<_, Result<(), ()>>(|_| Ok(()))
-    )
+  fn launch(&self, pool: &CpuPool, core: Arc<Core>, node: Node) -> CpuFuture<(), ()> {
+    pool.clone().spawn_fn(move || {
+      core.graph.create(node, &core)
+        .then::<_, Result<(), ()>>(|_| Ok(()))
+    })
   }
 
   /**
@@ -119,11 +118,16 @@ impl Scheduler {
     let runnable_count = 0;
     let scheduling_iterations = 0;
 
+    // We create a new pool per-execution to avoid worrying about re-initializing them
+    // if the daemon has forked.
+    let pool = CpuPool::new_num_cpus();
+
     // Bootstrap tasks for the roots, and then wait for all of them.
+    self.core.externs.log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
     let roots_res =
       future::join_all(
         self.roots.iter()
-          .map(|root| self.launch(root.clone()))
+          .map(|root| self.launch(&pool, self.core.clone(), root.clone()))
           .collect::<Vec<_>>()
       );
 

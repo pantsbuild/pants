@@ -5,20 +5,75 @@ use std::fs::OpenOptions;
 use std::io::{BufWriter, Write};
 use std::io;
 use std::path::Path;
-use std::sync::RwLock;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, RwLock};
+
+use crossbeam::mem::epoch;
 
 use futures::future::Future;
 use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, ContextFactory};
+use nodes::{Failure, Node, NodeFuture, NodeResult, Context, ContextFactory};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct EntryId(usize);
 
 pub type DepSet = HashSet<EntryId, FNV>;
+
+enum EntryState {
+  Pending(Context, Node),
+  Started(NodeFuture),
+}
+
+type EntryStateField = Arc<epoch::Atomic<EntryState>>;
+
+/**
+ * A holder for a reference to the Node's Future. This indirection exists in order
+ * to allow Nodes to start lazily, outside of the graph lock.
+ */
+trait EntryStateGetter {
+  fn get(&self) -> NodeFuture;
+}
+
+impl EntryStateGetter for EntryStateField {
+  fn get(&self) -> NodeFuture {
+    loop {
+      // Observe the current state.
+      let guard = epoch::pin();
+      let state = self.load(Ordering::Relaxed, &guard);
+
+      let (context, node) =
+        match state {
+          Some(shared) => match *shared {
+            &EntryState::Pending(ref context, ref node) =>
+              // Clone the Pending state so that we can attempt to cast to `Starting`.
+              (context.clone(), node.clone()),
+            &EntryState::Started(ref node_future) =>
+              // Already started.
+              return node_future.clone(),
+          },
+          None =>
+            // Another caller is already starting the Node, busywait to retry.
+            continue,
+        };
+
+      // Attempt to empty the State to take responsibility for starting the Node.
+      if let Ok(_) = self.cas(state, None, Ordering::Relaxed) {
+        // We're responsible: start the Node and then loop to retrieve the value..
+        self.store_and_ref(
+          epoch::Owned::new(
+            EntryState::Started(future::Shared::new(node.step(context)))
+          ),
+          Ordering::Relaxed,
+          &guard
+        );
+      }
+    }
+  }
+}
 
 /**
  * An Entry and its adjacencies.
@@ -29,9 +84,7 @@ pub struct Entry {
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: Node,
-  // To avoid holding the Graph's lock longer than necessary, a Node initializes on a CpuPool.
-  // TODO: See comment in ensure_entry_internal.
-  state: NodeFuture,
+  state: Arc<epoch::Atomic<EntryState>>,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
@@ -40,18 +93,34 @@ pub struct Entry {
 }
 
 impl Entry {
+  fn new(id: EntryId, node: Node, context: Context) -> Entry {
+    let state = epoch::Atomic::null();
+    state.store(
+      Some(epoch::Owned::new(EntryState::Pending(context, node.clone()))),
+      Ordering::Relaxed,
+    );
+    Entry {
+      id: id,
+      node: node,
+      state: Arc::new(state),
+      dependencies: Default::default(),
+      dependents: Default::default(),
+      cyclic_dependencies: Default::default(),
+    }
+  }
+
   /**
-   * Returns the Future for this Node.
+   * Returns a reference to the Node's Future.
    */
-  fn get(&self) -> &NodeFuture {
-    &self.state
+  fn state(&self) -> EntryStateField {
+    self.state.clone()
   }
 
   /**
    * Waits for the Future for this Node to have completed and returns a clone of its value.
    */
-  fn wait(&self, externs: &Externs) -> NodeResult {
-    match self.get().clone().wait() {
+  fn peek(&self, externs: &Externs) -> Option<NodeResult> {
+    self.state().get().peek().map(|state_opt| match state_opt {
       Ok(ref v) => Ok(externs.clone_val(v)),
       Err(shared_err) => {
         match *shared_err {
@@ -59,7 +128,7 @@ impl Entry {
           Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
         }
       },
-    }
+    })
   }
 
   fn dependencies(&self) -> &DepSet {
@@ -76,10 +145,11 @@ impl Entry {
 
   fn format(&self, externs: &Externs) -> String {
     let state =
-      match self.wait(externs) {
-        Ok(ref v) => externs.val_to_str(v),
-        Err(Failure::Throw(ref v)) => externs.val_to_str(v),
-        Err(ref x) => format!("{:?}", x),
+      match self.peek(externs) {
+        Some(Ok(ref v)) => externs.val_to_str(v),
+        Some(Err(Failure::Throw(ref v))) => externs.val_to_str(v),
+        Some(Err(ref x)) => format!("{:?}", x),
+        None => "<None>".to_string(),
       };
     format!(
       "{}:{}:{} == {}",
@@ -147,33 +217,10 @@ impl InnerGraph {
       return id;
     }
 
-    // New entry. Launch the Node on the pool.
-    // FIXME: It's necessary to call back to the pool here currently, because otherwise the work
-    // represented by the Node begins executing immediately on the current thread, which is
-    // undesirable because we are holding the graph lock. Fixing that would likely mean making
-    // the creation of an Entry's state an atomic operation outside of the Graph lock.
+    // New entry.
     let context = context_factory.create(id);
-    let pool = context.core().pool.clone();
-    let pool_node = entry_node.clone();
-    let state =
-      future::Shared::new(
-        pool.spawn_fn(move || {
-          pool_node.step(context)
-        })
-        .boxed()
-      );
     *id_generator += 1;
-    entries.insert(
-      id,
-      Entry {
-        id: id,
-        node: entry_node,
-        state: state,
-        dependencies: Default::default(),
-        dependents: Default::default(),
-        cyclic_dependencies: Default::default(),
-      }
-    );
+    entries.insert(id, Entry::new(id, entry_node, context));
 
     id
   }
@@ -302,10 +349,10 @@ impl InnerGraph {
     let viz_max_colors = 12;
     let mut format_color =
       |entry: &Entry| {
-        match entry.wait(externs) {
-          Err(Failure::Noop(_, _)) => "white".to_string(),
-          Err(Failure::Throw(_)) => "tomato".to_string(),
-          Ok(_) => {
+        match entry.peek(externs) {
+          None | Some(Err(Failure::Noop(_, _))) => "white".to_string(),
+          Some(Err(Failure::Throw(_))) => "tomato".to_string(),
+          Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
@@ -352,10 +399,10 @@ impl InnerGraph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.wait(externs) {
-        Ok(_) => true,
-        Err(Failure::Throw(_)) => false,
-        Err(Failure::Noop(..)) => true,
+      match entry.peek(externs) {
+        None | Some(Err(Failure::Noop(..))) => true,
+        Some(Err(Failure::Throw(_))) => false,
+        Some(Ok(_)) => true,
       }
     };
 
@@ -383,10 +430,11 @@ impl InnerGraph {
                            externs.id_to_str(entry.node.product().0),
                            externs.id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.wait(externs) {
-          Ok(ref x) => format!("Return({})", externs.val_to_str(x)),
-          Err(Failure::Throw(ref x)) => format!("Throw({})", externs.val_to_str(x)),
-          Err(Failure::Noop(ref x, ref opt_node)) => format!("Noop({:?}, {:?})", x, opt_node),
+        let state_str = match entry.peek(externs) {
+          None => "<None>".to_string(),
+          Some(Ok(ref x)) => format!("Return({})", externs.val_to_str(x)),
+          Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs.val_to_str(x)),
+          Some(Err(Failure::Noop(ref x, ref opt_node))) => format!("Noop({:?}, {:?})", x, opt_node),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -438,11 +486,11 @@ impl Graph {
   }
 
   /**
-   * Returns a clone of the state of the given Node.
+   * If the given Node has completed, returns a clone of its state.
    */
-  pub fn wait(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
+  pub fn peek(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
     let inner = self.inner.read().unwrap();
-    inner.entry(node).map(|e| e.wait(externs))
+    inner.entry(node).and_then(|e| e.peek(externs))
   }
 
   /**
@@ -454,18 +502,30 @@ impl Graph {
    */
   pub fn get(&self, src_id: EntryId, context: &ContextFactory, dst_node: &Node) -> NodeFuture {
     // First, check whether the destination already exists, and the dep is already declared.
-    {
+    let dst_state_opt = {
       let inner = self.inner.read().unwrap();
       let src_entry = inner.entry_for_id(src_id);
       if let Some(dst_entry) = inner.entry(dst_node) {
         if src_entry.dependencies().contains(&dst_entry.id) {
           // Declared and valid.
-          return dst_entry.get().clone();
+          Some(dst_entry.state())
         } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
           // Declared but cyclic.
           return inner.cyclic_singleton();
+        } else {
+          // Exists, but isn't declared.
+          None
         }
+      } else {
+        // Hasn't been created.
+        None
       }
+    };
+
+    // Got the destination's state. Now that we're outside the graph locks, we can safely
+    // retrieve it.
+    if let Some(dst_state) = dst_state_opt {
+      return dst_state.get();
     }
 
     // Get or create the destination, and then insert the dep.
@@ -494,9 +554,14 @@ impl Graph {
    * immediately.
    */
   pub fn create(&self, node: Node, context: &ContextFactory) -> NodeFuture {
-    let mut inner = self.inner.write().unwrap();
-    let id = inner.ensure_entry(context, node);
-    inner.entry_for_id(id).get().clone()
+    // Initialize the state while under the lock...
+    let state = {
+      let mut inner = self.inner.write().unwrap();
+      let id = inner.ensure_entry(context, node);
+      inner.entry_for_id(id).state()
+    };
+    // ...but only `get` it outside the lock.
+    state.get()
   }
 
   pub fn invalidate(&self, subjects: HashSet<&Key, FNV>) -> usize {

@@ -10,7 +10,7 @@ import re
 from collections import OrderedDict
 
 from pathspec import PathSpec
-from pathspec.gitignore import GitIgnorePattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from pants.build_graph.address import Address
 from pants.engine.objects import Serializable
@@ -178,7 +178,7 @@ class AddressMapper(object):
   def __init__(self,
                symbol_table_cls,
                parser_cls,
-               build_pattern=None,
+               build_patterns=None,
                build_ignore_patterns=None,
                exclude_target_regexps=None):
     """Create an AddressMapper.
@@ -190,16 +190,15 @@ class AddressMapper(object):
     :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
     :param parser_cls: The BUILD file parser cls to use.
     :type parser_cls: A :class:`pants.engine.parser.Parser`.
-    :param string build_pattern: A fnmatch-compatible pattern for identifying BUILD files used
-                                 to resolve addresses; by default looks for `BUILD*` files.
+    :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
+                                 used to resolve addresses.
     :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
-    self.build_pattern = build_pattern or b'BUILD*'
-
-    self.build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
+    self.build_patterns = build_patterns or (b'BUILD', b'BUILD.*')
+    self.build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
     self._exclude_target_regexps = exclude_target_regexps or []
     self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
 
@@ -209,7 +208,7 @@ class AddressMapper(object):
     if type(other) != type(self):
       return NotImplemented
     return (other.symbol_table_cls == self.symbol_table_cls and
-            other.build_pattern == self.build_pattern and
+            other.build_patterns == self.build_patterns and
             other.parser_cls == self.parser_cls)
 
   def __ne__(self, other):
@@ -220,8 +219,8 @@ class AddressMapper(object):
     return hash((self.symbol_table_cls, self.parser_cls))
 
   def __repr__(self):
-    return 'AddressMapper(parser={}, symbol_table={}, build_pattern={})'.format(
-      self.parser_cls, self.symbol_table_cls, self.build_pattern)
+    return 'AddressMapper(parser={}, symbol_table={}, build_patterns={})'.format(
+      self.parser_cls, self.symbol_table_cls, self.build_patterns)
 
   def __str__(self):
     return repr(self)

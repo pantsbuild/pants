@@ -19,6 +19,7 @@ pub type SatisfiedByExtern =
 
 pub struct Externs {
   context: *const ExternContext,
+  log: LogExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -43,6 +44,7 @@ unsafe impl Send for Externs {}
 impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
+    log: LogExtern,
     key_for: KeyForExtern,
     val_for: ValForExtern,
     clone_val: CloneValExtern,
@@ -60,6 +62,7 @@ impl Externs {
   ) -> Externs {
     Externs {
       context: ext_context,
+      log: log,
       key_for: key_for,
       val_for: val_for,
       clone_val: clone_val,
@@ -76,6 +79,10 @@ impl Externs {
       create_exception: create_exception,
       invoke_runnable: invoke_runnable,
     }
+  }
+
+  pub fn log(&self, level: LogLevel, msg: &str) {
+    (self.log)(self.context, level as u8, msg.as_ptr(), msg.len() as u64)
   }
 
   pub fn key_for(&self, val: &Value) -> Key {
@@ -189,6 +196,9 @@ impl Externs {
   }
 }
 
+pub type LogExtern =
+  extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
+
 pub type KeyForExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Key;
 
@@ -212,6 +222,16 @@ pub type LiftDirectoryListingExtern =
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
+
+// Not all log levels are always in use.
+#[allow(dead_code)]
+#[repr(u8)]
+pub enum LogLevel {
+  Debug = 0,
+  Info = 1,
+  Warn = 2,
+  Critical = 3,
+}
 
 // This enum is only ever constructed from the python side.
 #[allow(dead_code)]
