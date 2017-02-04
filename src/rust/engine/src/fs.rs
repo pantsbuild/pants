@@ -459,7 +459,7 @@ pub struct Snapshot {
 
 impl Snapshot {
   /**
-   * Fingerprint the given path ,or return an error string.
+   * Fingerprint the given path or return an error string.
    */
   fn fingerprint(path: &Path) -> Result<Fingerprint, String> {
     let mut hasher = Sha256::new();
