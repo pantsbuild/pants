@@ -17,7 +17,7 @@ from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_tasks
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -408,7 +408,7 @@ def setup_json_scheduler(build_root, native):
       'resolve': Classpath,
       'list': Address,
       GenGoal.name(): GenGoal,
-      'ls': Files,
+      'ls': Snapshot,
       'cat': FilesContent,
     }
   tasks = [
@@ -443,7 +443,7 @@ def setup_json_scheduler(build_root, native):
        extract_scala_imports),
       (Address,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs, field='stats', field_types=(Dir,))],
+        SelectDependencies(AddressFamily, Snapshot, field='dirs', field_types=(Dir,))],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),

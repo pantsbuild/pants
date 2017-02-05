@@ -5,27 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import errno
 import functools
-import shutil
-from abc import abstractproperty
 from binascii import hexlify
-from fnmatch import fnmatch
-from hashlib import sha1
-from itertools import chain
-from os import sep as os_sep
-from os.path import basename, dirname, join, normpath
+from os.path import dirname, join
 
 import six
-from twitter.common.collections.orderedset import OrderedSet
 
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addressable import Collection
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection
-from pants.source.wrapped_globs import Globs, RGlobs, ZGlobs
-from pants.util.contextutil import open_tar, temporary_file_path
+from pants.engine.selectors import Select, SelectDependencies
+from pants.util.contextutil import open_tar
 from pants.util.dirutil import safe_mkdir
-from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
 
@@ -36,24 +26,12 @@ class ReadLink(datatype('ReadLink', ['path'])):
     return super(ReadLink, cls).__new__(cls, six.binary_type(path))
 
 
-class Dirs(datatype('Dirs', ['dependencies'])):
-  """A collection of Path objects with Dir stats."""
-
-  @property
-  def stats(self):
-    return tuple(s.stat for s in self.dependencies)
-
-
 class Files(datatype('Files', ['dependencies'])):
   """A collection of Path objects with File stats."""
 
   @property
   def stats(self):
     return tuple(s.stat for s in self.dependencies)
-
-
-class Links(datatype('Links', ['dependencies'])):
-  """A collection of Path objects with Link stats."""
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -214,7 +192,7 @@ def create_fs_tasks(project_tree):
     return p
   return [
     # File content.
-    # Public
+    # TODO: Consume a Snapshot in memory.
     (FilesContent,
      [Select(Files),
       SelectDependencies(FileContent, Files, field='stats', field_types=(File,))],
