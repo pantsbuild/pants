@@ -16,6 +16,7 @@ from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket
 
+
 logger = logging.getLogger(__name__)
 
 
