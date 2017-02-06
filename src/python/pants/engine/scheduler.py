@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
 from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
@@ -79,13 +79,16 @@ class LocalScheduler(object):
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
+    select_product = lambda product: Select(product)
+
     root_subject_types = {
-      Address,
-      AscendantAddresses,
-      DescendantAddresses,
-      PathGlobs,
-      SiblingAddresses,
-      SingleAddress,
+      Address: select_product,
+      BuildFileAddress: select_product,
+      AscendantAddresses: select_product,
+      DescendantAddresses: select_product,
+      PathGlobs: select_product,
+      SiblingAddresses: select_product,
+      SingleAddress: select_product,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     singletons = create_snapshot_singletons(project_tree)
