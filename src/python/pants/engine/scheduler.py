@@ -82,13 +82,13 @@ class LocalScheduler(object):
     select_product = lambda product: Select(product)
 
     root_subject_types = {
-      Address: select_product,
-      BuildFileAddress: select_product,
-      AscendantAddresses: select_product,
-      DescendantAddresses: select_product,
-      PathGlobs: select_product,
-      SiblingAddresses: select_product,
-      SingleAddress: select_product,
+      Address,
+      BuildFileAddress,
+      AscendantAddresses,
+      DescendantAddresses,
+      PathGlobs,
+      SiblingAddresses,
+      SingleAddress,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     singletons = create_snapshot_singletons(project_tree)
