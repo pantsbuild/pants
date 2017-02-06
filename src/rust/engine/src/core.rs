@@ -114,6 +114,11 @@ pub struct Value {
   type_id: TypeId,
 }
 
+// By default, Values would not be marked Send because of the raw pointer they hold.
+// Because the handle is opaque and can't be cloned, we can safely implement Send.
+unsafe impl Send for Value {}
+unsafe impl Sync for Value {}
+
 impl Drop for Value {
   fn drop(&mut self) {
     enqueue_drop_handle(self.handle);

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 
 from pants.pantsd.process_manager import ProcessManager
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -34,15 +35,20 @@ def read_pantsd_log(workdir):
 
 
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
-  def test_pantsd_run(self):
+  @contextmanager
+  def pantsd_test_context(self, config=None):
     with self.temporary_workdir() as workdir_base:
       pid_dir = os.path.join(workdir_base, '.pids')
       workdir = os.path.join(workdir_base, '.workdir.pants.d')
-      pantsd_config = {'GLOBAL': {'enable_pantsd': True,
-                                  'level': 'debug',
-                                  'pants_subprocessdir': pid_dir}}
+      pantsd_config = config or {}
+      pantsd_config.setdefault('GLOBAL', {'enable_pantsd': True,
+                                          'level': 'debug',
+                                          'pants_subprocessdir': pid_dir})
       checker = PantsDaemonMonitor(pid_dir)
+      yield workdir, pantsd_config, checker
 
+  def test_pantsd_run(self):
+    with self.pantsd_test_context() as (workdir, pantsd_config, checker):
       # Explicitly kill any running pantsd instances for the current buildroot.
       self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
       try:
@@ -72,18 +78,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         print(line)
 
   def test_pantsd_run_with_watchman(self):
-    with self.temporary_workdir() as workdir_base:
-      pid_dir = os.path.join(workdir_base, '.pids')
-      workdir = os.path.join(workdir_base, '.workdir.pants.d')
-      pantsd_config = {'GLOBAL': {'enable_pantsd': True,
-                                  'level': 'debug',
-                                  'pants_subprocessdir': pid_dir},
-                       'pantsd': {'fs_event_detection': True},
-                       # The absolute paths in CI can exceed the UNIX socket path limitation
-                       # (>104-108 characters), so we override that here with a shorter path.
-                       'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
-      checker = PantsDaemonMonitor(pid_dir)
+    config = {'pantsd': {'fs_event_detection': True},
+              # The absolute paths in CI can exceed the UNIX socket path limitation
+              # (>104-108 characters), so we override that here with a shorter path.
+              'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
 
+    with self.pantsd_test_context(config) as (workdir, pantsd_config, checker):
       print('log: {}/pantsd/pantsd.log'.format(workdir))
       # Explicitly kill any running pantsd instances for the current buildroot.
       print('\nkill-pantsd')
@@ -127,3 +127,21 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
           continue
 
         self.assertNotRegexpMatches(line, r'^[WE].*')
+
+  def test_pantsd_broken_pipe(self):
+    with self.pantsd_test_context() as (workdir, pantsd_config, checker):
+      # Explicitly kill any running pantsd instances for the current buildroot.
+      self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
+      try:
+        # Start pantsd implicitly via a throwaway invocation.
+        self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
+        checker.await_pantsd()
+
+        run = self.run_pants_with_workdir('help | head -1', workdir, pantsd_config, shell=True)
+        self.assertNotIn('broken pipe', run.stderr_data.lower())
+        checker.assert_running()
+      finally:
+        # Explicitly kill pantsd (from a pantsd-launched runner).
+        self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
+
+      checker.assert_stopped()

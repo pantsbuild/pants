@@ -8,8 +8,6 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * Registry of tasks able to produce each type, along with a few fundamental python
  * types that the engine must be aware of.
  */
-// TODO remove Clone https://github.com/pantsbuild/pants/issues/4236
-#[derive(Clone)]
 pub struct Tasks {
   // subject_type, selector -> list of tasks implementing it
   intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,

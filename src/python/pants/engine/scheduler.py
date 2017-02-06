@@ -277,16 +277,16 @@ class LocalScheduler(object):
                                   self._native.lib.nodes_destroy)
       roots = {}
       for root, raw_root in zip(execution_request.roots, self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len)):
-        if raw_root.union_tag is 0:
+        if raw_root.state_tag is 0:
           state = None
-        elif raw_root.union_tag is 1:
-          state = Return(self._from_value(raw_root.union_return))
-        elif raw_root.union_tag is 2:
-          state = Throw(self._from_value(raw_root.union_throw))
-        elif raw_root.union_tag is 3:
-          state = Throw(Exception("Nooped"))
+        elif raw_root.state_tag is 1:
+          state = Return(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 2:
+          state = Throw(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 3:
+          state = Throw(self._from_value(raw_root.state_value))
         else:
-          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.union_tag, raw_root))
+          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
         roots[root] = state
       return roots
 

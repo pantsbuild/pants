@@ -82,7 +82,8 @@ class GoThriftGenIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run)
 
         # Fetch the hash for task impl version.
-        go_thrift_contents = os.listdir(os.path.join(workdir, 'gen', 'go-thrift'))
+        go_thrift_contents = [p for p in os.listdir(os.path.join(workdir, 'gen', 'go-thrift'))
+                              if p != 'current']  # Ignore the 'current' symlink.
         self.assertEqual(len(go_thrift_contents), 1)
         hash_dir = go_thrift_contents[0]
 
