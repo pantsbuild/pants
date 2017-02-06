@@ -54,4 +54,3 @@ class NodeBundle(NodeModule):
           self.dependencies))
     else:
       return self.dependencies[0]
-
