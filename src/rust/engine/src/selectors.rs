@@ -59,9 +59,7 @@ impl Selector {
     )
   }
 
-  /*
-  * The product type this selector will ultimately produce.
-  */
+  // The product type this selector will ultimately produce.
   pub fn product(&self) -> &TypeConstraint {
     match self {
       &Selector::Select(ref s) => &s.product,

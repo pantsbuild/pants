@@ -173,11 +173,11 @@ python_tests(
   sources=['test_rules.py'],
   coverage=['pants.engine.rules'],
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     ':scheduler_test_base',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
   ]
 )
 

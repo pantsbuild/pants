@@ -11,10 +11,8 @@ use std::collections::VecDeque;
 
 use tasks::Tasks;
 
-// I think I ought to be able to replace the below with a set of structs keyed by EntryType.
-// My first couple attempts failed.
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-enum EntryType {
+enum Entry {
   SubjectIsProduct {
     subject_type: TypeId
   },
@@ -43,8 +41,8 @@ struct RootEntry {
 }
 
 impl RootEntry {
-  fn as_entry_type(&self) -> EntryType {
-    EntryType::Root(self.clone())
+  fn as_entry_type(&self) -> Entry {
+    Entry::Root(self.clone())
   }
 }
 
@@ -54,31 +52,31 @@ struct InnerEntry {
   rule: Task
 }
 
-impl EntryType {
+impl Entry {
 
-  fn new_inner(subject_type: TypeId, rule: &Task) -> EntryType {
-    EntryType::InnerEntry(InnerEntry {
+  fn new_inner(subject_type: TypeId, rule: &Task) -> Entry {
+    Entry::InnerEntry(InnerEntry {
       subject_type: subject_type,
       rule: rule.clone(),
     })
   }
 
-  fn new_subject_is_product(subject_type: TypeId) -> EntryType {
-    EntryType::SubjectIsProduct {
+  fn new_subject_is_product(subject_type: TypeId) -> Entry {
+    Entry::SubjectIsProduct {
       subject_type: subject_type,
 
     }
   }
 
-  fn new_unreachable(rule: &Task) -> EntryType {
-    EntryType::Unreachable {
+  fn new_unreachable(rule: &Task) -> Entry {
+    Entry::Unreachable {
       rule: rule.clone(),
       reason: Diagnostic { subject_type: TypeId(0), reason: "".to_string() },
     }
   }
 
-  fn new_literal(value: Key, product: TypeConstraint) -> EntryType {
-    EntryType::Literal {
+  fn new_literal(value: Key, product: TypeConstraint) -> Entry {
+    Entry::Literal {
       value: value,
       product: product
     }
@@ -86,29 +84,29 @@ impl EntryType {
 
   fn can_have_dependencies(&self) -> bool {
     match self {
-      &EntryType::SubjectIsProduct {..} => false,
-      &EntryType::Literal { .. } => false,
-      &EntryType::InnerEntry(_) => true,
-      &EntryType::Root(_) => true,
-      &EntryType::Unreachable { .. } => false,
+      &Entry::SubjectIsProduct {..} => false,
+      &Entry::Literal { .. } => false,
+      &Entry::InnerEntry(_) => true,
+      &Entry::Root(_) => true,
+      &Entry::Unreachable { .. } => false,
     }
   }
 
   fn can_be_dependency(&self) -> bool {
     match self {
-      &EntryType::SubjectIsProduct { .. } => true,
-      &EntryType::Literal { .. } => true,
-      &EntryType::InnerEntry(_) => true,
-      &EntryType::Root(_) => false,
-      &EntryType::Unreachable { .. } => false,
+      &Entry::SubjectIsProduct { .. } => true,
+      &Entry::Literal { .. } => true,
+      &Entry::InnerEntry(_) => true,
+      &Entry::Root(_) => false,
+      &Entry::Unreachable { .. } => false,
     }
   }
 
   fn subject_type(&self) -> TypeId {
     match self {
-      &EntryType::InnerEntry(ref inner) => inner.subject_type,
-      &EntryType::Root(ref root) => root.subject_type,
-      &EntryType::SubjectIsProduct { subject_type, .. } => subject_type,
+      &Entry::InnerEntry(ref inner) => inner.subject_type,
+      &Entry::Root(ref root) => root.subject_type,
+      &Entry::SubjectIsProduct { subject_type, .. } => subject_type,
       _ => panic!("has no subject type"),
 
     }
@@ -116,19 +114,19 @@ impl EntryType {
 
   fn rule(&self) -> &Task {
     match self {
-      &EntryType::InnerEntry(ref inner) => &inner.rule,
-      &EntryType::Unreachable { ref rule, .. } => rule,
+      &Entry::InnerEntry(ref inner) => &inner.rule,
+      &Entry::Unreachable { ref rule, .. } => rule,
       _ => panic!("no rule"),
     }
   }
 }
 
-type Entries = Vec<EntryType>;
+type Entries = Vec<Entry>;
 type RootRuleDependencyEdges = HashMap<RootEntry, RuleEdges>;
 type Rule = Task;
 type RuleDependencyEdges = HashMap<InnerEntry, RuleEdges>;
 type RuleDiagnostics = Vec<Diagnostic>;
-type UnfulfillableRuleMap = HashMap<EntryType, RuleDiagnostics>;
+type UnfulfillableRuleMap = HashMap<Entry, RuleDiagnostics>;
 
 #[derive(Debug)]
 pub struct RootSubjectTypes {
@@ -141,10 +139,8 @@ pub struct Diagnostic {
   reason: String
 }
 
-/*
- * Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
- * to be found statically rather than dynamically.
- */
+// Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
+// to be found statically rather than dynamically.
 pub struct GraphMaker<'a> {
     tasks: &'a Tasks,
     root_subject_types: RootSubjectTypes
@@ -186,7 +182,7 @@ impl <'a> GraphMaker<'a> {
       .collect();
 
     for rule in unreachable_rules {
-      let diagnostics = full_unfulfillable_rules.entry(EntryType::new_unreachable(rule)).or_insert(vec![]);
+      let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
       let terrible_type = TypeId(0); // need to come up with something better.
       // This is used to collate the error messages by subject. It could use either a well known
       // special value or I could make the subject type an option and use None here.
@@ -210,29 +206,29 @@ impl <'a> GraphMaker<'a> {
     fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
       if tasks.externs.satisfied_by(&select.product, &subject_type) {
         // NB a matching subject is always picked first
-        vec![ EntryType::new_subject_is_product(subject_type)]
+        vec![Entry::new_subject_is_product(subject_type)]
       } else {
         match tasks.gen_tasks(&subject_type, &select.product) {
           Some(ref matching_tasks) => {
-            matching_tasks.iter().map(|t| EntryType::new_inner(subject_type, t) ).collect()
+            matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t) ).collect()
           }
           None => vec![]
         }
       }
     }
 
-    fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &EntryType, subject_type: TypeId, reason: String) {
+    fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
       // instead of being modifiable, this could return a UnfulfillableRuleMap that then gets merged.
       let ref mut diagnostics_for_entry = *unfulfillable_rules.entry(entry.clone()).or_insert(vec![]);
       diagnostics_for_entry.push(Diagnostic { subject_type: subject_type, reason: reason });
     }
 
 
-    fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<EntryType>,
+    fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
                           rule_dependency_edges: &mut RuleDependencyEdges,
                           unfulfillable_rules: &mut UnfulfillableRuleMap,
                           root_rule_dependency_edges: &mut RootRuleDependencyEdges,
-                          entry: &EntryType,
+                          entry: &Entry,
                           selector_path: Vec<Selector>,
                           dep_rules: Entries) {
 
@@ -241,19 +237,19 @@ impl <'a> GraphMaker<'a> {
         let unseen_dep_rules = dep_rules.iter()
           .filter(|g| !unfulfillable_rules.contains_key(g))
           .filter(|g| match *g {
-            &EntryType::InnerEntry(ref r) => !rule_deps.contains_key(&r),
-            &EntryType::Root(ref r) => !root_rule_dependency_edges.contains_key(&r),
+            &Entry::InnerEntry(ref r) => !rule_deps.contains_key(&r),
+            &Entry::Root(ref r) => !root_rule_dependency_edges.contains_key(&r),
             _ => true
           })
           .map(|g| g.clone());
         rules_to_traverse.extend(unseen_dep_rules);
       }
       match entry {
-        &EntryType::Root(ref root_entry) => {
+        &Entry::Root(ref root_entry) => {
           let mut edges = root_rule_dependency_edges.entry(root_entry.clone()).or_insert(RuleEdges::new());
           edges.add_edges_via(selector_path, &dep_rules);
         },
-        &EntryType::InnerEntry(ref inner_entry) => {
+        &Entry::InnerEntry(ref inner_entry) => {
           let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(RuleEdges::new());
           if edges.has_edges_for(selector_path.clone()) {
             // This is an error that should only happen if there's a bug in the algorithm, but it
@@ -265,7 +261,7 @@ impl <'a> GraphMaker<'a> {
         _ => {
           // these should have already been filtered out before this was called.
           // TODO enforce ^^ more clearly
-          panic!("TODO")
+          panic!("expected this entry type to have already been filtered out {:?}", entry)
         }
       }
     }
@@ -282,15 +278,15 @@ impl <'a> GraphMaker<'a> {
       if unfulfillable_rules.contains_key(&entry) {
         continue
       }
-      if let EntryType::InnerEntry(ref inner_entry) = entry {
+      if let Entry::InnerEntry(ref inner_entry) = entry {
         if rule_dependency_edges.contains_key(inner_entry) {
           continue
         }
       }
       let mut was_unfulfillable = false;
       match entry {
-        EntryType::InnerEntry(InnerEntry { rule: Task { ref clause, .. }, .. }) |
-        EntryType::Root(RootEntry { ref clause, .. }) => {
+        Entry::InnerEntry(InnerEntry { rule: Task { ref clause, .. }, .. }) |
+        Entry::Root(RootEntry { ref clause, .. }) => {
           for selector in clause {
             match selector {
               &Selector::Select(ref select) =>{
@@ -322,7 +318,7 @@ impl <'a> GraphMaker<'a> {
                                    &mut root_rule_dependency_edges,
                                    &entry,
                                    vec![Selector::SelectLiteral(select.clone())],
-                                   vec![EntryType::new_literal(select.subject.clone(),
+                                   vec![Entry::new_literal(select.subject.clone(),
                                                                select.product.clone())]);
               },
               &Selector::SelectDependencies(ref select) => {
@@ -425,7 +421,7 @@ impl <'a> GraphMaker<'a> {
             }
           }
         },
-        _ => { panic!("TODO") }
+        _ => { panic!("Entry type that cannot dependencies was not filtered out {:?}", entry) }
       }
       // if rule is a snapshot rule
       /*
@@ -513,7 +509,7 @@ pub struct RuleGraph {
 
 impl RuleGraph {
   pub fn has_errors(&self) -> bool {
-    // self.unfulfillable_rules.iter().any(|kv| kv.0.entry_type != EntryType::Root && !kv.1.is_empty())
+    // self.unfulfillable_rules.iter().any(|kv| kv.0.entry_type != Entry::Root && !kv.1.is_empty())
     false
   }
 }
