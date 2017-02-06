@@ -6,8 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
-from collections import OrderedDict
 from textwrap import dedent
+
+from twitter.common.collections import OrderedSet
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
@@ -74,7 +75,7 @@ class SubA(A):
     return 'SubA()'
 
 
-_suba_root_subject_fns = {SubA: lambda p: Select(p)}
+_suba_root_subject_types = {SubA}
 
 
 class BoringRule(Rule):
@@ -111,7 +112,7 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [(A, (Select(B),), noop)]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
                                  goal_to_product={},
-                                 root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
+                                 root_subject_types={SubA})
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
@@ -126,7 +127,7 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [(A, (Select(B), Select(C)), noop)]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
+      root_subject_types={SubA})
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
@@ -142,7 +143,7 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [(A, (Select(B),), noop)]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns={k: lambda p: Select(p) for k in (B,)})
+      root_subject_types={B,})
 
     validator.validate()
 
@@ -153,7 +154,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns={k: lambda p: Select(p) for k in (C,)})
+      root_subject_types={C,})
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
@@ -175,7 +176,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={'goal-name': AGoal},
-      root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
+      root_subject_types={SubA})
     with self.assertRaises(ValueError) as cm:
       validator.validate()
 
@@ -189,7 +190,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns={k: lambda p: Select(p) for k in (SubA,)})
+      root_subject_types={SubA})
 
     validator.validate()
 
@@ -202,7 +203,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(RuleIndex.create(rules, intrinsics),
       goal_to_product={},
-      root_subject_fns={k: lambda p: Select(p) for k in (A,)})
+      root_subject_types={A,})
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
@@ -224,7 +225,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(RuleIndex.create(rules, intrinsics),
       goal_to_product={},
-      root_subject_fns={k: lambda p: Select(p) for k in (A,)})
+      root_subject_types={A,})
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
@@ -246,7 +247,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
@@ -265,7 +266,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
@@ -285,7 +286,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
     validator = RulesetValidator(RuleIndex.create(rules, tuple()),
       goal_to_product={},
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
 
     with self.assertRaises(ValueError) as cm:
       validator.validate()
@@ -313,7 +314,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     with self.assertRaises(ValueError) as cm:
       GraphMaker(RuleIndex.create(rules), tuple())
     self.assertEquals(dedent("""
-                                  root_subject_fns must not be empty
+                                  root_subject_types must not be empty
                                """).strip(), str(cm.exception))
 
   def test_smallest_full_test(self):
@@ -322,7 +323,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     fullgraph = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns={k: lambda p: Select(p) for k in (SubA,)}).full_graph()
+      root_subject_types={SubA}).full_graph()
 
     self.assert_equal_with_printing(dedent("""
                                {
@@ -341,13 +342,12 @@ class RuleGraphMakerTest(unittest.TestCase):
 
     rule_index = RuleIndex.create(tasks, intrinsics)
     graphmaker = GraphMaker(rule_index,
-      root_subject_fns={k: lambda p: Select(p) for k in (Address, # TODO, use the actual fns.
+      root_subject_types={Address,
                           PathGlobs,
                           SingleAddress,
                           SiblingAddresses,
                           DescendantAddresses,
-                          AscendantAddresses
-      )})
+                          AscendantAddresses})
     fullgraph = graphmaker.full_graph()
     print('---diagnostic------')
     print(fullgraph.error_message())
@@ -371,9 +371,8 @@ class RuleGraphMakerTest(unittest.TestCase):
       (A, (Select(SubA),), noop),
       (B, (Select(A),), noop)
     ]
-    select_p = lambda p: Select(p)
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=OrderedDict([(SubA, select_p), (A, select_p)]))
+      root_subject_types=OrderedSet([SubA, A]))
     fullgraph = graphmaker.full_graph()
 
     self.assert_equal_with_printing(dedent("""
@@ -397,7 +396,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -416,7 +415,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -437,7 +436,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -462,7 +461,7 @@ class RuleGraphMakerTest(unittest.TestCase):
 
     graphmaker = GraphMaker(RuleIndex.create(rules,
                                              intrinsics),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -485,7 +484,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
-                            root_subject_fns=_suba_root_subject_fns)
+                            root_subject_types=_suba_root_subject_types)
     fullgraph = graphmaker.full_graph()
 
     self.assert_equal_with_printing(dedent("""
@@ -509,7 +508,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (D, C, BoringRule(C))
     ]
     graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
-      root_subject_fns=_suba_root_subject_fns,
+      root_subject_types=_suba_root_subject_types,
 
     )
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
@@ -531,7 +530,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -553,7 +552,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -574,7 +573,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -598,7 +597,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -623,7 +622,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -650,7 +649,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       (C, B, noop),
     ]
     graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
-                            root_subject_fns=_suba_root_subject_fns)
+                            root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing('{empty graph}', subgraph)
@@ -669,7 +668,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, intrinsics),
-                            root_subject_fns=_suba_root_subject_fns)
+                            root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -691,7 +690,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=B)
 
     self.assert_equal_with_printing(dedent("""
@@ -712,7 +711,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.full_graph()
 
     self.assert_equal_with_printing(dedent("""
@@ -735,7 +734,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=B)
 
     self.assert_equal_with_printing(dedent("""
@@ -754,7 +753,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=A)
 
     self.assert_equal_with_printing(dedent("""
@@ -776,7 +775,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     ]
 
     graphmaker = GraphMaker(RuleIndex.create(rules, tuple()),
-      root_subject_fns=_suba_root_subject_fns)
+      root_subject_types=_suba_root_subject_types)
     subgraph = graphmaker.generate_subgraph(SubA(), requested_product=D)
 
     self.assert_equal_with_printing(dedent("""

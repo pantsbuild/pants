@@ -72,7 +72,11 @@ class RemotePantsRunner(object):
     modified_env = self._combine_dicts(self._env, ng_env)
 
     # Instantiate a NailgunClient.
-    client = NailgunClient(port=self._port, ins=self._stdin, out=self._stdout, err=self._stderr)
+    client = NailgunClient(port=self._port,
+                           ins=self._stdin,
+                           out=self._stdout,
+                           err=self._stderr,
+                           exit_on_broken_pipe=True)
 
     with self._trapped_control_c(client):
       # Execute the command on the pailgun.

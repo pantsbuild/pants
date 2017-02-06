@@ -188,7 +188,7 @@ python_library(
     '3rdparty/python:lmdb',
     ':nodes',
     ':objects',
-    ':scheduler',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:meta',
   ]
 )
