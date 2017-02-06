@@ -9,8 +9,11 @@ use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProje
  * types that the engine must be aware of.
  */
 pub struct Tasks {
+  // subject_type, selector -> list of tasks implementing it
   intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,
+  // any-subject, selector -> list of tasks implementing it
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
+  // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   pub externs: Externs,
   pub field_name: Field,
@@ -59,6 +62,26 @@ impl Tasks {
     }
   }
 
+  pub fn all_product_types(&self) -> Vec<TypeConstraint> {
+    self.all_rules().iter().map(|t| t.product).collect()
+  }
+
+  pub fn is_singleton_task(&self, sought_task: &Task) -> bool {
+    self.singletons.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
+  }
+
+  pub fn is_intrinsic_task(&self, sought_task: &Task) -> bool {
+    self.intrinsics.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
+  }
+
+  pub fn all_rules(&self) -> Vec<&Task> {
+    self.singletons.values()
+      .chain(self.intrinsics.values())
+      .chain(self.tasks.values())
+      .flat_map(|tasks| tasks)
+      .collect()
+  }
+
   pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
     // Use singletons, then intrinsics, otherwise tasks.
     self.singletons.get(product)
@@ -105,7 +128,6 @@ impl Tasks {
   /**
    * The following methods define the Task registration lifecycle.
    */
-
   pub fn task_add(&mut self, func: Function, product: TypeConstraint) {
     assert!(
       self.preparing.is_none(),
