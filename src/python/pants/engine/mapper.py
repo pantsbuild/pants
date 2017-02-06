@@ -150,11 +150,10 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
     :rtype: dict from :class:`pants.build_graph.address.BuildFileAddress` to thin addressable
             objects.
     """
-    addressables = {}
-    for (name, value) in self.objects_by_name.items():
-      path, obj = value
-      addressables[BuildFileAddress(rel_path=path, target_name=name)] = obj
-    return addressables
+    return {
+      BuildFileAddress(rel_path=path, target_name=name): obj
+      for name, (path, obj) in self.objects_by_name.items()
+    }
 
   def __eq__(self, other):
     if not type(other) == type(self):

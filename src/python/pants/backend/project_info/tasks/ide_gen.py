@@ -10,7 +10,6 @@ import os
 import shutil
 from collections import defaultdict
 
-
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from twitter.common.collections.orderedset import OrderedSet
