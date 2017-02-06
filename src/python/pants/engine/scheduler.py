@@ -79,22 +79,30 @@ class LocalScheduler(object):
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
-    select_product = lambda product: Select(product)
-    root_selector_fns = {
-      Address: select_product,
-      AscendantAddresses: select_product,
-      DescendantAddresses: select_product,
-      PathGlobs: select_product,
-      SiblingAddresses: select_product,
-      SingleAddress: select_product,
+    root_subject_types = {
+      Address,
+      AscendantAddresses,
+      DescendantAddresses,
+      PathGlobs,
+      SiblingAddresses,
+      SingleAddress,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     singletons = create_snapshot_singletons(project_tree)
     rule_index = RuleIndex.create(tasks, intrinsics, singletons)
-    RulesetValidator(rule_index, goals, root_selector_fns).validate()
+
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
+
+    self._validate_ruleset(root_subject_types)
+
+    RulesetValidator(rule_index, goals, root_subject_types).validate()
+
+  def _validate_ruleset(self, root_subject_types):
+    listed = list(TypeId(self._to_id(t)) for t in root_subject_types)
+
+    self._native.lib.validator_run(self._scheduler, listed, len(listed))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
