@@ -154,7 +154,7 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
                                        type_or_constraint_repr(self.product),
                                        self.projected_subject.__name__,
                                        repr(self.fields),
-                                       self.input_product.__name__)
+                                       self.input_product.__class__.__name__ or self.input_product.__name__)
 
 
 class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):

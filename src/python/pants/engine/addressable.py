@@ -119,9 +119,6 @@ class TypeConstraint(AbstractClass):
       .format(type_constraint_type=type(self).__name__,
                     constrained_type=constrained_type))
 
-  def __name__(self):
-    return ', '.join(t.__name__ for t in self._types)
-
 
 class SuperclassesOf(TypeConstraint):
   """Objects of the exact type as well as any super-types are allowed."""
