@@ -41,8 +41,6 @@ use externs::{
   SatisfiedByExtern,
   StoreListExtern,
   TypeIdBuffer,
-  TypeConstraintToTypeIdExtern,
-  TypeIdToTypeConstraintExtern,
   ValForExtern,
   ValToStrExtern,
   with_vec,
@@ -156,8 +154,6 @@ pub extern fn scheduler_create(
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  type_constraint_to_type_id: TypeConstraintToTypeIdExtern,
-  type_id_to_type_constraint: TypeIdToTypeConstraintExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -182,8 +178,6 @@ pub extern fn scheduler_create(
       project_multi,
       create_exception,
       invoke_runnable,
-      type_constraint_to_type_id,
-      type_id_to_type_constraint,
     );
   Box::into_raw(
     Box::new(

@@ -13,7 +13,6 @@ import six
 from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.engine.addressable import Exactly
 from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
@@ -96,9 +95,6 @@ _FFI.cdef(
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
     typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
 
-    typedef TypeId           (*extern_type_constraint_to_type_id)(ExternContext*, TypeConstraint*);
-    typedef TypeConstraint   (*extern_type_id_to_type_constraint)(ExternContext*, TypeId*);
-
     typedef void RawScheduler;
 
     typedef struct {
@@ -134,8 +130,6 @@ _FFI.cdef(
                                    extern_project_multi,
                                    extern_create_exception,
                                    extern_invoke_runnable,
-                                   extern_type_constraint_to_type_id,
-                                   extern_type_id_to_type_constraint,
                                    Field,
                                    Field,
                                    Field,
@@ -277,21 +271,6 @@ def extern_project(context_handle, val, field, type_id):
 
   return c.to_value(projected)
 
-@_FFI.callback("TypeId(ExternContext*, TypeConstraint*)")
-def extern_type_constraint_to_type_id(context_handle, type_constraint):
-  c = _FFI.from_handle(context_handle)
-  type_constraint = c.from_id(type_constraint.id_)
-  if type(type_constraint) is Exactly and len(type_constraint._types) == 1:
-    return TypeId(c.to_id(next(iter(type_constraint._types))))
-  else:
-    print("AAAAAAAAA")
-    return None # todo, blow up, or could make this return a buffer instead
-
-@_FFI.callback("TypeConstraint(ExternContext*, TypeId*)")
-def extern_type_id_to_type_constraint(context_handle, type_id):
-  c = _FFI.from_handle(context_handle)
-  klass = c.from_id(type_id.id_)
-  return TypeConstraint(c.to_id(klass))
 
 @_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
 def extern_project_multi(context_handle, val, field):
@@ -565,8 +544,6 @@ class Native(object):
                                           extern_project_multi,
                                           extern_create_exception,
                                           extern_invoke_runnable,
-                                          extern_type_constraint_to_type_id,
-                                          extern_type_id_to_type_constraint,
                                           self.context.to_key('name'),
                                           self.context.to_key('products'),
                                           self.context.to_key('default'),
