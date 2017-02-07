@@ -68,10 +68,10 @@ _FFI.cdef(
 
 
     typedef struct {
-      TypeConstraint*     constraints_ptr;
-      uint64_t   constraints_len;
+      TypeId*     ids_ptr;
+      uint64_t   ids_len;
       Value      handle_;
-    } TypeConstraintBuffer;
+    } TypeIdBuffer;
 
     typedef struct {
       Value  value;
@@ -151,7 +151,7 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraintBuffer, bool);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeIdBuffer, bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
     void task_end(RawScheduler*);
 
@@ -421,8 +421,8 @@ class ExternContext(object):
     buf = _FFI.new('Value[]', keys)
     return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
 
-  def constraints_buf(self, types):
-    buf = _FFI.new('TypeConstraint[]', types)
+  def type_ids_buf(self, types):
+    buf = _FFI.new('TypeId[]', types)
     return (buf, len(types), self.to_value(buf, type_id=self.anon_id))
 
   def to_value(self, obj, type_id=None):

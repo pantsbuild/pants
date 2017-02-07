@@ -7,7 +7,7 @@ use futures::future::Future;
 use futures::future;
 use futures_cpupool::{CpuPool, CpuFuture};
 
-use core::{Field, Key, TypeConstraint};
+use core::{Field, Key, TypeConstraint, TypeId};
 use externs::LogLevel;
 use graph::{EntryId, Graph};
 use nodes::{Node, NodeResult, Context, ContextFactory};
@@ -72,7 +72,7 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
-    field_types: Vec<TypeConstraint>,
+    field_types: Vec<TypeId>,
     transitive: bool,
   ) {
     self.add_root(

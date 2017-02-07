@@ -11,7 +11,7 @@ pub struct SelectDependencies {
   pub product: TypeConstraint,
   pub dep_product: TypeConstraint,
   pub field: Field,
-  pub field_types: Vec<TypeConstraint>,
+  pub field_types: Vec<TypeId>,
   pub transitive: bool,
 }
 

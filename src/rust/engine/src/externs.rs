@@ -224,16 +224,16 @@ pub struct ValueBuffer {
 }
 
 #[repr(C)]
-pub struct TypeConstraintBuffer {
-  constraints_ptr: *mut TypeConstraint,
-  constraints_len: u64,
+pub struct TypeIdBuffer {
+  ids_ptr: *mut TypeId,
+  ids_len: u64,
   // handle to hold the underlying buffer alive
   handle_: Value
 }
 
-impl TypeConstraintBuffer {
-  pub fn to_vec(&self) -> Vec<TypeConstraint> {
-    with_vec(self.constraints_ptr, self.constraints_len as usize, |vec| {
+impl TypeIdBuffer {
+  pub fn to_vec(&self) -> Vec<TypeId> {
+    with_vec(self.ids_ptr, self.ids_len as usize, |vec| {
       vec.clone()
     })
   }

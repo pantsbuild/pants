@@ -40,7 +40,7 @@ use externs::{
   ProjectMultiExtern,
   SatisfiedByExtern,
   StoreListExtern,
-  TypeConstraintBuffer,
+  TypeIdBuffer,
   TypeConstraintToTypeIdExtern,
   TypeIdToTypeConstraintExtern,
   ValForExtern,
@@ -237,7 +237,7 @@ pub extern fn execution_add_root_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
-  field_types: TypeConstraintBuffer,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
@@ -350,7 +350,7 @@ pub extern fn task_add_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
-  field_types: TypeConstraintBuffer,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_tasks(scheduler_ptr, |tasks| {
