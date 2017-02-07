@@ -12,7 +12,7 @@ from collections import OrderedDict
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
-from pants.build_graph.address import Address
+from pants.build_graph.address import BuildFileAddress
 from pants.engine.objects import Serializable
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
@@ -140,17 +140,20 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
                                            current_path=current_path))
         objects_by_name[name] = (current_path, obj)
     return AddressFamily(namespace=spec_path,
-                         objects_by_name=OrderedDict((name, obj) for name, (_, obj)
-                                                     in sorted(objects_by_name.items())))
+                         objects_by_name=OrderedDict((name, (path, obj)) for name, (path, obj)
+                                                      in sorted(objects_by_name.items())))
 
   @memoized_property
   def addressables(self):
-    """Return a mapping from address to thin addressable objects in this namespace.
+    """Return a mapping from BuildFileAddress to thin addressable objects in this namespace.
 
-    :rtype: dict from :class:`pants.build_graph.address.Address` to thin addressable objects.
+    :rtype: dict from :class:`pants.build_graph.address.BuildFileAddress` to thin addressable
+            objects.
     """
-    return {Address(spec_path=self.namespace, target_name=name): obj
-            for name, obj in self.objects_by_name.items()}
+    return {
+      BuildFileAddress(rel_path=path, target_name=name): obj
+      for name, (path, obj) in self.objects_by_name.items()
+    }
 
   def __eq__(self, other):
     if not type(other) == type(self):
@@ -164,8 +167,8 @@ class AddressFamily(datatype('AddressFamily', ['namespace', 'objects_by_name']))
     return hash(self.namespace)
 
   def __repr__(self):
-    return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(self.namespace,
-                                                                        self.objects_by_name.keys())
+    return 'AddressFamily(namespace={!r}, objects_by_name={!r})'.format(
+        self.namespace, self.objects_by_name.keys())
 
 
 class ResolveError(MappingError):
