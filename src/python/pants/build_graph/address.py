@@ -259,8 +259,6 @@ class BuildFileAddress(Address):
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
                                            target_name=target_name or os.path.basename(spec_path))
     self.rel_path = rel_path
-    with open("a", "w") as a:
-      a.write(self.rel_path)
     self._build_file = build_file
 
   @property
