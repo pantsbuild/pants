@@ -46,9 +46,9 @@ class BuildFileAddressMapperTest(BaseTest):
     subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
     with open(os.path.join(self.build_root, 'BUILD.invalid.suffix'), 'w') as invalid_build_file:
       invalid_build_file.write('target(name="foobar")')
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo'),
-                       BuildFileAddress(subdir_build_file, 'bar'),
-                       BuildFileAddress(subdir_suffix_build_file, 'baz')},
+    self.assertEquals({BuildFileAddress(build_file=root_build_file, target_name='foo'),
+                       BuildFileAddress(build_file=subdir_build_file, target_name='bar'),
+                       BuildFileAddress(build_file=subdir_suffix_build_file, target_name='baz')},
                       self.address_mapper.scan_addresses())
 
   def test_scan_addresses_with_root(self):
@@ -56,8 +56,8 @@ class BuildFileAddressMapperTest(BaseTest):
     subdir_build_file = self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
     subdir_suffix_build_file = self.add_to_build_file('subdir/BUILD.suffix', 'target(name="baz")')
     subdir = os.path.join(self.build_root, 'subdir')
-    self.assertEquals({BuildFileAddress(subdir_build_file, 'bar'),
-                       BuildFileAddress(subdir_suffix_build_file, 'baz')},
+    self.assertEquals({BuildFileAddress(build_file=subdir_build_file, target_name='bar'),
+                       BuildFileAddress(build_file=subdir_suffix_build_file, target_name='baz')},
                       self.address_mapper.scan_addresses(root=subdir))
 
   def test_scan_addresses_with_invalid_root(self):
@@ -130,7 +130,9 @@ class BuildFileAddressMapperWithIgnoreTest(BaseTest):
   def test_scan_from_address_mapper(self):
     root_build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
     self.add_to_build_file('subdir/BUILD', 'target(name="bar")')
-    self.assertEquals({BuildFileAddress(root_build_file, 'foo')}, self.address_mapper.scan_addresses())
+    self.assertEquals(
+      {BuildFileAddress(build_file=root_build_file, target_name='foo')},
+      self.address_mapper.scan_addresses())
 
   def test_scan_from_context(self):
     self.add_to_build_file('BUILD', 'target(name="foo")')

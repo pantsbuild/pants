@@ -363,7 +363,6 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assertEquals(declared_rule_strings,
       rules_remaining_in_graph_strs
     )
-
     # statically assert that the number of dependency keys is fixed
     self.assertEquals(41, len(fullgraph.rule_dependencies))
 

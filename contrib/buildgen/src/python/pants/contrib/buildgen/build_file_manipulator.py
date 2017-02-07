@@ -331,7 +331,7 @@ class BuildFileManipulator(object):
     """See BuildFileManipulator.load() for how to construct one as a user."""
     self.name = name
     self.build_file = build_file
-    self.target_address = BuildFileAddress(build_file, name)
+    self.target_address = BuildFileAddress(build_file=build_file, target_name=name)
     self._build_file_source_lines = build_file_source_lines
     self._target_source_lines = target_source_lines
     self._target_interval = target_interval
