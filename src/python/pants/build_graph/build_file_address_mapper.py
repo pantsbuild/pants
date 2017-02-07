@@ -9,9 +9,7 @@ import logging
 import os
 import re
 import traceback
-from collections import defaultdict
 
-import six
 from pathspec import PathSpec
 from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from twitter.common.collections import OrderedSet
@@ -42,11 +40,6 @@ logger = logging.getLogger(__name__)
 class BuildFileAddressMapper(AddressMapper):
   """Maps addresses in the pants virtual address space to corresponding BUILD file declarations."""
 
-  # Target specs are mapped to the patterns which match them, if any. This variable is a key for
-  # specs which don't match any exclusion regexps. We know it won't already be in the list of
-  # patterns, because the asterisks in its name make it an invalid regexp.
-  _UNMATCHED_KEY = '** unmatched **'
-
   def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None, exclude_target_regexps=None):
     """Create a BuildFileAddressMapper.
 
@@ -61,6 +54,13 @@ class BuildFileAddressMapper(AddressMapper):
     self._exclude_target_regexps = exclude_target_regexps or []
     self._exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
 
+  def _exclude_address(self, address):
+    for pattern in self._exclude_patterns:
+      if pattern.search(address.spec) is not None:
+        logger.debug('Address "{}" is excluded by pattern "{}"\n'.format(address.spec, pattern.pattern))
+        return True
+    return False
+
   @property
   def root_dir(self):
     return self._build_file_parser.root_dir
@@ -74,7 +74,7 @@ class BuildFileAddressMapper(AddressMapper):
     """
     address_map = self._address_map_from_spec_path(address.spec_path)
     if address not in address_map:
-      self._raise_incorrect_address_error(address.spec_path, address.target_name, address_map)
+      self._raise_incorrect_address_error(address, address_map)
     else:
       return address_map[address]
 
@@ -94,7 +94,8 @@ class BuildFileAddressMapper(AddressMapper):
         raise AddressLookupError("{message}\n Loading addresses from '{spec_path}' failed."
                                  .format(message=e, spec_path=spec_path))
 
-      address_map = {address: (address, addressed) for address, addressed in mapping.items()}
+      address_map = {address: (address, addressed)
+                     for address, addressed in mapping.items() if not self._exclude_address(address)}
       self._spec_path_to_address_map_map[spec_path] = address_map
     return self._spec_path_to_address_map_map[spec_path]
 
@@ -121,11 +122,6 @@ class BuildFileAddressMapper(AddressMapper):
       raise self.InvalidBuildFileReference('{message}\n  when translating spec {spec}'
                                            .format(message=e, spec=spec))
 
-  def scan_build_files(self, base_path):
-    build_files = BuildFile.scan_build_files(self._project_tree, base_path,
-                                             build_ignore_patterns=self._build_ignore_patterns)
-    return OrderedSet(bf.relpath for bf in build_files)
-
   def specs_to_addresses(self, specs, relative_to=''):
     """The equivalent of `spec_to_address` for a group of specs all relative to the same path.
 
@@ -134,6 +130,11 @@ class BuildFileAddressMapper(AddressMapper):
     """
     for spec in specs:
       yield self.spec_to_address(spec, relative_to=relative_to)
+
+  def scan_build_files(self, base_path):
+    build_files = BuildFile.scan_build_files(self._project_tree, base_path,
+                                             build_ignore_patterns=self._build_ignore_patterns)
+    return OrderedSet(bf.relpath for bf in build_files)
 
   def scan_addresses(self, root=None):
     """Recursively gathers all addresses visible under `root` of the virtual address space.
@@ -154,10 +155,8 @@ class BuildFileAddressMapper(AddressMapper):
 
     addresses = set()
     try:
-      for build_file in BuildFile.scan_build_files(self._project_tree,
-                                                   base_relpath=base_path,
-                                                   build_ignore_patterns=self._build_ignore_patterns):
-        for address in self.addresses_in_spec_path(build_file.spec_path):
+      for build_file in self.scan_build_files(base_path):
+        for address in self.addresses_in_spec_path(os.path.dirname(build_file)):
           addresses.add(address)
     except BuildFile.BuildFileError as e:
       # Handle exception from BuildFile out of paranoia.  Currently, there is no way to trigger it.
@@ -167,42 +166,12 @@ class BuildFileAddressMapper(AddressMapper):
 
   def scan_specs(self, specs, fail_fast=True):
     """Execute a collection of `specs.Spec` objects and return a set of Addresses."""
-    excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
-
-    def exclude_spec(spec):
-      for pattern in self._exclude_patterns:
-        if pattern.search(spec) is not None:
-          excluded_target_map[pattern.pattern].add(spec)
-          return True
-      excluded_target_map[self._UNMATCHED_KEY].add(spec)
-      return False
-
-    def exclude_address(address):
-      return exclude_spec(address.spec)
 
     #TODO: Investigate why using set will break ci. May help migration to v2 engine.
     addresses = OrderedSet()
     for spec in specs:
       for address in self._scan_spec(spec, fail_fast):
-        if not exclude_address(address):
-          addresses.add(address)
-
-    # Print debug information about the excluded targets
-    if logger.getEffectiveLevel() <= logging.DEBUG and excluded_target_map:
-      logger.debug('excludes:\n  {excludes}'
-                   .format(excludes='\n  '.join(self._exclude_target_regexps)))
-      targets = ', '.join(excluded_target_map[self._UNMATCHED_KEY])
-      logger.debug('Targets after excludes: %s', targets)
-      excluded_count = 0
-      for pattern, targets in six.iteritems(excluded_target_map):
-        if pattern != self._UNMATCHED_KEY:
-          logger.debug('Targets excluded by pattern {pattern}\n  {targets}'
-                       .format(pattern=pattern,
-                               targets='\n  '.join(targets)))
-          excluded_count += len(targets)
-      logger.debug('Excluded {count} target{plural}.'
-                   .format(count=excluded_count,
-                           plural=('s' if excluded_count != 1 else '')))
+        addresses.add(address)
     return addresses
 
   @staticmethod
@@ -241,12 +210,18 @@ class BuildFileAddressMapper(AddressMapper):
     else:
       raise ValueError('Unsupported Spec type: {}'.format(spec))
 
-  def _raise_incorrect_address_error(self, spec_path, wrong_target_name, addresses):
+  def _raise_incorrect_address_error(self, wrong_address, addresses):
     """Search through the list of targets and return those which originate from the same folder
     which wrong_target_name resides in.
 
     :raises: A helpful error message listing possible correct target addresses.
     """
+    if self._exclude_address(wrong_address):
+      raise self.InvalidAddressError(
+        '"{}" is excluded by exclude_target_regexp option.'.format(wrong_address.spec))
+
+    spec_path = wrong_address.spec_path
+    wrong_target_name = wrong_address.target_name
     was_not_found_message = '{target_name} was not found in BUILD files from {spec_path}'.format(
       target_name=wrong_target_name, spec_path=spec_path)
 

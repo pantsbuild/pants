@@ -93,3 +93,21 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
 
     self.assert_success(run_result)
     self.assertIn('testprojects/tests/python/pants/constants_only:constants_only', run_result.stdout_data)
+
+  @ensure_engine
+  def test_build_ignore_dependees(self):
+    run_result = self.run_pants(['-q',
+                                 'dependees',
+                                 'examples/src/scala/org/pantsbuild/example/hello/welcome'],
+                                config={
+                                  'DEFAULT': {
+                                    'build_ignore': [
+                                      'examples/tests/scala/'
+                                    ]
+                                  }
+                                })
+
+    self.assert_success(run_result)
+    self.assertEqual({'examples/src/scala/org/pantsbuild/example:jvm-run-example-lib',
+                      'examples/src/scala/org/pantsbuild/example/hello/exe:exe'},
+                     set(run_result.stdout_data.strip().split()))

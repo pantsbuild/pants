@@ -94,7 +94,7 @@ class MutableBuildGraph(BuildGraph):
       raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
                                        .format(message=e, spec=target_address.spec))
 
-  def inject_specs_closure(self, specs, fail_fast=None):
+  def inject_specs_closure(self, specs, fail_fast=False):
     for address in self._address_mapper.scan_specs(specs,
                                                    fail_fast=fail_fast):
       self.inject_address_closure(address)

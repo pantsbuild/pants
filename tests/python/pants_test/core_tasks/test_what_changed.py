@@ -417,15 +417,3 @@ class WhatChangedTest(WhatChangedTestBasic):
       '//:pants-config',
       workspace=self.workspace(files=['pants.ini'])
     )
-
-
-class WhatChangedTestWithIgnorePatterns(WhatChangedTestBasic):
-  @property
-  def build_ignore_patterns(self):
-    return ['root/src/py/1']
-
-  def test_build_ignore_patterns(self):
-    self.assert_console_output(
-      'root/src/py/a:alpha',
-      workspace=self.workspace(files=['root/src/py/a/b/c', 'root/src/py/a/d', 'root/src/py/1/2'])
-    )

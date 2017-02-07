@@ -316,6 +316,27 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
         self.assertIn(expected_item, pants_run.stdout_data)
 
   @ensure_engine
+  def test_test_changed_build_ignore(self):
+    changed_src = 'src/resources/org/pantsbuild/resourceonly/README.md'
+    build_ignore_pattern = 'helloworld'
+
+    with create_isolated_git_repo() as worktree:
+      with mutated_working_copy([os.path.join(worktree, changed_src)]):
+        pants_run = self.run_pants([
+          '-ldebug',  # This ensures the changed target names show up in the pants output.
+          '--build-ignore={}'.format(build_ignore_pattern),
+          'changed',
+          '--changes-since=HEAD',
+          '--include-dependees=transitive'
+        ])
+
+      self.assert_success(pants_run)
+      self.assertEqual(
+        {'src/resources/org/pantsbuild/resourceonly:resource'},
+        lines_to_set(pants_run.stdout_data)
+      )
+
+  @ensure_engine
   def test_test_changed_exclude_target(self):
     changed_src = 'src/python/python_targets/test_library.py'
     exclude_target_regexp = r'_[0-9]'
@@ -328,10 +349,10 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       with mutated_working_copy([os.path.join(worktree, changed_src)]):
         pants_run = self.run_pants([
           '-ldebug',   # This ensures the changed target names show up in the pants output.
-          '--exclude-target-regexp={}'.format(exclude_target_regexp),
           'test-changed',
           '--changes-since=HEAD',
-          '--include-dependees=transitive'
+          '--include-dependees=transitive',
+          '--exclude-target-regexp={}'.format(exclude_target_regexp)
         ])
 
       self.assert_success(pants_run)
