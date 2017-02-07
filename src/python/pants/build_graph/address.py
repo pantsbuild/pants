@@ -248,7 +248,7 @@ class BuildFileAddress(Address):
     """
     :param build_file: The build file that contains the object this address points to.
     :type build_file: :class:`pants.base.build_file.BuildFile`
-    :param string rel_path: The path relative to root_dir where the BUILD file is located.
+    :param string rel_path: The BUILD files' path, relative to the root_dir.
     :param string target_name: The name of the target within the BUILD file; defaults to the default
                                target, aka the name of the BUILD file parent dir.
 
@@ -259,6 +259,8 @@ class BuildFileAddress(Address):
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
                                            target_name=target_name or os.path.basename(spec_path))
     self.rel_path = rel_path
+    with open("a", "w") as a:
+      a.write(self.rel_path)
     self._build_file = build_file
 
   @property

@@ -79,16 +79,15 @@ class LocalScheduler(object):
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
-    select_product = lambda product: Select(product)
 
     root_subject_types = {
-      Address: select_product,
-      BuildFileAddress: select_product,
-      AscendantAddresses: select_product,
-      DescendantAddresses: select_product,
-      PathGlobs: select_product,
-      SiblingAddresses: select_product,
-      SingleAddress: select_product,
+      Address,
+      BuildFileAddress,
+      AscendantAddresses,
+      DescendantAddresses,
+      PathGlobs,
+      SiblingAddresses,
+      SingleAddress,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     singletons = create_snapshot_singletons(project_tree)
