@@ -78,6 +78,22 @@ class NodeTask(Task):
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 
+  def execute_yarnpkg(self, args, workunit_name=None, workunit_labels=None):
+    """Executes npm passing the given args.
+
+    :param list args: The command line args to pass to `yarnpkg`.
+    :param string workunit_name: A name for the execution's work unit; defaults to 'yarnpkg'.
+    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
+    :returns: A tuple of (returncode, command).
+    :rtype: A tuple of (int,
+            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
+    """
+
+    yarnpkg_command = self.node_distribution.yarnpkg_command(args=args)
+    return self._execute_command(yarnpkg_command,
+                                 workunit_name=workunit_name,
+                                 workunit_labels=workunit_labels)
+
   def _execute_command(self, command, workunit_name=None, workunit_labels=None):
     """Executes a node or npm command via self._run_node_distribution_command.
 

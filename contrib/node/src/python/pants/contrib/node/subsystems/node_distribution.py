@@ -35,6 +35,9 @@ class NodeDistribution(object):
       register('--version', advanced=True, default='6.9.1',
                help='Node distribution version.  Used as part of the path to lookup the '
                     'distribution with --binary-util-baseurls and --pants-bootstrapdir')
+      register('--package-manager', advanced=True, default='npm',
+               help='Node distribution version.  Used as part of the path to lookup the '
+                    'distribution with --binary-util-baseurls and --pants-bootstrapdir')
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
@@ -151,6 +154,15 @@ class NodeDistribution(object):
     :rtype: :class:`NodeDistribution.Command`
     """
     return self._create_command('npm', args)
+
+  def yarnpkg_command(self, args):
+    """Creates a command that can run `yarnpkg`, passing the given args to it.
+
+    :param list args: A list of arguments to pass to `yarnpkg`.
+    :returns: An `yarnpkg` command that can be run later.
+    :rtype: :class:`NodeDistribution.Command`
+    """
+    return self._create_command('yarnpkg', args)
 
   def _create_command(self, executable, args=None):
     return self.Command(os.path.join(self.path, 'bin'), executable, args or [])
