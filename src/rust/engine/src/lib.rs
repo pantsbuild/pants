@@ -40,6 +40,9 @@ use externs::{
   ProjectMultiExtern,
   SatisfiedByExtern,
   StoreListExtern,
+  TypeConstraintBuffer,
+  TypeConstraintToTypeIdExtern,
+  TypeIdToTypeConstraintExtern,
   ValForExtern,
   ValToStrExtern,
   with_vec,
@@ -153,6 +156,8 @@ pub extern fn scheduler_create(
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
+  type_constraint_to_type_id: TypeConstraintToTypeIdExtern,
+  type_id_to_type_constraint: TypeIdToTypeConstraintExtern,
   field_name: Field,
   field_products: Field,
   field_variants: Field,
@@ -177,6 +182,8 @@ pub extern fn scheduler_create(
       project_multi,
       create_exception,
       invoke_runnable,
+      type_constraint_to_type_id,
+      type_id_to_type_constraint,
     );
   Box::into_raw(
     Box::new(
@@ -230,6 +237,7 @@ pub extern fn execution_add_root_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
+  field_types: TypeConstraintBuffer,
   transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
@@ -238,6 +246,7 @@ pub extern fn execution_add_root_select_dependencies(
       product,
       dep_product,
       field,
+      field_types.to_vec(),
       transitive,
     );
   })
@@ -341,10 +350,11 @@ pub extern fn task_add_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
+  field_types: TypeConstraintBuffer,
   transitive: bool,
 ) {
   with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_dependencies(product, dep_product, field, transitive);
+    tasks.add_select_dependencies(product, dep_product, field, field_types.to_vec(), transitive);
   })
 }
 
@@ -434,8 +444,9 @@ pub extern fn validator_run(
       let graph = graph_maker.full_graph();
       if graph.has_errors() {
         // NB This is just the initial validation message.
-        println!("there were validation errors")
+        println!("had errors");
       }
+      graph.print_debug(&raw.scheduler.tasks.externs)
     })
   })
 }

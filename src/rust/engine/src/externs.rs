@@ -30,6 +30,8 @@ pub struct Externs {
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
+  type_constraint_to_type_id: TypeConstraintToTypeIdExtern,
+  type_id_to_type_constraint: TypeIdToTypeConstraintExtern,
 }
 
 // The pointer to the context is safe for sharing between threads.
@@ -52,6 +54,8 @@ impl Externs {
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
     invoke_runnable: InvokeRunnable,
+    type_constraint_to_type_id: TypeConstraintToTypeIdExtern,
+    type_id_to_type_constraint: TypeIdToTypeConstraintExtern,
   ) -> Externs {
     Externs {
       context: ext_context,
@@ -69,6 +73,8 @@ impl Externs {
       val_to_str: val_to_str,
       create_exception: create_exception,
       invoke_runnable: invoke_runnable,
+      type_id_to_type_constraint: type_id_to_type_constraint,
+      type_constraint_to_type_id: type_constraint_to_type_id,
     }
   }
 
@@ -161,6 +167,13 @@ impl Externs {
       Ok(result.value)
     }
   }
+
+  pub fn type_id_to_type_constraint(&self, type_id: &TypeId) -> TypeConstraint {
+    (self.type_id_to_type_constraint)(self.context, type_id)
+  }
+  pub fn type_constraint_to_type_id(&self, type_constraint: &TypeConstraint) -> TypeId {
+    (self.type_constraint_to_type_id)(self.context, type_constraint)
+  }
 }
 
 pub type LogExtern =
@@ -201,12 +214,29 @@ pub struct RunnableComplete {
   pub is_throw: bool,
 }
 
+// points to a buffer, ie array containing a series of values allocated by python.
 #[repr(C)]
 pub struct ValueBuffer {
   values_ptr: *mut Value,
   values_len: u64,
   // A Value handle to hold the underlying buffer alive.
   handle_: Value,
+}
+
+#[repr(C)]
+pub struct TypeConstraintBuffer {
+  constraints_ptr: *mut TypeConstraint,
+  constraints_len: u64,
+  // handle to hold the underlying buffer alive
+  handle_: Value
+}
+
+impl TypeConstraintBuffer {
+  pub fn to_vec(&self) -> Vec<TypeConstraint> {
+    with_vec(self.constraints_ptr, self.constraints_len as usize, |vec| {
+      vec.clone()
+    })
+  }
 }
 
 pub type ProjectMultiExtern =
@@ -243,6 +273,12 @@ pub type CreateExceptionExtern =
 
 pub type InvokeRunnable =
   extern "C" fn(*const ExternContext, *const Function, *const Value, u64, bool) -> RunnableComplete;
+
+pub type TypeIdToTypeConstraintExtern =
+  extern "C" fn(*const ExternContext, *const TypeId) -> TypeConstraint;
+
+pub type TypeConstraintToTypeIdExtern =
+  extern "C" fn(*const ExternContext, *const TypeConstraint) -> TypeId;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {

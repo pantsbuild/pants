@@ -3,6 +3,8 @@
 
 use core::{Key, TypeConstraint, TypeId};
 
+use externs::Externs;
+
 use selectors::{Select, Selector, Task};
 
 use std::collections::HashMap;
@@ -50,6 +52,12 @@ impl RootEntry {
 struct InnerEntry {
   subject_type: TypeId,
   rule: Task
+}
+
+impl InnerEntry{
+  fn as_entry_type(&self) -> Entry {
+    Entry::InnerEntry(self.clone())
+  }
 }
 
 impl Entry {
@@ -190,11 +198,13 @@ impl <'a> GraphMaker<'a> {
       diagnostics.push(Diagnostic{subject_type: terrible_type, reason:"Unreachable".to_string()});
     }
 
-    RuleGraph {
+    let unfinished_graph = RuleGraph {
       root_dependencies: full_root_rule_dependency_edges,
       rule_dependency_edges: full_dependency_edges,
       unfulfillable_rules: full_unfulfillable_rules
-    }
+    };
+
+    self._remove_unfulfillable_rules_and_dependents(unfinished_graph)
   }
 
   fn _construct_graph(&self,
@@ -301,7 +311,7 @@ impl <'a> GraphMaker<'a> {
                                      // might be better as {} with display derived
                                      format!("no matches for {:?}", select));
                   was_unfulfillable = true;
-                  continue
+                  continue;
                 }
                 add_rules_to_graph(&mut rules_to_traverse,
                                    &mut rule_dependency_edges,
@@ -317,7 +327,7 @@ impl <'a> GraphMaker<'a> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![Selector::SelectLiteral(select.clone())],
+                                   vec![selector.clone()],
                                    vec![Entry::new_literal(select.subject.clone(),
                                                                select.product.clone())]);
               },
@@ -332,43 +342,43 @@ impl <'a> GraphMaker<'a> {
                                      entry.subject_type(),
                                      format!("no matches for {:?} when resolving {:?}", entry.subject_type(), initial_selector)); // might be better as {} with display derived
                   was_unfulfillable = true;
-                  continue
+                  continue;
                 }
-                // TODO port the rest of this after adding field types to the selectors
+                let mut rules_for_dependencies = vec![];
+                for field_type in select.field_types.iter() {
 
-                /*
-                      initial_selector = selector.input_product_selector
-          initial_rules_or_literals = _find_rhs_for_select(entry.subject_type, initial_selector)
-          if not initial_rules_or_literals:
-            mark_unfulfillable(entry,
-                               entry.subject_type,
-                               'no matches for {} when resolving {}'
-                               .format(initial_selector, selector))
-            was_unfulfillable = True
-            continue
+                  let field_type_id = &self.tasks.externs.type_constraint_to_type_id(field_type);
+                  let rules_for_field_subjects = rhs_for_select(&self.tasks,
+                                                                field_type_id.clone(),
 
-          rules_for_dependencies = []
-          for field_type in selector.field_types:
-            rules_for_field_subjects = _find_rhs_for_select(field_type,
-                                                            selector.projected_product_selector)
-            rules_for_dependencies.extend(rules_for_field_subjects)
+                                                                &Select { product: select.product, variant_key: None });
+                  rules_for_dependencies.extend(rules_for_field_subjects);
+                }
+                if rules_for_dependencies.is_empty() {
+                  mark_unfulfillable(&mut unfulfillable_rules,
+                    &entry,
+                    self.tasks.externs.type_constraint_to_type_id(&select.field_types[0]),
+                    //TypeId(select.field_types[0].0), // TODO show all of the field types.
+                    format!("no matches for {:?} when resolving {:?}", select.product, select)
+                  );
+                  was_unfulfillable = true;
+                  continue;
+                }
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![selector.clone(), Selector::Select(Select { product: select.dep_product, variant_key: None})],
+                                   initial_rules_or_literals);
 
-          if not rules_for_dependencies:
-            mark_unfulfillable(entry,
-                               selector.field_types,
-                               'no matches for {} when resolving {}'
-                               .format(selector.projected_product_selector, selector))
-            was_unfulfillable = True
-            continue
-
-          add_rules_to_graph(entry,
-                             (selector, selector.input_product_selector),
-                             initial_rules_or_literals)
-          add_rules_to_graph(entry,
-                             (selector, selector.projected_product_selector),
-                             tuple(rules_for_dependencies))
-                             */
-
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![selector.clone(), Selector::Select(Select { product: select.product, variant_key: None})],
+                                   rules_for_dependencies);
               },
               &Selector::SelectProjection(ref select) =>{
                 let initial_selector = select.input_product;
@@ -383,36 +393,37 @@ impl <'a> GraphMaker<'a> {
                   was_unfulfillable = true;
                   continue
                 }
-                /*
-                      # TODO, could validate that input product has fields
-          initial_rules_or_literals = _find_rhs_for_select(entry.subject_type,
-                                                           selector.input_product_selector)
-          if not initial_rules_or_literals:
-            mark_unfulfillable(entry,
-                               entry.subject_type,
-                               'no matches for {} when resolving {}'
-                               .format(selector.input_product_selector, selector))
-            was_unfulfillable = True
-            continue
 
-          projected_rules = _find_rhs_for_select(selector.projected_subject,
-                                                 selector.projected_product_selector)
-          if not projected_rules:
-            mark_unfulfillable(entry,
-                               selector.projected_subject,
-                               'no matches for {} when resolving {}'
-                               .format(selector.projected_product_selector, selector))
-            was_unfulfillable = True
-            continue
+                let projected_rules_or_literals = rhs_for_select(&self.tasks,
+                                                                 select.projected_subject,
+                                                                 &Select { product: select.product, variant_key: None });
+                if projected_rules_or_literals.is_empty() {
+                  mark_unfulfillable(&mut unfulfillable_rules,
+                                     &entry,
+                                     select.projected_subject,
+                                     format!("no matches for {:?} when resolving {:?}", select.product, select)); // might be better as {} with display derived
+                  was_unfulfillable = true;
+                  continue
 
-          add_rules_to_graph(entry,
-                             (selector, selector.input_product_selector),
-                             initial_rules_or_literals)
-          add_rules_to_graph(entry,
-                             (selector, selector.projected_product_selector),
-                             projected_rules)
-                */
-
+                }
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![Selector::SelectProjection(select.clone()),
+                                        Selector::Select(Select { product: initial_selector, variant_key: None })
+                                   ],
+                                   initial_rules_or_literals);
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![Selector::SelectProjection(select.clone()),
+                                        Selector::Select(Select { product: select.product, variant_key: None })
+                                   ],
+                                   projected_rules_or_literals);
               },
               &Selector::Task(ref select) =>{
                 // TODO, not sure what task is in this context exactly
@@ -475,20 +486,111 @@ impl <'a> GraphMaker<'a> {
 
   fn _remove_unfulfillable_rules_and_dependents(&self,
                                                 rule_graph: RuleGraph) -> RuleGraph {
-    // TODO port this portion
-    rule_graph
+    // Removes all unfulfillable rules transitively from the roots and the dependency edges.
+    //
+    // Takes the current root rule set and dependency table and removes all rules that are not
+    // transitively fulfillable.
+    //
+    // Deforestation. Leaping from tree to tree.
+    println!("-----------before rm unfulfillable");
+    rule_graph.print_debug(&self.tasks.externs);
+    println!("/-----------before rm unfulfillable");
+    // could experiment with doing this for each rule added and deduping the traversal list
+    let mut new_unfulfillable_rules = rule_graph.unfulfillable_rules.clone();
+    let mut new_dependency_edges = rule_graph.rule_dependency_edges.clone();
+    let mut new_root_dependencies = rule_graph.root_dependencies.clone();
+
+    let mut removal_traversal: VecDeque<_> = rule_graph.unfulfillable_rules.keys().map(|r|r.clone()).collect();
+    while let Some(unfulfillable_entry) = removal_traversal.pop_front() {
+
+      // TODO extract a fn for the following two stanzas, need generics tho. :)
+      // update internal edges
+      let filtered_entry_tuples: Vec<(_, _)> = {
+        new_dependency_edges.iter()
+          .filter(|&(c, _)| !new_unfulfillable_rules.contains_key(&c.as_entry_type()))
+          .map(|(&ref c, &ref d)| (c.clone(), d.clone()))
+          .collect()
+      };
+
+      let entries_to_modify: HashMap<_, _> = filtered_entry_tuples.iter()
+        .map(|&(ref current_entry, ref deps)|
+          if deps.makes_unfulfillable(&unfulfillable_entry) {
+            let mut diagnostics = new_unfulfillable_rules.entry(current_entry.as_entry_type()).or_insert(vec![]);
+            diagnostics.push(Diagnostic {
+              subject_type: current_entry.subject_type,
+              reason: format!("depends on unfulfillable {:?}", unfulfillable_entry)
+            });
+            removal_traversal.push_back(current_entry.as_entry_type());
+            None
+          } else {
+            Some((current_entry.clone(), deps.without_rule(&unfulfillable_entry)))
+          }
+        )
+        .flat_map(|o| o.into_iter() )
+        .collect();
+
+      new_dependency_edges = entries_to_modify;
+
+      // update root edges
+      let filtered_entry_tuples: Vec<(_, _)> = {
+        new_root_dependencies.iter()
+          .filter(|&(c, _)| !new_unfulfillable_rules.contains_key(&c.as_entry_type()))
+          .map(|(&ref c, &ref d)| (c.clone(), d.clone()))
+          .collect()
+      };
+
+      let entries_to_modify: HashMap<_, _> = filtered_entry_tuples.iter()
+        .map(|&(ref current_entry, ref deps)|
+          if deps.makes_unfulfillable(&unfulfillable_entry) {
+            let mut diagnostics = new_unfulfillable_rules.entry(current_entry.as_entry_type()).or_insert(vec![]);
+            diagnostics.push(Diagnostic {
+              subject_type: current_entry.subject_type,
+              reason: format!("depends on unfulfillable {:?}", unfulfillable_entry)
+            });
+            removal_traversal.push_back(current_entry.as_entry_type());
+            None
+          } else {
+            Some((current_entry.clone(), deps.without_rule(&unfulfillable_entry)))
+          }
+        )
+        .flat_map(|o| o.into_iter() )
+        .collect();
+      new_root_dependencies = entries_to_modify;
+    }
+
+    // blow up if there's something off.
+    for (ref root_rule, ref deps)  in new_root_dependencies.iter() {
+      for d in deps.dependencies.iter() {
+        match d {
+          &Entry::InnerEntry(ref inner) => {
+            if !new_dependency_edges.contains_key(inner) {
+              panic!("All referenced dependencies should have entries in the graph, but {:?} had {:?}, \
+                  which is missing!", root_rule, d)
+            }
+          },
+          // TODO, this should be ensured on edge add.
+          &Entry::Root(_) => panic!("Root entries cannot be depended on"),
+          _ => {
+            // ok
+          }
+        }
+      }
+    }
+    RuleGraph {rule_dependency_edges: new_dependency_edges, root_dependencies: new_root_dependencies, unfulfillable_rules: new_unfulfillable_rules}
   }
 
   fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
     let mut result: Vec<RootEntry> = Vec::new();
     for subj_type in self.root_subject_types.subject_types.iter() {
       for pt in product_types {
+
+        let constraint = pt;
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
           if !tasks.is_empty() {
             result.push(RootEntry {
               subject_type: subj_type.clone(),
               clause: vec![Selector::Select(Select {
-                product: TypeConstraint(pt.0),
+                product: constraint.clone(),
                 variant_key: None
               })]
             });
@@ -508,9 +610,58 @@ pub struct RuleGraph {
 }
 
 impl RuleGraph {
+  pub fn print_debug(&self, externs: &Externs) {
+    println!("root ct {:?}\ninner ct {:?}\nunfulfillable ct {:?}",
+             self.root_dependencies.len(), self.rule_dependency_edges.len(), self.unfulfillable_rules.len());
+    self.print_errors(externs);
+  }
+
+  pub fn print_errors(&self, externs: &Externs) {
+    // TODO the rule display is really unfriendly right now. Next up should be to improve it.
+    let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
+
+    let used_rules: HashSet<_> = self.rule_dependency_edges.keys().map(|entry| &entry.rule).collect();
+    for (rule_entry, diagnostics) in self.unfulfillable_rules.iter() {
+      match rule_entry {
+        &Entry::InnerEntry(ref inner) => {
+          if used_rules.contains(&inner.rule) {
+            continue
+          }
+          for d in diagnostics.iter() {
+            let mut msg_to_type = collated_errors.entry(inner.rule.clone())
+              .or_insert(HashMap::new());
+            let mut subject_set = msg_to_type.entry(d.reason.clone())
+              .or_insert(HashSet::new());
+            subject_set.insert(d.subject_type.clone());
+          }
+        },
+        _ => { } // We're only checking rule usage not entry usage generally.
+                 // So we ignore entries that do not have rules.
+      }
+    }
+    fn format_msgs(externs: &Externs, rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
+      let mut errors: Vec<_> = subject_types_by_reasons.iter().map(|(reason, subject_types)|
+        format!("{} with subject types: {}",
+                reason,
+                subject_types.iter().map(|t| externs.id_to_str(t.0)).collect::<Vec<String>>().join(", "))
+      ).collect();
+      errors.sort();
+      format!("{:?}: {}", rule, errors.join("\n    "))
+    }
+    let mut msgs: Vec<String> = collated_errors.into_iter()
+      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(externs, rule, subject_types_by_reasons))
+      .collect();
+    msgs.sort();
+    println!("Rules with errors {}:\n  {}", msgs.len(), msgs.join("  \n"));
+  }
+
   pub fn has_errors(&self) -> bool {
-    // self.unfulfillable_rules.iter().any(|kv| kv.0.entry_type != Entry::Root && !kv.1.is_empty())
-    false
+    let used_rules: HashSet<_> = self.rule_dependency_edges.keys().map(|entry| &entry.rule).collect();
+    self.unfulfillable_rules.iter().any(|(&ref entry, &ref diagnostics)| match entry {
+      &Entry::InnerEntry(ref inner) => !used_rules.contains(&inner.rule) &&
+                                       !diagnostics.is_empty(),
+      _ => false,
+    })
   }
 }
 
@@ -542,5 +693,28 @@ impl RuleEdges {
 
   fn has_edges_for(&self, selector_path: Vec<Selector>) -> bool {
     self.selector_to_dependencies.contains_key(&selector_path)
+  }
+
+  fn makes_unfulfillable(&self, dep_to_eliminate: &Entry) -> bool {
+    // Returns true if removing dep_to_eliminate makes this set of edges unfulfillable.
+    if self.dependencies.len() == 1 && &self.dependencies[0] == dep_to_eliminate {
+      true
+    } else if self.selector_to_dependencies.values().any(|deps| deps.len() == 1 && &deps[0] == dep_to_eliminate) {
+      true
+    } else {
+      false
+    }
+  }
+
+  fn without_rule(&self, dep: &Entry) -> RuleEdges {
+    let new_deps: Entries = self.dependencies.iter().filter(|&d| d != dep).map(|d|d.clone()).collect();
+    if new_deps.len() == self.dependencies.len() {
+      return self.clone();
+    }
+    let mut new_selector_deps: HashMap<Vec<Selector>, Entries> = HashMap::new();
+    for (selector, deps) in &self.selector_to_dependencies {
+      new_selector_deps.insert(selector.clone(), deps.iter().filter(|&d| d != dep).map(|d| d.clone()).collect());
+    }
+    RuleEdges { dependencies: new_deps, selector_to_dependencies: new_selector_deps}
   }
 }

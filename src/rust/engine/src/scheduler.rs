@@ -72,12 +72,17 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
+    field_types: Vec<TypeConstraint>,
     transitive: bool,
   ) {
     self.add_root(
       Node::create(
         Selector::SelectDependencies(
-          SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }),
+          SelectDependencies { product: product,
+                               dep_product: dep_product,
+                               field: field,
+                               field_types: field_types,
+                               transitive: transitive }),
         subject,
         Default::default(),
       )

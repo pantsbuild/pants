@@ -13,6 +13,7 @@ import six
 from cffi import FFI
 
 from pants.binaries.binary_util import BinaryUtil
+from pants.engine.addressable import Exactly
 from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
@@ -65,6 +66,13 @@ _FFI.cdef(
       Value      handle_;
     } ValueBuffer;
 
+
+    typedef struct {
+      TypeConstraint*     constraints_ptr;
+      uint64_t   constraints_len;
+      Value      handle_;
+    } TypeConstraintBuffer;
+
     typedef struct {
       Value  value;
       bool   is_throw;
@@ -87,6 +95,9 @@ _FFI.cdef(
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
     typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
+
+    typedef TypeId           (*extern_type_constraint_to_type_id)(ExternContext*, TypeConstraint*);
+    typedef TypeConstraint   (*extern_type_id_to_type_constraint)(ExternContext*, TypeId*);
 
     typedef void RawScheduler;
 
@@ -123,6 +134,8 @@ _FFI.cdef(
                                    extern_project_multi,
                                    extern_create_exception,
                                    extern_invoke_runnable,
+                                   extern_type_constraint_to_type_id,
+                                   extern_type_id_to_type_constraint,
                                    Field,
                                    Field,
                                    Field,
@@ -138,7 +151,7 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraintBuffer, bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
     void task_end(RawScheduler*);
 
@@ -264,6 +277,21 @@ def extern_project(context_handle, val, field, type_id):
 
   return c.to_value(projected)
 
+@_FFI.callback("TypeId(ExternContext*, TypeConstraint*)")
+def extern_type_constraint_to_type_id(context_handle, type_constraint):
+  c = _FFI.from_handle(context_handle)
+  type_constraint = c.from_id(type_constraint.id_)
+  if type(type_constraint) is Exactly and len(type_constraint._types) == 1:
+    return TypeId(c.to_id(next(iter(type_constraint._types))))
+  else:
+    print("AAAAAAAAA")
+    return None # todo, blow up, or could make this return a buffer instead
+
+@_FFI.callback("TypeConstraint(ExternContext*, TypeId*)")
+def extern_type_id_to_type_constraint(context_handle, type_id):
+  c = _FFI.from_handle(context_handle)
+  klass = c.from_id(type_id.id_)
+  return TypeConstraint(c.to_id(klass))
 
 @_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
 def extern_project_multi(context_handle, val, field):
@@ -392,6 +420,10 @@ class ExternContext(object):
   def vals_buf(self, keys):
     buf = _FFI.new('Value[]', keys)
     return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
+
+  def constraints_buf(self, types):
+    buf = _FFI.new('TypeConstraint[]', types)
+    return (buf, len(types), self.to_value(buf, type_id=self.anon_id))
 
   def to_value(self, obj, type_id=None):
     handle = _FFI.new_handle(obj)
@@ -533,6 +565,8 @@ class Native(object):
                                           extern_project_multi,
                                           extern_create_exception,
                                           extern_invoke_runnable,
+                                          extern_type_constraint_to_type_id,
+                                          extern_type_id_to_type_constraint,
                                           self.context.to_key('name'),
                                           self.context.to_key('products'),
                                           self.context.to_key('default'),

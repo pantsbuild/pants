@@ -151,9 +151,9 @@ impl Tasks {
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, transitive: bool) {
+  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeConstraint>, transitive: bool) {
     self.clause(Selector::SelectDependencies(
-      SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }
+      SelectDependencies { product: product, dep_product: dep_product, field: field, field_types: field_types, transitive: transitive }
     ));
   }
 
