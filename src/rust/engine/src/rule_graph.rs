@@ -556,12 +556,6 @@ pub struct RuleGraph {
 }
 
 impl RuleGraph {
-  pub fn print_debug(&self, externs: &Externs) {
-    println!("root ct {:?}\ninner ct {:?}\nunfulfillable ct {:?}",
-             self.root_dependencies.len(), self.rule_dependency_edges.len(), self.unfulfillable_rules.len());
-    self.print_errors(externs);
-  }
-
   pub fn print_errors(&self, externs: &Externs) {
     // TODO the rule display is really unfriendly right now. Next up should be to improve it.
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();

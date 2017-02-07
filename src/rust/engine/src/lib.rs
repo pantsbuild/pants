@@ -439,8 +439,8 @@ pub extern fn validator_run(
       if graph.has_errors() {
         // NB This is just the initial validation message.
         println!("had errors");
+        graph.print_errors(&raw.scheduler.tasks.externs)
       }
-      graph.print_debug(&raw.scheduler.tasks.externs)
     })
   })
 }
