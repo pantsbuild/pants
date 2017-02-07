@@ -10,6 +10,7 @@ from pants.task.task import Task
 from pants.util.memo import memoized_property
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
+from pants.contrib.node.targets.node_bundle import NodeBundle
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
@@ -46,6 +47,11 @@ class NodeTask(Task):
   def is_node_test(cls, target):
     """Returns `True` if the given target is a `NodeTest`."""
     return isinstance(target, NodeTest)
+
+  @classmethod
+  def is_node_bundle(cls, target):
+    """Returns `True` if given target is a `NodeBundle`."""
+    return isinstance(target, NodeBundle)
 
   def execute_node(self, args, workunit_name=None, workunit_labels=None):
     """Executes node passing the given args.

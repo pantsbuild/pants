@@ -1,8 +1,8 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::mem;
 use std::os::raw;
 use std::string::FromUtf8Error;
+use std::sync::RwLock;
 
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
@@ -14,15 +14,15 @@ pub type ExternContext = raw::c_void;
 pub type SatisfiedByExtern =
   extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
 
-#[derive(Clone)]
 pub struct Externs {
   context: *const ExternContext,
+  log: LogExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
-  satisfied_by_cache: RefCell<HashMap<(TypeConstraint, TypeId), bool>>,
+  satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -32,9 +32,14 @@ pub struct Externs {
   invoke_runnable: InvokeRunnable,
 }
 
+// The pointer to the context is safe for sharing between threads.
+unsafe impl Sync for Externs {}
+unsafe impl Send for Externs {}
+
 impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
+    log: LogExtern,
     key_for: KeyForExtern,
     val_for: ValForExtern,
     clone_val: CloneValExtern,
@@ -50,12 +55,13 @@ impl Externs {
   ) -> Externs {
     Externs {
       context: ext_context,
+      log: log,
       key_for: key_for,
       val_for: val_for,
       clone_val: clone_val,
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
-      satisfied_by_cache: RefCell::new(HashMap::new()),
+      satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       project: project,
       project_multi: project_multi,
@@ -64,6 +70,10 @@ impl Externs {
       create_exception: create_exception,
       invoke_runnable: invoke_runnable,
     }
+  }
+
+  pub fn log(&self, level: LogLevel, msg: &str) {
+    (self.log)(self.context, level as u8, msg.as_ptr(), msg.len() as u64)
   }
 
   pub fn key_for(&self, val: &Value) -> Key {
@@ -83,7 +93,19 @@ impl Externs {
   }
 
   pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.satisfied_by_cache.borrow_mut().entry((*constraint, *cls))
+    let key = (*constraint, *cls);
+
+    // See if a value already exists.
+    {
+      let read = self.satisfied_by_cache.read().unwrap();
+      if let Some(v) = read.get(&key) {
+        return *v;
+      }
+    }
+
+    // If not, compute and insert.
+    let mut write = self.satisfied_by_cache.write().unwrap();
+    write.entry(key)
       .or_insert_with(||
         (self.satisfied_by)(self.context, constraint, cls)
       )
@@ -120,20 +142,29 @@ impl Externs {
     })
   }
 
-  pub fn create_exception(&self, msg: String) -> Value {
+  pub fn create_exception(&self, msg: &str) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 
-  pub fn invoke_runnable(&self, runnable: &Runnable) -> RunnableComplete {
-    (self.invoke_runnable)(
-      self.context,
-      runnable.func(),
-      runnable.args().as_ptr(),
-      runnable.args().len() as u64,
-      runnable.cacheable()
-    )
+  pub fn invoke_runnable(&self, runnable: &Runnable) -> Result<Value, Value> {
+    let result =
+      (self.invoke_runnable)(
+        self.context,
+        &runnable.func,
+        runnable.args.as_ptr(),
+        runnable.args.len() as u64,
+        runnable.cacheable
+      );
+    if result.is_throw {
+      Err(result.value)
+    } else {
+      Ok(result.value)
+    }
   }
 }
+
+pub type LogExtern =
+  extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 pub type KeyForExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Key;
@@ -153,6 +184,16 @@ pub type StoreListExtern =
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
 
+// Not all log levels are always in use.
+#[allow(dead_code)]
+#[repr(u8)]
+pub enum LogLevel {
+  Debug = 0,
+  Info = 1,
+  Warn = 2,
+  Critical = 3,
+}
+
 #[repr(C)]
 #[derive(Debug)]
 pub struct RunnableComplete {
@@ -164,31 +205,38 @@ pub struct RunnableComplete {
 pub struct ValueBuffer {
   values_ptr: *mut Value,
   values_len: u64,
+  // A Value handle to hold the underlying buffer alive.
+  handle_: Value,
 }
 
 pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field) -> ValueBuffer;
 
 #[repr(C)]
-pub struct UTF8Buffer {
-  str_ptr: *mut u8,
-  str_len: u64,
+pub struct Buffer {
+  bytes_ptr: *mut u8,
+  bytes_len: u64,
+  // A Value handle to hold the underlying buffer alive.
+  handle_: Value,
 }
 
-impl UTF8Buffer {
-  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
-    with_vec(self.str_ptr, self.str_len as usize, |char_vec| {
-      // Attempt to decode from unicode.
-      String::from_utf8(char_vec.clone())
+impl Buffer {
+  pub fn to_bytes(&self) -> Vec<u8> {
+    with_vec(self.bytes_ptr, self.bytes_len as usize, |vec| {
+      vec.clone()
     })
+  }
+
+  pub fn to_string(&self) -> Result<String, FromUtf8Error> {
+    String::from_utf8(self.to_bytes())
   }
 }
 
 pub type IdToStrExtern =
-  extern "C" fn(*const ExternContext, Id) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, Id) -> Buffer;
 
 pub type ValToStrExtern =
-  extern "C" fn(*const ExternContext, *const Value) -> UTF8Buffer;
+  extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
 pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;

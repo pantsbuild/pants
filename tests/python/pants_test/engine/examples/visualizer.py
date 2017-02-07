@@ -21,9 +21,9 @@ from pants_test.engine.examples.planners import setup_json_scheduler
 from pants_test.subsystem.subsystem_util import subsystem_instance
 
 
-def visualize_execution_graph(scheduler, request):
+def visualize_execution_graph(scheduler):
   with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
-    scheduler.visualize_graph_to_file(request.roots, dot_file)
+    scheduler.visualize_graph_to_file(dot_file)
     print('dot file saved to: {}'.format(dot_file))
 
   with temporary_file_path(cleanup=False, suffix='.svg') as image_file:
@@ -41,7 +41,7 @@ def visualize_build_request(build_root, goals, subjects):
     engine = LocalSerialEngine(scheduler, Storage.create())
     try:
       engine.reduce(execution_request)
-      visualize_execution_graph(scheduler, execution_request)
+      visualize_execution_graph(scheduler)
     finally:
       engine.close()
 

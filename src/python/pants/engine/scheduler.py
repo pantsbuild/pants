@@ -79,22 +79,30 @@ class LocalScheduler(object):
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
-    select_product = lambda product: Select(product)
-    root_selector_fns = {
-      Address: select_product,
-      AscendantAddresses: select_product,
-      DescendantAddresses: select_product,
-      PathGlobs: select_product,
-      SiblingAddresses: select_product,
-      SingleAddress: select_product,
+    root_subject_types = {
+      Address,
+      AscendantAddresses,
+      DescendantAddresses,
+      PathGlobs,
+      SiblingAddresses,
+      SingleAddress,
     }
     intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
     singletons = create_snapshot_singletons(project_tree)
     rule_index = RuleIndex.create(tasks, intrinsics, singletons)
-    RulesetValidator(rule_index, goals, root_selector_fns).validate()
+
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
+
+    self._validate_ruleset(root_subject_types)
+
+    RulesetValidator(rule_index, goals, root_subject_types).validate()
+
+  def _validate_ruleset(self, root_subject_types):
+    listed = list(TypeId(self._to_id(t)) for t in root_subject_types)
+
+    self._native.lib.validator_run(self._scheduler, listed, len(listed))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -269,16 +277,16 @@ class LocalScheduler(object):
                                   self._native.lib.nodes_destroy)
       roots = {}
       for root, raw_root in zip(execution_request.roots, self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len)):
-        if raw_root.union_tag is 0:
+        if raw_root.state_tag is 0:
           state = None
-        elif raw_root.union_tag is 1:
-          state = Return(self._from_value(raw_root.union_return))
-        elif raw_root.union_tag is 2:
-          state = Throw(self._from_value(raw_root.union_throw))
-        elif raw_root.union_tag is 3:
-          state = Throw(Exception("Nooped"))
+        elif raw_root.state_tag is 1:
+          state = Return(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 2:
+          state = Throw(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 3:
+          state = Throw(self._from_value(raw_root.state_value))
         else:
-          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.union_tag, raw_root))
+          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
         roots[root] = state
       return roots
 
