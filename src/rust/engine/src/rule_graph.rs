@@ -531,14 +531,12 @@ impl <'a> GraphMaker<'a> {
     let mut result: Vec<RootEntry> = Vec::new();
     for subj_type in self.root_subject_types.subject_types.iter() {
       for pt in product_types {
-
-        let constraint = pt;
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
           if !tasks.is_empty() {
             result.push(RootEntry {
               subject_type: subj_type.clone(),
               clause: vec![Selector::Select(Select {
-                product: constraint.clone(),
+                product: pt.clone(),
                 variant_key: None
               })]
             });
