@@ -13,7 +13,7 @@ from collections import defaultdict
 
 import six
 from pathspec import PathSpec
-from pathspec.gitignore import GitIgnorePattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
@@ -56,7 +56,7 @@ class BuildFileAddressMapper(AddressMapper):
     self._build_file_parser = build_file_parser
     self._spec_path_to_address_map_map = {}  # {spec_path: {address: addressable}} mapping
     self._project_tree = project_tree
-    self._build_ignore_patterns = PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
+    self._build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
 
     self._exclude_target_regexps = exclude_target_regexps or []
     self._exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]

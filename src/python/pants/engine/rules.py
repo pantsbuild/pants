@@ -77,13 +77,13 @@ class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', '
 class RulesetValidator(object):
   """Validates that the rule index has no missing tasks."""
 
-  def __init__(self, rule_index, goal_to_product, root_subject_fns):
-    if not root_subject_fns:
-      raise ValueError('root_subject_fns must not be empty')
+  def __init__(self, rule_index, goal_to_product, root_subject_types):
+    if not root_subject_types:
+      raise ValueError('root_subject_types must not be empty')
     self._goal_to_product = goal_to_product
 
 
-    self._graph = GraphMaker(rule_index, root_subject_fns).full_graph()
+    self._graph = GraphMaker(rule_index, root_subject_types).full_graph()
 
   def validate(self):
     """ Validates that all tasks can be executed based on the declared product types and selectors.
@@ -485,11 +485,14 @@ class RuleEdges(object):
 
 class GraphMaker(object):
 
-  def __init__(self, rule_index, root_subject_fns):
-    if not root_subject_fns:
-      raise ValueError('root_subject_fns must not be empty')
-    self.root_subject_selector_fns = root_subject_fns
+  def __init__(self, rule_index, root_subject_types):
+    if not root_subject_types:
+      raise ValueError('root_subject_types must not be empty')
+    self.root_subject_types = root_subject_types
     self.rule_index = rule_index
+
+  def _root_selector(self, product):
+    return Select(product)
 
   def new_graph_from_existing(self, root_subject_type, root_selector, existing_graph):
     root_rule = RootRuleGraphEntry(root_subject_type, root_selector)
@@ -501,15 +504,14 @@ class GraphMaker(object):
     root_rule_dependency_edges, edges = self._remove_unfulfillable_rules_and_dependents(root_rule_dependency_edges,
                                                                                         edges, unfulfillable)
     return RuleGraph(self,
-                     self.root_subject_selector_fns.keys() + [root_subject_type,],
+      self.root_subject_types + [root_subject_type],
                      root_rule_dependency_edges,
                      edges,
                      unfulfillable)
 
   def generate_subgraph(self, root_subject, requested_product):
     root_subject_type = type(root_subject)
-    root_selector = self.root_subject_selector_fns[root_subject_type](requested_product)
-    root_rule = RootRuleGraphEntry(root_subject_type, root_selector)
+    root_rule = RootRuleGraphEntry(root_subject_type, self._root_selector(requested_product))
     root_rule_dependency_edges, edges, unfulfillable = self._construct_graph(root_rule)
     root_rule_dependency_edges, edges = self._remove_unfulfillable_rules_and_dependents(root_rule_dependency_edges,
                                                                                         edges, unfulfillable)
@@ -524,9 +526,9 @@ class GraphMaker(object):
     full_root_rule_dependency_edges = dict()
     full_dependency_edges = {}
     full_unfulfillable_rules = {}
-    for root_subject_type, selector_fn in self.root_subject_selector_fns.items():
+    for root_subject_type in self.root_subject_types:
       for product in sorted(self.rule_index.all_produced_product_types(root_subject_type)):
-        beginning_root = RootRuleGraphEntry(root_subject_type, selector_fn(product))
+        beginning_root = RootRuleGraphEntry(root_subject_type, self._root_selector(product))
         root_dependencies, rule_dependency_edges, unfulfillable_rules = self._construct_graph(
           beginning_root,
           root_rule_dependency_edges=full_root_rule_dependency_edges,
@@ -558,7 +560,7 @@ class GraphMaker(object):
       full_unfulfillable_rules)
 
     return RuleGraph(self,
-                     self.root_subject_selector_fns,
+                     self.root_subject_types,
                      dict(full_root_rule_dependency_edges),
                      full_dependency_edges,
                      full_unfulfillable_rules)
@@ -581,33 +583,33 @@ class GraphMaker(object):
         return tuple(RuleGraphEntry(subject_type, rule)
                      for rule in self.rule_index.gen_rules(subject_type, selector.product))
 
-    def mark_unfulfillable(rule, subject_type, reason):
-      if rule not in unfulfillable_rules:
-        unfulfillable_rules[rule] = []
-      unfulfillable_rules[rule].append(Diagnostic(subject_type, reason))
+    def mark_unfulfillable(entry, subject_type, reason):
+      if entry not in unfulfillable_rules:
+        unfulfillable_rules[entry] = []
+      unfulfillable_rules[entry].append(Diagnostic(subject_type, reason))
 
-    def add_rules_to_graph(rule, selector_path, dep_rules):
+    def add_rules_to_graph(entry, selector_path, dep_rules):
       unseen_dep_rules = [g for g in dep_rules
                           if g not in rule_dependency_edges and
                           g not in unfulfillable_rules and
                           g not in root_rule_dependency_edges]
       rules_to_traverse.extend(unseen_dep_rules)
-      if type(rule) is RootRuleGraphEntry:
-        if rule in root_rule_dependency_edges:
-          root_rule_dependency_edges[rule].add_edges_via(selector_path, dep_rules)
+      if type(entry) is RootRuleGraphEntry:
+        if entry in root_rule_dependency_edges:
+          root_rule_dependency_edges[entry].add_edges_via(selector_path, dep_rules)
         else:
           new_edges = RuleEdges()
           new_edges.add_edges_via(selector_path, dep_rules)
-          root_rule_dependency_edges[rule] = new_edges
-      elif rule not in rule_dependency_edges:
+          root_rule_dependency_edges[entry] = new_edges
+      elif entry not in rule_dependency_edges:
         new_edges = RuleEdges()
         new_edges.add_edges_via(selector_path, dep_rules)
-        rule_dependency_edges[rule] = new_edges
+        rule_dependency_edges[entry] = new_edges
       else:
-        existing_deps = rule_dependency_edges[rule]
+        existing_deps = rule_dependency_edges[entry]
         if existing_deps.has_edges_for(selector_path):
           raise ValueError("rule {} already has dependencies set for selector {}"
-                           .format(rule, selector_path))
+            .format(entry, selector_path))
 
         existing_deps.add_edges_via(selector_path, dep_rules)
 

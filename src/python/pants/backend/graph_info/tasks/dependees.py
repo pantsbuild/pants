@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from collections import defaultdict
 
-from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
+from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
 
 
-class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
+class ReverseDepmap(ConsoleTask):
   """List all targets that depend on any of the input targets."""
 
   @classmethod
@@ -33,20 +33,15 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
     self._closed = self.get_options().closed
 
   def console_output(self, _):
-    address_mapper = self.context.address_mapper
-    build_graph = self.context.build_graph
-
     dependees_by_target = defaultdict(set)
-
-    for address in address_mapper.scan_addresses():
-      build_graph.inject_address_closure(address)
-      target = build_graph.get_target(address)
+    for address in self.context.build_graph.inject_specs_closure([DescendantAddresses('')]):
+      target = self.context.build_graph.get_target(address)
       # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
       # user vs. targets created by pants at runtime.
-      target = self.get_concrete_target(target)
-      for dependency in target.dependencies:
+      concrete_target = self.get_concrete_target(target)
+      for dependency in concrete_target.dependencies:
         dependency = self.get_concrete_target(dependency)
-        dependees_by_target[dependency].add(target)
+        dependees_by_target[dependency].add(concrete_target)
 
     roots = set(self.context.target_roots)
     if self.get_options().output_format == 'json':

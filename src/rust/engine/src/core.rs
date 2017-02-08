@@ -65,6 +65,9 @@ pub struct Function(pub Id);
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Field(pub Key);
 
+/**
+ * Wraps a type id for use as a key in HashMaps and sets.
+ */
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Key {
@@ -110,6 +113,11 @@ pub struct Value {
   handle: Handle,
   type_id: TypeId,
 }
+
+// By default, Values would not be marked Send because of the raw pointer they hold.
+// Because the handle is opaque and can't be cloned, we can safely implement Send.
+unsafe impl Send for Value {}
+unsafe impl Sync for Value {}
 
 impl Drop for Value {
   fn drop(&mut self) {

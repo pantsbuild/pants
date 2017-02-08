@@ -1,4 +1,5 @@
 node_module(
+  name='web-component-button',
   sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
   dependencies=[
     'contrib/node/examples/3rdparty/node/mocha',
@@ -22,4 +23,9 @@ node_test(
     ':web-component-button'
   ],
   tags={'integration'},
+)
+
+node_bundle(
+  name='web-component-button-bundle',
+  node_module=':web-component-button'
 )

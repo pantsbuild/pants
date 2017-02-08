@@ -3,9 +3,18 @@ version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
+[profile.release]
+# Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
+# but enables profiling of optimized builds.
+debug = true
+
 [lib]
 crate-type = ["dylib"]
 
 [dependencies]
-fnv = "1.0.3"
+crossbeam = "0.2.10"
+fnv = "1.0.5"
+# See https://github.com/alexcrichton/futures-rs/pull/383
+futures = { git = "https://github.com/stuhood/futures-rs", branch = "stuhood/shared-peek" }
+futures-cpupool = { git = "https://github.com/stuhood/futures-rs", branch = "stuhood/shared-peek" }
 lazy_static = "0.2.2"

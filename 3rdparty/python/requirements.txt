@@ -9,10 +9,10 @@ isort==4.2.5
 lmdb==0.89
 Markdown==2.1.1
 mock==1.3.0
-packaging==16.7
-pathspec==0.3.4
+packaging==16.8
+pathspec==0.5.0
 pep8==1.6.2
-pex==1.1.20
+pex==1.2.1
 psutil==4.3.0
 pyflakes==1.1.0
 Pygments==1.4
