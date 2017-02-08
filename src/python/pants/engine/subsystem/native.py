@@ -162,6 +162,7 @@ _FFI.cdef(
                                                 TypeConstraint,
                                                 TypeConstraint,
                                                 Field,
+                                                TypeIdBuffer,
                                                 bool);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);

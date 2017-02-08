@@ -7,10 +7,7 @@ use externs::Externs;
 
 use selectors::{Select, Selector, Task};
 
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::collections::VecDeque;
-use std::collections::hash_map::Entry as StdEntry;
+use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 use tasks::Tasks;
@@ -215,69 +212,6 @@ impl <'a> GraphMaker<'a> {
                       mut rule_dependency_edges: RuleDependencyEdges,
                       mut unfulfillable_rules: UnfulfillableRuleMap) -> RuleGraph {
 
-    fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
-      if tasks.externs.satisfied_by(&select.product, &subject_type) {
-        // NB a matching subject is always picked first
-        vec![Entry::new_subject_is_product(subject_type)]
-      } else {
-        match tasks.gen_tasks(&subject_type, &select.product) {
-          Some(ref matching_tasks) => {
-            matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t) ).collect()
-          }
-          None => vec![]
-        }
-      }
-    }
-
-    fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
-      // instead of being modifiable, this could return a UnfulfillableRuleMap that then gets merged.
-      let ref mut diagnostics_for_entry = *unfulfillable_rules.entry(entry.clone()).or_insert(vec![]);
-      diagnostics_for_entry.push(Diagnostic { subject_type: subject_type, reason: reason });
-    }
-
-
-    fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
-                          rule_dependency_edges: &mut RuleDependencyEdges,
-                          unfulfillable_rules: &mut UnfulfillableRuleMap,
-                          root_rule_dependency_edges: &mut RootRuleDependencyEdges,
-                          entry: &Entry,
-                          selector_path: Vec<Selector>,
-                          dep_rules: Entries) {
-
-      {
-        let rule_deps: &RuleDependencyEdges = rule_dependency_edges;
-        let unseen_dep_rules = dep_rules.iter()
-          .filter(|g| !unfulfillable_rules.contains_key(g))
-          .filter(|g| match *g {
-            &Entry::InnerEntry(ref r) => !rule_deps.contains_key(&r),
-            &Entry::Root(ref r) => !root_rule_dependency_edges.contains_key(&r),
-            _ => true
-          })
-          .map(|g| g.clone());
-        rules_to_traverse.extend(unseen_dep_rules);
-      }
-      match entry {
-        &Entry::Root(ref root_entry) => {
-          let mut edges = root_rule_dependency_edges.entry(root_entry.clone()).or_insert(RuleEdges::new());
-          edges.add_edges_via(selector_path, &dep_rules);
-        },
-        &Entry::InnerEntry(ref inner_entry) => {
-          let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(RuleEdges::new());
-          if edges.has_edges_for(selector_path.clone()) {
-            // This is an error that should only happen if there's a bug in the algorithm, but it
-            // might make sense to expose it in a more friendly way.
-            panic!("Rule {:?} already has dependencies set for selector {:?}", entry, selector_path)
-          }
-          edges.add_edges_via(selector_path, &dep_rules);
-        },
-        _ => {
-          // these should have already been filtered out before this was called.
-          // TODO enforce ^^ more clearly
-          panic!("expected this entry type to have already been filtered out {:?}", entry)
-        }
-      }
-    }
-
     let mut rules_to_traverse: VecDeque<Entry> = VecDeque::new();
     rules_to_traverse.push_back(Entry::from(beginning_rule));
     while let Some(entry) = rules_to_traverse.pop_front() {
@@ -463,41 +397,6 @@ impl <'a> GraphMaker<'a> {
     let mut new_dependency_edges = rule_graph.rule_dependency_edges.clone();
     let mut new_root_dependencies = rule_graph.root_dependencies.clone();
 
-    fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, RuleEdges>,
-                                                    new_unfulfillable_rules: &mut UnfulfillableRuleMap,
-                                                    removal_traversal: &mut VecDeque<Entry>,
-                                                    unfulfillable_entry: &Entry
-    )
-      where Entry: From<K>,
-            K: Eq + Hash + Clone
-    {
-      let keys: Vec<_> = edge_container.keys()
-        .filter(|&c| !new_unfulfillable_rules.contains_key(&Entry::from(c.clone())))
-        .map(|c| c.clone())
-        .collect();
-      for current_entry in keys.into_iter() {
-        if let StdEntry::Occupied(mut o) = edge_container.entry(current_entry) {
-          if o.get().makes_unfulfillable(&unfulfillable_entry) {
-            let key_entry = Entry::from(o.key().clone());
-
-            let entry_subject = key_entry.subject_type();
-            let mut diagnostics = new_unfulfillable_rules.entry(key_entry.clone()).or_insert(vec![]);
-            diagnostics.push(Diagnostic {
-              subject_type: entry_subject,
-              reason: format!("depends on unfulfillable {:?}", unfulfillable_entry)
-            });
-
-            removal_traversal.push_back(key_entry.clone());
-
-            o.remove();
-          } else {
-            let deps_without_rule = o.get().without_rule(&unfulfillable_entry);
-            o.insert(deps_without_rule);
-          }
-        }
-      }
-    }
-
     let mut removal_traversal: VecDeque<_> = rule_graph.unfulfillable_rules.keys().map(|r| r.clone()).collect();
     while let Some(unfulfillable_entry) = removal_traversal.pop_front() {
       update_edges_based_on_unfulfillable_entry(&mut new_dependency_edges, &mut new_unfulfillable_rules, &mut removal_traversal, &unfulfillable_entry);
@@ -524,7 +423,11 @@ impl <'a> GraphMaker<'a> {
         }
       }
     }
-    RuleGraph {rule_dependency_edges: new_dependency_edges, root_dependencies: new_root_dependencies, unfulfillable_rules: new_unfulfillable_rules}
+    RuleGraph {
+      rule_dependency_edges: new_dependency_edges,
+      root_dependencies: new_root_dependencies,
+      unfulfillable_rules: new_unfulfillable_rules
+    }
   }
 
   fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
@@ -556,7 +459,15 @@ pub struct RuleGraph {
 }
 
 impl RuleGraph {
-  pub fn print_errors(&self, externs: &Externs) {
+  pub fn validate(&self, externs: &Externs) -> Result<(), String> {
+    if self.has_errors() {
+      Result::Err(self.build_error_msg(externs))
+    } else {
+      Result::Ok(())
+    }
+  }
+
+  fn build_error_msg(&self, externs: &Externs) -> String{
     // TODO the rule display is really unfriendly right now. Next up should be to improve it.
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
 
@@ -579,24 +490,15 @@ impl RuleGraph {
                  // So we ignore entries that do not have rules.
       }
     }
-    fn format_msgs(externs: &Externs, rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
-      let mut errors: Vec<_> = subject_types_by_reasons.iter().map(|(reason, subject_types)|
-        format!("{} with subject types: {}",
-                reason,
-                subject_types.iter().map(|t| externs.id_to_str(t.0)).collect::<Vec<String>>().join(", "))
-      ).collect();
-      errors.sort();
-      format!("{:?}: {}", rule, errors.join("\n    "))
-    }
     let mut msgs: Vec<String> = collated_errors.into_iter()
       .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(externs, rule, subject_types_by_reasons))
       .collect();
     msgs.sort();
 
-    println!("Rules with errors {}:\n  {}", msgs.len(), msgs.join("  \n"));
+    format!("Rules with errors {}:\n  {}", msgs.len(), msgs.join("  \n")).to_string()
   }
 
-  pub fn has_errors(&self) -> bool {
+  fn has_errors(&self) -> bool {
     let used_rules: HashSet<_> = self.rule_dependency_edges.keys().map(|entry| &entry.rule).collect();
     self.unfulfillable_rules.iter().any(|(&ref entry, &ref diagnostics)| match entry {
       &Entry::InnerEntry(ref inner) => !used_rules.contains(&inner.rule) &&
@@ -658,4 +560,110 @@ impl RuleEdges {
     }
     RuleEdges { dependencies: new_deps, selector_to_dependencies: new_selector_deps}
   }
+}
+
+fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, RuleEdges>,
+                                                new_unfulfillable_rules: &mut UnfulfillableRuleMap,
+                                                removal_traversal: &mut VecDeque<Entry>,
+                                                unfulfillable_entry: &Entry
+)
+  where Entry: From<K>,
+        K: Eq + Hash + Clone
+{
+  let keys: Vec<_> = edge_container.keys()
+    .filter(|&c| !new_unfulfillable_rules.contains_key(&Entry::from(c.clone())))
+    .map(|c| c.clone())
+    .collect();
+  for current_entry in keys.into_iter() {
+    if let hash_map::Entry::Occupied(mut o) = edge_container.entry(current_entry) {
+      if o.get().makes_unfulfillable(&unfulfillable_entry) {
+        let key_entry = Entry::from(o.key().clone());
+
+        let entry_subject = key_entry.subject_type();
+        let mut diagnostics = new_unfulfillable_rules.entry(key_entry.clone()).or_insert(vec![]);
+        diagnostics.push(Diagnostic {
+          subject_type: entry_subject,
+          reason: format!("depends on unfulfillable {:?}", unfulfillable_entry)
+        });
+
+        removal_traversal.push_back(key_entry.clone());
+
+        o.remove();
+      } else {
+        let deps_without_rule = o.get().without_rule(&unfulfillable_entry);
+        o.insert(deps_without_rule);
+      }
+    }
+  }
+}
+
+fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
+  if tasks.externs.satisfied_by(&select.product, &subject_type) {
+    // NB a matching subject is always picked first
+    vec![Entry::new_subject_is_product(subject_type)]
+  } else {
+    match tasks.gen_tasks(&subject_type, &select.product) {
+      Some(ref matching_tasks) => {
+        matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t)).collect()
+      }
+      None => vec![]
+    }
+  }
+}
+
+fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
+  // instead of being modifiable, this could return a UnfulfillableRuleMap that then gets merged.
+  let ref mut diagnostics_for_entry = *unfulfillable_rules.entry(entry.clone()).or_insert(vec![]);
+  diagnostics_for_entry.push(Diagnostic { subject_type: subject_type, reason: reason });
+}
+
+fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
+                      rule_dependency_edges: &mut RuleDependencyEdges,
+                      unfulfillable_rules: &mut UnfulfillableRuleMap,
+                      root_rule_dependency_edges: &mut RootRuleDependencyEdges,
+                      entry: &Entry,
+                      selector_path: Vec<Selector>,
+                      dep_rules: Entries) {
+  {
+    let rule_deps: &RuleDependencyEdges = rule_dependency_edges;
+    let unseen_dep_rules = dep_rules.iter()
+      .filter(|g| !unfulfillable_rules.contains_key(g))
+      .filter(|g| match *g {
+        &Entry::InnerEntry(ref r) => !rule_deps.contains_key(&r),
+        &Entry::Root(ref r) => !root_rule_dependency_edges.contains_key(&r),
+        _ => true
+      })
+      .map(|g| g.clone());
+    rules_to_traverse.extend(unseen_dep_rules);
+  }
+  match entry {
+    &Entry::Root(ref root_entry) => {
+      let mut edges = root_rule_dependency_edges.entry(root_entry.clone()).or_insert(RuleEdges::new());
+      edges.add_edges_via(selector_path, &dep_rules);
+    },
+    &Entry::InnerEntry(ref inner_entry) => {
+      let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(RuleEdges::new());
+      if edges.has_edges_for(selector_path.clone()) {
+        // This is an error that should only happen if there's a bug in the algorithm, but it
+        // might make sense to expose it in a more friendly way.
+        panic!("Rule {:?} already has dependencies set for selector {:?}", entry, selector_path)
+      }
+      edges.add_edges_via(selector_path, &dep_rules);
+    },
+    _ => {
+      // these should have already been filtered out before this was called.
+      // TODO enforce ^^ more clearly
+      panic!("expected this entry type to have already been filtered out {:?}", entry)
+    }
+  }
+}
+
+fn format_msgs(externs: &Externs, rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
+  let mut errors: Vec<_> = subject_types_by_reasons.iter().map(|(reason, subject_types)|
+    format!("{} with subject types: {}",
+            reason,
+            subject_types.iter().map(|t| externs.id_to_str(t.0)).collect::<Vec<String>>().join(", "))
+  ).collect();
+  errors.sort();
+  format!("{:?}: {}", rule, errors.join("\n    "))
 }

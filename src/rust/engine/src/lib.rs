@@ -436,10 +436,12 @@ pub extern fn validator_run(
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
                                         RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
-      if graph.has_errors() {
-        // NB This is just the initial validation message.
-        println!("had errors");
-        graph.print_errors(&raw.scheduler.tasks.externs)
+
+      match graph.validate(&raw.scheduler.tasks.externs) {
+        Result::Ok(_) => {},
+        Result::Err(msg) => {
+          println!("had errors!\n{}", msg)
+        }
       }
     })
   })
