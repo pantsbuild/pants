@@ -467,7 +467,7 @@ impl RuleGraph {
     }
   }
 
-  fn build_error_msg(&self, externs: &Externs) -> String{
+  fn build_error_msg(&self, externs: &Externs) -> String {
     // TODO the rule display is really unfriendly right now. Next up should be to improve it.
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
 
@@ -495,7 +495,7 @@ impl RuleGraph {
       .collect();
     msgs.sort();
 
-    format!("Rules with errors {}:\n  {}", msgs.len(), msgs.join("  \n")).to_string()
+    format!("Rules with errors {}:\n  {}", msgs.len(), msgs.join("\n  ")).to_string()
   }
 
   fn has_errors(&self) -> bool {
