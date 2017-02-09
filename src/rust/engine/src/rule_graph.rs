@@ -281,14 +281,14 @@ impl <'a> GraphMaker<'a> {
                   continue;
                 }
                 let mut rules_for_dependencies = vec![];
-                for field_type in select.field_types.iter() {
+                for field_type in &select.field_types {
                   let rules_for_field_subjects = rhs_for_select(&self.tasks,
                                                                 field_type.clone(),
                                                                 &Select { product: select.product, variant_key: None });
                   rules_for_dependencies.extend(rules_for_field_subjects);
                 }
                 if rules_for_dependencies.is_empty() {
-                    for t in select.field_types.iter() {
+                    for t in &select.field_types {
                         mark_unfulfillable(&mut unfulfillable_rules,
                                            &entry,
                                            t.clone(),
@@ -410,8 +410,8 @@ impl <'a> GraphMaker<'a> {
     // blow up if there's something off.
     // TODO do this with types on add rather than blowing up after.
     // I think I could make it impossible rather than fixing up after the fact.
-    for (ref root_rule, ref deps)  in rule_graph.root_dependencies.iter() {
-      for d in deps.dependencies.iter() {
+    for (ref root_rule, ref deps)  in &rule_graph.root_dependencies {
+      for d in &deps.dependencies {
         match d {
           &Entry::InnerEntry(ref inner) => {
             if !rule_graph.rule_dependency_edges.contains_key(inner) {
@@ -432,7 +432,7 @@ impl <'a> GraphMaker<'a> {
 
   fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
     let mut result: Vec<RootEntry> = Vec::new();
-    for subj_type in self.root_subject_types.subject_types.iter() {
+    for subj_type in &self.root_subject_types.subject_types {
       for pt in product_types {
         if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
           if !tasks.is_empty() {
@@ -472,13 +472,13 @@ impl RuleGraph {
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
 
     let used_rules: HashSet<_> = self.rule_dependency_edges.keys().map(|entry| &entry.rule).collect();
-    for (rule_entry, diagnostics) in self.unfulfillable_rules.iter() {
+    for (rule_entry, diagnostics) in &self.unfulfillable_rules {
       match rule_entry {
         &Entry::InnerEntry(ref inner) => {
           if used_rules.contains(&inner.rule) {
             continue
           }
-          for d in diagnostics.iter() {
+          for d in diagnostics {
             let mut msg_to_type = collated_errors.entry(inner.rule.clone())
               .or_insert(HashMap::new());
             let mut subject_set = msg_to_type.entry(d.reason.clone())
@@ -574,7 +574,7 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
     .filter(|&c| !new_unfulfillable_rules.contains_key(&Entry::from(c.clone())))
     .map(|c| c.clone())
     .collect();
-  for current_entry in keys.into_iter() {
+  for current_entry in keys {
     if let hash_map::Entry::Occupied(mut o) = edge_container.entry(current_entry) {
       if o.get().makes_unfulfillable(&unfulfillable_entry) {
         let key_entry = Entry::from(o.key().clone());
