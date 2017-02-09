@@ -1,5 +1,5 @@
 {
-  "name": "pantsbuild-hello",
+  "name": "pantsbuild-hello-node",
   "version": "1.0.0",
   "description": "Pantsbuild hello for Node.js",
   "main": "index.js",

@@ -7,10 +7,13 @@
   "author": "pantsbuild",
   "license": "MIT",
   "scripts": {
-    "start": "babel-node index.js"
+    "start": "babel-node index.js",
+    "test": "mocha --compilers js:babel-register"
   },
   "devDependencies": {
     "babel-cli": "^6.22.2",
-    "babel-preset-latest": "^6.22.0"
+    "babel-preset-latest": "^6.22.0",
+    "babel-register": "^6.22.0",
+    "mocha": "^3.2.0"
   }
 }
