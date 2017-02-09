@@ -1,3 +1,6 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 mod core;
 mod context;
 mod externs;
@@ -5,6 +8,7 @@ mod fs;
 mod graph;
 mod handles;
 mod nodes;
+mod rule_graph;
 mod scheduler;
 mod selectors;
 mod tasks;
@@ -52,6 +56,7 @@ use externs::{
   with_vec,
 };
 use nodes::{Failure, NodeResult};
+use rule_graph::{GraphMaker, RootSubjectTypes};
 use scheduler::{Scheduler, ExecutionStat};
 use tasks::Tasks;
 use types::Types;
@@ -460,6 +465,26 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
+}
+
+#[no_mangle]
+pub extern fn validator_run(
+  scheduler_ptr: *mut RawScheduler,
+  subject_types_ptr: *mut TypeId,
+  subject_types_len: u64
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
+      let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                        &raw.scheduler.core.externs,
+                                        RootSubjectTypes { subject_types: subject_types.clone() });
+      let graph = graph_maker.full_graph();
+      if graph.has_errors() {
+        // NB This is just the initial validation message.
+        println!("there were validation errors")
+      }
+    })
+  })
 }
 
 fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T

@@ -14,6 +14,7 @@ from cffi import FFI
 
 from pants.base.project_tree import Dir, File, Link
 from pants.binaries.binary_util import BinaryUtil
+from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
@@ -190,6 +191,8 @@ _FFI.cdef(
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
+    void validator_run(RawScheduler*, TypeId*, uint64_t);
+
     void nodes_destroy(RawNodes*);
     '''
   )
@@ -305,7 +308,7 @@ def extern_lift_directory_listing(context_handle, directory_listing_val):
     else:
       raise Exception('Unrecognized stat type: {}'.format(stat))
 
-  return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.bytes_id))
+  return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.anon_id))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
@@ -382,14 +385,45 @@ class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw'])):
   """Corresponds to the native object of the same name."""
 
 
-class ExternContext(object):
-  """A wrapper around python objects used in static extern functions in this module.
+class ObjectIdMap(object):
+  """In the native context, assign and memoize python objects an unique unsigned-integer Id.
 
-  In the native context, python objects are identified by an unsigned-integer Id which is
-  assigned and memoized here. Note that this is independent-from and much-lighter-than
-  the Digest computed when an object is stored via storage.py (which is generally only necessary
-  for multi-processing or cache lookups).
+  Underlying, the id is uniquely derived from object's digest instead of using its hash code
+  because the content may change and object's hash function could be overridden. In order not
+  to return the stale object we trade performance for correctness.
+
+  In the future, we could improve performance by only computing digests for mutable objects.
+  For this reason referring an implementation-independent id instead of the digest in the native
+  context is more flexible.
   """
+
+  def __init__(self):
+    # Objects indexed by their keys, i.e, content digests
+    self._objects = Storage.create(in_memory=True)
+    # Memoized object Ids.
+    self._id_to_key = dict()
+    self._key_to_id = dict()
+    self._next_id = 0
+
+  def put(self, obj):
+    key = self._objects.put(obj)
+    new_id = self._next_id
+    oid = self._key_to_id.setdefault(key, new_id)
+    if oid is not new_id:
+      # Object already existed.
+      return oid
+
+    # Object is new/unique.
+    self._id_to_key[oid] = key
+    self._next_id += 1
+    return oid
+
+  def get(self, oid):
+    return self._objects.get(self._id_to_key[oid])
+
+
+class ExternContext(object):
+  """A wrapper around python objects used in static extern functions in this module."""
 
   def __init__(self):
     # A handle to this object to ensure that the native wrapper survives at least as
@@ -404,10 +438,7 @@ class ExternContext(object):
     self._id_generator = 0
     self._id_to_obj = dict()
     self._obj_to_id = dict()
-    self.bytes_id = TypeId(self.to_id(bytes))
-
-    # An anonymous Id for Values that keep *Buffers alive.
-    self.anon_id = TypeId(self.to_id(int))
+    self._object_id_map = ObjectIdMap()
 
     # An anonymous Id for Values that keep *Buffers alive.
     self.anon_id = TypeId(self.to_id(int))
@@ -441,19 +472,10 @@ class ExternContext(object):
   def put(self, obj):
     with self._lock:
       # If we encounter an existing id, return it.
-      new_id = self._id_generator
-      _id = self._obj_to_id.setdefault(obj, new_id)
-      if _id is not new_id:
-        # Object already existed.
-        return _id
-
-      # Object is new/unique.
-      self._id_to_obj[_id] = obj
-      self._id_generator += 1
-      return _id
+      return self._object_id_map.put(obj)
 
   def get(self, id_):
-    return self._id_to_obj[id_]
+    return self._object_id_map.get(id_)
 
   def to_id(self, typ):
     return self.put(typ)

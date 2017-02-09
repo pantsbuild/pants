@@ -86,4 +86,3 @@ class TestNodeBundle(TaskTestBase):
   def test_require_node_module_for_bundle(self):
     with self.assertRaisesRegexp(TargetDefinitionException, 'node_module'):
       NodeBundle()
-

@@ -14,7 +14,7 @@ from os.path import join as os_path_join
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.build_files import create_graph_tasks
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_tasks
@@ -406,7 +406,7 @@ def setup_json_scheduler(build_root, native):
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
-      'list': Address,
+      'list': BuildFileAddress,
       GenGoal.name(): GenGoal,
       'ls': Snapshot,
       'cat': FilesContent,
@@ -436,12 +436,12 @@ def setup_json_scheduler(build_root, native):
       # scala dependency inference
       (ScalaSources,
        [Select(ScalaInferredDepsSources),
-        SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))],
+        SelectDependencies(BuildFileAddress, ImportedJVMPackages, field_types=(JVMPackageName, ))],
        reify_scala_sources),
       (ImportedJVMPackages,
        [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)],
        extract_scala_imports),
-      (Address,
+      (BuildFileAddress,
        [Select(JVMPackageName),
         SelectDependencies(AddressFamily, Snapshot, field='dirs', field_types=(Dir,))],
        select_package_address),
