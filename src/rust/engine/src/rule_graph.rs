@@ -384,7 +384,7 @@ impl <'a> GraphMaker<'a> {
   }
 
   fn _remove_unfulfillable_rules_and_dependents(&self,
-                                                rule_graph: RuleGraph) -> RuleGraph {
+                                                mut rule_graph: RuleGraph) -> RuleGraph {
     // Removes all unfulfillable rules transitively from the roots and the dependency edges.
     //
     // Takes the current root rule set and dependency table and removes all rules that are not
@@ -392,25 +392,29 @@ impl <'a> GraphMaker<'a> {
     //
     // Deforestation. Leaping from tree to tree.
 
+    let mut removal_traversal: VecDeque<_> = rule_graph.unfulfillable_rules.keys()
+      .map(|r| r.clone())
+      .collect();
     // could experiment with doing this for each rule added and deduping the traversal list
-    let mut new_unfulfillable_rules = rule_graph.unfulfillable_rules.clone();
-    let mut new_dependency_edges = rule_graph.rule_dependency_edges.clone();
-    let mut new_root_dependencies = rule_graph.root_dependencies.clone();
-
-    let mut removal_traversal: VecDeque<_> = rule_graph.unfulfillable_rules.keys().map(|r| r.clone()).collect();
     while let Some(unfulfillable_entry) = removal_traversal.pop_front() {
-      update_edges_based_on_unfulfillable_entry(&mut new_dependency_edges, &mut new_unfulfillable_rules, &mut removal_traversal, &unfulfillable_entry);
-      update_edges_based_on_unfulfillable_entry(&mut new_root_dependencies, &mut new_unfulfillable_rules, &mut removal_traversal, &unfulfillable_entry);
+      update_edges_based_on_unfulfillable_entry(&mut rule_graph.rule_dependency_edges,
+                                                &mut rule_graph.unfulfillable_rules,
+                                                &mut removal_traversal,
+                                                &unfulfillable_entry);
+      update_edges_based_on_unfulfillable_entry(&mut rule_graph.root_dependencies,
+                                                &mut rule_graph.unfulfillable_rules,
+                                                &mut removal_traversal,
+                                                &unfulfillable_entry);
     }
 
     // blow up if there's something off.
     // TODO do this with types on add rather than blowing up after.
     // I think I could make it impossible rather than fixing up after the fact.
-    for (ref root_rule, ref deps)  in new_root_dependencies.iter() {
+    for (ref root_rule, ref deps)  in rule_graph.root_dependencies.iter() {
       for d in deps.dependencies.iter() {
         match d {
           &Entry::InnerEntry(ref inner) => {
-            if !new_dependency_edges.contains_key(inner) {
+            if !rule_graph.rule_dependency_edges.contains_key(inner) {
               panic!("All referenced dependencies should have entries in the graph, but {:?} had {:?}, \
                   which is missing!", root_rule, d)
             }
@@ -423,11 +427,7 @@ impl <'a> GraphMaker<'a> {
         }
       }
     }
-    RuleGraph {
-      rule_dependency_edges: new_dependency_edges,
-      root_dependencies: new_root_dependencies,
-      unfulfillable_rules: new_unfulfillable_rules
-    }
+    rule_graph
   }
 
   fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
