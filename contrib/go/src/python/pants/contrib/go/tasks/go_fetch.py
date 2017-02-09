@@ -33,10 +33,7 @@ class GoFetch(GoTask):
 
   @classmethod
   def register_options(cls, register):
-    register('--skip-meta-tag-resolution', advanced=True, type=bool, default=False,
-             removal_version='1.2.0',
-             removal_hint='Use --disallow-cloning-fetcher on scope go-fetchers instead.',
-             help='Whether to ignore meta tag resolution when resolving remote libraries.')
+    pass
 
   @property
   def cache_target_dirs(self):

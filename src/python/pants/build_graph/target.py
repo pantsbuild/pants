@@ -151,7 +151,7 @@ class Target(AbstractTarget):
 
     options_scope = 'target-arguments'
     deprecated_options_scope = 'unknown-arguments'
-    deprecated_options_scope_removal_version = '1.4.0'
+    deprecated_options_scope_removal_version = '1.4.0.dev0'
 
     @classmethod
     def register_options(cls, register):
