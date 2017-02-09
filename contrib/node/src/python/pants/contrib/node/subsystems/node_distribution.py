@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 import subprocess
 from collections import namedtuple
@@ -14,6 +15,9 @@ from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 class NodeDistribution(object):
@@ -45,7 +49,10 @@ class NodeDistribution(object):
       # transitioning from the 0.10.x series to the 0.12.x series.
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
-      return NodeDistribution(binary_util, options.supportdir, options.version)
+      for o in options:
+        logger.debug('NodeDistrybution.Factory.create options[%s]: %s', o, options[o])
+      return NodeDistribution(
+        binary_util, options.supportdir, options.version, package_manager=options.package_manager)
 
   @classmethod
   def _normalize_version(cls, version):
@@ -53,10 +60,15 @@ class NodeDistribution(object):
     # 'X.Y.Z'.
     return version if version.startswith('v') else 'v' + version
 
-  def __init__(self, binary_util, relpath, version):
+  def __init__(self, binary_util, relpath, version, package_manager):
     self._binary_util = binary_util
     self._relpath = relpath
     self._version = self._normalize_version(version)
+    package_manager = 'yarnpkg' if package_manager == 'yarn' else package_manager
+    if package_manager and package_manager not in ['npm', 'yarnpkg']:
+      raise RuntimeError('Unknown package manager: %s' % package_manager)
+    logger.info('Node.js version: %s package manager: %s', self._version, package_manager)
+    self.package_manager = package_manager
 
   @property
   def version(self):
@@ -81,7 +93,8 @@ class NodeDistribution(object):
       with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
         TGZ.extract(node_distribution, tmp_dist)
         os.rename(tmp_dist, outdir)
-    return os.path.join(outdir, 'node')
+    node_bin_path = os.path.join(outdir, 'node')
+    return node_bin_path
 
   class Command(namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):
     """Describes a command to be run using a Node distribution."""

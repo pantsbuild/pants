@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import logging
 import os
 
 from pants.base.exceptions import TaskError
@@ -18,6 +19,9 @@ from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
 
 
+logger = logging.getLogger(__name__)
+
+
 class NpmResolver(Subsystem, NodeResolverBase):
   options_scope = 'npm-resolver'
 
@@ -27,8 +31,14 @@ class NpmResolver(Subsystem, NodeResolverBase):
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
+    package_manager = target.payload.get_field('package_manager').value
+    package_manager = package_manager or node_task.node_distribution.package_manager
+    logger.warning(
+      'package manager:%s, payload:%s option: %s', package_manager,
+      target.payload.get_field('package_manager').value,
+      node_task.node_distribution.package_manager)
     self._copy_sources(target, results_dir)
-    self._emit_package_descriptor(node_task, target, results_dir, node_paths)
+    # self._emit_package_descriptor(node_task, target, results_dir, node_paths)
     with pushd(results_dir):
       result, npm_install = node_task.execute_npm(['install'],
                                                   workunit_name=target.address.reference(),
@@ -40,7 +50,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
   def _emit_package_descriptor(self, node_task, target, results_dir, node_paths):
     dependencies = {
       dep.package_name: node_paths.node_path(dep) if node_task.is_node_module(dep) else dep.version
-                        for dep in target.dependencies
+      for dep in target.dependencies
     }
 
     package_json_path = os.path.join(results_dir, 'package.json')
@@ -69,6 +79,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
     dependenciesToRemove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
+    logger.error('Removing dependency')
     for dependencyType in dependenciesToRemove:
       package.pop(dependencyType, None)
 
@@ -76,3 +87,5 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
     with open(package_json_path, 'wb') as fp:
       json.dump(package, fp, indent=2)
+
+    logger.info('emit package descriptor options: %s', dir(self.get_options()))

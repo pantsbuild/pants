@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
 from pants.util.memo import memoized_property
@@ -15,6 +17,9 @@ from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest
+
+
+logger = logging.getLogger(__name__)
 
 
 class NodeTask(Task):
