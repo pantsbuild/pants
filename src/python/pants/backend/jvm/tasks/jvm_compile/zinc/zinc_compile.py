@@ -160,7 +160,7 @@ class BaseZincCompile(JvmCompile):
     register('--name-hashing', advanced=True, type=bool, fingerprint=True,
              removal_hint='Name hashing is required for operation in zinc 1.0.0-X: this '
                           'option no longer has any effect.',
-             removal_version='1.4.0',
+             removal_version='1.4.0.dev0',
              help='Use zinc name hashing.')
     register('--whitelisted-args', advanced=True, type=dict,
              default={

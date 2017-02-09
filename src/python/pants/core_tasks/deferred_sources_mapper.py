@@ -52,7 +52,7 @@ class DeferredSourcesMapper(Task):
   @classmethod
   def register_options(cls, register):
     register('--allow-from-target', default=True, type=bool,
-             removal_hint='from_target was removed in 1.3.0', removal_version='1.5.0',
+             removal_hint='from_target was removed in 1.3.0', removal_version='1.5.0.dev0',
              help='This option has no effect, because from_target has been removed.')
 
   def process_remote_sources(self):
