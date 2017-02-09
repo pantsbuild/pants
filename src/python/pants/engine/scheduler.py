@@ -127,6 +127,9 @@ class LocalScheduler(object):
   def _to_constraint(self, type_or_constraint):
     return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
 
+  def _to_ids_buf(self, types):
+    return self._native.context.type_ids_buf([TypeId(self._to_id(t)) for t in types])
+
   def _register_singletons(self, singletons):
     """Register the given singletons dict.
 
@@ -188,6 +191,7 @@ class LocalScheduler(object):
                                                           product_constraint,
                                                           self._to_constraint(selector.dep_product),
                                                           self._to_key(selector.field),
+                                                          self._to_ids_buf(selector.field_types),
                                                           selector.transitive)
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
@@ -322,6 +326,7 @@ class LocalScheduler(object):
                                                                 self._to_constraint(selector.product),
                                                                 self._to_constraint(selector.dep_product),
                                                                 self._to_key(selector.field),
+                                                                self._to_ids_buf(selector.field_types),
                                                                 selector.transitive)
       else:
         raise ValueError('Unsupported root selector type: {}'.format(selector))

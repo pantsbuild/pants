@@ -65,6 +65,13 @@ _FFI.cdef(
       Value      handle_;
     } ValueBuffer;
 
+
+    typedef struct {
+      TypeId*     ids_ptr;
+      uint64_t   ids_len;
+      Value      handle_;
+    } TypeIdBuffer;
+
     typedef struct {
       Value  value;
       bool   is_throw;
@@ -138,7 +145,7 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeIdBuffer, bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
     void task_end(RawScheduler*);
 
@@ -155,6 +162,7 @@ _FFI.cdef(
                                                 TypeConstraint,
                                                 TypeConstraint,
                                                 Field,
+                                                TypeIdBuffer,
                                                 bool);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
@@ -392,6 +400,10 @@ class ExternContext(object):
   def vals_buf(self, keys):
     buf = _FFI.new('Value[]', keys)
     return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
+
+  def type_ids_buf(self, types):
+    buf = _FFI.new('TypeId[]', types)
+    return (buf, len(types), self.to_value(buf, type_id=self.anon_id))
 
   def to_value(self, obj, type_id=None):
     handle = _FFI.new_handle(obj)
