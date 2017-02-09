@@ -9,7 +9,7 @@ import logging
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 from pants.contrib.node.targets.node_bundle import NodeBundle
@@ -28,7 +28,8 @@ class NodeTask(Task):
   def subsystem_dependencies(cls):
     return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.Factory,)
 
-  @memoized_property
+  @property
+  @memoized_method
   def node_distribution(self):
     """A bootstrapped node distribution for use by node tasks."""
     return NodeDistribution.Factory.global_instance().create()
@@ -57,6 +58,15 @@ class NodeTask(Task):
   def is_node_bundle(cls, target):
     """Returns `True` if given target is a `NodeBundle`."""
     return isinstance(target, NodeBundle)
+
+  def get_package_manager_for_target(self, target):
+    """Returns package manager string for target argument or global config."""
+    package_manager = target.payload.get_field('package_manager').value
+    package_manager = package_manager or self.node_distribution.package_manager
+    logger.debug('NodeTask package manager:%s', package_manager)
+    if package_manager not in ['npm', 'yarnpkg']:
+      raise RuntimeError('Unknown package manager: %s' % package_manager)
+    return package_manager
 
   def execute_node(self, args, workunit_name=None, workunit_labels=None):
     """Executes node passing the given args.

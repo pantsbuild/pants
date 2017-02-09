@@ -49,8 +49,8 @@ class NodeDistribution(object):
       # transitioning from the 0.10.x series to the 0.12.x series.
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
-      for o in options:
-        logger.debug('NodeDistrybution.Factory.create options[%s]: %s', o, options[o])
+      # for o in options:
+      #   logger.debug('NodeDistrybution.Factory.create options[%s]: %s', o, options[o])
       return NodeDistribution(
         binary_util, options.supportdir, options.version, package_manager=options.package_manager)
 
@@ -65,10 +65,10 @@ class NodeDistribution(object):
     self._relpath = relpath
     self._version = self._normalize_version(version)
     package_manager = 'yarnpkg' if package_manager == 'yarn' else package_manager
-    if package_manager and package_manager not in ['npm', 'yarnpkg']:
+    if package_manager not in ['npm', 'yarnpkg']:
       raise RuntimeError('Unknown package manager: %s' % package_manager)
     logger.info('Node.js version: %s package manager: %s', self._version, package_manager)
-    self.package_manager = package_manager
+    self._package_manager = package_manager
 
   @property
   def version(self):
@@ -78,6 +78,18 @@ class NodeDistribution(object):
     :rtype: string
     """
     return self._version
+
+  @property
+  def package_manager(self):
+    """Returns the package manager of the Node distribution.
+
+    This is the package manager defined in pants.ini as [node-distribution]package_manager. The
+    available package manager are ['npm','yarnpkg'], may be overwriten by target arguments.
+
+    :returns: The package manager string.
+    :rtype: string
+    """
+    return self._package_manager
 
   @memoized_property
   def path(self):
@@ -175,7 +187,7 @@ class NodeDistribution(object):
     :returns: An `yarnpkg` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
-    return self._create_command('yarnpkg', args)
+    return self.Command(bin_dir_path='', executable='yarnpkg', args=args or [])
 
   def _create_command(self, executable, args=None):
     return self.Command(os.path.join(self.path, 'bin'), executable, args or [])

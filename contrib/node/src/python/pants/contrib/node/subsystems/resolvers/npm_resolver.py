@@ -31,21 +31,31 @@ class NpmResolver(Subsystem, NodeResolverBase):
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
-    package_manager = target.payload.get_field('package_manager').value
-    package_manager = package_manager or node_task.node_distribution.package_manager
-    logger.warning(
-      'package manager:%s, payload:%s option: %s', package_manager,
-      target.payload.get_field('package_manager').value,
-      node_task.node_distribution.package_manager)
+    package_manager = node_task.get_package_manager_for_target(target=target)
     self._copy_sources(target, results_dir)
-    # self._emit_package_descriptor(node_task, target, results_dir, node_paths)
-    with pushd(results_dir):
-      result, npm_install = node_task.execute_npm(['install'],
-                                                  workunit_name=target.address.reference(),
-                                                  workunit_labels=[WorkUnitLabel.COMPILER])
-      if result != 0:
-        raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(target.address.reference(), npm_install, result))
+    if package_manager == 'npm':
+      self._emit_package_descriptor(node_task, target, results_dir, node_paths)
+      with pushd(results_dir):
+        result, npm_install = node_task.execute_npm(['install'],
+                                                    workunit_name=target.address.reference(),
+                                                    workunit_labels=[WorkUnitLabel.COMPILER])
+        if result != 0:
+          raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
+                          .format(target.address.reference(), npm_install, result))
+    elif package_manager == 'yarnpkg':
+      with pushd(results_dir):
+        if not os.path.exists('package.json') or not os.path.exists('yarn.lock'):
+          raise TaskError(
+            'Cannot find package.json and yarn.lock. Did you forget to put them in target sources?')
+        returncode, yarnpkg_command = node_task.execute_yarnpkg(
+          args=[],
+          workunit_name=target.address.reference(),
+          workunit_labels=[WorkUnitLabel.COMPILER])
+        if returncode != 0:
+          raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
+                          .format(target.address.reference(), yarnpkg_command, returncode))
+    else:
+      raise RuntimeError('Unknown package manager: {}'.format(package_manager))
 
   def _emit_package_descriptor(self, node_task, target, results_dir, node_paths):
     dependencies = {
@@ -79,7 +89,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
     dependenciesToRemove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
-    logger.error('Removing dependency')
+    logger.error('Removing dependencies')
     for dependencyType in dependenciesToRemove:
       package.pop(dependencyType, None)
 
@@ -87,5 +97,3 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
     with open(package_json_path, 'wb') as fp:
       json.dump(package, fp, indent=2)
-
-    logger.info('emit package descriptor options: %s', dir(self.get_options()))

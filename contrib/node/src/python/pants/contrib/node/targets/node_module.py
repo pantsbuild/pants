@@ -38,7 +38,7 @@ class NodeModule(NodePackage):
       'sources': self.create_sources_field(sources=sources,
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
-      'package_manager': PrimitiveField(str(package_manager)),
+      'package_manager': PrimitiveField(package_manager),
     })
-    logger.info('NodeModule.__init__ payload:%s ', payload.fields)
+    logger.debug('NodeModule payload: %s', payload.fields)
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
