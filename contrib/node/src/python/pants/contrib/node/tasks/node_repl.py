@@ -52,7 +52,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
         'version': '0.0.0',
         'dependencies': {
           target.package_name: node_paths.node_path(target) if self.is_node_module(target)
-                               else target.version for target in targets
+          else target.version for target in targets
         }
       }
       with open(package_json_path, 'wb') as fp:
@@ -70,3 +70,9 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
         repl_session = node_repl.run()
         repl_session.wait()
+    # TODO(qsong): Consider not specifying dependency in BUILD
+    # Repl task doesn't make any sence for Node.js with yarnpkg for the following reasons:
+    # 1. Node.js can simply start from the source root, make an alias for 'cd package_root && node'
+    #   does not give any benefits but increase the maintance work
+    # 2. There's no simple entry point (binary) for Node.js packages. A package may start with node,
+    #   babel-node, babel-polyfill, webpack, etc.

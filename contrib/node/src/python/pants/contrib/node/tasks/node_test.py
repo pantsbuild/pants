@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
@@ -13,6 +15,9 @@ from pants.util.process_handler import SubprocessProcessHandler
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
+
+
+logger = logging.getLogger(__name__)
 
 
 class NodeTest(TestRunnerTaskMixin, NodeTask):
@@ -65,14 +70,29 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     for target in targets:
       node_path = node_paths.node_path(target.dependencies[0])
 
-      args = ['run-script', target.script_name, '--'] + self.get_passthru_args()
+      logger.debug('First dependency: %s', target.dependencies[0])
 
-      with pushd(node_path):
-        self._currently_executing_test_targets = [target]
-        result, npm_test_command = self.execute_npm(args, workunit_labels=[WorkUnitLabel.TEST])
-        if result != 0:
-          raise TaskError('npm test script failed:\n'
-                          '\t{} failed with exit code {}'.format(npm_test_command, result))
+      package_manager = self.get_package_manager_for_target(target=target.dependencies[0])
+      if package_manager == 'npm':
+        args = ['run-script', target.script_name, '--'] + self.get_passthru_args()
+
+        with pushd(node_path):
+          self._currently_executing_test_targets = [target]
+          result, npm_test_command = self.execute_npm(args, workunit_labels=[WorkUnitLabel.TEST])
+          if result != 0:
+            raise TaskError('npm test script failed:\n'
+                            '\t{} failed with exit code {}'.format(npm_test_command, result))
+      elif package_manager == 'yarnpkg':
+        args = ['run', target.script_name, '--'] + self.get_passthru_args()
+        with pushd(node_path):
+          self._currently_executing_test_targets = [target]
+          result, npm_test_command = self.execute_yarnpkg(
+            args=args, workunit_labels=[WorkUnitLabel.TEST])
+          if result != 0:
+            raise TaskError('npm test script failed:\n'
+                            '\t{} failed with exit code {}'.format(npm_test_command, result))
+      else:
+        raise RuntimeError('Unknown package manager: {}'.format(package_manager))
 
     self._currently_executing_test_targets = []
 
