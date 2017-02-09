@@ -43,6 +43,7 @@ use externs::{
   Externs,
   IdToStrExtern,
   InvokeRunnable,
+  LiftDirectoryListingExtern,
   LogExtern,
   KeyForExtern,
   ProjectExtern,
@@ -50,7 +51,7 @@ use externs::{
   SatisfiedByExtern,
   StoreListExtern,
   StoreBytesExtern,
-  LiftDirectoryListingExtern,
+  TypeIdBuffer,
   ValForExtern,
   ValToStrExtern,
   with_vec,
@@ -276,6 +277,7 @@ pub extern fn execution_add_root_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
@@ -284,6 +286,7 @@ pub extern fn execution_add_root_select_dependencies(
       product,
       dep_product,
       field,
+      field_types.to_vec(),
       transitive,
     );
   })
@@ -387,10 +390,11 @@ pub extern fn task_add_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_dependencies(product, dep_product, field, transitive);
+    core.tasks.add_select_dependencies(product, dep_product, field, field_types.to_vec(), transitive);
   })
 }
 
@@ -479,9 +483,12 @@ pub extern fn validator_run(
                                         &raw.scheduler.core.externs,
                                         RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
-      if graph.has_errors() {
-        // NB This is just the initial validation message.
-        println!("there were validation errors")
+
+      match graph.validate(&raw.scheduler.core.externs) {
+        Result::Ok(_) => {},
+        Result::Err(msg) => {
+          println!("had errors!\n{}", msg)
+        }
       }
     })
   })

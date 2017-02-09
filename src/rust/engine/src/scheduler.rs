@@ -8,7 +8,7 @@ use futures::future;
 use futures_cpupool::{CpuPool, CpuFuture};
 
 use context::Core;
-use core::{Field, Key, TypeConstraint};
+use core::{Field, Key, TypeConstraint, TypeId};
 use externs::{Externs, LogLevel};
 use fs::Snapshots;
 use graph::{EntryId, Graph};
@@ -88,12 +88,17 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
+    field_types: Vec<TypeId>,
     transitive: bool,
   ) {
     self.add_root(
       Node::create(
         Selector::SelectDependencies(
-          SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }),
+          SelectDependencies { product: product,
+                               dep_product: dep_product,
+                               field: field,
+                               field_types: field_types,
+                               transitive: transitive }),
         subject,
         Default::default(),
       )

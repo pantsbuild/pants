@@ -166,7 +166,7 @@ class GlobalOptionsRegistrar(Optionable):
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
-             removal_version='1.3.0', removal_hint='Use --build-ignore instead.',
+             removal_version='1.3.0.dev0', removal_hint='Use --build-ignore instead.',
              mutually_exclusive_group='build_ignore', help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],

@@ -11,6 +11,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ],
+  timeout=30,
 )
 
 python_tests(
@@ -23,4 +24,5 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout=90,
 )

@@ -100,11 +100,11 @@ class OptionsTest(unittest.TestCase):
     register_global('--b', type=int, recursive=True)
 
     # Deprecated global options
-    register_global('--global-crufty', removal_version='999.99.9',
+    register_global('--global-crufty', removal_version='999.99.9.dev0',
                     removal_hint='use a less crufty global option')
-    register_global('--global-crufty-boolean', type=bool, removal_version='999.99.9',
+    register_global('--global-crufty-boolean', type=bool, removal_version='999.99.9.dev0',
                       removal_hint='say no to crufty global options')
-    register_global('--global-crufty-expired', removal_version='0.0.1',
+    register_global('--global-crufty-expired', removal_version='0.0.1.dev0',
                     removal_hint='use a less crufty global option')
 
     # Mutual Exclusive options
@@ -121,10 +121,10 @@ class OptionsTest(unittest.TestCase):
     # Test deprecated options with a scope
     options.register('stale', '--still-good')
     options.register('stale', '--crufty',
-                     removal_version='999.99.9',
+                     removal_version='999.99.9.dev0',
                      removal_hint='use a less crufty stale scoped option')
     options.register('stale', '--crufty-boolean', type=bool,
-                     removal_version='999.99.9',
+                     removal_version='999.99.9.dev0',
                      removal_hint='say no to crufty, stale scoped options')
 
     # Test mutual exclusive options with a scope
@@ -1185,13 +1185,13 @@ class OptionsTest(unittest.TestCase):
       options_scope = 'new-scope1'
       options_scope_category = ScopeInfo.SUBSYSTEM
       deprecated_options_scope = 'deprecated-scope'
-      deprecated_options_scope_removal_version = '9999.9.9'
+      deprecated_options_scope_removal_version = '9999.9.9.dev0'
 
     class DummyOptionable2(Optionable):
       options_scope = 'new-scope2'
       options_scope_category = ScopeInfo.SUBSYSTEM
       deprecated_options_scope = 'deprecated-scope'
-      deprecated_options_scope_removal_version = '9999.9.9'
+      deprecated_options_scope_removal_version = '9999.9.9.dev0'
 
     options = Options.create(env={},
                              config=self._create_config({

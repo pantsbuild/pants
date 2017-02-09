@@ -266,12 +266,30 @@ pub struct RunnableComplete {
   is_throw: bool,
 }
 
+// Points to an array containing a series of values allocated by Python.
 #[repr(C)]
 pub struct ValueBuffer {
   values_ptr: *mut Value,
   values_len: u64,
   // A Value handle to hold the underlying buffer alive.
   handle_: Value,
+}
+
+// Points to an array of TypeIds.
+#[repr(C)]
+pub struct TypeIdBuffer {
+  ids_ptr: *mut TypeId,
+  ids_len: u64,
+  // handle to hold the underlying buffer alive
+  handle_: Value
+}
+
+impl TypeIdBuffer {
+  pub fn to_vec(&self) -> Vec<TypeId> {
+    with_vec(self.ids_ptr, self.ids_len as usize, |vec| {
+      vec.clone()
+    })
+  }
 }
 
 pub type ProjectMultiExtern =
