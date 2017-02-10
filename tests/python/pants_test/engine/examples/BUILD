@@ -62,6 +62,7 @@ python_library(
     'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:desktop',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
@@ -81,3 +82,4 @@ python_binary(
     ':visualizer'
   ]
 )
+
