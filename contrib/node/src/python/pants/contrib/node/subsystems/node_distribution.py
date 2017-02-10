@@ -40,8 +40,9 @@ class NodeDistribution(object):
                help='Node distribution version.  Used as part of the path to lookup the '
                     'distribution with --binary-util-baseurls and --pants-bootstrapdir')
       register('--package-manager', advanced=True, default='npm',
-               help='Node distribution version.  Used as part of the path to lookup the '
-                    'distribution with --binary-util-baseurls and --pants-bootstrapdir')
+               help='Default package manager config for repo. Should be one of [npm,yarnpkg]')
+      register('--yarnpkg-version', advanced=True, default='v0.19.1',
+               help='Yarnpkg version. Used for binary utils')
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
@@ -52,7 +53,8 @@ class NodeDistribution(object):
       # for o in options:
       #   logger.debug('NodeDistrybution.Factory.create options[%s]: %s', o, options[o])
       return NodeDistribution(
-        binary_util, options.supportdir, options.version, package_manager=options.package_manager)
+        binary_util, options.supportdir, options.version,
+        package_manager=options.package_manager, yarnpkg_version=options.yarnpkg_version)
 
   @classmethod
   def _normalize_version(cls, version):
@@ -60,7 +62,7 @@ class NodeDistribution(object):
     # 'X.Y.Z'.
     return version if version.startswith('v') else 'v' + version
 
-  def __init__(self, binary_util, relpath, version, package_manager):
+  def __init__(self, binary_util, relpath, version, package_manager, yarnpkg_version):
     self._binary_util = binary_util
     self._relpath = relpath
     self._version = self._normalize_version(version)
@@ -68,7 +70,8 @@ class NodeDistribution(object):
     if package_manager not in ['npm', 'yarnpkg']:
       raise RuntimeError('Unknown package manager: %s' % package_manager)
     logger.info('Node.js version: %s package manager: %s', self._version, package_manager)
-    self._package_manager = package_manager
+    self.package_manager = package_manager
+    self.yarnpkg_version = self._normalize_version(yarnpkg_version)
 
   @property
   def version(self):
@@ -78,18 +81,6 @@ class NodeDistribution(object):
     :rtype: string
     """
     return self._version
-
-  @property
-  def package_manager(self):
-    """Returns the package manager of the Node distribution.
-
-    This is the package manager defined in pants.ini as [node-distribution]package_manager. The
-    available package manager are ['npm','yarnpkg'], may be overwriten by target arguments.
-
-    :returns: The package manager string.
-    :rtype: string
-    """
-    return self._package_manager
 
   @memoized_property
   def path(self):
@@ -105,8 +96,29 @@ class NodeDistribution(object):
       with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
         TGZ.extract(node_distribution, tmp_dist)
         os.rename(tmp_dist, outdir)
-    node_bin_path = os.path.join(outdir, 'node')
-    return node_bin_path
+    node_distribution_path = os.path.join(outdir, 'node')
+    logger.debug('Node distribution path: %s', node_distribution_path)
+    return node_distribution_path
+
+  @memoized_property
+  def yarnpkg_path(self):
+    """Returns the root path of this node distribution.
+
+    :returns: The Node distribution root path.
+    :rtype: string
+    """
+    yarnpkg_tar = self._binary_util.select_binary(
+      'bin/yarnpkg', self.yarnpkg_version, 'yarnpkg.tar.gz')
+    logger.debug('Yarnpkg dist package: %s', yarnpkg_tar)
+    yarnpkg_work_dir = os.path.dirname(yarnpkg_tar)
+    yarnpkg_umpacked_dir = os.path.join(yarnpkg_work_dir, 'unpacked')
+    if not os.path.exists(yarnpkg_umpacked_dir):
+      with temporary_dir(root_dir=yarnpkg_work_dir) as tmp_dist:
+        TGZ.extract(yarnpkg_tar, tmp_dist)
+        os.rename(tmp_dist, yarnpkg_umpacked_dir)
+    yarnpkg_path = os.path.join(yarnpkg_umpacked_dir, 'dist')
+    logger.debug('Yarnpkg dist path: %s', yarnpkg_path)
+    return yarnpkg_path
 
   class Command(namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):
     """Describes a command to be run using a Node distribution."""
@@ -187,7 +199,8 @@ class NodeDistribution(object):
     :returns: An `yarnpkg` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
-    return self.Command(bin_dir_path='', executable='yarnpkg', args=args or [])
+    return self.Command(
+      bin_dir_path=os.path.join(self.yarnpkg_path, 'bin'), executable='yarnpkg', args=args or [])
 
   def _create_command(self, executable, args=None):
     return self.Command(os.path.join(self.path, 'bin'), executable, args or [])
