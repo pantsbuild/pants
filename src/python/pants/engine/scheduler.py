@@ -345,6 +345,9 @@ class LocalScheduler(object):
       else:
         raise ValueError('Unsupported root selector type: {}'.format(selector))
 
+  def post_fork(self):
+    self._native.lib.scheduler_post_fork(self._scheduler)
+
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
 

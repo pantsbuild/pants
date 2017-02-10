@@ -246,6 +246,13 @@ pub extern fn scheduler_create(
 }
 
 #[no_mangle]
+pub extern fn scheduler_post_fork(scheduler_ptr: *mut RawScheduler) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.core.post_fork();
+  })
+}
+
+#[no_mangle]
 pub extern fn scheduler_destroy(scheduler_ptr: *mut RawScheduler) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.

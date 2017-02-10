@@ -168,6 +168,7 @@ _FFI.cdef(
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint);
+    void scheduler_post_fork(RawScheduler*);
     void scheduler_destroy(RawScheduler*);
 
     void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
