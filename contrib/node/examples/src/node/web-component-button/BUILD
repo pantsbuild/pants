@@ -5,7 +5,8 @@ node_module(
     'contrib/node/examples/3rdparty/node/mocha',
     'contrib/node/examples/3rdparty/node/react',
     'contrib/node/examples/src/node/web-build-tool',
-  ]
+  ],
+  build_script='build'
 )
 
 node_test(

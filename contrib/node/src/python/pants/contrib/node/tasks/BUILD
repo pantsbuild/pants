@@ -17,6 +17,18 @@ python_library(
 )
 
 python_library(
+  name='node_build',
+  sources=['node_build.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:workunit',
+    'src/python/pants/task',
+    'src/python/pants/util:contextutil',
+  ]
+)
+
+python_library(
   name='node_bundle',
   sources=['node_bundle.py'],
   dependencies=[
