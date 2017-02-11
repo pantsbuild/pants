@@ -10,7 +10,7 @@ import unittest
 
 from pants.fs.archive import archiver
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_walk, touch
+from pants.util.dirutil import relative_symlink, safe_mkdir, safe_walk, touch
 
 
 class ArchiveTest(unittest.TestCase):
@@ -72,3 +72,28 @@ class ArchiveTest(unittest.TestCase):
         with temporary_dir() as todir:
           archiver('zip').extract(archive, todir, filter_func=do_filter)
           self.assertEquals(set(['allowed.txt']), self._listtree(todir, empty_dirs=False))
+
+  def test_tar_dereference(self):
+
+    def check_archive_with_flags(archive_format, dereference):
+      with temporary_dir() as fromdir:
+        filename = os.path.join(fromdir, 'a')
+        linkname = os.path.join(fromdir, 'link_to_a')
+        touch(filename)
+        relative_symlink(filename, linkname)
+
+        with temporary_dir() as archivedir:
+          archive = archiver(archive_format).create(fromdir, archivedir, 'archive', dereference=dereference)
+          with temporary_dir() as todir:
+            archiver(archive_format).extract(archive, todir)
+            extracted_linkname = os.path.join(todir, 'link_to_a')
+            assertion = self.assertFalse if dereference else self.assertTrue
+            assertion(os.path.islink(extracted_linkname))
+            assertion(os.path.samefile(extracted_linkname, os.path.join(todir, 'a')))
+
+    check_archive_with_flags('tar', False)
+    check_archive_with_flags('tar', True)
+    check_archive_with_flags('tgz', False)
+    check_archive_with_flags('tgz', True)
+    check_archive_with_flags('tbz2', False)
+    check_archive_with_flags('tbz2', True)

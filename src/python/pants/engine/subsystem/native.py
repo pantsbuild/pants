@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import threading
 
 import pkg_resources
@@ -13,10 +14,14 @@ from cffi import FFI
 
 from pants.base.project_tree import Dir, File, Link
 from pants.binaries.binary_util import BinaryUtil
+from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
+
+
+logger = logging.getLogger(__name__)
 
 
 _FFI = FFI()
@@ -61,6 +66,13 @@ _FFI.cdef(
       Value      handle_;
     } ValueBuffer;
 
+
+    typedef struct {
+      TypeId*     ids_ptr;
+      uint64_t   ids_len;
+      Value      handle_;
+    } TypeIdBuffer;
+
     typedef struct {
       Buffer       path;
       uint8_t      tag;
@@ -81,6 +93,7 @@ _FFI.cdef(
 
     typedef void ExternContext;
 
+    typedef void             (*extern_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
     typedef Value            (*extern_val_for)(ExternContext*, Key*);
     typedef Value            (*extern_clone_val)(ExternContext*, Value*);
@@ -118,6 +131,7 @@ _FFI.cdef(
     } RawNodes;
 
     RawScheduler* scheduler_create(ExternContext*,
+                                   extern_log,
                                    extern_key_for,
                                    extern_val_for,
                                    extern_clone_val,
@@ -154,6 +168,7 @@ _FFI.cdef(
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint);
+    void scheduler_post_fork(RawScheduler*);
     void scheduler_destroy(RawScheduler*);
 
     void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
@@ -163,7 +178,7 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeIdBuffer, bool);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
     void task_end(RawScheduler*);
 
@@ -180,13 +195,30 @@ _FFI.cdef(
                                                 TypeConstraint,
                                                 TypeConstraint,
                                                 Field,
+                                                TypeIdBuffer,
                                                 bool);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
+    void validator_run(RawScheduler*, TypeId*, uint64_t);
+
     void nodes_destroy(RawNodes*);
     '''
   )
+
+
+@_FFI.callback("void(ExternContext*, uint8_t, uint8_t*, uint64_t)")
+def extern_log(context_handle, level, msg_ptr, msg_len):
+  """Given a log level and utf8 message string, log it."""
+  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  if level == 0:
+    logger.debug(msg)
+  elif level == 1:
+    logger.info(msg)
+  elif level == 2:
+    logger.warn(msg)
+  else:
+    logger.critical(msg)
 
 
 @_FFI.callback("Key(ExternContext*, Value*)")
@@ -285,7 +317,7 @@ def extern_lift_directory_listing(context_handle, directory_listing_val):
     else:
       raise Exception('Unrecognized stat type: {}'.format(stat))
 
-  return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.bytes_id))
+  return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.anon_id))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
@@ -362,14 +394,45 @@ class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw'])):
   """Corresponds to the native object of the same name."""
 
 
-class ExternContext(object):
-  """A wrapper around python objects used in static extern functions in this module.
+class ObjectIdMap(object):
+  """In the native context, assign and memoize python objects an unique unsigned-integer Id.
 
-  In the native context, python objects are identified by an unsigned-integer Id which is
-  assigned and memoized here. Note that this is independent-from and much-lighter-than
-  the Digest computed when an object is stored via storage.py (which is generally only necessary
-  for multi-processing or cache lookups).
+  Underlying, the id is uniquely derived from object's digest instead of using its hash code
+  because the content may change and object's hash function could be overridden. In order not
+  to return the stale object we trade performance for correctness.
+
+  In the future, we could improve performance by only computing digests for mutable objects.
+  For this reason referring an implementation-independent id instead of the digest in the native
+  context is more flexible.
   """
+
+  def __init__(self):
+    # Objects indexed by their keys, i.e, content digests
+    self._objects = Storage.create(in_memory=True)
+    # Memoized object Ids.
+    self._id_to_key = dict()
+    self._key_to_id = dict()
+    self._next_id = 0
+
+  def put(self, obj):
+    key = self._objects.put(obj)
+    new_id = self._next_id
+    oid = self._key_to_id.setdefault(key, new_id)
+    if oid is not new_id:
+      # Object already existed.
+      return oid
+
+    # Object is new/unique.
+    self._id_to_key[oid] = key
+    self._next_id += 1
+    return oid
+
+  def get(self, oid):
+    return self._objects.get(self._id_to_key[oid])
+
+
+class ExternContext(object):
+  """A wrapper around python objects used in static extern functions in this module."""
 
   def __init__(self):
     # A handle to this object to ensure that the native wrapper survives at least as
@@ -384,7 +447,7 @@ class ExternContext(object):
     self._id_generator = 0
     self._id_to_obj = dict()
     self._obj_to_id = dict()
-    self.bytes_id = TypeId(self.to_id(bytes))
+    self._object_id_map = ObjectIdMap()
 
     # An anonymous Id for Values that keep *Buffers alive.
     self.anon_id = TypeId(self.to_id(int))
@@ -403,6 +466,10 @@ class ExternContext(object):
     buf = _FFI.new('Value[]', keys)
     return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
 
+  def type_ids_buf(self, types):
+    buf = _FFI.new('TypeId[]', types)
+    return (buf, len(types), self.to_value(buf, type_id=self.anon_id))
+
   def to_value(self, obj, type_id=None):
     handle = _FFI.new_handle(obj)
     self._handles.add(handle)
@@ -418,19 +485,10 @@ class ExternContext(object):
   def put(self, obj):
     with self._lock:
       # If we encounter an existing id, return it.
-      new_id = self._id_generator
-      _id = self._obj_to_id.setdefault(obj, new_id)
-      if _id is not new_id:
-        # Object already existed.
-        return _id
-
-      # Object is new/unique.
-      self._id_to_obj[_id] = obj
-      self._id_generator += 1
-      return _id
+      return self._object_id_map.put(obj)
 
   def get(self, id_):
-    return self._id_to_obj[id_]
+    return self._object_id_map.get(id_)
 
   def to_id(self, typ):
     return self.put(typ)
@@ -558,6 +616,7 @@ class Native(object):
         # Context.
         self.context.handle,
         # Externs.
+        extern_log,
         extern_key_for,
         extern_val_for,
         extern_clone_val,

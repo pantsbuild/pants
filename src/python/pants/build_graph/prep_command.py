@@ -70,7 +70,7 @@ class PrepCommand(Target):
     if goals:
       goals = sorted(goals)
     elif goal:
-      warn_or_error('1.5.0', 'goal', hint='Use `goals=[{!r}]` instead.'.format(goal))
+      warn_or_error('1.5.0.dev0', 'goal', hint='Use `goals=[{!r}]` instead.'.format(goal))
       goals = [goal]
     else:
       goals = ['test']

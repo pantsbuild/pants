@@ -5,12 +5,12 @@ use std::sync::Arc;
 
 use futures::future::Future;
 use futures::future;
-use futures_cpupool::{CpuPool, CpuFuture};
+use futures_cpupool::CpuFuture;
 
 use context::Core;
-use core::{Field, Key, TypeConstraint};
-use externs::Externs;
-use graph::{EntryId, Graph};
+use core::{Field, Key, TypeConstraint, TypeId};
+use externs::{Externs, LogLevel};
+use graph::EntryId;
 use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
 use tasks::Tasks;
@@ -35,15 +35,7 @@ impl Scheduler {
     externs: Externs,
   ) -> Scheduler {
     Scheduler {
-      core: Arc::new(
-        Core {
-          graph: Graph::new(),
-          tasks: tasks,
-          types: types,
-          externs: externs,
-          pool: CpuPool::new_num_cpus(),
-        }
-      ),
+      core: Arc::new(Core::new(tasks, types, externs)),
       roots: Vec::new(),
     }
   }
@@ -69,7 +61,7 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
     self.roots.iter()
       .map(|root| {
-        (root.subject(), root.product(), self.core.graph.wait(root, &self.core.externs))
+        (root.subject(), root.product(), self.core.graph.peek(root, &self.core.externs))
       })
       .collect()
   }
@@ -84,12 +76,17 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
+    field_types: Vec<TypeId>,
     transitive: bool,
   ) {
     self.add_root(
       Node::create(
         Selector::SelectDependencies(
-          SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }),
+          SelectDependencies { product: product,
+                               dep_product: dep_product,
+                               field: field,
+                               field_types: field_types,
+                               transitive: transitive }),
         subject,
         Default::default(),
       )
@@ -106,9 +103,10 @@ impl Scheduler {
    */
   fn launch(&self, node: Node) -> CpuFuture<(), ()> {
     let core = self.core.clone();
-    self.core.pool.spawn_fn(move || core.graph.create(node, &core)
-      .then::<_, Result<(), ()>>(|_| Ok(()))
-    )
+    self.core.pool().spawn_fn(move || {
+      core.graph.create(node, &core)
+        .then::<_, Result<(), ()>>(|_| Ok(()))
+    })
   }
 
   /**
@@ -120,6 +118,7 @@ impl Scheduler {
     let scheduling_iterations = 0;
 
     // Bootstrap tasks for the roots, and then wait for all of them.
+    self.core.externs.log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
     let roots_res =
       future::join_all(
         self.roots.iter()

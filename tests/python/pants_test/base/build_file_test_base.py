@@ -11,7 +11,7 @@ import tempfile
 import unittest
 
 from pathspec import PathSpec
-from pathspec.gitignore import GitIgnorePattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from pants.base.build_file import BuildFile
 from pants.util.dirutil import safe_mkdir, touch
@@ -28,7 +28,7 @@ class BuildFileTestBase(unittest.TestCase):
     touch(self.fullpath(path))
 
   def _create_ignore_spec(self, build_ignore_patterns):
-    return PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns or [])
+    return PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
 
   def scan_buildfiles(self, base_relpath, build_ignore_patterns=None):
     return BuildFile.scan_build_files(self._project_tree, base_relpath,

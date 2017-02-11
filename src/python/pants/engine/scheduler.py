@@ -13,7 +13,7 @@ from contextlib import contextmanager
 
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import (Dir, DirectoryListing, File, Link, Path, PathGlobs, ReadLink, Snapshot,
                              create_fs_intrinsics, generate_fs_subjects)
@@ -94,21 +94,31 @@ class LocalScheduler(object):
     # TODO: This bounding of input Subject types allows for closed-world validation, but is not
     # strictly necessary for execution. We might eventually be able to remove it by only executing
     # validation below the execution roots (and thus not considering paths that aren't in use).
-    select_product = lambda product: Select(product)
-    root_selector_fns = {
-      Address: select_product,
-      AscendantAddresses: select_product,
-      DescendantAddresses: select_product,
-      PathGlobs: select_product,
-      SiblingAddresses: select_product,
-      SingleAddress: select_product,
+
+    root_subject_types = {
+      Address,
+      BuildFileAddress,
+      AscendantAddresses,
+      DescendantAddresses,
+      PathGlobs,
+      SiblingAddresses,
+      SingleAddress,
     }
     intrinsics = create_fs_intrinsics(project_tree)
     rule_index = RuleIndex.create(tasks, intrinsics, singleton_entries=[])
-    RulesetValidator(rule_index, goals, root_selector_fns).validate()
+
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
+
+    self._validate_ruleset(root_subject_types)
+
+    RulesetValidator(rule_index, goals, root_subject_types).validate()
+
+  def _validate_ruleset(self, root_subject_types):
+    listed = list(TypeId(self._to_id(t)) for t in root_subject_types)
+
+    self._native.lib.validator_run(self._scheduler, listed, len(listed))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -130,6 +140,9 @@ class LocalScheduler(object):
 
   def _to_constraint(self, type_or_constraint):
     return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
+
+  def _to_ids_buf(self, types):
+    return self._native.context.type_ids_buf([TypeId(self._to_id(t)) for t in types])
 
   def _register_singletons(self, singletons):
     """Register the given singletons dict.
@@ -192,6 +205,7 @@ class LocalScheduler(object):
                                                           product_constraint,
                                                           self._to_constraint(selector.dep_product),
                                                           self._to_key(selector.field),
+                                                          self._to_ids_buf(selector.field_types),
                                                           selector.transitive)
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
@@ -326,9 +340,13 @@ class LocalScheduler(object):
                                                                 self._to_constraint(selector.product),
                                                                 self._to_constraint(selector.dep_product),
                                                                 self._to_key(selector.field),
+                                                                self._to_ids_buf(selector.field_types),
                                                                 selector.transitive)
       else:
         raise ValueError('Unsupported root selector type: {}'.format(selector))
+
+  def post_fork(self):
+    self._native.lib.scheduler_post_fork(self._scheduler)
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.

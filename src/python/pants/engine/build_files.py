@@ -14,8 +14,8 @@ import six
 from pants.base.project_tree import Dir, File
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
-from pants.engine.addressable import AddressableDescriptor, Addresses, TypeConstraintError
+from pants.build_graph.address import Address, BuildFileAddress
+from pants.engine.addressable import AddressableDescriptor, Addresses, Exactly, TypeConstraintError
 from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -42,11 +42,13 @@ class BuildFiles(datatype('BuildFiles', ['files'])):
 
 
 def filter_buildfile_paths(address_mapper, directory_listing):
-  build_pattern = address_mapper.build_pattern
   def match(stat):
-    # TODO: Use match_file instead when pathspec 0.4.1 (TBD) is released.
-    ignored = any(True for _ in address_mapper.build_ignore_patterns.match_files([stat.path]))
-    return (not ignored) and type(stat) is File and fnmatch(basename(stat.path), build_pattern)
+    # Short circuit for ignored paths.
+    if address_mapper.build_ignore_patterns.match_file(stat.path):
+      return False
+
+    return (type(stat) is File and any(fnmatch(basename(stat.path), pattern)
+                                       for pattern in address_mapper.build_patterns))
   build_files = tuple(Path(stat.path, stat)
                       for stat in directory_listing.dependencies if match(stat))
   return BuildFiles(build_files)
@@ -104,7 +106,8 @@ def resolve_unhydrated_struct(address_family, address):
   """
 
   struct = address_family.addressables.get(address)
-  if not struct:
+  addresses = address_family.addressables
+  if not struct or address not in addresses:
     _raise_did_you_mean(address_family, address.target_name)
 
   dependencies = []
@@ -129,7 +132,9 @@ def resolve_unhydrated_struct(address_family, address):
         maybe_append(key, value)
 
   collect_dependencies(struct)
-  return UnhydratedStruct(address, struct, dependencies)
+
+  return UnhydratedStruct(
+    filter(lambda build_address: build_address == address, addresses)[0], struct, dependencies)
 
 
 def hydrate_struct(unhydrated_struct, dependencies):
@@ -219,14 +224,14 @@ def filter_build_dirs(address_mapper, snapshot):
 
 def single_or_sib_addresses_to_globs(address_mapper, single_or_sib_addresses):
   """Given a SiblingAddresses or SingleAddress object, return a PathGlobs object for relevant build files."""
-  pattern = address_mapper.build_pattern
-  return PathGlobs.create(single_or_sib_addresses.directory, include=[pattern], exclude=[])
+  patterns = address_mapper.build_patterns
+  return PathGlobs.create(single_or_sib_addresses.directory, include=patterns, exclude=[])
 
 
 def descendant_addresses_to_globs(address_mapper, descendant_addresses):
   """Given a DescendantAddresses object, return a PathGlobs object for matching build files."""
-  pattern = address_mapper.build_pattern
-  return PathGlobs.create(descendant_addresses.directory, include=[pattern, join(b'**', pattern)], exclude=[])
+  patterns = [join('**', pattern) for pattern in address_mapper.build_patterns]
+  return PathGlobs.create(descendant_addresses.directory, include=patterns, exclude=[])
 
 
 def _recursive_dirname(f):
@@ -246,8 +251,11 @@ def _recursive_dirname(f):
 
 def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
   """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
-  pattern = address_mapper.build_pattern
-  patterns = [join(f, pattern) for f in _recursive_dirname(ascendant_addresses.directory)]
+  patterns = [
+    join(f, pattern)
+    for pattern in address_mapper.build_patterns
+    for f in _recursive_dirname(ascendant_addresses.directory)
+  ]
   return PathGlobs.create('', include=patterns, exclude=[])
 
 
@@ -262,11 +270,12 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Support for resolving Structs from Addresses
     (symbol_table_constraint,
      [Select(UnhydratedStruct),
-      SelectDependencies(symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
-     hydrate_struct),
+      SelectDependencies(
+        symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
+      hydrate_struct),
     (UnhydratedStruct,
-     [SelectProjection(AddressFamily, Dir, ('spec_path',), Address),
-      Select(Address)],
+     [SelectProjection(AddressFamily, Dir, ('spec_path',), Exactly(Address, BuildFileAddress)),
+      Select(Exactly(Address, BuildFileAddress))],
      resolve_unhydrated_struct),
   ] + [
     # BUILD file parsing.

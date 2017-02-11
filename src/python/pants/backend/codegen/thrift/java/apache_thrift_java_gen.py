@@ -13,12 +13,17 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.binaries.thrift_binary import ThriftBinary
 
 
+# TODO: Currently the injected runtime deps are specified by the --deps option defined in the
+# base class, which can only take specs (as it must also work for Python).
+# However it would be more convenient if this task could provide a default hard-coded
+# JarDependency via register_jvm_tool(), as then users happy with the default wouldn't have
+# to have a BUILD file entry for the default spec to point to.
 class ApacheThriftJavaGen(ApacheThriftGenBase):
   """Generate Java source files from thrift IDL files."""
   deprecated_options_scope = 'gen.thrift'  # New scope is gen.thrift-java.
   deprecated_options_scope_removal_version = '1.5.0dev0'
 
-  thrift_library_target_type = JavaThriftLibrary
+  gentarget_type = JavaThriftLibrary
   thrift_generator = 'java'
 
   _COMPILER = 'thrift'

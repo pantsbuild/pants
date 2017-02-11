@@ -12,7 +12,7 @@ from textwrap import dedent
 
 from twitter.common.dirutil.fileset import Fileset
 
-from pants.backend.codegen.antlr.java.antlr_gen import AntlrGen
+from pants.backend.codegen.antlr.java.antlr_java_gen import AntlrJavaGen
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -20,14 +20,14 @@ from pants.util.dirutil import safe_mkdtemp
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class AntlrGenTest(NailgunTaskTestBase):
+class AntlrJavaGenTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
-    return AntlrGen
+    return AntlrJavaGen
 
   @property
   def alias_groups(self):
-    return super(AntlrGenTest, self).alias_groups.merge(BuildFileAliases(
+    return super(AntlrJavaGenTest, self).alias_groups.merge(BuildFileAliases(
       targets={
         'java_antlr_library': JavaAntlrLibrary,
       },
@@ -45,7 +45,7 @@ class AntlrGenTest(NailgunTaskTestBase):
   BUILDFILE = '{srcroot}/{dir}/BUILD'.format(**PARTS)
 
   def setUp(self):
-    super(AntlrGenTest, self).setUp()
+    super(AntlrJavaGenTest, self).setUp()
 
     for ver in self.VERSIONS:
       self.create_file(
@@ -83,7 +83,7 @@ class AntlrGenTest(NailgunTaskTestBase):
     expected_sources = syn_target.sources_relative_to_source_root()
     self.assertEquals(set(expected_sources), set(actual_sources))
 
-    # and that the synthetic target has a valid source root and the generated sources have the
+    # Check that the synthetic target has a valid source root and the generated sources have the
     # expected java package
     def get_package(path):
       with open(path) as fp:

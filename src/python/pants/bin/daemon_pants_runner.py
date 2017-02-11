@@ -151,6 +151,9 @@ class DaemonPantsRunner(ProcessManager):
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 
+        # Reinitialize scheduler threads.
+        self._graph_helper.scheduler.post_fork()
+
         # Re-raise any deferred exceptions, if present.
         self._raise_deferred_exc()
 

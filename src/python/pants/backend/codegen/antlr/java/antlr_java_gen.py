@@ -16,6 +16,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
@@ -32,18 +33,23 @@ _DEFAULT_ANTLR_DEPS = {
 }
 
 
-class AntlrGen(SimpleCodegenTask, NailgunTask):
+# TODO: Refactor this and AntlrPyGen to share a common base class with most of the functionality.
+# See comments there for what that would take.
+class AntlrJavaGen(SimpleCodegenTask, NailgunTask):
+  """Generate .java source code from ANTLR grammar files."""
+  gentarget_type = JavaAntlrLibrary
 
   class AmbiguousPackageError(TaskError):
     """Raised when a java package cannot be unambiguously determined for a JavaAntlrLibrary."""
 
+  # TODO: Do we need this?
   def find_sources(self, target, target_dir):
-    sources = super(AntlrGen, self).find_sources(target, target_dir)
+    sources = super(AntlrJavaGen, self).find_sources(target, target_dir)
     return [source for source in sources if source.endswith('.java')]
 
   @classmethod
   def register_options(cls, register):
-    super(AntlrGen, cls).register_options(register)
+    super(AntlrJavaGen, cls).register_options(register)
     for key, (classpath_spec, classpath) in _DEFAULT_ANTLR_DEPS.items():
       cls.register_jvm_tool(register, key, classpath=classpath, classpath_spec=classpath_spec)
 
@@ -72,6 +78,8 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
       args.append('-package')
       args.append(java_package)
       java_main = 'org.antlr.v4.Tool'
+    else:
+      raise TaskError('Unsupported ANTLR compiler: {}'.format(compiler))
 
     antlr_classpath = self.tool_classpath(compiler)
     sources = self._calculate_sources([target])
@@ -87,8 +95,12 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     # Fetch the right java dependency from the target's compiler option
-    compiler_classpath_spec = self.get_options()[target.compiler]
-    return self.resolve_deps([compiler_classpath_spec])
+    return self._deps(target.compiler)
+
+  @memoized_method
+  def _deps(self, compiler):
+    spec = self.get_options()[compiler]
+    return list(self.resolve_deps([spec])) if spec else []
 
   # This checks to make sure that all of the sources have an identical package source structure, and
   # if they do, uses that as the package. If they are different, then the user will need to set the
@@ -103,9 +115,9 @@ class AntlrGen(SimpleCodegenTask, NailgunTask):
   def _calculate_sources(self, targets):
     sources = set()
 
-    def collect_sources(target):
-      if self.is_gentarget(target):
-        sources.update(target.sources_relative_to_buildroot())
+    def collect_sources(tgt):
+      if self.is_gentarget(tgt):
+        sources.update(tgt.sources_relative_to_buildroot())
     for target in targets:
       target.walk(collect_sources)
     return sources

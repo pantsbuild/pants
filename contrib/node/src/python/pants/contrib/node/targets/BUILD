@@ -11,6 +11,16 @@ target(
 )
 
 python_library(
+  name='node_bundle',
+  sources=['node_bundle.py'],
+  dependencies=[
+    ':node_module',
+    'src/python/pants/base:payload',
+    'src/python/pants/fs',
+  ],
+)
+
+python_library(
   name='node_module',
   sources=['node_module.py'],
   dependencies=[

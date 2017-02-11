@@ -173,7 +173,13 @@ class PantsRunIntegrationTest(unittest.TestCase):
       args.append('--config-override=' + ini_file_name)
 
     pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
-    pants_command = [pants_script] + args + command
+
+    # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
+    if kwargs.get('shell') is True:
+      assert not isinstance(command, list), 'must pass command as a string when using shell=True'
+      pants_command = ' '.join([pants_script, ' '.join(args), command])
+    else:
+      pants_command = [pants_script] + args + command
 
     # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():

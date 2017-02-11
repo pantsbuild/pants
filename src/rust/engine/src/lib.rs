@@ -1,3 +1,6 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 mod core;
 mod context;
 mod externs;
@@ -5,15 +8,17 @@ mod fs;
 mod graph;
 mod handles;
 mod nodes;
+mod rule_graph;
 mod scheduler;
 mod selectors;
 mod tasks;
 mod types;
 
+extern crate crossbeam;
 extern crate fnv;
-extern crate glob;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate glob;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
@@ -38,18 +43,21 @@ use externs::{
   Externs,
   IdToStrExtern,
   InvokeRunnable,
+  LiftDirectoryListingExtern,
+  LogExtern,
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
   SatisfiedByExtern,
   StoreListExtern,
   StoreBytesExtern,
-  LiftDirectoryListingExtern,
+  TypeIdBuffer,
   ValForExtern,
   ValToStrExtern,
   with_vec,
 };
 use nodes::{Failure, NodeResult};
+use rule_graph::{GraphMaker, RootSubjectTypes};
 use scheduler::{Scheduler, ExecutionStat};
 use tasks::Tasks;
 use types::Types;
@@ -144,6 +152,7 @@ impl RawNodes {
 #[no_mangle]
 pub extern fn scheduler_create(
   ext_context: *const ExternContext,
+  log: LogExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -214,6 +223,7 @@ pub extern fn scheduler_create(
           },
           Externs::new(
             ext_context,
+            log,
             key_for,
             val_for,
             clone_val,
@@ -233,6 +243,13 @@ pub extern fn scheduler_create(
       }
     )
   )
+}
+
+#[no_mangle]
+pub extern fn scheduler_post_fork(scheduler_ptr: *mut RawScheduler) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.core.post_fork();
+  })
 }
 
 #[no_mangle]
@@ -267,6 +284,7 @@ pub extern fn execution_add_root_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
@@ -275,6 +293,7 @@ pub extern fn execution_add_root_select_dependencies(
       product,
       dep_product,
       field,
+      field_types.to_vec(),
       transitive,
     );
   })
@@ -378,10 +397,11 @@ pub extern fn task_add_select_dependencies(
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Field,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_dependencies(product, dep_product, field, transitive);
+    core.tasks.add_select_dependencies(product, dep_product, field, field_types.to_vec(), transitive);
   })
 }
 
@@ -456,6 +476,29 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
+}
+
+#[no_mangle]
+pub extern fn validator_run(
+  scheduler_ptr: *mut RawScheduler,
+  subject_types_ptr: *mut TypeId,
+  subject_types_len: u64
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
+      let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                        &raw.scheduler.core.externs,
+                                        RootSubjectTypes { subject_types: subject_types.clone() });
+      let graph = graph_maker.full_graph();
+
+      match graph.validate(&raw.scheduler.core.externs) {
+        Result::Ok(_) => {},
+        Result::Err(msg) => {
+          println!("had errors!\n{}", msg)
+        }
+      }
+    })
+  })
 }
 
 fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
