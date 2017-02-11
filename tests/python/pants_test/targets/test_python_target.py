@@ -79,3 +79,15 @@ class PythonTargetTest(BaseTest):
                                                    expected_resource_path='res/data.txt',
                                                    expected_resource_contents='1/137')
     self.assertIs(res, resource_dep)
+
+  def test_resource_dependencies(self):
+    self.create_file('res/data.txt', contents='1/137')
+    res = self.make_target(spec='res:resources', target_type=Resources, sources=['data.txt'])
+    lib = self.make_target(spec='test:lib',
+                           target_type=PythonLibrary,
+                           sources=[],
+                           dependencies=[res])
+    resource_dep = self.assert_single_resource_dep(lib,
+                                                   expected_resource_path='res/data.txt',
+                                                   expected_resource_contents='1/137')
+    self.assertIs(res, resource_dep)

@@ -124,21 +124,12 @@ class PythonTarget(Target):
 
   @property
   def resources(self):
-    resource_targets = []
-
-    if self._resource_target_specs:
-      def get_target(spec):
-        address = Address.parse(spec, relative_to=self.address.spec_path)
-        tgt = self._build_graph.get_target(address)
-        if tgt is None:
-          raise TargetDefinitionException(self, 'No such resource target: {}'.format(address))
-        return tgt
-      resource_targets.extend(get_target(spec) for spec in self._resource_target_specs)
-
-    if self._synthetic_resources_target:
-      resource_targets.append(self._synthetic_resources_target)
-
-    return resource_targets
+    # Note: Will correctly find:
+    #   - Regular dependencies on Resources targets.
+    #   - Resources targets specified via resource_targets=.
+    #   - The synthetic Resources target created from the resources= fileset.
+    # Because these are all in the traversable_dependency_specs.
+    return [dep for dep in self.dependencies if isinstance(dep, Resources)]
 
   def walk(self, work, predicate=None):
     super(PythonTarget, self).walk(work, predicate)
