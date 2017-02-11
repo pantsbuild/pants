@@ -43,11 +43,9 @@ jvm_binary(name = 'bundle-bin',
   source = 'BundleMain.java',
   main = 'org.pantsbuild.testproject.bundle.BundleMain',
   basename = 'bundle-example-bin',
-  resources = [
-    'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
-  ],
   dependencies = [
     '3rdparty:guava',
+    'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
   ]
 )
 
@@ -60,14 +58,14 @@ jvm_app(name='missing-files',
   ]
 )
 
-# Tests `resources=` ordering via integration test.
+# Tests resources ordering via integration test.
 jvm_binary(
   name='bundle-resource-ordering',
   source='BundleMain.java',
   main='org.pantsbuild.testproject.bundle.BundleMain',
-  resources=[
+  dependencies=[
+    '3rdparty:guava',
     'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
     'testprojects/tests/resources/org/pantsbuild/testproject/bundleresources:resources',
-  ],
-  dependencies=['3rdparty:guava']
+  ]
 )
