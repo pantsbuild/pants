@@ -37,8 +37,8 @@ class BuildDirs(datatype('BuildDirs', ['dependencies'])):
   """A list of Stat objects for directories containing build files."""
 
 
-class BuildFiles(datatype('BuildFiles', ['files'])):
-  """A list of Paths that are known to match a build file pattern."""
+class BuildFiles(datatype('BuildFiles', ['path_globs'])):
+  """A wrapper around PathGlobs that are known to match a build file pattern."""
 
 
 def filter_buildfile_paths(address_mapper, directory_listing):
@@ -49,9 +49,10 @@ def filter_buildfile_paths(address_mapper, directory_listing):
 
     return (type(stat) is File and any(fnmatch(basename(stat.path), pattern)
                                        for pattern in address_mapper.build_patterns))
-  build_files = tuple(Path(stat.path, stat)
-                      for stat in directory_listing.dependencies if match(stat))
-  return BuildFiles(build_files)
+
+  # TODO: Skip straight to requesting a Snapshot per directory, rather than re-requesting one here.
+  matches = tuple(stat.path for stat in directory_listing.dependencies if match(stat))
+  return BuildFiles(PathGlobs.create('', include=matches, exclude=()))
 
 
 def parse_address_family(address_mapper, path, build_files_content):
@@ -282,7 +283,7 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     (AddressFamily,
      [SelectLiteral(address_mapper, AddressMapper),
       Select(Dir),
-      SelectProjection(FilesContent, Files, ('files',), BuildFiles)],
+      SelectProjection(FilesContent, PathGlobs, ('path_globs',), BuildFiles)],
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),

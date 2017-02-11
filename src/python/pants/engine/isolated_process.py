@@ -11,7 +11,6 @@ import os
 import subprocess
 from abc import abstractproperty
 
-from pants.engine.fs import extract_snapshot, select_snapshot_directory
 from pants.engine.selectors import Select
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir
