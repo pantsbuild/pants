@@ -12,6 +12,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
+from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField
 from pants.build_graph.resources import Resources
@@ -74,6 +75,9 @@ class JvmTarget(Target, Jarable):
                               rollbacks, but in certain cases may conflict with user libraries.
     :type zinc_file_manager: bool
     """
+    deprecated_conditional(lambda: resources is not None, '1.5.0dev0',
+                           'The `resources=` JVM target argument', 'Use `dependences=` instead.')
+
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
