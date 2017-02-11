@@ -17,7 +17,6 @@ A `python_library` target definition should specify the following:
 * A `name` for the target
 * Either a single `source` Python file or a list of `sources`
 * A list of `dependencies` (optional)
-* A list of `resources` (optional). More info can be found in [[Create a Resource Bundle|pants('src/docs/common_tasks:resources')]].
 
 Here is an example target definition:
 
@@ -27,10 +26,8 @@ Here is an example target definition:
       dependencies=[
         'server/src/python:server-lib',
         'client/src/python:client-lib',
+        'static/json:config'
       ],
-      resources=[
-        globs('static/*.json')
-      ]
     )
 
 Now, another library or binary can depend on the target you created:

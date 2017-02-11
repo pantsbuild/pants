@@ -79,7 +79,6 @@ class Page(Target):
                source=None,
                format=None,
                links=None,
-               resources=None,
                provides=None,
                **kwargs):
     """
@@ -91,7 +90,6 @@ class Page(Target):
     :param provides: Optional "Addresses" at which this page is published.
        E.g., a wiki location.
     :type provides: List of ``wiki_artifact``s
-    :param resources: An optional list of Resources objects.
     """
     payload = payload or Payload()
     if not format:
@@ -107,7 +105,6 @@ class Page(Target):
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
     })
-    self._resource_specs = resources or []
     super(Page, self).__init__(address=address, payload=payload, **kwargs)
 
     if provides and not isinstance(provides[0], WikiArtifact):
@@ -117,13 +114,6 @@ class Page(Target):
   def source(self):
     """The first (and only) source listed by this Page."""
     return list(self.payload.sources.source_paths)[0]
-
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(Page, self).traversable_dependency_specs:
-      yield spec
-    for resource_spec in self._resource_specs:
-      yield resource_spec
 
   @property
   def traversable_specs(self):

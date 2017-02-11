@@ -38,13 +38,18 @@ You can also exclude files, globs, or rglobs using the `-` operator:
       sources=rglobs('*') - rglobs('*.pyc')
     )
 
-Once your resource bundle has been specified, you can include it in, for example, a library target definition. Here's an example:
+Once your resource bundle has been specified, you can depend on it, for example, a library target definition. Here's an example:
 
     ::python
     java_library(name='server',
-      # Other parameters
-      resources=['myproject/src/main/resources:config']
+      sources=globs('*.java'),
+      dependencies=[
+        ...
+        'myproject/src/main/resources:config'
+      ]
     )
+
+This dependency ensures that the files in the resource bundle will be present at runtime (e.g., they will be bundled up with the code).
 
 ## See Also
 

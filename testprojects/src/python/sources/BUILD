@@ -1,3 +1,3 @@
 python_library(
-  resources=globs('*.txt'),
+  sources=globs('*.py'),
 )
