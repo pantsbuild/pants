@@ -5,7 +5,7 @@
 java_library(
   name='code',
   sources = ['ResourcesAndCode.java'],
-  resources=[
+  dependencies=[
       ':readme',
       'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
    ],

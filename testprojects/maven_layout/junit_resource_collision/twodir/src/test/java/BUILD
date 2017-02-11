@@ -7,9 +7,7 @@ junit_tests(
   ],
   dependencies=[
     '3rdparty:junit',
-  ],
-  resources=[
-    'testprojects/maven_layout/junit_resource_collision/twodir/src/test/resources'
+    'testprojects/maven_layout/junit_resource_collision/twodir/src/test/resources',
   ],
   cwd='testprojects/maven_layout/junit_resource_collision/twodir',
 )
