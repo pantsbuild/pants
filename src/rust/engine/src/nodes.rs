@@ -725,18 +725,23 @@ impl Snapshot {
     context
       .expand(path_globs)
       .and_then(move |path_stats| {
-        // And then create a Snapshot.
-        let snapshot_res =
-          context.core.snapshots.create(
-            &context.build_root(),
-            path_stats
-          );
-        match snapshot_res {
-          Ok(snapshot) =>
-            Ok(context.store_snapshot(&snapshot)),
-          Err(err) =>
-            Err(context.throw(&format!("Snapshot failed: {}", err)))
-        }
+          // And then create a Snapshot (re-entering the pool in order to mark it as a
+          // `definitely blocking` operation.
+          let context_in_pool = context.clone();
+          let pool = context.core.pool();
+          pool.spawn_fn(move || {
+            let snapshot_res =
+              context_in_pool.core.snapshots.create(
+                &context_in_pool.build_root(),
+                path_stats
+              );
+            match snapshot_res {
+              Ok(snapshot) =>
+                Ok(context_in_pool.store_snapshot(&snapshot)),
+              Err(err) =>
+                Err(context_in_pool.throw(&format!("Snapshot failed: {}", err)))
+            }
+          })
       })
       .boxed()
   }
