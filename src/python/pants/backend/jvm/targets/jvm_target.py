@@ -76,7 +76,7 @@ class JvmTarget(Target, Jarable):
     :type zinc_file_manager: bool
     """
     deprecated_conditional(lambda: resources is not None, '1.5.0dev0',
-                           'The `resources=` JVM target argument', 'Use `dependences=` instead.')
+                           'The `resources=` JVM target argument', 'Use `dependencies=` instead.')
 
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
