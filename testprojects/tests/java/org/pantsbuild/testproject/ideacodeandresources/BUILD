@@ -5,15 +5,13 @@
 junit_tests(
   name='code',
   sources = ['TestResourcesAndCode.java'],
-  resources=[
-      ':readme',
-      # Add a direct dependency on a non-test resources folder
-      # to make sure it stays non-test resources
-      'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
-      'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
-   ],
   dependencies=[
     '3rdparty:junit',
+    ':readme',
+    # Add a direct dependency on a non-test resources folder
+    # to make sure it stays non-test resources
+    'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
+    'testprojects/tests/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
   ]
 )
 

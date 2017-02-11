@@ -79,7 +79,7 @@ class JvmBinaryTask(JarBuilderTask):
 
     :param binary: The jvm_binary target to operate on.
     :param path: Write the output jar here, overwriting an existing file, if any.
-    :param string manifest_classpath: If set output jar will set as its manifest's
+    :param iterable manifest_classpath: If set output jar will set as its manifest's
       classpath, otherwise output jar will simply include class files.
     """
     # TODO(benjy): There's actually nothing here that requires 'binary' to be a jvm_binary.
