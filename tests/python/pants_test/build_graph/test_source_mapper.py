@@ -46,7 +46,7 @@ class SourceMapperTest(object):
     self.add_to_build_file('path', dedent('''
     java_library(name='target',
                  sources=['BUILD'],
-                 resources=[':buildholder']
+                 dependencies=[':buildholder']
     )
     java_library(name='buildholder',
                  sources=['BUILD']

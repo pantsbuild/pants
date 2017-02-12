@@ -50,12 +50,10 @@ python_library(
 python_library(
   name='ivy_utils',
   sources=['ivy_utils.py'],
-  resource_targets=[
-    ':ivy_utils_resources',
-  ],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
+    ':ivy_utils_resources',
     ':jar_dependency_utils',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',

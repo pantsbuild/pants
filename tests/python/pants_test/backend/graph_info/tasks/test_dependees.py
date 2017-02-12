@@ -94,7 +94,7 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
       java_library(
         name='a_java',
         sources=[],
-        resources=['resources/a:a_resources']
+        dependencies=['resources/a:a_resources']
       )
     """))
 
