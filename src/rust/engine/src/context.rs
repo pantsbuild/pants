@@ -34,6 +34,7 @@ impl Core {
     types: Types,
     externs: Externs,
     build_root: PathBuf,
+    ignore_patterns: Vec<String>,
   ) -> Core {
     let pool = Arc::new(RwLock::new(Core::create_pool()));
     Core {
@@ -45,7 +46,9 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
         }),
-      vfs: PosixVFS::new(build_root, pool.clone())
+      // FIXME: Errors in initialization should definitely be exposed as python
+      // exceptions, rather than as panics.
+      vfs: PosixVFS::new(build_root, ignore_patterns, pool.clone())
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),

@@ -18,6 +18,7 @@ fnv = "1.0.5"
 futures = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
 futures-cpupool = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
 glob = "0.2.11"
+ignore = "0.1.7"
 lazy_static = "0.2.2"
 ordermap = "0.2.7"
 sha2 = "0.4"

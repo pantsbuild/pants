@@ -7,6 +7,8 @@ use std::{fmt, fs, io};
 use futures::future::{self, BoxFuture, Future};
 use futures_cpupool::CpuPool;
 use glob::{Pattern, PatternError};
+use ignore::gitignore::{Gitignore, GitignoreBuilder};
+use ignore;
 use ordermap::OrderMap;
 use sha2::{Sha256, Digest};
 use tar;
@@ -265,32 +267,52 @@ struct PathGlobsExpansion<T: Sized> {
 pub struct PosixVFS {
   build_root: Dir,
   pool: Arc<RwLock<CpuPool>>,
-  // TODO: switch to Gitignore.
-  ignore: Pattern,
+  ignore: Gitignore,
 }
 
 impl PosixVFS {
-  pub fn new(build_root: PathBuf, pool: Arc<RwLock<CpuPool>>) -> Result<PosixVFS, io::Error> {
-    let canonical = build_root.canonicalize()?;
-    if !canonical.metadata()?.is_dir() {
-      return Err(
-        io::Error::new(
-          io::ErrorKind::InvalidInput,
-          format!("Build root {:?} is not a directory.", build_root)
+  pub fn new(
+    build_root: PathBuf,
+    ignore_patterns: Vec<String>,
+    pool: Arc<RwLock<CpuPool>>,
+  ) -> Result<PosixVFS, String> {
+    let canonical_build_root =
+      build_root.canonicalize().and_then(|canonical|
+        canonical.metadata().and_then(|metadata|
+          if metadata.is_dir() {
+            Ok(Dir(canonical))
+          } else {
+            Err(io::Error::new(io::ErrorKind::InvalidInput, "Not a directory."))
+          }
         )
       )
-    }
+      .map_err(|e| format!("Could not canonicalize build root {:?}: {:?}", build_root, e))?;
+
+    let ignore =
+      PosixVFS::create_ignore(&canonical_build_root, &ignore_patterns)
+        .map_err(|e|
+          format!("Could not parse build ignore inputs {:?}: {:?}", ignore_patterns, e)
+        )?;
     Ok(
       PosixVFS {
-        build_root: Dir(canonical),
+        build_root: canonical_build_root,
         pool: pool,
-        ignore: Pattern::new("build-support/*.venv").unwrap(),
+        ignore: ignore,
       }
     )
   }
 
+  fn create_ignore(root: &Dir, patterns: &Vec<String>) -> Result<Gitignore, ignore::Error> {
+    let mut ignore_builder = GitignoreBuilder::new(root.0.as_path());
+    for pattern in patterns {
+      ignore_builder.add_line(None, pattern.as_str())?;
+    }
+    ignore_builder
+      .build()
+  }
+
   fn scandir_sync(&self, dir: &Dir) -> Result<Vec<Stat>, io::Error> {
-    if self.ignore.matches_path(dir.0.as_path()) {
+    if !self.ignore.matched(dir.0.as_path(), true).is_none() {
       return Ok(vec![]);
     }
 

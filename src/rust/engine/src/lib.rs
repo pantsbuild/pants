@@ -19,6 +19,7 @@ extern crate fnv;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
+extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
@@ -248,8 +249,12 @@ pub extern fn scheduler_create(
               create_exception,
               invoke_runnable,
             ),
-            // TODO: Pass build_root as argument.
+            // TODO: Pass build_root and ignore patterns as argument.
             PathBuf::from("."),
+            vec![
+              "build-support/*.venv/".to_string(),
+              ".pants.d/".to_string(),
+            ],
           ),
         )
       }
