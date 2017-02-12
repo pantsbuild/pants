@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
-use futures_cpupool::CpuPool;
+use futures_cpupool::{CpuFuture, CpuPool};
 use glob::{Pattern, PatternError};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore;
@@ -311,13 +311,9 @@ impl PosixVFS {
       .build()
   }
 
-  fn scandir_sync(&self, dir: &Dir) -> Result<Vec<Stat>, io::Error> {
-    if !self.ignore.matched(dir.0.as_path(), true).is_none() {
-      return Ok(vec![]);
-    }
-
+  fn scandir_sync(dir: Dir, dir_abs: PathBuf) -> Result<Vec<Stat>, io::Error> {
     let mut stats = Vec::new();
-    for dir_entry_res in self.build_root.0.join(dir.0.as_path()).read_dir()? {
+    for dir_entry_res in dir_abs.read_dir()? {
       let dir_entry = dir_entry_res?;
       let path = dir.0.join(dir_entry.file_name());
       let file_type = dir_entry.file_type()?;
@@ -335,15 +331,17 @@ impl PosixVFS {
 }
 
 impl VFS<io::Error> for PosixVFS {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
-    future::result(
-      self.build_root.0.join(link.0.as_path())
+  fn read_link(&self, link: Link) -> CpuFuture<PathBuf, io::Error> {
+    let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
+    let pool = self.pool.read().unwrap();
+    pool.spawn_fn(move || {
+      link_abs
         .read_link()
         .and_then(|path_buf| {
           if path_buf.is_absolute() {
             Err(
               io::Error::new(
-                io::ErrorKind::InvalidData, format!("Absolute symlink: {:?}", link)
+                io::ErrorKind::InvalidData, format!("Absolute symlink: {:?}", link_abs)
               )
             )
           } else {
@@ -351,16 +349,25 @@ impl VFS<io::Error> for PosixVFS {
               .map(|parent| parent.join(path_buf))
               .ok_or_else(|| {
                 io::Error::new(
-                  io::ErrorKind::InvalidData, format!("Symlink without a parent?: {:?}", link)
+                  io::ErrorKind::InvalidData, format!("Symlink without a parent?: {:?}", link_abs)
                 )
               })
           }
         })
-    ).boxed()
+    })
   }
 
-  fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
-    future::result(self.scandir_sync(dir)).boxed()
+  fn scandir(&self, dir: Dir) -> CpuFuture<Vec<Stat>, io::Error> {
+    let pool = self.pool.read().unwrap();
+    if !self.ignore.matched(dir.0.as_path(), true).is_none() {
+      // A bit awkward. But better than cloning the ignore patterns into the pool.
+      return pool.spawn(future::ok(vec![]));
+    }
+
+    let dir_abs = self.build_root.0.join(dir.0.as_path());
+    pool.spawn_fn(move || {
+      PosixVFS::scandir_sync(dir, dir_abs)
+    })
   }
 }
 
@@ -368,8 +375,8 @@ impl VFS<io::Error> for PosixVFS {
  * A context for filesystem operations parameterized on an error type 'E'.
  */
 pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
-  fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
+  fn read_link(&self, link: Link) -> CpuFuture<PathBuf, E>;
+  fn scandir(&self, dir: Dir) -> CpuFuture<Vec<Stat>, E>;
 
   /**
    * Canonicalize the Link for the given Path to an underlying File or Dir. May result
@@ -380,7 +387,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
-    self.read_link(&link)
+    self.read_link(link)
       .map(|dest_path| {
         // If the link destination can't be parsed as PathGlob(s), it is broken.
         dest_path.to_str()
@@ -406,7 +413,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       .boxed()
   }
 
-  fn directory_listing(&self, canonical_dir: &Dir, symbolic_path: PathBuf, wildcard: Pattern) -> BoxFuture<Vec<PathStat>, E> {
+  fn directory_listing(&self, canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory.
     let context = self.clone();
     self.scandir(canonical_dir)
@@ -537,12 +544,12 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         future::ok((vec![PathGlob::root_stat()], vec![])).boxed(),
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
-        self.directory_listing(&canonical_dir, symbolic_path, wildcard)
+        self.directory_listing(canonical_dir, symbolic_path, wildcard)
           .map(|path_stats| (path_stats, vec![]))
           .boxed(),
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
-        self.directory_listing(&canonical_dir, symbolic_path, wildcard)
+        self.directory_listing(canonical_dir, symbolic_path, wildcard)
           .map(move |path_stats| {
             path_stats.into_iter()
               .filter_map(|ps| {
