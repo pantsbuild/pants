@@ -45,6 +45,7 @@ class AbstractTarget(object):
     """
     return tuple()
 
+  # TODO: Kill this in 1.5.0.dev0, once this old-style resource specification is gone.
   @property
   def has_resources(self):
     """Returns True if the target has an associated set of Resources.
