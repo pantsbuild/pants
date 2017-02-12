@@ -252,8 +252,9 @@ pub extern fn scheduler_create(
             // TODO: Pass build_root and ignore patterns as argument.
             PathBuf::from("."),
             vec![
-              "build-support/*.venv/".to_string(),
-              ".pants.d/".to_string(),
+              ".*".to_string(),
+              "/build-support/*.venv/".to_string(),
+              "/dist/".to_string(),
             ],
           ),
         )

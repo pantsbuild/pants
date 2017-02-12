@@ -1,6 +1,6 @@
 use std::collections::{HashSet, HashMap};
 use std::ffi::OsStr;
-use std::path::{self, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, fs, io};
 
@@ -344,12 +344,6 @@ impl VFS<io::Error> for PosixVFS {
             Err(
               io::Error::new(
                 io::ErrorKind::InvalidData, format!("Absolute symlink: {:?}", link)
-              )
-            )
-          } else if path_buf.components().any(|c| c == path::Component::ParentDir) {
-            Err(
-              io::Error::new(
-                io::ErrorKind::Other, format!("TODO: Upward symlinks not supported {:?}", link)
               )
             )
           } else {
