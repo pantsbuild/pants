@@ -1,11 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
-
 use glob::{Pattern, PatternError};
 use ordermap::OrderMap;
 use sha2::{Sha256, Digest};
@@ -458,23 +457,30 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   }
 }
 
+pub struct FileContent {
+  path: PathStat,
+  content: Vec<u8>,
+}
+
 pub type Fingerprint = [u8;32];
 
+#[derive(Clone)]
 pub struct Snapshot {
   pub fingerprint: Fingerprint,
   pub path_stats: Vec<PathStat>,
+}
+
+struct SnapshotsInner {
+  next_temp_id: usize,
+  snapshots: HashMap<Fingerprint, Snapshot>,
 }
 
 /**
  * A facade for the snapshot directory, which is currently thrown away at the end of
  * each run.
  */
-struct SnapshotsInner {
-  next_temp_id: usize,
-  temp_dir: TempDir,
-}
-
 pub struct Snapshots {
+  temp_dir: TempDir,
   inner: Mutex<SnapshotsInner>,
 }
 
@@ -482,11 +488,12 @@ impl Snapshots {
   pub fn new() -> Result<Snapshots, io::Error> {
     Ok(
       Snapshots {
+        temp_dir: TempDir::new("snapshots")?,
         inner:
           Mutex::new(
             SnapshotsInner {
               next_temp_id: 0,
-              temp_dir: TempDir::new("snapshots")?
+              snapshots: Default::default(),
             }
           ),
       }
@@ -596,31 +603,76 @@ impl Snapshots {
   /**
    * Returns the next temporary path, and the destination path prefix for Snapshots.
    */
-  fn next_paths(&self) -> (PathBuf, PathBuf) {
-    let (temp_id, temp_dir) = {
+  fn next_temp_path(&self) -> PathBuf {
+    let temp_id = {
       let mut inner = self.inner.lock().unwrap();
       inner.next_temp_id += 1;
-      (inner.next_temp_id, inner.temp_dir.path().to_owned())
+      inner.next_temp_id
     };
 
-    (temp_dir.join(format!("{}.tar.tmp", temp_id)), temp_dir)
+    self.temp_dir.path().join(format!("{}.tar.tmp", temp_id))
+  }
+
+  fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
+    self.temp_dir.path().join(format!("{}.tar", Snapshots::hex(&fingerprint)))
   }
 
   pub fn create(&self, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
-    let (temp_path, mut dest_path) = self.next_paths();
+    let temp_path = self.next_temp_path();
     Snapshots::tar_create(temp_path.as_path(), &paths, build_root)?;
 
-    // Fingerprint the tar file and then rename it to create the Snapshot.
+    // Fingerprint the resulting tar file.
     let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;
-    dest_path.push(format!("{:}.tar", Snapshots::hex(&fingerprint)));
-    fs::rename(temp_path, dest_path)
-      .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
-    Ok(
-      Snapshot {
-        fingerprint: fingerprint,
-        path_stats: paths,
+    let dest_path = self.path_for(&fingerprint);
+
+    // If the resulting Snapshot already exists, return it immediately. Otherwise, rename to
+    // the final path and store.
+    let snapshot = {
+      let mut inner = self.inner.lock().unwrap();
+      if let Some(snapshot) = inner.snapshots.get(&fingerprint).map(|s| s.clone()) {
+        snapshot
+      } else {
+        fs::rename(temp_path, dest_path)
+          .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
+        inner.snapshots.entry(fingerprint).or_insert(
+          Snapshot {
+            fingerprint: fingerprint,
+            path_stats: paths,
+          }
+        ).clone()
       }
-    )
+    };
+    Ok(snapshot)
+  }
+
+  fn contents_for_snapshot(&self, snapshot: Snapshot) -> Result<Vec<FileContent>, io::Error> {
+    let mut archive = {
+      let archive_path = self.path_for(&snapshot.fingerprint);
+      fs::File::open(archive_path).map(|f| tar::Archive::new(f))?
+    };
+
+    let mut files_content = Vec::new();
+    for (entry_res, path_stat) in archive.entries()?.zip(snapshot.path_stats.into_iter()) {
+      let mut entry = entry_res?;
+      if entry.header().entry_type() == tar::EntryType::file() {
+        let mut content = Vec::new();
+        io::Read::read_to_end(&mut entry, &mut content)?;
+        files_content.push(FileContent { path: path_stat, content: content });
+      }
+    }
+    Ok(files_content)
+  }
+
+  pub fn contents_for(&self, fingerprint: Fingerprint) -> Result<Vec<FileContent>, String> {
+    let snapshot = {
+      let inner = self.inner.lock().unwrap();
+      inner.snapshots.get(&fingerprint)
+        .ok_or_else(|| format!("Snapshot not found: {}", Snapshots::hex(&fingerprint)))?
+        .clone()
+    };
+
+    self.contents_for_snapshot(snapshot)
+      .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", Snapshots::hex(&fingerprint), e))
   }
 }
