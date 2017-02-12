@@ -3,7 +3,7 @@
 
 
 python_tests(
-  sources=globs('test_*.py', exclude=[globs('test_*_integration.py')]),
+  sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
     '3rdparty/python:mock',
     '3rdparty/python:pex',
@@ -21,8 +21,8 @@ python_tests(
 
 
 python_tests(
-  name='python_run_integration',
-  sources=['test_python_run_integration.py'],
+  name='integration',
+  sources=globs('*_integration.py'),
   dependencies=[
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
