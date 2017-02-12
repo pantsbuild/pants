@@ -74,17 +74,6 @@ _FFI.cdef(
     } TypeIdBuffer;
 
     typedef struct {
-      Buffer       path;
-      uint8_t      tag;
-    } RawStat;
-
-    typedef struct {
-      RawStat*     stats_ptr;
-      uint64_t     stats_len;
-      Value        _value;
-    } RawStats;
-
-    typedef struct {
       Value  value;
       bool   is_throw;
     } RunnableComplete;
@@ -104,7 +93,6 @@ _FFI.cdef(
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
     typedef Buffer           (*extern_lift_bytes)(ExternContext*, Value*);
-    typedef RawStats         (*extern_lift_directory_listing)(ExternContext*, Value*);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -143,7 +131,6 @@ _FFI.cdef(
                                    extern_store_list,
                                    extern_store_bytes,
                                    extern_lift_bytes,
-                                   extern_lift_directory_listing,
                                    extern_project,
                                    extern_project_multi,
                                    extern_create_exception,
@@ -163,8 +150,6 @@ _FFI.cdef(
                                    Function,
                                    Function,
                                    Function,
-                                   TypeConstraint,
-                                   TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
@@ -311,28 +296,6 @@ def extern_lift_bytes(context_handle, bytes_val):
   """Given a context and a Value representing bytes, return a Buffer."""
   c = _FFI.from_handle(context_handle)
   return c.buf(c.from_value(bytes_val))
-
-
-@_FFI.callback("RawStats(ExternContext*, Value*)")
-def extern_lift_directory_listing(context_handle, directory_listing_val):
-  """Given a context and a Value representing a DirectoryListing, return RawStats."""
-  c = _FFI.from_handle(context_handle)
-  directory_listing = c.from_value(directory_listing_val)
-
-  raw_stats_len = len(directory_listing.dependencies)
-  raw_stats = _FFI.new('RawStat[]', raw_stats_len)
-  for i, stat in enumerate(directory_listing.dependencies):
-    raw_stats[i].path = c.buf(stat.path)
-    if type(stat) == Dir:
-      raw_stats[i].tag = 0
-    elif type(stat) == File:
-      raw_stats[i].tag = 1
-    elif type(stat) == Link:
-      raw_stats[i].tag = 2
-    else:
-      raise Exception('Unrecognized stat type: {}'.format(stat))
-
-  return (raw_stats, raw_stats_len, c.to_value(raw_stats, type_id=c.anon_id))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
@@ -619,8 +582,6 @@ class Native(object):
                     constraint_path_globs,
                     constraint_snapshot,
                     constraint_files_content,
-                    constraint_read_link,
-                    constraint_directory_listing,
                     constraint_dir,
                     constraint_file,
                     constraint_link):
@@ -645,7 +606,6 @@ class Native(object):
         extern_store_list,
         extern_store_bytes,
         extern_lift_bytes,
-        extern_lift_directory_listing,
         extern_project,
         extern_project_multi,
         extern_create_exception,
@@ -675,8 +635,6 @@ class Native(object):
         tc(constraint_path_globs),
         tc(constraint_snapshot),
         tc(constraint_files_content),
-        tc(constraint_read_link),
-        tc(constraint_directory_listing),
         tc(constraint_dir),
         tc(constraint_file),
         tc(constraint_link),

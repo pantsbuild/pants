@@ -2,9 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-use std::ffi::OsString;
-use std::os::unix::ffi::{OsStrExt, OsStringExt};
-use std::path::{Path, PathBuf};
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 use std::sync::Arc;
 
 use futures::future::{self, BoxFuture, Future};
@@ -19,10 +18,8 @@ use fs::{
   File,
   FileContent,
   Fingerprint,
-  Link,
   PathGlobs,
   PathStat,
-  Stat
 };
 use graph::EntryId;
 use handles::maybe_drain_handles;
@@ -205,11 +202,6 @@ impl Context {
     self.invoke_unsafe(&self.core.types.construct_dir, &args)
   }
 
-  fn store_link(&self, item: &Link) -> Value {
-    let args = vec![self.store_path(item.0.as_path())];
-    self.invoke_unsafe(&self.core.types.construct_link, &args)
-  }
-
   fn store_file(&self, item: &File) -> Value {
     let args = vec![self.store_path(item.0.as_path())];
     self.invoke_unsafe(&self.core.types.construct_file, &args)
@@ -293,14 +285,6 @@ impl Context {
     &self.core.types.files_content
   }
 
-  fn type_read_link(&self) -> &TypeConstraint {
-    &self.core.types.read_link
-  }
-
-  fn type_directory_listing(&self) -> &TypeConstraint {
-    &self.core.types.directory_listing
-  }
-
   fn lift_path_globs(&self, item: &Value) -> Result<PathGlobs, String> {
     let include = self.project_multi_strs(item, &self.core.tasks.field_include);
     let exclude = self.project_multi_strs(item, &self.core.tasks.field_exclude);
@@ -318,20 +302,6 @@ impl Context {
         &self.core.types.bytes,
       );
     Fingerprint::from_bytes_unsafe(&self.core.externs.lift_bytes(&fingerprint_val))
-  }
-
-  fn lift_read_link(&self, item: &Value) -> PathBuf {
-    let path_val =
-      self.core.externs.project(
-        item,
-        &self.core.tasks.field_path,
-        &self.core.types.bytes,
-      );
-    PathBuf::from(OsString::from_vec(self.core.externs.lift_bytes(&path_val)))
-  }
-
-  fn lift_directory_listing(&self, item: &Value) -> Vec<Stat> {
-    self.core.externs.lift_directory_listing(item)
   }
 
   /**
@@ -378,49 +348,6 @@ impl Context {
 
   fn err(&self, failure: Failure) -> StepFuture {
     future::err(failure).boxed()
-  }
-}
-
-impl FSContext<Failure> for Context {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, Failure> {
-    let context = self.clone();
-    self
-      .get(
-        &Node::create(
-          Selector::select(self.type_read_link().clone()),
-          self.key_for(&self.store_link(link)),
-          Variants::default(),
-        )
-      )
-      .then(move |read_link_res| {
-        match read_link_res {
-          Ok(ref read_link) =>
-            Ok(context.lift_read_link(read_link)),
-          Err(failure) =>
-            Err(context.was_required(failure)),
-        }
-      })
-      .boxed()
-  }
-
-  fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, Failure> {
-    let context = self.clone();
-    let node =
-      Node::create(
-        Selector::select(self.type_directory_listing().clone()),
-        self.key_for(&self.store_dir(dir)),
-        Variants::default(),
-      );
-    self.get(&node)
-      .then(move |dir_listing_res| {
-        match dir_listing_res {
-          Ok(ref dir_listing) =>
-            Ok(context.lift_directory_listing(dir_listing)),
-          Err(failure) =>
-            Err(context.was_required(failure)),
-        }
-      })
-      .boxed()
   }
 }
 

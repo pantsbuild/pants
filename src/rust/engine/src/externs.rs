@@ -3,11 +3,9 @@ use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
-use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use fs::{Dir, File, Link, Stat};
 use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 
@@ -29,7 +27,6 @@ pub struct Externs {
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   lift_bytes: LiftBytesExtern,
-  lift_directory_listing: LiftDirectoryListingExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
@@ -56,7 +53,6 @@ impl Externs {
     store_list: StoreListExtern,
     store_bytes: StoreBytesExtern,
     lift_bytes: LiftBytesExtern,
-    lift_directory_listing: LiftDirectoryListingExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
@@ -74,7 +70,6 @@ impl Externs {
       store_list: store_list,
       store_bytes: store_bytes,
       lift_bytes: lift_bytes,
-      lift_directory_listing: lift_directory_listing,
       project: project,
       project_multi: project_multi,
       id_to_str: id_to_str,
@@ -162,22 +157,6 @@ impl Externs {
     (self.lift_bytes)(self.context, item).to_bytes()
   }
 
-  pub fn lift_directory_listing(&self, val: &Value) -> Vec<Stat> {
-    let raw_stats = (self.lift_directory_listing)(self.context, val);
-    with_vec(raw_stats.stats_ptr, raw_stats.stats_len as usize, |stats_vec| {
-      stats_vec.iter()
-        .map(|raw_stat| {
-          let path = PathBuf::from(raw_stat.path.to_os_string());
-          match raw_stat.tag {
-            RawStatTag::Dir => Stat::Dir(Dir(path)),
-            RawStatTag::File => Stat::File(File(path)),
-            RawStatTag::Link => Stat::Link(Link(path)),
-          }
-        })
-        .collect()
-    })
-  }
-
   pub fn create_exception(&self, msg: &str) -> Value {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
@@ -223,9 +202,6 @@ pub type StoreBytesExtern =
 pub type LiftBytesExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
-pub type LiftDirectoryListingExtern =
-  extern "C" fn(*const ExternContext, *const Value) -> RawStats;
-
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
 
@@ -237,30 +213,6 @@ pub enum LogLevel {
   Info = 1,
   Warn = 2,
   Critical = 3,
-}
-
-// This enum is only ever constructed from the python side.
-#[allow(dead_code)]
-#[repr(C)]
-#[repr(u8)]
-pub enum RawStatTag {
-  Dir = 0,
-  File = 1,
-  Link = 2,
-}
-
-#[repr(C)]
-pub struct RawStat {
-  path: Buffer,
-  tag: RawStatTag,
-}
-
-#[repr(C)]
-pub struct RawStats {
-  stats_ptr: *mut RawStat,
-  stats_len: u64,
-  // A handle to hold the underlying stats buffer alive.
-  value_: Value,
 }
 
 #[repr(C)]

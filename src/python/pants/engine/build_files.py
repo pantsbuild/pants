@@ -6,17 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-from fnmatch import fnmatch
-from os.path import basename, dirname, join
+from os.path import dirname, join
 
 import six
 
-from pants.base.project_tree import Dir, File
+from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import AddressableDescriptor, Addresses, Exactly, TypeConstraintError
-from pants.engine.fs import DirectoryListing, Files, FilesContent, Path, PathGlobs, Snapshot
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
@@ -41,18 +40,9 @@ class BuildFiles(datatype('BuildFiles', ['path_globs'])):
   """A wrapper around PathGlobs that are known to match a build file pattern."""
 
 
-def filter_buildfile_paths(address_mapper, directory_listing):
-  def match(stat):
-    # Short circuit for ignored paths.
-    if address_mapper.build_ignore_patterns.match_file(stat.path):
-      return False
-
-    return (type(stat) is File and any(fnmatch(basename(stat.path), pattern)
-                                       for pattern in address_mapper.build_patterns))
-
-  # TODO: Skip straight to requesting a Snapshot per directory, rather than re-requesting one here.
-  matches = tuple(stat.path for stat in directory_listing.dependencies if match(stat))
-  return BuildFiles(PathGlobs.create('', include=matches, exclude=()))
+def buildfile_path_globs_for_dir(address_mapper, directory):
+  patterns = address_mapper.build_patterns
+  return BuildFiles(PathGlobs.create(directory.path, include=patterns, exclude=()))
 
 
 def parse_address_family(address_mapper, path, build_files_content):
@@ -287,8 +277,8 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      parse_address_family),
     (BuildFiles,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(DirectoryListing)],
-     filter_buildfile_paths),
+      Select(Dir)],
+     buildfile_path_globs_for_dir),
   ] + [
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.

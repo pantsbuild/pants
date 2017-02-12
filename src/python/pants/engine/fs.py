@@ -9,29 +9,10 @@ import functools
 from binascii import hexlify
 from os.path import dirname, join
 
-import six
-
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addressable import Collection
-from pants.engine.selectors import Select, SelectDependencies
-from pants.util.contextutil import open_tar
-from pants.util.dirutil import safe_mkdir
+from pants.engine.selectors import Select
 from pants.util.objects import datatype
-
-
-class ReadLink(datatype('ReadLink', ['path'])):
-  """The result of reading a symbolic link."""
-
-  def __new__(cls, path):
-    return super(ReadLink, cls).__new__(cls, six.binary_type(path))
-
-
-class Files(datatype('Files', ['dependencies'])):
-  """A collection of Path objects with File stats."""
-
-  @property
-  def stats(self):
-    return tuple(s.stat for s in self.dependencies)
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
@@ -72,10 +53,6 @@ class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
                      tuple(join(relative_to, f) for f in exclude))
 
 
-class DirectoryListing(datatype('DirectoryListing', ['directory', 'dependencies'])):
-  """A list of Stat objects representing a directory listing."""
-
-
 class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
   """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
@@ -107,18 +84,6 @@ def files_content_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')
 
 
-def scan_directory(project_tree, directory):
-  """List Stat objects directly below the given path, relative to the ProjectTree.
-
-  :returns: A DirectoryListing.
-  """
-  return DirectoryListing(directory, tuple(project_tree.scandir(directory.path)))
-
-
-def read_link(project_tree, link):
-  return ReadLink(project_tree.readlink(link.path))
-
-
 FilesContent = Collection.of(FileContent)
 
 
@@ -142,8 +107,7 @@ def create_fs_intrinsics(project_tree):
     p.__name__ = '{}_intrinsic'.format(func.__name__)
     return p
   return [
-    (DirectoryListing, Dir, ptree(scan_directory)),
-    (ReadLink, Link, ptree(read_link)),
+    # TODO: Remove!
   ]
 
 

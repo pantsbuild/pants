@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import (FileContent, FilesContent, Dir, DirectoryListing, File, Link, Path, PathGlobs, ReadLink, Snapshot,
+from pants.engine.fs import (FileContent, FilesContent, Dir, File, Link, Path, PathGlobs, Snapshot,
                              create_fs_intrinsics, generate_fs_subjects)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, RulesetValidator
@@ -85,8 +85,6 @@ class LocalScheduler(object):
         constraint_for(PathGlobs),
         constraint_for(Snapshot),
         constraint_for(FilesContent),
-        constraint_for(ReadLink),
-        constraint_for(DirectoryListing),
         constraint_for(Dir),
         constraint_for(File),
         constraint_for(Link),

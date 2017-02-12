@@ -14,8 +14,6 @@ pub struct Types {
   pub path_globs: TypeConstraint,
   pub snapshot: TypeConstraint,
   pub files_content: TypeConstraint,
-  pub read_link: TypeConstraint,
-  pub directory_listing: TypeConstraint,
   pub dir: TypeConstraint,
   pub file: TypeConstraint,
   pub link: TypeConstraint,
