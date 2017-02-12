@@ -790,23 +790,23 @@ impl Snapshot {
     context
       .expand(path_globs)
       .and_then(move |path_stats| {
-          // And then create a Snapshot (re-entering the pool in order to mark it as a
-          // `definitely blocking` operation.
-          let context_in_pool = context.clone();
-          let pool = context.core.pool();
-          pool.spawn_fn(move || {
-            let snapshot_res =
-              context_in_pool.core.snapshots.create(
-                &context_in_pool.build_root(),
-                path_stats
-              );
-            match snapshot_res {
-              Ok(snapshot) =>
-                Ok(context_in_pool.store_snapshot(&snapshot)),
-              Err(err) =>
-                Err(context_in_pool.throw(&format!("Snapshot failed: {}", err)))
-            }
-          })
+        // And then create a Snapshot (re-entering the pool in order to mark it as an
+        // operation that probably blocks).
+        let context_in_pool = context.clone();
+        let pool = context.core.pool();
+        pool.spawn_fn(move || {
+          let snapshot_res =
+            context_in_pool.core.snapshots.create(
+              &context_in_pool.build_root(),
+              path_stats
+            );
+          match snapshot_res {
+            Ok(snapshot) =>
+              Ok(context_in_pool.store_snapshot(&snapshot)),
+            Err(err) =>
+              Err(context_in_pool.throw(&format!("Snapshot failed: {}", err)))
+          }
+        })
       })
       .boxed()
   }
@@ -861,12 +861,17 @@ impl Step for FilesContent {
         Ok(snapshot_val) => {
           // Request the file contents of the Snapshot, and then store them.
           let fingerprint = context.lift_snapshot_fingerprint(&snapshot_val);
-          context.core.snapshots.contents_for(fingerprint)
-            .map(|files_content| context.store_files_content(&files_content))
-            .map_err(|e| context.throw(&e))
+          let context_in_pool = context.clone();
+          let pool = context.core.pool();
+          pool.spawn_fn(move || {
+            context_in_pool.core.snapshots.contents_for(fingerprint)
+              .map(|files_content| context_in_pool.store_files_content(&files_content))
+              .map_err(|e| context_in_pool.throw(&e))
+          })
+          .boxed()
         },
         Err(failure) =>
-          Err(context.was_optional(failure, "No source of Snapshot."))
+          context.err(context.was_optional(failure, "No source of Snapshot."))
       })
       .boxed()
   }
