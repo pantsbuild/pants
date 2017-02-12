@@ -1,10 +1,11 @@
 use std::collections::{HashSet, HashMap};
 use std::ffi::OsStr;
 use std::path::{self, Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
+use futures_cpupool::CpuPool;
 use glob::{Pattern, PatternError};
 use ordermap::OrderMap;
 use sha2::{Sha256, Digest};
@@ -261,18 +262,31 @@ struct PathGlobsExpansion<T: Sized> {
 }
 
 #[derive(Clone)]
-pub struct ProjectTree {
-  build_root: PathBuf,
+pub struct PosixVFS {
+  build_root: Dir,
+  pool: Arc<RwLock<CpuPool>>,
   // TODO: switch to Gitignore.
   ignore: Pattern,
 }
 
-impl ProjectTree {
-  pub fn new(build_root: PathBuf) -> ProjectTree {
-    ProjectTree {
-      build_root: build_root,
-      ignore: Pattern::new("build-support/*.venv").unwrap(),
+impl PosixVFS {
+  pub fn new(build_root: PathBuf, pool: Arc<RwLock<CpuPool>>) -> Result<PosixVFS, io::Error> {
+    let canonical = build_root.canonicalize()?;
+    if !canonical.metadata()?.is_dir() {
+      return Err(
+        io::Error::new(
+          io::ErrorKind::InvalidInput,
+          format!("Build root {:?} is not a directory.", build_root)
+        )
+      )
     }
+    Ok(
+      PosixVFS {
+        build_root: Dir(canonical),
+        pool: pool,
+        ignore: Pattern::new("build-support/*.venv").unwrap(),
+      }
+    )
   }
 
   fn scandir_sync(&self, dir: &Dir) -> Result<Vec<Stat>, io::Error> {
@@ -281,7 +295,7 @@ impl ProjectTree {
     }
 
     let mut stats = Vec::new();
-    for dir_entry_res in self.build_root.join(dir.0.as_path()).read_dir()? {
+    for dir_entry_res in self.build_root.0.join(dir.0.as_path()).read_dir()? {
       let dir_entry = dir_entry_res?;
       let path = dir.0.join(dir_entry.file_name());
       let file_type = dir_entry.file_type()?;
@@ -298,10 +312,10 @@ impl ProjectTree {
   }
 }
 
-impl FSContext<io::Error> for ProjectTree {
+impl VFS<io::Error> for PosixVFS {
   fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     future::result(
-      self.build_root.join(link.0.as_path())
+      self.build_root.0.join(link.0.as_path())
         .read_link()
         .and_then(|path_buf| {
           if path_buf.is_absolute() {
@@ -337,7 +351,7 @@ impl FSContext<io::Error> for ProjectTree {
 /**
  * A context for filesystem operations parameterized on an error type 'E'.
  */
-pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
+pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, E>;
 
@@ -703,10 +717,10 @@ impl Snapshots {
     self.temp_dir.path().join(format!("{}.tar", fingerprint.to_hex()))
   }
 
-  pub fn create(&self, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
+  pub fn create(&self, vfs: &PosixVFS, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
     let temp_path = self.next_temp_path();
-    Snapshots::tar_create(temp_path.as_path(), &paths, build_root)?;
+    Snapshots::tar_create(temp_path.as_path(), &paths, &vfs.build_root)?;
 
     // Fingerprint the resulting tar file.
     let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;

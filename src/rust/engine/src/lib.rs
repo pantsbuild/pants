@@ -29,7 +29,7 @@ extern crate tempdir;
 use std::ffi::CStr;
 use std::mem;
 use std::os::raw;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use context::Core;
@@ -199,55 +199,59 @@ pub extern fn scheduler_create(
     Box::new(
       RawScheduler {
         scheduler: Scheduler::new(
-          Tasks::new(
-            field_name,
-            field_products,
-            field_variants,
-            field_include,
-            field_exclude,
-            field_dependencies,
-            field_path,
-            field_fingerprint,
+          Core::new(
+            Tasks::new(
+              field_name,
+              field_products,
+              field_variants,
+              field_include,
+              field_exclude,
+              field_dependencies,
+              field_path,
+              field_fingerprint,
+            ),
+            Types {
+              construct_snapshot: construct_snapshot,
+              construct_file_content: construct_file_content,
+              construct_files_content: construct_files_content,
+              construct_path_stat: construct_path_stat,
+              construct_dir: construct_dir,
+              construct_file: construct_file,
+              construct_link: construct_link,
+              address: type_address,
+              has_products: type_has_products,
+              has_variants: type_has_variants,
+              path_globs: type_path_globs,
+              snapshot: type_snapshot,
+              files_content: type_files_content,
+              dir: type_dir,
+              file: type_file,
+              link: type_link,
+              string: type_string,
+              bytes: type_bytes,
+            },
+            Externs::new(
+              ext_context,
+              log,
+              key_for,
+              val_for,
+              clone_val,
+              drop_handles,
+              id_to_str,
+              val_to_str,
+              satisfied_by,
+              store_list,
+              store_bytes,
+              lift_bytes,
+              project,
+              project_multi,
+              create_exception,
+              invoke_runnable,
+            ),
+            // TODO: Pass build_root as argument.
+            PathBuf::from("."),
           ),
-          Types {
-            construct_snapshot: construct_snapshot,
-            construct_file_content: construct_file_content,
-            construct_files_content: construct_files_content,
-            construct_path_stat: construct_path_stat,
-            construct_dir: construct_dir,
-            construct_file: construct_file,
-            construct_link: construct_link,
-            address: type_address,
-            has_products: type_has_products,
-            has_variants: type_has_variants,
-            path_globs: type_path_globs,
-            snapshot: type_snapshot,
-            files_content: type_files_content,
-            dir: type_dir,
-            file: type_file,
-            link: type_link,
-            string: type_string,
-            bytes: type_bytes,
-          },
-          Externs::new(
-            ext_context,
-            log,
-            key_for,
-            val_for,
-            clone_val,
-            drop_handles,
-            id_to_str,
-            val_to_str,
-            satisfied_by,
-            store_list,
-            store_bytes,
-            lift_bytes,
-            project,
-            project_multi,
-            create_exception,
-            invoke_runnable,
-          ),
-        ),
+        )
       }
     )
   )
@@ -458,10 +462,10 @@ pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
 pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
   with_scheduler(scheduler_ptr, |raw| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-    let path = Path::new(path_str.as_str());
+    let path = PathBuf::from(path_str);
     // TODO: This should likely return an error condition to python.
     //   see https://github.com/pantsbuild/pants/issues/4025
-    raw.scheduler.visualize(&path).unwrap_or_else(|e| {
+    raw.scheduler.visualize(path.as_path()).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
   })
@@ -470,9 +474,9 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
 #[no_mangle]
 pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-  let path = Path::new(path_str.as_str());
+  let path = PathBuf::from(path_str);
   with_scheduler(scheduler_ptr, |raw| {
-     raw.scheduler.trace(path).unwrap_or_else(|e| {
+     raw.scheduler.trace(path.as_path()).unwrap_or_else(|e| {
        println!("Failed to write trace to {}: {:?}", path.display(), e);
      });
   });

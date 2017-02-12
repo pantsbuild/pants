@@ -1,5 +1,6 @@
 
-use std::sync::{RwLock, RwLockReadGuard};
+use std::path::PathBuf;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use futures_cpupool::{self, CpuPool};
 
@@ -7,14 +8,14 @@ use externs::Externs;
 use graph::Graph;
 use tasks::Tasks;
 use types::Types;
-use fs::Snapshots;
+use fs::{PosixVFS, Snapshots};
 
 
 /**
  * The core context shared (via Arc) between the Scheduler and the Context objects of
  * all running Nodes.
  *
- * TODO: Move `nodes.Context` to this module.
+ * TODO: Move `nodes.Context` to this module and rename both of these.
  */
 pub struct Core {
   pub graph: Graph,
@@ -22,12 +23,19 @@ pub struct Core {
   pub types: Types,
   pub externs: Externs,
   pub snapshots: Snapshots,
+  pub vfs: PosixVFS,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
-  pool: RwLock<CpuPool>,
+  pool: Arc<RwLock<CpuPool>>,
 }
 
 impl Core {
-  pub fn new(tasks: Tasks, types: Types, externs: Externs) -> Core {
+  pub fn new(
+    tasks: Tasks,
+    types: Types,
+    externs: Externs,
+    build_root: PathBuf,
+  ) -> Core {
+    let pool = Arc::new(RwLock::new(Core::create_pool()));
     Core {
       graph: Graph::new(),
       tasks: tasks,
@@ -37,7 +45,11 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
         }),
-      pool: RwLock::new(Core::create_pool()),
+      vfs: PosixVFS::new(build_root, pool.clone())
+        .unwrap_or_else(|e| {
+          panic!("Could not initialize VFS: {:?}", e);
+        }),
+      pool: pool,
     }
   }
 

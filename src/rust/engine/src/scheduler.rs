@@ -9,12 +9,10 @@ use futures_cpupool::CpuFuture;
 
 use context::Core;
 use core::{Field, Key, TypeConstraint, TypeId};
-use externs::{Externs, LogLevel};
+use externs::LogLevel;
 use graph::EntryId;
 use nodes::{Node, NodeResult, Context, ContextFactory};
 use selectors::{Selector, SelectDependencies};
-use tasks::Tasks;
-use types::Types;
 
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
@@ -29,13 +27,9 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(
-    tasks: Tasks,
-    types: Types,
-    externs: Externs,
-  ) -> Scheduler {
+  pub fn new(core: Core) -> Scheduler {
     Scheduler {
-      core: Arc::new(Core::new(tasks, types, externs)),
+      core: Arc::new(core),
       roots: Vec::new(),
     }
   }

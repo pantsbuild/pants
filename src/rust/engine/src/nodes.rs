@@ -14,12 +14,12 @@ use externs::Externs;
 use fs::{
   self,
   Dir,
-  FSContext,
   File,
   FileContent,
   Fingerprint,
   PathGlobs,
   PathStat,
+  VFS,
 };
 use graph::EntryId;
 use handles::maybe_drain_handles;
@@ -266,11 +266,6 @@ impl Context {
     self.core.externs.project_multi(item, field).iter()
       .map(|v| self.core.externs.val_to_str(v))
       .collect()
-  }
-
-  fn build_root(&self) -> Dir {
-    // TODO
-    Dir(Path::new(".").to_owned())
   }
 
   fn type_path_globs(&self) -> &TypeConstraint {
@@ -714,32 +709,26 @@ pub struct Snapshot {
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> StepFuture {
     // Recursively expand PathGlobs into PathStats.
-    // TODO: Clean this up.
-    let pt = fs::ProjectTree::new(context.build_root().0.to_owned());
-    let pool = context.core.pool();
-    let context2 = context.clone();
-    pool.spawn_fn(move || {
-      pt
-        .expand(path_globs)
-        .then(move |path_stats_res| match path_stats_res {
-          Ok(path_stats) => {
-            // And then create a Snapshot (re-entering the pool in order to mark it as a
-            // `definitely blocking` operation.
-            let snapshot_res =
-              context2.core.snapshots.create(
-                &context2.build_root(),
-                path_stats
-              );
-            match snapshot_res {
-              Ok(snapshot) =>
-                Ok(context2.store_snapshot(&snapshot)),
-              Err(err) =>
-                Err(context2.throw(&format!("Snapshot failed: {}", err)))
-            }
-          },
-          Err(e) =>
-            Err(context2.throw(&format!("PathGlobs expansion failed: {:?}", e))),
-        })
+    context.core.vfs
+      .expand(path_globs)
+      .then(move |path_stats_res| match path_stats_res {
+        Ok(path_stats) => {
+          // And then create a Snapshot (re-entering the pool in order to mark it as a
+          // `definitely blocking` operation.
+          let snapshot_res =
+            context.core.snapshots.create(
+              &context.core.vfs,
+              path_stats
+            );
+          match snapshot_res {
+            Ok(snapshot) =>
+              Ok(context.store_snapshot(&snapshot)),
+            Err(err) =>
+              Err(context.throw(&format!("Snapshot failed: {}", err)))
+          }
+        },
+        Err(e) =>
+          Err(context.throw(&format!("PathGlobs expansion failed: {:?}", e))),
       })
       .boxed()
   }
