@@ -1,7 +1,7 @@
 use std::collections::{HashSet, HashMap};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -335,6 +335,10 @@ impl PosixVFS {
     Ok(stats)
   }
 
+  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+    self.pool.read().unwrap()
+  }
+
   pub fn post_fork(&self) {
     let mut pool = self.pool.write().unwrap();
     *pool = PosixVFS::create_pool();
@@ -344,8 +348,7 @@ impl PosixVFS {
 impl VFS<io::Error> for Arc<PosixVFS> {
   fn read_link(&self, link: Link) -> CpuFuture<PathBuf, io::Error> {
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
-    let pool = self.pool.read().unwrap();
-    pool.spawn_fn(move || {
+    self.pool().spawn_fn(move || {
       link_abs
         .read_link()
         .and_then(|path_buf| {
@@ -369,14 +372,13 @@ impl VFS<io::Error> for Arc<PosixVFS> {
   }
 
   fn scandir(&self, dir: Dir) -> CpuFuture<Vec<Stat>, io::Error> {
-    let pool = self.pool.read().unwrap();
     if !self.ignore.matched(dir.0.as_path(), true).is_none() {
       // A bit awkward. But better than cloning the ignore patterns into the pool.
-      return pool.spawn(future::ok(vec![]));
+      return self.pool().spawn(future::ok(vec![]));
     }
 
     let dir_abs = self.build_root.0.join(dir.0.as_path());
-    pool.spawn_fn(move || {
+    self.pool().spawn_fn(move || {
       PosixVFS::scandir_sync(dir, dir_abs)
     })
   }
@@ -734,26 +736,20 @@ impl Snapshots {
     Ok(())
   }
 
-  /**
-   * Returns the next temporary path, and the destination path prefix for Snapshots.
-   */
-  fn next_temp_path(&self) -> PathBuf {
-    let temp_id = {
-      let mut inner = self.inner.lock().unwrap();
-      inner.next_temp_id += 1;
-      inner.next_temp_id
-    };
-
-    self.temp_dir.path().join(format!("{}.tar.tmp", temp_id))
-  }
-
   fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
     self.temp_dir.path().join(format!("{}.tar", fingerprint.to_hex()))
   }
 
+  /**
+   * Creates a Snapshot for the given paths under the given VFS.
+   */
   pub fn create(&self, vfs: &PosixVFS, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
-    let temp_path = self.next_temp_path();
+    let temp_path = {
+      let mut inner = self.inner.lock().unwrap();
+      inner.next_temp_id += 1;
+      self.temp_dir.path().join(format!("{}.tar.tmp", inner.next_temp_id))
+    };
     Snapshots::tar_create(temp_path.as_path(), &paths, &vfs.build_root)?;
 
     // Fingerprint the resulting tar file.
@@ -819,8 +815,7 @@ impl Snapshots {
     };
 
     let archive_path = self.path_for(&snapshot.fingerprint);
-    let pool = vfs.pool.read().unwrap();
-    pool.spawn_fn(move || {
+    vfs.pool().spawn_fn(move || {
       Snapshots::contents_for_snapshot(snapshot, archive_path)
         .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", fingerprint.to_hex(), e))
     })
