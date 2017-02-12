@@ -3,7 +3,13 @@
 
 python_tests(
   dependencies = [
+    ':testdata',
     'src/python/pants/backend/jvm/zinc',
     'src/python/pants/util:contextutil',
   ]
+)
+
+resources(
+  name='testdata',
+  sources=rglobs('testdata/*')
 )

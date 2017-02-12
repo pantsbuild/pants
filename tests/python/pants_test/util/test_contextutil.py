@@ -15,9 +15,9 @@ import zipfile
 
 import mock
 
-from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as, exception_logging,
-                                    hard_exit_handler, maybe_profiled, open_zip, pushd, stdio_as,
-                                    temporary_dir, temporary_file)
+from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as,
+                                    exception_logging, hard_exit_handler, maybe_profiled, open_zip,
+                                    pushd, stdio_as, temporary_dir, temporary_file)
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)

@@ -26,6 +26,7 @@ from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
 from pants.version import PANTS_SEMVER
 
+
 logger = logging.getLogger(__name__)
 
 

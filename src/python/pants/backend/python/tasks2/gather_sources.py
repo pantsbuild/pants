@@ -12,7 +12,9 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
@@ -31,6 +33,10 @@ class GatherSources(Task):
   PYTHON_SOURCES = 'python_sources'
 
   @classmethod
+  def implementation_version(cls):
+    return super(GatherSources, cls).implementation_version() + [('GatherSources', 3)]
+
+  @classmethod
   def product_types(cls):
     return [cls.PYTHON_SOURCES]
 
@@ -40,7 +46,10 @@ class GatherSources(Task):
     round_manager.require_data('python')  # For codegen.
 
   def execute(self):
-    targets = self.context.targets(lambda tgt: isinstance(tgt, (PythonTarget, Resources)))
+    # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
+    # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
+    # we remove the old python pipeline entirely) we want to ignore those target types here.
+    targets = self.context.targets(lambda tgt: isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary, Resources)))
     with self.invalidated(targets) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of gathering
       # an empty set of sources, to prevent downstream tasks from having to check
@@ -85,7 +94,7 @@ class GatherSources(Task):
             os.path.join(tgt.target_base, relpath), tgt.address.spec))
         raise
 
-    if getattr(tgt, 'resources', None):
+    if getattr(tgt, '_resource_target_specs', None) or getattr(tgt, '_synthetic_resources_target', None):
       # No one should be on old-style resources any more.  And if they are,
       # switching to the new python pipeline will be a great opportunity to fix that.
       raise TaskError('Old-style resources not supported for target {}.  '
