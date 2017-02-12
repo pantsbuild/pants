@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-use std::os::unix::ffi::OsStrExt;
+use std::ffi::OsString;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -11,7 +12,18 @@ use futures::future::{self, BoxFuture, Future};
 use context::Core;
 use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
-use fs::{self, Dir, File, FSContext, Link, PathGlobs, PathStat, Stat};
+use fs::{
+  self,
+  Dir,
+  FSContext,
+  File,
+  FileContent,
+  Fingerprint,
+  Link,
+  PathGlobs,
+  PathStat,
+  Stat
+};
 use graph::EntryId;
 use handles::maybe_drain_handles;
 use selectors::{self, Selector};
@@ -62,6 +74,19 @@ impl Context {
         // different subjects but identical PathGlobs will cause redundant work.
         Node::Snapshot(
           Snapshot {
+            subject: subject.clone(),
+            product: product.clone(),
+            variants: variants.clone(),
+          }
+        )
+      ]
+    } else if product == self.type_files_content() {
+      vec![
+        // TODO: Hack... should have an intermediate Node to Select PathGlobs for the subject
+        // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
+        // different subjects but identical PathGlobs will cause redundant work.
+        Node::FilesContent(
+          FilesContent {
             subject: subject.clone(),
             product: product.clone(),
             variants: variants.clone(),
@@ -198,8 +223,28 @@ impl Context {
     self.invoke_unsafe(
       &self.core.types.construct_snapshot,
       &vec![
-        self.store_bytes(&item.fingerprint),
+        self.store_bytes(&item.fingerprint.0),
         self.store_list(path_stats.iter().collect(), false),
+      ],
+    )
+  }
+
+  fn store_file_content(&self, item: &FileContent) -> Value {
+    self.invoke_unsafe(
+      &self.core.types.construct_file_content,
+      &vec![
+        self.store_path(&item.path),
+        self.store_bytes(&item.content),
+      ],
+    )
+  }
+
+  fn store_files_content(&self, item: &Vec<FileContent>) -> Value {
+    let entries: Vec<_> = item.iter().map(|e| self.store_file_content(e)).collect();
+    self.invoke_unsafe(
+      &self.core.types.construct_files_content,
+      &vec![
+        self.store_list(entries.iter().collect(), false),
       ],
     )
   }
@@ -244,6 +289,10 @@ impl Context {
     &self.core.types.snapshot
   }
 
+  fn type_files_content(&self) -> &TypeConstraint {
+    &self.core.types.files_content
+  }
+
   fn type_read_link(&self) -> &TypeConstraint {
     &self.core.types.read_link
   }
@@ -261,8 +310,24 @@ impl Context {
       })
   }
 
+  fn lift_snapshot_fingerprint(&self, item: &Value) -> Fingerprint {
+    let fingerprint_val =
+      self.core.externs.project(
+        item,
+        &self.core.tasks.field_fingerprint,
+        &self.core.types.bytes,
+      );
+    Fingerprint::from_bytes_unsafe(&self.core.externs.lift_bytes(&fingerprint_val))
+  }
+
   fn lift_read_link(&self, item: &Value) -> PathBuf {
-    self.core.externs.lift_read_link(item, &self.core.tasks.field_path)
+    let path_val =
+      self.core.externs.project(
+        item,
+        &self.core.tasks.field_path,
+        &self.core.types.bytes,
+      );
+    PathBuf::from(OsString::from_vec(self.core.externs.lift_bytes(&path_val)))
   }
 
   fn lift_directory_listing(&self, item: &Value) -> Vec<Stat> {
@@ -764,19 +829,55 @@ impl Step for Snapshot {
           self.variants.clone()
         )
       )
-      .then(move |path_globs_res| {
-        match path_globs_res {
-          Ok(path_globs_val) => {
-            match context.lift_path_globs(&path_globs_val) {
-              Ok(pgs) =>
-                Snapshot::create(context, pgs),
-              Err(e) =>
-                context.err(context.throw(&format!("Failed to parse PathGlobs: {}", e))),
-            }
-          },
-          Err(failure) =>
-            context.err(context.was_optional(failure, "No source of PathGlobs."))
-        }
+      .then(move |path_globs_res| match path_globs_res {
+        Ok(path_globs_val) => {
+          match context.lift_path_globs(&path_globs_val) {
+            Ok(pgs) =>
+              Snapshot::create(context, pgs),
+            Err(e) =>
+              context.err(context.throw(&format!("Failed to parse PathGlobs: {}", e))),
+          }
+        },
+        Err(failure) =>
+          context.err(context.was_optional(failure, "No source of PathGlobs."))
+      })
+      .boxed()
+  }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct FilesContent {
+  subject: Key,
+  product: TypeConstraint,
+  variants: Variants,
+}
+
+impl Step for FilesContent {
+  fn step(&self, context: Context) -> StepFuture {
+    // Request a Snapshot for the subject.
+    context
+      .get(
+        &Node::create(
+          Selector::select(context.type_snapshot().clone()),
+          self.subject.clone(),
+          self.variants.clone()
+        )
+      )
+      .then(move |snapshot_res| match snapshot_res {
+        Ok(snapshot_val) => {
+          // Request the file contents of the Snapshot, and then store them.
+          let fingerprint = context.lift_snapshot_fingerprint(&snapshot_val);
+          let context_in_pool = context.clone();
+          let pool = context.core.pool();
+          pool.spawn_fn(move || {
+            context_in_pool.core.snapshots.contents_for(fingerprint)
+              .map(|files_content| context_in_pool.store_files_content(&files_content))
+              .map_err(|e| context_in_pool.throw(&e))
+          })
+          .boxed()
+        },
+        Err(failure) =>
+          context.err(context.was_optional(failure, "No source of Snapshot."))
       })
       .boxed()
   }
@@ -828,6 +929,7 @@ pub enum Node {
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   Snapshot(Snapshot),
+  FilesContent(FilesContent),
   Task(Task),
 }
 
@@ -840,6 +942,7 @@ impl Node {
       &Node::SelectProjection(_) => "Projection".to_string(),
       &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.selector.func.0)),
       &Node::Snapshot(_) => "Snapshot".to_string(),
+      &Node::FilesContent(_) => "FilesContent".to_string(),
     }
   }
 
@@ -851,6 +954,7 @@ impl Node {
       &Node::SelectProjection(ref s) => &s.subject,
       &Node::Task(ref t) => &t.subject,
       &Node::Snapshot(ref t) => &t.subject,
+      &Node::FilesContent(ref t) => &t.subject,
     }
   }
 
@@ -862,6 +966,7 @@ impl Node {
       &Node::SelectProjection(ref s) => &s.selector.product,
       &Node::Task(ref t) => &t.selector.product,
       &Node::Snapshot(ref t) => &t.product,
+      &Node::FilesContent(ref t) => &t.product,
     }
   }
 
@@ -908,6 +1013,7 @@ impl Node {
       &Node::SelectProjection(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
       &Node::Snapshot(ref n) => n.step(context),
+      &Node::FilesContent(ref n) => n.step(context),
     }
   }
 }

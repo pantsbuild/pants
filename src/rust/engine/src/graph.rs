@@ -366,7 +366,7 @@ impl InnerGraph {
     try!(f.write_all(b"digraph plans {\n"));
     try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme)));
     try!(f.write_all(b"  concentrate=true;\n"));
-    try!(f.write_all(b"  rankdir=LR;\n"));
+    try!(f.write_all(b"  rankdir=TB;\n"));
 
     let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
     let predicate = |_| true;

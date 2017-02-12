@@ -20,8 +20,6 @@ jvm_app(
 jvm_binary(name = 'main-bin',
   dependencies = [
     'examples/src/java/org/pantsbuild/example/hello/greet',
-  ],
-  resources=[
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
   source = 'HelloMain.java',

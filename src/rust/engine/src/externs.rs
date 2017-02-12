@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
@@ -28,6 +28,7 @@ pub struct Externs {
   satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
+  lift_bytes: LiftBytesExtern,
   lift_directory_listing: LiftDirectoryListingExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -54,6 +55,7 @@ impl Externs {
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
     store_bytes: StoreBytesExtern,
+    lift_bytes: LiftBytesExtern,
     lift_directory_listing: LiftDirectoryListingExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
@@ -71,6 +73,7 @@ impl Externs {
       satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
+      lift_bytes: lift_bytes,
       lift_directory_listing: lift_directory_listing,
       project: project,
       project_multi: project_multi,
@@ -143,12 +146,6 @@ impl Externs {
     })
   }
 
-  pub fn lift_read_link(&self, item: &Value, field: &Field) -> PathBuf {
-    let path_val = self.project(item, field, field.0.type_id());
-    let path_buf = (self.val_to_str)(self.context, &path_val);
-    Path::new(path_buf.to_os_string().as_os_str()).to_owned()
-  }
-
   pub fn id_to_str(&self, digest: Id) -> String {
     (self.id_to_str)(self.context, digest).to_string().unwrap_or_else(|e| {
       format!("<failed to decode unicode for {:?}: {}>", digest, e)
@@ -161,12 +158,16 @@ impl Externs {
     })
   }
 
+  pub fn lift_bytes(&self, item: &Value) -> Vec<u8> {
+    (self.lift_bytes)(self.context, item).to_bytes()
+  }
+
   pub fn lift_directory_listing(&self, val: &Value) -> Vec<Stat> {
     let raw_stats = (self.lift_directory_listing)(self.context, val);
     with_vec(raw_stats.stats_ptr, raw_stats.stats_len as usize, |stats_vec| {
       stats_vec.iter()
         .map(|raw_stat| {
-          let path = Path::new(raw_stat.path.to_os_string().as_os_str()).to_owned();
+          let path = PathBuf::from(raw_stat.path.to_os_string());
           match raw_stat.tag {
             RawStatTag::Dir => Stat::Dir(Dir(path)),
             RawStatTag::File => Stat::File(File(path)),
@@ -218,6 +219,9 @@ pub type StoreListExtern =
 
 pub type StoreBytesExtern =
   extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
+
+pub type LiftBytesExtern =
+  extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
 pub type LiftDirectoryListingExtern =
   extern "C" fn(*const ExternContext, *const Value) -> RawStats;

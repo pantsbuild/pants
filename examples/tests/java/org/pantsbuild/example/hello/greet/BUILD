@@ -6,8 +6,6 @@
 junit_tests(
   dependencies=[
     'examples/src/java/org/pantsbuild/example/hello/greet',
-  ],
-  resources=[
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
 )

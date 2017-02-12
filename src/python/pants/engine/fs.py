@@ -35,11 +35,10 @@ class Files(datatype('Files', ['dependencies'])):
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
-  """The content of a file, or None if it did not exist."""
+  """The content of a file."""
 
   def __repr__(self):
-    content_str = '(len:{})'.format(len(self.content)) if self.content is not None else 'None'
-    return 'FileContent(path={}, content={})'.format(self.path, content_str)
+    return 'FileContent(path={}, content=(len:{}))'.format(self.path, len(self.content))
 
   def __str__(self):
     return repr(self)
@@ -101,26 +100,11 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
 
 
 def snapshot_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should not run.')
+  raise Exception('This task is replaced intrinsically, and should never run.')
 
 
-def _snapshot_path(snapshot, archive_root):
-  safe_mkdir(archive_root)
-  tar_location = join(archive_root, '{}.tar'.format(snapshot.fingerprint))
-  return tar_location
-
-
-def extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir):
-  with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
-    tar.extractall(sandbox_dir)
-
-
-class _SnapshotDirectory(datatype('_SnapshotDirectory', ['root'])):
-  """Private singleton value for the snapshot directory."""
-
-
-def select_snapshot_directory():
-  return Select(_SnapshotDirectory)
+def files_content_noop(*args):
+  raise Exception('This task is replaced intrinsically, and should never run.')
 
 
 def scan_directory(project_tree, directory):
@@ -133,26 +117,6 @@ def scan_directory(project_tree, directory):
 
 def read_link(project_tree, link):
   return ReadLink(project_tree.readlink(link.path))
-
-
-def file_content(project_tree, f):
-  """Return a FileContent for a known-existing File.
-
-  NB: This method fails eagerly, because it expects to be executed only after a caller has
-  stat'd a path to determine that it is, in fact, an existing File.
-  """
-  return FileContent(f.path, project_tree.content(f.path))
-
-
-def resolve_link(stats):
-  """Passes through the projected Files/Dirs for link resolution."""
-  return stats
-
-
-def files_content(files, file_values):
-  entries = tuple(FileContent(f.path, f_value.content)
-                  for f, f_value in zip(files.dependencies, file_values))
-  return FilesContent(entries)
 
 
 FilesContent = Collection.of(FileContent)
@@ -179,7 +143,6 @@ def create_fs_intrinsics(project_tree):
     return p
   return [
     (DirectoryListing, Dir, ptree(scan_directory)),
-    (FileContent, File, ptree(file_content)),
     (ReadLink, Link, ptree(read_link)),
   ]
 
@@ -192,12 +155,8 @@ def create_fs_tasks(project_tree):
     return p
   return [
     # File content.
-    # TODO: Consume a Snapshot in memory.
-    (FilesContent,
-     [Select(Files),
-      SelectDependencies(FileContent, Files, field='stats', field_types=(File,))],
-     files_content),
+    (FilesContent, [Select(Snapshot)], files_content_noop),
   ] + [
     # Snapshot creation.
-    (Snapshot, [], snapshot_noop),
+    (Snapshot, [Select(PathGlobs)], snapshot_noop),
   ]
