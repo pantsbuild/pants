@@ -5,7 +5,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
-use futures_cpupool::{CpuFuture, CpuPool};
+use futures_cpupool::{self, CpuFuture, CpuPool};
 use glob::{Pattern, PatternError};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore;
@@ -263,10 +263,10 @@ struct PathGlobsExpansion<T: Sized> {
   outputs: OrderMap<PathStat, ()>,
 }
 
-#[derive(Clone)]
 pub struct PosixVFS {
   build_root: Dir,
-  pool: Arc<RwLock<CpuPool>>,
+  // The pool needs to be reinitialized after a fork, so it is protected by a lock.
+  pool: RwLock<CpuPool>,
   ignore: Gitignore,
 }
 
@@ -274,8 +274,8 @@ impl PosixVFS {
   pub fn new(
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
-    pool: Arc<RwLock<CpuPool>>,
   ) -> Result<PosixVFS, String> {
+    let pool = RwLock::new(PosixVFS::create_pool());
     let canonical_build_root =
       build_root.canonicalize().and_then(|canonical|
         canonical.metadata().and_then(|metadata|
@@ -300,6 +300,12 @@ impl PosixVFS {
         ignore: ignore,
       }
     )
+  }
+
+  fn create_pool() -> CpuPool {
+    futures_cpupool::Builder::new()
+      .name_prefix("engine-")
+      .create()
   }
 
   fn create_ignore(root: &Dir, patterns: &Vec<String>) -> Result<Gitignore, ignore::Error> {
@@ -328,9 +334,14 @@ impl PosixVFS {
     }
     Ok(stats)
   }
+
+  pub fn post_fork(&self) {
+    let mut pool = self.pool.write().unwrap();
+    *pool = PosixVFS::create_pool();
+  }
 }
 
-impl VFS<io::Error> for PosixVFS {
+impl VFS<io::Error> for Arc<PosixVFS> {
   fn read_link(&self, link: Link) -> CpuFuture<PathBuf, io::Error> {
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
     let pool = self.pool.read().unwrap();
@@ -769,11 +780,8 @@ impl Snapshots {
     Ok(snapshot)
   }
 
-  fn contents_for_snapshot(&self, snapshot: Snapshot) -> Result<Vec<FileContent>, io::Error> {
-    let mut archive = {
-      let archive_path = self.path_for(&snapshot.fingerprint);
-      fs::File::open(archive_path).map(|f| tar::Archive::new(f))?
-    };
+  fn contents_for_snapshot(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
+    let mut archive = fs::File::open(path).map(|f| tar::Archive::new(f))?;
 
     // Zip the in-memory Snapshot to the on disk representation, validating as we go.
     let mut files_content = Vec::new();
@@ -798,15 +806,23 @@ impl Snapshots {
     Ok(files_content)
   }
 
-  pub fn contents_for(&self, fingerprint: Fingerprint) -> Result<Vec<FileContent>, String> {
+  pub fn contents_for(&self, vfs: &PosixVFS, fingerprint: Fingerprint) -> CpuFuture<Vec<FileContent>, String> {
     let snapshot = {
       let inner = self.inner.lock().unwrap();
       inner.snapshots.get(&fingerprint)
-        .ok_or_else(|| format!("Snapshot not found: {}", fingerprint.to_hex()))?
+        .unwrap_or_else(|| {
+          // Given that Snapshots are currently specific to a particular execution and located
+          // in a private temp directory, they should never disappear out from beneath us.
+          panic!("Snapshot not found: {}", fingerprint.to_hex())
+        })
         .clone()
     };
 
-    self.contents_for_snapshot(snapshot)
-      .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", fingerprint.to_hex(), e))
+    let archive_path = self.path_for(&snapshot.fingerprint);
+    let pool = vfs.pool.read().unwrap();
+    pool.spawn_fn(move || {
+      Snapshots::contents_for_snapshot(snapshot, archive_path)
+        .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", fingerprint.to_hex(), e))
+    })
   }
 }

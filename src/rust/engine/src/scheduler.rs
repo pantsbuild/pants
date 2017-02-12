@@ -3,9 +3,7 @@ use std::io;
 use std::path::Path;
 use std::sync::Arc;
 
-use futures::future::Future;
-use futures::future;
-use futures_cpupool::CpuFuture;
+use futures::future::{self, Future};
 
 use context::Core;
 use core::{Field, Key, TypeConstraint, TypeId};
@@ -92,18 +90,6 @@ impl Scheduler {
   }
 
   /**
-   * Starts running a Node, and returns a Future that will succeed regardless of the
-   * success of the node.
-   */
-  fn launch(&self, node: Node) -> CpuFuture<(), ()> {
-    let core = self.core.clone();
-    self.core.pool().spawn_fn(move || {
-      core.graph.create(node, &core)
-        .then::<_, Result<(), ()>>(|_| Ok(()))
-    })
-  }
-
-  /**
    * Starting from existing roots, execute a graph to completion.
    */
   pub fn execute(&mut self) -> ExecutionStat {
@@ -116,7 +102,10 @@ impl Scheduler {
     let roots_res =
       future::join_all(
         self.roots.iter()
-          .map(|root| self.launch(root.clone()))
+          .map(|root| {
+            self.core.graph.create(root.clone(), &self.core)
+              .then::<_, Result<(), ()>>(|_| Ok(()))
+          })
           .collect::<Vec<_>>()
       );
 

@@ -1,8 +1,6 @@
 
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use futures_cpupool::{self, CpuPool};
+use std::sync::Arc;
 
 use externs::Externs;
 use graph::Graph;
@@ -23,9 +21,7 @@ pub struct Core {
   pub types: Types,
   pub externs: Externs,
   pub snapshots: Snapshots,
-  pub vfs: PosixVFS,
-  // The pool needs to be reinitialized after a fork, so it is protected by a lock.
-  pool: Arc<RwLock<CpuPool>>,
+  pub vfs: Arc<PosixVFS>,
 }
 
 impl Core {
@@ -36,7 +32,6 @@ impl Core {
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
   ) -> Core {
-    let pool = Arc::new(RwLock::new(Core::create_pool()));
     Core {
       graph: Graph::new(),
       tasks: tasks,
@@ -48,29 +43,20 @@ impl Core {
         }),
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixVFS::new(build_root, ignore_patterns, pool.clone())
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize VFS: {:?}", e);
-        }),
-      pool: pool,
+      vfs:
+        Arc::new(
+          PosixVFS::new(build_root, ignore_patterns)
+          .unwrap_or_else(|e| {
+            panic!("Could not initialize VFS: {:?}", e);
+          })
+        ),
     }
-  }
-
-  fn create_pool() -> CpuPool {
-    futures_cpupool::Builder::new()
-      .name_prefix("engine-")
-      .create()
-  }
-
-  pub fn pool(&self) -> RwLockReadGuard<CpuPool> {
-    self.pool.read().unwrap()
   }
 
   /**
    * Reinitializes a Core in a new process (basically, recreates its CpuPool).
    */
   pub fn post_fork(&self) {
-    let mut pool = self.pool.write().unwrap();
-    *pool = Core::create_pool();
+    self.vfs.post_fork();
   }
 }

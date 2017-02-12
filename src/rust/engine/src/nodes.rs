@@ -713,8 +713,7 @@ impl Snapshot {
       .expand(path_globs)
       .then(move |path_stats_res| match path_stats_res {
         Ok(path_stats) => {
-          // And then create a Snapshot (re-entering the pool in order to mark it as a
-          // `definitely blocking` operation.
+          // And then create a Snapshot.
           let snapshot_res =
             context.core.snapshots.create(
               &context.core.vfs,
@@ -783,14 +782,12 @@ impl Step for FilesContent {
         Ok(snapshot_val) => {
           // Request the file contents of the Snapshot, and then store them.
           let fingerprint = context.lift_snapshot_fingerprint(&snapshot_val);
-          let context_in_pool = context.clone();
-          let pool = context.core.pool();
-          pool.spawn_fn(move || {
-            context_in_pool.core.snapshots.contents_for(fingerprint)
-              .map(|files_content| context_in_pool.store_files_content(&files_content))
-              .map_err(|e| context_in_pool.throw(&e))
-          })
-          .boxed()
+          context.core.snapshots.contents_for(&context.core.vfs, fingerprint)
+            .then(move |files_content_res| match files_content_res {
+              Ok(files_content) => Ok(context.store_files_content(&files_content)),
+              Err(e) => Err(context.throw(&e)),
+            })
+            .boxed()
         },
         Err(failure) =>
           context.err(context.was_optional(failure, "No source of Snapshot."))
