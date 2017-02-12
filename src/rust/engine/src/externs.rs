@@ -28,6 +28,7 @@ pub struct Externs {
   satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
+  lift_bytes: LiftBytesExtern,
   lift_directory_listing: LiftDirectoryListingExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
@@ -54,6 +55,7 @@ impl Externs {
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
     store_bytes: StoreBytesExtern,
+    lift_bytes: LiftBytesExtern,
     lift_directory_listing: LiftDirectoryListingExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
@@ -71,6 +73,7 @@ impl Externs {
       satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
+      lift_bytes: lift_bytes,
       lift_directory_listing: lift_directory_listing,
       project: project,
       project_multi: project_multi,
@@ -161,6 +164,10 @@ impl Externs {
     })
   }
 
+  pub fn lift_bytes(&self, item: &Value) -> Vec<u8> {
+    (self.lift_bytes)(self.context, item).to_bytes()
+  }
+
   pub fn lift_directory_listing(&self, val: &Value) -> Vec<Stat> {
     let raw_stats = (self.lift_directory_listing)(self.context, val);
     with_vec(raw_stats.stats_ptr, raw_stats.stats_len as usize, |stats_vec| {
@@ -218,6 +225,9 @@ pub type StoreListExtern =
 
 pub type StoreBytesExtern =
   extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
+
+pub type LiftBytesExtern =
+  extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
 pub type LiftDirectoryListingExtern =
   extern "C" fn(*const ExternContext, *const Value) -> RawStats;

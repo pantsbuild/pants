@@ -458,11 +458,32 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
 }
 
 pub struct FileContent {
-  path: PathStat,
-  content: Vec<u8>,
+  pub path: PathStat,
+  pub content: Vec<u8>,
 }
 
-pub type Fingerprint = [u8;32];
+#[derive(Clone, Eq, Hash, PartialEq)]
+pub struct Fingerprint(pub [u8;32]);
+
+impl Fingerprint {
+  pub fn from_bytes_unsafe(bytes: &[u8]) -> Fingerprint {
+    if bytes.len() != 32 {
+      panic!("Input value was not a fingerprint; had length: {}", bytes.len());
+    }
+
+    let mut fingerprint = [0;32];
+    fingerprint.clone_from_slice(&bytes[0..32]);
+    Fingerprint(fingerprint)
+  }
+
+  pub fn to_hex(&self) -> String {
+    let mut s = String::new();
+    for &byte in self.0.iter() {
+      fmt::Write::write_fmt(&mut s, format_args!("{:x}", byte)).unwrap();
+    }
+    s
+  }
+}
 
 #[derive(Clone)]
 pub struct Snapshot {
@@ -522,17 +543,8 @@ impl Snapshots {
       }
     };
 
-    let mut fingerprint: Fingerprint = [0;32];
-    fingerprint.clone_from_slice(&hasher.result()[0..32]);
-    Ok(fingerprint)
-  }
 
-  fn hex(fingerprint: &Fingerprint) -> String {
-    let mut s = String::new();
-    for &byte in fingerprint {
-      fmt::Write::write_fmt(&mut s, format_args!("{:x}", byte)).unwrap();
-    }
-    s
+    Ok(Fingerprint::from_bytes_unsafe(&hasher.result()))
   }
 
   /**
@@ -614,7 +626,7 @@ impl Snapshots {
   }
 
   fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
-    self.temp_dir.path().join(format!("{}.tar", Snapshots::hex(&fingerprint)))
+    self.temp_dir.path().join(format!("{}.tar", fingerprint.to_hex()))
   }
 
   pub fn create(&self, build_root: &Dir, paths: Vec<PathStat>) -> Result<Snapshot, String> {
@@ -668,11 +680,11 @@ impl Snapshots {
     let snapshot = {
       let inner = self.inner.lock().unwrap();
       inner.snapshots.get(&fingerprint)
-        .ok_or_else(|| format!("Snapshot not found: {}", Snapshots::hex(&fingerprint)))?
+        .ok_or_else(|| format!("Snapshot not found: {}", fingerprint.to_hex()))?
         .clone()
     };
 
     self.contents_for_snapshot(snapshot)
-      .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", Snapshots::hex(&fingerprint), e))
+      .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", fingerprint.to_hex(), e))
   }
 }

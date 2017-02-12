@@ -222,14 +222,30 @@ impl Context {
     self.invoke_unsafe(
       &self.core.types.construct_snapshot,
       &vec![
-        self.store_bytes(&item.fingerprint),
+        self.store_bytes(&item.fingerprint.0),
         self.store_list(path_stats.iter().collect(), false),
       ],
     )
   }
 
-  fn store_files_content(&self, item: Vec<FileContent>) -> Value {
-    unimplemented!();
+  fn store_file_content(&self, item: &FileContent) -> Value {
+    self.invoke_unsafe(
+      &self.core.types.construct_file_content,
+      &vec![
+        self.store_path_stat(&item.path),
+        self.store_bytes(&item.content),
+      ],
+    )
+  }
+
+  fn store_files_content(&self, item: &Vec<FileContent>) -> Value {
+    let entries: Vec<_> = item.iter().map(|e| self.store_file_content(e)).collect();
+    self.invoke_unsafe(
+      &self.core.types.construct_snapshot,
+      &vec![
+        self.store_list(entries.iter().collect(), false),
+      ],
+    )
   }
 
   /**
@@ -273,7 +289,7 @@ impl Context {
   }
 
   fn type_files_content(&self) -> &TypeConstraint {
-    unimplemented!();
+    &self.core.types.files_content
   }
 
   fn type_read_link(&self) -> &TypeConstraint {
@@ -294,7 +310,9 @@ impl Context {
   }
 
   fn lift_snapshot_fingerprint(&self, item: &Value) -> Fingerprint {
-    unimplemented!();
+    let fingerprint_val =
+      self.core.externs.project(item, &self.core.tasks.field_fingerprint, unimplemented!());
+    Fingerprint::from_bytes_unsafe(&self.core.externs.lift_bytes(&fingerprint_val))
   }
 
   fn lift_read_link(&self, item: &Value) -> PathBuf {
@@ -833,7 +851,7 @@ impl Step for FilesContent {
           // Request the file contents of the Snapshot, and then store them.
           let fingerprint = context.lift_snapshot_fingerprint(&snapshot_val);
           context.core.snapshots.contents_for(fingerprint)
-            .map(|files_content| context.store_files_content(files_content))
+            .map(|files_content| context.store_files_content(&files_content))
             .map_err(|e| context.throw(&e))
         },
         Err(failure) =>
