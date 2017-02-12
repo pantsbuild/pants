@@ -35,11 +35,10 @@ class Files(datatype('Files', ['dependencies'])):
 
 
 class FileContent(datatype('FileContent', ['path', 'content'])):
-  """The content of a file, or None if it did not exist."""
+  """The content of a file."""
 
   def __repr__(self):
-    content_str = '(len:{})'.format(len(self.content)) if self.content is not None else 'None'
-    return 'FileContent(path={}, content={})'.format(self.path, content_str)
+    return 'FileContent(path={}, content=(len:{}))'.format(self.path, len(self.content))
 
   def __str__(self):
     return repr(self)

@@ -233,7 +233,7 @@ impl Context {
     self.invoke_unsafe(
       &self.core.types.construct_file_content,
       &vec![
-        self.store_path_stat(&item.path),
+        self.store_path(&item.path),
         self.store_bytes(&item.content),
       ],
     )

@@ -458,7 +458,7 @@ pub trait FSContext<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
 }
 
 pub struct FileContent {
-  pub path: PathStat,
+  pub path: PathBuf,
   pub content: Vec<u8>,
 }
 
@@ -664,13 +664,24 @@ impl Snapshots {
       fs::File::open(archive_path).map(|f| tar::Archive::new(f))?
     };
 
+    // Zip the in-memory Snapshot to the on disk representation, validating as we go.
     let mut files_content = Vec::new();
     for (entry_res, path_stat) in archive.entries()?.zip(snapshot.path_stats.into_iter()) {
       let mut entry = entry_res?;
       if entry.header().entry_type() == tar::EntryType::file() {
+        let path =
+          match path_stat {
+            PathStat::File { path, .. } => path,
+            PathStat::Dir { .. } => panic!("Snapshot contents changed after storage."),
+          };
         let mut content = Vec::new();
         io::Read::read_to_end(&mut entry, &mut content)?;
-        files_content.push(FileContent { path: path_stat, content: content });
+        files_content.push(
+          FileContent {
+            path: path,
+            content: content,
+          }
+        );
       }
     }
     Ok(files_content)
