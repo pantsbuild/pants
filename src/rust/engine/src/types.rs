@@ -1,4 +1,4 @@
-use core::{Function, TypeConstraint};
+use core::{Function, TypeConstraint, TypeId};
 
 pub struct Types {
   pub construct_snapshot: Function,
@@ -19,4 +19,6 @@ pub struct Types {
   pub dir: TypeConstraint,
   pub file: TypeConstraint,
   pub link: TypeConstraint,
+  pub string: TypeId,
+  pub bytes: TypeId,
 }

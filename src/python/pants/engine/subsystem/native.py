@@ -103,6 +103,7 @@ _FFI.cdef(
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+    typedef Buffer           (*extern_lift_bytes)(ExternContext*, Value*);
     typedef RawStats         (*extern_lift_directory_listing)(ExternContext*, Value*);
     typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
@@ -141,6 +142,7 @@ _FFI.cdef(
                                    extern_satisfied_by,
                                    extern_store_list,
                                    extern_store_bytes,
+                                   extern_lift_bytes,
                                    extern_lift_directory_listing,
                                    extern_project,
                                    extern_project_multi,
@@ -153,11 +155,14 @@ _FFI.cdef(
                                    Field,
                                    Field,
                                    Field,
+                                   Field,
                                    Function,
                                    Function,
                                    Function,
                                    Function,
                                    Function,
+                                   Function,
+                                   Function,
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
@@ -167,7 +172,10 @@ _FFI.cdef(
                                    TypeConstraint,
                                    TypeConstraint,
                                    TypeConstraint,
-                                   TypeConstraint);
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeId,
+                                   TypeId);
     void scheduler_post_fork(RawScheduler*);
     void scheduler_destroy(RawScheduler*);
 
@@ -296,6 +304,13 @@ def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
   """Given a context and raw bytes, return a new Value to represent the content."""
   c = _FFI.from_handle(context_handle)
   return c.to_value(bytes(_FFI.buffer(bytes_ptr, bytes_len)))
+
+
+@_FFI.callback("Buffer(ExternContext*, Value*)")
+def extern_lift_bytes(context_handle, bytes_val):
+  """Given a context and a Value representing bytes, return a Buffer."""
+  c = _FFI.from_handle(context_handle)
+  return c.buf(c.from_value(bytes_val))
 
 
 @_FFI.callback("RawStats(ExternContext*, Value*)")
@@ -592,6 +607,8 @@ class Native(object):
 
   def new_scheduler(self,
                     construct_snapshot,
+                    construct_file_content,
+                    construct_files_content,
                     construct_path_stat,
                     construct_dir,
                     construct_file,
@@ -601,6 +618,7 @@ class Native(object):
                     constraint_variants,
                     constraint_path_globs,
                     constraint_snapshot,
+                    constraint_files_content,
                     constraint_read_link,
                     constraint_directory_listing,
                     constraint_dir,
@@ -626,6 +644,7 @@ class Native(object):
         extern_satisfied_by,
         extern_store_list,
         extern_store_bytes,
+        extern_lift_bytes,
         extern_lift_directory_listing,
         extern_project,
         extern_project_multi,
@@ -640,8 +659,11 @@ class Native(object):
         self.context.to_key('exclude'),
         self.context.to_key('dependencies'),
         self.context.to_key('path'),
+        self.context.to_key('fingerprint'),
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
+        Function(self.context.to_id(construct_file_content)),
+        Function(self.context.to_id(construct_files_content)),
         Function(self.context.to_id(construct_path_stat)),
         Function(self.context.to_id(construct_dir)),
         Function(self.context.to_id(construct_file)),
@@ -652,10 +674,14 @@ class Native(object):
         tc(constraint_variants),
         tc(constraint_path_globs),
         tc(constraint_snapshot),
+        tc(constraint_files_content),
         tc(constraint_read_link),
         tc(constraint_directory_listing),
         tc(constraint_dir),
         tc(constraint_file),
         tc(constraint_link),
+        # Types.
+        TypeId(self.context.to_id(six.text_type)),
+        TypeId(self.context.to_id(six.binary_type)),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)

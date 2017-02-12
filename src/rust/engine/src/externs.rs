@@ -3,7 +3,7 @@ use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
@@ -146,12 +146,6 @@ impl Externs {
     })
   }
 
-  pub fn lift_read_link(&self, item: &Value, field: &Field) -> PathBuf {
-    let path_val = self.project(item, field, field.0.type_id());
-    let path_buf = (self.val_to_str)(self.context, &path_val);
-    Path::new(path_buf.to_os_string().as_os_str()).to_owned()
-  }
-
   pub fn id_to_str(&self, digest: Id) -> String {
     (self.id_to_str)(self.context, digest).to_string().unwrap_or_else(|e| {
       format!("<failed to decode unicode for {:?}: {}>", digest, e)
@@ -173,7 +167,7 @@ impl Externs {
     with_vec(raw_stats.stats_ptr, raw_stats.stats_len as usize, |stats_vec| {
       stats_vec.iter()
         .map(|raw_stat| {
-          let path = Path::new(raw_stat.path.to_os_string().as_os_str()).to_owned();
+          let path = PathBuf::from(raw_stat.path.to_os_string());
           match raw_stat.tag {
             RawStatTag::Dir => Stat::Dir(Dir(path)),
             RawStatTag::File => Stat::File(File(path)),

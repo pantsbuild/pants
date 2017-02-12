@@ -462,7 +462,7 @@ pub struct FileContent {
   pub content: Vec<u8>,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Fingerprint(pub [u8;32]);
 
 impl Fingerprint {

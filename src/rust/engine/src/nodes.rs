@@ -2,7 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-use std::os::unix::ffi::OsStrExt;
+use std::ffi::OsString;
+use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -241,7 +242,7 @@ impl Context {
   fn store_files_content(&self, item: &Vec<FileContent>) -> Value {
     let entries: Vec<_> = item.iter().map(|e| self.store_file_content(e)).collect();
     self.invoke_unsafe(
-      &self.core.types.construct_snapshot,
+      &self.core.types.construct_files_content,
       &vec![
         self.store_list(entries.iter().collect(), false),
       ],
@@ -311,12 +312,22 @@ impl Context {
 
   fn lift_snapshot_fingerprint(&self, item: &Value) -> Fingerprint {
     let fingerprint_val =
-      self.core.externs.project(item, &self.core.tasks.field_fingerprint, unimplemented!());
+      self.core.externs.project(
+        item,
+        &self.core.tasks.field_fingerprint,
+        &self.core.types.bytes,
+      );
     Fingerprint::from_bytes_unsafe(&self.core.externs.lift_bytes(&fingerprint_val))
   }
 
   fn lift_read_link(&self, item: &Value) -> PathBuf {
-    self.core.externs.lift_read_link(item, &self.core.tasks.field_path)
+    let path_val =
+      self.core.externs.project(
+        item,
+        &self.core.tasks.field_path,
+        &self.core.types.bytes,
+      );
+    PathBuf::from(OsString::from_vec(self.core.externs.lift_bytes(&path_val)))
   }
 
   fn lift_directory_listing(&self, item: &Value) -> Vec<Stat> {
