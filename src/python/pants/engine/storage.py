@@ -95,8 +95,6 @@ class Storage(object):
   into keys, and vice versa are also provided.
   """
 
-  LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
-
   @classmethod
   def create(cls, protocol=None):
     """Create a content addressable Storage backed by a key value store.
