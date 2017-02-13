@@ -13,8 +13,6 @@ from contextlib import closing
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
-import six
-
 from pants.engine.nodes import State
 from pants.engine.objects import SerializationError
 
@@ -83,9 +81,10 @@ class InvalidKeyError(Exception):
 
 
 class Storage(object):
-  """Stores and creates unique keys for input pickleable objects.
+  """Stores and creates unique keys for input objects from their contents.
 
-  TODO assumes everything fits in memory.
+  This assumes objects can fit in memory, therefore there is no need to store their
+  serialized form.
 
   Besides contents indexed by their hashed Keys, a secondary index is also provided
   for mappings between Keys. This allows to establish links between contents that
@@ -104,20 +103,13 @@ class Storage(object):
 
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
     """
-    content, key_mappings = dict(), dict()
-    return Storage(content, key_mappings, protocol=protocol)
+    return Storage(protocol=protocol)
 
-  @classmethod
-  def clone(cls, storage):
-    """Clone a Storage so it can be shared across process boundary."""
-    objects, key_mappings = storage._objects, storage._key_mappings
-    return Storage(objects, key_mappings, protocol=storage._protocol)
-
-  def __init__(self, _objects, key_mappings, protocol=None):
+  def __init__(self, protocol=None):
     """Not for direct use: construct a Storage via either `create` or `clone`."""
-    self._key_mappings = key_mappings
-    self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
     self._objects = dict()
+    self._key_mappings = dict()
+    self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
 
   def put(self, obj):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
@@ -175,29 +167,14 @@ class Storage(object):
     meaning a key can be re-mapped to a different key.
     """
     if from_key.digest not in self._key_mappings:
-      self._key_mappings[from_key.digest] = pickle.dumps(to_key, protocol=self._protocol)
+      self._key_mappings[from_key.digest] = to_key
 
   def get_mapping(self, from_key):
     """Retrieve the mapping Key from a given Key.
 
-    Noe is returned if the mapping does not exist.
+    None is returned if the mapping does not exist.
     """
-    to_key = self._key_mappings.get(from_key.digest)
-
-    if to_key is None:
-      return None
-
-    if isinstance(to_key, six.binary_type):
-      return pickle.loads(to_key)
-    return pickle.load(to_key)
-
-  def _assert_type_matches(self, value, key_type):
-    """Ensure the type of deserialized object matches the type from key."""
-    value_type = type(value)
-    if key_type and value_type is not key_type:
-      raise ValueError('Mismatch types, key: {}, value: {}'
-                       .format(key_type, value_type))
-    return value
+    return self._key_mappings.get(from_key.digest)
 
 
 class Cache(object):
