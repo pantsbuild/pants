@@ -160,7 +160,7 @@ _FFI.cdef(
                                                 Key,
                                                 TypeConstraint,
                                                 TypeConstraint,
-                                                Field,
+                                                Buffer,
                                                 TypeIdBuffer,
                                                 bool);
     ExecutionStat execution_execute(RawScheduler*);
