@@ -17,7 +17,7 @@ from struct import Struct as StdlibStruct
 import six
 
 from pants.engine.nodes import State
-from pants.engine.objects import Closable, SerializationError
+from pants.engine.objects import SerializationError
 from pants.util.meta import AbstractClass
 
 
@@ -100,11 +100,10 @@ class InvalidKeyError(Exception):
   """Indicate an invalid `Key` entry"""
 
 
-class Storage(Closable):
+class Storage(object):
   """Stores and creates unique keys for input pickleable objects.
 
-  Storage as `Closable`, `close()` can be called either explicitly or through the `with`
-  statement in a context.
+  TODO assumes everything fits in memory.
 
   Besides contents indexed by their hashed Keys, a secondary index is also provided
   for mappings between Keys. This allows to establish links between contents that
@@ -129,15 +128,14 @@ class Storage(Closable):
   @classmethod
   def clone(cls, storage):
     """Clone a Storage so it can be shared across process boundary."""
-    contents, key_mappings = storage._contents, storage._key_mappings
-    return Storage(contents, key_mappings, protocol=storage._protocol)
+    objects, key_mappings = storage._objects, storage._key_mappings
+    return Storage(objects, key_mappings, protocol=storage._protocol)
 
-  def __init__(self, contents, key_mappings, protocol=None):
+  def __init__(self, _objects, key_mappings, protocol=None):
     """Not for direct use: construct a Storage via either `create` or `clone`."""
-    self._contents = contents
     self._key_mappings = key_mappings
     self._protocol = protocol if protocol is not None else pickle.HIGHEST_PROTOCOL
-    self._memo = dict()
+    self._objects = dict()
 
   def put(self, obj):
     """Serialize and hash something pickleable, returning a unique key to retrieve it later.
@@ -156,9 +154,8 @@ class Storage(Closable):
 
         # Hash the blob and store it if it does not exist.
         key = Key.create(blob)
-        if key not in self._memo:
-          self._memo[key] = obj
-          self._contents.put(key.digest, blob)
+        if key not in self._objects:
+          self._objects[key] = obj
     except Exception as e:
       # Unfortunately, pickle can raise things other than PickleError instances.  For example it
       # will raise ValueError when handed a lambda; so we handle the otherwise overly-broad
@@ -176,10 +173,7 @@ class Storage(Closable):
     if not isinstance(key, Key):
       raise InvalidKeyError('Not a valid key: {}'.format(key))
 
-    obj = self._memo.get(key)
-    if obj is not None:
-      return obj
-    return self._contents.get(key.digest, _unpickle)
+    return self._objects.get(key)
 
   def put_state(self, state):
     """Put the components of the State individually in storage, then put the aggregate."""
@@ -215,9 +209,6 @@ class Storage(Closable):
       return pickle.loads(to_key)
     return pickle.load(to_key)
 
-  def close(self):
-    self._contents.close()
-
   def _assert_type_matches(self, value, key_type):
     """Ensure the type of deserialized object matches the type from key."""
     value_type = type(value)
@@ -227,7 +218,7 @@ class Storage(Closable):
     return value
 
 
-class Cache(Closable):
+class Cache(object):
   """Cache the State resulting from a given Runnable."""
 
   @classmethod
@@ -282,10 +273,6 @@ class Cache(Closable):
       request = self._storage.get(request_key)
       yield request, self._storage.get(self._storage.get_mapping(self._storage.put(request)))
 
-  def close(self):
-    # NB: This is a facade above a Storage instance, which is always closed independently.
-    pass
-
 
 class CacheStats(Counter):
   """Record cache hits and misses."""
@@ -320,7 +307,7 @@ class CacheStats(Counter):
     return 'hits={}, misses={}, total={}'.format(self.hits, self.misses, self.total)
 
 
-class KeyValueStore(Closable, AbstractClass):
+class KeyValueStore(AbstractClass):
   @abstractmethod
   def get(self, key, transform=_identity):
     """Fetch the value for a given key.
