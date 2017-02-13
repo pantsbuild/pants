@@ -8,7 +8,7 @@ use futures::future::{BoxFuture, Future};
 use futures::future;
 use futures_cpupool::CpuPool;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
@@ -99,11 +99,12 @@ impl Context {
    * importantly, there is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
+
     let name_val =
       self.project(
         item,
         &self.tasks.field_name,
-        self.tasks.field_name.0.type_id()
+        &self.tasks.externs.py_str_type
       );
     self.tasks.externs.val_to_str(&name_val)
   }
@@ -141,14 +142,14 @@ impl Context {
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
+  fn project(&self, item: &Value, field: &String, type_id: &TypeId) -> Value {
     self.tasks.externs.project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
-  fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
+  fn project_multi(&self, item: &Value, field: &String) -> Vec<Value> {
     self.tasks.externs.project_multi(item, field)
   }
 
@@ -262,7 +263,7 @@ impl Select {
         false,
       _ =>
         true,
-    };
+    }
   }
 
   /**

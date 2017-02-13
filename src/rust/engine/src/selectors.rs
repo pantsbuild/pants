@@ -1,4 +1,4 @@
-use core::{Field, Function, Key, TypeConstraint, TypeId};
+use core::{Function, Key, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -10,7 +10,7 @@ pub struct Select {
 pub struct SelectDependencies {
   pub product: TypeConstraint,
   pub dep_product: TypeConstraint,
-  pub field: Field,
+  pub field: String,
   pub field_types: Vec<TypeId>,
   pub transitive: bool,
 }
@@ -22,7 +22,7 @@ pub struct SelectProjection {
   // needs to construct an instance of the type if the result doesn't match, we use
   // a concrete type here.
   pub projected_subject: TypeId,
-  pub field: Field,
+  pub field: String,
   pub input_product: TypeConstraint,
 }
 

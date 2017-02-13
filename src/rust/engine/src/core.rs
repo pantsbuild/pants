@@ -60,11 +60,6 @@ pub struct TypeConstraint(pub Id);
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Function(pub Id);
 
-// The name of a field.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Field(pub Key);
-
 /**
  * Wraps a type id for use as a key in HashMaps and sets.
  */
