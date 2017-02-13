@@ -120,11 +120,11 @@ impl Externs {
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
 
-  pub fn project(&self, value: &Value, field: &String, type_id: &TypeId) -> Value {
+  pub fn project(&self, value: &Value, field: &str, type_id: &TypeId) -> Value {
     (self.project)(self.context, value, field.as_ptr(), field.len() as u64, type_id)
   }
 
-  pub fn project_multi(&self, value: &Value, field: &String) -> Vec<Value> {
+  pub fn project_multi(&self, value: &Value, field: &str) -> Vec<Value> {
     let buf = (self.project_multi)(self.context, value, field.as_ptr(), field.len() as u64);
     with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| {
       unsafe {
@@ -133,7 +133,7 @@ impl Externs {
     })
   }
 
-  pub fn project_str(&self, value: &Value, field_name: &String) -> String {
+  pub fn project_str(&self, value: &Value, field_name: &str) -> String {
     let name_val = self.project(
       value,
       field_name,

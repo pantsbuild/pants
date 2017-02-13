@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use core::{Function, FNV, Key, TypeConstraint, TypeId};
+use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
 use externs::Externs;
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
 
@@ -16,9 +16,9 @@ pub struct Tasks {
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   pub externs: Externs,
-  pub field_name: String,
-  pub field_products: String,
-  pub field_variants: String,
+  pub field_name: Field,
+  pub field_products: Field,
+  pub field_variants: Field,
   pub type_address: TypeConstraint,
   pub type_has_products: TypeConstraint,
   pub type_has_variants: TypeConstraint,
@@ -40,9 +40,9 @@ pub struct Tasks {
 impl Tasks {
   pub fn new(
     externs: Externs,
-    field_name: String,
-    field_products: String,
-    field_variants: String,
+    field_name: Field,
+    field_products: Field,
+    field_variants: Field,
     type_address: TypeConstraint,
     type_has_products: TypeConstraint,
     type_has_variants: TypeConstraint,
@@ -151,13 +151,13 @@ impl Tasks {
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: String, field_types: Vec<TypeId>, transitive: bool) {
+  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeId>, transitive: bool) {
     self.clause(Selector::SelectDependencies(
       SelectDependencies { product: product, dep_product: dep_product, field: field, field_types: field_types, transitive: transitive }
     ));
   }
 
-  pub fn add_select_projection(&mut self, product: TypeConstraint, projected_subject: TypeId, field: String, input_product: TypeConstraint) {
+  pub fn add_select_projection(&mut self, product: TypeConstraint, projected_subject: TypeId, field: Field, input_product: TypeConstraint) {
     self.clause(Selector::SelectProjection(
       SelectProjection { product: product, projected_subject: projected_subject, field: field, input_product: input_product }
     ));

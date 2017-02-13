@@ -272,18 +272,6 @@ def extern_project(context_handle, val, field_str_ptr, field_str_len, type_id):
   return c.to_value(projected)
 
 
-@_FFI.callback("Value(ExternContext*, Value*, uint8_t*, uint64_t)")
-def extern_project_no_type(context_handle, val, field_str_ptr, field_str_len):
-  """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
-  c = _FFI.from_handle(context_handle)
-  obj = c.from_value(val)
-  field_name = to_py_str(field_str_ptr, field_str_len)
-
-  projected = getattr(obj, field_name)
-
-  return c.to_value(projected, type_id=[True])
-
-
 @_FFI.callback("ValueBuffer(ExternContext*, Value*, uint8_t*, uint64_t)")
 def extern_project_multi(context_handle, val, field_str_ptr, field_str_len):
   """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
@@ -303,8 +291,7 @@ def extern_create_exception(context_handle, msg_ptr, msg_len):
 
 
 def to_py_str(msg_ptr, msg_len):
-  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
-  return msg
+  return bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
 
 
 @_FFI.callback("RunnableComplete(ExternContext*, Function*, Value*, uint64_t, bool)")

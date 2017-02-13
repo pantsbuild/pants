@@ -44,6 +44,9 @@ impl Variants {
 
 pub type Id = u64;
 
+// The name of a field.
+pub type Field = String;
+
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
