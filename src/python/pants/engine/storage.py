@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import cPickle as pickle
 import cStringIO as StringIO
-import sys
 from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
@@ -15,12 +14,10 @@ from contextlib import closing
 from hashlib import sha1
 from struct import Struct as StdlibStruct
 
-import lmdb
 import six
 
 from pants.engine.nodes import State
 from pants.engine.objects import Closable, SerializationError
-from pants.util.dirutil import safe_mkdtemp
 from pants.util.meta import AbstractClass
 
 
@@ -121,30 +118,18 @@ class Storage(Closable):
   LMDB_KEY_MAPPINGS_DB_NAME = b'_key_mappings_'
 
   @classmethod
-  def create(cls, path=None, in_memory=True, protocol=None):
+  def create(cls, protocol=None):
     """Create a content addressable Storage backed by a key value store.
 
-    :param path: If in_memory=False, the path to store the database in.
-    :param in_memory: Indicate whether to use the in-memory kvs or an embeded database.
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
     """
-    if in_memory:
-      content, key_mappings = InMemoryDb(), InMemoryDb()
-    else:
-      content, key_mappings = Lmdb.create(path=path,
-                                          child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
-
+    content, key_mappings = InMemoryDb(), InMemoryDb()
     return Storage(content, key_mappings, protocol=protocol)
 
   @classmethod
   def clone(cls, storage):
     """Clone a Storage so it can be shared across process boundary."""
-    if isinstance(storage._contents, InMemoryDb):
-      contents, key_mappings = storage._contents, storage._key_mappings
-    else:
-      contents, key_mappings = Lmdb.create(path=storage._contents.path,
-                                           child_databases=[cls.LMDB_KEY_MAPPINGS_DB_NAME])
-
+    contents, key_mappings = storage._contents, storage._key_mappings
     return Storage(contents, key_mappings, protocol=storage._protocol)
 
   def __init__(self, contents, key_mappings, protocol=None):
@@ -388,80 +373,3 @@ class InMemoryDb(KeyValueStore):
     for k in iter(self._storage):
       yield k, self._storage.get(k)
 
-
-class Lmdb(KeyValueStore):
-  """A lmdb implementation of the kvs interface."""
-
-  # TODO make this more configurable through a subsystem.
-
-  # 256GB - some arbitrary maximum size database may grow to.
-  MAX_DATABASE_SIZE = 256 * 1024 * 1024 * 1024
-
-  # writemap will use a writeable memory mapping to directly update storage, therefore
-  # improves performance. But it may cause filesystems that don’t support sparse files,
-  # such as OSX, to immediately preallocate map_size = bytes of underlying storage.
-  # See https://lmdb.readthedocs.org/en/release/#writemap-mode
-  USE_SPARSE_FILES = sys.platform != 'darwin'
-
-  @classmethod
-  def create(self, path=None, child_databases=None):
-    """
-    :param path: Database directory location, if `None` a temporary location will be provided
-      and cleaned up upon process exit.
-    :param child_databases: Optional child database names.
-    :return: List of Lmdb databases, main database under the path is always created,
-     plus the child databases requested.
-    """
-    path = path if path is not None else safe_mkdtemp()
-    child_databases = child_databases or []
-    env = lmdb.open(path, map_size=self.MAX_DATABASE_SIZE,
-                    metasync=False, sync=False, map_async=True,
-                    writemap=self.USE_SPARSE_FILES,
-                    max_dbs=1+len(child_databases))
-    instances = [Lmdb(env)]
-    for child_db in child_databases:
-      instances.append(Lmdb(env, env.open_db(child_db)))
-    return tuple(instances)
-
-  def __init__(self, env, db=None):
-    """Not for direct use, use factory method `create`.
-
-    db if None represents the main database.
-    """
-    self._env = env
-    self._db = db
-
-  @property
-  def path(self):
-    return self._env.path()
-
-  def get(self, key, transform=_identity):
-    """Return the value or `None` if the key does not exist.
-
-    NB: Memory mapped storage returns a buffer object without copying keys or values, which
-    is then wrapped with `StringIO` as the more friendly string buffer to allow `pickle.load`
-    to read, again no copy involved.
-    """
-    with self._env.begin(db=self._db, buffers=True) as txn:
-      value = txn.get(key)
-      if value is not None:
-        return transform(StringIO.StringIO(value))
-      return None
-
-  def put(self, key, value, transform=_identity):
-    """Returning True if the key/value are actually written to the storage.
-
-    No need to do additional transform since value is to be persisted.
-    """
-    with self._env.begin(db=self._db, buffers=True, write=True) as txn:
-      return txn.put(key, transform(value), overwrite=False)
-
-  def items(self):
-    with self._env.begin(db=self._db, buffers=True) as txn:
-      cursor = txn.cursor()
-      for k, v in cursor:
-        yield k, v
-
-  def close(self):
-    """Close the lmdb environment, calling multiple times has no effect."""
-    self._env.close()

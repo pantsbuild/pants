@@ -10,7 +10,7 @@ from contextlib import closing
 
 from pants.base.project_tree import Dir, File
 from pants.engine.nodes import Runnable
-from pants.engine.storage import Cache, InvalidKeyError, Lmdb, Storage
+from pants.engine.storage import Cache, InvalidKeyError, Storage
 
 
 def _runnable(an_arg):
@@ -35,20 +35,6 @@ class StorageTest(unittest.TestCase):
     self.storage = Storage.create()
     self.result = 'something'
     self.request = Runnable(func=_runnable, args=('this is an arg',), cacheable=True)
-
-  def test_lmdb_key_value_store(self):
-    lmdb = Lmdb.create()[0]
-    with closing(lmdb) as kvs:
-      # Initially key does not exist.
-      self.assertFalse(kvs.get(self.TEST_KEY))
-
-      # Now write a key value pair and read back.
-      written = kvs.put(self.TEST_KEY, self.TEST_VALUE)
-      self.assertTrue(written)
-      self.assertEquals(self.TEST_VALUE, kvs.get(self.TEST_KEY).getvalue())
-
-      # Write the same key again will not overwrite.
-      self.assertFalse(kvs.put(self.TEST_KEY, self.TEST_VALUE))
 
   def test_storage(self):
     with closing(self.storage) as storage:
