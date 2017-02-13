@@ -44,6 +44,9 @@ impl Variants {
 
 pub type Id = u64;
 
+// The name of a field.
+pub type Field = String;
+
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
@@ -59,11 +62,6 @@ pub struct TypeConstraint(pub Id);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Function(pub Id);
-
-// The name of a field.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Field(pub Key);
 
 /**
  * Wraps a type id for use as a key in HashMaps and sets.
