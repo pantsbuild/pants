@@ -30,7 +30,7 @@ pub struct Externs {
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  pub py_str_type: TypeId,
+  py_str_type: TypeId,
 }
 
 // The pointer to the context is safe for sharing between threads.
@@ -131,6 +131,15 @@ impl Externs {
         value_vec.iter().map(|v| v.clone()).collect()
       }
     })
+  }
+
+  pub fn project_str(&self, value: &Value, field_name: &String) -> String {
+    let name_val = self.project(
+      value,
+      field_name,
+      &self.py_str_type,
+    );
+    self.val_to_str(&name_val)
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {

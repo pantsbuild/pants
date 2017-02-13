@@ -94,19 +94,10 @@ impl Context {
   /**
    * Returns the `name` field of the given item.
    *
-   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
-   * `str` type, we just assume that it has the same type as the name of the field. And more
-   * importantly, there is no check that the object _has_ a name field.
+   * TODO: There is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
-
-    let name_val =
-      self.project(
-        item,
-        &self.tasks.field_name,
-        &self.tasks.externs.py_str_type
-      );
-    self.tasks.externs.val_to_str(&name_val)
+    self.tasks.externs.project_str(item, &self.tasks.field_name)
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
