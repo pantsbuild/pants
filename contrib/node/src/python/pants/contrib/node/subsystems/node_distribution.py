@@ -69,7 +69,8 @@ class NodeDistribution(object):
     package_manager = 'yarnpkg' if package_manager == 'yarn' else package_manager
     if package_manager not in ['npm', 'yarnpkg']:
       raise RuntimeError('Unknown package manager: %s' % package_manager)
-    logger.info('Node.js version: %s package manager: %s', self._version, package_manager)
+    logger.info('Node.js version: %s package manager from config: %s',
+                self._version, package_manager)
     self.package_manager = package_manager
     self.yarnpkg_version = self._normalize_version(yarnpkg_version)
 
@@ -89,27 +90,28 @@ class NodeDistribution(object):
     :returns: The Node distribution root path.
     :rtype: string
     """
-    node_distribution = self._binary_util.select_binary(self._relpath, self.version, 'node.tar.gz')
-    distribution_workdir = os.path.dirname(node_distribution)
-    outdir = os.path.join(distribution_workdir, 'unpacked')
-    if not os.path.exists(outdir):
-      with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
-        TGZ.extract(node_distribution, tmp_dist)
-        os.rename(tmp_dist, outdir)
-    node_distribution_path = os.path.join(outdir, 'node')
-    logger.debug('Node distribution path: %s', node_distribution_path)
-    return node_distribution_path
+    node_tar = self._binary_util.select_binary(self._relpath, self.version, 'node.tar.gz')
+    logger.debug('Node tarball: %s', node_tar)
+    node_work_dir = os.path.dirname(node_tar)
+    node_umpacked_dir = os.path.join(node_work_dir, 'unpacked')
+    if not os.path.exists(node_umpacked_dir):
+      with temporary_dir(root_dir=node_work_dir) as tmp_dist:
+        TGZ.extract(node_tar, tmp_dist)
+        os.rename(tmp_dist, node_umpacked_dir)
+    node_path = os.path.join(node_umpacked_dir, 'node')
+    logger.debug('Node path: %s', node_path)
+    return node_path
 
   @memoized_property
   def yarnpkg_path(self):
-    """Returns the root path of this node distribution.
+    """Returns the root path of yarnpkg distribution.
 
-    :returns: The Node distribution root path.
+    :returns: The yarnpkg root path.
     :rtype: string
     """
     yarnpkg_tar = self._binary_util.select_binary(
       'bin/yarnpkg', self.yarnpkg_version, 'yarnpkg.tar.gz')
-    logger.debug('Yarnpkg dist package: %s', yarnpkg_tar)
+    logger.debug('Yarnpkg tarball: %s', yarnpkg_tar)
     yarnpkg_work_dir = os.path.dirname(yarnpkg_tar)
     yarnpkg_umpacked_dir = os.path.join(yarnpkg_work_dir, 'unpacked')
     if not os.path.exists(yarnpkg_umpacked_dir):
@@ -117,7 +119,7 @@ class NodeDistribution(object):
         TGZ.extract(yarnpkg_tar, tmp_dist)
         os.rename(tmp_dist, yarnpkg_umpacked_dir)
     yarnpkg_path = os.path.join(yarnpkg_umpacked_dir, 'dist')
-    logger.debug('Yarnpkg dist path: %s', yarnpkg_path)
+    logger.debug('Yarnpkg path: %s', yarnpkg_path)
     return yarnpkg_path
 
   class Command(namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):

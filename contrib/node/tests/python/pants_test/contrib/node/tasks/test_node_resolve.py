@@ -150,8 +150,8 @@ class NodeResolveTest(TaskTestBase):
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
               self.assertEqual(1, len(typ_packages),
-                              'Expected to find exactly 1 de-duped `typ` package, but found these:'
-                              '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
+                               'Expected to find exactly 1 de-duped `typ` package, but found these:'
+                               '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
 
     script_path = os.path.join(node_path, 'leaf.js')
     out = task.node_distribution.node_command(args=[script_path]).check_output()
