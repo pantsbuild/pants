@@ -8,7 +8,7 @@ use futures::future::{BoxFuture, Future};
 use futures::future;
 use futures_cpupool::CpuPool;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
@@ -94,18 +94,10 @@ impl Context {
   /**
    * Returns the `name` field of the given item.
    *
-   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
-   * `str` type, we just assume that it has the same type as the name of the field. And more
-   * importantly, there is no check that the object _has_ a name field.
+   * TODO: There is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
-    let name_val =
-      self.project(
-        item,
-        &self.tasks.field_name,
-        self.tasks.field_name.0.type_id()
-      );
-    self.tasks.externs.val_to_str(&name_val)
+    self.tasks.externs.project_str(item, self.tasks.field_name.as_str())
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
@@ -141,14 +133,14 @@ impl Context {
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
+  fn project(&self, item: &Value, field: &str, type_id: &TypeId) -> Value {
     self.tasks.externs.project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
-  fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
+  fn project_multi(&self, item: &Value, field: &str) -> Vec<Value> {
     self.tasks.externs.project_multi(item, field)
   }
 
@@ -262,7 +254,7 @@ impl Select {
         false,
       _ =>
         true,
-    };
+    }
   }
 
   /**

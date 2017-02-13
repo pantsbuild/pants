@@ -4,7 +4,7 @@ use std::os::raw;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Field, Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
 use handles::Handle;
 
@@ -30,6 +30,7 @@ pub struct Externs {
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
+  py_str_type: TypeId,
 }
 
 // The pointer to the context is safe for sharing between threads.
@@ -52,6 +53,7 @@ impl Externs {
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
     invoke_runnable: InvokeRunnable,
+    py_str_type: TypeId,
   ) -> Externs {
     Externs {
       context: ext_context,
@@ -69,6 +71,7 @@ impl Externs {
       val_to_str: val_to_str,
       create_exception: create_exception,
       invoke_runnable: invoke_runnable,
+      py_str_type: py_str_type
     }
   }
 
@@ -117,17 +120,26 @@ impl Externs {
     (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
   }
 
-  pub fn project(&self, value: &Value, field: &Field, type_id: &TypeId) -> Value {
-    (self.project)(self.context, value, field, type_id)
+  pub fn project(&self, value: &Value, field: &str, type_id: &TypeId) -> Value {
+    (self.project)(self.context, value, field.as_ptr(), field.len() as u64, type_id)
   }
 
-  pub fn project_multi(&self, value: &Value, field: &Field) -> Vec<Value> {
-    let buf = (self.project_multi)(self.context, value, field);
+  pub fn project_multi(&self, value: &Value, field: &str) -> Vec<Value> {
+    let buf = (self.project_multi)(self.context, value, field.as_ptr(), field.len() as u64);
     with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| {
       unsafe {
         value_vec.iter().map(|v| v.clone()).collect()
       }
     })
+  }
+
+  pub fn project_str(&self, value: &Value, field_name: &str) -> String {
+    let name_val = self.project(
+      value,
+      field_name,
+      &self.py_str_type,
+    );
+    self.val_to_str(&name_val)
   }
 
   pub fn id_to_str(&self, digest: Id) -> String {
@@ -182,7 +194,7 @@ pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
 
 pub type ProjectExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const Field, *const TypeId) -> Value;
+  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64, *const TypeId) -> Value;
 
 // Not all log levels are always in use.
 #[allow(dead_code)]
@@ -228,7 +240,7 @@ impl TypeIdBuffer {
 }
 
 pub type ProjectMultiExtern =
-  extern "C" fn(*const ExternContext, *const Value, *const Field) -> ValueBuffer;
+  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64) -> ValueBuffer;
 
 #[repr(C)]
 pub struct Buffer {

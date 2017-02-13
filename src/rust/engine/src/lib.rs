@@ -24,7 +24,7 @@ use std::os::raw;
 use std::path::Path;
 use std::sync::Arc;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
   CloneValExtern,
@@ -154,12 +154,13 @@ pub extern fn scheduler_create(
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  field_name: Field,
-  field_products: Field,
-  field_variants: Field,
+  field_name: Buffer,
+  field_products: Buffer,
+  field_variants: Buffer,
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
+  py_str_type: TypeId,
 ) -> *const RawScheduler {
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   let externs =
@@ -178,6 +179,7 @@ pub extern fn scheduler_create(
       project_multi,
       create_exception,
       invoke_runnable,
+      py_str_type,
     );
   Box::into_raw(
     Box::new(
@@ -186,9 +188,9 @@ pub extern fn scheduler_create(
           Graph::new(),
           Tasks::new(
             externs,
-            field_name,
-            field_products,
-            field_variants,
+            field_name.to_string().expect("field_name to be a string"),
+            field_products.to_string().expect("field_products to be a string"),
+            field_variants.to_string().expect("field_variants to be a string"),
             type_address,
             type_has_products,
             type_has_variants,
@@ -230,7 +232,7 @@ pub extern fn execution_add_root_select_dependencies(
   subject: Key,
   product: TypeConstraint,
   dep_product: TypeConstraint,
-  field: Field,
+  field: Buffer,
   field_types: TypeIdBuffer,
   transitive: bool,
 ) {
@@ -239,7 +241,7 @@ pub extern fn execution_add_root_select_dependencies(
       subject,
       product,
       dep_product,
-      field,
+      field.to_string().expect("field name to be string"),
       field_types.to_vec(),
       transitive,
     );
@@ -343,12 +345,12 @@ pub extern fn task_add_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
   dep_product: TypeConstraint,
-  field: Field,
+  field: Buffer,
   field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_dependencies(product, dep_product, field, field_types.to_vec(), transitive);
+    tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec(), transitive);
   })
 }
 
@@ -357,11 +359,11 @@ pub extern fn task_add_select_projection(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
   projected_subject: TypeId,
-  field: Field,
+  field: Buffer,
   input_product: TypeConstraint,
 ) {
   with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_projection(product, projected_subject, field, input_product);
+    tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
   })
 }
 
