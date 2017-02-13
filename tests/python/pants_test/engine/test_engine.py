@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 
 from pants.build_graph.address import Address
 from pants.engine.engine import LocalSerialEngine
@@ -37,8 +37,7 @@ class EngineTest(unittest.TestCase):
 
   @contextmanager
   def serial_engine(self):
-    with closing(LocalSerialEngine(self.scheduler)) as e:
-      yield e
+    yield LocalSerialEngine(self.scheduler)
 
   def test_serial_engine_simple(self):
     with self.serial_engine() as engine:

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import cPickle as pickle
 import cStringIO as StringIO
-from abc import abstractmethod
 from binascii import hexlify
 from collections import Counter
 from contextlib import closing
@@ -18,23 +17,6 @@ import six
 
 from pants.engine.nodes import State
 from pants.engine.objects import SerializationError
-from pants.util.meta import AbstractClass
-
-
-def _unpickle(value):
-  if isinstance(value, six.binary_type):
-    # Deserialize string values.
-    return pickle.loads(value)
-  # Deserialize values with file interface,
-  return pickle.load(value)
-
-
-def _identity(value):
-  return value
-
-
-def _copy_bytes(value):
-  return bytes(value)
 
 
 class Key(object):
@@ -122,7 +104,7 @@ class Storage(object):
 
     :param protocol: Serialization protocol for pickle, if not provided will use ASCII protocol.
     """
-    content, key_mappings = InMemoryDb(), InMemoryDb()
+    content, key_mappings = dict(), dict()
     return Storage(content, key_mappings, protocol=protocol)
 
   @classmethod
@@ -192,15 +174,15 @@ class Storage(object):
     Unlike content storage, key mappings allows overwriting existing entries,
     meaning a key can be re-mapped to a different key.
     """
-    self._key_mappings.put(key=from_key.digest,
-                           value=pickle.dumps(to_key, protocol=self._protocol))
+    if from_key.digest not in self._key_mappings:
+      self._key_mappings[from_key.digest] = pickle.dumps(to_key, protocol=self._protocol)
 
   def get_mapping(self, from_key):
     """Retrieve the mapping Key from a given Key.
 
     Noe is returned if the mapping does not exist.
     """
-    to_key = self._key_mappings.get(key=from_key.digest)
+    to_key = self._key_mappings.get(from_key.digest)
 
     if to_key is None:
       return None
@@ -305,58 +287,3 @@ class CacheStats(Counter):
 
   def __repr__(self):
     return 'hits={}, misses={}, total={}'.format(self.hits, self.misses, self.total)
-
-
-class KeyValueStore(AbstractClass):
-  @abstractmethod
-  def get(self, key, transform=_identity):
-    """Fetch the value for a given key.
-
-    :param key: key in bytestring.
-    :param transform: optional function that is applied on the retrieved value from storage
-      before it is returned, since the original value may be only valid within the context.
-    :return: value can be either string-like or file-like, `None` if does not exist.
-    """
-
-  @abstractmethod
-  def put(self, key, value, transform=_copy_bytes):
-    """Save the value under a key, but only once.
-
-    The write once semantics is specifically provided for the content addressable use case.
-
-    :param key: key in bytestring.
-    :param value: value in bytestring.
-    :param transform: optional function that is applied on the input value before it is
-      saved to the storage, since the original value may be only valid within the context,
-      default is to play safe and make a copy.
-    :return: `True` to indicate the write actually happens, i.e, first write, `False` for
-      repeated writes of the same key.
-    """
-
-  @abstractmethod
-  def items(self):
-    """Generator to iterate over items.
-
-    For testing purpose.
-    """
-
-
-class InMemoryDb(KeyValueStore):
-  """An in-memory implementation of the kvs interface."""
-
-  def __init__(self):
-    self._storage = dict()
-
-  def get(self, key, transform=_identity):
-    return transform(self._storage.get(key))
-
-  def put(self, key, value, transform=_copy_bytes):
-    if key in self._storage:
-      return False
-    self._storage[key] = transform(value)
-    return True
-
-  def items(self):
-    for k in iter(self._storage):
-      yield k, self._storage.get(k)
-
