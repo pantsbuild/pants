@@ -4,7 +4,7 @@ use std::os::raw;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
 use handles::Handle;
 
@@ -85,6 +85,10 @@ impl Externs {
 
   pub fn val_for(&self, key: &Key) -> Value {
     (self.val_for)(self.context, key)
+  }
+
+  pub fn val_for_id(&self, id: Id) -> Value {
+    self.val_for(&Key::new_with_anon_type_id(id))
   }
 
   pub fn clone_val(&self, val: &Value) -> Value {

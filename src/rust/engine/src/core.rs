@@ -88,6 +88,10 @@ impl hash::Hash for Key {
 }
 
 impl Key {
+  pub fn new_with_anon_type_id(id: Id) -> Key {
+    Key { id: id, type_id: TypeId(0) }
+  }
+
   pub fn id(&self) -> Id {
     self.id
   }

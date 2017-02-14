@@ -574,7 +574,7 @@ impl Step for Task {
           Ok(deps) =>
             context.invoke_runnable(
               Runnable {
-                func: context.tasks.externs.val_for(&Key{id:selector.func.0, type_id: TypeId(0)}),
+                func: context.tasks.externs.val_for_id(selector.func.0),
                 args: deps.iter().map(|v| context.clone_val(v)).collect(),
                 cacheable: selector.cacheable,
               }
