@@ -1,3 +1,6 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use core::{Field, Function, Key, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

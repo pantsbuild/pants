@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
+use std::convert::TryFrom;
 use std::sync::Arc;
 
 use futures::future::{BoxFuture, Future};
@@ -28,6 +28,15 @@ pub struct Runnable {
 pub enum Failure {
   Noop(&'static str, Option<Node>),
   Throw(Value),
+}
+
+impl Failure {
+  pub fn clone(&self, externs: &Externs) -> Failure {
+    match self {
+      &Failure::Noop(msg, ref node) => Failure::Noop(msg, node.clone()),
+      &Failure::Throw(ref msg) => Failure::Throw(externs.clone_val(msg)),
+    }
+  }
 }
 
 pub type StepFuture<T> = BoxFuture<T, Failure>;
@@ -215,9 +224,16 @@ impl ContextFactory for Context {
 
 /**
  * Defines executing a cacheable/memoizable step for the given context.
+ *
+ * The Output type of a Step is bounded to values that can be stored and retrieved from
+ * the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
+ * stored inside the NodeResult requires an implementation of TryFrom. But the
+ * combination of bounds at usage sites mean that a failure to unwrap the result should
+ * be exceedingly rare.
  */
 pub trait Step: Into<Node> {
-  type Output: Into<NodeResult>;
+  type Output: Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+
   fn step(&self, context: Context) -> StepFuture<Self::Output>;
 }
 
@@ -730,8 +746,35 @@ pub enum NodeResult {
   Value(Value),
 }
 
+impl NodeResult {
+  pub fn clone(&self, externs: &Externs) -> NodeResult {
+    match self {
+      &NodeResult::Value(ref v) => NodeResult::Value(externs.clone_val(v)),
+    }
+  }
+}
+
 impl From<Value> for NodeResult {
   fn from(v: Value) -> Self {
     NodeResult::Value(v)
+  }
+}
+
+impl TryFrom<NodeResult> for NodeResult {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    Ok(nr)
+  }
+}
+
+impl TryFrom<NodeResult> for Value {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::Value(v) => Ok(v),
+      _ => Err(()),
+    }
   }
 }

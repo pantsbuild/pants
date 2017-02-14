@@ -1,3 +1,5 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::io;
 use std::path::Path;
@@ -68,10 +70,10 @@ impl Scheduler {
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<RootResult>)> {
     self.roots.iter()
       .map(|root| match root {
-        &Root::Select(s) =>
-          (&s.subject, &s.selector.product, self.graph.peek(s, &self.tasks.externs)),
-        &Root::SelectDependencies(s) =>
-          (&s.subject, &s.selector.product, self.graph.peek(s, &self.tasks.externs)),
+        &Root::Select(ref s) =>
+          (&s.subject, &s.selector.product, self.graph.peek(s.clone(), &self.tasks.externs)),
+        &Root::SelectDependencies(ref s) =>
+          (&s.subject, &s.selector.product, self.graph.peek(s.clone(), &self.tasks.externs)),
       })
       .collect()
   }
@@ -113,10 +115,10 @@ impl Scheduler {
    * success of the node.
    */
   fn launch(&self, context_factory: BootstrapContextFactory, node: Node) -> CpuFuture<(), ()> {
-    context_factory.pool.clone().spawn_fn(move || {
+    context_factory.pool.clone().spawn(
       context_factory.graph.create(node, &context_factory)
         .then::<_, Result<(), ()>>(|_| Ok(()))
-    })
+    )
   }
 
   /**

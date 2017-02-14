@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::convert::TryInto;
 use std::fs::File;
 use std::fs::OpenOptions;
-use std::io::{BufWriter, Write};
-use std::io;
+use std::io::{self, BufWriter, Write};
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock};
@@ -38,10 +38,26 @@ type EntryStateField = Arc<epoch::Atomic<EntryState>>;
  */
 trait EntryStateGetter {
   fn get<N: Step>(&self) -> NodeFuture<N::Output>;
+  fn get_raw(&self) -> NodeFuture<NodeResult>;
 }
 
 impl EntryStateGetter for EntryStateField {
   fn get<N: Step>(&self) -> NodeFuture<N::Output> {
+    self.get_raw()
+      .then(|node_result| match node_result {
+        Ok(nr) =>
+          Ok(
+            nr.try_into().unwrap_or_else(|_| {
+              panic!("A Step implementation was ambiguous.")
+            })
+          ),
+        Err(failure) =>
+          Err(failure)
+      })
+      .boxed()
+  }
+
+  fn get_raw(&self) -> NodeFuture<NodeResult> {
     loop {
       // Observe the current state.
       let guard = epoch::pin();
@@ -121,11 +137,11 @@ impl Entry {
   }
 
   /**
-   * Waits for the Future for this Node to have completed and returns a clone of its value.
+   * If the Future for this Node has already completed, returns a clone of its result.
    */
-  fn peek(&self, externs: &Externs) -> Option<Result<NodeResult, Failure>> {
-    self.state().get().peek().map(|state_opt| match state_opt {
-      Ok(ref v) => Ok(externs.clone_val(v)),
+  fn peek<N: Step>(&self, externs: &Externs) -> Option<Result<N::Output, Failure>> {
+    self.state().get::<N>().peek().map(|state_opt| match state_opt {
+      Ok(nr) => Ok(*nr),
       Err(shared_err) => {
         match *shared_err {
           Failure::Noop(msg, ref n) => Err(Failure::Noop(msg, n.clone())),
@@ -159,7 +175,7 @@ impl Entry {
       "{}:{}:{} == {}",
       self.node.format(externs),
       externs.id_to_str(self.node.subject().id()),
-      externs.id_to_str(self.node.selector().product().0),
+      externs.id_to_str(self.node.product().0),
       state,
     ).replace("\"", "\\\"")
   }
@@ -175,7 +191,7 @@ struct InnerGraph {
 }
 
 impl InnerGraph {
-  fn cyclic<T>(&self) -> NodeFuture<T> {
+  fn cyclic<T: Send + 'static>(&self) -> NodeFuture<T> {
     future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed())
   }
 
@@ -357,7 +373,7 @@ impl InnerGraph {
           Some(Err(Failure::Throw(_))) => "tomato".to_string(),
           Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
-            viz_colors.entry(entry.node.selector().product().clone()).or_insert_with(|| {
+            viz_colors.entry(entry.node.product().clone()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },
@@ -490,8 +506,9 @@ impl Graph {
    * If the given Node has completed, returns a clone of its state.
    */
   pub fn peek<N: Step>(&self, node: N, externs: &Externs) -> Option<Result<N::Output, Failure>> {
+    let node = node.into();
     let inner = self.inner.read().unwrap();
-    inner.entry(node).and_then(|e| e.peek(externs))
+    inner.entry(&node).and_then(|e| e.peek::<N>(externs))
   }
 
   /**
@@ -500,13 +517,18 @@ impl Graph {
    *
    * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
    * to make cycle detection cheaper.
+   *
+   * TODO: The vast majority of `get` calls will occur exactly once per src+dst, so double
+   * checking a RwLock here is probably overkill. Should switch to Mutex and acquire once.
    */
   pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
+    let dst_node = dst_node.into();
+
     // First, check whether the destination already exists, and the dep is already declared.
     let dst_state_opt = {
       let inner = self.inner.read().unwrap();
       let src_entry = inner.entry_for_id(src_id);
-      if let Some(dst_entry) = inner.entry(dst_node) {
+      if let Some(dst_entry) = inner.entry(&dst_node) {
         if src_entry.dependencies().contains(&dst_entry.id) {
           // Declared and valid.
           Some(dst_entry.state())
@@ -529,25 +551,24 @@ impl Graph {
       return dst_state.get();
     }
 
-    // Get or create the destination, and then insert the dep.
+    // Get or create the destination, and then insert the dep and return its state.
     // TODO: doing cycle detection under the writelock... unfortunate, but probably unavoidable
     // without a much more complicated algorithm.
-    {
+    let dst_state = {
       let mut inner = self.inner.write().unwrap();
       let dst_id = inner.ensure_entry(context, dst_node.clone());
       if inner.detect_cycle(src_id, dst_id) {
-        // Undeclared but cyclic.
         inner.entry_for_id_mut(src_id).cyclic_dependencies.insert(dst_id);
+        return inner.cyclic();
       } else {
-        // Undeclared and valid.
         inner.entry_for_id_mut(src_id).dependencies.insert(dst_id);
-        inner.entry_for_id_mut(dst_id).dependents.insert(src_id);
+        let dst_entry = inner.entry_for_id_mut(dst_id);
+        dst_entry.dependents.insert(src_id);
+        dst_entry.state()
       }
-    }
+    };
 
-    // Recurse to retry (which should always succeed the first time).
-    // TODO: will look up the Node multiple times.
-    self.get(src_id, context, dst_node)
+    dst_state.get()
   }
 
   /**
@@ -557,7 +578,7 @@ impl Graph {
     // Initialize the state while under the lock...
     let state = {
       let mut inner = self.inner.write().unwrap();
-      let id = inner.ensure_entry(context, node);
+      let id = inner.ensure_entry(context, node.into());
       inner.entry_for_id(id).state()
     };
     // ...but only `get` it outside the lock.
