@@ -58,12 +58,9 @@ class GraphInvalidationTest(unittest.TestCase):
     graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                         symbol_table_cls=symbol_table_cls,
                                                         native=self._native)
-    try:
-      graph = graph_helper.create_build_graph(target_roots)[0]
-      addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
-      yield graph, addresses, graph_helper.scheduler
-    finally:
-      graph_helper.engine.close()
+    graph = graph_helper.create_build_graph(target_roots)[0]
+    addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+    yield graph, addresses, graph_helper.scheduler
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
