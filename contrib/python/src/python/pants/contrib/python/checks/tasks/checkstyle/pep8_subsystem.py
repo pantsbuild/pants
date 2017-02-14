@@ -11,7 +11,7 @@ from pants.contrib.python.checks.tasks.checkstyle.plugin_subsystem_base import P
 class PEP8Subsystem(PluginSubsystemBase):
   options_scope = 'pycheck-pep8'
 
-  # Code reference is here: http://pep8.readthedocs.org/en/latest/intro.html#error-codes
+  # Code reference is here: https://pep8.readthedocs.io/en/latest/intro.html#error-codes
   DEFAULT_IGNORE_CODES = (
     # continuation_line_indentation
     'E121', # continuation line under-indented for hanging indent

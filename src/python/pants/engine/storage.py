@@ -400,7 +400,7 @@ class Lmdb(KeyValueStore):
   # writemap will use a writeable memory mapping to directly update storage, therefore
   # improves performance. But it may cause filesystems that don’t support sparse files,
   # such as OSX, to immediately preallocate map_size = bytes of underlying storage.
-  # See https://lmdb.readthedocs.org/en/release/#writemap-mode
+  # See https://lmdb.readthedocs.io/en/release/#writemap-mode
   USE_SPARSE_FILES = sys.platform != 'darwin'
 
   @classmethod
