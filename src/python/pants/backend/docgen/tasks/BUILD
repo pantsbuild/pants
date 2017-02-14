@@ -2,10 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  resource_targets = [
-    ':resources',
-  ],
   dependencies = [
+    ':resources',
     '3rdparty/python:docutils',
     '3rdparty/python:Markdown',
     '3rdparty/python:Pygments',

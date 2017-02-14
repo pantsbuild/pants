@@ -9,7 +9,7 @@ use std::sync::Arc;
 use futures::future::{self, BoxFuture, Future};
 
 use context::Core;
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Function, Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use fs::{
   self,
@@ -124,20 +124,10 @@ impl Context {
   /**
    * Returns the `name` field of the given item.
    *
-   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
-   * `str` type, we just assume that it has the same type as the name of the field. And more
-   * importantly, there is no check that the object _has_ a name field.
-   *
-   * See https://github.com/pantsbuild/pants/issues/4207 about cleaning this up a bit.
+   * TODO: There is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
-    let name_val =
-      self.project(
-        item,
-        &self.core.tasks.field_name,
-        self.core.tasks.field_name.0.type_id()
-      );
-    self.core.externs.val_to_str(&name_val)
+    self.core.externs.project_str(item, self.core.tasks.field_name.as_str())
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
@@ -251,18 +241,18 @@ impl Context {
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
+  fn project(&self, item: &Value, field: &str, type_id: &TypeId) -> Value {
     self.core.externs.project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
-  fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
+  fn project_multi(&self, item: &Value, field: &str) -> Vec<Value> {
     self.core.externs.project_multi(item, field)
   }
 
-  fn project_multi_strs(&self, item: &Value, field: &Field) -> Vec<String> {
+  fn project_multi_strs(&self, item: &Value, field: &str) -> Vec<String> {
     self.core.externs.project_multi(item, field).iter()
       .map(|v| self.core.externs.val_to_str(v))
       .collect()
@@ -405,7 +395,7 @@ impl Select {
         false,
       _ =>
         true,
-    };
+    }
   }
 
   /**

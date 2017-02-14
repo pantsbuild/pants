@@ -64,6 +64,7 @@ class EngineSourceMapper(SourceMapper):
         yield f
 
     # Handle `resources`-declaring targets.
+    # TODO: Remember to get rid of this in 1.5.0.dev0, when the deprecation of `resources` is complete.
     target_resources = target_kwargs.get('resources')
     if target_resources:
       # N.B. `resources` params come in two flavors:

@@ -9,6 +9,7 @@ from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -60,6 +61,10 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
+    deprecated_conditional(lambda: resources is not None, '1.5.0.dev0',
+                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
+    deprecated_conditional(lambda: resource_targets is not None, '1.5.0.dev0',
+                           'The `resource_targets=` Python target argument', 'Use `dependencies=` instead.')
     self.address = address
     payload = payload or Payload()
     payload.add_fields({

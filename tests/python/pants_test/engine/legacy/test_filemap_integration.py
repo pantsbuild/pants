@@ -48,9 +48,6 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
                           success=True,
                           enable_v2_engine=True)
     self.assertIn('testprojects/src/python/sources/sources.py', run.stdout_data)
-    # FIXME: The synthetic target that is created to expose the `resources=globs` arg does not show
-    # up in filemap, because it is synthetic. see https://github.com/pantsbuild/pants/issues/3563
-    #self.assertIn('testprojects/src/python/sources/sources.txt', run.stdout_data)
 
   def test_exclude_invalid_string(self):
     build_path = os.path.join(self.PATH_PREFIX, 'BUILD.invalid')

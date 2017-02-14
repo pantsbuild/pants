@@ -246,14 +246,12 @@ python_library(
 python_library(
   name = 'jar_publish',
   sources = ['jar_publish.py'],
-  resource_targets = [
-    ':jar_publish_resources',
-    ':reports_resources'
-  ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':jar_publish_resources',
     ':jar_task',
     ':properties',
+    ':reports_resources',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ivy_utils',

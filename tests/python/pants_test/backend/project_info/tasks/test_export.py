@@ -404,6 +404,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       result['targets']['src/python/z:z']['globs']
     )
 
+  # TODO: Delete this test in 1.5.0.dev0, once we remove support for resources=.
   def test_synthetic_target(self):
     # Create a BUILD file then add itself as resources
     self.add_to_build_file('src/python/alpha/BUILD', """

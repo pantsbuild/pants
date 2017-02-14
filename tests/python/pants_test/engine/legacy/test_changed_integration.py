@@ -202,8 +202,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       transitive=['src/java/org/pantsbuild/helloworld:helloworld',
                   'src/resources/org/pantsbuild/resourceonly:resource'],
     ),
-    # A `python_library` with `resources=['file.name']`.
-    'src/python/sources/sources.txt': dict(
+    # A `python_library` with `sources=['file.name'] .
+    'src/python/sources/sources.py': dict(
       none=['src/python/sources:sources'],
       direct=['src/python/sources:sources'],
       transitive=['src/python/sources:sources']

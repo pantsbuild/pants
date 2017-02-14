@@ -34,7 +34,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use context::Core;
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
   CloneValExtern,
@@ -168,14 +168,6 @@ pub extern fn scheduler_create(
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  field_name: Field,
-  field_products: Field,
-  field_variants: Field,
-  field_include: Field,
-  field_exclude: Field,
-  field_dependencies: Field,
-  field_path: Field,
-  field_fingerprint: Field,
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
@@ -202,14 +194,14 @@ pub extern fn scheduler_create(
         scheduler: Scheduler::new(
           Core::new(
             Tasks::new(
-              field_name,
-              field_products,
-              field_variants,
-              field_include,
-              field_exclude,
-              field_dependencies,
-              field_path,
-              field_fingerprint,
+              "name".to_string(),
+              "products".to_string(),
+              "variants".to_string(),
+              "include".to_string(),
+              "exclude".to_string(),
+              "dependencies".to_string(),
+              "path".to_string(),
+              "fingerprint".to_string(),
             ),
             Types {
               construct_snapshot: construct_snapshot,
@@ -248,6 +240,7 @@ pub extern fn scheduler_create(
               project_multi,
               create_exception,
               invoke_runnable,
+              type_string,
             ),
             // TODO: Pass build_root and ignore patterns as argument.
             PathBuf::from("."),
@@ -301,7 +294,7 @@ pub extern fn execution_add_root_select_dependencies(
   subject: Key,
   product: TypeConstraint,
   dep_product: TypeConstraint,
-  field: Field,
+  field: Buffer,
   field_types: TypeIdBuffer,
   transitive: bool,
 ) {
@@ -310,7 +303,7 @@ pub extern fn execution_add_root_select_dependencies(
       subject,
       product,
       dep_product,
-      field,
+      field.to_string().expect("field name to be string"),
       field_types.to_vec(),
       transitive,
     );
@@ -414,13 +407,13 @@ pub extern fn task_add_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
   dep_product: TypeConstraint,
-  field: Field,
+  field: Buffer,
   field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_dependencies(product, dep_product, field, field_types.to_vec(), transitive);
-  })
+    core.tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec(), transitive);
+    })
 }
 
 #[no_mangle]
@@ -428,11 +421,11 @@ pub extern fn task_add_select_projection(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
   projected_subject: TypeId,
-  field: Field,
+  field: Buffer,
   input_product: TypeConstraint,
 ) {
   with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_projection(product, projected_subject, field, input_product);
+    core.tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
   })
 }
 

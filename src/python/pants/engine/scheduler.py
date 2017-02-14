@@ -145,6 +145,9 @@ class LocalScheduler(object):
   def _to_ids_buf(self, types):
     return self._native.context.type_ids_buf([TypeId(self._to_id(t)) for t in types])
 
+  def _to_utf8_buf(self, string):
+    return self._native.context.utf8_buf(string)
+
   def _register_singletons(self, singletons):
     """Register the given singletons dict.
 
@@ -192,7 +195,7 @@ class LocalScheduler(object):
             self._native.lib.task_add_select(self._scheduler,
                                              product_constraint)
           elif selector_type is SelectVariant:
-            key_buf = self._native.context.utf8_buf(selector.variant_key)
+            key_buf = self._to_utf8_buf(selector.variant_key)
             self._native.lib.task_add_select_variant(self._scheduler,
                                                      product_constraint,
                                                      key_buf)
@@ -205,7 +208,7 @@ class LocalScheduler(object):
             self._native.lib.task_add_select_dependencies(self._scheduler,
                                                           product_constraint,
                                                           self._to_constraint(selector.dep_product),
-                                                          self._to_key(selector.field),
+                                                          self._to_utf8_buf(selector.field),
                                                           self._to_ids_buf(selector.field_types),
                                                           selector.transitive)
           elif selector_type is SelectProjection:
@@ -215,7 +218,7 @@ class LocalScheduler(object):
             self._native.lib.task_add_select_projection(self._scheduler,
                                                         self._to_constraint(selector.product),
                                                         TypeId(self._to_id(selector.projected_subject)),
-                                                        self._to_key(field),
+                                                        self._to_utf8_buf(field),
                                                         self._to_constraint(selector.input_product))
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
@@ -340,7 +343,7 @@ class LocalScheduler(object):
                                                                 self._to_key(subject),
                                                                 self._to_constraint(selector.product),
                                                                 self._to_constraint(selector.dep_product),
-                                                                self._to_key(selector.field),
+                                                                self._to_utf8_buf(selector.field),
                                                                 self._to_ids_buf(selector.field_types),
                                                                 selector.transitive)
       else:

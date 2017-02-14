@@ -52,8 +52,6 @@ _FFI.cdef(
       TypeId   type_id;
     } Key;
 
-    typedef Key Field;
-
     typedef struct {
       uint8_t*  bytes_ptr;
       uint64_t  bytes_len;
@@ -93,8 +91,8 @@ _FFI.cdef(
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
     typedef Buffer           (*extern_lift_bytes)(ExternContext*, Value*);
-    typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
-    typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
+    typedef Value            (*extern_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
+    typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
     typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
 
@@ -135,14 +133,6 @@ _FFI.cdef(
                                    extern_project_multi,
                                    extern_create_exception,
                                    extern_invoke_runnable,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
-                                   Field,
                                    Function,
                                    Function,
                                    Function,
@@ -171,8 +161,8 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeIdBuffer, bool);
-    void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer, bool);
+    void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
@@ -187,7 +177,7 @@ _FFI.cdef(
                                                 Key,
                                                 TypeConstraint,
                                                 TypeConstraint,
-                                                Field,
+                                                Buffer,
                                                 TypeIdBuffer,
                                                 bool);
     ExecutionStat execution_execute(RawScheduler*);
@@ -298,12 +288,12 @@ def extern_lift_bytes(context_handle, bytes_val):
   return c.buf(c.from_value(bytes_val))
 
 
-@_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
-def extern_project(context_handle, val, field, type_id):
+@_FFI.callback("Value(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*)")
+def extern_project(context_handle, val, field_str_ptr, field_str_len, type_id):
   """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
   c = _FFI.from_handle(context_handle)
   obj = c.from_value(val)
-  field_name = c.from_key(field)
+  field_name = to_py_str(field_str_ptr, field_str_len)
   typ = c.from_id(type_id.id_)
 
   projected = getattr(obj, field_name)
@@ -313,12 +303,12 @@ def extern_project(context_handle, val, field, type_id):
   return c.to_value(projected)
 
 
-@_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
-def extern_project_multi(context_handle, val, field):
+@_FFI.callback("ValueBuffer(ExternContext*, Value*, uint8_t*, uint64_t)")
+def extern_project_multi(context_handle, val, field_str_ptr, field_str_len):
   """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
   c = _FFI.from_handle(context_handle)
   obj = c.from_value(val)
-  field_name = c.from_key(field)
+  field_name = to_py_str(field_str_ptr, field_str_len)
 
   return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
@@ -327,8 +317,12 @@ def extern_project_multi(context_handle, val, field):
 def extern_create_exception(context_handle, msg_ptr, msg_len):
   """Given a utf8 message string, create an Exception object."""
   c = _FFI.from_handle(context_handle)
-  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  msg = to_py_str(msg_ptr, msg_len)
   return c.to_value(Exception(msg))
+
+
+def to_py_str(msg_ptr, msg_len):
+  return bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
 
 
 @_FFI.callback("RunnableComplete(ExternContext*, Function*, Value*, uint64_t, bool)")
@@ -610,16 +604,6 @@ class Native(object):
         extern_project_multi,
         extern_create_exception,
         extern_invoke_runnable,
-        # Field names.
-        # TODO: See https://github.com/pantsbuild/pants/issues/4207
-        self.context.to_key('name'),
-        self.context.to_key('products'),
-        self.context.to_key('default'),
-        self.context.to_key('include'),
-        self.context.to_key('exclude'),
-        self.context.to_key('dependencies'),
-        self.context.to_key('path'),
-        self.context.to_key('fingerprint'),
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_file_content)),
