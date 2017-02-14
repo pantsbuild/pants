@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::convert::TryInto;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
@@ -15,9 +14,9 @@ use crossbeam::mem::epoch;
 use futures::future::Future;
 use futures::future;
 
-use externs::Externs;
+use externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, Step, Context, ContextFactory};
+use nodes::{Failure, Node, NodeFuture, NodeResult, Step, Context, ContextFactory, TryInto};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -47,14 +46,16 @@ impl EntryStateGetter for EntryStateField {
       .then(|node_result| match node_result {
         Ok(nr) =>
           Ok(
-            nr.try_into().unwrap_or_else(|_| {
+            nr.clone().try_into().unwrap_or_else(|_| {
               panic!("A Step implementation was ambiguous.")
             })
           ),
-        Err(failure) =>
-          Err(failure)
+        Err(failure) => Err(failure.clone())
       })
+      // TODO: reboxing/sharing here is unnecessary. Since we've forced the clone, don't need
+      // to claim that this is shared any longer.
       .boxed()
+      .shared()
   }
 
   fn get_raw(&self) -> NodeFuture<NodeResult> {
@@ -139,15 +140,10 @@ impl Entry {
   /**
    * If the Future for this Node has already completed, returns a clone of its result.
    */
-  fn peek<N: Step>(&self, externs: &Externs) -> Option<Result<N::Output, Failure>> {
+  fn peek<N: Step>(&self) -> Option<Result<N::Output, Failure>> {
     self.state().get::<N>().peek().map(|state_opt| match state_opt {
-      Ok(nr) => Ok(*nr),
-      Err(shared_err) => {
-        match *shared_err {
-          Failure::Noop(msg, ref n) => Err(Failure::Noop(msg, n.clone())),
-          Failure::Throw(ref msg) => Err(Failure::Throw(externs.clone_val(msg))),
-        }
-      },
+      Ok(ok) => Ok(ok.clone()),
+      Err(err) => Err(err.clone())
     })
   }
 
@@ -163,19 +159,19 @@ impl Entry {
     &self.cyclic_dependencies
   }
 
-  fn format(&self, externs: &Externs) -> String {
+  fn format(&self) -> String {
     let state =
-      match self.peek(externs) {
-        Some(Ok(ref v)) => externs.val_to_str(v),
-        Some(Err(Failure::Throw(ref v))) => externs.val_to_str(v),
+      match self.peek::<Node>() {
+        Some(Ok(ref nr)) => format!("{:?}", nr),
+        Some(Err(Failure::Throw(ref v))) => externs::val_to_str(v),
         Some(Err(ref x)) => format!("{:?}", x),
         None => "<None>".to_string(),
       };
     format!(
       "{}:{}:{} == {}",
-      self.node.format(externs),
-      externs.id_to_str(self.node.subject().id()),
-      externs.id_to_str(self.node.product().0),
+      self.node.format(),
+      externs::id_to_str(self.node.subject().id()),
+      externs::id_to_str(self.node.product().0),
       state,
     ).replace("\"", "\\\"")
   }
@@ -360,7 +356,7 @@ impl InnerGraph {
     );
   }
 
-  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -368,7 +364,7 @@ impl InnerGraph {
     let viz_max_colors = 12;
     let mut format_color =
       |entry: &Entry| {
-        match entry.peek(externs) {
+        match entry.peek::<Node>() {
           None | Some(Err(Failure::Noop(_, _))) => "white".to_string(),
           Some(Err(Failure::Throw(_))) => "tomato".to_string(),
           Some(Ok(_)) => {
@@ -389,7 +385,7 @@ impl InnerGraph {
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
-      let node_str = entry.format(externs);
+      let node_str = entry.format();
 
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
@@ -403,7 +399,7 @@ impl InnerGraph {
           }
 
           // Write an entry per edge.
-          let dep_str = dep_entry.format(externs);
+          let dep_str = dep_entry.format();
           try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
         }
       }
@@ -413,12 +409,12 @@ impl InnerGraph {
     Ok(())
   }
 
-  pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
+  pub fn trace(&self, root: &Node, path: &Path) -> io::Result<()> {
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.peek(externs) {
+      match entry.peek::<Node>() {
         None | Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(_))) => false,
         Some(Ok(_)) => true,
@@ -446,13 +442,13 @@ impl InnerGraph {
       let indent = _indent(level);
       let output = format!("{}Computing {} for {}",
                            indent,
-                           externs.id_to_str(entry.node.product().0),
-                           externs.id_to_str(entry.node.subject().id()));
+                           externs::id_to_str(entry.node.product().0),
+                           externs::id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.peek(externs) {
+        let state_str = match entry.peek::<Node>() {
           None => "<None>".to_string(),
-          Some(Ok(ref x)) => format!("Return({})", externs.val_to_str(x)),
-          Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs.val_to_str(x)),
+          Some(Ok(ref x)) => format!("{:?}", x),
+          Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs::val_to_str(x)),
           Some(Err(Failure::Noop(ref x, ref opt_node))) => format!("Noop({:?}, {:?})", x, opt_node),
         };
         format!("{}\n{}  {}", output, indent, state_str)
@@ -505,10 +501,10 @@ impl Graph {
   /**
    * If the given Node has completed, returns a clone of its state.
    */
-  pub fn peek<N: Step>(&self, node: N, externs: &Externs) -> Option<Result<N::Output, Failure>> {
+  pub fn peek<N: Step>(&self, node: N) -> Option<Result<N::Output, Failure>> {
     let node = node.into();
     let inner = self.inner.read().unwrap();
-    inner.entry(&node).and_then(|e| e.peek::<N>(externs))
+    inner.entry(&node).and_then(|e| e.peek::<N>())
   }
 
   /**
@@ -548,7 +544,7 @@ impl Graph {
     // Got the destination's state. Now that we're outside the graph locks, we can safely
     // retrieve it.
     if let Some(dst_state) = dst_state_opt {
-      return dst_state.get();
+      return dst_state.get::<N>();
     }
 
     // Get or create the destination, and then insert the dep and return its state.
@@ -568,7 +564,7 @@ impl Graph {
       }
     };
 
-    dst_state.get()
+    dst_state.get::<N>()
   }
 
   /**
@@ -582,7 +578,7 @@ impl Graph {
       inner.entry_for_id(id).state()
     };
     // ...but only `get` it outside the lock.
-    state.get()
+    state.get::<N>()
   }
 
   pub fn invalidate(&self, subjects: HashSet<&Key, FNV>) -> usize {
@@ -590,14 +586,14 @@ impl Graph {
     inner.invalidate(subjects)
   }
 
-  pub fn trace(&self, root: &Node, path: &Path, externs: &Externs) -> io::Result<()> {
+  pub fn trace(&self, root: &Node, path: &Path) -> io::Result<()> {
     let inner = self.inner.read().unwrap();
-    inner.trace(root, path, externs)
+    inner.trace(root, path)
   }
 
-  pub fn visualize(&self, roots: &Vec<Node>, path: &Path, externs: &Externs) -> io::Result<()> {
+  pub fn visualize(&self, roots: &Vec<Node>, path: &Path) -> io::Result<()> {
     let inner = self.inner.read().unwrap();
-    inner.visualize(roots, path, externs)
+    inner.visualize(roots, path)
   }
 }
 

@@ -10,9 +10,9 @@ use futures::future;
 use futures_cpupool::{CpuPool, CpuFuture};
 
 use core::{Field, Key, TypeConstraint, TypeId, Value};
-use externs::LogLevel;
+use externs::{self, LogLevel};
 use graph::{EntryId, Graph};
-use nodes::{Context, ContextFactory, Failure, Node, NodeResult, Select, SelectDependencies};
+use nodes::{Context, ContextFactory, Failure, Node, Select, SelectDependencies};
 use selectors;
 use tasks::Tasks;
 
@@ -53,12 +53,12 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.graph.visualize(&self.root_nodes(), path, &self.tasks.externs)
+    self.graph.visualize(&self.root_nodes(), path)
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
     for root in self.root_nodes() {
-      self.graph.trace(&root, path, &self.tasks.externs)?;
+      self.graph.trace(&root, path)?;
     }
     Ok(())
   }
@@ -71,9 +71,9 @@ impl Scheduler {
     self.roots.iter()
       .map(|root| match root {
         &Root::Select(ref s) =>
-          (&s.subject, &s.selector.product, self.graph.peek(s.clone(), &self.tasks.externs)),
+          (&s.subject, &s.selector.product, self.graph.peek(s.clone())),
         &Root::SelectDependencies(ref s) =>
-          (&s.subject, &s.selector.product, self.graph.peek(s.clone(), &self.tasks.externs)),
+          (&s.subject, &s.selector.product, self.graph.peek(s.clone())),
       })
       .collect()
   }
@@ -139,7 +139,7 @@ impl Scheduler {
       };
 
     // Bootstrap tasks for the roots, and then wait for all of them.
-    self.tasks.externs.log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
+    externs::log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
     let roots_res =
       future::join_all(
         self.root_nodes().into_iter()

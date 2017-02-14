@@ -4,10 +4,10 @@
 use fnv::FnvHasher;
 
 use std::collections::HashMap;
-use std::hash;
+use std::{fmt, hash};
 use std::ops::Drop;
-use std::ptr;
 
+use externs;
 use handles::{Handle, enqueue_drop_handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -109,7 +109,6 @@ impl Key {
  * back to Python to clone the underlying CFFI handle.
  */
 #[repr(C)]
-#[derive(Debug)]
 pub struct Value {
   handle: Handle,
   type_id: TypeId,
@@ -132,21 +131,28 @@ impl Value {
   }
 
   /**
-   * An escape hatch to allow for cloning a Value: you should generally not do this unless you
-   * are certain the cloned Value has been mem::forgotten (otherwise it will be `Drop`ed twice).
+   * An escape hatch to allow for cloning a Value without cloning its handle. You should generally
+   * not do this unless you are certain the inpuit Value has been mem::forgotten (otherwise it
+   * will be `Drop`ed twice).
    */
-  pub unsafe fn clone(&self) -> Value {
+  pub unsafe fn clone_without_handle(&self) -> Value {
     Value {
       ..*self
     }
   }
 }
 
-impl Default for Value {
-  fn default() -> Self {
-    Value {
-      handle: ptr::null() as Handle,
-      type_id: TypeId(0),
-    }
+/**
+ * Implemented by calling back to python to clone the underlying Handle.
+ */
+impl Clone for Value {
+  fn clone(&self) -> Value {
+    externs::clone_val(self)
+  }
+}
+
+impl fmt::Debug for Value {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Value({})", externs::val_to_str(&self))
   }
 }

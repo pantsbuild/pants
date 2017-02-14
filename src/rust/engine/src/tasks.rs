@@ -4,7 +4,6 @@
 use std::collections::HashMap;
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
-use externs::Externs;
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
 
 
@@ -27,7 +26,6 @@ pub struct Tasks {
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
-  pub externs: Externs,
   pub field_name: Field,
   pub field_products: Field,
   pub field_variants: Field,
@@ -51,7 +49,6 @@ pub struct Tasks {
  */
 impl Tasks {
   pub fn new(
-    externs: Externs,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -63,7 +60,6 @@ impl Tasks {
       intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
-      externs: externs,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,

@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{Field, Function, Key, TypeConstraint, TypeId};
+use core::{Field, Key, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -51,15 +51,5 @@ impl Selector {
         variant_key: None,
       }
     )
-  }
-
-  // The product type this selector will ultimately produce.
-  pub fn product(&self) -> &TypeConstraint {
-    match self {
-      &Selector::Select(ref s) => &s.product,
-      &Selector::SelectLiteral(ref s) => &s.product,
-      &Selector::SelectDependencies(ref s) => &s.product,
-      &Selector::SelectProjection(ref s) => &s.product,
-    }
   }
 }

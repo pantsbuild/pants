@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::convert::TryFrom;
 use std::sync::Arc;
 
 use futures::future::{BoxFuture, Future};
@@ -9,7 +8,7 @@ use futures::future;
 use futures_cpupool::CpuPool;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value, Variants};
-use externs::Externs;
+use externs;
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use selectors::Selector;
@@ -24,19 +23,10 @@ pub struct Runnable {
   pub cacheable: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Failure {
   Noop(&'static str, Option<Node>),
   Throw(Value),
-}
-
-impl Failure {
-  pub fn clone(&self, externs: &Externs) -> Failure {
-    match self {
-      &Failure::Noop(msg, ref node) => Failure::Noop(msg, node.clone()),
-      &Failure::Throw(ref msg) => Failure::Throw(externs.clone_val(msg)),
-    }
-  }
 }
 
 pub type StepFuture<T> = BoxFuture<T, Failure>;
@@ -91,14 +81,14 @@ impl Context {
   fn get<N: Step>(&self, node: N) -> NodeFuture<N::Output> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| {
-      self.tasks.externs.drop_handles(handles);
+      externs::drop_handles(handles);
     });
 
     self.graph.get(self.entry_id, self, node)
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
+    externs::satisfied_by(&self.tasks.type_has_products, item.type_id())
   }
 
   /**
@@ -107,7 +97,7 @@ impl Context {
    * TODO: There is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
-    self.tasks.externs.project_str(item, self.tasks.field_name.as_str())
+    externs::project_str(item, self.tasks.field_name.as_str())
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
@@ -115,54 +105,54 @@ impl Context {
   }
 
   fn key_for(&self, val: &Value) -> Key {
-    self.tasks.externs.key_for(val)
+    externs::key_for(val)
   }
 
   fn val_for(&self, key: &Key) -> Value {
-    self.tasks.externs.val_for(key)
+    externs::val_for(key)
   }
 
   fn clone_val(&self, val: &Value) -> Value {
-    self.tasks.externs.clone_val(val)
+    externs::clone_val(val)
   }
 
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
-    self.tasks.externs.store_list(items, merge)
+    externs::store_list(items, merge)
   }
 
   /**
    * Calls back to Python for a satisfied_by check.
    */
   fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.tasks.externs.satisfied_by(constraint, cls)
+    externs::satisfied_by(constraint, cls)
   }
 
   /**
    * Calls back to Python to project a field.
    */
   fn project(&self, item: &Value, field: &str, type_id: &TypeId) -> Value {
-    self.tasks.externs.project(item, field, type_id)
+    externs::project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
   fn project_multi(&self, item: &Value, field: &str) -> Vec<Value> {
-    self.tasks.externs.project_multi(item, field)
+    externs::project_multi(item, field)
   }
 
   /**
    * Creates a Throw state with the given exception message.
    */
   fn throw(&self, msg: &str) -> Failure {
-    Failure::Throw(self.tasks.externs.create_exception(msg))
+    Failure::Throw(externs::create_exception(msg))
   }
 
   fn invoke_runnable(&self, runnable: Runnable) -> Result<Value, Failure> {
-    self.tasks.externs.invoke_runnable(&runnable)
+    externs::invoke_runnable(&runnable)
       .map_err(|v| Failure::Throw(v))
   }
 
@@ -227,12 +217,12 @@ impl ContextFactory for Context {
  *
  * The Output type of a Step is bounded to values that can be stored and retrieved from
  * the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
- * stored inside the NodeResult requires an implementation of TryFrom. But the
+ * stored inside the NodeResult requires an implementation of From<NodeResult>. But the
  * combination of bounds at usage sites mean that a failure to unwrap the result should
  * be exceedingly rare.
  */
 pub trait Step: Into<Node> {
-  type Output: Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+  type Output: Clone + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
   fn step(&self, context: Context) -> StepFuture<Self::Output>;
 }
@@ -697,13 +687,13 @@ pub enum Node {
 }
 
 impl Node {
-  pub fn format(&self, externs: &Externs) -> String {
+  pub fn format(&self) -> String {
     match self {
       &Node::Select(_) => "Select".to_string(),
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.task.func.0)),
+      &Node::Task(ref t) => format!("Task({})", externs::id_to_str(t.task.func.0)),
     }
   }
 
@@ -742,14 +732,15 @@ impl Step for Node {
   }
 }
 
+#[derive(Clone, Debug)]
 pub enum NodeResult {
   Value(Value),
 }
 
 impl NodeResult {
-  pub fn clone(&self, externs: &Externs) -> NodeResult {
+  pub fn clone(&self) -> NodeResult {
     match self {
-      &NodeResult::Value(ref v) => NodeResult::Value(externs.clone_val(v)),
+      &NodeResult::Value(ref v) => NodeResult::Value(externs::clone_val(v)),
     }
   }
 }
@@ -757,6 +748,26 @@ impl NodeResult {
 impl From<Value> for NodeResult {
   fn from(v: Value) -> Self {
     NodeResult::Value(v)
+  }
+}
+
+// TODO: These traits exist in the stdlib, but are marked unstable.
+//   see https://github.com/rust-lang/rust/issues/33417
+pub trait TryFrom<T>: Sized {
+  type Err;
+  fn try_from(T) -> Result<Self, Self::Err>;
+}
+
+pub trait TryInto<T>: Sized {
+  type Err;
+  fn try_into(self) -> Result<T, Self::Err>;
+}
+
+impl<T, U> TryInto<U> for T where U: TryFrom<T> {
+  type Err = U::Err;
+
+  fn try_into(self) -> Result<U, U::Err> {
+    U::try_from(self)
   }
 }
 
@@ -774,7 +785,6 @@ impl TryFrom<NodeResult> for Value {
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
       NodeResult::Value(v) => Ok(v),
-      _ => Err(()),
     }
   }
 }
