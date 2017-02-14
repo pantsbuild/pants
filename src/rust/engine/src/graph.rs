@@ -123,7 +123,7 @@ impl Entry {
   /**
    * Waits for the Future for this Node to have completed and returns a clone of its value.
    */
-  fn peek(&self, externs: &Externs) -> Option<NodeResult> {
+  fn peek(&self, externs: &Externs) -> Option<Result<NodeResult, Failure>> {
     self.state().get().peek().map(|state_opt| match state_opt {
       Ok(ref v) => Ok(externs.clone_val(v)),
       Err(shared_err) => {
@@ -489,7 +489,7 @@ impl Graph {
   /**
    * If the given Node has completed, returns a clone of its state.
    */
-  pub fn peek(&self, node: &Node, externs: &Externs) -> Option<NodeResult> {
+  pub fn peek(&self, node: &Node, externs: &Externs) -> Option<Result<NodeResult, Failure>> {
     let inner = self.inner.read().unwrap();
     inner.entry(node).and_then(|e| e.peek(externs))
   }
@@ -501,7 +501,7 @@ impl Graph {
    * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
    * to make cycle detection cheaper.
    */
-  pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: &Node) -> NodeFuture<N::Output> {
+  pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: &N) -> NodeFuture<N::Output> {
     // First, check whether the destination already exists, and the dep is already declared.
     let dst_state_opt = {
       let inner = self.inner.read().unwrap();
@@ -553,7 +553,7 @@ impl Graph {
   /**
    * Create the given Node if it does not already exist.
    */
-  pub fn create<N: Step>(&self, node: Node, context: &ContextFactory) -> NodeFuture<N::Output> {
+  pub fn create<N: Step>(&self, node: N, context: &ContextFactory) -> NodeFuture<N::Output> {
     // Initialize the state while under the lock...
     let state = {
       let mut inner = self.inner.write().unwrap();

@@ -80,6 +80,11 @@ impl Context {
    * Get the future value for the given Node implementation.
    */
   fn get<N: Step>(&self, node: &N) -> NodeFuture<N::Output> {
+    // TODO: Odd place for this... could do it periodically in the background?
+    maybe_drain_handles().map(|handles| {
+      self.tasks.externs.drop_handles(handles);
+    });
+
     self.graph.get(self.entry_id, self, node)
   }
 
@@ -178,11 +183,11 @@ impl Context {
     }
   }
 
-  fn ok<O>(&self, value: O) -> StepFuture<O> {
+  fn ok<O: Send + 'static>(&self, value: O) -> StepFuture<O> {
     future::ok(value).boxed()
   }
 
-  fn err<O>(&self, failure: Failure) -> StepFuture<O> {
+  fn err<O: Send + 'static>(&self, failure: Failure) -> StepFuture<O> {
     future::err(failure).boxed()
   }
 }
@@ -232,6 +237,14 @@ pub struct Select {
 }
 
 impl Select {
+  fn new(product: TypeConstraint, subject: Key, variants: Variants) -> Select {
+    Select {
+      selector: selectors::Select { product: product, variant_key: None },
+      subject: subject,
+      variants: variants,
+    }
+  }
+
   fn product(&self) -> &TypeConstraint {
     &self.selector.product
   }
@@ -362,7 +375,7 @@ impl Step for Select {
         context.gen_nodes(&self.subject, self.product(), &self.variants).iter()
           .map(|task_node| {
             // Attempt to get the value of each task Node, but don't fail the join if one fails.
-            context.get(&task_node).then(|r| future::ok(r))
+            context.get(task_node).then(|r| future::ok(r))
           })
           .collect::<Vec<_>>()
       );
@@ -466,11 +479,7 @@ impl Step for SelectDependencies {
     context
       .get(
         // Select the product holding the dependency list.
-        &Node::create(
-          Selector::select(self.selector.dep_product),
-          self.subject.clone(),
-          self.variants.clone()
-        )
+        &Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -530,11 +539,7 @@ impl Step for SelectProjection {
     context
       .get(
         // Request the product we need to compute the subject.
-        &Node::create(
-          Selector::select(self.selector.input_product),
-          self.subject.clone(),
-          self.variants.clone()
-        )
+        &Select::new(self.selector.input_product, self.subject.clone(), self.variants.clone())
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -548,8 +553,8 @@ impl Step for SelectProjection {
               );
             context
               .get(
-                &Node::create(
-                  Selector::select(node.selector.product),
+                &Select::new(
+                  node.selector.product,
                   context.key_for(&projected_subject),
                   node.variants.clone()
                 )
@@ -710,19 +715,18 @@ impl Node {
         }),
     }
   }
+}
 
-  pub fn step(&self, context: Context) -> StepFuture<Value> {
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| {
-      context.tasks.externs.drop_handles(handles);
-    });
+impl Step for Node {
+  type Output = NodeResult;
 
+  fn step(&self, context: Context) -> StepFuture<NodeResult> {
     match self {
-      &Node::Select(ref n) => n.step(context),
-      &Node::SelectDependencies(ref n) => n.step(context),
-      &Node::SelectLiteral(ref n) => n.step(context),
-      &Node::SelectProjection(ref n) => n.step(context),
-      &Node::Task(ref n) => n.step(context),
+      &Node::Select(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &Node::SelectDependencies(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &Node::SelectLiteral(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &Node::SelectProjection(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &Node::Task(ref n) => n.step(context).map(|v| v.into()).boxed(),
     }
   }
 }
