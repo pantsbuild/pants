@@ -272,7 +272,7 @@ pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
 
 pub type InvokeRunnable =
-  extern "C" fn(*const ExternContext, *const Function, *const Value, u64, bool) -> RunnableComplete;
+  extern "C" fn(*const ExternContext, *const Value, *const Value, u64, bool) -> RunnableComplete;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {

@@ -8,7 +8,7 @@ use futures::future::{BoxFuture, Future};
 use futures::future;
 use futures_cpupool::CpuPool;
 
-use core::{Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Key, TypeConstraint, TypeId, Value, Variants};
 use externs::Externs;
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
@@ -19,7 +19,7 @@ use tasks::Tasks;
 
 #[derive(Debug)]
 pub struct Runnable {
-  pub func: Function,
+  pub func: Value,
   pub args: Vec<Value>,
   pub cacheable: bool,
 }
@@ -574,7 +574,7 @@ impl Step for Task {
           Ok(deps) =>
             context.invoke_runnable(
               Runnable {
-                func: selector.func,
+                func: context.tasks.externs.val_for(&Key{id:selector.func.0, type_id: TypeId(0)}),
                 args: deps.iter().map(|v| context.clone_val(v)).collect(),
                 cacheable: selector.cacheable,
               }
