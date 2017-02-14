@@ -190,7 +190,7 @@ impl <'a> GraphMaker<'a> {
 
     for rule in unreachable_rules {
       let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
-      diagnostics.push(Diagnostic{subject_type: ANY_TYPE, reason:"Unreachable".to_string()});
+      diagnostics.push(Diagnostic { subject_type: ANY_TYPE, reason: "Unreachable".to_string() });
     }
 
     let unfinished_graph = RuleGraph {
@@ -273,8 +273,7 @@ impl <'a> GraphMaker<'a> {
                                      entry.subject_type(),
                                      format!("no matches for {} when resolving {}",
                                              selector_str(&self.tasks.externs, &Selector::Select(Select { product: initial_selector, variant_key: None})),
-                                             selector_str(&self.tasks.externs, selector))
-                  ); // might be better as {} with display derived
+                                             selector_str(&self.tasks.externs, selector)));
                   was_unfulfillable = true;
                   continue;
                 }
