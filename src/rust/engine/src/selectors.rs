@@ -32,22 +32,12 @@ pub struct SelectLiteral {
   pub product: TypeConstraint,
 }
 
-// NB: The `Task` selector is not user facing, and is provided for symmetry.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Task {
-  pub product: TypeConstraint,
-  pub clause: Vec<Selector>,
-  pub func: Function,
-  pub cacheable: bool,
-}
-
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Selector {
   Select(Select),
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   SelectLiteral(SelectLiteral),
-  Task(Task),
 }
 
 impl Selector {
@@ -67,7 +57,6 @@ impl Selector {
       &Selector::SelectLiteral(ref s) => &s.product,
       &Selector::SelectDependencies(ref s) => &s.product,
       &Selector::SelectProjection(ref s) => &s.product,
-      &Selector::Task(ref t) => &t.product,
     }
   }
 }

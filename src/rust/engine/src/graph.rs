@@ -501,7 +501,7 @@ impl Graph {
    * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
    * to make cycle detection cheaper.
    */
-  pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: &N) -> NodeFuture<N::Output> {
+  pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
     // First, check whether the destination already exists, and the dep is already declared.
     let dst_state_opt = {
       let inner = self.inner.read().unwrap();

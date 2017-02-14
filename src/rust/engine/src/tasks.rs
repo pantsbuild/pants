@@ -2,7 +2,16 @@ use std::collections::HashMap;
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
 use externs::Externs;
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
+
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Task {
+  pub product: TypeConstraint,
+  pub clause: Vec<Selector>,
+  pub func: Function,
+  pub cacheable: bool,
+}
 
 /**
  * Registry of tasks able to produce each type, along with a few fundamental python

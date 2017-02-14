@@ -359,10 +359,6 @@ impl <'a> GraphMaker<'a> {
                                    ],
                                    projected_rules_or_literals);
               },
-              &Selector::Task(ref select) =>{
-                // TODO, not sure what task is in this context exactly
-                panic!("Unexpected type of selector: {:?}", select)
-              }
             }
           }
         },

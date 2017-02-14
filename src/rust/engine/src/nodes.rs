@@ -14,7 +14,7 @@ use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use selectors::Selector;
 use selectors;
-use tasks::Tasks;
+use tasks::{self, Tasks};
 
 
 #[derive(Debug)]
@@ -68,7 +68,7 @@ impl Context {
               subject: subject.clone(),
               product: product.clone(),
               variants: variants.clone(),
-              selector: task.clone(),
+              task: task.clone(),
             }
           )
           .collect()
@@ -79,7 +79,7 @@ impl Context {
   /**
    * Get the future value for the given Node implementation.
    */
-  fn get<N: Step>(&self, node: &N) -> NodeFuture<N::Output> {
+  fn get<N: Step>(&self, node: N) -> NodeFuture<N::Output> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| {
       self.tasks.externs.drop_handles(handles);
@@ -372,7 +372,7 @@ impl Step for Select {
     // Else, attempt to use the configured tasks to compute the value.
     let deps_future =
       future::join_all(
-        context.gen_nodes(&self.subject, self.product(), &self.variants).iter()
+        context.gen_nodes(&self.subject, self.product(), &self.variants).into_iter()
           .map(|task_node| {
             // Attempt to get the value of each task Node, but don't fail the join if one fails.
             context.get(task_node).then(|r| future::ok(r))
@@ -434,7 +434,7 @@ pub struct SelectDependencies {
 }
 
 impl SelectDependencies {
-  fn dep_node(&self, context: &Context, dep_subject: &Value) -> Node {
+  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
@@ -444,13 +444,15 @@ impl SelectDependencies {
       // After the root has been expanded, a traversal continues with dep_product == product.
       let mut selector = self.selector.clone();
       selector.dep_product = selector.product;
-      Node::create(
-        Selector::SelectDependencies(selector),
-        dep_subject_key,
-        self.variants.clone()
+      context.get(
+        SelectDependencies {
+          subject: dep_subject_key,
+          variants: self.variants.clone(),
+          selector: selector,
+        }
       )
     } else {
-      Node::create(Selector::select(self.selector.product), dep_subject_key, self.variants.clone())
+      context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
     }
   }
 
@@ -479,7 +481,7 @@ impl Step for SelectDependencies {
     context
       .get(
         // Select the product holding the dependency list.
-        &Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
+        Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -489,7 +491,7 @@ impl Step for SelectDependencies {
               future::join_all(
                 context.project_multi(&dep_product, &node.selector.field).iter()
                   .map(|dep_subject| {
-                    context.get(&node.dep_node(&context, &dep_subject))
+                    node.get_dep(&context, &dep_subject)
                   })
                   .collect::<Vec<_>>()
               );
@@ -539,7 +541,7 @@ impl Step for SelectProjection {
     context
       .get(
         // Request the product we need to compute the subject.
-        &Select::new(self.selector.input_product, self.subject.clone(), self.variants.clone())
+        Select::new(self.selector.input_product, self.subject.clone(), self.variants.clone())
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -553,7 +555,7 @@ impl Step for SelectProjection {
               );
             context
               .get(
-                &Select::new(
+                Select::new(
                   node.selector.product,
                   context.key_for(&projected_subject),
                   node.variants.clone()
@@ -587,7 +589,41 @@ pub struct Task {
   subject: Key,
   product: TypeConstraint,
   variants: Variants,
-  selector: selectors::Task,
+  task: tasks::Task,
+}
+
+impl Task {
+  /**
+   * TODO: Can/should inline execution of all of these.
+   */
+  fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
+    match selector {
+      Selector::Select(s) =>
+        context.get(Select {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+      Selector::SelectDependencies(s) =>
+        context.get(SelectDependencies {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+      Selector::SelectProjection(s) =>
+        context.get(SelectProjection {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+      Selector::SelectLiteral(s) =>
+        context.get(SelectLiteral {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+    }
+  }
 }
 
 impl Step for Task {
@@ -596,23 +632,21 @@ impl Step for Task {
   fn step(&self, context: Context) -> StepFuture<Value> {
     let deps =
       future::join_all(
-        self.selector.clause.iter()
-          .map(|selector| {
-            context.get(&Node::create(selector.clone(), self.subject.clone(), self.variants.clone()))
-          })
+        self.task.clause.iter()
+          .map(|selector| self.get(&context, selector.clone()))
           .collect::<Vec<_>>()
       );
 
-    let selector = self.selector.clone();
+    let task = self.task.clone();
     deps
       .then(move |deps_result| {
         match deps_result {
           Ok(deps) =>
             context.invoke_runnable(
               Runnable {
-                func: selector.func,
+                func: task.func,
                 args: deps.iter().map(|v| context.clone_val(v)).collect(),
-                cacheable: selector.cacheable,
+                cacheable: task.cacheable,
               }
             ),
           Err(err) =>
@@ -645,7 +679,7 @@ impl Node {
       &Node::SelectLiteral(_) => "Literal".to_string(),
       &Node::SelectDependencies(_) => "Dependencies".to_string(),
       &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.selector.func.0)),
+      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.task.func.0)),
     }
   }
 
@@ -665,54 +699,7 @@ impl Node {
       &Node::SelectLiteral(ref s) => &s.selector.product,
       &Node::SelectDependencies(ref s) => &s.selector.product,
       &Node::SelectProjection(ref s) => &s.selector.product,
-      &Node::Task(ref t) => &t.selector.product,
-    }
-  }
-
-  pub fn selector(&self) -> Selector {
-    match self {
-      &Node::Select(ref s) => Selector::Select(s.selector.clone()),
-      &Node::SelectLiteral(ref s) => Selector::SelectLiteral(s.selector.clone()),
-      &Node::SelectDependencies(ref s) => Selector::SelectDependencies(s.selector.clone()),
-      &Node::SelectProjection(ref s) => Selector::SelectProjection(s.selector.clone()),
-      &Node::Task(ref t) => Selector::Task(t.selector.clone()),
-    }
-  }
-
-  pub fn create(selector: Selector, subject: Key, variants: Variants) -> Node {
-    match selector {
-      Selector::Select(s) =>
-        Node::Select(Select {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectLiteral(s) =>
-        // NB: Intentionally ignores subject parameter to provide a literal subject.
-        Node::SelectLiteral(SelectLiteral {
-          subject: s.subject.clone(),
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectDependencies(s) =>
-        Node::SelectDependencies(SelectDependencies {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectProjection(s) =>
-        Node::SelectProjection(SelectProjection {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::Task(t) =>
-        Node::Task(Task {
-          subject: subject,
-          product: t.product,
-          variants: variants,
-          selector: t,
-        }),
+      &Node::Task(ref t) => &t.product,
     }
   }
 }
