@@ -4,7 +4,7 @@ use std::os::raw;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
 use handles::Handle;
 
@@ -85,6 +85,10 @@ impl Externs {
 
   pub fn val_for(&self, key: &Key) -> Value {
     (self.val_for)(self.context, key)
+  }
+
+  pub fn val_for_id(&self, id: Id) -> Value {
+    self.val_for(&Key::new_with_anon_type_id(id))
   }
 
   pub fn clone_val(&self, val: &Value) -> Value {
@@ -272,7 +276,7 @@ pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
 
 pub type InvokeRunnable =
-  extern "C" fn(*const ExternContext, *const Function, *const Value, u64, bool) -> RunnableComplete;
+  extern "C" fn(*const ExternContext, *const Value, *const Value, u64, bool) -> RunnableComplete;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {
