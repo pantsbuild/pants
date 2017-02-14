@@ -38,6 +38,7 @@ use externs::{
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
+  ProjectIgnoringTypeExtern,
   SatisfiedByExtern,
   StoreListExtern,
   TypeIdBuffer,
@@ -151,6 +152,7 @@ pub extern fn scheduler_create(
   satisfied_by: SatisfiedByExtern,
   store_list: StoreListExtern,
   project: ProjectExtern,
+  project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
@@ -176,6 +178,7 @@ pub extern fn scheduler_create(
       satisfied_by,
       store_list,
       project,
+      project_ignoring_type,
       project_multi,
       create_exception,
       invoke_runnable,
@@ -432,7 +435,7 @@ pub extern fn validator_run(
   scheduler_ptr: *mut RawScheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
-) {
+) -> *const Value {
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
@@ -440,9 +443,13 @@ pub extern fn validator_run(
       let graph = graph_maker.full_graph();
 
       match graph.validate(&raw.scheduler.tasks.externs) {
-        Result::Ok(_) => {},
+        Result::Ok(_) => {
+          // returns an empty list on ok
+          Box::into_raw(Box::new(raw.scheduler.tasks.externs.store_list(vec![], false)))
+      },
         Result::Err(msg) => {
-          println!("had errors!\n{}", msg)
+          let exception = raw.scheduler.tasks.externs.create_exception(&msg);
+          Box::into_raw(Box::new(exception))
         }
       }
     })

@@ -25,6 +25,7 @@ pub struct Externs {
   satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   project: ProjectExtern,
+  project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
@@ -50,6 +51,7 @@ impl Externs {
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
     project: ProjectExtern,
+    project_ignoring_type: ProjectIgnoringTypeExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
     invoke_runnable: InvokeRunnable,
@@ -66,6 +68,7 @@ impl Externs {
       satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       project: project,
+      project_ignoring_type: project_ignoring_type,
       project_multi: project_multi,
       id_to_str: id_to_str,
       val_to_str: val_to_str,
@@ -126,6 +129,10 @@ impl Externs {
 
   pub fn project(&self, value: &Value, field: &str, type_id: &TypeId) -> Value {
     (self.project)(self.context, value, field.as_ptr(), field.len() as u64, type_id)
+  }
+
+  pub fn project_ignoring_type(&self, value: &Value, field: &str) -> Value {
+    (self.project_ignoring_type)(self.context, value, field.as_ptr(), field.len() as u64)
   }
 
   pub fn project_multi(&self, value: &Value, field: &str) -> Vec<Value> {
@@ -242,6 +249,9 @@ impl TypeIdBuffer {
     })
   }
 }
+
+pub type ProjectIgnoringTypeExtern =
+  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64) -> Value;
 
 pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64) -> ValueBuffer;
