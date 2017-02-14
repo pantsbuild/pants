@@ -5,12 +5,12 @@ use core::{Key, TypeConstraint, TypeId};
 
 use externs::Externs;
 
-use selectors::{Select, Selector, Task};
+use selectors::{Select, Selector};
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
-use tasks::Tasks;
+use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 enum Entry {

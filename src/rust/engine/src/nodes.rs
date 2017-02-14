@@ -231,22 +231,18 @@ pub trait Step: Into<Node> {
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::Select,
+  pub subject: Key,
+  pub variants: Variants,
+  pub selector: selectors::Select,
 }
 
 impl Select {
-  fn new(product: TypeConstraint, subject: Key, variants: Variants) -> Select {
+  pub fn new(product: TypeConstraint, subject: Key, variants: Variants) -> Select {
     Select {
       selector: selectors::Select { product: product, variant_key: None },
       subject: subject,
       variants: variants,
     }
-  }
-
-  fn product(&self) -> &TypeConstraint {
-    &self.selector.product
   }
 
   fn select_literal_single<'a>(
@@ -372,7 +368,7 @@ impl Step for Select {
     // Else, attempt to use the configured tasks to compute the value.
     let deps_future =
       future::join_all(
-        context.gen_nodes(&self.subject, self.product(), &self.variants).into_iter()
+        context.gen_nodes(&self.subject, &self.selector.product, &self.variants).into_iter()
           .map(|task_node| {
             // Attempt to get the value of each task Node, but don't fail the join if one fails.
             context.get(task_node).then(|r| future::ok(r))
@@ -428,12 +424,24 @@ impl From<SelectLiteral> for Node {
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::SelectDependencies,
+  pub subject: Key,
+  pub variants: Variants,
+  pub selector: selectors::SelectDependencies,
 }
 
 impl SelectDependencies {
+  pub fn new(
+    selector: selectors::SelectDependencies,
+    subject: Key,
+    variants: Variants
+  ) -> SelectDependencies {
+    SelectDependencies {
+      subject: subject,
+      variants: variants,
+      selector: selector,
+    }
+  }
+
   fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:

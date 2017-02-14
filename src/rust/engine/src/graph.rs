@@ -489,7 +489,7 @@ impl Graph {
   /**
    * If the given Node has completed, returns a clone of its state.
    */
-  pub fn peek(&self, node: &Node, externs: &Externs) -> Option<Result<NodeResult, Failure>> {
+  pub fn peek<N: Step>(&self, node: N, externs: &Externs) -> Option<Result<N::Output, Failure>> {
     let inner = self.inner.read().unwrap();
     inner.entry(node).and_then(|e| e.peek(externs))
   }

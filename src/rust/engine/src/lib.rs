@@ -46,8 +46,8 @@ use externs::{
   with_vec,
 };
 use graph::Graph;
-use nodes::{Failure, NodeResult};
-use scheduler::{Scheduler, ExecutionStat};
+use nodes::Failure;
+use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
 use rule_graph::{GraphMaker, RootSubjectTypes};
 
@@ -83,7 +83,7 @@ impl RawNode {
     externs: &Externs,
     subject: &Key,
     product: &TypeConstraint,
-    state: Option<NodeResult>,
+    state: Option<RootResult>,
   ) -> RawNode {
     let (state_tag, state_value) =
       match state {
@@ -115,7 +115,7 @@ pub struct RawNodes {
 impl RawNodes {
   fn create(
     externs: &Externs,
-    node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>
+    node_states: Vec<(&Key, &TypeConstraint, Option<RootResult>)>
   ) -> Box<RawNodes> {
     let nodes =
       node_states.into_iter()
