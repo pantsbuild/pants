@@ -120,11 +120,6 @@ class Engine(AbstractClass):
       for computed_product in maybe_list(return_value, expected_type=product):
         yield computed_product
 
-  def close(self):
-    """Shutdown this engine instance, releasing resources it was using."""
-    self._storage.close()
-    self._cache.close()
-
   def cache_stats(self):
     """Returns cache stats for the engine."""
     return self._cache.get_stats()

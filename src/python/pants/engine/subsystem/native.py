@@ -362,7 +362,7 @@ class ObjectIdMap(object):
 
   def __init__(self):
     # Objects indexed by their keys, i.e, content digests
-    self._objects = Storage.create(in_memory=True)
+    self._objects = Storage.create()
     # Memoized object Ids.
     self._id_to_key = dict()
     self._key_to_id = dict()
