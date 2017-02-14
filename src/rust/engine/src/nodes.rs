@@ -30,12 +30,10 @@ pub enum Failure {
   Throw(Value),
 }
 
-pub type NodeResult = Result<Value, Failure>;
-
-pub type StepFuture = BoxFuture<Value, Failure>;
+pub type StepFuture<T> = BoxFuture<T, Failure>;
 
 // Because multiple callers may wait on the same Node, the Future for a Node must be shareable.
-pub type NodeFuture = future::Shared<StepFuture>;
+pub type NodeFuture<T> = future::Shared<StepFuture<T>>;
 
 #[derive(Clone)]
 pub struct Context {
@@ -61,19 +59,17 @@ impl Context {
    *
    * (analogous to NodeBuilder.gen_nodes)
    */
-  fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Node> {
+  fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Task> {
     self.tasks.gen_tasks(subject.type_id(), product)
       .map(|tasks| {
         tasks.iter()
           .map(|task|
-            Node::Task(
-              Task {
-                subject: subject.clone(),
-                product: product.clone(),
-                variants: variants.clone(),
-                selector: task.clone(),
-              }
-            )
+            Task {
+              subject: subject.clone(),
+              product: product.clone(),
+              variants: variants.clone(),
+              selector: task.clone(),
+            }
           )
           .collect()
       })
@@ -81,9 +77,9 @@ impl Context {
   }
 
   /**
-   * Get the future value for the given Node.
+   * Get the future value for the given Node implementation.
    */
-  fn get(&self, node: &Node) -> NodeFuture {
+  fn get<N: Step>(&self, node: &N) -> NodeFuture<N::Output> {
     self.graph.get(self.entry_id, self, node)
   }
 
@@ -182,11 +178,11 @@ impl Context {
     }
   }
 
-  fn ok(&self, value: Value) -> StepFuture {
+  fn ok<O>(&self, value: O) -> StepFuture<O> {
     future::ok(value).boxed()
   }
 
-  fn err(&self, failure: Failure) -> StepFuture {
+  fn err<O>(&self, failure: Failure) -> StepFuture<O> {
     future::err(failure).boxed()
   }
 }
@@ -213,10 +209,11 @@ impl ContextFactory for Context {
 }
 
 /**
- * Defines executing a single step for the given context.
+ * Defines executing a cacheable/memoizable step for the given context.
  */
-trait Step {
-  fn step(&self, context: Context) -> StepFuture;
+pub trait Step: Into<Node> {
+  type Output: Into<NodeResult>;
+  fn step(&self, context: Context) -> StepFuture<Self::Output>;
 }
 
 /**
@@ -334,7 +331,9 @@ impl Select {
 }
 
 impl Step for Select {
-  fn step(&self, context: Context) -> StepFuture {
+  type Output = Value;
+
+  fn step(&self, context: Context) -> StepFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -378,6 +377,12 @@ impl Step for Select {
   }
 }
 
+impl From<Select> for Node {
+  fn from(n: Select) -> Self {
+    Node::Select(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   subject: Key,
@@ -386,8 +391,16 @@ pub struct SelectLiteral {
 }
 
 impl Step for SelectLiteral {
-  fn step(&self, context: Context) -> StepFuture {
+  type Output = Value;
+
+  fn step(&self, context: Context) -> StepFuture<Value> {
     context.ok(context.val_for(&self.selector.subject))
+  }
+}
+
+impl From<SelectLiteral> for Node {
+  fn from(n: SelectLiteral) -> Self {
+    Node::SelectLiteral(n)
   }
 }
 
@@ -445,7 +458,9 @@ impl SelectDependencies {
 }
 
 impl Step for SelectDependencies {
-  fn step(&self, context: Context) -> StepFuture {
+  type Output = Value;
+
+  fn step(&self, context: Context) -> StepFuture<Value> {
     let node = self.clone();
 
     context
@@ -493,6 +508,12 @@ impl Step for SelectDependencies {
   }
 }
 
+impl From<SelectDependencies> for Node {
+  fn from(n: SelectDependencies) -> Self {
+    Node::SelectDependencies(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   subject: Key,
@@ -501,7 +522,9 @@ pub struct SelectProjection {
 }
 
 impl Step for SelectProjection {
-  fn step(&self, context: Context) -> StepFuture {
+  type Output = Value;
+
+  fn step(&self, context: Context) -> StepFuture<Value> {
     let node = self.clone();
 
     context
@@ -548,6 +571,12 @@ impl Step for SelectProjection {
   }
 }
 
+impl From<SelectProjection> for Node {
+  fn from(n: SelectProjection) -> Self {
+    Node::SelectProjection(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   subject: Key,
@@ -557,7 +586,9 @@ pub struct Task {
 }
 
 impl Step for Task {
-  fn step(&self, context: Context) -> StepFuture {
+  type Output = Value;
+
+  fn step(&self, context: Context) -> StepFuture<Value> {
     let deps =
       future::join_all(
         self.selector.clause.iter()
@@ -584,6 +615,12 @@ impl Step for Task {
         }
       })
       .boxed()
+  }
+}
+
+impl From<Task> for Node {
+  fn from(n: Task) -> Self {
+    Node::Task(n)
   }
 }
 
@@ -674,7 +711,7 @@ impl Node {
     }
   }
 
-  pub fn step(&self, context: Context) -> StepFuture {
+  pub fn step(&self, context: Context) -> StepFuture<Value> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| {
       context.tasks.externs.drop_handles(handles);
@@ -687,5 +724,15 @@ impl Node {
       &Node::SelectProjection(ref n) => n.step(context),
       &Node::Task(ref n) => n.step(context),
     }
+  }
+}
+
+pub enum NodeResult {
+  Value(Value),
+}
+
+impl From<Value> for NodeResult {
+  fn from(v: Value) -> Self {
+    NodeResult::Value(v)
   }
 }

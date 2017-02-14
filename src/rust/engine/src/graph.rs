@@ -17,7 +17,7 @@ use futures::future;
 
 use externs::Externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, Context, ContextFactory};
+use nodes::{Failure, Node, NodeFuture, NodeResult, Step, Context, ContextFactory};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -27,7 +27,7 @@ pub type DepSet = HashSet<EntryId, FNV>;
 
 enum EntryState {
   Pending(Context, Node),
-  Started(NodeFuture),
+  Started(NodeFuture<NodeResult>),
 }
 
 type EntryStateField = Arc<epoch::Atomic<EntryState>>;
@@ -37,11 +37,11 @@ type EntryStateField = Arc<epoch::Atomic<EntryState>>;
  * to allow Nodes to start lazily, outside of the graph lock.
  */
 trait EntryStateGetter {
-  fn get(&self) -> NodeFuture;
+  fn get<N: Step>(&self) -> NodeFuture<N::Output>;
 }
 
 impl EntryStateGetter for EntryStateField {
-  fn get(&self) -> NodeFuture {
+  fn get<N: Step>(&self) -> NodeFuture<N::Output> {
     loop {
       // Observe the current state.
       let guard = epoch::pin();
@@ -172,12 +172,11 @@ struct InnerGraph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
-  cyclic_singleton: NodeFuture,
 }
 
 impl InnerGraph {
-  fn cyclic_singleton(&self) -> NodeFuture {
-    self.cyclic_singleton.clone()
+  fn cyclic<T>(&self) -> NodeFuture<T> {
+    future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed())
   }
 
   fn entry(&self, node: &Node) -> Option<&Entry> {
@@ -476,8 +475,6 @@ impl Graph {
         id_generator: 0,
         nodes: HashMap::default(),
         entries: HashMap::default(),
-        cyclic_singleton:
-          future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()),
       };
     Graph {
       inner: RwLock::new(inner),
@@ -504,7 +501,7 @@ impl Graph {
    * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
    * to make cycle detection cheaper.
    */
-  pub fn get(&self, src_id: EntryId, context: &ContextFactory, dst_node: &Node) -> NodeFuture {
+  pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: &Node) -> NodeFuture<N::Output> {
     // First, check whether the destination already exists, and the dep is already declared.
     let dst_state_opt = {
       let inner = self.inner.read().unwrap();
@@ -515,7 +512,7 @@ impl Graph {
           Some(dst_entry.state())
         } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
           // Declared but cyclic.
-          return inner.cyclic_singleton();
+          return inner.cyclic();
         } else {
           // Exists, but isn't declared.
           None
@@ -554,10 +551,9 @@ impl Graph {
   }
 
   /**
-   * Create the given Node. If it does not already exist, this will cause it to begin executing
-   * immediately.
+   * Create the given Node if it does not already exist.
    */
-  pub fn create(&self, node: Node, context: &ContextFactory) -> NodeFuture {
+  pub fn create<N: Step>(&self, node: Node, context: &ContextFactory) -> NodeFuture<N::Output> {
     // Initialize the state while under the lock...
     let state = {
       let mut inner = self.inner.write().unwrap();
