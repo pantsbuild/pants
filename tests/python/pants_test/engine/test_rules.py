@@ -141,7 +141,7 @@ class RulesetValidatorTest(unittest.TestCase):
     rules = [(A, (Select(B), Select(C)), noop)]
     validator = self.create_validator({}, tuple(), {SubA}, rules)
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
@@ -153,19 +153,19 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
     rules = [(A, (Select(B),), noop)]
-    validator = self.create_validator({}, tuple(), {B, }, rules)
+    validator = self.create_validator({}, tuple(), {B}, rules)
 
-    validator.validate()
+    validator.assert_ruleset_valid()
 
   def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
     rules = [
       (A, (Select(B),), noop),
       (B, (Select(SubA),), noop)
     ]
-    validator = self.create_validator({}, tuple(), {C, }, rules)
+    validator = self.create_validator({}, tuple(), {C}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
                                         (Exactly(A), (Select(Exactly(B)),), noop):
@@ -185,7 +185,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
     validator = self.create_validator({'goal-name': AGoal}, tuple(), {SubA}, rules)
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing("no task for product used by goal \"goal-name\": AGoal",
                                     str(cm.exception))
@@ -197,7 +197,7 @@ class RulesetValidatorTest(unittest.TestCase):
     ]
     validator = self.create_validator({}, tuple(), {SubA}, rules)
 
-    validator.validate()
+    validator.assert_ruleset_valid()
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_intrinsic(self):
     rules = [
@@ -206,10 +206,10 @@ class RulesetValidatorTest(unittest.TestCase):
     intrinsics = [
       (B, C, noop),
     ]
-    validator = self.create_validator({}, intrinsics, {A,}, rules)
+    validator = self.create_validator({}, intrinsics, {A}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     # This error message could note near matches like the intrinsic.
     self.assert_equal_with_printing(dedent("""
@@ -226,10 +226,10 @@ class RulesetValidatorTest(unittest.TestCase):
     intrinsics = [
       (B, C, noop),
     ]
-    validator = self.create_validator({}, intrinsics, {A, }, rules)
+    validator = self.create_validator({}, intrinsics, {A}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                              Rules with errors: 1
@@ -249,7 +249,7 @@ class RulesetValidatorTest(unittest.TestCase):
     validator = self.create_validator({}, tuple(), _suba_root_subject_types, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
@@ -267,7 +267,7 @@ class RulesetValidatorTest(unittest.TestCase):
     validator = self.create_validator({}, tuple(), _suba_root_subject_types, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 1
@@ -285,7 +285,7 @@ class RulesetValidatorTest(unittest.TestCase):
     validator = self.create_validator({}, tuple(), _suba_root_subject_types, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1

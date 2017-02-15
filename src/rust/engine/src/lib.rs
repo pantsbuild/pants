@@ -435,7 +435,7 @@ pub extern fn validator_run(
   scheduler_ptr: *mut RawScheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
-) -> *const Value {
+) -> Value {
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
@@ -444,12 +444,10 @@ pub extern fn validator_run(
 
       match graph.validate(&raw.scheduler.tasks.externs) {
         Result::Ok(_) => {
-          // returns an empty list on ok
-          Box::into_raw(Box::new(raw.scheduler.tasks.externs.store_list(vec![], false)))
+          raw.scheduler.tasks.externs.store_list(vec![], false)
       },
         Result::Err(msg) => {
-          let exception = raw.scheduler.tasks.externs.create_exception(&msg);
-          Box::into_raw(Box::new(exception))
+          raw.scheduler.tasks.externs.create_exception(&msg)
         }
       }
     })

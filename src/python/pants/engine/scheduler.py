@@ -62,18 +62,14 @@ class WrappedNativeScheduler(object):
         for line in fd.readlines():
           yield line.rstrip()
 
-  def validate(self):
-    self.assert_ruleset_valid()
-
   def assert_ruleset_valid(self):
     listed = list(TypeId(self._to_id(t)) for t in self.root_subject_types)
 
     raw_value = self._native.lib.validator_run(self._scheduler, listed, len(listed))
     value = self._from_value(raw_value)
+
     if isinstance(value, Exception):
       raise ValueError(str(value))
-    else:
-      pass # validation success
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)

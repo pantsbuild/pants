@@ -168,7 +168,7 @@ _FFI.cdef(
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
-    Value* validator_run(RawScheduler*, TypeId*, uint64_t);
+    Value validator_run(RawScheduler*, TypeId*, uint64_t);
 
     void nodes_destroy(RawNodes*);
     '''
