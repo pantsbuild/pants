@@ -30,10 +30,7 @@ pub enum Failure {
   Throw(Value),
 }
 
-pub type StepFuture<T> = BoxFuture<T, Failure>;
-
-// Because multiple callers may wait on the same Node, the Future for a Node must be shareable.
-pub type NodeFuture<T> = future::Shared<StepFuture<T>>;
+pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
 #[derive(Clone)]
 pub struct Context {
@@ -113,10 +110,6 @@ impl Context {
     externs::val_for(key)
   }
 
-  fn clone_val(&self, val: &Value) -> Value {
-    externs::clone_val(val)
-  }
-
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
@@ -158,15 +151,12 @@ impl Context {
   }
 
   /**
-   * A helper to take ownership of the given Failure, while indicating that the value
-   * represented by the Failure was an optional value.
+   * A helper to indicate that the value represented by the Failure was an optional value.
    */
-  fn was_optional(&self, failure: future::SharedError<Failure>, msg: &'static str) -> Failure {
-    match *failure {
-      Failure::Noop(..) =>
-        Failure::Noop(msg, None),
-      Failure::Throw(ref msg) =>
-        Failure::Throw(self.clone_val(msg)),
+  fn was_optional(&self, failure: Failure, msg: &'static str) -> Failure {
+    match failure {
+      Failure::Noop(..) => Failure::Noop(msg, None),
+      f => f,
     }
   }
 
@@ -174,20 +164,18 @@ impl Context {
    * A helper to take ownership of the given Failure, while indicating that the value
    * represented by the Failure was required, and thus fatal if not present.
    */
-  fn was_required(&self, failure: future::SharedError<Failure>) -> Failure {
-    match *failure {
-      Failure::Noop(..) =>
-        self.throw("No source of required dependencies"),
-      Failure::Throw(ref msg) =>
-        Failure::Throw(self.clone_val(msg)),
+  fn was_required(&self, failure: Failure) -> Failure {
+    match failure {
+      Failure::Noop(..) => self.throw("No source of required dependencies"),
+      f => f,
     }
   }
 
-  fn ok<O: Send + 'static>(&self, value: O) -> StepFuture<O> {
+  fn ok<O: Send + 'static>(&self, value: O) -> NodeFuture<O> {
     future::ok(value).boxed()
   }
 
-  fn err<O: Send + 'static>(&self, failure: Failure) -> StepFuture<O> {
+  fn err<O: Send + 'static>(&self, failure: Failure) -> NodeFuture<O> {
     future::err(failure).boxed()
   }
 }
@@ -225,7 +213,7 @@ impl ContextFactory for Context {
 pub trait Step: Into<Node> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
-  fn step(&self, context: Context) -> StepFuture<Self::Output>;
+  fn step(&self, context: Context) -> NodeFuture<Self::Output>;
 }
 
 /**
@@ -305,23 +293,23 @@ impl Select {
   fn choose_task_result(
     &self,
     context: Context,
-    results: Vec<Result<future::SharedItem<Value>, future::SharedError<Failure>>>,
+    results: Vec<Result<Value, Failure>>,
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
     let mut matches = Vec::new();
     for result in results {
       match result {
         Ok(ref value) => {
-          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
+          if let Some(v) = self.select_literal(&context, value.clone(), variant_value) {
             matches.push(v);
           }
         },
         Err(err) => {
-          match *err {
+          match err {
             Failure::Noop(_, _) =>
               continue,
-            Failure::Throw(ref msg) =>
-              return Err(Failure::Throw(context.clone_val(msg))),
+            f @ Failure::Throw(_) =>
+              return Err(f),
           }
         },
       }
@@ -349,7 +337,7 @@ impl Select {
 impl Step for Select {
   type Output = Value;
 
-  fn step(&self, context: Context) -> StepFuture<Value> {
+  fn step(&self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -409,7 +397,7 @@ pub struct SelectLiteral {
 impl Step for SelectLiteral {
   type Output = Value;
 
-  fn step(&self, context: Context) -> StepFuture<Value> {
+  fn step(&self, context: Context) -> NodeFuture<Value> {
     context.ok(context.val_for(&self.selector.subject))
   }
 }
@@ -490,7 +478,7 @@ impl SelectDependencies {
 impl Step for SelectDependencies {
   type Output = Value;
 
-  fn step(&self, context: Context) -> StepFuture<Value> {
+  fn step(&self, context: Context) -> NodeFuture<Value> {
     let node = self.clone();
 
     context
@@ -515,10 +503,7 @@ impl Step for SelectDependencies {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    // TODO: cloning to go from a `SharedValue` list to a list of values...
-                    // there ought to be a better way.
-                    let dv: Vec<Value> = dep_values.iter().map(|v| context.clone_val(v)).collect();
-                    Ok(node.store(&context, &dep_product, dv.iter().collect()))
+                    Ok(node.store(&context, &dep_product, dep_values.iter().collect()))
                   },
                   Err(failure) =>
                     Err(context.was_required(failure)),
@@ -550,7 +535,7 @@ pub struct SelectProjection {
 impl Step for SelectProjection {
   type Output = Value;
 
-  fn step(&self, context: Context) -> StepFuture<Value> {
+  fn step(&self, context: Context) -> NodeFuture<Value> {
     let node = self.clone();
 
     context
@@ -579,7 +564,7 @@ impl Step for SelectProjection {
               .then(move |output_res| {
                 // If the output product is available, return it.
                 match output_res {
-                  Ok(output) => Ok(context.clone_val(&output)),
+                  Ok(output) => Ok(output),
                   Err(failure) => Err(context.was_required(failure)),
                 }
               })
@@ -644,7 +629,7 @@ impl Task {
 impl Step for Task {
   type Output = Value;
 
-  fn step(&self, context: Context) -> StepFuture<Value> {
+  fn step(&self, context: Context) -> NodeFuture<Value> {
     let deps =
       future::join_all(
         self.task.clause.iter()
@@ -660,7 +645,7 @@ impl Step for Task {
             context.invoke_runnable(
               Runnable {
                 func: task.func,
-                args: deps.iter().map(|v| context.clone_val(v)).collect(),
+                args: deps.iter().map(|v| v.clone()).collect(),
                 cacheable: task.cacheable,
               }
             ),
@@ -722,7 +707,7 @@ impl Node {
 impl Step for Node {
   type Output = NodeResult;
 
-  fn step(&self, context: Context) -> StepFuture<NodeResult> {
+  fn step(&self, context: Context) -> NodeFuture<NodeResult> {
     match self {
       &Node::Select(ref n) => n.step(context).map(|v| v.into()).boxed(),
       &Node::SelectDependencies(ref n) => n.step(context).map(|v| v.into()).boxed(),
@@ -736,14 +721,6 @@ impl Step for Node {
 #[derive(Clone, Debug)]
 pub enum NodeResult {
   Value(Value),
-}
-
-impl NodeResult {
-  pub fn clone(&self) -> NodeResult {
-    match self {
-      &NodeResult::Value(ref v) => NodeResult::Value(externs::clone_val(v)),
-    }
-  }
 }
 
 impl From<Value> for NodeResult {

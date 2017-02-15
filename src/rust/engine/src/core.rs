@@ -104,9 +104,8 @@ impl Key {
  * Represents a handle to a python object, explicitly without equality or hashing. Whenever
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.
  *
- * Additionally, since a Value corresponds one-to-one with a Python CFFI handle, Value does not
- * directly implement Copy or Clone. Instead, there is an explicit extern `clone_value` that calls
- * back to Python to clone the underlying CFFI handle.
+ * Value implements Clone by calling out to a python extern `clone_val` which clones the
+ * underlying CFFI handle.
  */
 #[repr(C)]
 pub struct Value {

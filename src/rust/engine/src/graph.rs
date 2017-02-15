@@ -26,7 +26,7 @@ pub type DepSet = HashSet<EntryId, FNV>;
 
 enum EntryState {
   Pending(Context, Node),
-  Started(NodeFuture<NodeResult>),
+  Started(future::Shared<NodeFuture<NodeResult>>),
 }
 
 type EntryStateField = Arc<epoch::Atomic<EntryState>>;
@@ -37,20 +37,17 @@ type EntryStateField = Arc<epoch::Atomic<EntryState>>;
  */
 trait EntryStateGetter {
   fn get<N: Step>(&self) -> NodeFuture<N::Output>;
-  fn get_raw(&self) -> NodeFuture<NodeResult>;
+  fn get_raw(&self) -> future::Shared<NodeFuture<NodeResult>>;
 }
 
 impl EntryStateGetter for EntryStateField {
   fn get<N: Step>(&self) -> NodeFuture<N::Output> {
     self.get_raw()
       .then(|node_result| Entry::unwrap::<N>(node_result))
-      // TODO: reboxing/sharing here is unnecessary. Since we've forced the clone, don't need
-      // to claim that this is shared any longer.
       .boxed()
-      .shared()
   }
 
-  fn get_raw(&self) -> NodeFuture<NodeResult> {
+  fn get_raw(&self) -> future::Shared<NodeFuture<NodeResult>> {
     loop {
       // Observe the current state.
       let guard = epoch::pin();
@@ -191,7 +188,7 @@ struct InnerGraph {
 
 impl InnerGraph {
   fn cyclic<T: Send + 'static>(&self) -> NodeFuture<T> {
-    future::Shared::new(future::err(Failure::Noop("Dep would be cyclic.", None)).boxed())
+    future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()
   }
 
   fn entry(&self, node: &Node) -> Option<&Entry> {
