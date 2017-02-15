@@ -1,4 +1,7 @@
-use core::{Field, Function, Key, TypeConstraint, TypeId};
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+use core::{Field, Key, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -30,15 +33,6 @@ pub struct SelectProjection {
 pub struct SelectLiteral {
   pub subject: Key,
   pub product: TypeConstraint,
-}
-
-// NB: The `Task` selector is not user facing, and is provided for symmetry.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Task {
-  pub product: TypeConstraint,
-  pub clause: Vec<Selector>,
-  pub func: Function,
-  pub cacheable: bool,
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

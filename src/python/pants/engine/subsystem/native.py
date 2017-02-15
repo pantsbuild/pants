@@ -117,23 +117,25 @@ _FFI.cdef(
       // ignore them because we never have collections of this type.
     } RawNodes;
 
-    RawScheduler* scheduler_create(ExternContext*,
-                                   extern_log,
-                                   extern_key_for,
-                                   extern_val_for,
-                                   extern_clone_val,
-                                   extern_drop_handles,
-                                   extern_id_to_str,
-                                   extern_val_to_str,
-                                   extern_satisfied_by,
-                                   extern_store_list,
-                                   extern_store_bytes,
-                                   extern_lift_bytes,
-                                   extern_project,
-                                   extern_project_multi,
-                                   extern_create_exception,
-                                   extern_invoke_runnable,
-                                   Function,
+    void externs_set(ExternContext*,
+                     extern_log,
+                     extern_key_for,
+                     extern_val_for,
+                     extern_clone_val,
+                     extern_drop_handles,
+                     extern_id_to_str,
+                     extern_val_to_str,
+                     extern_satisfied_by,
+                     extern_store_list,
+                     extern_store_bytes,
+                     extern_lift_bytes,
+                     extern_project,
+                     extern_project_multi,
+                     extern_create_exception,
+                     extern_invoke_runnable,
+                     TypeId);
+
+    RawScheduler* scheduler_create(Function,
                                    Function,
                                    Function,
                                    Function,
@@ -543,7 +545,28 @@ class Native(object):
   def context(self):
     # We statically initialize a ExternContext to correspond to the queue of dropped
     # Handles that the native code maintains.
-    return _FFI.init_once(ExternContext, 'ExternContext singleton')
+    def init_externs():
+      context = ExternContext()
+      self.lib.externs_set(context.handle,
+                           extern_log,
+                           extern_key_for,
+                           extern_val_for,
+                           extern_clone_val,
+                           extern_drop_handles,
+                           extern_id_to_str,
+                           extern_val_to_str,
+                           extern_satisfied_by,
+                           extern_store_list,
+                           extern_store_bytes,
+                           extern_lift_bytes,
+                           extern_project,
+                           extern_project_multi,
+                           extern_create_exception,
+                           extern_invoke_runnable,
+                           TypeId(context.to_id(str)))
+      return context
+
+    return _FFI.init_once(init_externs, 'ExternContext singleton')
 
   def new(self, cdecl, init):
     return _FFI.new(cdecl, init)
@@ -586,24 +609,6 @@ class Native(object):
 
     scheduler =\
       self.lib.scheduler_create(
-        # Context.
-        self.context.handle,
-        # Externs.
-        extern_log,
-        extern_key_for,
-        extern_val_for,
-        extern_clone_val,
-        extern_drop_handles,
-        extern_id_to_str,
-        extern_val_to_str,
-        extern_satisfied_by,
-        extern_store_list,
-        extern_store_bytes,
-        extern_lift_bytes,
-        extern_project,
-        extern_project_multi,
-        extern_create_exception,
-        extern_invoke_runnable,
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_file_content)),

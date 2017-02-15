@@ -1,3 +1,5 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::io;
 use std::path::Path;
@@ -6,11 +8,12 @@ use std::sync::Arc;
 use futures::future::{self, Future};
 
 use context::Core;
-use core::{Field, Key, TypeConstraint, TypeId};
-use externs::LogLevel;
-use graph::EntryId;
-use nodes::{Node, NodeResult, Context, ContextFactory};
-use selectors::{Selector, SelectDependencies};
+use core::{Field, Key, TypeConstraint, TypeId, Value};
+use externs::{self, LogLevel};
+use graph::{EntryId, Graph};
+use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies};
+use selectors;
+use tasks::Tasks;
 
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
@@ -18,10 +21,24 @@ use selectors::{Selector, SelectDependencies};
 pub struct Scheduler {
   pub core: Arc<Core>,
   // Initial set of roots for the execution, in the order they were declared.
-  roots: Vec<Node>,
+  roots: Vec<Root>,
 }
 
 impl Scheduler {
+  /**
+   * Roots are limited to either `SelectDependencies` and `Select`, which are known to
+   * produce Values. But this method exists to satisfy Graph APIs which only need instances
+   * of the NodeKey enum.
+   */
+  fn root_nodes(&self) -> Vec<NodeKey> {
+    self.roots.iter()
+      .map(|r| match r {
+        &Root::Select(ref s) => s.clone().into(),
+        &Root::SelectDependencies(ref s) => s.clone().into(),
+      })
+      .collect()
+  }
+
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
@@ -33,15 +50,12 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.core.graph.visualize(&self.roots, path, &self.core.externs)
+    self.core.graph.visualize(&self.roots, path)
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
-    for root in &self.roots {
-      let result = self.core.graph.trace(&root, path, &self.core.externs);
-      if result.is_err() {
-        return result;
-      }
+    for root in self.root_nodes() {
+      self.core.graph.trace(&root, path)?;
     }
     Ok(())
   }
@@ -50,16 +64,21 @@ impl Scheduler {
     self.roots.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<NodeResult>)> {
+  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<RootResult>)> {
     self.roots.iter()
-      .map(|root| {
-        (root.subject(), root.product(), self.core.graph.peek(root, &self.core.externs))
+      .map(|root| match root {
+        &Root::Select(ref s) =>
+          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
+        &Root::SelectDependencies(ref s) =>
+          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
       })
       .collect()
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
-    self.add_root(Node::create(Selector::select(product), subject, Default::default()));
+    self.roots.push(
+      Root::Select(Select::new(product, subject, Default::default()))
+    );
   }
 
   pub fn add_root_select_dependencies(
@@ -71,22 +90,21 @@ impl Scheduler {
     field_types: Vec<TypeId>,
     transitive: bool,
   ) {
-    self.add_root(
-      Node::create(
-        Selector::SelectDependencies(
-          SelectDependencies { product: product,
-                               dep_product: dep_product,
-                               field: field,
-                               field_types: field_types,
-                               transitive: transitive }),
-        subject,
-        Default::default(),
+    self.roots.push(
+      Root::SelectDependencies(
+        SelectDependencies::new(
+          selectors::SelectDependencies {
+            product: product,
+            dep_product: dep_product,
+            field: field,
+            field_types: field_types,
+            transitive: transitive
+          },
+          subject,
+          Default::default(),
+        )
       )
     );
-  }
-
-  fn add_root(&mut self, node: Node) {
-    self.roots.push(node.clone());
   }
 
   /**
@@ -98,10 +116,10 @@ impl Scheduler {
     let scheduling_iterations = 0;
 
     // Bootstrap tasks for the roots, and then wait for all of them.
-    self.core.externs.log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
+    externs::log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
     let roots_res =
       future::join_all(
-        self.roots.iter()
+        self.root_nodes().into_iter()
           .map(|root| {
             self.core.graph.create(root.clone(), &self.core)
               .then::<_, Result<(), ()>>(|_| Ok(()))
@@ -119,6 +137,16 @@ impl Scheduler {
     }
   }
 }
+
+/**
+ * Root requests are limited to Selectors that produce (python) Values.
+ */
+enum Root {
+  Select(Select),
+  SelectDependencies(SelectDependencies),
+}
+
+pub type RootResult = Result<Value, Failure>;
 
 impl ContextFactory for Arc<Core> {
   fn create(&self, entry_id: EntryId) -> Context {

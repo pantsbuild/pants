@@ -6,9 +6,9 @@ use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
 use core::{ANY_TYPE, Key, TypeConstraint, TypeId};
-use externs::Externs;
-use selectors::{Select, Selector, Task};
-use tasks::Tasks;
+use externs;
+use selectors::{Select, Selector};
+use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 enum Entry {
@@ -148,15 +148,13 @@ pub struct Diagnostic {
 // to be found statically rather than dynamically.
 pub struct GraphMaker<'t, 'e> {
   tasks: &'t Tasks,
-  externs: &'e Externs,
   root_subject_types: RootSubjectTypes
 }
 
 impl <'t, 'e> GraphMaker<'t, 'e> {
-  pub fn new(tasks: &'t Tasks, externs: &'e Externs, root_subject_types: RootSubjectTypes) -> GraphMaker<'t, 'e> {
+  pub fn new(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker<'t, 'e> {
     GraphMaker {
       tasks: tasks,
-      externs: externs,
       root_subject_types: root_subject_types
     }
   }
@@ -205,20 +203,6 @@ impl <'t, 'e> GraphMaker<'t, 'e> {
     self._remove_unfulfillable_rules_and_dependents(unfinished_graph)
   }
 
-  fn rhs_for_select(&self, subject_type: TypeId, select: &Select) -> Entries {
-    if self.externs.satisfied_by(&select.product, &subject_type) {
-      // NB a matching subject is always picked first
-      vec![Entry::new_subject_is_product(subject_type)]
-    } else {
-      match self.tasks.gen_tasks(&subject_type, &select.product) {
-        Some(ref matching_tasks) => {
-          matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t) ).collect()
-        }
-        None => vec![]
-      }
-    }
-  }
-
   fn _construct_graph(&self,
                       beginning_rule: RootEntry,
                       mut root_rule_dependency_edges: RootRuleDependencyEdges,
@@ -250,8 +234,9 @@ impl <'t, 'e> GraphMaker<'t, 'e> {
             match selector {
               &Selector::Select(ref select) =>{
                 // TODO, handle the Addresses / Variants case
-                let rules_or_literals_for_selector = self.rhs_for_select(entry.subject_type(),
-                                                                         &select);
+                let rules_or_literals_for_selector = rhs_for_select(&self.tasks,
+                                                                    entry.subject_type(),
+                                                                    &select);
                 if rules_or_literals_for_selector.is_empty() {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
@@ -281,8 +266,9 @@ impl <'t, 'e> GraphMaker<'t, 'e> {
               },
               &Selector::SelectDependencies(ref select) => {
                 let initial_selector = select.dep_product;
-                let initial_rules_or_literals = self.rhs_for_select(entry.subject_type(),
-                                                                    &Select { product: initial_selector, variant_key: None });
+                let initial_rules_or_literals = rhs_for_select(&self.tasks,
+                                                               entry.subject_type(),
+                                                               &Select { product: initial_selector, variant_key: None });
                 if initial_rules_or_literals.is_empty() {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
@@ -293,8 +279,9 @@ impl <'t, 'e> GraphMaker<'t, 'e> {
                 }
                 let mut rules_for_dependencies = vec![];
                 for field_type in &select.field_types {
-                  let rules_for_field_subjects = self.rhs_for_select(field_type.clone(),
-                                                                     &Select { product: select.product, variant_key: None });
+                  let rules_for_field_subjects = rhs_for_select(&self.tasks,
+                                                                field_type.clone(),
+                                                                &Select { product: select.product, variant_key: None });
                   rules_for_dependencies.extend(rules_for_field_subjects);
                 }
                 if rules_for_dependencies.is_empty() {
@@ -326,8 +313,9 @@ impl <'t, 'e> GraphMaker<'t, 'e> {
               },
               &Selector::SelectProjection(ref select) =>{
                 let initial_selector = select.input_product;
-                let initial_rules_or_literals = self.rhs_for_select(entry.subject_type(),
-                                                                    &Select { product: initial_selector, variant_key: None });
+                let initial_rules_or_literals = rhs_for_select(&self.tasks,
+                                                               entry.subject_type(),
+                                                               &Select { product: initial_selector, variant_key: None });
                 if initial_rules_or_literals.is_empty() {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
@@ -337,8 +325,9 @@ impl <'t, 'e> GraphMaker<'t, 'e> {
                   continue
                 }
 
-                let projected_rules_or_literals = self.rhs_for_select(select.projected_subject,
-                                                                      &Select { product: select.product, variant_key: None });
+                let projected_rules_or_literals = rhs_for_select(&self.tasks,
+                                                                 select.projected_subject,
+                                                                 &Select { product: select.product, variant_key: None });
                 if projected_rules_or_literals.is_empty() {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
@@ -463,15 +452,15 @@ pub struct RuleGraph {
 }
 
 impl RuleGraph {
-  pub fn validate(&self, externs: &Externs) -> Result<(), String> {
+  pub fn validate(&self) -> Result<(), String> {
     if self.has_errors() {
-      Result::Err(self.build_error_msg(externs))
+      Result::Err(self.build_error_msg())
     } else {
       Result::Ok(())
     }
   }
 
-  fn build_error_msg(&self, externs: &Externs) -> String {
+  fn build_error_msg(&self) -> String {
     // TODO the rule display is really unfriendly right now. Next up should be to improve it.
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
 
@@ -495,7 +484,7 @@ impl RuleGraph {
       }
     }
     let mut msgs: Vec<String> = collated_errors.into_iter()
-      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(externs, rule, subject_types_by_reasons))
+      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(rule, subject_types_by_reasons))
       .collect();
     msgs.sort();
 
@@ -601,6 +590,20 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
   }
 }
 
+fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
+  if externs::satisfied_by(&select.product, &subject_type) {
+    // NB a matching subject is always picked first
+    vec![Entry::new_subject_is_product(subject_type)]
+  } else {
+    match tasks.gen_tasks(&subject_type, &select.product) {
+      Some(ref matching_tasks) => {
+        matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t)).collect()
+      }
+      None => vec![]
+    }
+  }
+}
+
 fn mark_unfulfillable(unfulfillable_rules: &mut UnfulfillableRuleMap, entry: &Entry, subject_type: TypeId, reason: String) {
   // instead of being modifiable, this could return a UnfulfillableRuleMap that then gets merged.
   let ref mut diagnostics_for_entry = *unfulfillable_rules.entry(entry.clone()).or_insert(vec![]);
@@ -648,11 +651,11 @@ fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
   }
 }
 
-fn format_msgs(externs: &Externs, rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
+fn format_msgs(rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
   let mut errors: Vec<_> = subject_types_by_reasons.iter().map(|(reason, subject_types)|
     format!("{} with subject types: {}",
             reason,
-            subject_types.iter().map(|t| externs.id_to_str(t.0)).collect::<Vec<String>>().join(", "))
+            subject_types.iter().map(|t| externs::id_to_str(t.0)).collect::<Vec<String>>().join(", "))
   ).collect();
   errors.sort();
   format!("{:?}: {}", rule, errors.join("\n    "))

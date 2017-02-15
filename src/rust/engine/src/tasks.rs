@@ -1,7 +1,19 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::collections::HashMap;
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
+
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Task {
+  pub product: TypeConstraint,
+  pub clause: Vec<Selector>,
+  pub func: Function,
+  pub cacheable: bool,
+}
 
 /**
  * Registry of tasks able to produce each type, along with a few fundamental python

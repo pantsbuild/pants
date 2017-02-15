@@ -57,9 +57,10 @@ use externs::{
   ValToStrExtern,
   with_vec,
 };
-use nodes::{Failure, NodeResult};
+use graph::Graph;
+use nodes::Failure;
 use rule_graph::{GraphMaker, RootSubjectTypes};
-use scheduler::{Scheduler, ExecutionStat};
+use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
 use types::Types;
 
@@ -91,22 +92,17 @@ pub struct RawNode {
 }
 
 impl RawNode {
-  fn create(
-    externs: &Externs,
-    subject: &Key,
-    product: &TypeConstraint,
-    state: Option<NodeResult>,
-  ) -> RawNode {
+  fn create(subject: &Key, product: &TypeConstraint, state: Option<RootResult>) -> RawNode {
     let (state_tag, state_value) =
       match state {
         None =>
-          (RawStateTag::Empty as u8, externs.create_exception("No value")),
+          (RawStateTag::Empty as u8, externs::create_exception("No value")),
         Some(Ok(v)) =>
           (RawStateTag::Return as u8, v),
         Some(Err(Failure::Throw(msg))) =>
           (RawStateTag::Throw as u8, msg),
         Some(Err(Failure::Noop(msg, _))) =>
-          (RawStateTag::Noop as u8, externs.create_exception(msg)),
+          (RawStateTag::Noop as u8, externs::create_exception(msg)),
       };
 
     RawNode {
@@ -125,14 +121,11 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn create(
-    externs: &Externs,
-    node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>
-  ) -> Box<RawNodes> {
+  fn create(node_states: Vec<(&Key, &TypeConstraint, Option<RootResult>)>) -> Box<RawNodes> {
     let nodes =
       node_states.into_iter()
         .map(|(subject, product, state)|
-          RawNode::create(externs, subject, product, state)
+          RawNode::create(subject, product, state)
         )
         .collect();
     let mut raw_nodes =
@@ -151,7 +144,7 @@ impl RawNodes {
 }
 
 #[no_mangle]
-pub extern fn scheduler_create(
+pub extern fn externs_set(
   ext_context: *const ExternContext,
   log: LogExtern,
   key_for: KeyForExtern,
@@ -168,6 +161,33 @@ pub extern fn scheduler_create(
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
+  py_str_type: TypeId,
+) {
+  externs::set_externs(
+    Externs::new(
+      ext_context,
+      log,
+      key_for,
+      val_for,
+      clone_val,
+      drop_handles,
+      id_to_str,
+      val_to_str,
+      satisfied_by,
+      store_list,
+      store_bytes,
+      lift_bytes,
+      project,
+      project_multi,
+      create_exception,
+      invoke_runnable,
+      py_str_type,
+    )
+  );
+}
+
+#[no_mangle]
+pub extern fn scheduler_create(
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
@@ -223,25 +243,6 @@ pub extern fn scheduler_create(
               string: type_string,
               bytes: type_bytes,
             },
-            Externs::new(
-              ext_context,
-              log,
-              key_for,
-              val_for,
-              clone_val,
-              drop_handles,
-              id_to_str,
-              val_to_str,
-              satisfied_by,
-              store_list,
-              store_bytes,
-              lift_bytes,
-              project,
-              project_multi,
-              create_exception,
-              invoke_runnable,
-              type_string,
-            ),
             // TODO: Pass build_root and ignore patterns as argument.
             PathBuf::from("."),
             vec![
@@ -324,12 +325,7 @@ pub extern fn execution_roots(
   scheduler_ptr: *mut RawScheduler,
 ) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |raw| {
-    Box::into_raw(
-      RawNodes::create(
-        &raw.scheduler.core.externs,
-        raw.scheduler.root_states()
-      )
-    )
+    Box::into_raw(RawNodes::create(raw.scheduler.root_states()))
   })
 }
 
@@ -502,7 +498,7 @@ pub extern fn validator_run(
                                         RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
 
-      match graph.validate(&raw.scheduler.core.externs) {
+      match graph.validate() {
         Result::Ok(_) => {},
         Result::Err(msg) => {
           println!("had errors!\n{}", msg)
