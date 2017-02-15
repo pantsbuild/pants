@@ -10,6 +10,7 @@ import logging
 from abc import abstractmethod
 
 from pants.util.meta import AbstractClass
+from pants.base.deprecated import deprecated
 
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,9 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
   :API: public
   """
 
+  @deprecated('1.5.0.dev0',
+              'The information that was previously included in the fingerprint by '
+              'TaskIdentityFingerprintStrategy is now included by default in all Tasks.')
   def __init__(self, task):
     self._task = task
 

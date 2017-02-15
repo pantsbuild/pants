@@ -13,7 +13,6 @@ from hashlib import sha1
 from itertools import repeat
 
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
@@ -179,12 +178,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     super(TaskBase, self).__init__()
     self.context = context
     self._workdir = workdir
-    # TODO: It would be nice to use self.get_options().cache_key_gen_version here, because then
-    # we could have a separate value for each scope if we really wanted to. However we can't
-    # access per-task options in Task.__init__ because GroupTask.__init__ calls it with the
-    # group task's scope, which isn't currently in the known scopes we generate options for.
-    self._cache_key_generator = CacheKeyGenerator(
-      self.context.options.for_global_scope().cache_key_gen_version)
 
     self._cache_key_errors = set()
 
@@ -196,6 +189,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
+    self._cache_key_generator = CacheKeyGenerator(
+      self.context.options.for_global_scope().cache_key_gen_version,
+      self.fingerprint)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -336,7 +332,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :rtype: InvalidationCheck
     """
 
-    fingerprint_strategy = fingerprint_strategy or TaskIdentityFingerprintStrategy(self)
     cache_manager = InvalidationCacheManager(self.workdir,
                                              self._cache_key_generator,
                                              self._build_invalidator_dir,
