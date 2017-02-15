@@ -161,8 +161,8 @@ impl Context {
   }
 
   /**
-   * A helper to take ownership of the given Failure, while indicating that the value
-   * represented by the Failure was required, and thus fatal if not present.
+   * A helper to indicate that the value represented by the Failure was required, and thus
+   * fatal if not present.
    */
   fn was_required(&self, failure: Failure) -> Failure {
     match failure {
@@ -206,9 +206,9 @@ impl ContextFactory for Context {
  *
  * The Output type of a Node is bounded to values that can be stored and retrieved from
  * the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
- * stored inside the NodeResult requires an implementation of From<NodeResult>. But the
- * combination of bounds at usage sites mean that a failure to unwrap the result should
- * be exceedingly rare.
+ * stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
+ * combination of bounds at usage sites should mean that a failure to unwrap the result is
+ * exceedingly rare.
  */
 pub trait Node: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
@@ -299,8 +299,8 @@ impl Select {
     let mut matches = Vec::new();
     for result in results {
       match result {
-        Ok(ref value) => {
-          if let Some(v) = self.select_literal(&context, value.clone(), variant_value) {
+        Ok(value) => {
+          if let Some(v) = self.select_literal(&context, value, variant_value) {
             matches.push(v);
           }
         },
@@ -493,9 +493,7 @@ impl Node for SelectDependencies {
             let deps =
               future::join_all(
                 context.project_multi(&dep_product, &node.selector.field).iter()
-                  .map(|dep_subject| {
-                    node.get_dep(&context, &dep_subject)
-                  })
+                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
                   .collect::<Vec<_>>()
               );
             deps

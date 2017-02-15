@@ -35,8 +35,8 @@ impl Scheduler {
   fn root_nodes(&self) -> Vec<NodeKey> {
     self.roots.iter()
       .map(|r| match r {
-        &Root::Select(ref s) => NodeKey::Select(s.clone()),
-        &Root::SelectDependencies(ref s) => NodeKey::SelectDependencies(s.clone()),
+        &Root::Select(ref s) => s.clone().into(),
+        &Root::SelectDependencies(ref s) => s.clone().into(),
       })
       .collect()
   }
