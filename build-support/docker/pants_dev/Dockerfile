@@ -9,7 +9,7 @@
 # Pants repo, suitable for running Pants's own tests in.
 
 # To build this image:
-#   docker build -t pants_dev build-support/docker
+#   docker build -t pants_dev build-support/docker/pants_dev
 #   TBD: Push to a pants account on dockerhub.
 
 # To use on MacOS:
@@ -32,6 +32,7 @@ FROM anapsix/alpine-java:8_jdk
 RUN apk update && apk add bash curl gcc git libffi-dev linux-headers musl-dev openssl python python-dev
 
 # Clone the pantsbuild repo and bootstrap Pants in it.
-RUN git clone https://github.com/pantsbuild/pants.git && cd /pants && ./pants
+RUN git clone https://github.com/pantsbuild/pants.git && cd /pants && ./pants goals
 
 CMD bash
+
