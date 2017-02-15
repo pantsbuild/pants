@@ -24,6 +24,7 @@ from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
 from pants_test.engine.test_mapper import TargetTable
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def assert_equal_with_printing(test_case, expected, actual):
@@ -114,6 +115,7 @@ class RulesetValidatorTest(unittest.TestCase):
     return self.create_native_scheduler(intrinsic_entries, root_subject_types, rules)
 
   def create_native_scheduler(self, intrinsic_entries, root_subject_types, rules):
+    init_subsystem(Native.Factory)
     rule_index = RuleIndex.create(rules, intrinsic_entries)
     native = Native.Factory.global_instance().create()
     scheduler = WrappedNativeScheduler(native, rule_index, root_subject_types)
