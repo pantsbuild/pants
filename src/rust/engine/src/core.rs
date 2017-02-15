@@ -152,6 +152,6 @@ impl Clone for Value {
 
 impl fmt::Debug for Value {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(f, "Value({})", externs::val_to_str(&self))
+    write!(f, "{}", externs::val_to_str(&self))
   }
 }
