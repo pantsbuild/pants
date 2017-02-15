@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{Key, TypeConstraint, TypeId};
+use core::{ANY_TYPE, Key, TypeConstraint, TypeId};
 
 use externs;
 
@@ -78,7 +78,7 @@ impl Entry {
   fn new_unreachable(rule: &Task) -> Entry {
     Entry::Unreachable {
       rule: rule.clone(),
-      reason: Diagnostic { subject_type: TypeId(0), reason: "".to_string() },
+      reason: Diagnostic { subject_type: ANY_TYPE, reason: "".to_string() },
     }
   }
 
@@ -190,11 +190,7 @@ impl <'a> GraphMaker<'a> {
 
     for rule in unreachable_rules {
       let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
-      let terrible_type = TypeId(0); // need to come up with something better.
-      // This is used to collate the error messages by subject. It could use either a well known
-      // special value or I could make the subject type an option and use None here.
-
-      diagnostics.push(Diagnostic{subject_type: terrible_type, reason:"Unreachable".to_string()});
+      diagnostics.push(Diagnostic{subject_type: ANY_TYPE, reason:"Unreachable".to_string()});
     }
 
     let unfinished_graph = RuleGraph {

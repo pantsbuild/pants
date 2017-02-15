@@ -91,7 +91,7 @@ _FFI.cdef(
     typedef Value            (*extern_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
-    typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
+    typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, bool);
 
     typedef void RawScheduler;
 
@@ -295,11 +295,11 @@ def to_py_str(msg_ptr, msg_len):
   return bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
 
 
-@_FFI.callback("RunnableComplete(ExternContext*, Function*, Value*, uint64_t, bool)")
+@_FFI.callback("RunnableComplete(ExternContext*, Value*, Value*, uint64_t, bool)")
 def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
   """Given a destructured rawRunnable, run it."""
   c = _FFI.from_handle(context_handle)
-  runnable = c.from_id(func.id_)
+  runnable = c.from_value(func)
   args = tuple(c.from_value(arg) for arg in _FFI.unpack(args_ptr, args_len))
 
   try:
@@ -350,7 +350,7 @@ class ObjectIdMap(object):
 
   def __init__(self):
     # Objects indexed by their keys, i.e, content digests
-    self._objects = Storage.create(in_memory=True)
+    self._objects = Storage.create()
     # Memoized object Ids.
     self._id_to_key = dict()
     self._key_to_id = dict()

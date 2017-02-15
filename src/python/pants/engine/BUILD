@@ -186,8 +186,6 @@ python_library(
   name='storage',
   sources=['storage.py'],
   dependencies=[
-    '3rdparty/python:cffi',
-    '3rdparty/python:lmdb',
     ':nodes',
     ':objects',
     'src/python/pants/util:dirutil',

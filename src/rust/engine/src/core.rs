@@ -56,6 +56,9 @@ pub type Field = String;
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);
 
+// On the python side, the 0th type id is used as an anonymous id
+pub const ANY_TYPE: TypeId = TypeId(0);
+
 // A type constraint, which a TypeId may or may-not satisfy.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
@@ -91,6 +94,10 @@ impl hash::Hash for Key {
 }
 
 impl Key {
+  pub fn new_with_anon_type_id(id: Id) -> Key {
+    Key { id: id, type_id: ANY_TYPE }
+  }
+
   pub fn id(&self) -> Id {
     self.id
   }
