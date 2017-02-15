@@ -57,7 +57,7 @@ function ensure_build_prerequisites() {
   then
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
-    local readonly rustup=$(mktemp -t pants.rustup.XXXXX)
+    local readonly rustup=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup}
     sh ${rustup} -y --no-modify-path 1>&2
     rm -f ${rustup}
