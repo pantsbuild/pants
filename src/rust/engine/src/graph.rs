@@ -81,7 +81,7 @@ impl EntryStateGetter for EntryStateField {
         // We're responsible: start the Node and then loop to retrieve the value..
         self.store_and_ref(
           epoch::Owned::new(
-            EntryState::Started(future::Shared::new(node.step(context)))
+            EntryState::Started(future::Shared::new(node.run(context)))
           ),
           Ordering::Relaxed,
           &guard
