@@ -151,7 +151,8 @@ impl Context {
    * those configured in types::Types.
    */
   fn invoke_unsafe(&self, func: &Function, args: &Vec<Value>) -> Value {
-    self.core.externs.invoke_runnable(func, args, false)
+    let func_val = self.core.externs.val_for_id(func.0);
+    self.core.externs.invoke_runnable(&func_val, args, false)
       .unwrap_or_else(|e| {
         panic!(
           "Core function `{}` failed: {}",
@@ -296,7 +297,7 @@ impl Context {
     Failure::Throw(self.core.externs.create_exception(msg))
   }
 
-  fn invoke_runnable(&self, func: &Function, args: &Vec<Value>, cacheable: bool) -> Result<Value, Failure> {
+  fn invoke_runnable(&self, func: &Value, args: &Vec<Value>, cacheable: bool) -> Result<Value, Failure> {
     self.core.externs.invoke_runnable(func, args, cacheable)
       .map_err(|v| Failure::Throw(v))
   }
@@ -811,7 +812,7 @@ impl Step for Task {
         match deps_result {
           Ok(deps) =>
             context.invoke_runnable(
-              &selector.func,
+              &context.core.externs.val_for_id(selector.func.0),
               &deps.iter().map(|v| context.clone_val(v)).collect(),
               selector.cacheable,
             ),

@@ -6,7 +6,7 @@ use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Id, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 
 // An opaque pointer to a context used by the extern functions.
@@ -95,6 +95,10 @@ impl Externs {
     (self.val_for)(self.context, key)
   }
 
+  pub fn val_for_id(&self, id: Id) -> Value {
+    self.val_for(&Key::new_with_anon_type_id(id))
+  }
+
   pub fn clone_val(&self, val: &Value) -> Value {
     (self.clone_val)(self.context, val)
   }
@@ -174,7 +178,7 @@ impl Externs {
     (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
   }
 
-  pub fn invoke_runnable(&self, func: &Function, args: &Vec<Value>, cacheable: bool) -> Result<Value, Value> {
+  pub fn invoke_runnable(&self, func: &Value, args: &Vec<Value>, cacheable: bool) -> Result<Value, Value> {
     let result =
       (self.invoke_runnable)(
         self.context,
@@ -298,7 +302,7 @@ pub type CreateExceptionExtern =
   extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
 
 pub type InvokeRunnable =
-  extern "C" fn(*const ExternContext, *const Function, *const Value, u64, bool) -> RunnableComplete;
+  extern "C" fn(*const ExternContext, *const Value, *const Value, u64, bool) -> RunnableComplete;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
     where F: FnOnce(&Vec<C>)->T {
