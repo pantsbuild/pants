@@ -43,15 +43,7 @@ trait EntryStateGetter {
 impl EntryStateGetter for EntryStateField {
   fn get<N: Step>(&self) -> NodeFuture<N::Output> {
     self.get_raw()
-      .then(|node_result| match node_result {
-        Ok(nr) =>
-          Ok(
-            nr.clone().try_into().unwrap_or_else(|_| {
-              panic!("A Step implementation was ambiguous.")
-            })
-          ),
-        Err(failure) => Err(failure.clone())
-      })
+      .then(|node_result| Entry::unwrap::<N>(node_result))
       // TODO: reboxing/sharing here is unnecessary. Since we've forced the clone, don't need
       // to claim that this is shared any longer.
       .boxed()
@@ -130,6 +122,20 @@ impl Entry {
     }
   }
 
+  fn unwrap<N: Step>(
+    res: Result<future::SharedItem<NodeResult>, future::SharedError<Failure>>
+  ) -> Result<N::Output, Failure> {
+    match res {
+      Ok(nr) =>
+        Ok(
+          nr.clone().try_into().unwrap_or_else(|_| {
+            panic!("A Step implementation was ambiguous.")
+          })
+        ),
+      Err(failure) => Err(failure.clone())
+    }
+  }
+
   /**
    * Returns a reference to the Node's Future.
    */
@@ -141,10 +147,7 @@ impl Entry {
    * If the Future for this Node has already completed, returns a clone of its result.
    */
   fn peek<N: Step>(&self) -> Option<Result<N::Output, Failure>> {
-    self.state().get::<N>().peek().map(|state_opt| match state_opt {
-      Ok(ok) => Ok(ok.clone()),
-      Err(err) => Err(err.clone())
-    })
+    self.state().get_raw().peek().map(|nr| Entry::unwrap::<N>(nr))
   }
 
   fn dependencies(&self) -> &DepSet {
@@ -159,9 +162,9 @@ impl Entry {
     &self.cyclic_dependencies
   }
 
-  fn format(&self) -> String {
+  fn format<N: Step>(&self) -> String {
     let state =
-      match self.peek::<Node>() {
+      match self.peek::<N>() {
         Some(Ok(ref nr)) => format!("{:?}", nr),
         Some(Err(Failure::Throw(ref v))) => externs::val_to_str(v),
         Some(Err(ref x)) => format!("{:?}", x),
@@ -385,7 +388,7 @@ impl InnerGraph {
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
-      let node_str = entry.format();
+      let node_str = entry.format::<Node>();
 
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
@@ -399,7 +402,7 @@ impl InnerGraph {
           }
 
           // Write an entry per edge.
-          let dep_str = dep_entry.format();
+          let dep_str = dep_entry.format::<Node>();
           try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
         }
       }

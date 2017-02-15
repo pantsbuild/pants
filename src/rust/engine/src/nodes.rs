@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::sync::Arc;
+use std::fmt;
 
 use futures::future::{BoxFuture, Future};
 use futures::future;
@@ -222,7 +223,7 @@ impl ContextFactory for Context {
  * be exceedingly rare.
  */
 pub trait Step: Into<Node> {
-  type Output: Clone + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+  type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
   fn step(&self, context: Context) -> StepFuture<Self::Output>;
 }
