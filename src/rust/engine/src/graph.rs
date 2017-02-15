@@ -11,12 +11,20 @@ use std::sync::{Arc, RwLock};
 
 use crossbeam::mem::epoch;
 
-use futures::future::Future;
-use futures::future;
+use futures::future::{self, Future};
 
 use externs;
 use core::{FNV, Key};
-use nodes::{Failure, NodeKey, NodeFuture, NodeResult, Step, Context, ContextFactory, TryInto};
+use nodes::{
+  Context,
+  ContextFactory,
+  Failure,
+  Node,
+  NodeFuture,
+  NodeKey,
+  NodeResult,
+  TryInto
+};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -36,12 +44,12 @@ type EntryStateField = Arc<epoch::Atomic<EntryState>>;
  * to allow Nodes to start lazily, outside of the graph lock.
  */
 trait EntryStateGetter {
-  fn get<N: Step>(&self) -> NodeFuture<N::Output>;
+  fn get<N: Node>(&self) -> NodeFuture<N::Output>;
   fn get_raw(&self) -> future::Shared<NodeFuture<NodeResult>>;
 }
 
 impl EntryStateGetter for EntryStateField {
-  fn get<N: Step>(&self) -> NodeFuture<N::Output> {
+  fn get<N: Node>(&self) -> NodeFuture<N::Output> {
     self.get_raw()
       .then(|node_result| Entry::unwrap::<N>(node_result))
       .boxed()
@@ -119,14 +127,14 @@ impl Entry {
     }
   }
 
-  fn unwrap<N: Step>(
+  fn unwrap<N: Node>(
     res: Result<future::SharedItem<NodeResult>, future::SharedError<Failure>>
   ) -> Result<N::Output, Failure> {
     match res {
       Ok(nr) =>
         Ok(
           nr.clone().try_into().unwrap_or_else(|_| {
-            panic!("A Step implementation was ambiguous.")
+            panic!("A Node implementation was ambiguous.")
           })
         ),
       Err(failure) => Err(failure.clone())
@@ -143,7 +151,7 @@ impl Entry {
   /**
    * If the Future for this Node has already completed, returns a clone of its result.
    */
-  fn peek<N: Step>(&self) -> Option<Result<N::Output, Failure>> {
+  fn peek<N: Node>(&self) -> Option<Result<N::Output, Failure>> {
     self.state().get_raw().peek().map(|nr| Entry::unwrap::<N>(nr))
   }
 
@@ -159,7 +167,7 @@ impl Entry {
     &self.cyclic_dependencies
   }
 
-  fn format<N: Step>(&self) -> String {
+  fn format<N: Node>(&self) -> String {
     let state =
       match self.peek::<N>() {
         Some(Ok(ref nr)) => format!("{:?}", nr),
@@ -501,7 +509,7 @@ impl Graph {
   /**
    * If the given Node has completed, returns a clone of its state.
    */
-  pub fn peek<N: Step>(&self, node: N) -> Option<Result<N::Output, Failure>> {
+  pub fn peek<N: Node>(&self, node: N) -> Option<Result<N::Output, Failure>> {
     let node = node.into();
     let inner = self.inner.read().unwrap();
     inner.entry(&node).and_then(|e| e.peek::<N>())
@@ -517,7 +525,7 @@ impl Graph {
    * TODO: The vast majority of `get` calls will occur exactly once per src+dst, so double
    * checking a RwLock here is probably overkill. Should switch to Mutex and acquire once.
    */
-  pub fn get<N: Step>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
+  pub fn get<N: Node>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
     let dst_node = dst_node.into();
 
     // First, check whether the destination already exists, and the dep is already declared.
@@ -570,7 +578,7 @@ impl Graph {
   /**
    * Create the given Node if it does not already exist.
    */
-  pub fn create<N: Step>(&self, node: N, context: &ContextFactory) -> NodeFuture<N::Output> {
+  pub fn create<N: Node>(&self, node: N, context: &ContextFactory) -> NodeFuture<N::Output> {
     // Initialize the state while under the lock...
     let state = {
       let mut inner = self.inner.write().unwrap();

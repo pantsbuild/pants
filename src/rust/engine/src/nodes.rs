@@ -76,7 +76,7 @@ impl Context {
   /**
    * Get the future value for the given Node implementation.
    */
-  fn get<N: Step>(&self, node: N) -> NodeFuture<N::Output> {
+  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| {
       externs::drop_handles(handles);
@@ -204,13 +204,13 @@ impl ContextFactory for Context {
 /**
  * Defines executing a cacheable/memoizable step for the given context.
  *
- * The Output type of a Step is bounded to values that can be stored and retrieved from
+ * The Output type of a Node is bounded to values that can be stored and retrieved from
  * the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
  * stored inside the NodeResult requires an implementation of From<NodeResult>. But the
  * combination of bounds at usage sites mean that a failure to unwrap the result should
  * be exceedingly rare.
  */
-pub trait Step: Into<NodeKey> {
+pub trait Node: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
   fn step(&self, context: Context) -> NodeFuture<Self::Output>;
@@ -334,7 +334,7 @@ impl Select {
   }
 }
 
-impl Step for Select {
+impl Node for Select {
   type Output = Value;
 
   fn step(&self, context: Context) -> NodeFuture<Value> {
@@ -394,7 +394,7 @@ pub struct SelectLiteral {
   selector: selectors::SelectLiteral,
 }
 
-impl Step for SelectLiteral {
+impl Node for SelectLiteral {
   type Output = Value;
 
   fn step(&self, context: Context) -> NodeFuture<Value> {
@@ -475,7 +475,7 @@ impl SelectDependencies {
   }
 }
 
-impl Step for SelectDependencies {
+impl Node for SelectDependencies {
   type Output = Value;
 
   fn step(&self, context: Context) -> NodeFuture<Value> {
@@ -532,7 +532,7 @@ pub struct SelectProjection {
   selector: selectors::SelectProjection,
 }
 
-impl Step for SelectProjection {
+impl Node for SelectProjection {
   type Output = Value;
 
   fn step(&self, context: Context) -> NodeFuture<Value> {
@@ -626,7 +626,7 @@ impl Task {
   }
 }
 
-impl Step for Task {
+impl Node for Task {
   type Output = Value;
 
   fn step(&self, context: Context) -> NodeFuture<Value> {
@@ -704,7 +704,7 @@ impl NodeKey {
   }
 }
 
-impl Step for NodeKey {
+impl Node for NodeKey {
   type Output = NodeResult;
 
   fn step(&self, context: Context) -> NodeFuture<NodeResult> {
