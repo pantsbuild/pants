@@ -16,7 +16,7 @@ use futures::future;
 
 use externs;
 use core::{FNV, Key};
-use nodes::{Failure, Node, NodeFuture, NodeResult, Step, Context, ContextFactory, TryInto};
+use nodes::{Failure, NodeKey, NodeFuture, NodeResult, Step, Context, ContextFactory, TryInto};
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -25,7 +25,7 @@ pub struct EntryId(usize);
 pub type DepSet = HashSet<EntryId, FNV>;
 
 enum EntryState {
-  Pending(Context, Node),
+  Pending(Context, NodeKey),
   Started(future::Shared<NodeFuture<NodeResult>>),
 }
 
@@ -91,7 +91,7 @@ pub struct Entry {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
-  node: Node,
+  node: NodeKey,
   // To avoid holding the Graph's lock longer than necessary, a Node initializes on a CpuPool.
   // TODO: See comment in ensure_entry_internal.
   state: Arc<epoch::Atomic<EntryState>>,
@@ -103,7 +103,7 @@ pub struct Entry {
 }
 
 impl Entry {
-  fn new(id: EntryId, node: Node, context: Context) -> Entry {
+  fn new(id: EntryId, node: NodeKey, context: Context) -> Entry {
     let state = epoch::Atomic::null();
     state.store(
       Some(epoch::Owned::new(EntryState::Pending(context, node.clone()))),
@@ -177,7 +177,7 @@ impl Entry {
   }
 }
 
-type Nodes = HashMap<Node, EntryId, FNV>;
+type Nodes = HashMap<NodeKey, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
 
 struct InnerGraph {
@@ -191,7 +191,7 @@ impl InnerGraph {
     future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()
   }
 
-  fn entry(&self, node: &Node) -> Option<&Entry> {
+  fn entry(&self, node: &NodeKey) -> Option<&Entry> {
     self.nodes.get(node).map(|&id| self.entry_for_id(id))
   }
 
@@ -203,7 +203,7 @@ impl InnerGraph {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  fn ensure_entry(&mut self, context: &ContextFactory, node: Node) -> EntryId {
+  fn ensure_entry(&mut self, context: &ContextFactory, node: NodeKey) -> EntryId {
     InnerGraph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
@@ -218,7 +218,7 @@ impl InnerGraph {
     nodes: &mut Nodes,
     id_generator: &mut usize,
     context_factory: &ContextFactory,
-    node: Node
+    node: NodeKey
   ) -> EntryId {
     // See TODO on Entry.
     let entry_node = node.clone();
@@ -342,7 +342,7 @@ impl InnerGraph {
     }
 
     // Filter the Nodes to delete any with matching ids.
-    let filtered: Vec<(Node, EntryId)> =
+    let filtered: Vec<(NodeKey, EntryId)> =
       nodes.drain()
         .filter(|&(_, id)| !ids.contains(&id))
         .collect();
@@ -356,7 +356,7 @@ impl InnerGraph {
     );
   }
 
-  pub fn visualize(&self, roots: &Vec<Node>, path: &Path) -> io::Result<()> {
+  pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
     let file = try!(File::create(path));
     let mut f = BufWriter::new(file);
     let mut viz_colors = HashMap::new();
@@ -364,7 +364,7 @@ impl InnerGraph {
     let viz_max_colors = 12;
     let mut format_color =
       |entry: &Entry| {
-        match entry.peek::<Node>() {
+        match entry.peek::<NodeKey>() {
           None | Some(Err(Failure::Noop(_, _))) => "white".to_string(),
           Some(Err(Failure::Throw(_))) => "tomato".to_string(),
           Some(Ok(_)) => {
@@ -385,7 +385,7 @@ impl InnerGraph {
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
-      let node_str = entry.format::<Node>();
+      let node_str = entry.format::<NodeKey>();
 
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
@@ -399,7 +399,7 @@ impl InnerGraph {
           }
 
           // Write an entry per edge.
-          let dep_str = dep_entry.format::<Node>();
+          let dep_str = dep_entry.format::<NodeKey>();
           try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
         }
       }
@@ -409,12 +409,12 @@ impl InnerGraph {
     Ok(())
   }
 
-  pub fn trace(&self, root: &Node, path: &Path) -> io::Result<()> {
+  pub fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
     let is_bottom = |entry: &Entry| -> bool {
-      match entry.peek::<Node>() {
+      match entry.peek::<NodeKey>() {
         None | Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(_))) => false,
         Some(Ok(_)) => true,
@@ -445,7 +445,7 @@ impl InnerGraph {
                            externs::id_to_str(entry.node.product().0),
                            externs::id_to_str(entry.node.subject().id()));
       if is_one_level_above_bottom(entry) {
-        let state_str = match entry.peek::<Node>() {
+        let state_str = match entry.peek::<NodeKey>() {
           None => "<None>".to_string(),
           Some(Ok(ref x)) => format!("{:?}", x),
           Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs::val_to_str(x)),
@@ -586,12 +586,12 @@ impl Graph {
     inner.invalidate(subjects)
   }
 
-  pub fn trace(&self, root: &Node, path: &Path) -> io::Result<()> {
+  pub fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
     let inner = self.inner.read().unwrap();
     inner.trace(root, path)
   }
 
-  pub fn visualize(&self, roots: &Vec<Node>, path: &Path) -> io::Result<()> {
+  pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
     let inner = self.inner.read().unwrap();
     inner.visualize(roots, path)
   }

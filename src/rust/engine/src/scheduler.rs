@@ -12,7 +12,7 @@ use futures_cpupool::{CpuPool, CpuFuture};
 use core::{Field, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::{EntryId, Graph};
-use nodes::{Context, ContextFactory, Failure, Node, Select, SelectDependencies};
+use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies};
 use selectors;
 use tasks::Tasks;
 
@@ -30,13 +30,13 @@ impl Scheduler {
   /**
    * Roots are limited to either `SelectDependencies` and `Select`, which are known to
    * produce Values. But this method exists to satisfy Graph APIs which only need instances
-   * of the Node enum.
+   * of the NodeKey enum.
    */
-  fn root_nodes(&self) -> Vec<Node> {
+  fn root_nodes(&self) -> Vec<NodeKey> {
     self.roots.iter()
       .map(|r| match r {
-        &Root::Select(ref s) => Node::Select(s.clone()),
-        &Root::SelectDependencies(ref s) => Node::SelectDependencies(s.clone()),
+        &Root::Select(ref s) => NodeKey::Select(s.clone()),
+        &Root::SelectDependencies(ref s) => NodeKey::SelectDependencies(s.clone()),
       })
       .collect()
   }
@@ -114,7 +114,7 @@ impl Scheduler {
    * Starts running a Node, and returns a Future that will succeed regardless of the
    * success of the node.
    */
-  fn launch(&self, context_factory: BootstrapContextFactory, node: Node) -> CpuFuture<(), ()> {
+  fn launch(&self, context_factory: BootstrapContextFactory, node: NodeKey) -> CpuFuture<(), ()> {
     context_factory.pool.clone().spawn(
       context_factory.graph.create(node, &context_factory)
         .then::<_, Result<(), ()>>(|_| Ok(()))

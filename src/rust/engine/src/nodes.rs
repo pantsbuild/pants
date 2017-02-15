@@ -26,7 +26,7 @@ pub struct Runnable {
 
 #[derive(Debug, Clone)]
 pub enum Failure {
-  Noop(&'static str, Option<Node>),
+  Noop(&'static str, Option<NodeKey>),
   Throw(Value),
 }
 
@@ -51,7 +51,7 @@ impl Context {
   }
 
   /**
-   * Create Nodes for each Task that might be able to compute the given product for the
+   * Create NodeKeys for each Task that might be able to compute the given product for the
    * given subject and variants.
    *
    * (analogous to NodeBuilder.gen_nodes)
@@ -210,7 +210,7 @@ impl ContextFactory for Context {
  * combination of bounds at usage sites mean that a failure to unwrap the result should
  * be exceedingly rare.
  */
-pub trait Step: Into<Node> {
+pub trait Step: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
   fn step(&self, context: Context) -> NodeFuture<Self::Output>;
@@ -381,9 +381,9 @@ impl Step for Select {
   }
 }
 
-impl From<Select> for Node {
+impl From<Select> for NodeKey {
   fn from(n: Select) -> Self {
-    Node::Select(n)
+    NodeKey::Select(n)
   }
 }
 
@@ -402,9 +402,9 @@ impl Step for SelectLiteral {
   }
 }
 
-impl From<SelectLiteral> for Node {
+impl From<SelectLiteral> for NodeKey {
   fn from(n: SelectLiteral) -> Self {
-    Node::SelectLiteral(n)
+    NodeKey::SelectLiteral(n)
   }
 }
 
@@ -519,9 +519,9 @@ impl Step for SelectDependencies {
   }
 }
 
-impl From<SelectDependencies> for Node {
+impl From<SelectDependencies> for NodeKey {
   fn from(n: SelectDependencies) -> Self {
-    Node::SelectDependencies(n)
+    NodeKey::SelectDependencies(n)
   }
 }
 
@@ -578,9 +578,9 @@ impl Step for SelectProjection {
   }
 }
 
-impl From<SelectProjection> for Node {
+impl From<SelectProjection> for NodeKey {
   fn from(n: SelectProjection) -> Self {
-    Node::SelectProjection(n)
+    NodeKey::SelectProjection(n)
   }
 }
 
@@ -657,14 +657,14 @@ impl Step for Task {
   }
 }
 
-impl From<Task> for Node {
+impl From<Task> for NodeKey {
   fn from(n: Task) -> Self {
-    Node::Task(n)
+    NodeKey::Task(n)
   }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Node {
+pub enum NodeKey {
   Select(Select),
   SelectLiteral(SelectLiteral),
   SelectDependencies(SelectDependencies),
@@ -672,48 +672,48 @@ pub enum Node {
   Task(Task),
 }
 
-impl Node {
+impl NodeKey {
   pub fn format(&self) -> String {
     match self {
-      &Node::Select(_) => "Select".to_string(),
-      &Node::SelectLiteral(_) => "Literal".to_string(),
-      &Node::SelectDependencies(_) => "Dependencies".to_string(),
-      &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", externs::id_to_str(t.task.func.0)),
+      &NodeKey::Select(_) => "Select".to_string(),
+      &NodeKey::SelectLiteral(_) => "Literal".to_string(),
+      &NodeKey::SelectDependencies(_) => "Dependencies".to_string(),
+      &NodeKey::SelectProjection(_) => "Projection".to_string(),
+      &NodeKey::Task(ref t) => format!("Task({})", externs::id_to_str(t.task.func.0)),
     }
   }
 
   pub fn subject(&self) -> &Key {
     match self {
-      &Node::Select(ref s) => &s.subject,
-      &Node::SelectLiteral(ref s) => &s.subject,
-      &Node::SelectDependencies(ref s) => &s.subject,
-      &Node::SelectProjection(ref s) => &s.subject,
-      &Node::Task(ref t) => &t.subject,
+      &NodeKey::Select(ref s) => &s.subject,
+      &NodeKey::SelectLiteral(ref s) => &s.subject,
+      &NodeKey::SelectDependencies(ref s) => &s.subject,
+      &NodeKey::SelectProjection(ref s) => &s.subject,
+      &NodeKey::Task(ref t) => &t.subject,
     }
   }
 
   pub fn product(&self) -> &TypeConstraint {
     match self {
-      &Node::Select(ref s) => &s.selector.product,
-      &Node::SelectLiteral(ref s) => &s.selector.product,
-      &Node::SelectDependencies(ref s) => &s.selector.product,
-      &Node::SelectProjection(ref s) => &s.selector.product,
-      &Node::Task(ref t) => &t.product,
+      &NodeKey::Select(ref s) => &s.selector.product,
+      &NodeKey::SelectLiteral(ref s) => &s.selector.product,
+      &NodeKey::SelectDependencies(ref s) => &s.selector.product,
+      &NodeKey::SelectProjection(ref s) => &s.selector.product,
+      &NodeKey::Task(ref t) => &t.product,
     }
   }
 }
 
-impl Step for Node {
+impl Step for NodeKey {
   type Output = NodeResult;
 
   fn step(&self, context: Context) -> NodeFuture<NodeResult> {
     match self {
-      &Node::Select(ref n) => n.step(context).map(|v| v.into()).boxed(),
-      &Node::SelectDependencies(ref n) => n.step(context).map(|v| v.into()).boxed(),
-      &Node::SelectLiteral(ref n) => n.step(context).map(|v| v.into()).boxed(),
-      &Node::SelectProjection(ref n) => n.step(context).map(|v| v.into()).boxed(),
-      &Node::Task(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &NodeKey::Select(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectDependencies(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectLiteral(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectProjection(ref n) => n.step(context).map(|v| v.into()).boxed(),
+      &NodeKey::Task(ref n) => n.step(context).map(|v| v.into()).boxed(),
     }
   }
 }
