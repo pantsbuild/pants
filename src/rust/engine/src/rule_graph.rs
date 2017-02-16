@@ -146,13 +146,13 @@ pub struct Diagnostic {
 
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
 // to be found statically rather than dynamically.
-pub struct GraphMaker<'t, 'e> {
+pub struct GraphMaker<'t> {
   tasks: &'t Tasks,
   root_subject_types: RootSubjectTypes
 }
 
-impl <'t, 'e> GraphMaker<'t, 'e> {
-  pub fn new(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker<'t, 'e> {
+impl <'t> GraphMaker<'t> {
+  pub fn new(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker<'t> {
     GraphMaker {
       tasks: tasks,
       root_subject_types: root_subject_types

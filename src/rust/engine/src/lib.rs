@@ -494,7 +494,6 @@ pub extern fn validator_run(
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
-                                        &raw.scheduler.core.externs,
                                         RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
 

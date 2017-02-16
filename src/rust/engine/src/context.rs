@@ -2,7 +2,6 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use externs::Externs;
 use graph::Graph;
 use tasks::Tasks;
 use types::Types;
@@ -19,7 +18,6 @@ pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
   pub types: Types,
-  pub externs: Externs,
   pub snapshots: Snapshots,
   pub vfs: Arc<PosixVFS>,
 }
@@ -28,7 +26,6 @@ impl Core {
   pub fn new(
     tasks: Tasks,
     types: Types,
-    externs: Externs,
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
   ) -> Core {
@@ -36,7 +33,6 @@ impl Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
-      externs: externs,
       snapshots: Snapshots::new()
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
