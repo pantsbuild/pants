@@ -189,9 +189,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
 
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
-    self._cache_key_generator = CacheKeyGenerator(
-      self.context.options.for_global_scope().cache_key_gen_version,
-      self.fingerprint)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -332,8 +329,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :rtype: InvalidationCheck
     """
 
+    cache_key_generator = CacheKeyGenerator(
+      self.context.options.for_global_scope().cache_key_gen_version,
+      self.fingerprint)
     cache_manager = InvalidationCacheManager(self.workdir,
-                                             self._cache_key_generator,
+                                             cache_key_generator,
                                              self._build_invalidator_dir,
                                              invalidate_dependents,
                                              fingerprint_strategy=fingerprint_strategy,
