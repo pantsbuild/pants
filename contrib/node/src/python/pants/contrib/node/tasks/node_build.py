@@ -8,11 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import defaultdict
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import pushd
-from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdtemp
+from pants.util.dirutil import absolute_symlink
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
@@ -40,9 +41,10 @@ class NodeBuild(NodeTask):
 
   def execute(self):
     node_paths = self.context.products.get_data(NodePaths)
-    runtime_classpath_product = self.context.products.get_data('runtime_classpath')
+    runtime_classpath_product = self.context.products.get_data(
+      'runtime_classpath', init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
     bundleable_js_product = self.context.products.get_data(
-      'bundleable_js', lambda: defaultdict(MultipleRootedProducts))
+      'bundleable_js', init_func=lambda: defaultdict(MultipleRootedProducts))
 
     targets = self.context.targets(predicate=self.is_node_module)
     with self.invalidated(targets) as invalidation_check:
@@ -85,4 +87,3 @@ class NodeBuild(NodeTask):
             self.context.log.debug('adding {} for target {} to runtime classpath'.format(
               vt.results_dir, target_address))
             runtime_classpath_product.add_for_target(target, [('default', vt.results_dir)])
-

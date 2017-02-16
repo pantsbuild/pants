@@ -16,7 +16,7 @@ class NodeModule(NodePackage):
 
   def __init__(
     self, sources=None, build_script=None, output_dir='dist',
-    address=None, payload=None, preserve_artifacts=True, **kwargs):
+    preserve_artifacts=True, address=None, payload=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
