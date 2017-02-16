@@ -31,9 +31,9 @@ from pants.util.memo import memoized_property
 
 
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
-  def __init__(self, task, main, custom_rules=None):
+  def __init__(self, main, custom_rules=None):
     # The bootstrapper uses no custom confs in its resolves.
-    super(ShadedToolFingerprintStrategy, self).__init__(task, confs=None)
+    super(ShadedToolFingerprintStrategy, self).__init__(confs=None)
 
     self._main = main
     self._custom_rules = custom_rules
@@ -231,7 +231,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return Shader.Factory.create(self.context)
 
   def _bootstrap_shaded_jvm_tool(self, jvm_tool, targets):
-    fingerprint_strategy = ShadedToolFingerprintStrategy(self, jvm_tool.main,
+    fingerprint_strategy = ShadedToolFingerprintStrategy(jvm_tool.main,
                                                          custom_rules=jvm_tool.custom_rules)
 
     with self.invalidated(targets,
