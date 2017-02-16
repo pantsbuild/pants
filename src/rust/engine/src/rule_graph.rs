@@ -3,14 +3,14 @@
 
 use core::{ANY_TYPE, Key, TypeConstraint, TypeId};
 
-use externs::Externs;
+use externs;
 
-use selectors::{Select, Selector, Task};
+use selectors::{Select, Selector};
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
-use tasks::Tasks;
+use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 enum Entry {
@@ -355,10 +355,6 @@ impl <'a> GraphMaker<'a> {
                                    ],
                                    projected_rules_or_literals);
               },
-              &Selector::Task(ref select) =>{
-                // TODO, not sure what task is in this context exactly
-                panic!("Unexpected type of selector: {:?}", select)
-              }
             }
           }
         },
@@ -455,15 +451,15 @@ pub struct RuleGraph {
 }
 
 impl RuleGraph {
-  pub fn validate(&self, externs: &Externs) -> Result<(), String> {
+  pub fn validate(&self) -> Result<(), String> {
     if self.has_errors() {
-      Result::Err(self.build_error_msg(externs))
+      Result::Err(self.build_error_msg())
     } else {
       Result::Ok(())
     }
   }
 
-  fn build_error_msg(&self, externs: &Externs) -> String {
+  fn build_error_msg(&self) -> String {
     // TODO the rule display is really unfriendly right now. Next up should be to improve it.
     let mut collated_errors: HashMap<Task, HashMap<String, HashSet<TypeId>>> = HashMap::new();
 
@@ -487,7 +483,7 @@ impl RuleGraph {
       }
     }
     let mut msgs: Vec<String> = collated_errors.into_iter()
-      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(externs, rule, subject_types_by_reasons))
+      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(rule, subject_types_by_reasons))
       .collect();
     msgs.sort();
 
@@ -594,7 +590,7 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
 }
 
 fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
-  if tasks.externs.satisfied_by(&select.product, &subject_type) {
+  if externs::satisfied_by(&select.product, &subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
   } else {
@@ -654,11 +650,11 @@ fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
   }
 }
 
-fn format_msgs(externs: &Externs, rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
+fn format_msgs(rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<TypeId>>) -> String {
   let mut errors: Vec<_> = subject_types_by_reasons.iter().map(|(reason, subject_types)|
     format!("{} with subject types: {}",
             reason,
-            subject_types.iter().map(|t| externs.id_to_str(t.0)).collect::<Vec<String>>().join(", "))
+            subject_types.iter().map(|t| externs::id_to_str(t.0)).collect::<Vec<String>>().join(", "))
   ).collect();
   errors.sort();
   format!("{:?}: {}", rule, errors.join("\n    "))
