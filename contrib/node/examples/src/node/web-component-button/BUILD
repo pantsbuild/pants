@@ -6,7 +6,6 @@ node_module(
     'contrib/node/examples/3rdparty/node/react',
     'contrib/node/examples/src/node/web-build-tool',
   ],
-  build_script='build'
 )
 
 node_test(
@@ -29,4 +28,33 @@ node_test(
 node_bundle(
   name='web-component-button-bundle',
   node_module=':web-component-button'
+)
+
+# The following target invokes webpack build.
+node_module(
+  name='web-component-button-processed',
+  sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
+  dependencies=[
+    'contrib/node/examples/3rdparty/node/mocha',
+    'contrib/node/examples/3rdparty/node/react',
+    'contrib/node/examples/src/node/web-build-tool',
+  ],
+  build_script='build',
+)
+
+node_bundle(
+  name='web-component-button-processed-bundle',
+  node_module=':web-component-button-processed'
+)
+
+node_module(
+  name='web-component-button-processed-with-dependency-artifacts',
+  sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
+  dependencies=[
+    'contrib/node/examples/3rdparty/node/mocha',
+    'contrib/node/examples/3rdparty/node/react',
+    'contrib/node/examples/src/node/web-build-tool',
+    'contrib/node/examples/src/node/web-dependency-test',
+  ],
+  build_script='build',
 )

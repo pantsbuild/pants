@@ -6,5 +6,6 @@ node_module(
     'contrib/node/examples/3rdparty/node/null-loader',
     'contrib/node/examples/3rdparty/node/style-loader',
     'contrib/node/examples/3rdparty/node/webpack',
-  ]
+  ],
+  preserve_artifacts=False,
 )
