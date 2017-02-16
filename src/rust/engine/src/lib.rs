@@ -46,8 +46,8 @@ use externs::{
   with_vec,
 };
 use graph::Graph;
-use nodes::{Failure, NodeResult};
-use scheduler::{Scheduler, ExecutionStat};
+use nodes::Failure;
+use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
 use rule_graph::{GraphMaker, RootSubjectTypes};
 
@@ -79,22 +79,17 @@ pub struct RawNode {
 }
 
 impl RawNode {
-  fn create(
-    externs: &Externs,
-    subject: &Key,
-    product: &TypeConstraint,
-    state: Option<NodeResult>,
-  ) -> RawNode {
+  fn create(subject: &Key, product: &TypeConstraint, state: Option<RootResult>) -> RawNode {
     let (state_tag, state_value) =
       match state {
         None =>
-          (RawStateTag::Empty as u8, externs.create_exception("No value")),
+          (RawStateTag::Empty as u8, externs::create_exception("No value")),
         Some(Ok(v)) =>
           (RawStateTag::Return as u8, v),
         Some(Err(Failure::Throw(msg))) =>
           (RawStateTag::Throw as u8, msg),
         Some(Err(Failure::Noop(msg, _))) =>
-          (RawStateTag::Noop as u8, externs.create_exception(msg)),
+          (RawStateTag::Noop as u8, externs::create_exception(msg)),
       };
 
     RawNode {
@@ -113,14 +108,11 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn create(
-    externs: &Externs,
-    node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>
-  ) -> Box<RawNodes> {
+  fn create(node_states: Vec<(&Key, &TypeConstraint, Option<RootResult>)>) -> Box<RawNodes> {
     let nodes =
       node_states.into_iter()
         .map(|(subject, product, state)|
-          RawNode::create(externs, subject, product, state)
+          RawNode::create(subject, product, state)
         )
         .collect();
     let mut raw_nodes =
@@ -139,7 +131,7 @@ impl RawNodes {
 }
 
 #[no_mangle]
-pub extern fn scheduler_create(
+pub extern fn externs_set(
   ext_context: *const ExternContext,
   log: LogExtern,
   key_for: KeyForExtern,
@@ -154,16 +146,9 @@ pub extern fn scheduler_create(
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  field_name: Buffer,
-  field_products: Buffer,
-  field_variants: Buffer,
-  type_address: TypeConstraint,
-  type_has_products: TypeConstraint,
-  type_has_variants: TypeConstraint,
   py_str_type: TypeId,
-) -> *const RawScheduler {
-  // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let externs =
+) {
+  externs::set_externs(
     Externs::new(
       ext_context,
       log,
@@ -180,14 +165,26 @@ pub extern fn scheduler_create(
       create_exception,
       invoke_runnable,
       py_str_type,
-    );
+    )
+  );
+}
+
+#[no_mangle]
+pub extern fn scheduler_create(
+  field_name: Buffer,
+  field_products: Buffer,
+  field_variants: Buffer,
+  type_address: TypeConstraint,
+  type_has_products: TypeConstraint,
+  type_has_variants: TypeConstraint,
+) -> *const RawScheduler {
+  // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       RawScheduler {
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
-            externs,
             field_name.to_string().expect("field_name to be a string"),
             field_products.to_string().expect("field_products to be a string"),
             field_variants.to_string().expect("field_variants to be a string"),
@@ -262,12 +259,7 @@ pub extern fn execution_roots(
   scheduler_ptr: *mut RawScheduler,
 ) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |raw| {
-    Box::into_raw(
-      RawNodes::create(
-        &raw.scheduler.tasks.externs,
-        raw.scheduler.root_states()
-      )
-    )
+    Box::into_raw(RawNodes::create(raw.scheduler.root_states()))
   })
 }
 
@@ -439,7 +431,7 @@ pub extern fn validator_run(
                                         RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
 
-      match graph.validate(&raw.scheduler.tasks.externs) {
+      match graph.validate() {
         Result::Ok(_) => {},
         Result::Err(msg) => {
           println!("had errors!\n{}", msg)
