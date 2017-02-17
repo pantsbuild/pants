@@ -5,7 +5,6 @@
   "main": "index.js",
   "repository": "https://github.com/pantsbuild/pants.git",
   "author": "pantsbuild",
-  "license": "MIT",
   "scripts": {
     "start": "babel-node index.js",
     "test": "mocha --compilers js:babel-register"

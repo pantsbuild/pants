@@ -91,8 +91,6 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
           if result != 0:
             raise TaskError('npm test script failed:\n'
                             '\t{} failed with exit code {}'.format(npm_test_command, result))
-      else:
-        raise RuntimeError('Unknown package manager: {}'.format(package_manager))
 
     self._currently_executing_test_targets = []
 

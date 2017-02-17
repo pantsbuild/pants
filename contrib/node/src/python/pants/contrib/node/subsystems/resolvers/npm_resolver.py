@@ -39,7 +39,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
       #     'Cannot find package.json. Did you forget to put it in target sources?')
       package_manager = node_task.get_package_manager_for_target(target=target)
       if package_manager == 'npm':
-        if os.path.exists(os.path.join(results_dir, 'npm-shrinkwrap.json')):
+        if os.path.exists('npm-shrinkwrap.json'):
           logger.info('Found npm-shrinkwrap.json, do not inject package.json')
         else:
           logger.warning(
@@ -65,8 +65,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
         if returncode != 0:
           raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
                           .format(target.address.reference(), yarnpkg_command, returncode))
-      else:
-        raise RuntimeError('Unknown package manager: {}'.format(package_manager))
 
   def _emit_package_descriptor(self, node_task, target, results_dir, node_paths):
     dependencies = {

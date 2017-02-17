@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
-
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 
 from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 from pants.contrib.node.targets.node_bundle import NodeBundle
@@ -19,17 +17,13 @@ from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest
 
 
-logger = logging.getLogger(__name__)
-
-
 class NodeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
     return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.Factory,)
 
-  @property
-  @memoized_method
+  @memoized_property
   def node_distribution(self):
     """A bootstrapped node distribution for use by node tasks."""
     return NodeDistribution.Factory.global_instance().create()
@@ -62,10 +56,9 @@ class NodeTask(Task):
   def get_package_manager_for_target(self, target):
     """Returns package manager string for target argument or global config."""
     package_manager = target.payload.get_field('package_manager').value
-    package_manager = package_manager or self.node_distribution.package_manager
-    logger.debug('NodeTask package manager:%s', package_manager)
-    if package_manager not in ['npm', 'yarnpkg']:
-      raise RuntimeError('Unknown package manager: %s' % package_manager)
+    package_manager = self.node_distribution.validate_package_manager(
+      package_manager=package_manager
+    ) if package_manager else self.node_distribution.package_manager
     return package_manager
 
   def execute_node(self, args, workunit_name=None, workunit_labels=None):

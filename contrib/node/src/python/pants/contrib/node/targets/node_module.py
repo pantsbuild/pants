@@ -30,9 +30,6 @@ class NodeModule(NodePackage):
     # tasks.  The reality is likely to be though that both pants will never cover all cases, and a
     # back door to execute new tools during development will be desirable and supporting conversion
     # of pre-existing package.json files as node_module targets will require this.
-    package_manager = 'yarnpkg' if package_manager == 'yarn' else package_manager
-    if package_manager and package_manager not in ['npm', 'yarnpkg']:
-      raise RuntimeError('Unknown package manager: %s' % package_manager)
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources=sources,

@@ -10,6 +10,7 @@ import os
 import subprocess
 from collections import namedtuple
 
+from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
@@ -39,9 +40,10 @@ class NodeDistribution(object):
       register('--version', advanced=True, default='6.9.1',
                help='Node distribution version.  Used as part of the path to lookup the '
                     'distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--package-manager', advanced=True, default='npm',
+      register('--package-manager', advanced=True, default='npm', fingerprint=True,
+               choices=NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys(),
                help='Default package manager config for repo. Should be one of [npm,yarnpkg]')
-      register('--yarnpkg-version', advanced=True, default='v0.19.1',
+      register('--yarnpkg-version', advanced=True, default='v0.19.1', fingerprint=True,
                help='Yarnpkg version. Used for binary utils')
 
     def create(self):
@@ -50,11 +52,19 @@ class NodeDistribution(object):
       # transitioning from the 0.10.x series to the 0.12.x series.
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
-      # for o in options:
-      #   logger.debug('NodeDistrybution.Factory.create options[%s]: %s', o, options[o])
       return NodeDistribution(
         binary_util, options.supportdir, options.version,
-        package_manager=options.package_manager, yarnpkg_version=options.yarnpkg_version)
+        package_manager=options.package_manager,
+        yarnpkg_version=options.yarnpkg_version)
+
+  VALID_PACKAGE_MANAGER_LIST = {'npm': 'npm', 'yarn': 'yarnpkg'}
+
+  @classmethod
+  def validate_package_manager(cls, package_manager):
+    if package_manager not in cls.VALID_PACKAGE_MANAGER_LIST.keys():
+      raise TaskError('Unknown package manager: %s' % package_manager)
+    package_manager = cls.VALID_PACKAGE_MANAGER_LIST[package_manager]
+    return package_manager
 
   @classmethod
   def _normalize_version(cls, version):
@@ -66,13 +76,10 @@ class NodeDistribution(object):
     self._binary_util = binary_util
     self._relpath = relpath
     self._version = self._normalize_version(version)
-    package_manager = 'yarnpkg' if package_manager == 'yarn' else package_manager
-    if package_manager not in ['npm', 'yarnpkg']:
-      raise RuntimeError('Unknown package manager: %s' % package_manager)
-    logger.info('Node.js version: %s package manager from config: %s',
-                self._version, package_manager)
-    self.package_manager = package_manager
-    self.yarnpkg_version = self._normalize_version(yarnpkg_version)
+    self.package_manager = self.validate_package_manager(package_manager=package_manager)
+    self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
+    logger.debug('Node.js version: %s package manager from config: %s',
+                 self._version, package_manager)
 
   @property
   def version(self):
@@ -83,6 +90,19 @@ class NodeDistribution(object):
     """
     return self._version
 
+  def get_binary_path_from_tgz(self, supportdir, version, filename, inpackage_path):
+    tarball_filepath = self._binary_util.select_binary(
+      supportdir=supportdir, version=version, name=filename)
+    logger.debug('Tarball for %s(%s): %s', supportdir, version, tarball_filepath)
+    work_dir = os.path.dirname(tarball_filepath)
+    unpacked_dir = os.path.join(work_dir, 'unpacked')
+    if not os.path.exists(unpacked_dir):
+      with temporary_dir(root_dir=work_dir) as tmp_dist:
+        TGZ.extract(tarball_filepath, tmp_dist)
+        os.rename(tmp_dist, unpacked_dir)
+    binary_path = os.path.join(unpacked_dir, inpackage_path)
+    return binary_path
+
   @memoized_property
   def path(self):
     """Returns the root path of this node distribution.
@@ -90,15 +110,9 @@ class NodeDistribution(object):
     :returns: The Node distribution root path.
     :rtype: string
     """
-    node_tar = self._binary_util.select_binary(self._relpath, self.version, 'node.tar.gz')
-    logger.debug('Node tarball: %s', node_tar)
-    node_work_dir = os.path.dirname(node_tar)
-    node_umpacked_dir = os.path.join(node_work_dir, 'unpacked')
-    if not os.path.exists(node_umpacked_dir):
-      with temporary_dir(root_dir=node_work_dir) as tmp_dist:
-        TGZ.extract(node_tar, tmp_dist)
-        os.rename(tmp_dist, node_umpacked_dir)
-    node_path = os.path.join(node_umpacked_dir, 'node')
+    node_path = self.get_binary_path_from_tgz(
+      supportdir=self._relpath, version=self.version, filename='node.tar.gz',
+      inpackage_path='node')
     logger.debug('Node path: %s', node_path)
     return node_path
 
@@ -109,16 +123,9 @@ class NodeDistribution(object):
     :returns: The yarnpkg root path.
     :rtype: string
     """
-    yarnpkg_tar = self._binary_util.select_binary(
-      'bin/yarnpkg', self.yarnpkg_version, 'yarnpkg.tar.gz')
-    logger.debug('Yarnpkg tarball: %s', yarnpkg_tar)
-    yarnpkg_work_dir = os.path.dirname(yarnpkg_tar)
-    yarnpkg_umpacked_dir = os.path.join(yarnpkg_work_dir, 'unpacked')
-    if not os.path.exists(yarnpkg_umpacked_dir):
-      with temporary_dir(root_dir=yarnpkg_work_dir) as tmp_dist:
-        TGZ.extract(yarnpkg_tar, tmp_dist)
-        os.rename(tmp_dist, yarnpkg_umpacked_dir)
-    yarnpkg_path = os.path.join(yarnpkg_umpacked_dir, 'dist')
+    yarnpkg_path = self.get_binary_path_from_tgz(
+      supportdir='bin/yarnpkg', version=self.yarnpkg_version, filename='yarnpkg.tar.gz',
+      inpackage_path='dist')
     logger.debug('Yarnpkg path: %s', yarnpkg_path)
     return yarnpkg_path
 
