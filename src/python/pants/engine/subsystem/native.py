@@ -90,7 +90,6 @@ _FFI.cdef(
     typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
-    typedef Buffer           (*extern_lift_bytes)(ExternContext*, Value*);
     typedef Value            (*extern_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
@@ -128,7 +127,6 @@ _FFI.cdef(
                      extern_satisfied_by,
                      extern_store_list,
                      extern_store_bytes,
-                     extern_lift_bytes,
                      extern_project,
                      extern_project_multi,
                      extern_create_exception,
@@ -281,13 +279,6 @@ def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
   """Given a context and raw bytes, return a new Value to represent the content."""
   c = _FFI.from_handle(context_handle)
   return c.to_value(bytes(_FFI.buffer(bytes_ptr, bytes_len)))
-
-
-@_FFI.callback("Buffer(ExternContext*, Value*)")
-def extern_lift_bytes(context_handle, bytes_val):
-  """Given a context and a Value representing bytes, return a Buffer."""
-  c = _FFI.from_handle(context_handle)
-  return c.buf(c.from_value(bytes_val))
 
 
 @_FFI.callback("Value(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*)")
@@ -558,7 +549,6 @@ class Native(object):
                            extern_satisfied_by,
                            extern_store_list,
                            extern_store_bytes,
-                           extern_lift_bytes,
                            extern_project,
                            extern_project_multi,
                            extern_create_exception,

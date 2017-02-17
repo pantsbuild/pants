@@ -10,14 +10,13 @@ use std::sync::Arc;
 use futures::future::{self, BoxFuture, Future};
 
 use context::Core;
-use core::{Function, Key, TypeConstraint, TypeId, Value, Variants};
+use core::{Function, Key, TypeConstraint, Value, Variants};
 use externs;
 use fs::{
   self,
   Dir,
   File,
   FileContent,
-  Fingerprint,
   PathGlobs,
   PathStat,
   VFS,
@@ -54,58 +53,6 @@ impl Context {
   }
 
   /**
-   * Create NodeKeys for each Task that might be able to compute the given product for the
-   * given subject and variants.
-   *
-   * (analogous to NodeBuilder.gen_nodes)
-   */
-  fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Task> {
-    // If the requested product is a Snapshot, use a Snapshot Node.
-    if product == self.type_snapshot() {
-      vec![
-        // TODO: Hack... should have an intermediate Node to Select PathGlobs for the subject
-        // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
-        // different subjects but identical PathGlobs will cause redundant work.
-        Node::Snapshot(
-          Snapshot {
-            subject: subject.clone(),
-            product: product.clone(),
-            variants: variants.clone(),
-          }
-        )
-      ]
-    } else if product == self.type_files_content() {
-      vec![
-        // TODO: Hack... should have an intermediate Node to Select PathGlobs for the subject
-        // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
-        // different subjects but identical PathGlobs will cause redundant work.
-        Node::FilesContent(
-          FilesContent {
-            subject: subject.clone(),
-            product: product.clone(),
-            variants: variants.clone(),
-          }
-        )
-      ]
-    } else {
-      self.core.tasks.gen_tasks(subject.type_id(), product)
-        .map(|tasks| {
-          tasks.iter()
-            .map(|task|
-              Task {
-                subject: subject.clone(),
-                product: product.clone(),
-                variants: variants.clone(),
-                task: task.clone(),
-              }
-            )
-            .collect()
-        })
-        .unwrap_or_else(|| Vec::new())
-    }
-  }
-
-  /**
    * Get the future value for the given Node implementation.
    */
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
@@ -118,7 +65,7 @@ impl Context {
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    externs::satisfied_by(&self.tasks.type_has_products, item.type_id())
+    externs::satisfied_by(&self.core.types.has_products, item.type_id())
   }
 
   /**
@@ -139,13 +86,13 @@ impl Context {
    * those configured in types::Types.
    */
   fn invoke_unsafe(&self, func: &Function, args: &Vec<Value>) -> Value {
-    let func_val = self.core.externs.val_for_id(func.0);
-    self.core.externs.invoke_runnable(&func_val, args, false)
+    let func_val = externs::val_for_id(func.0);
+    externs::invoke_runnable(&func_val, args, false)
       .unwrap_or_else(|e| {
         panic!(
           "Core function `{}` failed: {}",
-          self.core.externs.id_to_str(func.0),
-          self.core.externs.val_to_str(&e)
+          externs::id_to_str(func.0),
+          externs::val_to_str(&e)
         );
       })
   }
@@ -219,14 +166,6 @@ impl Context {
     &self.core.types.path_globs
   }
 
-  fn type_snapshot(&self) -> &TypeConstraint {
-    &self.core.types.snapshot
-  }
-
-  fn type_files_content(&self) -> &TypeConstraint {
-    &self.core.types.files_content
-  }
-
   fn lift_path_globs(&self, item: &Value) -> Result<PathGlobs, String> {
     let include = self.project_multi_strs(item, &self.core.tasks.field_include);
     let exclude = self.project_multi_strs(item, &self.core.tasks.field_exclude);
@@ -234,16 +173,6 @@ impl Context {
       .map_err(|e| {
         format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)
       })
-  }
-
-  fn lift_snapshot_fingerprint(&self, item: &Value) -> Fingerprint {
-    let fingerprint_val =
-      externs::project(
-        item,
-        &self.core.tasks.field_fingerprint,
-        &self.core.types.bytes,
-      );
-    Fingerprint::from_bytes_unsafe(&self.core.externs.lift_bytes(&fingerprint_val))
   }
 
   /**
@@ -344,6 +273,10 @@ impl Select {
     }
   }
 
+  fn product(&self) -> &TypeConstraint {
+    &self.selector.product
+  }
+
   fn select_literal_single<'a>(
     &self,
     context: &Context,
@@ -436,6 +369,72 @@ impl Select {
         ),
     }
   }
+
+  /**
+   * Gets a Snapshot for the current subject.
+   */
+  fn get_snapshot(&self, context: &Context) -> NodeFuture<fs::Snapshot> {
+    // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
+    // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
+    // different subjects but identical PathGlobs will cause redundant work.
+    context.get(
+      Snapshot {
+        subject: self.subject.clone(),
+        product: self.product().clone(),
+        variants: self.variants.clone(),
+      }
+    )
+  }
+
+  /**
+   * Return Futures for each Task/Node that might be able to compute the given product for the
+   * given subject and variants.
+   */
+  fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
+    // TODO: These `product==` hooks are hacky.
+    if self.product() == &context.core.types.snapshot {
+      // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
+      // for this caller.
+      let context = context.clone();
+      vec![
+        self.get_snapshot(&context)
+          .map(move |snapshot| context.store_snapshot(&snapshot))
+          .boxed()
+      ]
+    } else if self.product() == &context.core.types.files_content {
+      // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
+      let context = context.clone();
+      vec![
+        self.get_snapshot(&context)
+          .and_then(move |snapshot|
+            // Request the file contents of the Snapshot, and then store them.
+            context.core.snapshots.contents_for(&context.core.vfs, snapshot)
+              .then(move |files_content_res| match files_content_res {
+                Ok(files_content) => Ok(context.store_files_content(&files_content)),
+                Err(e) => Err(context.throw(&e)),
+              })
+          )
+          .boxed()
+      ]
+    } else {
+      context.core.tasks.gen_tasks(self.subject.type_id(), self.product())
+        .map(|tasks| {
+          tasks.iter()
+            .map(|task|
+              context.get(
+                Task {
+                  subject: self.subject.clone(),
+                  product: self.product().clone(),
+                  variants: self.variants.clone(),
+                  task: task.clone(),
+                }
+              )
+            )
+            .collect()
+        })
+        .unwrap_or_else(|| Vec::new())
+    }
+  }
 }
 
 impl Node for Select {
@@ -460,17 +459,17 @@ impl Node for Select {
       };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, context.val_for(&self.subject), &variant_value) {
+    if let Some(literal_value) = self.select_literal(&context, externs::val_for(&self.subject), &variant_value) {
       return context.ok(literal_value);
     }
 
     // Else, attempt to use the configured tasks to compute the value.
     let deps_future =
       future::join_all(
-        context.gen_nodes(&self.subject, &self.selector.product, &self.variants).into_iter()
-          .map(|task_node| {
-            // Attempt to get the value of each task Node, but don't fail the join if one fails.
-            context.get(task_node).then(|r| future::ok(r))
+        self.gen_nodes(&context).into_iter()
+          .map(|node_future| {
+            // Don't fail the join if one fails.
+            node_future.then(|r| future::ok(r))
           })
           .collect::<Vec<_>>()
       );
@@ -502,7 +501,7 @@ impl Node for SelectLiteral {
   type Output = Value;
 
   fn run(&self, context: Context) -> NodeFuture<Value> {
-    context.ok(context.val_for(&self.selector.subject))
+    context.ok(externs::val_for(&self.selector.subject))
   }
 }
 
@@ -546,7 +545,7 @@ impl SelectDependencies {
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
 
-    let dep_subject_key = context.key_for(dep_subject);
+    let dep_subject_key = externs::key_for(dep_subject);
     if self.selector.transitive {
       // After the root has been expanded, a traversal continues with dep_product == product.
       let mut selector = self.selector.clone();
@@ -563,7 +562,7 @@ impl SelectDependencies {
     }
   }
 
-  fn store(&self, context: &Context, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
+  fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
     if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product.type_id())  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
@@ -605,7 +604,7 @@ impl Node for SelectDependencies {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    Ok(node.store(&context, &dep_product, dep_values.iter().collect()))
+                    Ok(node.store(&dep_product, dep_values.iter().collect()))
                   },
                   Err(failure) =>
                     Err(context.was_required(failure)),
@@ -659,7 +658,7 @@ impl Node for SelectProjection {
               .get(
                 Select::new(
                   node.selector.product,
-                  context.key_for(&projected_subject),
+                  externs::key_for(&projected_subject),
                   node.variants.clone()
                 )
               )
@@ -686,6 +685,12 @@ impl From<SelectProjection> for NodeKey {
   }
 }
 
+/**
+ * A Node that captures an fs::Snapshot for the given subject.
+ *
+ * Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
+ * PathStats matched by the PathGlobs.
+ */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   subject: Key,
@@ -694,24 +699,21 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PathGlobs) -> StepFuture {
+  fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
     // Recursively expand PathGlobs into PathStats.
     context.core.vfs
       .expand(path_globs)
       .then(move |path_stats_res| match path_stats_res {
         Ok(path_stats) => {
           // And then create a Snapshot.
-          let snapshot_res =
-            context.core.snapshots.create(
+          context.core.snapshots
+            .create(
               &context.core.vfs,
               path_stats
-            );
-          match snapshot_res {
-            Ok(snapshot) =>
-              Ok(context.store_snapshot(&snapshot)),
-            Err(err) =>
-              Err(context.throw(&format!("Snapshot failed: {}", err)))
-          }
+            )
+            .map_err(|e| {
+              context.throw(&format!("Snapshot failed: {}", e))
+            })
         },
         Err(e) =>
           Err(context.throw(&format!("PathGlobs expansion failed: {:?}", e))),
@@ -720,13 +722,15 @@ impl Snapshot {
   }
 }
 
-impl Step for Snapshot {
-  fn step(&self, context: Context) -> StepFuture {
+impl Node for Snapshot {
+  type Output = fs::Snapshot;
+
+  fn run(&self, context: Context) -> NodeFuture<fs::Snapshot> {
     // Compute and parse PathGlobs for the subject.
     context
       .get(
-        &Node::create(
-          Selector::select(context.type_path_globs().clone()),
+        Select::new(
+          context.type_path_globs().clone(),
           self.subject.clone(),
           self.variants.clone()
         )
@@ -747,39 +751,9 @@ impl Step for Snapshot {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct FilesContent {
-  subject: Key,
-  product: TypeConstraint,
-  variants: Variants,
-}
-
-impl Step for FilesContent {
-  fn step(&self, context: Context) -> StepFuture {
-    // Request a Snapshot for the subject.
-    context
-      .get(
-        &Node::create(
-          Selector::select(context.type_snapshot().clone()),
-          self.subject.clone(),
-          self.variants.clone()
-        )
-      )
-      .then(move |snapshot_res| match snapshot_res {
-        Ok(snapshot_val) => {
-          // Request the file contents of the Snapshot, and then store them.
-          let fingerprint = context.lift_snapshot_fingerprint(&snapshot_val);
-          context.core.snapshots.contents_for(&context.core.vfs, fingerprint)
-            .then(move |files_content_res| match files_content_res {
-              Ok(files_content) => Ok(context.store_files_content(&files_content)),
-              Err(e) => Err(context.throw(&e)),
-            })
-            .boxed()
-        },
-        Err(failure) =>
-          context.err(context.was_optional(failure, "No source of Snapshot."))
-      })
-      .boxed()
+impl From<Snapshot> for NodeKey {
+  fn from(n: Snapshot) -> Self {
+    NodeKey::Snapshot(n)
   }
 }
 
@@ -842,7 +816,7 @@ impl Node for Task {
         Ok(deps) =>
           context.invoke_runnable(
             &externs::val_for_id(task.func.0),
-            deps,
+            &deps,
             task.cacheable,
           ),
         Err(err) =>
@@ -865,7 +839,6 @@ pub enum NodeKey {
   SelectDependencies(SelectDependencies),
   SelectProjection(SelectProjection),
   Snapshot(Snapshot),
-  FilesContent(FilesContent),
   Task(Task),
 }
 
@@ -878,7 +851,6 @@ impl NodeKey {
       &NodeKey::SelectProjection(_) => "Projection".to_string(),
       &NodeKey::Task(ref t) => format!("Task({})", externs::id_to_str(t.task.func.0)),
       &NodeKey::Snapshot(_) => "Snapshot".to_string(),
-      &NodeKey::FilesContent(_) => "FilesContent".to_string(),
     }
   }
 
@@ -890,7 +862,6 @@ impl NodeKey {
       &NodeKey::SelectProjection(ref s) => &s.subject,
       &NodeKey::Task(ref t) => &t.subject,
       &NodeKey::Snapshot(ref t) => &t.subject,
-      &NodeKey::FilesContent(ref t) => &t.subject,
     }
   }
 
@@ -902,7 +873,6 @@ impl NodeKey {
       &NodeKey::SelectProjection(ref s) => &s.selector.product,
       &NodeKey::Task(ref t) => &t.product,
       &NodeKey::Snapshot(ref t) => &t.product,
-      &NodeKey::FilesContent(ref t) => &t.product,
     }
   }
 }
@@ -918,7 +888,6 @@ impl Node for NodeKey {
       &NodeKey::SelectProjection(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Task(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Snapshot(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::FilesContent(ref n) => n.run(context).map(|v| v.into()).boxed(),
     }
   }
 }
@@ -926,11 +895,18 @@ impl Node for NodeKey {
 #[derive(Clone, Debug)]
 pub enum NodeResult {
   Value(Value),
+  Snapshot(fs::Snapshot),
 }
 
 impl From<Value> for NodeResult {
   fn from(v: Value) -> Self {
     NodeResult::Value(v)
+  }
+}
+
+impl From<fs::Snapshot> for NodeResult {
+  fn from(v: fs::Snapshot) -> Self {
+    NodeResult::Snapshot(v)
   }
 }
 
@@ -968,6 +944,18 @@ impl TryFrom<NodeResult> for Value {
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
       NodeResult::Value(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeResult> for fs::Snapshot {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::Snapshot(v) => Ok(v),
+      _ => Err(()),
     }
   }
 }

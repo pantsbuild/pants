@@ -44,7 +44,6 @@ use externs::{
   Externs,
   IdToStrExtern,
   InvokeRunnable,
-  LiftBytesExtern,
   LogExtern,
   KeyForExtern,
   ProjectExtern,
@@ -57,7 +56,6 @@ use externs::{
   ValToStrExtern,
   with_vec,
 };
-use graph::Graph;
 use nodes::Failure;
 use rule_graph::{GraphMaker, RootSubjectTypes};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
@@ -156,7 +154,6 @@ pub extern fn externs_set(
   satisfied_by: SatisfiedByExtern,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
-  lift_bytes: LiftBytesExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
@@ -176,7 +173,6 @@ pub extern fn externs_set(
       satisfied_by,
       store_list,
       store_bytes,
-      lift_bytes,
       project,
       project_multi,
       create_exception,

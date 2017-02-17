@@ -1,7 +1,7 @@
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use std::sync::{atomic, Arc, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -615,18 +615,18 @@ pub struct Snapshot {
   pub path_stats: Vec<PathStat>,
 }
 
-struct SnapshotsInner {
-  next_temp_id: usize,
-  snapshots: HashMap<Fingerprint, Snapshot>,
+impl fmt::Debug for Snapshot {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Snapshot({}, entries={})", self.fingerprint.to_hex(), self.path_stats.len())
+  }
 }
 
 /**
- * A facade for the snapshot directory, which is currently thrown away at the end of
- * each run.
+ * A facade for the snapshot directory, which is currently thrown away at the end of each run.
  */
 pub struct Snapshots {
   temp_dir: TempDir,
-  inner: Mutex<SnapshotsInner>,
+  next_temp_id: atomic::AtomicUsize,
 }
 
 impl Snapshots {
@@ -634,13 +634,7 @@ impl Snapshots {
     Ok(
       Snapshots {
         temp_dir: TempDir::new("snapshots")?,
-        inner:
-          Mutex::new(
-            SnapshotsInner {
-              next_temp_id: 0,
-              snapshots: Default::default(),
-            }
-          ),
+        next_temp_id: atomic::AtomicUsize::new(0),
       }
     )
   }
@@ -746,9 +740,8 @@ impl Snapshots {
   pub fn create(&self, vfs: &PosixVFS, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
     let temp_path = {
-      let mut inner = self.inner.lock().unwrap();
-      inner.next_temp_id += 1;
-      self.temp_dir.path().join(format!("{}.tar.tmp", inner.next_temp_id))
+      let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
+      self.temp_dir.path().join(format!("{}.tar.tmp", next_temp_id))
     };
     Snapshots::tar_create(temp_path.as_path(), &paths, &vfs.build_root)?;
 
@@ -756,27 +749,23 @@ impl Snapshots {
     let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;
     let dest_path = self.path_for(&fingerprint);
 
-    // If the resulting Snapshot already exists, return it immediately. Otherwise, rename to
-    // the final path and store.
-    let snapshot = {
-      let mut inner = self.inner.lock().unwrap();
-      if let Some(snapshot) = inner.snapshots.get(&fingerprint).map(|s| s.clone()) {
-        snapshot
-      } else {
-        fs::rename(temp_path, dest_path)
-          .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
-        inner.snapshots.entry(fingerprint).or_insert(
-          Snapshot {
-            fingerprint: fingerprint,
-            path_stats: paths,
-          }
-        ).clone()
+    // Rename to the final path if it does not already exist.
+    if dest_path.is_file() {
+      fs::remove_file(temp_path).unwrap_or(());
+    } else {
+      fs::rename(temp_path, dest_path)
+        .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
+    }
+
+    Ok(
+      Snapshot {
+        fingerprint: fingerprint,
+        path_stats: paths,
       }
-    };
-    Ok(snapshot)
+    )
   }
 
-  fn contents_for_snapshot(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
+  fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
     let mut archive = fs::File::open(path).map(|f| tar::Archive::new(f))?;
 
     // Zip the in-memory Snapshot to the on disk representation, validating as we go.
@@ -802,22 +791,12 @@ impl Snapshots {
     Ok(files_content)
   }
 
-  pub fn contents_for(&self, vfs: &PosixVFS, fingerprint: Fingerprint) -> CpuFuture<Vec<FileContent>, String> {
-    let snapshot = {
-      let inner = self.inner.lock().unwrap();
-      inner.snapshots.get(&fingerprint)
-        .unwrap_or_else(|| {
-          // Given that Snapshots are currently specific to a particular execution and located
-          // in a private temp directory, they should never disappear out from beneath us.
-          panic!("Snapshot not found: {}", fingerprint.to_hex())
-        })
-        .clone()
-    };
-
+  pub fn contents_for(&self, vfs: &PosixVFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
     vfs.pool().spawn_fn(move || {
-      Snapshots::contents_for_snapshot(snapshot, archive_path)
-        .map_err(|e| format!("Failed to open Snapshot {:?}: {:?}", fingerprint.to_hex(), e))
+      let snapshot_str = format!("{:?}", snapshot);
+      Snapshots::contents_for_sync(snapshot, archive_path)
+        .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))
     })
   }
 }

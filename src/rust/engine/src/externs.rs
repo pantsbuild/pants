@@ -82,12 +82,6 @@ pub fn store_bytes(bytes: &[u8]) -> Value {
   )
 }
 
-pub fn lift_bytes(item: &Value) -> Vec<u8> {
-  with_externs(|e|
-    (e.lift_bytes)(e.context, item).to_bytes()
-  )
-}
-
 pub fn project(value: &Value, field: &str, type_id: &TypeId) -> Value {
   with_externs(|e|
     (e.project)(e.context, value, field.as_ptr(), field.len() as u64, type_id)
@@ -193,7 +187,6 @@ pub struct Externs {
   satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
-  lift_bytes: LiftBytesExtern,
   project: ProjectExtern,
   project_multi: ProjectMultiExtern,
   id_to_str: IdToStrExtern,
@@ -221,7 +214,6 @@ impl Externs {
     satisfied_by: SatisfiedByExtern,
     store_list: StoreListExtern,
     store_bytes: StoreBytesExtern,
-    lift_bytes: LiftBytesExtern,
     project: ProjectExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
@@ -239,7 +231,6 @@ impl Externs {
       satisfied_by_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
-      lift_bytes: lift_bytes,
       project: project,
       project_multi: project_multi,
       id_to_str: id_to_str,
@@ -271,9 +262,6 @@ pub type StoreListExtern =
 
 pub type StoreBytesExtern =
   extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
-
-pub type LiftBytesExtern =
-  extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64, *const TypeId) -> Value;

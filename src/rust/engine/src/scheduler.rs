@@ -10,10 +10,9 @@ use futures::future::{self, Future};
 use context::Core;
 use core::{Field, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
-use graph::{EntryId, Graph};
+use graph::EntryId;
 use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies};
 use selectors;
-use tasks::Tasks;
 
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
@@ -50,7 +49,7 @@ impl Scheduler {
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.core.graph.visualize(&self.roots, path)
+    self.core.graph.visualize(&self.root_nodes(), path)
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
