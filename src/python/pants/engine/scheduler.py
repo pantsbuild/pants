@@ -316,13 +316,11 @@ class LocalScheduler(object):
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    subjects = set(generate_fs_subjects(filenames))
-    subject_keys = list(self._to_key(subject) for subject in subjects)
+    filenames_buf = self._native.context.vals_buf(tuple(self._to_value(fn)
+                                                        for fn in filenames))
     with self._product_graph_lock:
-      invalidated = self._native.lib.graph_invalidate(self._scheduler,
-                                                      subject_keys,
-                                                      len(subject_keys))
-      logger.debug('invalidated %d nodes for subjects: %s', invalidated, subjects)
+      invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
+      logger.debug('invalidated %d nodes for subjects: %s', invalidated, filenames)
       return invalidated
 
   def node_count(self):

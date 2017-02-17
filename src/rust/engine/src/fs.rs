@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::{atomic, Arc, RwLock, RwLockReadGuard};
+use std::sync::{atomic, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -14,7 +14,7 @@ use sha2::{Sha256, Digest};
 use tar;
 use tempdir::TempDir;
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
   Dir(Dir),
@@ -263,19 +263,19 @@ struct PathGlobsExpansion<T: Sized> {
   outputs: OrderMap<PathStat, ()>,
 }
 
-pub struct PosixVFS {
+pub struct PosixFS {
   build_root: Dir,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
   pool: RwLock<CpuPool>,
   ignore: Gitignore,
 }
 
-impl PosixVFS {
+impl PosixFS {
   pub fn new(
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
-  ) -> Result<PosixVFS, String> {
-    let pool = RwLock::new(PosixVFS::create_pool());
+  ) -> Result<PosixFS, String> {
+    let pool = RwLock::new(PosixFS::create_pool());
     let canonical_build_root =
       build_root.canonicalize().and_then(|canonical|
         canonical.metadata().and_then(|metadata|
@@ -289,12 +289,12 @@ impl PosixVFS {
       .map_err(|e| format!("Could not canonicalize build root {:?}: {:?}", build_root, e))?;
 
     let ignore =
-      PosixVFS::create_ignore(&canonical_build_root, &ignore_patterns)
+      PosixFS::create_ignore(&canonical_build_root, &ignore_patterns)
         .map_err(|e|
           format!("Could not parse build ignore inputs {:?}: {:?}", ignore_patterns, e)
         )?;
     Ok(
-      PosixVFS {
+      PosixFS {
         build_root: canonical_build_root,
         pool: pool,
         ignore: ignore,
@@ -341,46 +341,49 @@ impl PosixVFS {
 
   pub fn post_fork(&self) {
     let mut pool = self.pool.write().unwrap();
-    *pool = PosixVFS::create_pool();
+    *pool = PosixFS::create_pool();
   }
-}
 
-impl VFS<io::Error> for Arc<PosixVFS> {
-  fn read_link(&self, link: Link) -> CpuFuture<PathBuf, io::Error> {
+  pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
+    let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
-    self.pool().spawn_fn(move || {
-      link_abs
-        .read_link()
-        .and_then(|path_buf| {
-          if path_buf.is_absolute() {
-            Err(
-              io::Error::new(
-                io::ErrorKind::InvalidData, format!("Absolute symlink: {:?}", link_abs)
-              )
-            )
-          } else {
-            link.0.parent()
-              .map(|parent| parent.join(path_buf))
-              .ok_or_else(|| {
+    self.pool()
+      .spawn_fn(move || {
+        link_abs
+          .read_link()
+          .and_then(|path_buf| {
+            if path_buf.is_absolute() {
+              Err(
                 io::Error::new(
-                  io::ErrorKind::InvalidData, format!("Symlink without a parent?: {:?}", link_abs)
+                  io::ErrorKind::InvalidData, format!("Absolute symlink: {:?}", link_abs)
                 )
-              })
-          }
-        })
-    })
+              )
+            } else {
+              link_parent
+                .map(|parent| parent.join(path_buf))
+                .ok_or_else(|| {
+                  io::Error::new(
+                    io::ErrorKind::InvalidData, format!("Symlink without a parent?: {:?}", link_abs)
+                  )
+                })
+            }
+          })
+      })
+      .boxed()
   }
 
-  fn scandir(&self, dir: Dir) -> CpuFuture<Vec<Stat>, io::Error> {
+  pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     if !self.ignore.matched(dir.0.as_path(), true).is_none() {
-      // A bit awkward. But better than cloning the ignore patterns into the pool.
-      return self.pool().spawn(future::ok(vec![]));
+      return future::ok(vec![]).boxed();
     }
 
+    let dir = dir.to_owned();
     let dir_abs = self.build_root.0.join(dir.0.as_path());
-    self.pool().spawn_fn(move || {
-      PosixVFS::scandir_sync(dir, dir_abs)
-    })
+    self.pool()
+      .spawn_fn(move || {
+        PosixFS::scandir_sync(dir, dir_abs)
+      })
+      .boxed()
   }
 }
 
@@ -388,8 +391,8 @@ impl VFS<io::Error> for Arc<PosixVFS> {
  * A context for filesystem operations parameterized on an error type 'E'.
  */
 pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
-  fn read_link(&self, link: Link) -> CpuFuture<PathBuf, E>;
-  fn scandir(&self, dir: Dir) -> CpuFuture<Vec<Stat>, E>;
+  fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
+  fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
 
   /**
    * Canonicalize the Link for the given Path to an underlying File or Dir. May result
@@ -737,7 +740,7 @@ impl Snapshots {
   /**
    * Creates a Snapshot for the given paths under the given VFS.
    */
-  pub fn create(&self, vfs: &PosixVFS, paths: Vec<PathStat>) -> Result<Snapshot, String> {
+  pub fn create(&self, vfs: &PosixFS, paths: Vec<PathStat>) -> Result<Snapshot, String> {
     // Write the tar (with timestamps cleared) to a temporary file.
     let temp_path = {
       let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
@@ -791,7 +794,7 @@ impl Snapshots {
     Ok(files_content)
   }
 
-  pub fn contents_for(&self, vfs: &PosixVFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
+  pub fn contents_for(&self, vfs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
     vfs.pool().spawn_fn(move || {
       let snapshot_str = format!("{:?}", snapshot);

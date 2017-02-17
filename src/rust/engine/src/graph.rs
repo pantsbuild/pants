@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, RwLock};
 
@@ -14,7 +14,7 @@ use crossbeam::mem::epoch;
 use futures::future::{self, Future};
 
 use externs;
-use core::{FNV, Key};
+use core::FNV;
 use nodes::{
   Context,
   ContextFactory,
@@ -173,13 +173,7 @@ impl Entry {
         Some(Err(ref x)) => format!("{:?}", x),
         None => "<None>".to_string(),
       };
-    format!(
-      "{}:{}:{} == {}",
-      self.node.format(),
-      externs::id_to_str(self.node.subject().id()),
-      externs::id_to_str(self.node.product().0),
-      state,
-    ).replace("\"", "\\\"")
+    format!("{} == {}", self.node.format(), state).replace("\"", "\\\"")
   }
 }
 
@@ -299,17 +293,19 @@ impl InnerGraph {
   /**
    * Finds all Nodes with the given subjects, and invalidates their transitive dependents.
    */
-  fn invalidate(&mut self, subjects: HashSet<&Key, FNV>) -> usize {
+  fn invalidate(&mut self, paths: HashSet<PathBuf>) -> usize {
     // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
       let root_ids =
         self.nodes.iter()
           .filter_map(|(node, &entry_id)| {
-            if subjects.contains(node.subject()) {
-              Some(entry_id)
-            } else {
-              None
-            }
+            node.fs_subject().and_then(|path| {
+              if paths.contains(path) {
+                Some(entry_id)
+              } else {
+                None
+              }
+            })
           })
           .collect();
       self.walk(root_ids, { |_| true }, true).map(|e| e.id).collect()
@@ -375,7 +371,7 @@ impl InnerGraph {
           Some(Err(Failure::Throw(_))) => "tomato".to_string(),
           Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
-            viz_colors.entry(entry.node.product().clone()).or_insert_with(|| {
+            viz_colors.entry(entry.node.product_str()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },
@@ -446,10 +442,7 @@ impl InnerGraph {
 
     let _format = |entry: &Entry, level: u32| -> String {
       let indent = _indent(level);
-      let output = format!("{}Computing {} for {}",
-                           indent,
-                           externs::id_to_str(entry.node.product().0),
-                           externs::id_to_str(entry.node.subject().id()));
+      let output = format!("{}Computing {}", indent, entry.node.format());
       if is_one_level_above_bottom(entry) {
         let state_str = match entry.peek::<NodeKey>() {
           None => "<None>".to_string(),
@@ -587,9 +580,9 @@ impl Graph {
     state.get::<N>()
   }
 
-  pub fn invalidate(&self, subjects: HashSet<&Key, FNV>) -> usize {
+  pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
     let mut inner = self.inner.write().unwrap();
-    inner.invalidate(subjects)
+    inner.invalidate(paths)
   }
 
   pub fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {

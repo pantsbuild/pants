@@ -54,6 +54,7 @@ use externs::{
   TypeIdBuffer,
   ValForExtern,
   ValToStrExtern,
+  ValueBuffer,
   with_vec,
 };
 use nodes::Failure;
@@ -431,14 +432,14 @@ pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
 #[no_mangle]
 pub extern fn graph_invalidate(
   scheduler_ptr: *mut RawScheduler,
-  subjects_ptr: *mut Key,
-  subjects_len: u64,
+  path_vals: ValueBuffer,
 ) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
-   with_vec(subjects_ptr, subjects_len as usize, |subjects| {
-      let subjects_set = subjects.iter().collect();
-      raw.scheduler.core.graph.invalidate(subjects_set) as u64
-    })
+    let paths =
+      path_vals.to_vec().iter()
+        .map(|pv| PathBuf::from(externs::val_to_str(pv)))
+        .collect();
+    raw.scheduler.core.graph.invalidate(paths) as u64
   })
 }
 

@@ -1,11 +1,10 @@
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use graph::Graph;
 use tasks::Tasks;
 use types::Types;
-use fs::{PosixVFS, Snapshots};
+use fs::{PosixFS, Snapshots};
 
 
 /**
@@ -19,7 +18,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub types: Types,
   pub snapshots: Snapshots,
-  pub vfs: Arc<PosixVFS>,
+  pub vfs: PosixFS,
 }
 
 impl Core {
@@ -40,12 +39,10 @@ impl Core {
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs:
-        Arc::new(
-          PosixVFS::new(build_root, ignore_patterns)
-          .unwrap_or_else(|e| {
-            panic!("Could not initialize VFS: {:?}", e);
-          })
-        ),
+        PosixFS::new(build_root, ignore_patterns)
+        .unwrap_or_else(|e| {
+          panic!("Could not initialize VFS: {:?}", e);
+        }),
     }
   }
 

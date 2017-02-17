@@ -4,7 +4,7 @@
 
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures::future::{self, BoxFuture, Future};
@@ -17,8 +17,10 @@ use fs::{
   Dir,
   File,
   FileContent,
+  Link,
   PathGlobs,
   PathStat,
+  Stat,
   VFS,
 };
 use graph::EntryId;
@@ -231,6 +233,16 @@ impl ContextFactory for Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
+  }
+}
+
+impl VFS<Failure> for Context {
+  fn read_link(&self, link: Link) -> NodeFuture<PathBuf> {
+    self.get(ReadLink(link)).map(|res| res.0).boxed()
+  }
+
+  fn scandir(&self, dir: Dir) -> NodeFuture<Vec<Stat>> {
+    self.get(Scandir(dir)).map(|res| res.0).boxed()
   }
 }
 
@@ -686,6 +698,65 @@ impl From<SelectProjection> for NodeKey {
 }
 
 /**
+ * A Node that represents reading the destination of a symlink (non-recursively).
+ */
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ReadLink(Link);
+
+#[derive(Clone, Debug)]
+pub struct LinkDest(PathBuf);
+
+impl Node for ReadLink {
+  type Output = LinkDest;
+
+  fn run(&self, context: Context) -> NodeFuture<LinkDest> {
+    let link = self.0.clone();
+    context.core.vfs.read_link(&self.0)
+      .map(|dest_path| LinkDest(dest_path))
+      .map_err(move |e|
+        context.throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
+      )
+      .boxed()
+  }
+}
+
+impl From<ReadLink> for NodeKey {
+  fn from(n: ReadLink) -> Self {
+    NodeKey::ReadLink(n)
+  }
+}
+
+/**
+ * A Node that represents executing a directory listing that returns a Stat per directory
+ * entry (generally in one syscall). No symlinks are expanded.
+ */
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Scandir(Dir);
+
+#[derive(Clone, Debug)]
+pub struct DirectoryListing(Vec<Stat>);
+
+impl Node for Scandir {
+  type Output = DirectoryListing;
+
+  fn run(&self, context: Context) -> NodeFuture<DirectoryListing> {
+    let dir = self.0.clone();
+    context.core.vfs.scandir(&self.0)
+      .map(|listing| DirectoryListing(listing))
+      .map_err(move |e|
+        context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))
+      )
+      .boxed()
+  }
+}
+
+impl From<Scandir> for NodeKey {
+  fn from(n: Scandir) -> Self {
+    NodeKey::Scandir(n)
+  }
+}
+
+/**
  * A Node that captures an fs::Snapshot for the given subject.
  *
  * Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
@@ -700,17 +771,14 @@ pub struct Snapshot {
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
-    // Recursively expand PathGlobs into PathStats.
-    context.core.vfs
+    // Recursively expand PathGlobs into PathStats while tracking their dependencies.
+    context
       .expand(path_globs)
       .then(move |path_stats_res| match path_stats_res {
         Ok(path_stats) => {
           // And then create a Snapshot.
           context.core.snapshots
-            .create(
-              &context.core.vfs,
-              path_stats
-            )
+            .create(&context.core.vfs, path_stats)
             .map_err(|e| {
               context.throw(&format!("Snapshot failed: {}", e))
             })
@@ -834,9 +902,11 @@ impl From<Task> for NodeKey {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
+  ReadLink(ReadLink),
+  Scandir(Scandir),
   Select(Select),
-  SelectLiteral(SelectLiteral),
   SelectDependencies(SelectDependencies),
+  SelectLiteral(SelectLiteral),
   SelectProjection(SelectProjection),
   Snapshot(Snapshot),
   Task(Task),
@@ -844,35 +914,61 @@ pub enum NodeKey {
 
 impl NodeKey {
   pub fn format(&self) -> String {
+    fn keystr(key: &Key) -> String {
+      externs::id_to_str(key.id())
+    }
+    fn typstr(tc: &TypeConstraint) -> String {
+      externs::id_to_str(tc.0)
+    }
     match self {
-      &NodeKey::Select(_) => "Select".to_string(),
-      &NodeKey::SelectLiteral(_) => "Literal".to_string(),
-      &NodeKey::SelectDependencies(_) => "Dependencies".to_string(),
-      &NodeKey::SelectProjection(_) => "Projection".to_string(),
-      &NodeKey::Task(ref t) => format!("Task({})", externs::id_to_str(t.task.func.0)),
-      &NodeKey::Snapshot(_) => "Snapshot".to_string(),
+      &NodeKey::ReadLink(ref s) =>
+        format!("ReadLink({:?})", s.0),
+      &NodeKey::Scandir(ref s) =>
+        format!("Scandir({:?})", s.0),
+      &NodeKey::Select(ref s) =>
+        format!("Select({:?}, {:?})", keystr(&s.subject), typstr(&s.selector.product)),
+      &NodeKey::SelectLiteral(ref s) =>
+        format!("Literal({:?})", keystr(&s.subject)),
+      &NodeKey::SelectDependencies(ref s) =>
+        format!("Dependencies({:?}, {:?})", keystr(&s.subject), typstr(&s.selector.product)),
+      &NodeKey::SelectProjection(ref s) =>
+        format!("Projection({:?}, {:?})", keystr(&s.subject), typstr(&s.selector.product)),
+      &NodeKey::Task(ref s) =>
+        format!(
+          "Task({:?}, {:?}, {:?})",
+          externs::id_to_str(s.task.func.0),
+          keystr(&s.subject),
+          typstr(&s.product)
+        ),
+      &NodeKey::Snapshot(ref s) =>
+        format!("Snapshot({:?})", keystr(&s.subject)),
     }
   }
 
-  pub fn subject(&self) -> &Key {
+  pub fn product_str(&self) -> String {
+    fn typstr(tc: &TypeConstraint) -> String {
+      externs::id_to_str(tc.0)
+    }
     match self {
-      &NodeKey::Select(ref s) => &s.subject,
-      &NodeKey::SelectLiteral(ref s) => &s.subject,
-      &NodeKey::SelectDependencies(ref s) => &s.subject,
-      &NodeKey::SelectProjection(ref s) => &s.subject,
-      &NodeKey::Task(ref t) => &t.subject,
-      &NodeKey::Snapshot(ref t) => &t.subject,
+      &NodeKey::Select(ref s) => typstr(&s.selector.product),
+      &NodeKey::SelectLiteral(ref s) => typstr(&s.selector.product),
+      &NodeKey::SelectDependencies(ref s) => typstr(&s.selector.product),
+      &NodeKey::SelectProjection(ref s) => typstr(&s.selector.product),
+      &NodeKey::Task(ref s) => typstr(&s.product),
+      &NodeKey::Snapshot(..) => "Snapshot".to_string(),
+      &NodeKey::ReadLink(..) => "LinkDest".to_string(),
+      &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
     }
   }
 
-  pub fn product(&self) -> &TypeConstraint {
+  /**
+   * If this NodeKey represents an FS operation, returns its Path.
+   */
+  pub fn fs_subject(&self) -> Option<&Path> {
     match self {
-      &NodeKey::Select(ref s) => &s.selector.product,
-      &NodeKey::SelectLiteral(ref s) => &s.selector.product,
-      &NodeKey::SelectDependencies(ref s) => &s.selector.product,
-      &NodeKey::SelectProjection(ref s) => &s.selector.product,
-      &NodeKey::Task(ref t) => &t.product,
-      &NodeKey::Snapshot(ref t) => &t.product,
+      &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
+      &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
+      _ => None,
     }
   }
 }
@@ -882,20 +978,24 @@ impl Node for NodeKey {
 
   fn run(&self, context: Context) -> NodeFuture<NodeResult> {
     match self {
+      &NodeKey::ReadLink(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::Scandir(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Select(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectDependencies(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectLiteral(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectProjection(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Task(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Snapshot(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::Task(ref n) => n.run(context).map(|v| v.into()).boxed(),
     }
   }
 }
 
 #[derive(Clone, Debug)]
 pub enum NodeResult {
-  Value(Value),
+  DirectoryListing(DirectoryListing),
+  LinkDest(LinkDest),
   Snapshot(fs::Snapshot),
+  Value(Value),
 }
 
 impl From<Value> for NodeResult {
@@ -907,6 +1007,18 @@ impl From<Value> for NodeResult {
 impl From<fs::Snapshot> for NodeResult {
   fn from(v: fs::Snapshot) -> Self {
     NodeResult::Snapshot(v)
+  }
+}
+
+impl From<LinkDest> for NodeResult {
+  fn from(v: LinkDest) -> Self {
+    NodeResult::LinkDest(v)
+  }
+}
+
+impl From<DirectoryListing> for NodeResult {
+  fn from(v: DirectoryListing) -> Self {
+    NodeResult::DirectoryListing(v)
   }
 }
 
@@ -955,6 +1067,28 @@ impl TryFrom<NodeResult> for fs::Snapshot {
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
       NodeResult::Snapshot(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeResult> for LinkDest {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::LinkDest(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeResult> for DirectoryListing {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::DirectoryListing(v) => Ok(v),
       _ => Err(()),
     }
   }
