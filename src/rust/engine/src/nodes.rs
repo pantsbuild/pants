@@ -779,12 +779,13 @@ impl Snapshot {
           // And then create a Snapshot.
           context.core.snapshots
             .create(&context.core.vfs, path_stats)
-            .map_err(|e| {
+            .map_err(move |e| {
               context.throw(&format!("Snapshot failed: {}", e))
             })
+            .boxed()
         },
         Err(e) =>
-          Err(context.throw(&format!("PathGlobs expansion failed: {:?}", e))),
+          context.err(context.throw(&format!("PathGlobs expansion failed: {:?}", e))),
       })
       .boxed()
   }

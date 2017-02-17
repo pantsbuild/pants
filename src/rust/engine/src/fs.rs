@@ -550,8 +550,8 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   }
 
   /**
-   * Apply a PathGlob, returning either PathStats and PathGlobs on success or continuations
-   * if more information is needed.
+   * Apply a PathGlob, returning PathStats and additional PathGlobs that are needed for the
+   * expansion.
    */
   fn expand_single(&self, path_glob: PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
     match path_glob {
@@ -734,38 +734,47 @@ impl Snapshots {
   }
 
   fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
-    self.temp_dir.path().join(format!("{}.tar", fingerprint.to_hex()))
+    Snapshots::path_under_for(self.temp_dir.path(), fingerprint)
+  }
+
+  fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
+    path.join(format!("{}.tar", fingerprint.to_hex()))
   }
 
   /**
    * Creates a Snapshot for the given paths under the given VFS.
    */
-  pub fn create(&self, vfs: &PosixFS, paths: Vec<PathStat>) -> Result<Snapshot, String> {
-    // Write the tar (with timestamps cleared) to a temporary file.
+  pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
+    let dest_dir = self.temp_dir.path().to_owned();
+    let build_root = fs.build_root.clone();
     let temp_path = {
       let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
       self.temp_dir.path().join(format!("{}.tar.tmp", next_temp_id))
     };
-    Snapshots::tar_create(temp_path.as_path(), &paths, &vfs.build_root)?;
 
-    // Fingerprint the resulting tar file.
-    let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;
-    let dest_path = self.path_for(&fingerprint);
+    fs.pool().spawn_fn(move || {
+      // Write the tar (with timestamps cleared) to a temporary file.
+      Snapshots::tar_create(temp_path.as_path(), &paths, &build_root)?;
 
-    // Rename to the final path if it does not already exist.
-    if dest_path.is_file() {
-      fs::remove_file(temp_path).unwrap_or(());
-    } else {
-      fs::rename(temp_path, dest_path)
-        .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
-    }
+      // Fingerprint the resulting tar file.
+      let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;
+      let dest_path = Snapshots::path_under_for(&dest_dir, &fingerprint);
 
-    Ok(
-      Snapshot {
-        fingerprint: fingerprint,
-        path_stats: paths,
+      // Rename to the final path if it does not already exist.
+      if dest_path.is_file() {
+        fs::remove_file(temp_path).unwrap_or(());
+      } else {
+        fs::rename(temp_path, dest_path)
+          .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
       }
-    )
+
+      Ok(
+        Snapshot {
+          fingerprint: fingerprint,
+          path_stats: paths,
+        }
+      )
+    })
   }
 
   fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
@@ -794,9 +803,9 @@ impl Snapshots {
     Ok(files_content)
   }
 
-  pub fn contents_for(&self, vfs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
+  pub fn contents_for(&self, fs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    vfs.pool().spawn_fn(move || {
+    fs.pool().spawn_fn(move || {
       let snapshot_str = format!("{:?}", snapshot);
       Snapshots::contents_for_sync(snapshot, archive_path)
         .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))
