@@ -55,6 +55,7 @@ Created by running `build-support/bin/contributors.sh`.
 + James Mouradian
 + Jason Jackson
 + Jeff Jenkins
++ Jeremy Hintz
 + Jessica Rosenfield
 + Jin Feng
 + Joe Crobak
