@@ -87,7 +87,6 @@ pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
   )
 }
 
-
 pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
   with_externs(|e| {
     (e.project_multi)(e.context, value, field.as_ptr(), field.len() as u64).to_vec()
