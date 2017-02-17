@@ -1,3 +1,5 @@
+# web-component-button target installs all node module dependencies but does not run webpack
+# transpile since there is no build_script declared.
 node_module(
   name='web-component-button',
   sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
@@ -25,12 +27,13 @@ node_test(
   tags={'integration'},
 )
 
+# Contains non-transpiled codes including all dependencies under node_modules dirctory.
 node_bundle(
   name='web-component-button-bundle',
   node_module=':web-component-button'
 )
 
-# The following target invokes webpack build.
+# web-component-button-processed target invokes webpack transpiling via build_script.
 node_module(
   name='web-component-button-processed',
   sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),
@@ -42,11 +45,13 @@ node_module(
   build_script='build',
 )
 
+# Contained transpiled codes.
 node_bundle(
   name='web-component-button-processed-bundle',
   node_module=':web-component-button-processed'
 )
 
+# Used to testing dependencies bundling.
 node_module(
   name='web-component-button-processed-with-dependency-artifacts',
   sources=globs('package.json', 'webpack.config.js', 'src/*', 'test/*'),

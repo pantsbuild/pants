@@ -49,7 +49,7 @@ class NodeBundle(NodeTask):
               build_dir,
               self._outdir,
               target.package_name,
-              None,
+              prefix=None,
               dereference=False
             )
             bundle_archive_product.add(

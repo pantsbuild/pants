@@ -3,6 +3,7 @@
 
 target(
   dependencies=[
+    ':node_build',
     ':node_bundle',
     ':node_repl',
     ':node_resolve',

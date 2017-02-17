@@ -47,7 +47,7 @@ class NodeBuild(NodeTask):
       'bundleable_js', init_func=lambda: defaultdict(MultipleRootedProducts))
 
     targets = self.context.targets(predicate=self.is_node_module)
-    with self.invalidated(targets) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         target = vt.target
         target_address = target.address.reference()
@@ -67,7 +67,7 @@ class NodeBuild(NodeTask):
                   'Failed to run build for {}:\n\t{} failed with exit code {}'.format(
                     target_address, npm_build_command, result))
 
-            if target.payload.preserve_artifacts:
+            if not target.payload.dev_dependency:
               output_dir = os.path.join(node_installed_path, target.payload.output_dir)
               if os.path.exists(output_dir):
                 bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
@@ -76,11 +76,11 @@ class NodeBuild(NodeTask):
                   'Target {} has build script {} specified, but did not generate any output '
                   'at {}.\n'.format(target_address, npm_build_command, output_dir))
           else:
-            if target.payload.preserve_artifacts:
+            if not target.payload.dev_dependency:
               bundleable_js_product[target].add_abs_paths(node_installed_path, [node_installed_path])
               output_dir = node_installed_path
 
-          if target.payload.preserve_artifacts:
+          if not target.payload.dev_dependency:
             if not vt.valid:
               # Resources included in a JAR file will be under %target_name%
               absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))

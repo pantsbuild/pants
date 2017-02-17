@@ -12,6 +12,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ],
+  timeout=30,
 )
 
 python_tests(
@@ -24,6 +25,7 @@ python_tests(
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
   ],
+  timeout=30
 )
 
 python_tests(

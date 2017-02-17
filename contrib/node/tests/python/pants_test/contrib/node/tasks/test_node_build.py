@@ -85,13 +85,13 @@ class TestNodeBuild(TaskTestBase):
     node_dependent_module = self.make_target(
       spec=':dependent_target',
       target_type=NodeModule,
-      preserve_artifacts=False)
+      dev_dependency=True)
 
     target = self.make_target(
       spec=':target_no_build',
       target_type=NodeModule,
       dependencies=[node_dependent_module],
-      preserve_artifacts=False
+      dev_dependency=True
     )
     bundleable_js, runtime_classpath, node_paths = self._run_test_and_get_products(
       [(target, None), (node_dependent_module, None)])
