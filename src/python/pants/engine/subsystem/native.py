@@ -115,28 +115,29 @@ _FFI.cdef(
       // ignore them because we never have collections of this type.
     } RawNodes;
 
-    RawScheduler* scheduler_create(ExternContext*,
-                                   extern_log,
-                                   extern_key_for,
-                                   extern_val_for,
-                                   extern_clone_val,
-                                   extern_drop_handles,
-                                   extern_id_to_str,
-                                   extern_val_to_str,
-                                   extern_satisfied_by,
-                                   extern_store_list,
-                                   extern_project,
-                                   extern_project_ignoring_type,
-                                   extern_project_multi,
-                                   extern_create_exception,
-                                   extern_invoke_runnable,
-                                   Buffer,
+    void externs_set(ExternContext*,
+                     extern_log,
+                     extern_key_for,
+                     extern_val_for,
+                     extern_clone_val,
+                     extern_drop_handles,
+                     extern_id_to_str,
+                     extern_val_to_str,
+                     extern_satisfied_by,
+                     extern_store_list,
+                     extern_project,
+                     extern_project_ignoring_type,
+                     extern_project_multi,
+                     extern_create_exception,
+                     extern_invoke_runnable,
+                     TypeId);
+
+    RawScheduler* scheduler_create(Buffer,
                                    Buffer,
                                    Buffer,
                                    TypeConstraint,
                                    TypeConstraint,
-                                   TypeConstraint,
-                                   TypeId);
+                                   TypeConstraint);
     void scheduler_destroy(RawScheduler*);
 
     void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
@@ -522,7 +523,27 @@ class Native(object):
   def context(self):
     # We statically initialize a ExternContext to correspond to the queue of dropped
     # Handles that the native code maintains.
-    return _FFI.init_once(ExternContext, 'ExternContext singleton')
+    def init_externs():
+      context = ExternContext()
+      self.lib.externs_set(context.handle,
+                           extern_log,
+                           extern_key_for,
+                           extern_val_for,
+                           extern_clone_val,
+                           extern_drop_handles,
+                           extern_id_to_str,
+                           extern_val_to_str,
+                           extern_satisfied_by,
+                           extern_store_list,
+                           extern_project,
+                           extern_project_ignoring_type,
+                           extern_project_multi,
+                           extern_create_exception,
+                           extern_invoke_runnable,
+                           TypeId(context.to_id(str)))
+      return context
+
+    return _FFI.init_once(init_externs, 'ExternContext singleton')
 
   def new(self, cdecl, init):
     return _FFI.new(cdecl, init)
@@ -547,27 +568,10 @@ class Native(object):
     address_constraint = TypeConstraint(self.context.to_id(address_constraint))
     variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
 
-    scheduler = self.lib.scheduler_create(self.context.handle,
-                                          extern_log,
-                                          extern_key_for,
-                                          extern_val_for,
-                                          extern_clone_val,
-                                          extern_drop_handles,
-                                          extern_id_to_str,
-                                          extern_val_to_str,
-                                          extern_satisfied_by,
-                                          extern_store_list,
-                                          extern_project,
-                                          extern_project_ignoring_type,
-                                          extern_project_multi,
-                                          extern_create_exception,
-                                          extern_invoke_runnable,
-                                          self.context.utf8_buf('name'),
+    scheduler = self.lib.scheduler_create(self.context.utf8_buf('name'),
                                           self.context.utf8_buf('products'),
                                           self.context.utf8_buf('default'),
                                           address_constraint,
                                           has_products_constraint,
-                                          variants_constraint,
-                                          TypeId(self.context.to_id(str))
-    )
+                                          variants_constraint)
     return self.gc(scheduler, self.lib.scheduler_destroy)

@@ -1,3 +1,6 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::collections::HashMap;
 use std::mem;
 use std::os::raw;
@@ -7,6 +10,165 @@ use std::sync::RwLock;
 use core::{Id, Key, TypeConstraint, TypeId, Value};
 use nodes::Runnable;
 use handles::Handle;
+
+
+pub fn log(level: LogLevel, msg: &str) {
+  with_externs(|e|
+    (e.log)(e.context, level as u8, msg.as_ptr(), msg.len() as u64)
+  )
+}
+
+pub fn key_for(val: &Value) -> Key {
+  with_externs(|e|
+    (e.key_for)(e.context, val)
+  )
+}
+
+pub fn val_for(key: &Key) -> Value {
+  with_externs(|e|
+    (e.val_for)(e.context, key)
+  )
+}
+
+pub fn clone_val(val: &Value) -> Value {
+  with_externs(|e|
+    (e.clone_val)(e.context, val)
+  )
+}
+
+pub fn val_for_id(id: Id) -> Value {
+  val_for(&Key::new_with_anon_type_id(id))
+}
+
+pub fn drop_handles(handles: Vec<Handle>) {
+  with_externs(|e|
+    (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64)
+  )
+}
+
+pub fn satisfied_by(constraint: &TypeConstraint, cls: &TypeId) -> bool {
+  with_externs(|e| {
+    let key = (*constraint, *cls);
+
+    // See if a value already exists.
+    {
+      let read = e.satisfied_by_cache.read().unwrap();
+      if let Some(v) = read.get(&key) {
+        return *v;
+      }
+    }
+
+    // If not, compute and insert.
+    let mut write = e.satisfied_by_cache.write().unwrap();
+    write.entry(key)
+      .or_insert_with(||
+        (e.satisfied_by)(e.context, constraint, cls)
+      )
+      .clone()
+  })
+}
+
+pub fn store_list(values: Vec<&Value>, merge: bool) -> Value {
+  with_externs(|e| {
+    let values_clone: Vec<*const Value> = values.into_iter().map(|v| v as *const Value).collect();
+    (e.store_list)(e.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
+  })
+}
+
+pub fn project(value: &Value, field: &str, type_id: &TypeId) -> Value {
+  with_externs(|e|
+    (e.project)(e.context, value, field.as_ptr(), field.len() as u64, type_id)
+  )
+}
+
+pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
+  with_externs(|e|
+    (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64)
+  )
+}
+
+
+pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
+  with_externs(|e| {
+    (e.project_multi)(e.context, value, field.as_ptr(), field.len() as u64).to_vec()
+  })
+}
+
+pub fn project_str(value: &Value, field: &str) -> String {
+  let name_val =
+    with_externs(|e|
+      (e.project)(e.context, value, field.as_ptr(), field.len() as u64, &e.py_str_type)
+    );
+  val_to_str(&name_val)
+}
+
+pub fn id_to_str(digest: Id) -> String {
+  with_externs(|e| {
+    (e.id_to_str)(e.context, digest).to_string().unwrap_or_else(|e| {
+      format!("<failed to decode unicode for {:?}: {}>", digest, e)
+    })
+  })
+}
+
+pub fn val_to_str(val: &Value) -> String {
+  with_externs(|e| {
+    (e.val_to_str)(e.context, val).to_string().unwrap_or_else(|e| {
+      format!("<failed to decode unicode for {:?}: {}>", val, e)
+    })
+  })
+}
+
+pub fn create_exception(msg: &str) -> Value {
+  with_externs(|e|
+    (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64)
+  )
+}
+
+pub fn invoke_runnable(runnable: &Runnable) -> Result<Value, Value> {
+  let result =
+    with_externs(|e| {
+      (e.invoke_runnable)(
+        e.context,
+        &runnable.func,
+        runnable.args.as_ptr(),
+        runnable.args.len() as u64,
+        runnable.cacheable
+      )
+    });
+  if result.is_throw {
+    Err(result.value)
+  } else {
+    Ok(result.value)
+  }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+/// The remainder of this file deals with the static initialization of the Externs.
+/////////////////////////////////////////////////////////////////////////////////////////
+
+lazy_static! {
+  static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
+}
+
+/**
+ * Set the static Externs for this process. All other methods of this module will fail
+ * until this has been called.
+ */
+pub fn set_externs(externs: Externs) {
+  let mut externs_ref = EXTERNS.write().unwrap();
+  *externs_ref = Some(externs);
+}
+
+fn with_externs<F, T>(f: F) -> T where F: FnOnce(&Externs)->T {
+  let externs_opt = EXTERNS.read().unwrap();
+  let externs =
+    externs_opt
+      .as_ref()
+      .unwrap_or_else(||
+        panic!("externs used before static initialization.")
+      );
+  f(externs)
+}
 
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = raw::c_void;
@@ -77,113 +239,6 @@ impl Externs {
       py_str_type: py_str_type
     }
   }
-
-  pub fn log(&self, level: LogLevel, msg: &str) {
-    (self.log)(self.context, level as u8, msg.as_ptr(), msg.len() as u64)
-  }
-
-  pub fn key_for(&self, val: &Value) -> Key {
-    (self.key_for)(self.context, val)
-  }
-
-  pub fn val_for(&self, key: &Key) -> Value {
-    (self.val_for)(self.context, key)
-  }
-
-  pub fn val_for_id(&self, id: Id) -> Value {
-    self.val_for(&Key::new_with_anon_type_id(id))
-  }
-
-  pub fn clone_val(&self, val: &Value) -> Value {
-    (self.clone_val)(self.context, val)
-  }
-
-  pub fn drop_handles(&self, handles: Vec<Handle>) {
-    (self.drop_handles)(self.context, handles.as_ptr(), handles.len() as u64)
-  }
-
-  pub fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    let key = (*constraint, *cls);
-
-    // See if a value already exists.
-    {
-      let read = self.satisfied_by_cache.read().unwrap();
-      if let Some(v) = read.get(&key) {
-        return *v;
-      }
-    }
-
-    // If not, compute and insert.
-    let mut write = self.satisfied_by_cache.write().unwrap();
-    write.entry(key)
-      .or_insert_with(||
-        (self.satisfied_by)(self.context, constraint, cls)
-      )
-      .clone()
-  }
-
-  pub fn store_list(&self, values: Vec<&Value>, merge: bool) -> Value {
-    let values_clone: Vec<*const Value> = values.into_iter().map(|v| v as *const Value).collect();
-    (self.store_list)(self.context, values_clone.as_ptr(), values_clone.len() as u64, merge)
-  }
-
-  pub fn project(&self, value: &Value, field: &str, type_id: &TypeId) -> Value {
-    (self.project)(self.context, value, field.as_ptr(), field.len() as u64, type_id)
-  }
-
-  pub fn project_ignoring_type(&self, value: &Value, field: &str) -> Value {
-    (self.project_ignoring_type)(self.context, value, field.as_ptr(), field.len() as u64)
-  }
-
-  pub fn project_multi(&self, value: &Value, field: &str) -> Vec<Value> {
-    let buf = (self.project_multi)(self.context, value, field.as_ptr(), field.len() as u64);
-    with_vec(buf.values_ptr, buf.values_len as usize, |value_vec| {
-      unsafe {
-        value_vec.iter().map(|v| v.clone()).collect()
-      }
-    })
-  }
-
-  pub fn project_str(&self, value: &Value, field_name: &str) -> String {
-    let name_val = self.project(
-      value,
-      field_name,
-      &self.py_str_type,
-    );
-    self.val_to_str(&name_val)
-  }
-
-  pub fn id_to_str(&self, digest: Id) -> String {
-    (self.id_to_str)(self.context, digest).to_string().unwrap_or_else(|e| {
-      format!("<failed to decode unicode for {:?}: {}>", digest, e)
-    })
-  }
-
-  pub fn val_to_str(&self, val: &Value) -> String {
-    (self.val_to_str)(self.context, val).to_string().unwrap_or_else(|e| {
-      format!("<failed to decode unicode for {:?}: {}>", val, e)
-    })
-  }
-
-  pub fn create_exception(&self, msg: &str) -> Value {
-    (self.create_exception)(self.context, msg.as_ptr(), msg.len() as u64)
-  }
-
-  pub fn invoke_runnable(&self, runnable: &Runnable) -> Result<Value, Value> {
-    let result =
-      (self.invoke_runnable)(
-        self.context,
-        &runnable.func,
-        runnable.args.as_ptr(),
-        runnable.args.len() as u64,
-        runnable.cacheable
-      );
-    if result.is_throw {
-      Err(result.value)
-    } else {
-      Ok(result.value)
-    }
-  }
 }
 
 pub type LogExtern =
@@ -231,6 +286,16 @@ pub struct ValueBuffer {
   values_len: u64,
   // A Value handle to hold the underlying buffer alive.
   handle_: Value,
+}
+
+impl ValueBuffer {
+  pub fn to_vec(&self) -> Vec<Value> {
+    with_vec(self.values_ptr, self.values_len as usize, |value_vec| {
+      unsafe {
+        value_vec.iter().map(|v| v.clone_without_handle()).collect()
+      }
+    })
+  }
 }
 
 // Points to an array of TypeIds.
