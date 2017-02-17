@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class NodeModule(NodePackage):
   """A Node module."""
 
-  def __init__(self, sources=None, address=None, payload=None, package_manager=None, **kwargs):
+  def __init__(self, package_manager=None, sources=None, address=None, payload=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
