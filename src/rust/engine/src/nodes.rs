@@ -927,22 +927,22 @@ impl NodeKey {
       &NodeKey::Scandir(ref s) =>
         format!("Scandir({:?})", s.0),
       &NodeKey::Select(ref s) =>
-        format!("Select({:?}, {:?})", keystr(&s.subject), typstr(&s.selector.product)),
+        format!("Select({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectLiteral(ref s) =>
-        format!("Literal({:?})", keystr(&s.subject)),
+        format!("Literal({})", keystr(&s.subject)),
       &NodeKey::SelectDependencies(ref s) =>
-        format!("Dependencies({:?}, {:?})", keystr(&s.subject), typstr(&s.selector.product)),
+        format!("Dependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectProjection(ref s) =>
-        format!("Projection({:?}, {:?})", keystr(&s.subject), typstr(&s.selector.product)),
+        format!("Projection({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::Task(ref s) =>
         format!(
-          "Task({:?}, {:?}, {:?})",
+          "Task({}, {}, {})",
           externs::id_to_str(s.task.func.0),
           keystr(&s.subject),
           typstr(&s.product)
         ),
       &NodeKey::Snapshot(ref s) =>
-        format!("Snapshot({:?})", keystr(&s.subject)),
+        format!("Snapshot({})", keystr(&s.subject)),
     }
   }
 
