@@ -35,6 +35,9 @@ class _StreamLogger(object):
   def flush(self):
     return
 
+  def isatty(self):
+    return False
+
 
 class PantsDaemon(ProcessManager):
   """A daemon that manages PantsService instances."""
