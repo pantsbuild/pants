@@ -177,14 +177,6 @@ class WrappedNativeScheduler(object):
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
-  def raw_root_entries(self):
-    return self._native.gc(self._native.lib.execution_roots(self._scheduler),
-                           self._native.lib.nodes_destroy)
-
-  def unpacked_root_entries(self):
-    raw_roots = self.raw_root_entries()
-    return self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len)
-
   def invalidate_via_keys(self, subject_keys):
     return self._native.lib.graph_invalidate(self._scheduler,
                                              subject_keys,
@@ -222,18 +214,28 @@ class WrappedNativeScheduler(object):
   def to_keys(self, subjects):
     return list(self._to_key(subject) for subject in subjects)
 
-  def state_from_raw_root(self, raw_root):
-    if raw_root.state_tag is 0:
-      state = None
-    elif raw_root.state_tag is 1:
-      state = Return(self._from_value(raw_root.state_value))
-    elif raw_root.state_tag is 2:
-      state = Throw(self._from_value(raw_root.state_value))
-    elif raw_root.state_tag is 3:
-      state = Throw(self._from_value(raw_root.state_value))
-    else:
-      raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
-    return state
+  def root_entries(self, execution_request):
+    raw_roots = self._native.lib.execution_roots(self._scheduler)
+    try:
+      roots = {}
+      for root, raw_root in zip(execution_request.roots,
+                                self._native.unpack(raw_roots.nodes_ptr,
+                                                               raw_roots.nodes_len)):
+        if raw_root.state_tag is 0:
+          state = None
+        elif raw_root.state_tag is 1:
+          state = Return(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 2:
+          state = Throw(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 3:
+          state = Throw(self._from_value(raw_root.state_value))
+        else:
+          raise ValueError(
+            'Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
+        roots[root] = state
+    finally:
+      self._native.lib.nodes_destroy(raw_roots)
+    return roots
 
 
 class LocalScheduler(object):
@@ -353,13 +355,9 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       if self._execution_request is not execution_request:
         raise AssertionError(
-            "Multiple concurrent executions are not supported! {} vs {}".format(
-              self._execution_request, execution_request))
-      # TODO might want to just move the below into the Wrapped scheduler
-      roots = {}
-      for root, raw_root in zip(execution_request.roots, self._scheduler.unpacked_root_entries()):
-        roots[root] = self._scheduler.state_from_raw_root(raw_root)
-      return roots
+          "Multiple concurrent executions are not supported! {} vs {}".format(
+            self._execution_request, execution_request))
+      return self._scheduler.root_entries(execution_request)
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
