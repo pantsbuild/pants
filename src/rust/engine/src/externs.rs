@@ -307,7 +307,7 @@ impl ValueBuffer {
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
   ids_len: u64,
-  // handle to hold the underlying buffer alive
+  // handle to hold the underlying array alive
   handle_: Value
 }
 
@@ -326,7 +326,7 @@ pub type ProjectMultiExtern =
 pub struct Buffer {
   bytes_ptr: *mut u8,
   bytes_len: u64,
-  // A Value handle to hold the underlying buffer alive.
+  // A Value handle to hold the underlying array alive.
   handle_: Value,
 }
 
@@ -343,6 +343,33 @@ impl Buffer {
 
   pub fn to_string(&self) -> Result<String, FromUtf8Error> {
     String::from_utf8(self.to_bytes())
+  }
+}
+
+// Points to an array of (byte) Buffers.
+#[repr(C)]
+pub struct BufferBuffer {
+  bufs_ptr: *mut Buffer,
+  bufs_len: u64,
+  // handle to hold the underlying array alive
+  handle_: Value,
+}
+
+impl BufferBuffer {
+  pub fn to_bytes_vecs(&self) -> Vec<Vec<u8>> {
+    with_vec(self.bufs_ptr, self.bufs_len as usize, |vec| {
+      vec.iter().map(|b| b.to_bytes()).collect()
+    })
+  }
+
+  pub fn to_os_strings(&self) -> Vec<OsString> {
+    self.to_bytes_vecs().into_iter().map(|v| OsString::from_vec(v)).collect()
+  }
+
+  pub fn to_strings(&self) -> Result<Vec<String>,FromUtf8Error> {
+    self.to_bytes_vecs().into_iter()
+      .map(|v| String::from_utf8(v))
+      .collect()
   }
 }
 

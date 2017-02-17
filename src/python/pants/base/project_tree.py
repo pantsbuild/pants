@@ -38,7 +38,8 @@ class ProjectTree(AbstractClass):
           'ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
     logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
-    self.ignore = PathSpec.from_lines(GitWildMatchPattern, ignore_patterns if ignore_patterns else [])
+    self.ignore_patterns = ignore_patterns if ignore_patterns else []
+    self.ignore = PathSpec.from_lines(GitWildMatchPattern, self.ignore_patterns)
 
   @abstractmethod
   def _glob1_raw(self, dir_relpath, glob):

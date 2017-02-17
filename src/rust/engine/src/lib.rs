@@ -37,6 +37,7 @@ use context::Core;
 use core::{Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
+  BufferBuffer,
   CloneValExtern,
   DropHandlesExtern,
   CreateExceptionExtern,
@@ -54,7 +55,6 @@ use externs::{
   TypeIdBuffer,
   ValForExtern,
   ValToStrExtern,
-  ValueBuffer,
   with_vec,
 };
 use nodes::Failure;
@@ -185,6 +185,8 @@ pub extern fn externs_set(
 
 #[no_mangle]
 pub extern fn scheduler_create(
+  build_root_buf: Buffer,
+  ignore_patterns_buf: BufferBuffer,
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
@@ -204,6 +206,12 @@ pub extern fn scheduler_create(
   type_string: TypeId,
   type_bytes: TypeId,
 ) -> *const RawScheduler {
+  let build_root = PathBuf::from(build_root_buf.to_os_string());
+  let ignore_patterns =
+    ignore_patterns_buf.to_strings()
+      .unwrap_or_else(|e|
+        panic!("Failed to decode ignore patterns as UTF8: {:?}", e)
+      );
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
@@ -240,13 +248,8 @@ pub extern fn scheduler_create(
               string: type_string,
               bytes: type_bytes,
             },
-            // TODO: Pass build_root and ignore patterns as argument.
-            PathBuf::from("."),
-            vec![
-              ".*".to_string(),
-              "/build-support/*.venv/".to_string(),
-              "/dist/".to_string(),
-            ],
+            build_root,
+            ignore_patterns,
           ),
         )
       }
@@ -432,12 +435,12 @@ pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
 #[no_mangle]
 pub extern fn graph_invalidate(
   scheduler_ptr: *mut RawScheduler,
-  path_vals: ValueBuffer,
+  paths_buf: BufferBuffer,
 ) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
     let paths =
-      path_vals.to_vec().iter()
-        .map(|pv| PathBuf::from(externs::val_to_str(pv)))
+      paths_buf.to_os_strings().into_iter()
+        .map(|os_str| PathBuf::from(os_str))
         .collect();
     raw.scheduler.core.graph.invalidate(paths) as u64
   })

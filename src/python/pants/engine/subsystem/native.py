@@ -64,12 +64,17 @@ _FFI.cdef(
       Value      handle_;
     } ValueBuffer;
 
-
     typedef struct {
       TypeId*     ids_ptr;
-      uint64_t   ids_len;
-      Value      handle_;
+      uint64_t    ids_len;
+      Value       handle_;
     } TypeIdBuffer;
+
+    typedef struct {
+      Buffer*     bufs_ptr;
+      uint64_t    bufs_len;
+      Value       handle_;
+    } BufferBuffer;
 
     typedef struct {
       Value  value;
@@ -133,7 +138,9 @@ _FFI.cdef(
                      extern_invoke_runnable,
                      TypeId);
 
-    RawScheduler* scheduler_create(Function,
+    RawScheduler* scheduler_create(Buffer,
+                                   BufferBuffer,
+                                   Function,
                                    Function,
                                    Function,
                                    Function,
@@ -166,7 +173,7 @@ _FFI.cdef(
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
-    uint64_t graph_invalidate(RawScheduler*, ValueBuffer);
+    uint64_t graph_invalidate(RawScheduler*, BufferBuffer);
     void graph_visualize(RawScheduler*, char*);
     void graph_trace(RawScheduler*, char*);
 
@@ -427,6 +434,11 @@ class ExternContext(object):
   def utf8_buf(self, string):
     return self.buf(string.encode('utf-8'))
 
+  def utf8_buf_buf(self, strings):
+    bufs = [self.utf8_buf(string) for string in strings]
+    buf_buf = _FFI.new('Buffer[]', bufs)
+    return (buf_buf, len(bufs), self.to_value(buf_buf, type_id=self.anon_id))
+
   def vals_buf(self, keys):
     buf = _FFI.new('Value[]', keys)
     return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
@@ -576,6 +588,8 @@ class Native(object):
     return _FFI.buffer(cdata)
 
   def new_scheduler(self,
+                    build_root,
+                    ignore_patterns,
                     construct_snapshot,
                     construct_file_content,
                     construct_files_content,
@@ -599,6 +613,8 @@ class Native(object):
 
     scheduler =\
       self.lib.scheduler_create(
+        self.context.utf8_buf(build_root),
+        self.context.utf8_buf_buf(ignore_patterns),
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_file_content)),

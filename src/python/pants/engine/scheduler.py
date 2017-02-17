@@ -15,8 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import (FileContent, FilesContent, Dir, File, Link, Path, PathGlobs, Snapshot,
-                             create_fs_intrinsics, generate_fs_subjects)
+from pants.engine.fs import (FileContent, FilesContent, Dir, File, Link, Path, PathGlobs, Snapshot)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, RulesetValidator
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -61,7 +60,6 @@ class LocalScheduler(object):
                        instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
-    self._project_tree = project_tree
     self._native = native
     self._product_graph_lock = graph_lock or threading.RLock()
     self._run_count = 0
@@ -72,6 +70,8 @@ class LocalScheduler(object):
     # Create the ExternContext, and the native Scheduler.
     self._scheduler =\
       native.new_scheduler(
+        project_tree.build_root,
+        project_tree.ignore_patterns,
         Snapshot,
         FileContent,
         FilesContent,
@@ -105,8 +105,7 @@ class LocalScheduler(object):
       SiblingAddresses,
       SingleAddress,
     }
-    intrinsics = create_fs_intrinsics(project_tree)
-    rule_index = RuleIndex.create(tasks, intrinsics, singleton_entries=[])
+    rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=[])
 
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
@@ -316,8 +315,7 @@ class LocalScheduler(object):
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    filenames_buf = self._native.context.vals_buf(tuple(self._to_value(fn)
-                                                        for fn in filenames))
+    filenames_buf = self._native.context.utf8_buf_buf(filenames)
     with self._product_graph_lock:
       invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
       logger.debug('invalidated %d nodes for subjects: %s', invalidated, filenames)
