@@ -49,6 +49,7 @@ use externs::{
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
+  ProjectIgnoringTypeExtern,
   SatisfiedByExtern,
   StoreListExtern,
   StoreBytesExtern,
@@ -156,6 +157,7 @@ pub extern fn externs_set(
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   project: ProjectExtern,
+  project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
@@ -175,6 +177,7 @@ pub extern fn externs_set(
       store_list,
       store_bytes,
       project,
+      project_ignoring_type,
       project_multi,
       create_exception,
       invoke_runnable,
@@ -185,8 +188,6 @@ pub extern fn externs_set(
 
 #[no_mangle]
 pub extern fn scheduler_create(
-  build_root_buf: Buffer,
-  ignore_patterns_buf: BufferBuffer,
   construct_snapshot: Function,
   construct_file_content: Function,
   construct_files_content: Function,
@@ -205,6 +206,8 @@ pub extern fn scheduler_create(
   type_link: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
+  build_root_buf: Buffer,
+  ignore_patterns_buf: BufferBuffer,
 ) -> *const RawScheduler {
   let build_root = PathBuf::from(build_root_buf.to_os_string());
   let ignore_patterns =
@@ -490,7 +493,7 @@ pub extern fn validator_run(
   scheduler_ptr: *mut RawScheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
-) {
+) -> Value {
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
@@ -498,9 +501,11 @@ pub extern fn validator_run(
       let graph = graph_maker.full_graph();
 
       match graph.validate() {
-        Result::Ok(_) => {},
+        Result::Ok(_) => {
+          externs::store_list(vec![], false)
+        },
         Result::Err(msg) => {
-          println!("had errors!\n{}", msg)
+          externs::create_exception(&msg)
         }
       }
     })

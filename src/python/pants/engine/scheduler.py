@@ -17,7 +17,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import (FileContent, FilesContent, Dir, File, Link, Path, PathGlobs, Snapshot)
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import RuleIndex, RulesetValidator
+from pants.engine.rules import RuleIndex
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
@@ -40,30 +40,9 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   """
 
 
-class LocalScheduler(object):
-  """A scheduler that expands a product Graph by executing user defined tasks."""
-
-  def __init__(self,
-               goals,
-               tasks,
-               project_tree,
-               native,
-               graph_lock=None):
-    """
-    :param goals: A dict from a goal name to a product type. A goal is just an alias for a
-           particular (possibly synthetic) product.
-    :param tasks: A set of (output, input selection clause, task function) triples which
-           is used to compute values in the product graph.
-    :param project_tree: An instance of ProjectTree for the current build root.
-    :param native: An instance of engine.subsystem.native.Native.
-    :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
-                       instance. Defaults to creating a new threading.RLock().
-    """
-    self._products_by_goal = goals
+class WrappedNativeScheduler(object):
+  def __init__(self, native, project_tree, rule_index, root_subject_types):
     self._native = native
-    self._product_graph_lock = graph_lock or threading.RLock()
-    self._run_count = 0
-
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
 
@@ -89,36 +68,26 @@ class LocalScheduler(object):
         constraint_for(File),
         constraint_for(Link),
       )
-    self._execution_request = None
-
-    # Validate and register all provided and intrinsic tasks.
-    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
-    # strictly necessary for execution. We might eventually be able to remove it by only executing
-    # validation below the execution roots (and thus not considering paths that aren't in use).
-
-    root_subject_types = {
-      Address,
-      BuildFileAddress,
-      AscendantAddresses,
-      DescendantAddresses,
-      PathGlobs,
-      SiblingAddresses,
-      SingleAddress,
-    }
-    rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=[])
-
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
+    self.root_subject_types = root_subject_types
 
-    self._validate_ruleset(root_subject_types)
+  def graph_trace(self):
+    with temporary_file_path() as path:
+      self._native.lib.graph_trace(self._scheduler, bytes(path))
+      with open(path) as fd:
+        for line in fd.readlines():
+          yield line.rstrip()
 
-    RulesetValidator(rule_index, goals, root_subject_types).validate()
+  def assert_ruleset_valid(self):
+    listed = list(TypeId(self._to_id(t)) for t in self.root_subject_types)
 
-  def _validate_ruleset(self, root_subject_types):
-    listed = list(TypeId(self._to_id(t)) for t in root_subject_types)
+    raw_value = self._native.lib.validator_run(self._scheduler, listed, len(listed))
+    value = self._from_value(raw_value)
 
-    self._native.lib.validator_run(self._scheduler, listed, len(listed))
+    if isinstance(value, Exception):
+      raise ValueError(str(value))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -223,14 +192,122 @@ class LocalScheduler(object):
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
         self._native.lib.task_end(self._scheduler)
 
+  def visualize_graph_to_file(self, filename):
+    self._native.lib.graph_visualize(self._scheduler, bytes(filename))
+
+  def invalidate_via_keys(self, subject_keys):
+    return self._native.lib.graph_invalidate(self._scheduler,
+                                             subject_keys,
+                                             len(subject_keys))
+
+  def graph_len(self):
+    return self._native.lib.graph_len(self._scheduler)
+
+  def exec_reset(self):
+    self._native.lib.execution_reset(self._scheduler)
+
+  def add_root_selection(self, subject, selector):
+    if type(selector) is Select:
+      self._native.lib.execution_add_root_select(self._scheduler, self._to_key(subject),
+                                                 self._to_constraint(selector.product))
+    elif type(selector) is SelectDependencies:
+      self._native.lib.execution_add_root_select_dependencies(self._scheduler,
+                                                              self._to_key(subject),
+                                                              self._to_constraint(selector.product),
+                                                              self._to_constraint(
+                                                                selector.dep_product),
+                                                              self._to_utf8_buf(selector.field),
+                                                              self._to_ids_buf(
+                                                                selector.field_types),
+                                                              selector.transitive)
+    else:
+      raise ValueError('Unsupported root selector type: {}'.format(selector))
+
+  def run_and_return_stat(self):
+    return self._native.lib.execution_execute(self._scheduler)
+
+  def visualize_to_dir(self):
+    return self._native.visualize_to_dir
+
+  def to_keys(self, subjects):
+    return list(self._to_key(subject) for subject in subjects)
+
+  def root_entries(self, execution_request):
+    raw_roots = self._native.lib.execution_roots(self._scheduler)
+    try:
+      roots = {}
+      for root, raw_root in zip(execution_request.roots,
+                                self._native.unpack(raw_roots.nodes_ptr,
+                                                               raw_roots.nodes_len)):
+        if raw_root.state_tag is 0:
+          state = None
+        elif raw_root.state_tag is 1:
+          state = Return(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 2:
+          state = Throw(self._from_value(raw_root.state_value))
+        elif raw_root.state_tag is 3:
+          state = Throw(self._from_value(raw_root.state_value))
+        else:
+          raise ValueError(
+            'Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
+        roots[root] = state
+    finally:
+      self._native.lib.nodes_destroy(raw_roots)
+    return roots
+
+
+class LocalScheduler(object):
+  """A scheduler that expands a product Graph by executing user defined tasks."""
+
+  def __init__(self,
+               goals,
+               tasks,
+               project_tree,
+               native,
+               graph_lock=None):
+    """
+    :param goals: A dict from a goal name to a product type. A goal is just an alias for a
+           particular (possibly synthetic) product.
+    :param tasks: A set of (output, input selection clause, task function) triples which
+           is used to compute values in the product graph.
+    :param project_tree: An instance of ProjectTree for the current build root.
+    :param native: An instance of engine.subsystem.native.Native.
+    :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
+                       instance. Defaults to creating a new threading.RLock().
+    """
+    self._products_by_goal = goals
+    self._project_tree = project_tree
+    self._product_graph_lock = graph_lock or threading.RLock()
+    self._run_count = 0
+
+    # Create the ExternContext, and the native Scheduler.
+    self._execution_request = None
+
+
+    # Validate and register all provided and intrinsic tasks.
+    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
+    # strictly necessary for execution. We might eventually be able to remove it by only executing
+    # validation below the execution roots (and thus not considering paths that aren't in use).
+
+    root_subject_types = {
+      Address,
+      BuildFileAddress,
+      AscendantAddresses,
+      DescendantAddresses,
+      PathGlobs,
+      SiblingAddresses,
+      SingleAddress,
+    }
+    rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=[])
+    self._scheduler = WrappedNativeScheduler(native, project_tree, rule_index, root_subject_types)
+
+    self._scheduler.assert_ruleset_valid()
+
   def trace(self):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
     with self._product_graph_lock:
-      with temporary_file_path() as path:
-        self._native.lib.graph_trace(self._scheduler, bytes(path))
-        with open(path) as fd:
-          for line in fd.readlines():
-            yield line.rstrip()
+      for line in self._scheduler.graph_trace():
+        yield line
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -239,7 +316,7 @@ class LocalScheduler(object):
     :param str filename: The filename to output the graphviz output to.
     """
     with self._product_graph_lock:
-      self._native.lib.graph_visualize(self._scheduler, bytes(filename))
+      self._scheduler.visualize_graph_to_file(filename)
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -294,56 +371,28 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       if self._execution_request is not execution_request:
         raise AssertionError(
-            "Multiple concurrent executions are not supported! {} vs {}".format(
-              self._execution_request, execution_request))
-      raw_roots = self._native.gc(self._native.lib.execution_roots(self._scheduler),
-                                  self._native.lib.nodes_destroy)
-      roots = {}
-      for root, raw_root in zip(execution_request.roots, self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len)):
-        if raw_root.state_tag is 0:
-          state = None
-        elif raw_root.state_tag is 1:
-          state = Return(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag is 2:
-          state = Throw(self._from_value(raw_root.state_value))
-        elif raw_root.state_tag is 3:
-          state = Throw(self._from_value(raw_root.state_value))
-        else:
-          raise ValueError('Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
-        roots[root] = state
-      return roots
+          "Multiple concurrent executions are not supported! {} vs {}".format(
+            self._execution_request, execution_request))
+      return self._scheduler.root_entries(execution_request)
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
     filenames_buf = self._native.context.utf8_buf_buf(filenames)
     with self._product_graph_lock:
-      invalidated = self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
-      logger.debug('invalidated %d nodes for subjects: %s', invalidated, filenames)
+      invalidated = self._scheduler.invalidate(filenames_buf)
+      logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
       return invalidated
 
   def node_count(self):
     with self._product_graph_lock:
-      return self._native.lib.graph_len(self._scheduler)
+      return self._scheduler.graph_len()
 
   def _execution_add_roots(self, execution_request):
     if self._execution_request is not None:
-      self._native.lib.execution_reset(self._scheduler)
+      self._scheduler.exec_reset()
     self._execution_request = execution_request
     for subject, selector in execution_request.roots:
-      if type(selector) is Select:
-        self._native.lib.execution_add_root_select(self._scheduler,
-                                                   self._to_key(subject),
-                                                   self._to_constraint(selector.product))
-      elif type(selector) is SelectDependencies:
-        self._native.lib.execution_add_root_select_dependencies(self._scheduler,
-                                                                self._to_key(subject),
-                                                                self._to_constraint(selector.product),
-                                                                self._to_constraint(selector.dep_product),
-                                                                self._to_utf8_buf(selector.field),
-                                                                self._to_ids_buf(selector.field_types),
-                                                                selector.transitive)
-      else:
-        raise ValueError('Unsupported root selector type: {}'.format(selector))
+      self._scheduler.add_root_selection(subject, selector)
 
   def post_fork(self):
     self._native.lib.scheduler_post_fork(self._scheduler)
@@ -361,15 +410,15 @@ class LocalScheduler(object):
       # Reset execution, and add any roots from the request.
       self._execution_add_roots(execution_request)
       # Execute in native engine.
-      execution_stat = self._native.lib.execution_execute(self._scheduler)
+      execution_stat = self._scheduler.run_and_return_stat()
       # Receive execution statistics.
       runnable_count = execution_stat.runnable_count
       scheduling_iterations = execution_stat.scheduling_iterations
 
-      if self._native.visualize_to_dir is not None:
+      if self._scheduler.visualize_to_dir() is not None:
         name = 'run.{}.dot'.format(self._run_count)
         self._run_count += 1
-        self.visualize_graph_to_file(os.path.join(self._native.visualize_to_dir, name))
+        self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
 
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '
@@ -377,5 +426,5 @@ class LocalScheduler(object):
         scheduling_iterations,
         runnable_count,
         time.time() - start_time,
-        self._native.lib.graph_len(self._scheduler)
+        self._scheduler.graph_len()
       )
