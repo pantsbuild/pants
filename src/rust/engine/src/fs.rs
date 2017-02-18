@@ -332,6 +332,7 @@ impl PosixFS {
       }
       // Else: ignore.
     }
+    stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
   }
 

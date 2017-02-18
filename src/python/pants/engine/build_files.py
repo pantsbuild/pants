@@ -53,7 +53,11 @@ def parse_address_family(address_mapper, path, build_files_content):
   if not build_files_content.dependencies:
     raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
+  paths = (f.path for f in build_files_content.dependencies)
+  ignored_paths = set(address_mapper.build_ignore_patterns.match_files(paths))
   for filecontent_product in build_files_content.dependencies:
+    if filecontent_product.path in ignored_paths:
+      continue
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
                                          address_mapper.symbol_table_cls,
