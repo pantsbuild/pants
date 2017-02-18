@@ -1,11 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{ANY_TYPE, Key, TypeConstraint, TypeId};
+use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
 
 use externs;
 
 use selectors::{Select, Selector};
+use nodes::Runnable;
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
@@ -190,7 +191,7 @@ impl <'a> GraphMaker<'a> {
 
     for rule in unreachable_rules {
       let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
-      diagnostics.push(Diagnostic{subject_type: ANY_TYPE, reason:"Unreachable".to_string()});
+      diagnostics.push(Diagnostic { subject_type: ANY_TYPE, reason: "Unreachable".to_string() });
     }
 
     let unfinished_graph = RuleGraph {
@@ -240,8 +241,7 @@ impl <'a> GraphMaker<'a> {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
                                      entry.subject_type(),
-                                     // might be better as {} with display derived
-                                     format!("no matches for {:?}", select));
+                                     format!("no matches for {}", selector_str(selector)));
                   was_unfulfillable = true;
                   continue;
                 }
@@ -272,7 +272,9 @@ impl <'a> GraphMaker<'a> {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
                                      entry.subject_type(),
-                                     format!("no matches for {:?} when resolving {:?}", entry.subject_type(), initial_selector)); // might be better as {} with display derived
+                                     format!("no matches for {} when resolving {}",
+                                             selector_str(&Selector::Select(Select { product: initial_selector, variant_key: None})),
+                                             selector_str(selector)));
                   was_unfulfillable = true;
                   continue;
                 }
@@ -288,7 +290,9 @@ impl <'a> GraphMaker<'a> {
                         mark_unfulfillable(&mut unfulfillable_rules,
                                            &entry,
                                            t.clone(),
-                                           format!("no matches for {:?} when resolving {:?}", select.product, select)
+                                           format!("no matches for {} when resolving {}",
+                                                   selector_str(&Selector::Select(Select { product: select.product, variant_key: None})),
+                                                   selector_str(selector))
                         );
                     }
                   was_unfulfillable = true;
@@ -319,7 +323,9 @@ impl <'a> GraphMaker<'a> {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
                                      entry.subject_type(),
-                                     format!("no matches for {:?} when resolving {:?}", initial_selector, initial_selector)); // might be better as {} with display derived
+                                     format!("no matches for {} when resolving {}",
+                                             selector_str(&Selector::Select(Select{product: initial_selector, variant_key: None})),
+                                             selector_str(selector)));
                   was_unfulfillable = true;
                   continue
                 }
@@ -331,7 +337,9 @@ impl <'a> GraphMaker<'a> {
                   mark_unfulfillable(&mut unfulfillable_rules,
                                      &entry,
                                      select.projected_subject,
-                                     format!("no matches for {:?} when resolving {:?}", select.product, select)); // might be better as {} with display derived
+                                     format!("no matches for {} when resolving {}",
+                                             selector_str(&Selector::Select(Select{product: select.product, variant_key: None})),
+                                             selector_str(selector)));
                   was_unfulfillable = true;
                   continue
 
@@ -450,6 +458,98 @@ pub struct RuleGraph {
   unfulfillable_rules: UnfulfillableRuleMap,
 }
 
+fn type_constraint_str(type_constraint: TypeConstraint) -> String {
+  let val = to_val(type_constraint);
+  repr_of_val(&val)
+}
+
+fn to_val(type_constraint: TypeConstraint) -> Value {
+  to_val_from_id(type_constraint.0)
+}
+
+fn to_val_from_func(func: &Function) -> Value {
+  to_val_from_id(func.0)
+}
+
+fn to_val_from_id(id: Id) -> Value {
+  externs::val_for_id(id)
+}
+
+fn repr_of_val(value: &Value) -> String {
+  let rpr_val = externs::project_ignoring_type(&value, "__repr__");
+
+  let invoke_result  = externs::invoke_runnable(&Runnable{func: rpr_val, args:vec![], cacheable:false})
+                              .expect("string from calling repr");
+  externs::val_to_str(&invoke_result)
+}
+
+
+fn function_str(func: &Function) -> String {
+  let as_val = to_val_from_func(func);
+  val_name(&as_val)
+}
+
+
+fn type_str(type_id: TypeId) -> String {
+  if type_id == ANY_TYPE {
+    "Any".to_string()
+  } else {
+    let as_val = to_val_from_id(type_id.0);
+    val_name(&as_val)
+  }
+}
+
+fn val_name(val: &Value) -> String {
+  externs::project_str(val, "__name__")
+}
+
+fn selector_str(selector: &Selector) -> String {
+  match selector {
+    &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
+    &Selector::SelectDependencies(ref s) => format!("SelectDependencies({}, {}, {}field_types=({},){})",
+                                                    type_constraint_str(s.product),
+                                                    type_constraint_str(s.dep_product),
+                                                    if s.field == "dependencies" { "".to_string() } else {format!("{:?}, ", s.field)},
+                                                    s.field_types.iter()
+                                                                 .map(|&f| type_str(f))
+                                                                 .collect::<Vec<String>>()
+                                                                 .join(", "),
+                                                    if s.transitive { ", transitive=True" } else { "" }.to_string()
+
+    ),
+    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, ({:?},), {})",
+                                                  type_constraint_str(s.product),
+                                                  type_str(s.projected_subject),
+                                                  s.field,
+                                                  type_constraint_str(s.input_product),
+    ),
+    &Selector::SelectLiteral(ref s) => format!("SelectLiteral({:?})", s)
+  }
+}
+
+fn entry_str(entry: &Entry) -> String {
+  match entry {
+    &Entry::InnerEntry(ref inner) => {
+      format!("{} of {}", task_display(&inner.rule), type_str(inner.subject_type))
+    }
+    other => {
+      format!("{:?}", other)
+    }
+  }
+}
+
+fn task_display(task: &Task) -> String {
+  let product = type_constraint_str(task.product);
+  let mut clause_portion = task.clause.iter().map(|c| selector_str(c)).collect::<Vec<_>>().join(", ");
+  if task.clause.len() <= 1 {
+    clause_portion = format!("({},)", clause_portion)
+  } else {
+    clause_portion = format!("({})", clause_portion)
+  }
+  let function_name = function_str(&&task.func);
+  format!("({}, {}, {})", product, clause_portion, function_name).to_string()
+}
+
 impl RuleGraph {
   pub fn validate(&self) -> Result<(), String> {
     if self.has_errors() {
@@ -466,12 +566,13 @@ impl RuleGraph {
     let used_rules: HashSet<_> = self.rule_dependency_edges.keys().map(|entry| &entry.rule).collect();
     for (rule_entry, diagnostics) in &self.unfulfillable_rules {
       match rule_entry {
-        &Entry::InnerEntry(ref inner) => {
-          if used_rules.contains(&inner.rule) {
+        &Entry::InnerEntry(InnerEntry {ref rule, ..}) |
+        &Entry::Unreachable {ref rule, ..} => {
+          if used_rules.contains(&rule) {
             continue
           }
           for d in diagnostics {
-            let mut msg_to_type = collated_errors.entry(inner.rule.clone())
+            let mut msg_to_type = collated_errors.entry(rule.clone())
               .or_insert(HashMap::new());
             let mut subject_set = msg_to_type.entry(d.reason.clone())
               .or_insert(HashSet::new());
@@ -487,7 +588,7 @@ impl RuleGraph {
       .collect();
     msgs.sort();
 
-    format!("Rules with errors {}:\n  {}", msgs.len(), msgs.join("\n  ")).to_string()
+    format!("Rules with errors: {}\n  {}", msgs.len(), msgs.join("\n  ")).to_string()
   }
 
   fn has_errors(&self) -> bool {
@@ -495,6 +596,7 @@ impl RuleGraph {
     self.unfulfillable_rules.iter().any(|(&ref entry, &ref diagnostics)| match entry {
       &Entry::InnerEntry(ref inner) => !used_rules.contains(&inner.rule) &&
                                        !diagnostics.is_empty(),
+      &Entry::Unreachable { .. } => true,
       _ => false,
     })
   }
@@ -575,7 +677,7 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
         let mut diagnostics = new_unfulfillable_rules.entry(key_entry.clone()).or_insert(vec![]);
         diagnostics.push(Diagnostic {
           subject_type: entry_subject,
-          reason: format!("depends on unfulfillable {:?}", unfulfillable_entry)
+          reason: format!("depends on unfulfillable {}", entry_str(unfulfillable_entry))
         });
 
         removal_traversal.push_back(key_entry.clone());
@@ -654,8 +756,8 @@ fn format_msgs(rule: &Task, subject_types_by_reasons: &HashMap<String, HashSet<T
   let mut errors: Vec<_> = subject_types_by_reasons.iter().map(|(reason, subject_types)|
     format!("{} with subject types: {}",
             reason,
-            subject_types.iter().map(|t| externs::id_to_str(t.0)).collect::<Vec<String>>().join(", "))
+            subject_types.iter().map(|&t| type_str(t)).collect::<Vec<String>>().join(", "))
   ).collect();
   errors.sort();
-  format!("{:?}: {}", rule, errors.join("\n    "))
+  format!("{}:\n    {}", task_display(rule), errors.join("\n    "))
 }

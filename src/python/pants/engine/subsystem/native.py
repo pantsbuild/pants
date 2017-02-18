@@ -90,6 +90,7 @@ _FFI.cdef(
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
+    typedef Value            (*extern_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
     typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, bool);
 
@@ -125,6 +126,7 @@ _FFI.cdef(
                      extern_satisfied_by,
                      extern_store_list,
                      extern_project,
+                     extern_project_ignoring_type,
                      extern_project_multi,
                      extern_create_exception,
                      extern_invoke_runnable,
@@ -167,7 +169,7 @@ _FFI.cdef(
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
-    void validator_run(RawScheduler*, TypeId*, uint64_t);
+    Value validator_run(RawScheduler*, TypeId*, uint64_t);
 
     void nodes_destroy(RawNodes*);
     '''
@@ -271,6 +273,17 @@ def extern_project(context_handle, val, field_str_ptr, field_str_len, type_id):
     projected = typ(projected)
 
   return c.to_value(projected)
+
+
+@_FFI.callback("Value(ExternContext*, Value*, uint8_t*, uint64_t)")
+def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
+  """Given a Value for `obj`, and a field name, project the field as a new Value."""
+  c = _FFI.from_handle(context_handle)
+  obj = c.from_value(val)
+  field_name = to_py_str(field_str_ptr, field_str_len)
+  projected = getattr(obj, field_name)
+
+  return c.to_value(projected, type_id=TypeId(0))
 
 
 @_FFI.callback("ValueBuffer(ExternContext*, Value*, uint8_t*, uint64_t)")
@@ -523,6 +536,7 @@ class Native(object):
                            extern_satisfied_by,
                            extern_store_list,
                            extern_project,
+                           extern_project_ignoring_type,
                            extern_project_multi,
                            extern_create_exception,
                            extern_invoke_runnable,
