@@ -175,9 +175,11 @@ python_tests(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':scheduler_test_base',
+    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 
