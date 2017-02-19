@@ -49,6 +49,9 @@ Documentation
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Work around native engine/tag chicken-egg. (#4270)
+  `PR #4270 <https://github.com/pantsbuild/pants/pull/4270>`_
+
 * [engine] Make Graph.get generic and make Externs static (#4261)
   `PR #4261 <https://github.com/pantsbuild/pants/pull/4261>`_
 
