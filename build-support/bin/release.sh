@@ -518,7 +518,10 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi." && \
   (
-    check_origin && check_clean_branch && check_pgp && check_native_engine && check_owners && \
+    # NB: Ideally we'd `check_native_engine`, but it won't get built until the tag created
+    # in `tag_release` is pushed to origin, triggering a TravisCI run.
+    # See: https://github.com/pantsbuild/pants/issues/4269
+    check_origin && check_clean_branch && check_pgp && check_owners && \
       dry_run_install && publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi."
   ) || die "Failed to release packages to PyPi."
