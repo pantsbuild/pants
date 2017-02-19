@@ -670,36 +670,6 @@ impl Snapshots {
   }
 
   /**
-   * Append the given PathStat to the given Builder, (re)using the given Header.
-   */
-  fn tar_header_populate(head: &mut tar::Header, path_stat: &PathStat, relative_to: &Dir) -> Result<(), String> {
-    let path =
-      match path_stat {
-        &PathStat::File { ref path, ref stat } => {
-          head.set_entry_type(tar::EntryType::file());
-          // TODO: Unnecessarily re-executing the syscall here. Could store the `size` info on
-          // File stats to avoid this.
-          let abs_path = relative_to.0.join(stat.0.as_path());
-          head.set_size(
-            abs_path.metadata()
-              .map_err(|e| format!("Failed to stat {:?}: {:?}", stat, e))?
-              .len()
-          );
-          path
-        },
-        &PathStat::Dir { ref path, .. } => {
-          head.set_entry_type(tar::EntryType::dir());
-          head.set_size(0);
-          path
-        },
-      };
-    head.set_path(path.as_path())
-      .map_err(|e| format!("Illegal path {:?}: {:?}", path, e))?;
-    head.set_cksum();
-    Ok(())
-  }
-
-  /**
    * Create a tar file at the given path containing the given paths, or return an error string.
    */
   fn tar_create(dest: &Path, paths: &Vec<PathStat>, relative_to: &Dir) -> Result<(), String> {
@@ -709,22 +679,20 @@ impl Snapshots {
           .map_err(|e| format!("Failed to create destination file: {:?}", e))?
       );
     let mut tar_builder = tar::Builder::new(dest_file);
-    let mut head = tar::Header::new_ustar();
-    for path in paths {
-      // Populate the header for the File or Dir.
-      Snapshots::tar_header_populate(&mut head, &path, relative_to)?;
-      // And append.
-      match path {
-        &PathStat::File { ref stat, .. } => {
-          let input =
+    tar_builder.mode(tar::HeaderMode::Deterministic);
+    for path_stat in paths {
+      // Append the PathStat using the symbolic name and underlying stat.
+      match path_stat {
+        &PathStat::File { ref path, ref stat } => {
+          let mut input =
             fs::File::open(relative_to.0.join(stat.0.as_path()))
-              .map_err(|e| format!("Failed to open {:?}: {:?}", stat, e))?;
-          tar_builder.append(&head, input)
-            .map_err(|e| format!("Failed to tar {:?}: {:?}", stat, e))?;
+              .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
+          tar_builder.append_file(path, &mut input)
+            .map_err(|e| format!("Failed to tar {:?}: {:?}", path_stat, e))?;
         },
-        &PathStat::Dir { ref stat, .. } => {
-          tar_builder.append(&head, io::empty())
-            .map_err(|e| format!("Failed to tar {:?}: {:?}", stat, e))?;
+        &PathStat::Dir { ref path, ref stat } => {
+          tar_builder.append_dir(path, stat.0.as_path())
+            .map_err(|e| format!("Failed to tar {:?}: {:?}", path_stat, e))?;
         },
       }
     }

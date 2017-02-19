@@ -22,5 +22,6 @@ ignore = "0.1.7"
 lazy_static = "0.2.2"
 ordermap = "0.2.7"
 sha2 = "0.4"
-tar = "0.4.10"
+# TODO: https://github.com/alexcrichton/tar-rs/pull/99
+tar = { git = "https://github.com/stuhood/tar-rs", branch = "stuhood/deterministic-tar" }
 tempdir = "0.3"
