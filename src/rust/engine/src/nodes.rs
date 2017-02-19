@@ -244,6 +244,10 @@ impl VFS<Failure> for Context {
   fn scandir(&self, dir: Dir) -> NodeFuture<Vec<Stat>> {
     self.get(Scandir(dir)).map(|res| res.0).boxed()
   }
+
+  fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
+    !self.core.vfs.ignore.matched(path, is_dir).is_none()
+  }
 }
 
 /**

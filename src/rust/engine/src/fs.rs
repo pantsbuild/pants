@@ -267,7 +267,7 @@ pub struct PosixFS {
   build_root: Dir,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
   pool: RwLock<CpuPool>,
-  ignore: Gitignore,
+  pub ignore: Gitignore,
 }
 
 impl PosixFS {
@@ -374,10 +374,6 @@ impl PosixFS {
   }
 
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
-    if !self.ignore.matched(dir.0.as_path(), true).is_none() {
-      return future::ok(vec![]).boxed();
-    }
-
     let dir = dir.to_owned();
     let dir_abs = self.build_root.0.join(dir.0.as_path());
     self.pool()
@@ -394,10 +390,13 @@ impl PosixFS {
 pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
+  fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
 
   /**
    * Canonicalize the Link for the given Path to an underlying File or Dir. May result
    * in None if the PathStat represents a broken Link.
+   *
+   * Skips ignored paths both before and after expansion.
    *
    * TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand_multi).
    */
@@ -455,17 +454,34 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
                 })
             })
             .map(|(stat_symbolic_path, stat)| {
-              // Canonicalize matched PathStats.
-              // TODO: Boxing every Stat here, when technically we only need to box for Link
-              // expansion. Could fix this by partitioning into Links and non-links first, but
-              // that would lose ordering.
+              // Canonicalize matched PathStats, and filter ignored paths. Note that we ignore
+              // links both before and after expansion.
               match stat {
-                Stat::Link(l) =>
-                  context.canonicalize(stat_symbolic_path, l),
-                Stat::Dir(d) =>
-                  future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).boxed(),
-                Stat::File(f) =>
-                  future::ok(Some(PathStat::file(stat_symbolic_path.to_owned(), f))).boxed(),
+                Stat::Link(l) => {
+                  if context.ignore(l.0.as_path(), false) {
+                    future::ok(None).boxed()
+                  } else {
+                    context.canonicalize(stat_symbolic_path, l)
+                  }
+                },
+                Stat::Dir(d) => {
+                  let res =
+                    if context.ignore(d.0.as_path(), true) {
+                      None
+                    } else {
+                      Some(PathStat::dir(stat_symbolic_path.to_owned(), d))
+                    };
+                  future::ok(res).boxed()
+                },
+                Stat::File(f) => {
+                  let res =
+                    if context.ignore(f.0.as_path(), false) {
+                      None
+                    } else {
+                      Some(PathStat::file(stat_symbolic_path.to_owned(), f))
+                    };
+                  future::ok(res).boxed()
+                },
               }
             })
             .collect::<Vec<_>>()
