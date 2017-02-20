@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import subprocess
 import unittest
 
 from pants.util.contextutil import environment_as
@@ -28,13 +29,27 @@ class GoDistributionTest(unittest.TestCase):
 
   def assert_no_gopath(self):
     go_distribution = self.distribution()
+
+    go_env = go_distribution.go_env()
+
+    # As of go 1.8, when GOPATH is unset (set to ''), it defaults to ~/go (assuming HOME is set -
+    # and we can't unset that since it might legitmately be used by the subcommand) - so we manually
+    # fetch the "unset" default value here as our expected value for tests below.
+    # The key thing to note here is this default value is used only when `gopath` passed to
+    # `GoDistribution` is None, implying the command to be run does not need or use a GOPATH.
+    cmd = [os.path.join(go_distribution.goroot, 'bin', 'go'), 'env', 'GOPATH']
+    env = os.environ.copy()
+    env.update(go_env)
+    default_gopath = subprocess.check_output(cmd, env=env).strip()
+
     go_cmd = go_distribution.create_go_cmd(cmd='env', args=['GOPATH'])
 
-    self.assertEqual({'GOROOT': go_distribution.goroot, 'GOPATH': ''}, go_cmd.env)
+    self.assertEqual(go_env, go_cmd.env)
     self.assertEqual('go', os.path.basename(go_cmd.cmdline[0]))
     self.assertEqual(['env', 'GOPATH'], go_cmd.cmdline[1:])
-    self.assertRegexpMatches(str(go_cmd), r'^GOROOT=[^ ]+ GOPATH= .*/go env GOPATH')
-    self.assertEqual('', go_cmd.check_output().strip())
+    self.assertRegexpMatches(str(go_cmd),
+                             r'^GOROOT=[^ ]+ GOPATH={} .*/go env GOPATH'.format(default_gopath))
+    self.assertEqual(default_gopath, go_cmd.check_output().strip())
 
   def test_go_command_no_gopath(self):
     self.assert_no_gopath()
