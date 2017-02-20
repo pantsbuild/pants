@@ -11,6 +11,7 @@ from functools import wraps
 
 import six
 from packaging.version import InvalidVersion, Version
+from pants.util.memo import memoized_method
 
 from pants.version import PANTS_SEMVER
 
@@ -50,6 +51,7 @@ def get_deprecated_tense(removal_version, future_tense='will be', past_tense='wa
   return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
 
 
+@memoized_method
 def validate_removal_semver(removal_version):
   """Validates that removal_version is a valid semver.
 
