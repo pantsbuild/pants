@@ -23,7 +23,7 @@ from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.util.dirutil import fast_relpath, longest_dir_prefix
+from pants.util.dirutil import fast_relpath, longest_dir_prefix, join_specs
 
 
 logger = logging.getLogger(__name__)
@@ -107,10 +107,10 @@ class BuildFileAddressMapper(AddressMapper):
   def determine_subproject_spec(self, spec, relative_to):
     subproject_prefix = longest_dir_prefix(relative_to, self.subproject_roots)
     if subproject_prefix:
-      spec = os.path.join(subproject_prefix, spec)
+      spec = join_specs(subproject_prefix, spec)
 
-    logger.debug('Determined that spec {} relative to {} belongs to subproject '
-                 '{}'.format(spec, relative_to, subproject_prefix))
+      logger.debug('Determined that spec {} relative to {} belongs to '
+                   'subproject {}'.format(spec, relative_to, subproject_prefix))
     return spec
 
   def spec_to_address(self, spec, relative_to=''):

@@ -36,6 +36,27 @@ def longest_dir_prefix(path, prefixes):
   return longest_prefix
 
 
+def join_specs(parent, *children):
+  """Join the parent spec with child specs. If the child specs have a leading
+  "/" or "//", they are removed prior to joining.
+
+  :param string parent: The parent spec
+  :param *string children: child specs which should be joined to the parent
+  """
+  current_spec = parent
+  for child in children:
+    # If the child has a third (or more) slash, don't consider fixing it
+    if len(child) <= 2 or child[2] != '/':
+      if child.startswith('//'):
+        child = child[2:]
+      elif child.startswith('/'):
+        child = child[1:]
+
+    current_spec = os.path.join(current_spec, child)
+
+  return current_spec
+
+
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   if not path.startswith(start):
