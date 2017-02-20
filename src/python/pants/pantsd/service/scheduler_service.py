@@ -100,8 +100,3 @@ class SchedulerService(PantsService):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
-
-  def terminate(self):
-    """An extension of PantsService.terminate() that tears down the engine."""
-    self._engine.close()
-    super(SchedulerService, self).terminate()

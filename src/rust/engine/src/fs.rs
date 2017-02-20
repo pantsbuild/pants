@@ -1,3 +1,6 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
@@ -10,9 +13,10 @@ use glob::{Pattern, PatternError};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore;
 use ordermap::OrderMap;
-use sha2::{Sha256, Digest};
 use tar;
 use tempdir::TempDir;
+
+use hash::{Fingerprint, WriterHasher};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -606,29 +610,6 @@ pub struct FileContent {
   pub content: Vec<u8>,
 }
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Fingerprint(pub [u8;32]);
-
-impl Fingerprint {
-  pub fn from_bytes_unsafe(bytes: &[u8]) -> Fingerprint {
-    if bytes.len() != 32 {
-      panic!("Input value was not a fingerprint; had length: {}", bytes.len());
-    }
-
-    let mut fingerprint = [0;32];
-    fingerprint.clone_from_slice(&bytes[0..32]);
-    Fingerprint(fingerprint)
-  }
-
-  pub fn to_hex(&self) -> String {
-    let mut s = String::new();
-    for &byte in self.0.iter() {
-      fmt::Write::write_fmt(&mut s, format_args!("{:x}", byte)).unwrap();
-    }
-    s
-  }
-}
-
 #[derive(Clone)]
 pub struct Snapshot {
   pub fingerprint: Fingerprint,
@@ -660,41 +641,15 @@ impl Snapshots {
   }
 
   /**
-   * Fingerprint the given path or return an error string.
+   * Create a tar file on the given Write instance containing the given paths, or
+   * return an error string.
    */
-  fn fingerprint(path: &Path) -> Result<Fingerprint, String> {
-    let mut hasher = Sha256::new();
-
-    let mut file =
-      fs::File::open(path)
-        .map_err(|e| format!("Could not open snapshot for fingerprinting: {:?}", e))?;
-    let mut buffer = [0;4096];
-    loop {
-      match io::Read::read(&mut file, &mut buffer) {
-        Ok(len) if len > 0 =>
-          hasher.input(&buffer[..len]),
-        Ok(_) =>
-          // EOF
-          break,
-        Err(e) =>
-          return Err(format!("Could not read from snapshot: {:?}", e)),
-      }
-    };
-
-
-    Ok(Fingerprint::from_bytes_unsafe(&hasher.result()))
-  }
-
-  /**
-   * Create a tar file at the given path containing the given paths, or return an error string.
-   */
-  fn tar_create(dest: &Path, paths: &Vec<PathStat>, relative_to: &Dir) -> Result<(), String> {
-    let dest_file =
-      io::BufWriter::new(
-        fs::File::create(dest)
-          .map_err(|e| format!("Failed to create destination file: {:?}", e))?
-      );
-    let mut tar_builder = tar::Builder::new(dest_file);
+  fn tar_create<W: io::Write>(
+    dest: W,
+    paths: &Vec<PathStat>,
+    relative_to: &Dir
+  ) -> Result<W, String> {
+    let mut tar_builder = tar::Builder::new(dest);
     tar_builder.mode(tar::HeaderMode::Deterministic);
     for path_stat in paths {
       // Append the PathStat using the symbolic name and underlying stat.
@@ -712,10 +667,39 @@ impl Snapshots {
         },
       }
     }
-    // Finish the tar file, allowing the underlying file to be closed.
-    tar_builder.finish()
-      .map_err(|e| format!("Failed to finalize snapshot tar: {:?}", e))?;
-    Ok(())
+
+    // Finish the tar file, returning ownership of the stream to the caller.
+    Ok(
+      tar_builder.into_inner()
+        .map_err(|e| format!("Failed to finalize snapshot tar: {:?}", e))?
+    )
+  }
+
+  /**
+   * Create a tar file at the given dest Path containing the given paths, while
+   * fingerprinting the written stream.
+   */
+  fn tar_create_fingerprinted(
+    dest: &Path,
+    paths: &Vec<PathStat>,
+    relative_to: &Dir
+  ) -> Result<Fingerprint, String> {
+    // Wrap buffering around a fingerprinted stream above a File.
+    let stream =
+      io::BufWriter::new(
+        WriterHasher::new(
+          fs::File::create(dest)
+            .map_err(|e| format!("Failed to create destination file: {:?}", e))?
+        )
+      );
+
+    // Then append the tar to the stream, and retrieve the Fingerprint to flush all writers.
+    Ok(
+      Snapshots::tar_create(stream, paths, relative_to)?
+        .into_inner()
+        .map_err(|e| format!("Failed to flush to {:?}: {:?}", dest, e.error()))?
+        .finish()
+    )
   }
 
   fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
@@ -738,14 +722,12 @@ impl Snapshots {
     };
 
     fs.pool().spawn_fn(move || {
-      // Write the tar (with timestamps cleared) to a temporary file.
-      Snapshots::tar_create(temp_path.as_path(), &paths, &build_root)?;
-
-      // Fingerprint the resulting tar file.
-      let fingerprint = Snapshots::fingerprint(temp_path.as_path())?;
-      let dest_path = Snapshots::path_under_for(&dest_dir, &fingerprint);
+      // Write the tar deterministically to a temporary file while fingerprinting.
+      let fingerprint =
+        Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
 
       // Rename to the final path if it does not already exist.
+      let dest_path = Snapshots::path_under_for(&dest_dir, &fingerprint);
       if dest_path.is_file() {
         fs::remove_file(temp_path).unwrap_or(());
       } else {
