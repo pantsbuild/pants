@@ -15,6 +15,7 @@ mod selectors;
 mod tasks;
 mod types;
 
+extern crate blake2_rfc;
 extern crate crossbeam;
 extern crate fnv;
 extern crate futures;
@@ -24,7 +25,6 @@ extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
-extern crate sha2;
 extern crate tar;
 extern crate tempdir;
 

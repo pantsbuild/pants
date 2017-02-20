@@ -707,7 +707,8 @@ impl Snapshots {
   }
 
   fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
-    path.join(format!("{}.tar", fingerprint.to_hex()))
+    let hex = fingerprint.to_hex();
+    path.join(&hex[0..2]).join(&hex[2..4]).join(format!("{}.tar", hex))
   }
 
   /**
@@ -731,6 +732,7 @@ impl Snapshots {
       if dest_path.is_file() {
         fs::remove_file(temp_path).unwrap_or(());
       } else {
+        dest_path.parent().map(|p| fs::create_dir_all(p));
         fs::rename(temp_path, dest_path)
           .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
       }
