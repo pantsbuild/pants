@@ -236,14 +236,14 @@ def extern_val_to_str(context_handle, val):
 
 @_FFI.callback("bool(ExternContext*, TypeConstraint*, Value*)")
 def extern_satisfied_by(context_handle, constraint_id, val):
-  """Given two TypeIds, return constraint.satisfied_by(cls)."""
+  """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
   c = _FFI.from_handle(context_handle)
   return c.from_id(constraint_id.id_).satisfied_by(c.from_value(val))
 
 
 @_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
 def extern_satisfied_by_type(context_handle, constraint_id, cls_id):
-  """Given two TypeIds, return constraint.satisfied_by_type(cls)."""
+  """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
   c = _FFI.from_handle(context_handle)
   return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 

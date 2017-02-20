@@ -131,7 +131,7 @@ impl Drop for Value {
 impl Value {
   /**
    * An escape hatch to allow for cloning a Value without cloning its handle. You should generally
-   * not do this unless you are certain the inpuit Value has been mem::forgotten (otherwise it
+   * not do this unless you are certain the input Value has been mem::forgotten (otherwise it
    * will be `Drop`ed twice).
    */
   pub unsafe fn clone_without_handle(&self) -> Value {
