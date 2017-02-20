@@ -19,6 +19,23 @@ from contextlib import contextmanager
 from pants.util.strutil import ensure_text
 
 
+def longest_dir_prefix(path, prefixes):
+  """ Given a list of prefixes, return the one that is the longest prefix to 
+      the given path
+
+      Returns None if there are no matches
+  """
+  longest_match, longest_prefix = 0, None
+  for prefix in prefixes:
+    if not prefix.endswith('/'):
+      prefix = prefix + '/'
+
+    if path.startswith(prefix) and len(prefix) > longest_match:
+      longest_match, longest_prefix = len(prefix), prefix
+
+  return longest_prefix
+
+
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   if not path.startswith(start):
