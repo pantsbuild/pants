@@ -227,10 +227,10 @@ class LegacyBuildGraph(BuildGraph):
     self._index(target_entries)
 
     yielded_addresses = set()
-    for root, state in address_entries.items():
-      if not state.value:
+    for (subject, _), state in address_entries.items():
+      if not state.value.dependencies:
         raise self.InvalidCommandLineSpecError(
-          'Spec {} does not match any targets.'.format(root.subject))
+          'Spec {} does not match any targets.'.format(subject))
       for address in state.value.dependencies:
         if address not in yielded_addresses:
           yielded_addresses.add(address)

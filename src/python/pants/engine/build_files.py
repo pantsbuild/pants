@@ -204,9 +204,17 @@ def identity(v):
   return v
 
 
-def addresses_from_address_families(address_families):
-  """Given a list of AddressFamilies, return an Addresses object containing all addressables."""
-  return Addresses(tuple(a for af in address_families for a in af.addressables.keys()))
+def addresses_from_address_families(address_families, spec):
+  """Given a list of AddressFamilies and a Spec, return matching Addresses."""
+  if type(spec) in (DescendantAddresses, SiblingAddresses, AscendantAddresses):
+    addresses = tuple(a for af in address_families for a in af.addressables.keys())
+  elif type(spec) is SingleAddress:
+    addresses = tuple(a
+                      for af in address_families
+                      for a in af.addressables.keys() if a.target_name == spec.name)
+  else:
+    raise ValueError('Unrecognized Spec type: {}'.format(spec))
+  return Addresses(addresses)
 
 
 def filter_build_dirs(address_mapper, snapshot):
@@ -217,16 +225,24 @@ def filter_build_dirs(address_mapper, snapshot):
   return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
-def single_or_sib_addresses_to_globs(address_mapper, single_or_sib_addresses):
-  """Given a SiblingAddresses or SingleAddress object, return a PathGlobs object for relevant build files."""
-  patterns = address_mapper.build_patterns
-  return PathGlobs.create(single_or_sib_addresses.directory, include=patterns, exclude=[])
-
-
-def descendant_addresses_to_globs(address_mapper, descendant_addresses):
-  """Given a DescendantAddresses object, return a PathGlobs object for matching build files."""
-  patterns = [join('**', pattern) for pattern in address_mapper.build_patterns]
-  return PathGlobs.create(descendant_addresses.directory, include=patterns, exclude=[])
+def spec_to_globs(address_mapper, spec):
+  """Given a Spec object, return a PathGlobs object for the build files that it matches."""
+  if type(spec) is DescendantAddresses:
+    directory = spec.directory
+    patterns = [join('**', pattern) for pattern in address_mapper.build_patterns]
+  elif type(spec) in (SiblingAddresses, SingleAddress):
+    directory = spec.directory
+    patterns = address_mapper.build_patterns
+  elif type(spec) is AscendantAddresses:
+    directory = ''
+    patterns = [
+      join(f, pattern)
+      for pattern in address_mapper.build_patterns
+      for f in _recursive_dirname(spec.directory)
+    ]
+  else:
+    raise ValueError('Unrecognized Spec type: {}'.format(spec))
+  return PathGlobs.create(directory, include=patterns, exclude=[])
 
 
 def _recursive_dirname(f):
@@ -244,16 +260,6 @@ def _recursive_dirname(f):
   yield ''
 
 
-def ascendant_addresses_to_globs(address_mapper, ascendant_addresses):
-  """Given an AscendantAddresses object, return a PathGlobs object for matching build files."""
-  patterns = [
-    join(f, pattern)
-    for pattern in address_mapper.build_patterns
-    for f in _recursive_dirname(ascendant_addresses.directory)
-  ]
-  return PathGlobs.create('', include=patterns, exclude=[])
-
-
 def create_graph_tasks(address_mapper, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
@@ -261,6 +267,10 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
   """
   symbol_table_constraint = symbol_table_cls.constraint()
+  specs_constraint = Exactly(SingleAddress,
+                             SiblingAddresses,
+                             DescendantAddresses,
+                             AscendantAddresses)
   return [
     # Support for resolving Structs from Addresses
     (symbol_table_constraint,
@@ -287,7 +297,8 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
     (Addresses,
-     [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,))],
+     [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
+      Select(specs_constraint)],
      addresses_from_address_families),
     (BuildDirs,
      [SelectLiteral(address_mapper, AddressMapper),
@@ -295,18 +306,6 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
      filter_build_dirs),
     (PathGlobs,
      [SelectLiteral(address_mapper, AddressMapper),
-      Select(SiblingAddresses)],
-     single_or_sib_addresses_to_globs),
-    (PathGlobs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(SingleAddress)],
-     single_or_sib_addresses_to_globs),
-    (PathGlobs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(DescendantAddresses)],
-     descendant_addresses_to_globs),
-    (PathGlobs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(AscendantAddresses)],
-     ascendant_addresses_to_globs),
+      Select(specs_constraint)],
+     spec_to_globs),
   ]

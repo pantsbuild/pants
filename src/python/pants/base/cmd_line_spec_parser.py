@@ -68,5 +68,5 @@ class CmdLineSpecParser(object):
       return SiblingAddresses(self._normalize_spec_path(spec_path))
     else:
       spec_parts = spec.rsplit(':', 1)
-      return SingleAddress(self._normalize_spec_path(spec_parts[0]),
-                           spec_parts[1] if len(spec_parts) > 1 else None)
+      name = spec_parts[1] if len(spec_parts) > 1 else os.path.basename(spec_parts[0])
+      return SingleAddress(self._normalize_spec_path(spec_parts[0]), name)
