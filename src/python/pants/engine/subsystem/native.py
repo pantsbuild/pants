@@ -43,7 +43,6 @@ _FFI.cdef(
 
     typedef struct {
       Handle   handle;
-      TypeId   type_id;
     } Value;
 
     typedef struct {
@@ -86,7 +85,8 @@ _FFI.cdef(
     typedef void             (*extern_drop_handles)(ExternContext*, Handle*, uint64_t);
     typedef Buffer           (*extern_id_to_str)(ExternContext*, Id);
     typedef Buffer           (*extern_val_to_str)(ExternContext*, Value*);
-    typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
+    typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, Value*);
+    typedef bool             (*extern_satisfied_by_type)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
     typedef Value            (*extern_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
     typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
@@ -124,6 +124,7 @@ _FFI.cdef(
                      extern_id_to_str,
                      extern_val_to_str,
                      extern_satisfied_by,
+                     extern_satisfied_by_type,
                      extern_store_list,
                      extern_project,
                      extern_project_ignoring_type,
@@ -194,22 +195,21 @@ def extern_log(context_handle, level, msg_ptr, msg_len):
 def extern_key_for(context_handle, val):
   """Return a Key for a Value."""
   c = _FFI.from_handle(context_handle)
-  return c.value_to_key(val)
+  return c.to_key(c.from_value(val))
 
 
 @_FFI.callback("Value(ExternContext*, Key*)")
 def extern_val_for(context_handle, key):
   """Return a Value for a Key."""
   c = _FFI.from_handle(context_handle)
-  return c.key_to_value(key)
+  return c.to_value(c.from_key(key))
 
 
 @_FFI.callback("Value(ExternContext*, Value*)")
 def extern_clone_val(context_handle, val):
   """Clone the given Value."""
   c = _FFI.from_handle(context_handle)
-  item = c.from_value(val)
-  return c.to_value(item, type_id=val.type_id)
+  return c.to_value(c.from_value(val))
 
 
 @_FFI.callback("void(ExternContext*, Handle*, uint64_t)")
@@ -234,9 +234,16 @@ def extern_val_to_str(context_handle, val):
   return c.utf8_buf(six.text_type(c.from_value(val)))
 
 
+@_FFI.callback("bool(ExternContext*, TypeConstraint*, Value*)")
+def extern_satisfied_by(context_handle, constraint_id, val):
+  """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
+  c = _FFI.from_handle(context_handle)
+  return c.from_id(constraint_id.id_).satisfied_by(c.from_value(val))
+
+
 @_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
-def extern_satisfied_by(context_handle, constraint_id, cls_id):
-  """Given two TypeIds, return constraint.satisfied_by(cls)."""
+def extern_satisfied_by_type(context_handle, constraint_id, cls_id):
+  """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
   c = _FFI.from_handle(context_handle)
   return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 
@@ -283,7 +290,7 @@ def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_l
   field_name = to_py_str(field_str_ptr, field_str_len)
   projected = getattr(obj, field_name)
 
-  return c.to_value(projected, type_id=TypeId(0))
+  return c.to_value(projected)
 
 
 @_FFI.callback("ValueBuffer(ExternContext*, Value*, uint8_t*, uint64_t)")
@@ -325,7 +332,7 @@ def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
   return RunnableComplete(c.to_value(val), is_throw)
 
 
-class Value(datatype('Value', ['handle', 'type_id'])):
+class Value(datatype('Value', ['handle'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -409,24 +416,23 @@ class ExternContext(object):
 
   def buf(self, bytestring):
     buf = _FFI.new('uint8_t[]', bytestring)
-    return (buf, len(bytestring), self.to_value(buf, type_id=self.anon_id))
+    return (buf, len(bytestring), self.to_value(buf))
 
   def utf8_buf(self, string):
     return self.buf(string.encode('utf-8'))
 
   def vals_buf(self, keys):
     buf = _FFI.new('Value[]', keys)
-    return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
+    return (buf, len(keys), self.to_value(buf))
 
   def type_ids_buf(self, types):
     buf = _FFI.new('TypeId[]', types)
-    return (buf, len(types), self.to_value(buf, type_id=self.anon_id))
+    return (buf, len(types), self.to_value(buf))
 
-  def to_value(self, obj, type_id=None):
+  def to_value(self, obj):
     handle = _FFI.new_handle(obj)
     self._handles.add(handle)
-    type_id = type_id or TypeId(self.to_id(type(obj)))
-    return Value(handle, type_id)
+    return Value(handle)
 
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
@@ -444,14 +450,6 @@ class ExternContext(object):
 
   def to_id(self, typ):
     return self.put(typ)
-
-  def value_to_key(self, val):
-    obj = self.from_value(val)
-    type_id = TypeId(val.type_id.id_)
-    return Key(self.put(obj), type_id)
-
-  def key_to_value(self, key):
-    return self.to_value(self.get(key.id_), type_id=key.type_id)
 
   def to_key(self, obj):
     type_id = TypeId(self.put(type(obj)))
@@ -534,6 +532,7 @@ class Native(object):
                            extern_id_to_str,
                            extern_val_to_str,
                            extern_satisfied_by,
+                           extern_satisfied_by_type,
                            extern_store_list,
                            extern_project,
                            extern_project_ignoring_type,
