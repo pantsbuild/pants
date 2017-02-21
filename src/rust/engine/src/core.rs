@@ -115,10 +115,7 @@ impl Key {
  * underlying CFFI handle.
  */
 #[repr(C)]
-pub struct Value {
-  handle: Handle,
-  type_id: TypeId,
-}
+pub struct Value(Handle);
 
 // By default, Values would not be marked Send because of the raw pointer they hold.
 // Because the handle is opaque and can't be cloned, we can safely implement Send.
@@ -127,24 +124,18 @@ unsafe impl Sync for Value {}
 
 impl Drop for Value {
   fn drop(&mut self) {
-    enqueue_drop_handle(self.handle);
+    enqueue_drop_handle(self.0);
   }
 }
 
 impl Value {
-  pub fn type_id(&self) -> &TypeId {
-    &self.type_id
-  }
-
   /**
    * An escape hatch to allow for cloning a Value without cloning its handle. You should generally
-   * not do this unless you are certain the inpuit Value has been mem::forgotten (otherwise it
+   * not do this unless you are certain the input Value has been mem::forgotten (otherwise it
    * will be `Drop`ed twice).
    */
   pub unsafe fn clone_without_handle(&self) -> Value {
-    Value {
-      ..*self
-    }
+    Value(self.0)
   }
 }
 

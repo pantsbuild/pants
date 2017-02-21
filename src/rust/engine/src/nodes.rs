@@ -86,7 +86,7 @@ impl Context {
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    externs::satisfied_by(&self.tasks.type_has_products, item.type_id())
+    externs::satisfied_by(&self.tasks.type_has_products, item)
   }
 
   /**
@@ -115,13 +115,6 @@ impl Context {
    */
   fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
     externs::store_list(items, merge)
-  }
-
-  /**
-   * Calls back to Python for a satisfied_by check.
-   */
-  fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    externs::satisfied_by(constraint, cls)
   }
 
   /**
@@ -246,7 +239,7 @@ impl Select {
     candidate: &'a Value,
     variant_value: &Option<String>
   ) -> bool {
-    if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
+    if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
     }
     return match variant_value {
@@ -460,7 +453,7 @@ impl SelectDependencies {
   }
 
   fn store(&self, context: &Context, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.transitive && context.satisfied_by(&self.selector.product, dep_product.type_id())  {
+    if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.
