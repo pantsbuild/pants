@@ -76,7 +76,10 @@ class GatherSources(Task):
     for relpath in tgt.sources_relative_to_source_root():
       try:
         src = os.path.join(buildroot, tgt.target_base, relpath)
-        builder.add_source(src, relpath)
+        if isinstance(tgt, Resources):
+          builder.add_resource(src, relpath)
+        else:
+          builder.add_source(src, relpath)
       except OSError:
         self.context.log.error('Failed to copy {} for target {}'.format(
             os.path.join(tgt.target_base, relpath), tgt.address.spec))

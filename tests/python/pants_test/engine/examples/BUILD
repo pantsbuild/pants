@@ -83,3 +83,22 @@ python_binary(
   ]
 )
 
+resources(
+  name='fs_test',
+  sources=rglobs('fs_test/*')
+)
+
+resources(
+  name='graph_test',
+  sources=rglobs('graph_test/*')
+)
+
+resources(
+  name='mapper_test',
+  sources=rglobs('mapper_test/*')
+)
+
+resources(
+  name='scheduler_inputs',
+  sources=rglobs('scheduler_inputs/*')
+)
