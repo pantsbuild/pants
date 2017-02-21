@@ -118,7 +118,7 @@ class RulesetValidatorTest(unittest.TestCase):
     init_subsystem(Native.Factory)
     rule_index = RuleIndex.create(rules, intrinsic_entries)
     native = Native.Factory.global_instance().create()
-    scheduler = WrappedNativeScheduler(native, rule_index, root_subject_types)
+    scheduler = WrappedNativeScheduler(native, '.', [], rule_index, root_subject_types)
     return scheduler
 
   def test_ruleset_with_missing_product_type(self):

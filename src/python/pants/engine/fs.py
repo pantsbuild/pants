@@ -40,7 +40,7 @@ class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
   """
 
   @staticmethod
-  def create(relative_to, include, exclude):
+  def create(relative_to, include, exclude=tuple()):
     """Given various file patterns create a PathGlobs object (without using filesystem operations).
 
     :param relative_to: The path that all patterns are relative to (which will itself be relative

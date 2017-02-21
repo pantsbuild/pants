@@ -12,8 +12,8 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (DirectoryListing, FilesContent, PathGlobs,
-                             ReadLink, Snapshot, _snapshot_path)
+from pants.engine.fs import (DirectoryListing, FilesContent, PathGlobs, ReadLink, Snapshot,
+                             _snapshot_path)
 from pants.util.contextutil import open_tar
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase

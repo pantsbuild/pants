@@ -73,7 +73,6 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
@@ -84,16 +83,6 @@ python_tests(
     'src/python/pants/engine:nodes',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/testutils:git_util',
-  ]
-)
-
-
-python_tests(
-  name='path_globs',
-  sources=['test_path_globs.py'],
-  dependencies=[
-    'src/python/pants/base:project_tree',
-    'src/python/pants/engine:fs',
   ]
 )
 

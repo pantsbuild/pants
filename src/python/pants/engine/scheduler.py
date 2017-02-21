@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import (FileContent, FilesContent, Dir, File, Link, Path, PathGlobs, Snapshot)
+from pants.engine.fs import Dir, File, FileContent, FilesContent, Link, Path, PathGlobs, Snapshot
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
@@ -41,7 +41,7 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
 
 
 class WrappedNativeScheduler(object):
-  def __init__(self, native, project_tree, rule_index, root_subject_types):
+  def __init__(self, native, build_root, ignore_patterns, rule_index, root_subject_types):
     self._native = native
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
@@ -49,8 +49,8 @@ class WrappedNativeScheduler(object):
     # Create the ExternContext, and the native Scheduler.
     self._scheduler =\
       native.new_scheduler(
-        project_tree.build_root,
-        project_tree.ignore_patterns,
+        build_root,
+        ignore_patterns,
         Snapshot,
         FileContent,
         FilesContent,
@@ -195,10 +195,9 @@ class WrappedNativeScheduler(object):
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
-  def invalidate_via_keys(self, subject_keys):
-    return self._native.lib.graph_invalidate(self._scheduler,
-                                             subject_keys,
-                                             len(subject_keys))
+  def invalidate(self, filenames):
+    filenames_buf = self._native.context.utf8_buf_buf(filenames)
+    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
@@ -302,7 +301,11 @@ class LocalScheduler(object):
       SingleAddress,
     }
     rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=[])
-    self._scheduler = WrappedNativeScheduler(native, project_tree, rule_index, root_subject_types)
+    self._scheduler = WrappedNativeScheduler(native,
+                                             project_tree.build_root,
+                                             project_tree.ignore_patterns,
+                                             rule_index,
+                                             root_subject_types)
 
     self._scheduler.assert_ruleset_valid()
 
@@ -380,9 +383,8 @@ class LocalScheduler(object):
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    filenames_buf = self._native.context.utf8_buf_buf(filenames)
     with self._product_graph_lock:
-      invalidated = self._scheduler.invalidate(filenames_buf)
+      invalidated = self._scheduler.invalidate(filenames)
       logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
       return invalidated
 

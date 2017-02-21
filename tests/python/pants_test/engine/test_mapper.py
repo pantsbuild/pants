@@ -263,7 +263,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     return {uhs.address: uhs.struct for uhs in self.resolve(spec)}
 
   def test_no_address_no_family(self):
-    spec = SingleAddress('a/c', None)
+    spec = SingleAddress('a/c', 'c')
     # Should fail: does not exist.
     with self.assertRaises(Exception):
       self.resolve(spec)
@@ -283,7 +283,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     self.assertEqual(Struct(name='c', type_alias='struct'), resolved[0].struct)
 
   def test_resolve(self):
-    resolved = self.resolve(SingleAddress('a/b', None))
+    resolved = self.resolve(SingleAddress('a/b', 'b'))
     self.assertEqual(1, len(resolved))
     self.assertEqual(self.a_b, resolved[0].address)
 

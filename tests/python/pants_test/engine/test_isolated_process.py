@@ -9,11 +9,10 @@ import os
 import unittest
 
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import Files, PathGlobs, Snapshot, _snapshot_path
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select, SelectLiteral
-from pants.util.contextutil import open_tar
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -28,8 +27,8 @@ class ShellCat(Binary):
     return '/bin/cat'
 
 
-def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(files, snapshot):
-  return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in files.dependencies)),
+def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
+  return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in snapshot.files)),
                                    snapshots=(snapshot,))
 
 
@@ -75,9 +74,9 @@ class Javac(Binary):
     return '/usr/bin/javac'
 
 
-def java_sources_to_javac_args(java_sources, sources_snapshot, out_dir):
+def java_sources_to_javac_args(sources_snapshot, out_dir):
   return SnapshottedProcessRequest(args=('-d', out_dir.path)+
-                                        tuple(f.path for f in java_sources.dependencies),
+                                        tuple(f.path for f in sources_snapshot.files),
                                    snapshots=(sources_snapshot,),
                                    directories_to_create=(out_dir.path,))
 
@@ -110,14 +109,14 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
                                 binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Files), Select(Snapshot)),
+                                input_selectors=(Select(Snapshot)),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=process_result_to_concatted_from_outfile),
       [ShellCatToOutFile, [], ShellCatToOutFile],
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -128,12 +127,12 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   def test_javac_compilation_example(self):
-    sources = PathGlobs.create('', files=['scheduler_inputs/src/java/simple/Simple.java'])
+    sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Simple.java'])
 
     scheduler = self.mk_scheduler_in_example_fs([
       SnapshottedProcess.create(ClasspathEntry,
                                 Javac,
-                                (Select(Files), Select(Snapshot), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
+                                (Select(Snapshot), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
                                 java_sources_to_javac_args,
                                 process_result_to_classpath_entry),
       [Javac, [], Javac]
@@ -163,7 +162,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -176,24 +175,20 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
                                 binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Files), Select(Snapshot)),
+                                input_selectors=(Select(Snapshot)),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=fail_process_result),
       [ShellCatToOutFile, [], ShellCatToOutFile]
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Failed in output conversion!')
-
-  def assert_archive_files(self, expected_archive_files, snapshot, snapshot_archive_root):
-    with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
-      self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]

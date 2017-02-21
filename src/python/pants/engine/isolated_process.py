@@ -36,7 +36,6 @@ def _run_command(binary, sandbox_dir, process_request):
 
 def _snapshotted_process(input_conversion,
                          output_conversion,
-                         snapshot_directory,
                          binary,
                          *args):
   """A pickleable top-level function to execute a process.
@@ -46,11 +45,14 @@ def _snapshotted_process(input_conversion,
 
   process_request = input_conversion(*args)
 
+  # TODO: Should port this to rust.
+  todo = 'Should port this to rust.'
+
   # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
   with temporary_dir(cleanup=False) as sandbox_dir:
     if process_request.snapshots:
       for snapshot in process_request.snapshots:
-        extract_snapshot(snapshot_directory.root, snapshot, sandbox_dir)
+        todo.extract_snapshot(todo.root, snapshot, sandbox_dir)
 
     # All of the snapshots have been checked out now.
     if process_request.directories_to_create:
@@ -116,7 +118,7 @@ class SnapshottedProcess(object):
     """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
 
     # Select the concatenation of the snapshot directory, binary, and input selectors.
-    inputs = (select_snapshot_directory(), Select(binary_type)) + tuple(input_selectors)
+    inputs = (Select(binary_type)) + tuple(input_selectors)
 
     # Apply the input/output conversions to a top-level process-execution function which
     # will receive all inputs, convert in, execute, and convert out.
