@@ -37,7 +37,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
         else:
-          node_task.context.log.warning(
+          node_task.context.log.warn(
             'Cannot find npm-shrinkwrap.json. Did you forget to put it in target sources? '
             'This package will fall back to inject package.json with pants BUILD dependencies '
             'including node_remote_module and other node dependencies. However, this is '
@@ -93,12 +93,13 @@ class NpmResolver(Subsystem, NodeResolverBase):
     dependenciesToRemove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
-    node_task.context.log.debug('Removing %s from package.json for %s',
-                                dependenciesToRemove, package['name'])
+    node_task.context.log.debug(
+      'Removing {} from package.json for {}'.format(dependenciesToRemove, package['name']))
     for dependencyType in dependenciesToRemove:
       package.pop(dependencyType, None)
 
-    node_task.context.log.debug('Adding %s to package.json for %s', dependencies, package['name'])
+    node_task.context.log.debug(
+      'Adding {} to package.json for {}'.format(dependencies, package['name']))
     package['dependencies'] = dependencies
 
     with open(package_json_path, 'wb') as fp:

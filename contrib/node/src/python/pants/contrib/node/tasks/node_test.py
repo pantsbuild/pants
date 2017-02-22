@@ -66,7 +66,8 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     for target in targets:
       node_path = node_paths.node_path(target.dependencies[0])
 
-      self.context.log.debug('Testing node module (first dependency): %s', target.dependencies[0])
+      self.context.log.debug(
+        'Testing node module (first dependency): {}'.format(target.dependencies[0]))
 
       package_manager = self.get_package_manager_for_target(target=target.dependencies[0])
       if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
