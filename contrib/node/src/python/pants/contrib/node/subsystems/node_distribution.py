@@ -42,7 +42,8 @@ class NodeDistribution(object):
                     'distribution with --binary-util-baseurls and --pants-bootstrapdir')
       register('--package-manager', advanced=True, default='npm', fingerprint=True,
                choices=NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys(),
-               help='Default package manager config for repo. Should be one of [npm,yarnpkg]')
+               help='Default package manager config for repo. Should be one of {}'.format(
+                 NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()))
       register('--yarnpkg-version', advanced=True, default='v0.19.1', fingerprint=True,
                help='Yarnpkg version. Used for binary utils')
 
@@ -57,7 +58,12 @@ class NodeDistribution(object):
         package_manager=options.package_manager,
         yarnpkg_version=options.yarnpkg_version)
 
-  VALID_PACKAGE_MANAGER_LIST = {'npm': 'npm', 'yarn': 'yarnpkg'}
+  PACKAGE_MANAGER_NPM = 'npm'
+  PACKAGE_MANAGER_YARNPKG = 'yarnpkg'
+  VALID_PACKAGE_MANAGER_LIST = {
+    'npm': PACKAGE_MANAGER_NPM,
+    'yarn': PACKAGE_MANAGER_YARNPKG
+  }
 
   @classmethod
   def validate_package_manager(cls, package_manager):

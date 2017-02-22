@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
-import logging
 import os
 
 from pants.base.exceptions import TaskError
@@ -17,9 +16,6 @@ from pants.util.contextutil import pushd
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
-
-
-logger = logging.getLogger(__name__)
 
 
 class NpmResolver(Subsystem, NodeResolverBase):
@@ -33,20 +29,19 @@ class NpmResolver(Subsystem, NodeResolverBase):
   def resolve_target(self, node_task, target, results_dir, node_paths):
     self._copy_sources(target, results_dir)
     with pushd(results_dir):
-      # Comment out this checkout point because it cannot pass unit tests
-      # if not os.path.exists('package.json'):
-      #   raise TaskError(
-      #     'Cannot find package.json. Did you forget to put it in target sources?')
+      if not os.path.exists('package.json'):
+        raise TaskError(
+          'Cannot find package.json. Did you forget to put it in target sources?')
       package_manager = node_task.get_package_manager_for_target(target=target)
-      if package_manager == 'npm':
+      if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
         if os.path.exists('npm-shrinkwrap.json'):
-          logger.info('Found npm-shrinkwrap.json, do not inject package.json')
+          node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
         else:
-          logger.warning(
+          node_task.context.log.warning(
             'Cannot find npm-shrinkwrap.json. Did you forget to put it in target sources? '
             'This package will fall back to inject package.json with pants BUILD dependencies '
             'including node_remote_module and other node dependencies. However, this is '
-            'not fully supported. Do you intend to using this experimental functionality?')
+            'not fully supported.')
           self._emit_package_descriptor(node_task, target, results_dir, node_paths)
         result, npm_install = node_task.execute_npm(['install'],
                                                     workunit_name=target.address.reference(),
@@ -54,7 +49,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         if result != 0:
           raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
                           .format(target.address.reference(), npm_install, result))
-      elif package_manager == 'yarnpkg':
+      elif package_manager == node_task.node_distribution.PACKAGE_MANAGER_YARNPKG:
         if not os.path.exists('yarn.lock'):
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
@@ -98,10 +93,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
     dependenciesToRemove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
-    logger.error('Removing dependencies')
+    node_task.context.log.debug('Removing %s from package.json for %s',
+                                dependenciesToRemove, package['name'])
     for dependencyType in dependenciesToRemove:
       package.pop(dependencyType, None)
 
+    node_task.context.log.debug('Adding %s to package.json for %s', dependencies, package['name'])
     package['dependencies'] = dependencies
 
     with open(package_json_path, 'wb') as fp:

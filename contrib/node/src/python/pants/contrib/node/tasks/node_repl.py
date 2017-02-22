@@ -70,10 +70,11 @@ class NodeRepl(ReplTaskMixin, NodeTask):
 
         repl_session = node_repl.run()
         repl_session.wait()
-    # Repl task doesn't make any sence for Node.js with yarnpkg for the following reasons:
-    # 1. Node.js can simply start from the source root, make an alias for 'cd package_root && node'
-    #   does not give any benefits but increase the maintance work
-    # 2. There's no simple entry point (binary) for Node.js packages. A package may start with node,
-    #   babel-node, babel-polyfill, webpack, etc.
+    # TODO(qsong): Issue #4278 Find a good way to preserve the flexibility of Node REPL
+    # Repl task is hard to take over Node.js native REPL for the following reasons:
+    # 1. Node.js can simply start from the package source root because node package is
+    #   self-contained.
+    # 2. There's no simple entry point (binary) for Node.js packages. A package may start from
+    #   node, babel-node, babel-polyfill, webpack, etc.
     # In addition, since the repl task is modifing the package.json and there is no lockdown,
-    # it is impossible to use yarnpkg to start repl unless we remove the dependency resolver.
+    # it is impossible to use yarnpkg to start repl unless the dependency resolver is removed.

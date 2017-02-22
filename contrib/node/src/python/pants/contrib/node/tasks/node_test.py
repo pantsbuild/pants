@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -15,9 +14,6 @@ from pants.util.process_handler import SubprocessProcessHandler
 
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_task import NodeTask
-
-
-logger = logging.getLogger(__name__)
 
 
 class NodeTest(TestRunnerTaskMixin, NodeTask):
@@ -70,10 +66,10 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     for target in targets:
       node_path = node_paths.node_path(target.dependencies[0])
 
-      logger.debug('First dependency: %s', target.dependencies[0])
+      self.context.log.debug('Testing node module (first dependency): %s', target.dependencies[0])
 
       package_manager = self.get_package_manager_for_target(target=target.dependencies[0])
-      if package_manager == 'npm':
+      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
         args = ['run-script', target.script_name, '--'] + self.get_passthru_args()
 
         with pushd(node_path):
@@ -82,7 +78,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
           if result != 0:
             raise TaskError('npm test script failed:\n'
                             '\t{} failed with exit code {}'.format(npm_test_command, result))
-      elif package_manager == 'yarnpkg':
+      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
         args = ['run', target.script_name, '--'] + self.get_passthru_args()
         with pushd(node_path):
           self._currently_executing_test_targets = [target]
