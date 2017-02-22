@@ -13,7 +13,7 @@ from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
-class JarDependencyWrapper(object):
+class JarDependencyParseContextWrapper(object):
   def __init__(self, parse_context):
     """
     :param parse_context: The BUILD file parse context.
@@ -21,16 +21,13 @@ class JarDependencyWrapper(object):
     self._rel_path = parse_context.rel_path
 
   def __call__(self, org, name, rev=None, **kwargs):
-    return self.create_jar_dependency(self._rel_path, org, name, rev, **kwargs)
-
-  @classmethod
-  def create_jar_dependency(cls, rel_path, org, name, rev=None, **kwargs):
+    kwargs['rel_path'] = self._rel_path
     return JarDependency(org, name, rev, **kwargs)
 
 
 class JarDependency(datatype('JarDependency', [
-  'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
-  'classifier', 'mutable', 'intransitive', 'excludes'])):
+  'org', 'base_name', 'rev', 'force', 'ext', 'base_url', 'apidocs',
+  'classifier', 'mutable', 'intransitive', 'excludes', 'rel_path'])):
   """A pre-built Maven repository dependency.
 
   :API: public
@@ -45,7 +42,7 @@ class JarDependency(datatype('JarDependency', [
                              allowable=(tuple, list,)))
 
   def __new__(cls, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-              classifier=None, mutable=None, intransitive=False, excludes=None):
+              classifier=None, mutable=None, intransitive=False, excludes=None, rel_path=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -56,7 +53,8 @@ class JarDependency(datatype('JarDependency', [
     :param string ext: Extension of the artifact if different from the artifact type.
       This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
     :param string url: URL of this artifact, if different from the Maven repo standard location
-      (specifying this parameter is unusual).
+      (specifying this parameter is unusual).  For relative file URL, its absolute URL
+      is (buildroot + rel_path + relative url)
     :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
       will properly hyperlink {\ @link}s.
     :param string classifier: Classifier specifying the artifact variant to use.
@@ -66,15 +64,22 @@ class JarDependency(datatype('JarDependency', [
       the dependency itself should be downloaded and placed on the classpath
     :param list excludes: Transitive dependencies of this jar to exclude.
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+    :param string rel_path: relative path from the buildroot, used to compute url file path
+      when the url is relative.
     """
     excludes = JarDependency._prepare_excludes(excludes)
     return super(JarDependency, cls).__new__(
-        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
-        classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes)
+        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, base_url=url, apidocs=apidocs,
+        classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
+        rel_path=rel_path)
 
   @property
   def name(self):
     return self.base_name
+
+  @property
+  def url(self):
+    return self.base_url
 
   @property
   def transitive(self):

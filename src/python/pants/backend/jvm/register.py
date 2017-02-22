@@ -17,7 +17,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import LiteralCredentials, NetrcCredentials
 from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency, JarDependencyWrapper
+from pants.backend.jvm.targets.jar_dependency import JarDependency, JarDependencyParseContextWrapper
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -125,7 +125,7 @@ def build_file_aliases():
     },
     context_aware_object_factories={
       'bundle': Bundle,
-      'jar': JarDependencyWrapper,
+      'jar': JarDependencyParseContextWrapper,
       'managed_jar_libraries': ManagedJarLibraries,
     }
   )
