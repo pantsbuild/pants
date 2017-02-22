@@ -18,15 +18,41 @@ from pants.util.objects import datatype
 
 
 class JarDependencyParseContextWrapper(object):
+  """A pre-built Maven repository dependency."""
+
   def __init__(self, parse_context):
     """
     :param parse_context: The BUILD file parse context.
     """
     self._rel_path = parse_context.rel_path
 
-  def __call__(self, org, name, rev=None, **kwargs):
-    kwargs['base_path'] = os.path.join(get_buildroot(), self._rel_path)
-    return JarDependency(org, name, rev, **kwargs)
+  def __call__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
+              classifier=None, mutable=None, intransitive=False, excludes=None):
+    """
+    :param string org: The Maven ``groupId`` of this dependency.
+    :param string name: The Maven ``artifactId`` of this dependency.
+    :param string rev: The Maven ``version`` of this dependency.
+      If unspecified the latest available version is used.
+    :param boolean force: Force this specific artifact revision even if other transitive
+      dependencies specify a different revision. This requires specifying the ``rev`` parameter.
+    :param string ext: Extension of the artifact if different from the artifact type.
+      This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
+    :param string url: URL of this artifact, if different from the Maven repo standard location
+      (specifying this parameter is unusual). Path of file URL can be either absolute or relative
+      to the belonging BUILD file.
+    :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
+      will properly hyperlink {\ @link}s.
+    :param string classifier: Classifier specifying the artifact variant to use.
+    :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
+      Maven -SNAPSHOT style artifacts in an active development/integration cycle.
+    :param boolean intransitive: Declares this Dependency intransitive, indicating only the jar for
+      the dependency itself should be downloaded and placed on the classpath
+    :param list excludes: Transitive dependencies of this jar to exclude.
+    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+    """
+    base_path = os.path.join(get_buildroot(), self._rel_path)
+    return JarDependency(org, name, rev, force, ext, url, apidocs, classifier, mutable, intransitive,
+                         excludes, base_path)
 
 
 class JarDependency(datatype('JarDependency', [
@@ -57,8 +83,9 @@ class JarDependency(datatype('JarDependency', [
     :param string ext: Extension of the artifact if different from the artifact type.
       This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
     :param string url: URL of this artifact, if different from the Maven repo standard location
-      (specifying this parameter is unusual). For file URL, absolute is required by ivy.
-      If a relative path is used, the absolute URL is (base_path + relative url).
+      (specifying this parameter is unusual). For file URL, absolute path is required by ivy.
+      If a relative path is provided here, the absolute URL used for ivy will be
+      `base_path` + relative url.
     :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
       will properly hyperlink {\ @link}s.
     :param string classifier: Classifier specifying the artifact variant to use.

@@ -109,7 +109,6 @@ def build_file_aliases():
       'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
-      'jar': JarDependency,
       'scala_jar': ScalaJarDependency,
       'jar_rules': JarRules,
       'repository': repo,
