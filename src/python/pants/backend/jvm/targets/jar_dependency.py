@@ -40,7 +40,7 @@ class JarDependencyParseContextWrapper(object):
     """
     :param parse_context: The BUILD file parse context.
     """
-    self._rel_path = parse_context.rel_path
+    self._rel_path = parse_context.rel_path or ''
 
   def __call__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
               classifier=None, mutable=None, intransitive=False, excludes=None):
