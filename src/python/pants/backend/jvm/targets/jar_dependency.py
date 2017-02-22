@@ -18,7 +18,23 @@ from pants.util.objects import datatype
 
 
 class JarDependencyParseContextWrapper(object):
-  """A pre-built Maven repository dependency."""
+  """A pre-built Maven repository dependency.
+
+  Examples: ::
+
+    # The typical use case.
+    jar('com.puppycrawl.tools', 'checkstyle', '1.2')
+
+    # Test external dependency locally.
+    jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
+        url='file:///Users/pantsdev/workspace/project/jars/checkstyle/checkstyle.jar')
+
+    # Test external dependency locally using relative path (with respect to the path
+    # of the belonging BUILD file)
+    jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
+        url='file:../checkstyle/checkstyle.jar')
+
+  """
 
   def __init__(self, parse_context):
     """
