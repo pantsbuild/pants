@@ -296,8 +296,8 @@ class FrozenResolution(object):
 
     # Assuming target is a jar library.
     for j in target.jar_dependencies:
-      if j.url:
-        self.coordinate_to_attributes[j.coordinate] = {'url': j.url}
+      if j.get_url():
+        self.coordinate_to_attributes[j.coordinate] = {'url': j.get_url()}
       else:
         self.coordinate_to_attributes[j.coordinate] = {}
 
@@ -1156,7 +1156,7 @@ class IvyUtils(object):
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
-      url = jar.url
+      url = jar.get_url()
       if url:
         any_have_url = True
       classifier = jar.classifier
@@ -1202,7 +1202,7 @@ class IvyUtils(object):
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
-      url = jar.url
+      url = jar.get_url()
       if url:
         any_have_url = True
       classifier = jar.classifier

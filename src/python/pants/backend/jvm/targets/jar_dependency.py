@@ -5,11 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import urlparse
+
 from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.exclude import Exclude
+from pants.base.build_environment import get_buildroot
 from pants.base.payload_field import stable_json_sha1
 from pants.base.validation import assert_list
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 
 
@@ -26,7 +30,7 @@ class JarDependencyParseContextWrapper(object):
 
 
 class JarDependency(datatype('JarDependency', [
-  'org', 'base_name', 'rev', 'force', 'ext', 'base_url', 'apidocs',
+  'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
   'classifier', 'mutable', 'intransitive', 'excludes', 'rel_path'])):
   """A pre-built Maven repository dependency.
 
@@ -68,8 +72,9 @@ class JarDependency(datatype('JarDependency', [
       when the url is relative.
     """
     excludes = JarDependency._prepare_excludes(excludes)
+    rel_path = os.path.join(get_buildroot(), rel_path or '')
     return super(JarDependency, cls).__new__(
-        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, base_url=url, apidocs=apidocs,
+        cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
         rel_path=rel_path)
 
@@ -77,9 +82,18 @@ class JarDependency(datatype('JarDependency', [
   def name(self):
     return self.base_name
 
-  @property
-  def url(self):
-    return self.base_url
+  @memoized_method
+  def get_url(self, relative=False):
+    if self.url:
+      parsed_url = urlparse.urlparse(self.url)
+      if parsed_url.scheme == 'file':
+        if relative and os.path.isabs(parsed_url.path):
+          relative_path = os.path.relpath(parsed_url.path, self.rel_path)
+          return parsed_url._replace(path=relative_path).geturl()
+        if not relative and not os.path.isabs(parsed_url.path):
+          abs_path = os.path.join(self.rel_path, parsed_url.path)
+          return parsed_url._replace(path=abs_path).geturl()
+    return self.url
 
   @property
   def transitive(self):
@@ -116,7 +130,7 @@ class JarDependency(datatype('JarDependency', [
                                  rev=self.rev,
                                  force=self.force,
                                  ext=self.ext,
-                                 url=self.url,
+                                 url=self.get_url(relative=True),
                                  classifier=self.classifier,
                                  transitive=self.transitive,
                                  mutable=self.mutable,
