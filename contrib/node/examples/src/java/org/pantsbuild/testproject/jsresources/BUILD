@@ -1,4 +1,4 @@
-jvm_binary(name = 'jsresources',
+jvm_binary(
   source = 'JsResourcesMain.java',
   main = 'org.pantsbuild.testproject.jsresources.JsResourcesMain',
   dependencies = [

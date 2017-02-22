@@ -27,7 +27,7 @@ node_test(
   tags={'integration'},
 )
 
-# Contains non-transpiled codes including all dependencies under node_modules dirctory.
+# Contains non-transpiled codes including all subdirectories under node_modules dirctory.
 node_bundle(
   name='web-component-button-bundle',
   node_module=':web-component-button'
@@ -45,7 +45,7 @@ node_module(
   build_script='build',
 )
 
-# Contained transpiled codes.
+# Contains transpiled codes.
 node_bundle(
   name='web-component-button-processed-bundle',
   node_module=':web-component-button-processed'

@@ -36,8 +36,27 @@ class NodeBuild(NodeTask):
   def create_target_dirs(self):
     return True
 
-  def __init__(self, *args, **kwargs):
-    super(NodeBuild, self).__init__(*args, **kwargs)
+  def _run_build_script(self, target, results_dir, node_installed_path):
+    target_address = target.address.reference()
+    # If there is build script defined, run the build script and return build output directory;
+    # If there is not build script defined, use installation directory as build output.
+    if target.payload.build_script:
+      self.context.log.info('Running node build {} for {} at {}\n'.format(
+        target.payload.build_script, target_address, node_installed_path))
+      result, npm_build_command = self.execute_npm(
+        ['run-script', target.payload.build_script],
+        workunit_name=target_address,
+        workunit_labels=[WorkUnitLabel.COMPILER])
+      # Make sure script run is successful.
+      if result != 0:
+        raise TaskError(
+          'Failed to run build for {}:\n\t{} failed with exit code {}'.format(
+            target_address, npm_build_command, result))
+
+  def _get_output_dir(self, target, node_installed_path):
+    return os.path.normpath(os.path.join(
+      node_installed_path,
+      target.payload.output_dir if target.payload.build_script else ''))
 
   def execute(self):
     node_paths = self.context.products.get_data(NodePaths)
@@ -50,40 +69,20 @@ class NodeBuild(NodeTask):
     with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         target = vt.target
-        target_address = target.address.reference()
         node_installed_path = node_paths.node_path(target)
 
         with pushd(node_installed_path):
-          if target.payload.build_script:
-            if not vt.valid:
-              self.context.log.info('Running node build {} for {} at {}\n'.format(
-                target.payload.build_script, target_address, node_installed_path))
-              result, npm_build_command = self.execute_npm(
-                ['run-script', target.payload.build_script],
-                workunit_name=target_address,
-                workunit_labels=[WorkUnitLabel.COMPILER])
-              if result != 0:
-                raise TaskError(
-                  'Failed to run build for {}:\n\t{} failed with exit code {}'.format(
-                    target_address, npm_build_command, result))
-
-            if not target.payload.dev_dependency:
-              output_dir = os.path.join(node_installed_path, target.payload.output_dir)
-              if os.path.exists(output_dir):
-                bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
-              else:
-                raise TaskError(
-                  'Target {} has build script {} specified, but did not generate any output '
-                  'at {}.\n'.format(target_address, npm_build_command, output_dir))
-          else:
-            if not target.payload.dev_dependency:
-              bundleable_js_product[target].add_abs_paths(node_installed_path, [node_installed_path])
-              output_dir = node_installed_path
+          if not vt.valid:
+            self._run_build_script(target, vt.results_dir, node_installed_path)
 
           if not target.payload.dev_dependency:
-            if not vt.valid:
-              # Resources included in a JAR file will be under %target_name%
-              absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))
-            self.context.log.debug('adding {} for target {} to runtime classpath'.format(
-              vt.results_dir, target_address))
+            output_dir = self._get_output_dir(target, node_installed_path)
+            # Make sure that there is output generated.
+            if not os.path.exists(output_dir):
+              raise TaskError(
+                'Target {} has build script {} specified, but did not generate any output '
+                'at {}.\n'.format(
+                  target.address.reference(), target.payload.build_script, output_dir))
+            absolute_symlink(output_dir, os.path.join(vt.results_dir, target.address.target_name))
+            bundleable_js_product[target].add_abs_paths(output_dir, [output_dir])
             runtime_classpath_product.add_for_target(target, [('default', vt.results_dir)])
