@@ -692,7 +692,7 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
 }
 
 fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entries {
-  if externs::satisfied_by(&select.product, &subject_type) {
+  if externs::satisfied_by_type(&select.product, &subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
   } else {

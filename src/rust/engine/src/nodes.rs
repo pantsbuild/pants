@@ -67,7 +67,7 @@ impl Context {
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    externs::satisfied_by(&self.core.types.has_products, item.type_id())
+    externs::satisfied_by(&self.core.types.has_products, item)
   }
 
   /**
@@ -299,7 +299,7 @@ impl Select {
     candidate: &'a Value,
     variant_value: &Option<String>
   ) -> bool {
-    if !externs::satisfied_by(&self.selector.product, candidate.type_id()) {
+    if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
     }
     return match variant_value {
@@ -579,7 +579,7 @@ impl SelectDependencies {
   }
 
   fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product.type_id())  {
+    if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.

@@ -47,23 +47,29 @@ pub fn drop_handles(handles: Vec<Handle>) {
   )
 }
 
-pub fn satisfied_by(constraint: &TypeConstraint, cls: &TypeId) -> bool {
+pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
+  with_externs(|e| {
+    (e.satisfied_by)(e.context, constraint, obj)
+  })
+}
+
+pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
   with_externs(|e| {
     let key = (*constraint, *cls);
 
     // See if a value already exists.
     {
-      let read = e.satisfied_by_cache.read().unwrap();
+      let read = e.satisfied_by_type_cache.read().unwrap();
       if let Some(v) = read.get(&key) {
         return *v;
       }
     }
 
     // If not, compute and insert.
-    let mut write = e.satisfied_by_cache.write().unwrap();
+    let mut write = e.satisfied_by_type_cache.write().unwrap();
     write.entry(key)
       .or_insert_with(||
-        (e.satisfied_by)(e.context, constraint, cls)
+        (e.satisfied_by_type)(e.context, constraint, cls)
       )
       .clone()
   })
@@ -179,9 +185,6 @@ fn with_externs<F, T>(f: F) -> T where F: FnOnce(&Externs)->T {
 // An opaque pointer to a context used by the extern functions.
 pub type ExternContext = raw::c_void;
 
-pub type SatisfiedByExtern =
-  extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
-
 pub struct Externs {
   context: *const ExternContext,
   log: LogExtern,
@@ -190,7 +193,8 @@ pub struct Externs {
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
-  satisfied_by_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
+  satisfied_by_type: SatisfiedByTypeExtern,
+  satisfied_by_type_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   project: ProjectExtern,
@@ -219,6 +223,7 @@ impl Externs {
     id_to_str: IdToStrExtern,
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
+    satisfied_by_type: SatisfiedByTypeExtern,
     store_list: StoreListExtern,
     store_bytes: StoreBytesExtern,
     project: ProjectExtern,
@@ -236,7 +241,8 @@ impl Externs {
       clone_val: clone_val,
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
-      satisfied_by_cache: RwLock::new(HashMap::new()),
+      satisfied_by_type: satisfied_by_type,
+      satisfied_by_type_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
       project: project,
@@ -253,6 +259,12 @@ impl Externs {
 
 pub type LogExtern =
   extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
+
+pub type SatisfiedByExtern =
+  extern "C" fn(*const ExternContext, *const TypeConstraint, *const Value) -> bool;
+
+pub type SatisfiedByTypeExtern =
+  extern "C" fn(*const ExternContext, *const TypeConstraint, *const TypeId) -> bool;
 
 pub type KeyForExtern =
   extern "C" fn(*const ExternContext, *const Value) -> Key;
