@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 from binascii import hexlify
-from os.path import dirname, join
+from os.path import join
 
-from pants.base.project_tree import Dir, File, Link
+from pants.base.project_tree import Dir, File
 from pants.engine.addressable import Collection
 from pants.engine.selectors import Select
 from pants.util.objects import datatype
@@ -85,30 +85,6 @@ def files_content_noop(*args):
 
 
 FilesContent = Collection.of(FileContent)
-
-
-def generate_fs_subjects(filenames):
-  """Given filenames, generate a set of subjects for invalidation predicate matching."""
-  for f in filenames:
-    # ReadLink, FileContent, or DirectoryListing for the literal path.
-    yield File(f)
-    yield Link(f)
-    yield Dir(f)
-    # Additionally, since the FS event service does not send invalidation events
-    # for the root directory, treat any changed file in the root as an invalidation
-    # of the root's listing.
-    if dirname(f) in ('.', ''):
-      yield Dir('')
-
-
-def create_fs_intrinsics(project_tree):
-  def ptree(func):
-    p = functools.partial(func, project_tree)
-    p.__name__ = '{}_intrinsic'.format(func.__name__)
-    return p
-  return [
-    # TODO: Remove!
-  ]
 
 
 def create_fs_tasks(project_tree):

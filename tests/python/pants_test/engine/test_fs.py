@@ -12,12 +12,19 @@ from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
 from pants.base.scm_project_tree import ScmProjectTree
-from pants.engine.fs import (DirectoryListing, FilesContent, PathGlobs, ReadLink, Snapshot,
-                             _snapshot_path)
+from pants.engine.fs import (FilesContent, PathGlobs, Snapshot)
 from pants.util.contextutil import open_tar
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
+
+
+class DirectoryListing(object):
+  "TODO: See #4027."
+
+
+class ReadLink(object):
+  "TODO: See #4027."
 
 
 class FSTestBase(SchedulerTestBase, AbstractClass):
@@ -245,7 +252,9 @@ class PosixFSTest(unittest.TestCase, FSTestBase):
                                 snapshot_archive_root)
 
   def assert_archive_files(self, expected_archive_files, snapshot, snapshot_archive_root):
-    with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
+    # TODO.
+    todo = '/dev/null'
+    with open_tar(todo, errorlevel=1) as tar:
       self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
 
 

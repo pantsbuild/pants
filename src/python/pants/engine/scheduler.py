@@ -11,11 +11,12 @@ import threading
 import time
 from contextlib import contextmanager
 
+from pants.base.project_tree import Dir, File, Link
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import Dir, File, FileContent, FilesContent, Link, Path, PathGlobs, Snapshot
+from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
