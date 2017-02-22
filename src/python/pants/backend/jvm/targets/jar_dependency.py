@@ -25,13 +25,13 @@ class JarDependencyParseContextWrapper(object):
     self._rel_path = parse_context.rel_path
 
   def __call__(self, org, name, rev=None, **kwargs):
-    kwargs['rel_path'] = self._rel_path
+    kwargs['base_path'] = os.path.join(get_buildroot(), self._rel_path)
     return JarDependency(org, name, rev, **kwargs)
 
 
 class JarDependency(datatype('JarDependency', [
   'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
-  'classifier', 'mutable', 'intransitive', 'excludes', 'rel_path'])):
+  'classifier', 'mutable', 'intransitive', 'excludes', 'base_path'])):
   """A pre-built Maven repository dependency.
 
   :API: public
@@ -46,7 +46,7 @@ class JarDependency(datatype('JarDependency', [
                              allowable=(tuple, list,)))
 
   def __new__(cls, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
-              classifier=None, mutable=None, intransitive=False, excludes=None, rel_path=None):
+              classifier=None, mutable=None, intransitive=False, excludes=None, base_path=None):
     """
     :param string org: The Maven ``groupId`` of this dependency.
     :param string name: The Maven ``artifactId`` of this dependency.
@@ -57,8 +57,8 @@ class JarDependency(datatype('JarDependency', [
     :param string ext: Extension of the artifact if different from the artifact type.
       This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
     :param string url: URL of this artifact, if different from the Maven repo standard location
-      (specifying this parameter is unusual).  For relative file URL, its absolute URL
-      is (buildroot + rel_path + relative url)
+      (specifying this parameter is unusual). For file URL, absolute is required by ivy.
+      If a relative path is used, the absolute URL is (base_path + relative url).
     :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
       will properly hyperlink {\ @link}s.
     :param string classifier: Classifier specifying the artifact variant to use.
@@ -68,15 +68,16 @@ class JarDependency(datatype('JarDependency', [
       the dependency itself should be downloaded and placed on the classpath
     :param list excludes: Transitive dependencies of this jar to exclude.
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
-    :param string rel_path: relative path from the buildroot, used to compute url file path
-      when the url is relative.
+    :param string base_path: absolute base path that a relative file url is based from.
     """
     excludes = JarDependency._prepare_excludes(excludes)
-    rel_path = os.path.join(get_buildroot(), rel_path or '')
+    base_path = base_path or get_buildroot()
+    if not os.path.isabs(base_path):
+      raise ValueError('base_path is not absolute: {}'.format(base_path))
     return super(JarDependency, cls).__new__(
         cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
-        rel_path=rel_path)
+        base_path=base_path)
 
   @property
   def name(self):
@@ -88,11 +89,11 @@ class JarDependency(datatype('JarDependency', [
       parsed_url = urlparse.urlparse(self.url)
       if parsed_url.scheme == 'file':
         if relative and os.path.isabs(parsed_url.path):
-          relative_path = os.path.relpath(parsed_url.path, self.rel_path)
-          return parsed_url._replace(path=relative_path).geturl()
+          relative_path = os.path.relpath(parsed_url.path, self.base_path)
+          return 'file:{path}'.format(path=relative_path)
         if not relative and not os.path.isabs(parsed_url.path):
-          abs_path = os.path.join(self.rel_path, parsed_url.path)
-          return parsed_url._replace(path=abs_path).geturl()
+          abs_path = os.path.join(self.base_path, parsed_url.path)
+          return 'file://{path}'.format(path=abs_path)
     return self.url
 
   @property
