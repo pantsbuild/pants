@@ -13,6 +13,21 @@ from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
+class JarDependencyWrapper(object):
+  def __init__(self, parse_context):
+    """
+    :param parse_context: The BUILD file parse context.
+    """
+    self._rel_path = parse_context.rel_path
+
+  def __call__(self, org, name, rev=None, **kwargs):
+    return self.create_jar_dependency(self._rel_path, org, name, rev, **kwargs)
+
+  @classmethod
+  def create_jar_dependency(cls, rel_path, org, name, rev=None, **kwargs):
+    return JarDependency(org, name, rev, **kwargs)
+
+
 class JarDependency(datatype('JarDependency', [
   'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
   'classifier', 'mutable', 'intransitive', 'excludes'])):
