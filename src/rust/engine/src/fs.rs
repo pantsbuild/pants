@@ -2,14 +2,13 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashSet;
-use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::{atomic, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
 use futures_cpupool::{self, CpuFuture, CpuPool};
-use glob::{Pattern, PatternError};
+use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore;
 use ordermap::OrderMap;
@@ -121,7 +120,7 @@ impl PathGlob {
     }
   }
 
-  pub fn create(filespecs: &Vec<String>) -> Result<Vec<PathGlob>, PatternError> {
+  pub fn create(filespecs: &[String]) -> Result<Vec<PathGlob>, String> {
     let mut path_globs = Vec::new();
     for filespec in filespecs {
       let canonical_dir = Dir(PathBuf::new());
@@ -132,37 +131,38 @@ impl PathGlob {
   }
 
   /**
-   * Split a filespec string into path components while:
-   * 1) eliminating consecutive '**'s (to avoid repetitive traversing)
-   * 2) collapsing any leading "parent" or "current" directory entries relative
-   *    to the `canonical_dir`, which is safe since that path is canonical.
+   * Given a filespec String relative to a canonical Dir and path, split it into path components
+   * while eliminating consecutive '**'s (to avoid repetitive traversing), and parse it to a
+   * series of PathGlob objects.
    */
-  fn normalize_path(canonical_dir: Dir, filespec: &str) -> (Dir, Vec<&OsStr>) {
-    let mut out = Vec::new();
+  fn parse(canonical_dir: Dir, symbolic_path: PathBuf, filespec: &str) -> Result<Vec<PathGlob>, String> {
+    let mut parts = Vec::new();
     let mut prev_was_doublestar = false;
-    for part in Path::new(filespec).iter() {
+    for component in Path::new(filespec).components() {
+      let part =
+        match component {
+          Component::Prefix(..) | Component::RootDir =>
+            return Err(format!("Absolute paths not supported: {:?}", filespec)),
+          Component::CurDir =>
+            continue,
+          c => c.as_os_str(),
+        };
+
+      // Ignore repeated doublestar instances.
       let cur_is_doublestar = *DOUBLE_STAR == part;
       if prev_was_doublestar && cur_is_doublestar {
         continue;
       }
-      out.push(part);
       prev_was_doublestar = cur_is_doublestar;
-    }
-    (canonical_dir, out)
-  }
 
-  /**
-   * Given a filespec String relative to a canonical Dir and path, parse it to a
-   * series of PathGlob objects.
-   */
-  fn parse(canonical_dir: Dir, symbolic_path: PathBuf, filespec: &str) -> Result<Vec<PathGlob>, PatternError> {
-    let mut parts = Vec::new();
-    let (canonical_dir, normalized_parts) = PathGlob::normalize_path(canonical_dir, filespec);
-    for part in normalized_parts {
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
-      parts.push(Pattern::new(&part.to_string_lossy())?);
+      parts.push(
+        Pattern::new(&part.to_string_lossy())
+          .map_err(|e| format!("Could not decode {:?} as UTF8: {:?}", filespec, e))?
+      );
     }
+
     Ok(PathGlob::parse_globs(canonical_dir, symbolic_path, &parts))
   }
 
@@ -249,7 +249,7 @@ pub struct PathGlobs {
 }
 
 impl PathGlobs {
-  pub fn create(include: &Vec<String>, exclude: &Vec<String>) -> Result<PathGlobs, PatternError> {
+  pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
     Ok(
       PathGlobs {
         include: PathGlob::create(include)?,
@@ -415,7 +415,8 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         // If the link destination can't be parsed as PathGlob(s), it is broken.
         dest_path.to_str()
           .and_then(|dest_str| {
-            PathGlob::create(&vec![dest_str.to_string()]).ok()
+            let escaped = Pattern::escape(dest_str);
+            PathGlob::create(&[escaped]).ok()
           })
           .unwrap_or_else(|| vec![])
       })
