@@ -45,7 +45,7 @@ class ApacheThriftPyGenTest(TaskTestBase):
                            target_type=PythonThriftLibrary,
                            sources=['one.thrift'])
     synthetic_target = self.generate_single_thrift_target(one)
-    self.assertEqual({'__init__.py', 'foo/__init__.py', 'foo/ThingService-remote',
+    self.assertEqual({'foo/__init__.py', 'foo/ThingService-remote',
                       'foo/ThingService.py', 'foo/ttypes.py', 'foo/constants.py'},
                      set(synthetic_target.sources_relative_to_source_root()))
 
@@ -64,6 +64,6 @@ class ApacheThriftPyGenTest(TaskTestBase):
                            target_type=PythonThriftLibrary,
                            sources=['one.thrift', 'bar/two.thrift'])
     synthetic_target = self.generate_single_thrift_target(one)
-    self.assertEqual({'__init__.py', 'foo/__init__.py', 'foo/ttypes.py', 'foo/constants.py',
+    self.assertEqual({'foo/__init__.py', 'foo/ttypes.py', 'foo/constants.py',
                       'foo/bar/__init__.py', 'foo/bar/ttypes.py', 'foo/bar/constants.py'},
                      set(synthetic_target.sources_relative_to_source_root()))
