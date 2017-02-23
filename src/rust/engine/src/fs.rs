@@ -73,6 +73,13 @@ impl PathStat {
       stat: stat,
     }
   }
+
+  pub fn path(&self) -> &Path {
+    match self {
+      &PathStat::Dir { ref path, .. } => path.as_path(),
+      &PathStat::File { ref path, .. } => path.as_path(),
+    }
+  }
 }
 
 lazy_static! {

@@ -737,7 +737,9 @@ impl From<ReadLink> for NodeKey {
  * A Node that represents consuming the stat for some path.
  *
  * NB: Because the `Scandir` operation gets the stats for a parent directory in a single syscall,
- * this operation results in no data, and is simply a placeholder to declare that dependency.
+ * this operation results in no data, and is simply a placeholder for `Snapshot` Nodes to use to
+ * declare a dependency on the existence/content of a particular path. This makes them more error
+ * prone, unfortunately.
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Stat(PathBuf);
@@ -774,19 +776,10 @@ impl Node for Scandir {
     context.core.vfs.scandir(&self.0)
       .then(move |listing_res| match listing_res {
         Ok(listing) => {
-          // Record the dependencies on the resulting Stats.
-          let stats =
-            future::join_all(
-              listing.iter()
-                .map(|stat|
-                  context.get(Stat(stat.path().to_owned()))
-                )
-                .collect::<Vec<_>>()
-            );
-          stats.map(move |_| DirectoryListing(listing)).boxed()
+          Ok(DirectoryListing(listing))
         },
         Err(e) =>
-          context.err(context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
+          Err(context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .boxed()
   }
@@ -818,11 +811,23 @@ impl Snapshot {
       .expand(path_globs)
       .then(move |path_stats_res| match path_stats_res {
         Ok(path_stats) => {
+          // Declare dependencies on the relevant Stats, and then create a Snapshot.
+          let stats =
+            future::join_all(
+              path_stats.iter()
+                .map(|path_stat|
+                  context.get(Stat(path_stat.path().to_owned()))
+                )
+                .collect::<Vec<_>>()
+            );
           // And then create a Snapshot.
-          context.core.snapshots
-            .create(&context.core.vfs, path_stats)
-            .map_err(move |e| {
-              context.throw(&format!("Snapshot failed: {}", e))
+          stats
+            .and_then(move |_| {
+              context.core.snapshots
+                .create(&context.core.vfs, path_stats)
+                .map_err(move |e| {
+                  context.throw(&format!("Snapshot failed: {}", e))
+                })
             })
             .boxed()
         },
