@@ -226,10 +226,14 @@ impl PathGlob {
     } else if *PARENT_DIR == parts[0].as_str() {
       // A request for the parent of `canonical_dir`: since we've already expanded the directory
       // to make it canonical, we can safely drop it directly and recurse without this component.
-      let parent =
-        canonical_dir.0.parent()
-          .ok_or(format!("Globs may not traverse outside the root: {:?}", parts))?;
-      PathGlob::parse_globs(Dir(parent.to_owned()), parent.to_owned(), &parts[1..])
+      // The resulting symbolic path will continue to contain a literal `..`.
+      let mut canonical_dir_parent = canonical_dir;
+      let mut symbolic_path_parent = symbolic_path;
+      if !canonical_dir_parent.0.pop() {
+        return Err(format!("Globs may not traverse outside the root: {:?}", parts));
+      }
+      symbolic_path_parent.push(Path::new(*PARENT_DIR));
+      PathGlob::parse_globs(canonical_dir_parent, symbolic_path_parent, &parts[1..])
     } else if parts.len() == 1 {
       // This is the path basename.
       Ok(
@@ -655,6 +659,34 @@ impl Snapshots {
   }
 
   /**
+   * A non-canonical (does not expand symlinks) in-memory form of normalize. Used to collapse
+   * parent and cur components, which are legal in symbolic paths in PathStats, but not in
+   * Tar files.
+   */
+  fn normalize(path: &Path) -> Result<PathBuf, String> {
+    let mut res = PathBuf::new();
+    for component in path.components() {
+      match component {
+        Component::Prefix(..) | Component::RootDir =>
+          return Err(format!("Absolute paths not supported: {:?}", path)),
+        Component::CurDir =>
+          continue,
+        Component::ParentDir => {
+          // Pop the previous component.
+          if !res.pop() {
+            return Err(format!("Globs may not traverse outside the root: {:?}", path));
+          } else {
+            continue
+          }
+        },
+        Component::Normal(p) =>
+          res.push(p),
+      }
+    }
+    Ok(res)
+  }
+
+  /**
    * Create a tar file on the given Write instance containing the given paths, or
    * return an error string.
    */
@@ -670,13 +702,16 @@ impl Snapshots {
       let append_res =
         match path_stat {
           &PathStat::File { ref path, ref stat } => {
+            let normalized = Snapshots::normalize(path)?;
             let mut input =
               fs::File::open(relative_to.0.join(stat.0.as_path()))
                 .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
-            tar_builder.append_file(path, &mut input)
+            tar_builder.append_file(normalized, &mut input)
           },
-          &PathStat::Dir { ref path, ref stat } =>
-            tar_builder.append_dir(path, relative_to.0.join(stat.0.as_path())),
+          &PathStat::Dir { ref path, ref stat } => {
+            let normalized = Snapshots::normalize(path)?;
+            tar_builder.append_dir(normalized, relative_to.0.join(stat.0.as_path()))
+          },
         };
       append_res
         .map_err(|e| format!("Failed to tar {:?}: {:?}", path_stat, e))?;

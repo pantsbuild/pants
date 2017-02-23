@@ -116,7 +116,7 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
     self.assert_walk_files(['*'], ['4.txt'])
 
   def test_walk_parent_link(self):
-    self.assert_walk_files(['c.ln/../3.txt'], ['a/3.txt'])
+    self.assert_walk_files(['c.ln/../3.txt'], ['c.ln/../3.txt'])
 
   def test_walk_recursive_all(self):
     self.assert_walk_files(['**'], ['4.txt',
@@ -181,6 +181,9 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
       self.assert_content(['a/b/'], {'a/b/': 'nope\n'})
     with self.assertRaises(Exception):
       self.assert_content(['a/b'], {'a/b': 'nope\n'})
+
+  def test_files_content_symlink(self):
+    self.assert_content(['c.ln/../3.txt'], {'c.ln/../3.txt': 'three\n'})
 
   def test_files_digest_literal(self):
     self.assert_digest(['a/3.txt', '4.txt'], ['a/3.txt', '4.txt'])
