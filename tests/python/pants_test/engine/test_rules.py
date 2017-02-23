@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
+from pants.engine.fs import PathGlobs, create_fs_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import GraphMaker, Rule, RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
@@ -335,9 +335,8 @@ class RuleGraphMakerTest(unittest.TestCase):
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
     project_tree = 'Let us pretend that this is a ProjectTree!'
     tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks(project_tree)
-    intrinsics = create_fs_intrinsics(project_tree)
 
-    rule_index = RuleIndex.create(tasks, intrinsics)
+    rule_index = RuleIndex.create(tasks, intrinsic_entries=[])
     graphmaker = GraphMaker(rule_index,
       root_subject_types={Address,
                           PathGlobs,
