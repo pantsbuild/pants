@@ -122,20 +122,22 @@ impl PathGlob {
   }
 
   pub fn create(filespecs: &Vec<String>) -> Result<Vec<PathGlob>, PatternError> {
-    let canonical_dir = Dir(PathBuf::new());
-    let symbolic_path = PathBuf::new();
     let mut path_globs = Vec::new();
     for filespec in filespecs {
-      path_globs.extend(PathGlob::parse(&canonical_dir, &symbolic_path, filespec)?);
+      let canonical_dir = Dir(PathBuf::new());
+      let symbolic_path = PathBuf::new();
+      path_globs.extend(PathGlob::parse(canonical_dir, symbolic_path, filespec)?);
     }
     Ok(path_globs)
   }
 
   /**
-   * Split a filespec string into path components while eliminating
-   * consecutive '**'s (to avoid repetitive traversing).
+   * Split a filespec string into path components while:
+   * 1) eliminating consecutive '**'s (to avoid repetitive traversing)
+   * 2) collapsing any leading "parent" or "current" directory entries relative
+   *    to the `canonical_dir`, which is safe since that path is canonical.
    */
-  fn split_path(filespec: &str) -> Vec<&OsStr> {
+  fn normalize_path(canonical_dir: Dir, filespec: &str) -> (Dir, Vec<&OsStr>) {
     let mut out = Vec::new();
     let mut prev_was_doublestar = false;
     for part in Path::new(filespec).iter() {
@@ -146,16 +148,17 @@ impl PathGlob {
       out.push(part);
       prev_was_doublestar = cur_is_doublestar;
     }
-    out
+    (canonical_dir, out)
   }
 
   /**
    * Given a filespec String relative to a canonical Dir and path, parse it to a
    * series of PathGlob objects.
    */
-  fn parse(canonical_dir: &Dir, symbolic_path: &Path, filespec: &str) -> Result<Vec<PathGlob>, PatternError> {
+  fn parse(canonical_dir: Dir, symbolic_path: PathBuf, filespec: &str) -> Result<Vec<PathGlob>, PatternError> {
     let mut parts = Vec::new();
-    for part in PathGlob::split_path(filespec) {
+    let (canonical_dir, normalized_parts) = PathGlob::normalize_path(canonical_dir, filespec);
+    for part in normalized_parts {
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
       parts.push(Pattern::new(&part.to_string_lossy())?);
@@ -166,7 +169,7 @@ impl PathGlob {
   /**
    * Given a filespec as Patterns, create a series of PathGlob objects.
    */
-  fn parse_globs(canonical_dir: &Dir, symbolic_path: &Path, parts: &Vec<Pattern>) -> Vec<PathGlob> {
+  fn parse_globs(canonical_dir: Dir, symbolic_path: PathBuf, parts: &Vec<Pattern>) -> Vec<PathGlob> {
     if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *SINGLE_DOT_GLOB == parts[0] {
       // A request for the root path.
       vec![PathGlob::Root]
@@ -178,13 +181,13 @@ impl PathGlob {
         return vec![
           PathGlob::dir_wildcard(
             canonical_dir.clone(),
-            symbolic_path.to_owned(),
+            symbolic_path.clone(),
             SINGLE_STAR_GLOB.clone(),
             vec![DOUBLE_STAR_GLOB.clone()]
           ),
           PathGlob::wildcard(
-            canonical_dir.clone(),
-            symbolic_path.to_owned(),
+            canonical_dir,
+            symbolic_path,
             SINGLE_STAR_GLOB.clone()
           ),
         ];
@@ -196,21 +199,21 @@ impl PathGlob {
       let pathglob_with_doublestar =
         PathGlob::dir_wildcard(
           canonical_dir.clone(),
-          symbolic_path.to_owned(),
+          symbolic_path.clone(),
           SINGLE_STAR_GLOB.clone(),
           parts[0..].to_vec()
         );
       let pathglob_no_doublestar =
         if parts.len() == 2 {
           PathGlob::wildcard(
-            canonical_dir.clone(),
-            symbolic_path.to_owned(),
+            canonical_dir,
+            symbolic_path,
             parts[1].clone()
           )
         } else {
           PathGlob::dir_wildcard(
-            canonical_dir.clone(),
-            symbolic_path.to_owned(),
+            canonical_dir,
+            symbolic_path,
             parts[1].clone(),
             parts[2..].to_vec()
           )
@@ -220,8 +223,8 @@ impl PathGlob {
       // This is the path basename.
       vec![
         PathGlob::wildcard(
-          canonical_dir.clone(),
-          symbolic_path.to_owned(),
+          canonical_dir,
+          symbolic_path,
           parts[0].clone()
         )
       ]
@@ -229,8 +232,8 @@ impl PathGlob {
       // This is a path dirname.
       vec![
         PathGlob::dir_wildcard(
-          canonical_dir.clone(),
-          symbolic_path.to_owned(),
+          canonical_dir,
+          symbolic_path,
           parts[0].clone(),
           parts[1..].to_vec()
         )
@@ -422,12 +425,9 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       .map(|mut path_stats| {
         // Assume either 0 or 1 destination (anything else would imply a symlink to a path
         // containing an escaped glob character... leaving that as a `TODO` I guess).
-        path_stats.pop().map(|ps| {
-          // Merge the input symbolic Path to the underlying Stat.
-          match ps {
-            PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
-            PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
-          }
+        path_stats.pop().map(|ps| match ps {
+          PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
+          PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
         })
       })
       .boxed()
@@ -591,8 +591,8 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
             path_stats.into_iter()
               .filter_map(|ps| {
                 match ps {
-                  PathStat::Dir { ref path, ref stat } =>
-                    Some(PathGlob::parse_globs(stat, path.as_path(), &remainder)),
+                  PathStat::Dir { path, stat } =>
+                    Some(PathGlob::parse_globs(stat, path, &remainder)),
                   _ => None,
                 }
               })
@@ -653,19 +653,19 @@ impl Snapshots {
     tar_builder.mode(tar::HeaderMode::Deterministic);
     for path_stat in paths {
       // Append the PathStat using the symbolic name and underlying stat.
-      match path_stat {
-        &PathStat::File { ref path, ref stat } => {
-          let mut input =
-            fs::File::open(relative_to.0.join(stat.0.as_path()))
-              .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
-          tar_builder.append_file(path, &mut input)
-            .map_err(|e| format!("Failed to tar {:?}: {:?}", path_stat, e))?;
-        },
-        &PathStat::Dir { ref path, ref stat } => {
-          tar_builder.append_dir(path, stat.0.as_path())
-            .map_err(|e| format!("Failed to tar {:?}: {:?}", path_stat, e))?;
-        },
-      }
+      let append_res =
+        match path_stat {
+          &PathStat::File { ref path, ref stat } => {
+            let mut input =
+              fs::File::open(relative_to.0.join(stat.0.as_path()))
+                .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
+            tar_builder.append_file(path, &mut input)
+          },
+          &PathStat::Dir { ref path, ref stat } =>
+            tar_builder.append_dir(path, relative_to.0.join(stat.0.as_path())),
+        };
+      append_res
+        .map_err(|e| format!("Failed to tar {:?}: {:?}", path_stat, e))?;
     }
 
     // Finish the tar file, returning ownership of the stream to the caller.

@@ -7,16 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from abc import abstractmethod
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.base.scm_project_tree import ScmProjectTree
 from pants.engine.fs import (FilesContent, PathGlobs, Snapshot)
 from pants.util.contextutil import open_tar
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
-from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version, initialize_repo
 
 
 class DirectoryListing(object):
@@ -27,18 +24,17 @@ class ReadLink(object):
   "TODO: See #4027."
 
 
-class FSTestBase(SchedulerTestBase, AbstractClass):
+class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
 
   _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
 
-  @abstractmethod
   @contextmanager
   def mk_project_tree(self, build_root_src):
     """Construct a ProjectTree for the given src path."""
-    pass
+    yield self.mk_fs_tree(build_root_src)
 
   def specs(self, relative_to, *filespecs):
-    return PathGlobs.create_from_specs(relative_to, filespecs)
+    return PathGlobs.create(relative_to, include=filespecs)
 
   def assert_walk_dirs(self, filespecs, paths):
     self.assert_walk_snapshot('dirs', filespecs, paths)
@@ -233,20 +229,13 @@ class FSTestBase(SchedulerTestBase, AbstractClass):
         (Dir('a/b'), DirectoryListing),
       ])
 
-
-class PosixFSTest(unittest.TestCase, FSTestBase):
-
-  @contextmanager
-  def mk_project_tree(self, build_root_src):
-    yield self.mk_fs_tree(build_root_src)
-
   # TODO test exercising what happens if a snapshot file doesn't exist after hitting cache for snapshot node.
   def test_gather_snapshot_of_pathglobs(self):
     with self.mk_project_tree(self._original_src) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
 
-      result = self.execute(scheduler, Snapshot, PathGlobs.create('', globs=['fs_test/a/b/*']))[0]
+      result = self.execute(scheduler, Snapshot, PathGlobs.create('', include=['fs_test/a/b/*']))[0]
 
       self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], result,
                                 snapshot_archive_root)
@@ -256,35 +245,3 @@ class PosixFSTest(unittest.TestCase, FSTestBase):
     todo = '/dev/null'
     with open_tar(todo, errorlevel=1) as tar:
       self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
-
-
-@unittest.skipIf(git_version() < MIN_REQUIRED_GIT_VERSION,
-                 'The GitTest requires git >= {}.'.format(MIN_REQUIRED_GIT_VERSION))
-class GitFSTest(unittest.TestCase, FSTestBase):
-
-  @contextmanager
-  def mk_project_tree(self, build_root_src):
-    # Use mk_fs_tree only to feed the files for the git repo, not using its FileSystemProjectTree.
-    worktree = self.mk_fs_tree(build_root_src).build_root
-    with initialize_repo(worktree) as git_repo:
-      yield ScmProjectTree(worktree, git_repo, 'HEAD')
-
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
-  def test_walk_recursive(self):
-    super(GitFSTest, self).test_walk_recursive()
-
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
-  def test_walk_recursive_all(self):
-    super(GitFSTest, self).test_walk_recursive_all()
-
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
-  def test_files_content_literal(self):
-    super(GitFSTest, self).test_files_content_literal()
-
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
-  def test_walk_recursive_trailing_doublestar(self):
-    super(GitFSTest, self).test_walk_recursive_trailing_doublestar()
-
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3281')
-  def test_remove_duplicates(self):
-    super(GitFSTest, self).test_remove_duplicates()
