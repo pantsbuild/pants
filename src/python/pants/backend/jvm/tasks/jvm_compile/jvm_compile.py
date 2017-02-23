@@ -19,6 +19,7 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
@@ -42,7 +43,7 @@ from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
                                 safe_walk)
 from pants.util.fileutil import create_size_estimators
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
@@ -279,7 +280,8 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, zinc_file_manager, javac_plugins_to_exclude):
+              log_file, settings, fatal_warnings, zinc_file_manager,
+              javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -296,9 +298,8 @@ class JvmCompile(NailgunTaskBase):
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
     :param zinc_file_manager: whether to use zinc provided file manager.
-    :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
-                                     this compilation, even if requested (typically because
-                                     this compilation is building those same plugins).
+    :param javac_plugin_map: Map of names of javac plugins to use to their arguments.
+    :param scalac_plugin_map: Map of names of scalac plugins to use to their arguments.
     """
     raise NotImplementedError()
 
@@ -576,18 +577,61 @@ class JvmCompile(NailgunTaskBase):
         if self.get_options().capture_classpath:
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
-        # If compiling a plugin, don't try to use it on itself.
-        javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
         try:
           self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
                        log_file, settings, fatal_warnings, zinc_file_manager,
-                       javac_plugins_to_exclude)
+                       self._get_plugin_map('javac', target),
+                       self._get_plugin_map('scalac', target))
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
             if logs:
               self._find_missing_deps('\n'.join([read_file(log) for log in logs]), target)
           raise
+
+  def _get_plugin_map(self, compiler, target):
+    """Returns a map of plugin to args, for the given compiler.
+
+    Only plugins that must actually be activated will be present as keys in the map.
+    Plugins with no arguments will have an empty list as a value.
+
+    Active plugins and their args will be gathered from (in order of precedence):
+    - The <compiler>_plugins and <compiler>_plugins fields of the target, if it has them.
+    - The <compiler>_plugins and <compiler>_plugins options of this task, if it has them.
+    - The <compiler>_plugins and <compiler>_plugins fields of this task, if it has them.
+
+    Note that in-repo plugins will not be returned, even if requested, when building
+    themselves.  Use published versions of those plugins for that.
+
+    :param compiler: one of 'javac', 'scalac'.
+    :param target: The target whose plugins we compute.
+    """
+    # Note that we get() options and getattr() target fields and task methods,
+    # so we're robust when those don't exist (or are None).
+    plugins_key = '{}_plugins'.format(compiler)
+    requested_plugins = (
+      tuple(getattr(self, plugins_key, []) or []) +
+      tuple(self.get_options().get(plugins_key, []) or []) +
+      tuple((getattr(target, plugins_key, []) or []))
+    )
+    # Allow multiple flags and also comma-separated values in a single flag.
+    requested_plugins = set([p for val in requested_plugins for p in val.split(',')])
+
+    plugin_args_key = '{}_plugin_args'.format(compiler)
+    available_plugin_args = {}
+    available_plugin_args.update(getattr(self, plugin_args_key, {}) or {})
+    available_plugin_args.update(self.get_options().get(plugin_args_key, {}) or {})
+    available_plugin_args.update(getattr(target, plugin_args_key, {}) or {})
+
+    # From all available args, pluck just the ones for the selected plugins.
+    plugin_map = {}
+    for plugin in requested_plugins:
+      # Don't attempt to use a plugin while building that plugin.
+      # This avoids a bootstrapping problem.  Note that you can still
+      # use published plugins on themselves, just not in-repo plugins.
+      if target not in self._plugin_targets(compiler).get(plugin, {}):
+        plugin_map[plugin] = available_plugin_args.get(plugin, [])
+    return plugin_map
 
   def _find_failed_compile_logs(self, compile_workunit):
     """One of the compile child workunits actually calls compiler, this is to locate its stdout."""
@@ -940,3 +984,15 @@ class JvmCompile(NailgunTaskBase):
           yield (conf, jar)
 
     return list(extra_compile_classpath_iter())
+
+  @memoized_method
+  def _plugin_targets(self, compiler):
+    """Returns a map from plugin name to the targets that build that plugin."""
+    if compiler == 'javac':
+      plugin_cls = JavacPlugin
+    elif compiler == 'scalac':
+      plugin_cls = ScalacPlugin
+    else:
+      raise TaskError('Unknown JVM compiler: {}'.format(compiler))
+    plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
+    return {t.plugin: t.closure() for t in plugin_tgts}

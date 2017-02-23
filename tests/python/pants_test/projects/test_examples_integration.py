@@ -15,5 +15,5 @@ class ExamplesIntegrationTest(ProjectIntegrationTest):
   def tests_examples(self):
     # TODO: Remove the --exclude-target-regexp once we're on Java 8 everywhere.
     pants_run = self.pants_test(['examples::',
-                                 '--exclude-target-regexp=examples/src/java/org/pantsbuild/example/plugin'])
+        '--exclude-target-regexp=examples/src/java/org/pantsbuild/example/javac/plugin'])
     self.assert_success(pants_run)

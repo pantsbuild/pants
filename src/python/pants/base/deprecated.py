@@ -11,8 +11,8 @@ from functools import wraps
 
 import six
 from packaging.version import InvalidVersion, Version
-from pants.util.memo import memoized_method
 
+from pants.util.memo import memoized_method
 from pants.version import PANTS_SEMVER
 
 
