@@ -20,7 +20,7 @@ from pants.util.objects import datatype
 class JarDependencyParseContextWrapper(object):
   """A pre-built Maven repository dependency.
 
-  Examples: ::
+  Examples:
 
     # The typical use case.
     jar('com.puppycrawl.tools', 'checkstyle', '1.2')
@@ -33,14 +33,13 @@ class JarDependencyParseContextWrapper(object):
     # of the belonging BUILD file)
     jar('org.foobar', 'foobar', '1.2-SNAPSHOT',
         url='file:../checkstyle/checkstyle.jar')
-
   """
 
   def __init__(self, parse_context):
     """
     :param parse_context: The BUILD file parse context.
     """
-    self._rel_path = parse_context.rel_path or ''
+    self._rel_path = parse_context.rel_path
 
   def __call__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
               classifier=None, mutable=None, intransitive=False, excludes=None):
@@ -66,15 +65,23 @@ class JarDependencyParseContextWrapper(object):
     :param list excludes: Transitive dependencies of this jar to exclude.
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
-    base_path = os.path.join(get_buildroot(), self._rel_path)
     return JarDependency(org, name, rev, force, ext, url, apidocs, classifier, mutable, intransitive,
-                         excludes, base_path)
+                         excludes, self._rel_path)
 
 
 class JarDependency(datatype('JarDependency', [
   'org', 'base_name', 'rev', 'force', 'ext', 'url', 'apidocs',
   'classifier', 'mutable', 'intransitive', 'excludes', 'base_path'])):
   """A pre-built Maven repository dependency.
+
+  This is the developer facing api, compared to the context wrapper class
+  `JarDependencyParseContextWrapper`, which exposes api through build file to users.
+
+  The only additional parameter `base_path` here is so that we can retrieve the file URL
+  in its absolute (for ivy) or relative (for fingerprinting) form. The context wrapper class
+  determines the `base_path` from where `jar` is defined at.
+
+  If a relative file url is provided, its absolute form will be (`base_path` + relative url).
 
   :API: public
   """
@@ -90,33 +97,13 @@ class JarDependency(datatype('JarDependency', [
   def __new__(cls, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
               classifier=None, mutable=None, intransitive=False, excludes=None, base_path=None):
     """
-    :param string org: The Maven ``groupId`` of this dependency.
-    :param string name: The Maven ``artifactId`` of this dependency.
-    :param string rev: The Maven ``version`` of this dependency.
-      If unspecified the latest available version is used.
-    :param boolean force: Force this specific artifact revision even if other transitive
-      dependencies specify a different revision. This requires specifying the ``rev`` parameter.
-    :param string ext: Extension of the artifact if different from the artifact type.
-      This is sometimes needed for artifacts packaged with Maven bundle type but stored as jars.
-    :param string url: URL of this artifact, if different from the Maven repo standard location
-      (specifying this parameter is unusual). For file URL, absolute path is required by ivy.
-      If a relative path is provided here, the absolute URL used for ivy will be
-      `base_path` + relative url.
-    :param string apidocs: URL of existing javadocs, which if specified, pants-generated javadocs
-      will properly hyperlink {\ @link}s.
-    :param string classifier: Classifier specifying the artifact variant to use.
-    :param boolean mutable: Inhibit caching of this mutable artifact. A common use is for
-      Maven -SNAPSHOT style artifacts in an active development/integration cycle.
-    :param boolean intransitive: Declares this Dependency intransitive, indicating only the jar for
-      the dependency itself should be downloaded and placed on the classpath
-    :param list excludes: Transitive dependencies of this jar to exclude.
-    :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
+
     :param string base_path: absolute base path that a relative file url is based from.
     """
     excludes = JarDependency._prepare_excludes(excludes)
     base_path = base_path or get_buildroot()
     if not os.path.isabs(base_path):
-      raise ValueError('base_path is not absolute: {}'.format(base_path))
+      base_path = os.path.join(get_buildroot(), base_path)
     return super(JarDependency, cls).__new__(
         cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
