@@ -38,12 +38,8 @@ def visualize_build_request(build_root, goals, subjects):
 
     execution_request = scheduler.build_request(goals, subjects)
     # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
-    engine = LocalSerialEngine(scheduler, Storage.create())
-    try:
-      engine.reduce(execution_request)
-      visualize_execution_graph(scheduler)
-    finally:
-      engine.close()
+    LocalSerialEngine(scheduler, Storage.create()).reduce(execution_request)
+    visualize_execution_graph(scheduler)
 
 
 def pop_build_root_and_goals(description, args):
