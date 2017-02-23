@@ -76,8 +76,12 @@ impl PathStat {
 }
 
 lazy_static! {
-  static ref SINGLE_DOT_GLOB: Pattern = Pattern::new(".").unwrap();
+  static ref CURRENT_DIR: &'static str = ".";
+
+  static ref PARENT_DIR: &'static str = "..";
+
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
+
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
 }
@@ -163,34 +167,36 @@ impl PathGlob {
       );
     }
 
-    Ok(PathGlob::parse_globs(canonical_dir, symbolic_path, &parts))
+    PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
   }
 
   /**
    * Given a filespec as Patterns, create a series of PathGlob objects.
    */
-  fn parse_globs(canonical_dir: Dir, symbolic_path: PathBuf, parts: &Vec<Pattern>) -> Vec<PathGlob> {
-    if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *SINGLE_DOT_GLOB == parts[0] {
+  fn parse_globs(
+    canonical_dir: Dir,
+    symbolic_path: PathBuf,
+    parts: &[Pattern]
+  ) -> Result<Vec<PathGlob>, String> {
+    if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *CURRENT_DIR == parts[0].as_str() {
       // A request for the root path.
-      vec![PathGlob::Root]
-    } else if *DOUBLE_STAR_GLOB == parts[0] {
+      Ok(vec![PathGlob::Root])
+    } else if *DOUBLE_STAR == parts[0].as_str() {
       if parts.len() == 1 {
         // Per https://git-scm.com/docs/gitignore:
         //  "A trailing '/**' matches everything inside. For example, 'abc/**' matches all files inside
         //   directory "abc", relative to the location of the .gitignore file, with infinite depth."
-        return vec![
-          PathGlob::dir_wildcard(
-            canonical_dir.clone(),
-            symbolic_path.clone(),
-            SINGLE_STAR_GLOB.clone(),
-            vec![DOUBLE_STAR_GLOB.clone()]
-          ),
-          PathGlob::wildcard(
-            canonical_dir,
-            symbolic_path,
-            SINGLE_STAR_GLOB.clone()
-          ),
-        ];
+        return Ok(
+          vec![
+            PathGlob::dir_wildcard(
+              canonical_dir.clone(),
+              symbolic_path.clone(),
+              SINGLE_STAR_GLOB.clone(),
+              vec![DOUBLE_STAR_GLOB.clone()]
+            ),
+            PathGlob::wildcard(canonical_dir, symbolic_path, SINGLE_STAR_GLOB.clone()),
+          ]
+        );
       }
 
       // There is a double-wildcard in a dirname of the path: double wildcards are recursive,
@@ -205,39 +211,32 @@ impl PathGlob {
         );
       let pathglob_no_doublestar =
         if parts.len() == 2 {
-          PathGlob::wildcard(
-            canonical_dir,
-            symbolic_path,
-            parts[1].clone()
-          )
+          PathGlob::wildcard(canonical_dir, symbolic_path, parts[1].clone())
         } else {
-          PathGlob::dir_wildcard(
-            canonical_dir,
-            symbolic_path,
-            parts[1].clone(),
-            parts[2..].to_vec()
-          )
+          PathGlob::dir_wildcard(canonical_dir, symbolic_path, parts[1].clone(), parts[2..].to_vec())
         };
-      vec![pathglob_with_doublestar, pathglob_no_doublestar]
+      Ok(vec![pathglob_with_doublestar, pathglob_no_doublestar])
+    } else if *PARENT_DIR == parts[0].as_str() {
+      // A request for the parent of `canonical_dir`: since we've already expanded the directory
+      // to make it canonical, we can safely drop it directly and recurse without this component.
+      let parent =
+        canonical_dir.0.parent()
+          .ok_or(format!("Globs may not traverse outside the root: {:?}", parts))?;
+      PathGlob::parse_globs(Dir(parent.to_owned()), parent.to_owned(), &parts[1..])
     } else if parts.len() == 1 {
       // This is the path basename.
-      vec![
-        PathGlob::wildcard(
-          canonical_dir,
-          symbolic_path,
-          parts[0].clone()
-        )
-      ]
+      Ok(
+        vec![
+          PathGlob::wildcard(canonical_dir, symbolic_path, parts[0].clone())
+        ]
+      )
     } else {
       // This is a path dirname.
-      vec![
-        PathGlob::dir_wildcard(
-          canonical_dir,
-          symbolic_path,
-          parts[0].clone(),
-          parts[1..].to_vec()
-        )
-      ]
+      Ok(
+        vec![
+          PathGlob::dir_wildcard(canonical_dir, symbolic_path, parts[0].clone(), parts[1..].to_vec())
+        ]
+      )
     }
   }
 }
@@ -398,6 +397,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
   fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
+  fn mk_error(msg: &str) -> E;
 
   /**
    * Canonicalize the Link for the given Path to an underlying File or Dir. May result
@@ -588,19 +588,25 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
         self.directory_listing(canonical_dir, symbolic_path, wildcard)
-          .map(move |path_stats| {
+          .and_then(move |path_stats| {
             path_stats.into_iter()
-              .filter_map(|ps| {
-                match ps {
-                  PathStat::Dir { path, stat } =>
-                    Some(PathGlob::parse_globs(stat, path, &remainder)),
-                  _ => None,
-                }
+              .filter_map(|ps| match ps {
+                PathStat::Dir { path, stat } =>
+                  Some(
+                    PathGlob::parse_globs(stat, path, &remainder)
+                      .map_err(|e| Self::mk_error(e.as_str()))
+                  ),
+                PathStat::File { .. } => None,
               })
-              .flat_map(|path_globs| path_globs.into_iter())
-              .collect()
+              .collect::<Result<Vec<_>, E>>()
           })
-          .map(|path_globs| (vec![], path_globs))
+          .map(|path_globs| {
+            let flattened =
+              path_globs.into_iter()
+                .flat_map(|path_globs| path_globs.into_iter())
+                .collect();
+            (vec![], flattened)
+          })
           .boxed(),
     }
   }

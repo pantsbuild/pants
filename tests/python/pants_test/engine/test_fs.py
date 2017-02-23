@@ -10,8 +10,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import (FilesContent, PathGlobs, Snapshot)
-from pants.util.contextutil import open_tar
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -115,6 +114,9 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
 
   def test_walk_single_star(self):
     self.assert_walk_files(['*'], ['4.txt'])
+
+  def test_walk_parent_link(self):
+    self.assert_walk_files(['c.ln/../3.txt'], ['a/3.txt'])
 
   def test_walk_recursive_all(self):
     self.assert_walk_files(['**'], ['4.txt',
@@ -228,20 +230,3 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
         (Dir('a'), DirectoryListing),
         (Dir('a/b'), DirectoryListing),
       ])
-
-  # TODO test exercising what happens if a snapshot file doesn't exist after hitting cache for snapshot node.
-  def test_gather_snapshot_of_pathglobs(self):
-    with self.mk_project_tree(self._original_src) as project_tree:
-      scheduler = self.mk_scheduler(project_tree=project_tree)
-      snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
-
-      result = self.execute(scheduler, Snapshot, PathGlobs.create('', include=['fs_test/a/b/*']))[0]
-
-      self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], result,
-                                snapshot_archive_root)
-
-  def assert_archive_files(self, expected_archive_files, snapshot, snapshot_archive_root):
-    # TODO.
-    todo = '/dev/null'
-    with open_tar(todo, errorlevel=1) as tar:
-      self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
