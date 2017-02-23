@@ -25,11 +25,11 @@ pub enum Stat {
 }
 
 impl Stat {
-  fn path(&self) -> &PathBuf {
+  pub fn path(&self) -> &Path {
     match self {
-      &Stat::Dir(Dir(ref p)) => p,
-      &Stat::File(File(ref p)) => p,
-      &Stat::Link(Link(ref p)) => p,
+      &Stat::Dir(Dir(ref p)) => p.as_path(),
+      &Stat::File(File(ref p)) => p.as_path(),
+      &Stat::Link(Link(ref p)) => p.as_path(),
     }
   }
 }

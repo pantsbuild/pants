@@ -78,7 +78,7 @@ class GraphInvalidationTest(unittest.TestCase):
 
       # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
       # and then the root DirectoryListing by "touching" files/dirs.
-      for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
+      for filename in ('3rdparty/python/BUILD', '3rdparty/python', ''):
         invalidated_count = scheduler.invalidate_files([filename])
         self.assertGreater(invalidated_count,
                            0,

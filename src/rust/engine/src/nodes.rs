@@ -20,7 +20,6 @@ use fs::{
   Link,
   PathGlobs,
   PathStat,
-  Stat,
   VFS,
 };
 use graph::EntryId;
@@ -241,7 +240,7 @@ impl VFS<Failure> for Context {
     self.get(ReadLink(link)).map(|res| res.0).boxed()
   }
 
-  fn scandir(&self, dir: Dir) -> NodeFuture<Vec<Stat>> {
+  fn scandir(&self, dir: Dir) -> NodeFuture<Vec<fs::Stat>> {
     self.get(Scandir(dir)).map(|res| res.0).boxed()
   }
 
@@ -735,6 +734,29 @@ impl From<ReadLink> for NodeKey {
 }
 
 /**
+ * A Node that represents consuming the stat for some path.
+ *
+ * NB: Because the `Scandir` operation gets the stats for a parent directory in a single syscall,
+ * this operation results in no data, and is simply a placeholder to declare that dependency.
+ */
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Stat(PathBuf);
+
+impl Node for Stat {
+  type Output = ();
+
+  fn run(&self, _: Context) -> NodeFuture<()> {
+    future::ok(()).boxed()
+  }
+}
+
+impl From<Stat> for NodeKey {
+  fn from(n: Stat) -> Self {
+    NodeKey::Stat(n)
+  }
+}
+
+/**
  * A Node that represents executing a directory listing that returns a Stat per directory
  * entry (generally in one syscall). No symlinks are expanded.
  */
@@ -742,7 +764,7 @@ impl From<ReadLink> for NodeKey {
 pub struct Scandir(Dir);
 
 #[derive(Clone, Debug)]
-pub struct DirectoryListing(Vec<Stat>);
+pub struct DirectoryListing(Vec<fs::Stat>);
 
 impl Node for Scandir {
   type Output = DirectoryListing;
@@ -750,10 +772,22 @@ impl Node for Scandir {
   fn run(&self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
     context.core.vfs.scandir(&self.0)
-      .map(|listing| DirectoryListing(listing))
-      .map_err(move |e|
-        context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))
-      )
+      .then(move |listing_res| match listing_res {
+        Ok(listing) => {
+          // Record the dependencies on the resulting Stats.
+          let stats =
+            future::join_all(
+              listing.iter()
+                .map(|stat|
+                  context.get(Stat(stat.path().to_owned()))
+                )
+                .collect::<Vec<_>>()
+            );
+          stats.map(move |_| DirectoryListing(listing)).boxed()
+        },
+        Err(e) =>
+          context.err(context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
+      })
       .boxed()
   }
 }
@@ -913,6 +947,7 @@ impl From<Task> for NodeKey {
 pub enum NodeKey {
   ReadLink(ReadLink),
   Scandir(Scandir),
+  Stat(Stat),
   Select(Select),
   SelectDependencies(SelectDependencies),
   SelectLiteral(SelectLiteral),
@@ -934,6 +969,8 @@ impl NodeKey {
         format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) =>
         format!("Scandir({:?})", s.0),
+      &NodeKey::Stat(ref s) =>
+        format!("Stat({:?})", s.0),
       &NodeKey::Select(ref s) =>
         format!("Select({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectLiteral(ref s) =>
@@ -967,6 +1004,7 @@ impl NodeKey {
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
       &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
+      &NodeKey::Stat(..) => "Stat".to_string(),
     }
   }
 
@@ -977,6 +1015,7 @@ impl NodeKey {
     match self {
       &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
       &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
+      &NodeKey::Stat(ref s) => Some(s.0.as_path()),
       _ => None,
     }
   }
@@ -988,6 +1027,7 @@ impl Node for NodeKey {
   fn run(&self, context: Context) -> NodeFuture<NodeResult> {
     match self {
       &NodeKey::ReadLink(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::Stat(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Scandir(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Select(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectDependencies(ref n) => n.run(context).map(|v| v.into()).boxed(),
@@ -1001,10 +1041,17 @@ impl Node for NodeKey {
 
 #[derive(Clone, Debug)]
 pub enum NodeResult {
+  Unit,
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   Snapshot(fs::Snapshot),
   Value(Value),
+}
+
+impl From<()> for NodeResult {
+  fn from(_: ()) -> Self {
+    NodeResult::Unit
+  }
 }
 
 impl From<Value> for NodeResult {
@@ -1056,6 +1103,17 @@ impl TryFrom<NodeResult> for NodeResult {
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     Ok(nr)
+  }
+}
+
+impl TryFrom<NodeResult> for () {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::Unit => Ok(()),
+      _ => Err(()),
+    }
   }
 }
 
