@@ -51,11 +51,6 @@ class LegacyAddressMapper(AddressMapper):
 
   @staticmethod
   def is_declaring_file(address, file_path):
-    # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
-    # considered the one that declared it. That's ok though, because the spec path should be enough
-    # information for debugging most of the time.
-    #
-    # We could call into the engine to ask for the file that declared the address.
     if not BuildFile._is_buildfile_name(os.path.basename(file_path)):
       return False
 
@@ -63,6 +58,11 @@ class LegacyAddressMapper(AddressMapper):
       # A precise check for BuildFileAddress
       return address.rel_path == file_path
     except AttributeError:
+      # NB: this will cause any BUILD file, whether it contains the address declaration or not to be
+      # considered the one that declared it. That's ok though, because the spec path should be enough
+      # information for debugging most of the time.
+      #
+      # TODO: remove this after https://github.com/pantsbuild/pants/issues/3925 lands
       return os.path.dirname(file_path) == address.spec_path
 
   def addresses_in_spec_path(self, spec_path):
