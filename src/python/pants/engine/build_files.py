@@ -36,26 +36,31 @@ class BuildDirs(datatype('BuildDirs', ['dependencies'])):
   """A list of Stat objects for directories containing build files."""
 
 
-class BuildFiles(datatype('BuildFiles', ['path_globs'])):
+class BuildFiles(datatype('BuildFiles', ['files_content'])):
+  """The FileContents of BUILD files in some directory"""
+
+
+class BuildFileGlobs(datatype('BuildFilesGlobs', ['path_globs'])):
   """A wrapper around PathGlobs that are known to match a build file pattern."""
 
 
 def buildfile_path_globs_for_dir(address_mapper, directory):
   patterns = address_mapper.build_patterns
-  return BuildFiles(PathGlobs.create(directory.path, include=patterns, exclude=()))
+  return BuildFileGlobs(PathGlobs.create(directory.path, include=patterns, exclude=()))
 
 
-def parse_address_family(address_mapper, path, build_files_content):
+def parse_address_family(address_mapper, path, build_files):
   """Given the contents of the build files in one directory, return an AddressFamily.
 
   The AddressFamily may be empty, but it will not be None.
   """
-  if not build_files_content.dependencies:
+  files_content = build_files.files_content.dependencies
+  if not files_content:
     raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
-  paths = (f.path for f in build_files_content.dependencies)
+  paths = (f.path for f in files_content)
   ignored_paths = set(address_mapper.build_ignore_patterns.match_files(paths))
-  for filecontent_product in build_files_content.dependencies:
+  for filecontent_product in files_content:
     if filecontent_product.path in ignored_paths:
       continue
     address_maps.append(AddressMap.parse(filecontent_product.path,
@@ -287,9 +292,12 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
     (AddressFamily,
      [SelectLiteral(address_mapper, AddressMapper),
       Select(Dir),
-      SelectProjection(FilesContent, PathGlobs, ('path_globs',), BuildFiles)],
+      Select(BuildFiles)],
      parse_address_family),
     (BuildFiles,
+     [SelectProjection(FilesContent, PathGlobs, ('path_globs',), BuildFileGlobs)],
+     BuildFiles),
+    (BuildFileGlobs,
      [SelectLiteral(address_mapper, AddressMapper),
       Select(Dir)],
      buildfile_path_globs_for_dir),
