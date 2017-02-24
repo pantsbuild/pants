@@ -4,6 +4,58 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.3.0.dev11 (2/24/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Support local jar with relative path in JarDependency (#4279)
+  `PR #4279 <https://github.com/pantsbuild/pants/pull/4279>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade default jarjar to 1.6.4. (#4271)
+  `Issue #26 <https://github.com/pantsbuild/jarjar/issues/26>`_
+  `PR #4271 <https://github.com/pantsbuild/pants/pull/4271>`_
+
+* Memoize validation of deprecated versions (#4273)
+  `PR #4273 <https://github.com/pantsbuild/pants/pull/4273>`_
+
+* [engine] Remove type_id field from Value (#4274)
+  `PR #4274 <https://github.com/pantsbuild/pants/pull/4274>`_
+
+* [New Python Pipeline] Add resources to PEXes correctly. (#4275)
+  `PR #4275 <https://github.com/pantsbuild/pants/pull/4275>`_
+
+* Upgrade default go to 1.8. (#4272)
+  `PR #4272 <https://github.com/pantsbuild/pants/pull/4272>`_
+
+* Fix missed native_engine_version commit.
+  `Commit <https://github.com/pantsbuild/pants/commit/d966f9592fba2040429fc8a64f8aa4deb5e61f2c>`_
+
+* Make options fingerprinting very difficult to disable (#4262)
+  `PR #4262 <https://github.com/pantsbuild/pants/pull/4262>`_
+
+* Bump pex requirement to 1.2.3 (#4277)
+  `PR #4277 <https://github.com/pantsbuild/pants/pull/4277>`_
+
+* Strip the root-level __init__.py that apache thrift generates. (#4281)
+  `PR #4281 <https://github.com/pantsbuild/pants/pull/4281>`_
+
+* Small tweak to the Dockerfile. (#4263)
+  `PR #4263 <https://github.com/pantsbuild/pants/pull/4263>`_
+
+* Make "./pants changed" output correct results when BUILD files are modified (#4282)
+  `PR #4282 <https://github.com/pantsbuild/pants/pull/4282>`_
+
+* [engine] minor clean up `engine.close` usage in `visualizer` (#4284)
+  `PR #4284 <https://github.com/pantsbuild/pants/pull/4284>`_
+
+
 1.3.0.dev10 (2/17/2017)
 -----------------------
 
