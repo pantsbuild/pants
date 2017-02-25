@@ -658,6 +658,10 @@ impl Snapshots {
     )
   }
 
+  pub fn path(&self) -> &Path {
+    self.temp_dir.path()
+  }
+
   /**
    * A non-canonical (does not expand symlinks) in-memory form of normalize. Used to collapse
    * parent and cur components, which are legal in symbolic paths in PathStats, but not in

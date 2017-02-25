@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -133,6 +132,17 @@ impl Context {
       &vec![
         externs::store_bytes(&item.fingerprint.0),
         externs::store_list(path_stats.iter().collect(), false),
+      ],
+    )
+  }
+
+  fn store_snapshots(&self) -> Value {
+    self.invoke_unsafe(
+      &self.core.types.construct_snapshots,
+      &vec![
+        externs::store_bytes(
+          &self.core.snapshots.path().as_os_str().as_bytes()
+        ),
       ],
     )
   }
@@ -411,7 +421,12 @@ impl Select {
    */
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshot {
+    if self.product() == &context.core.types.snapshots {
+      // TODO: re-storing the Snapshots object for each request.
+      vec![
+        future::ok(context.store_snapshots()).boxed()
+      ]
+    } else if self.product() == &context.core.types.snapshot {
       // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
       // for this caller.
       let context = context.clone();

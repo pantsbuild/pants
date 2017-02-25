@@ -25,7 +25,7 @@ impl Fingerprint {
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
     for &byte in self.0.iter() {
-      fmt::Write::write_fmt(&mut s, format_args!("{:x}", byte)).unwrap();
+      fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
     }
     s
   }

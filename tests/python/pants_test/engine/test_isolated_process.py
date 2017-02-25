@@ -109,7 +109,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
                                 binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Snapshot)),
+                                input_selectors=(Select(Snapshot),),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=process_result_to_concatted_from_outfile),
       [ShellCatToOutFile, [], ShellCatToOutFile],
@@ -175,7 +175,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
                                 binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Snapshot)),
+                                input_selectors=(Select(Snapshot),),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=fail_process_result),
       [ShellCatToOutFile, [], ShellCatToOutFile]

@@ -10,9 +10,10 @@ import logging
 import os
 import subprocess
 from abc import abstractproperty
+from binascii import hexlify
 
 from pants.engine.selectors import Select
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
 
@@ -34,8 +35,22 @@ def _run_command(binary, sandbox_dir, process_request):
   return popen
 
 
+def _snapshot_path(snapshot, archive_root):
+  """TODO: This is an abstraction leak... see _Snapshots."""
+  fingerprint_hex = hexlify(snapshot.fingerprint)
+  snapshot_dir = os.path.join(archive_root, fingerprint_hex[0:2], fingerprint_hex[2:4])
+  safe_mkdir(snapshot_dir)
+  return os.path.join(snapshot_dir, '{}.tar'.format(fingerprint_hex))
+
+
+def _extract_snapshot(snapshot_archive_root, snapshot, sandbox_dir):
+  with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
+    tar.extractall(sandbox_dir)
+
+
 def _snapshotted_process(input_conversion,
                          output_conversion,
+                         snapshot_directory,
                          binary,
                          *args):
   """A pickleable top-level function to execute a process.
@@ -45,14 +60,11 @@ def _snapshotted_process(input_conversion,
 
   process_request = input_conversion(*args)
 
-  # TODO: Should port this to rust.
-  todo = 'Should port this to rust.'
-
   # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
   with temporary_dir(cleanup=False) as sandbox_dir:
     if process_request.snapshots:
       for snapshot in process_request.snapshots:
-        todo.extract_snapshot(todo.root, snapshot, sandbox_dir)
+        _extract_snapshot(snapshot_directory.root, snapshot, sandbox_dir)
 
     # All of the snapshots have been checked out now.
     if process_request.directories_to_create:
@@ -107,6 +119,18 @@ class SnapshottedProcessResult(datatype('SnapshottedProcessResult', ['stdout', '
   """Contains the stdout, stderr and exit code from executing a process."""
 
 
+class _Snapshots(datatype('_Snapshots', ['root'])):
+  """Private singleton value to expose the snapshot directory (managed by rust) to python.
+
+  TODO: This is an abstraction leak, but it's convenient to be able to pipeline the input/output
+  conversion tasks into a single Task node.
+  """
+
+
+def snapshots_noop(*args):
+  raise Exception('This task is replaced intrinsically, and should never run.')
+
+
 class SnapshottedProcess(object):
   """A static helper for defining a task rule to execute a snapshotted process."""
 
@@ -118,7 +142,7 @@ class SnapshottedProcess(object):
     """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
 
     # Select the concatenation of the snapshot directory, binary, and input selectors.
-    inputs = (Select(binary_type)) + tuple(input_selectors)
+    inputs = (Select(_Snapshots), Select(binary_type)) + tuple(input_selectors)
 
     # Apply the input/output conversions to a top-level process-execution function which
     # will receive all inputs, convert in, execute, and convert out.
@@ -131,3 +155,10 @@ class SnapshottedProcess(object):
 
     # Return a task triple that executes the function to produce the product type.
     return (product_type, inputs, func)
+
+
+def create_snapshot_singletons():
+  """Intrinsically replaced on the rust side."""
+  return [
+      (_Snapshots, snapshots_noop)
+    ]
