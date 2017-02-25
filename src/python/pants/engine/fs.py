@@ -66,8 +66,16 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
     return [p for p in self.path_stats if type(p.stat) == Dir]
 
   @property
+  def dir_stats(self):
+    return [p.stat for p in self.dirs]
+
+  @property
   def files(self):
     return [p for p in self.path_stats if type(p.stat) == File]
+
+  @property
+  def file_stats(self):
+    return [p.stat for p in self.files]
 
   def __repr__(self):
     return '''Snapshot(fingerprint='{}', entries={})'''.format(hexlify(self.fingerprint)[:8], len(self.path_stats))

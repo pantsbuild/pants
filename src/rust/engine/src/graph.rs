@@ -368,7 +368,7 @@ impl InnerGraph {
       |entry: &Entry| {
         match entry.peek::<NodeKey>() {
           None | Some(Err(Failure::Noop(_, _))) => "white".to_string(),
-          Some(Err(Failure::Throw(_))) => "tomato".to_string(),
+          Some(Err(Failure::Throw(_))) => "4".to_string(),
           Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.product_str()).or_insert_with(|| {

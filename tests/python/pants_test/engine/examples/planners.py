@@ -121,7 +121,7 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create_from_specs('', specs)
+  return PathGlobs.create('', include=specs)
 
 
 @printing_func
@@ -443,7 +443,7 @@ def setup_json_scheduler(build_root, native):
        extract_scala_imports),
       (BuildFileAddress,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Snapshot, field='dirs', field_types=(Dir,))],
+        SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),
