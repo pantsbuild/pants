@@ -35,7 +35,7 @@ Refactoring, Improvements, and Tooling
   `PR #4272 <https://github.com/pantsbuild/pants/pull/4272>`_
 
 * Fix missed native_engine_version commit.
-  `Commit <https://github.com/pantsbuild/pants/commit/d966f9592fba2040429fc8a64f8aa4deb5e61f2c>`_
+  `Commit d966f9592 <https://github.com/pantsbuild/pants/commit/d966f9592fba2040429fc8a64f8aa4deb5e61f2c>`_
 
 * Make options fingerprinting very difficult to disable (#4262)
   `PR #4262 <https://github.com/pantsbuild/pants/pull/4262>`_
