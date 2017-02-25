@@ -264,17 +264,15 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
 
   def test_no_address_no_family(self):
     spec = SingleAddress('a/c', 'c')
-    # Should fail: does not exist.
-    with self.assertRaises(Exception):
-      self.resolve(spec)
+    # Does not exist.
+    self.assertEqual(0, len(self.resolve(spec)))
 
     # Exists on disk, but not yet in memory.
     directory = 'a/c'
     build_file = os.path.join(self.build_root, directory, 'c.BUILD.json')
     with safe_open(build_file, 'w') as fp:
       fp.write('{"type_alias": "struct", "name": "c"}')
-    with self.assertRaises(Exception):
-      self.resolve(spec)
+    self.assertEqual(0, len(self.resolve(spec)))
 
     # Success.
     self.scheduler.invalidate_files([directory])
