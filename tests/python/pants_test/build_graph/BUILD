@@ -37,6 +37,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'subproject_integration',
+  sources = ['test_subproject_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+
+python_tests(
   name = 'build_file_aliases',
   sources = ['test_build_file_aliases.py'],
   dependencies = [

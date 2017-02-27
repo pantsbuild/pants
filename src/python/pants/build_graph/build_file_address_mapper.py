@@ -23,7 +23,7 @@ from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.util.dirutil import fast_relpath
+from pants.util.dirutil import fast_relpath, longest_dir_prefix, join_specs
 
 
 logger = logging.getLogger(__name__)
@@ -47,7 +47,8 @@ class BuildFileAddressMapper(AddressMapper):
   # patterns, because the asterisks in its name make it an invalid regexp.
   _UNMATCHED_KEY = '** unmatched **'
 
-  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None, exclude_target_regexps=None):
+  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None, exclude_target_regexps=None,
+               subproject_roots=None):
     """Create a BuildFileAddressMapper.
 
     :param build_file_parser: An instance of BuildFileParser
@@ -60,6 +61,7 @@ class BuildFileAddressMapper(AddressMapper):
 
     self._exclude_target_regexps = exclude_target_regexps or []
     self._exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
+    self.subproject_roots = subproject_roots or []
 
   @property
   def root_dir(self):
@@ -102,6 +104,15 @@ class BuildFileAddressMapper(AddressMapper):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
+  def determine_subproject_spec(self, spec, relative_to):
+    subproject_prefix = longest_dir_prefix(relative_to, self.subproject_roots)
+    if subproject_prefix:
+      spec = join_specs(subproject_prefix, spec)
+
+      logger.debug('Determined that spec {} relative to {} belongs to '
+                   'subproject {}'.format(spec, relative_to, subproject_prefix))
+    return spec
+
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.
 
@@ -113,6 +124,7 @@ class BuildFileAddressMapper(AddressMapper):
     :rtype: :class:`pants.build_graph.address.BuildFileAddress`
     """
     try:
+      spec = self.determine_subproject_spec(spec, relative_to)
       spec_path, name = parse_spec(spec, relative_to=relative_to)
       address = Address(spec_path, name)
       build_file_address, _ = self.resolve(address)

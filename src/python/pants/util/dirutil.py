@@ -19,6 +19,44 @@ from contextlib import contextmanager
 from pants.util.strutil import ensure_text
 
 
+def longest_dir_prefix(path, prefixes):
+  """ Given a list of prefixes, return the one that is the longest prefix to 
+      the given path
+
+      Returns None if there are no matches
+  """
+  longest_match, longest_prefix = 0, None
+  for prefix in prefixes:
+    if not prefix.endswith('/'):
+      prefix = prefix + '/'
+
+    if path.startswith(prefix) and len(prefix) > longest_match:
+      longest_match, longest_prefix = len(prefix), prefix
+
+  return longest_prefix
+
+
+def join_specs(parent, *children):
+  """Join the parent spec with child specs. If the child specs have a leading
+  "/" or "//", they are removed prior to joining.
+
+  :param string parent: The parent spec
+  :param *string children: child specs which should be joined to the parent
+  """
+  current_spec = parent
+  for child in children:
+    # If the child has a third (or more) slash, don't consider fixing it
+    if len(child) <= 2 or child[2] != '/':
+      if child.startswith('//'):
+        child = child[2:]
+      elif child.startswith('/'):
+        child = child[1:]
+
+    current_spec = os.path.join(current_spec, child)
+
+  return current_spec
+
+
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
   if not path.startswith(start):
