@@ -43,15 +43,25 @@ class NodeBuild(NodeTask):
     if target.payload.build_script:
       self.context.log.info('Running node build {} for {} at {}\n'.format(
         target.payload.build_script, target_address, node_installed_path))
-      result, npm_build_command = self.execute_npm(
-        ['run-script', target.payload.build_script],
-        workunit_name=target_address,
-        workunit_labels=[WorkUnitLabel.COMPILER])
+      package_manager = self.get_package_manager_for_target(target)
+      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
+        result, build_command = self.execute_npm(
+          ['run-script', target.payload.build_script],
+          workunit_name=target_address,
+          workunit_labels=[WorkUnitLabel.COMPILER])
+      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
+        result, build_command = self.execute_yarnpkg(
+          ['run', target.payload.build_script],
+          workunit_name=target_address,
+          workunit_labels=[WorkUnitLabel.COMPILER]
+          )
+      else:
+        raise TaskError('Unknown node package manager {}'.format(package_manager))
       # Make sure script run is successful.
       if result != 0:
         raise TaskError(
           'Failed to run build for {}:\n\t{} failed with exit code {}'.format(
-            target_address, npm_build_command, result))
+            target_address, build_command, result))
 
   def _get_output_dir(self, target, node_installed_path):
     return os.path.normpath(os.path.join(

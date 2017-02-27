@@ -27,6 +27,7 @@ class NodeModule(NodePackage):
                     relative to the BUILD file's directory.
     :type sources: `globs`, `rglobs` or a list of strings
 
+    :param package_manager: choose among supported package managers (npm or yarn).
     :param build_script: build script name as defined in package.json.  All files that are needed
       for the build script must be included in sources.  The script should output build results
       in the directory specified by output_dir.  If build_script is not supplied, the node
