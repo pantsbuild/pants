@@ -5,15 +5,21 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 
 from pants.contrib.node.targets.node_package import NodePackage
+
+
+logger = logging.getLogger(__name__)
 
 
 class NodeModule(NodePackage):
   """A Node module."""
 
-  def __init__(self, sources=None, address=None, payload=None, **kwargs):
+  def __init__(self, package_manager=None, sources=None, address=None, payload=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
@@ -29,5 +35,7 @@ class NodeModule(NodePackage):
       'sources': self.create_sources_field(sources=sources,
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
+      'package_manager': PrimitiveField(package_manager),
     })
+    logger.debug('NodeModule payload: %s', payload.fields)
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)

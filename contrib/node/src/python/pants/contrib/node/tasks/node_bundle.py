@@ -42,7 +42,7 @@ class NodeBundle(NodeTask):
         # build_dir is a symlink.  Since dereference option for tar is set to False, we need to
         # dereference manually to archive the linked build dir.
         build_dir = os.path.realpath(node_paths.node_path(target.node_module))
-        self.context.log.debug('archiving %s' % build_dir)
+        self.context.log.debug('archiving {}'.format(build_dir))
         archivepath = archiver.create(
           build_dir,
           self._outdir,

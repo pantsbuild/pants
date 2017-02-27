@@ -1,3 +1,3 @@
 node_remote_module(
-  version='5.8.23'
+  version='6.22.1'
 )
