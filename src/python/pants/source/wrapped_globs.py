@@ -111,7 +111,7 @@ class LazyFilesetWithSpec(FilesetWithSpec):
   def files(self):
     return self._files_calculator()
 
-  @memoized_property
+  @property
   def files_hash(self):
     h = sha1()
     for path in sorted(self.files):
