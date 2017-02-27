@@ -75,6 +75,7 @@ python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
   dependencies = [
+    ':deprecated',
     'src/python/pants/util:meta',
   ]
 )
