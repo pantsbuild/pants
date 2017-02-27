@@ -50,6 +50,13 @@ class NodeDistributionTest(unittest.TestCase):
 
     self.assertEqual(raw_version, versions['npm'])
 
+  def test_yarnpkg(self):
+    yarnpkg_version_command = self.distribution.yarnpkg_command(args=['--version'])
+    yarnpkg_version = yarnpkg_version_command.check_output().strip()
+    yarnpkg_versions_command = self.distribution.yarnpkg_command(args=['versions', '--json'])
+    yarnpkg_versions = json.loads(yarnpkg_versions_command.check_output())
+    self.assertEqual(yarnpkg_version, yarnpkg_versions['data']['yarn'])
+
   def test_bin_dir_on_path(self):
     node_cmd = self.distribution.node_command(args=['--eval', 'console.log(process.env["PATH"])'])
 
