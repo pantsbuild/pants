@@ -202,8 +202,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       transitive=['src/java/org/pantsbuild/helloworld:helloworld',
                   'src/resources/org/pantsbuild/resourceonly:resource'],
     ),
-    # A `python_library` with `resources=['file.name']`.
-    'src/python/sources/sources.txt': dict(
+    # A `python_library` with `sources=['file.name'] .
+    'src/python/sources/sources.py': dict(
       none=['src/python/sources:sources'],
       direct=['src/python/sources:sources'],
       transitive=['src/python/sources:sources']
@@ -369,6 +369,17 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
          'src/python/python_targets/test_library.py',
          'src/python/python_targets/test_unclaimed_src.py'}
       )
+
+  @ensure_engine
+  def test_changed_with_multiple_build_files(self):
+    new_build_file = 'src/python/python_targets/BUILD.new'
+
+    with create_isolated_git_repo() as worktree:
+      touch(os.path.join(worktree, new_build_file))
+      pants_run = self.run_pants(['changed'])
+
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), '')
 
   # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):

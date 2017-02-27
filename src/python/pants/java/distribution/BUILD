@@ -3,10 +3,8 @@
 
 python_library(
   sources=[ 'distribution.py' ],
-  resource_targets=[
-    ':resources',
-  ],
   dependencies=[
+    ':resources',
     '3rdparty/python:six',
     'src/python/pants/base:revision',
     'src/python/pants/java:util',

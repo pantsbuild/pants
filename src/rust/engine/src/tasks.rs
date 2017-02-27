@@ -1,8 +1,19 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use std::collections::HashMap;
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
-use externs::Externs;
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, Task};
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
+
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Task {
+  pub product: TypeConstraint,
+  pub clause: Vec<Selector>,
+  pub func: Function,
+  pub cacheable: bool,
+}
 
 /**
  * Registry of tasks able to produce each type, along with a few fundamental python
@@ -15,7 +26,6 @@ pub struct Tasks {
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
-  pub externs: Externs,
   pub field_name: Field,
   pub field_products: Field,
   pub field_variants: Field,
@@ -39,7 +49,6 @@ pub struct Tasks {
  */
 impl Tasks {
   pub fn new(
-    externs: Externs,
     field_name: Field,
     field_products: Field,
     field_variants: Field,
@@ -51,7 +60,6 @@ impl Tasks {
       intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
-      externs: externs,
       field_name: field_name,
       field_products: field_products,
       field_variants: field_variants,
@@ -151,9 +159,9 @@ impl Tasks {
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, transitive: bool) {
+  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeId>, transitive: bool) {
     self.clause(Selector::SelectDependencies(
-      SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }
+      SelectDependencies { product: product, dep_product: dep_product, field: field, field_types: field_types, transitive: transitive }
     ));
   }
 

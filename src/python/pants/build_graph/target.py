@@ -45,6 +45,7 @@ class AbstractTarget(object):
     """
     return tuple()
 
+  # TODO: Kill this in 1.5.0.dev0, once this old-style resource specification is gone.
   @property
   def has_resources(self):
     """Returns True if the target has an associated set of Resources.
@@ -151,7 +152,7 @@ class Target(AbstractTarget):
 
     options_scope = 'target-arguments'
     deprecated_options_scope = 'unknown-arguments'
-    deprecated_options_scope_removal_version = '1.4.0'
+    deprecated_options_scope_removal_version = '1.4.0.dev0'
 
     @classmethod
     def register_options(cls, register):

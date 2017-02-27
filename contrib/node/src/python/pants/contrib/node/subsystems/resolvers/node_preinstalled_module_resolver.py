@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import os
 import shutil
 
@@ -20,9 +19,6 @@ from pants.util.contextutil import temporary_dir
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
-
-
-logger = logging.getLogger(__name__)
 
 
 class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
@@ -47,11 +43,12 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
 
       download_path = os.path.join(temp_dir, archive_file_name)
 
-      logger.info('Downloading archive {archive_file_name} from '
-                  '{dependencies_archive_url} to {path}'
-                  .format(archive_file_name=archive_file_name,
-                          dependencies_archive_url=target.dependencies_archive_url,
-                          path=download_path))
+      node_task.context.log.info(
+        'Downloading archive {archive_file_name} from '
+        '{dependencies_archive_url} to {path}'
+        .format(archive_file_name=archive_file_name,
+                dependencies_archive_url=target.dependencies_archive_url,
+                path=download_path))
 
       try:
         Fetcher(get_buildroot()).download(target.dependencies_archive_url,
@@ -64,10 +61,11 @@ class NodePreinstalledModuleResolver(Subsystem, NodeResolverBase):
                                 url=target.dependencies_archive_url,
                                 error=error))
 
-      logger.info('Fetched archive {archive_file_name} from {dependencies_archive_url} to {path}'
-                  .format(archive_file_name=archive_file_name,
-                          dependencies_archive_url=target.dependencies_archive_url,
-                          path=download_path))
+      node_task.context.log.info(
+        'Fetched archive {archive_file_name} from {dependencies_archive_url} to {path}'
+        .format(archive_file_name=archive_file_name,
+                dependencies_archive_url=target.dependencies_archive_url,
+                path=download_path))
 
       archiver_for_path(archive_file_name).extract(download_path, temp_dir)
 

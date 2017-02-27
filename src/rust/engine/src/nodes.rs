@@ -1,41 +1,36 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 use std::sync::Arc;
+use std::fmt;
 
 use futures::future::{BoxFuture, Future};
 use futures::future;
 use futures_cpupool::CpuPool;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value, Variants};
-use externs::Externs;
+use core::{Key, TypeConstraint, TypeId, Value, Variants};
+use externs;
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use selectors::Selector;
 use selectors;
-use tasks::Tasks;
+use tasks::{self, Tasks};
 
 
 #[derive(Debug)]
 pub struct Runnable {
-  pub func: Function,
+  pub func: Value,
   pub args: Vec<Value>,
   pub cacheable: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Failure {
-  Noop(&'static str, Option<Node>),
+  Noop(&'static str, Option<NodeKey>),
   Throw(Value),
 }
 
-pub type NodeResult = Result<Value, Failure>;
-
-pub type StepFuture = BoxFuture<Value, Failure>;
-
-// Because multiple callers may wait on the same Node, the Future for a Node must be shareable.
-pub type NodeFuture = future::Shared<StepFuture>;
+pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
 #[derive(Clone)]
 pub struct Context {
@@ -56,24 +51,22 @@ impl Context {
   }
 
   /**
-   * Create Nodes for each Task that might be able to compute the given product for the
+   * Create NodeKeys for each Task that might be able to compute the given product for the
    * given subject and variants.
    *
    * (analogous to NodeBuilder.gen_nodes)
    */
-  fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Node> {
+  fn gen_nodes(&self, subject: &Key, product: &TypeConstraint, variants: &Variants) -> Vec<Task> {
     self.tasks.gen_tasks(subject.type_id(), product)
       .map(|tasks| {
         tasks.iter()
           .map(|task|
-            Node::Task(
-              Task {
-                subject: subject.clone(),
-                product: product.clone(),
-                variants: variants.clone(),
-                selector: task.clone(),
-              }
-            )
+            Task {
+              subject: subject.clone(),
+              product: product.clone(),
+              variants: variants.clone(),
+              task: task.clone(),
+            }
           )
           .collect()
       })
@@ -81,31 +74,28 @@ impl Context {
   }
 
   /**
-   * Get the future value for the given Node.
+   * Get the future value for the given Node implementation.
    */
-  fn get(&self, node: &Node) -> NodeFuture {
+  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
+    // TODO: Odd place for this... could do it periodically in the background?
+    maybe_drain_handles().map(|handles| {
+      externs::drop_handles(handles);
+    });
+
     self.graph.get(self.entry_id, self, node)
   }
 
   fn has_products(&self, item: &Value) -> bool {
-    self.tasks.externs.satisfied_by(&self.tasks.type_has_products, item.type_id())
+    externs::satisfied_by(&self.tasks.type_has_products, item)
   }
 
   /**
    * Returns the `name` field of the given item.
    *
-   * TODO: There are at least two hacks here. Because we don't have access to the appropriate
-   * `str` type, we just assume that it has the same type as the name of the field. And more
-   * importantly, there is no check that the object _has_ a name field.
+   * TODO: There is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
-    let name_val =
-      self.project(
-        item,
-        &self.tasks.field_name,
-        self.tasks.field_name.0.type_id()
-      );
-    self.tasks.externs.val_to_str(&name_val)
+    externs::project_str(item, self.tasks.field_name.as_str())
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
@@ -113,88 +103,72 @@ impl Context {
   }
 
   fn key_for(&self, val: &Value) -> Key {
-    self.tasks.externs.key_for(val)
+    externs::key_for(val)
   }
 
   fn val_for(&self, key: &Key) -> Value {
-    self.tasks.externs.val_for(key)
-  }
-
-  fn clone_val(&self, val: &Value) -> Value {
-    self.tasks.externs.clone_val(val)
+    externs::val_for(key)
   }
 
   /**
    * Stores a list of Keys, resulting in a Key for the list.
    */
   fn store_list(&self, items: Vec<&Value>, merge: bool) -> Value {
-    self.tasks.externs.store_list(items, merge)
-  }
-
-  /**
-   * Calls back to Python for a satisfied_by check.
-   */
-  fn satisfied_by(&self, constraint: &TypeConstraint, cls: &TypeId) -> bool {
-    self.tasks.externs.satisfied_by(constraint, cls)
+    externs::store_list(items, merge)
   }
 
   /**
    * Calls back to Python to project a field.
    */
-  fn project(&self, item: &Value, field: &Field, type_id: &TypeId) -> Value {
-    self.tasks.externs.project(item, field, type_id)
+  fn project(&self, item: &Value, field: &str, type_id: &TypeId) -> Value {
+    externs::project(item, field, type_id)
   }
 
   /**
    * Calls back to Python to project a field representing a collection.
    */
-  fn project_multi(&self, item: &Value, field: &Field) -> Vec<Value> {
-    self.tasks.externs.project_multi(item, field)
+  fn project_multi(&self, item: &Value, field: &str) -> Vec<Value> {
+    externs::project_multi(item, field)
   }
 
   /**
    * Creates a Throw state with the given exception message.
    */
   fn throw(&self, msg: &str) -> Failure {
-    Failure::Throw(self.tasks.externs.create_exception(msg))
+    Failure::Throw(externs::create_exception(msg))
   }
 
   fn invoke_runnable(&self, runnable: Runnable) -> Result<Value, Failure> {
-    self.tasks.externs.invoke_runnable(&runnable)
+    externs::invoke_runnable(&runnable)
       .map_err(|v| Failure::Throw(v))
   }
 
   /**
-   * A helper to take ownership of the given Failure, while indicating that the value
-   * represented by the Failure was an optional value.
+   * A helper to indicate that the value represented by the Failure was an optional value.
    */
-  fn was_optional(&self, failure: future::SharedError<Failure>, msg: &'static str) -> Failure {
-    match *failure {
-      Failure::Noop(..) =>
-        Failure::Noop(msg, None),
-      Failure::Throw(ref msg) =>
-        Failure::Throw(self.clone_val(msg)),
+  fn was_optional(&self, failure: Failure, msg: &'static str) -> Failure {
+    match failure {
+      Failure::Noop(..) => Failure::Noop(msg, None),
+      f => f,
     }
   }
 
   /**
-   * A helper to take ownership of the given Failure, while indicating that the value
-   * represented by the Failure was required, and thus fatal if not present.
+   * A helper to indicate that the value represented by the Failure was required, and thus
+   * fatal if not present.
    */
-  fn was_required(&self, failure: future::SharedError<Failure>) -> Failure {
-    match *failure {
-      Failure::Noop(..) =>
-        self.throw("No source of required dependencies"),
-      Failure::Throw(ref msg) =>
-        Failure::Throw(self.clone_val(msg)),
+  fn was_required(&self, failure: Failure) -> Failure {
+    match failure {
+      Failure::Noop(..) => self.throw("No source of required dependencies"),
+      f => f,
     }
   }
 
-  fn ok(&self, value: Value) -> StepFuture {
+  fn ok<O: Send + 'static>(&self, value: O) -> NodeFuture<O> {
     future::ok(value).boxed()
   }
 
-  fn err(&self, failure: Failure) -> StepFuture {
+  fn err<O: Send + 'static>(&self, failure: Failure) -> NodeFuture<O> {
     future::err(failure).boxed()
   }
 }
@@ -221,10 +195,18 @@ impl ContextFactory for Context {
 }
 
 /**
- * Defines executing a single step for the given context.
+ * Defines executing a cacheable/memoizable step for the given context.
+ *
+ * The Output type of a Node is bounded to values that can be stored and retrieved from
+ * the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
+ * stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
+ * combination of bounds at usage sites should mean that a failure to unwrap the result is
+ * exceedingly rare.
  */
-trait Step {
-  fn step(&self, context: Context) -> StepFuture;
+pub trait Node: Into<NodeKey> {
+  type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
+
+  fn run(&self, context: Context) -> NodeFuture<Self::Output>;
 }
 
 /**
@@ -237,14 +219,18 @@ trait Step {
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::Select,
+  pub subject: Key,
+  pub variants: Variants,
+  pub selector: selectors::Select,
 }
 
 impl Select {
-  fn product(&self) -> &TypeConstraint {
-    &self.selector.product
+  pub fn new(product: TypeConstraint, subject: Key, variants: Variants) -> Select {
+    Select {
+      selector: selectors::Select { product: product, variant_key: None },
+      subject: subject,
+      variants: variants,
+    }
   }
 
   fn select_literal_single<'a>(
@@ -253,7 +239,7 @@ impl Select {
     candidate: &'a Value,
     variant_value: &Option<String>
   ) -> bool {
-    if !context.satisfied_by(&self.selector.product, candidate.type_id()) {
+    if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
     }
     return match variant_value {
@@ -262,7 +248,7 @@ impl Select {
         false,
       _ =>
         true,
-    };
+    }
   }
 
   /**
@@ -300,23 +286,23 @@ impl Select {
   fn choose_task_result(
     &self,
     context: Context,
-    results: Vec<Result<future::SharedItem<Value>, future::SharedError<Failure>>>,
+    results: Vec<Result<Value, Failure>>,
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
     let mut matches = Vec::new();
     for result in results {
       match result {
-        Ok(ref value) => {
-          if let Some(v) = self.select_literal(&context, context.clone_val(value), variant_value) {
+        Ok(value) => {
+          if let Some(v) = self.select_literal(&context, value, variant_value) {
             matches.push(v);
           }
         },
         Err(err) => {
-          match *err {
+          match err {
             Failure::Noop(_, _) =>
               continue,
-            Failure::Throw(ref msg) =>
-              return Err(Failure::Throw(context.clone_val(msg))),
+            f @ Failure::Throw(_) =>
+              return Err(f),
           }
         },
       }
@@ -341,8 +327,10 @@ impl Select {
   }
 }
 
-impl Step for Select {
-  fn step(&self, context: Context) -> StepFuture {
+impl Node for Select {
+  type Output = Value;
+
+  fn run(&self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -368,10 +356,10 @@ impl Step for Select {
     // Else, attempt to use the configured tasks to compute the value.
     let deps_future =
       future::join_all(
-        context.gen_nodes(&self.subject, self.product(), &self.variants).iter()
+        context.gen_nodes(&self.subject, &self.selector.product, &self.variants).into_iter()
           .map(|task_node| {
             // Attempt to get the value of each task Node, but don't fail the join if one fails.
-            context.get(&task_node).then(|r| future::ok(r))
+            context.get(task_node).then(|r| future::ok(r))
           })
           .collect::<Vec<_>>()
       );
@@ -386,6 +374,12 @@ impl Step for Select {
   }
 }
 
+impl From<Select> for NodeKey {
+  fn from(n: Select) -> Self {
+    NodeKey::Select(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   subject: Key,
@@ -393,9 +387,17 @@ pub struct SelectLiteral {
   selector: selectors::SelectLiteral,
 }
 
-impl Step for SelectLiteral {
-  fn step(&self, context: Context) -> StepFuture {
+impl Node for SelectLiteral {
+  type Output = Value;
+
+  fn run(&self, context: Context) -> NodeFuture<Value> {
     context.ok(context.val_for(&self.selector.subject))
+  }
+}
+
+impl From<SelectLiteral> for NodeKey {
+  fn from(n: SelectLiteral) -> Self {
+    NodeKey::SelectLiteral(n)
   }
 }
 
@@ -410,13 +412,25 @@ impl Step for SelectLiteral {
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::SelectDependencies,
+  pub subject: Key,
+  pub variants: Variants,
+  pub selector: selectors::SelectDependencies,
 }
 
 impl SelectDependencies {
-  fn dep_node(&self, context: &Context, dep_subject: &Value) -> Node {
+  pub fn new(
+    selector: selectors::SelectDependencies,
+    subject: Key,
+    variants: Variants
+  ) -> SelectDependencies {
+    SelectDependencies {
+      subject: subject,
+      variants: variants,
+      selector: selector,
+    }
+  }
+
+  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
@@ -426,18 +440,20 @@ impl SelectDependencies {
       // After the root has been expanded, a traversal continues with dep_product == product.
       let mut selector = self.selector.clone();
       selector.dep_product = selector.product;
-      Node::create(
-        Selector::SelectDependencies(selector),
-        dep_subject_key,
-        self.variants.clone()
+      context.get(
+        SelectDependencies {
+          subject: dep_subject_key,
+          variants: self.variants.clone(),
+          selector: selector,
+        }
       )
     } else {
-      Node::create(Selector::select(self.selector.product), dep_subject_key, self.variants.clone())
+      context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
     }
   }
 
   fn store(&self, context: &Context, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.transitive && context.satisfied_by(&self.selector.product, dep_product.type_id())  {
+    if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.
@@ -452,18 +468,16 @@ impl SelectDependencies {
   }
 }
 
-impl Step for SelectDependencies {
-  fn step(&self, context: Context) -> StepFuture {
+impl Node for SelectDependencies {
+  type Output = Value;
+
+  fn run(&self, context: Context) -> NodeFuture<Value> {
     let node = self.clone();
 
     context
       .get(
         // Select the product holding the dependency list.
-        &Node::create(
-          Selector::select(self.selector.dep_product),
-          self.subject.clone(),
-          self.variants.clone()
-        )
+        Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -472,9 +486,7 @@ impl Step for SelectDependencies {
             let deps =
               future::join_all(
                 context.project_multi(&dep_product, &node.selector.field).iter()
-                  .map(|dep_subject| {
-                    context.get(&node.dep_node(&context, &dep_subject))
-                  })
+                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
                   .collect::<Vec<_>>()
               );
             deps
@@ -482,10 +494,7 @@ impl Step for SelectDependencies {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    // TODO: cloning to go from a `SharedValue` list to a list of values...
-                    // there ought to be a better way.
-                    let dv: Vec<Value> = dep_values.iter().map(|v| context.clone_val(v)).collect();
-                    Ok(node.store(&context, &dep_product, dv.iter().collect()))
+                    Ok(node.store(&context, &dep_product, dep_values.iter().collect()))
                   },
                   Err(failure) =>
                     Err(context.was_required(failure)),
@@ -501,6 +510,12 @@ impl Step for SelectDependencies {
   }
 }
 
+impl From<SelectDependencies> for NodeKey {
+  fn from(n: SelectDependencies) -> Self {
+    NodeKey::SelectDependencies(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   subject: Key,
@@ -508,18 +523,16 @@ pub struct SelectProjection {
   selector: selectors::SelectProjection,
 }
 
-impl Step for SelectProjection {
-  fn step(&self, context: Context) -> StepFuture {
+impl Node for SelectProjection {
+  type Output = Value;
+
+  fn run(&self, context: Context) -> NodeFuture<Value> {
     let node = self.clone();
 
     context
       .get(
         // Request the product we need to compute the subject.
-        &Node::create(
-          Selector::select(self.selector.input_product),
-          self.subject.clone(),
-          self.variants.clone()
-        )
+        Select::new(self.selector.input_product, self.subject.clone(), self.variants.clone())
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -533,8 +546,8 @@ impl Step for SelectProjection {
               );
             context
               .get(
-                &Node::create(
-                  Selector::select(node.selector.product),
+                Select::new(
+                  node.selector.product,
                   context.key_for(&projected_subject),
                   node.variants.clone()
                 )
@@ -542,7 +555,7 @@ impl Step for SelectProjection {
               .then(move |output_res| {
                 // If the output product is available, return it.
                 match output_res {
-                  Ok(output) => Ok(context.clone_val(&output)),
+                  Ok(output) => Ok(output),
                   Err(failure) => Err(context.was_required(failure)),
                 }
               })
@@ -556,35 +569,75 @@ impl Step for SelectProjection {
   }
 }
 
+impl From<SelectProjection> for NodeKey {
+  fn from(n: SelectProjection) -> Self {
+    NodeKey::SelectProjection(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
   subject: Key,
   product: TypeConstraint,
   variants: Variants,
-  selector: selectors::Task,
+  task: tasks::Task,
 }
 
-impl Step for Task {
-  fn step(&self, context: Context) -> StepFuture {
+impl Task {
+  /**
+   * TODO: Can/should inline execution of all of these.
+   */
+  fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
+    match selector {
+      Selector::Select(s) =>
+        context.get(Select {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+      Selector::SelectDependencies(s) =>
+        context.get(SelectDependencies {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+      Selector::SelectProjection(s) =>
+        context.get(SelectProjection {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+      Selector::SelectLiteral(s) =>
+        context.get(SelectLiteral {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
+    }
+  }
+}
+
+impl Node for Task {
+  type Output = Value;
+
+  fn run(&self, context: Context) -> NodeFuture<Value> {
     let deps =
       future::join_all(
-        self.selector.clause.iter()
-          .map(|selector| {
-            context.get(&Node::create(selector.clone(), self.subject.clone(), self.variants.clone()))
-          })
+        self.task.clause.iter()
+          .map(|selector| self.get(&context, selector.clone()))
           .collect::<Vec<_>>()
       );
 
-    let selector = self.selector.clone();
+    let task = self.task.clone();
     deps
       .then(move |deps_result| {
         match deps_result {
           Ok(deps) =>
             context.invoke_runnable(
               Runnable {
-                func: selector.func,
-                args: deps.iter().map(|v| context.clone_val(v)).collect(),
-                cacheable: selector.cacheable,
+                func: externs::val_for_id(task.func.0),
+                args: deps,
+                cacheable: task.cacheable,
               }
             ),
           Err(err) =>
@@ -595,8 +648,14 @@ impl Step for Task {
   }
 }
 
+impl From<Task> for NodeKey {
+  fn from(n: Task) -> Self {
+    NodeKey::Task(n)
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum Node {
+pub enum NodeKey {
   Select(Select),
   SelectLiteral(SelectLiteral),
   SelectDependencies(SelectDependencies),
@@ -604,96 +663,97 @@ pub enum Node {
   Task(Task),
 }
 
-impl Node {
-  pub fn format(&self, externs: &Externs) -> String {
+impl NodeKey {
+  pub fn format(&self) -> String {
     match self {
-      &Node::Select(_) => "Select".to_string(),
-      &Node::SelectLiteral(_) => "Literal".to_string(),
-      &Node::SelectDependencies(_) => "Dependencies".to_string(),
-      &Node::SelectProjection(_) => "Projection".to_string(),
-      &Node::Task(ref t) => format!("Task({})", externs.id_to_str(t.selector.func.0)),
+      &NodeKey::Select(_) => "Select".to_string(),
+      &NodeKey::SelectLiteral(_) => "Literal".to_string(),
+      &NodeKey::SelectDependencies(_) => "Dependencies".to_string(),
+      &NodeKey::SelectProjection(_) => "Projection".to_string(),
+      &NodeKey::Task(ref t) => format!("Task({})", externs::id_to_str(t.task.func.0)),
     }
   }
 
   pub fn subject(&self) -> &Key {
     match self {
-      &Node::Select(ref s) => &s.subject,
-      &Node::SelectLiteral(ref s) => &s.subject,
-      &Node::SelectDependencies(ref s) => &s.subject,
-      &Node::SelectProjection(ref s) => &s.subject,
-      &Node::Task(ref t) => &t.subject,
+      &NodeKey::Select(ref s) => &s.subject,
+      &NodeKey::SelectLiteral(ref s) => &s.subject,
+      &NodeKey::SelectDependencies(ref s) => &s.subject,
+      &NodeKey::SelectProjection(ref s) => &s.subject,
+      &NodeKey::Task(ref t) => &t.subject,
     }
   }
 
   pub fn product(&self) -> &TypeConstraint {
     match self {
-      &Node::Select(ref s) => &s.selector.product,
-      &Node::SelectLiteral(ref s) => &s.selector.product,
-      &Node::SelectDependencies(ref s) => &s.selector.product,
-      &Node::SelectProjection(ref s) => &s.selector.product,
-      &Node::Task(ref t) => &t.selector.product,
+      &NodeKey::Select(ref s) => &s.selector.product,
+      &NodeKey::SelectLiteral(ref s) => &s.selector.product,
+      &NodeKey::SelectDependencies(ref s) => &s.selector.product,
+      &NodeKey::SelectProjection(ref s) => &s.selector.product,
+      &NodeKey::Task(ref t) => &t.product,
     }
   }
+}
 
-  pub fn selector(&self) -> Selector {
+impl Node for NodeKey {
+  type Output = NodeResult;
+
+  fn run(&self, context: Context) -> NodeFuture<NodeResult> {
     match self {
-      &Node::Select(ref s) => Selector::Select(s.selector.clone()),
-      &Node::SelectLiteral(ref s) => Selector::SelectLiteral(s.selector.clone()),
-      &Node::SelectDependencies(ref s) => Selector::SelectDependencies(s.selector.clone()),
-      &Node::SelectProjection(ref s) => Selector::SelectProjection(s.selector.clone()),
-      &Node::Task(ref t) => Selector::Task(t.selector.clone()),
+      &NodeKey::Select(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectDependencies(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectLiteral(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectProjection(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::Task(ref n) => n.run(context).map(|v| v.into()).boxed(),
     }
   }
+}
 
-  pub fn create(selector: Selector, subject: Key, variants: Variants) -> Node {
-    match selector {
-      Selector::Select(s) =>
-        Node::Select(Select {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectLiteral(s) =>
-        // NB: Intentionally ignores subject parameter to provide a literal subject.
-        Node::SelectLiteral(SelectLiteral {
-          subject: s.subject.clone(),
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectDependencies(s) =>
-        Node::SelectDependencies(SelectDependencies {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::SelectProjection(s) =>
-        Node::SelectProjection(SelectProjection {
-          subject: subject,
-          variants: variants,
-          selector: s,
-        }),
-      Selector::Task(t) =>
-        Node::Task(Task {
-          subject: subject,
-          product: t.product,
-          variants: variants,
-          selector: t,
-        }),
-    }
+#[derive(Clone, Debug)]
+pub enum NodeResult {
+  Value(Value),
+}
+
+impl From<Value> for NodeResult {
+  fn from(v: Value) -> Self {
+    NodeResult::Value(v)
   }
+}
 
-  pub fn step(&self, context: Context) -> StepFuture {
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| {
-      context.tasks.externs.drop_handles(handles);
-    });
+// TODO: These traits exist in the stdlib, but are marked unstable.
+//   see https://github.com/rust-lang/rust/issues/33417
+pub trait TryFrom<T>: Sized {
+  type Err;
+  fn try_from(T) -> Result<Self, Self::Err>;
+}
 
-    match self {
-      &Node::Select(ref n) => n.step(context),
-      &Node::SelectDependencies(ref n) => n.step(context),
-      &Node::SelectLiteral(ref n) => n.step(context),
-      &Node::SelectProjection(ref n) => n.step(context),
-      &Node::Task(ref n) => n.step(context),
+pub trait TryInto<T>: Sized {
+  type Err;
+  fn try_into(self) -> Result<T, Self::Err>;
+}
+
+impl<T, U> TryInto<U> for T where U: TryFrom<T> {
+  type Err = U::Err;
+
+  fn try_into(self) -> Result<U, U::Err> {
+    U::try_from(self)
+  }
+}
+
+impl TryFrom<NodeResult> for NodeResult {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    Ok(nr)
+  }
+}
+
+impl TryFrom<NodeResult> for Value {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::Value(v) => Ok(v),
     }
   }
 }

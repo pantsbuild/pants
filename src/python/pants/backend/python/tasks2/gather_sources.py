@@ -51,13 +51,13 @@ class GatherSources(Task):
       else:
         target_set_id = 'no_targets'
 
-      path = os.path.join(self.workdir, target_set_id)
-      path_tmp = path + '.tmp'
-
-      shutil.rmtree(path_tmp, ignore_errors=True)
-
       interpreter = self.context.products.get_data(PythonInterpreter)
+      path = os.path.join(self.workdir, target_set_id)
+
+      # Note that we check for the existence of the directory, instead of for invalid_vts, to cover the empty case.
       if not os.path.isdir(path):
+        path_tmp = path + '.tmp'
+        shutil.rmtree(path_tmp, ignore_errors=True)
         self._build_pex(interpreter, path_tmp, invalidation_check.all_vts)
         shutil.move(path_tmp, path)
 
@@ -76,7 +76,10 @@ class GatherSources(Task):
     for relpath in tgt.sources_relative_to_source_root():
       try:
         src = os.path.join(buildroot, tgt.target_base, relpath)
-        builder.add_source(src, relpath)
+        if isinstance(tgt, Resources):
+          builder.add_resource(src, relpath)
+        else:
+          builder.add_source(src, relpath)
       except OSError:
         self.context.log.error('Failed to copy {} for target {}'.format(
             os.path.join(tgt.target_base, relpath), tgt.address.spec))

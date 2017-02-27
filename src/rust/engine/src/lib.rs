@@ -24,7 +24,7 @@ use std::os::raw;
 use std::path::Path;
 use std::sync::Arc;
 
-use core::{Field, Function, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
   CloneValExtern,
@@ -38,15 +38,18 @@ use externs::{
   KeyForExtern,
   ProjectExtern,
   ProjectMultiExtern,
+  ProjectIgnoringTypeExtern,
   SatisfiedByExtern,
+  SatisfiedByTypeExtern,
   StoreListExtern,
+  TypeIdBuffer,
   ValForExtern,
   ValToStrExtern,
   with_vec,
 };
 use graph::Graph;
-use nodes::{Failure, NodeResult};
-use scheduler::{Scheduler, ExecutionStat};
+use nodes::Failure;
+use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
 use rule_graph::{GraphMaker, RootSubjectTypes};
 
@@ -78,22 +81,17 @@ pub struct RawNode {
 }
 
 impl RawNode {
-  fn create(
-    externs: &Externs,
-    subject: &Key,
-    product: &TypeConstraint,
-    state: Option<NodeResult>,
-  ) -> RawNode {
+  fn create(subject: &Key, product: &TypeConstraint, state: Option<RootResult>) -> RawNode {
     let (state_tag, state_value) =
       match state {
         None =>
-          (RawStateTag::Empty as u8, externs.create_exception("No value")),
+          (RawStateTag::Empty as u8, externs::create_exception("No value")),
         Some(Ok(v)) =>
           (RawStateTag::Return as u8, v),
         Some(Err(Failure::Throw(msg))) =>
           (RawStateTag::Throw as u8, msg),
         Some(Err(Failure::Noop(msg, _))) =>
-          (RawStateTag::Noop as u8, externs.create_exception(msg)),
+          (RawStateTag::Noop as u8, externs::create_exception(msg)),
       };
 
     RawNode {
@@ -112,14 +110,11 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn create(
-    externs: &Externs,
-    node_states: Vec<(&Key, &TypeConstraint, Option<NodeResult>)>
-  ) -> Box<RawNodes> {
+  fn create(node_states: Vec<(&Key, &TypeConstraint, Option<RootResult>)>) -> Box<RawNodes> {
     let nodes =
       node_states.into_iter()
         .map(|(subject, product, state)|
-          RawNode::create(externs, subject, product, state)
+          RawNode::create(subject, product, state)
         )
         .collect();
     let mut raw_nodes =
@@ -138,7 +133,7 @@ impl RawNodes {
 }
 
 #[no_mangle]
-pub extern fn scheduler_create(
+pub extern fn externs_set(
   ext_context: *const ExternContext,
   log: LogExtern,
   key_for: KeyForExtern,
@@ -148,20 +143,16 @@ pub extern fn scheduler_create(
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
+  satisfied_by_type: SatisfiedByTypeExtern,
   store_list: StoreListExtern,
   project: ProjectExtern,
+  project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  field_name: Field,
-  field_products: Field,
-  field_variants: Field,
-  type_address: TypeConstraint,
-  type_has_products: TypeConstraint,
-  type_has_variants: TypeConstraint,
-) -> *const RawScheduler {
-  // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
-  let externs =
+  py_str_type: TypeId,
+) {
+  externs::set_externs(
     Externs::new(
       ext_context,
       log,
@@ -172,22 +163,37 @@ pub extern fn scheduler_create(
       id_to_str,
       val_to_str,
       satisfied_by,
+      satisfied_by_type,
       store_list,
       project,
+      project_ignoring_type,
       project_multi,
       create_exception,
       invoke_runnable,
-    );
+      py_str_type,
+    )
+  );
+}
+
+#[no_mangle]
+pub extern fn scheduler_create(
+  field_name: Buffer,
+  field_products: Buffer,
+  field_variants: Buffer,
+  type_address: TypeConstraint,
+  type_has_products: TypeConstraint,
+  type_has_variants: TypeConstraint,
+) -> *const RawScheduler {
+  // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       RawScheduler {
         scheduler: Scheduler::new(
           Graph::new(),
           Tasks::new(
-            externs,
-            field_name,
-            field_products,
-            field_variants,
+            field_name.to_string().expect("field_name to be a string"),
+            field_products.to_string().expect("field_products to be a string"),
+            field_variants.to_string().expect("field_variants to be a string"),
             type_address,
             type_has_products,
             type_has_variants,
@@ -229,7 +235,8 @@ pub extern fn execution_add_root_select_dependencies(
   subject: Key,
   product: TypeConstraint,
   dep_product: TypeConstraint,
-  field: Field,
+  field: Buffer,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
@@ -237,7 +244,8 @@ pub extern fn execution_add_root_select_dependencies(
       subject,
       product,
       dep_product,
-      field,
+      field.to_string().expect("field name to be string"),
+      field_types.to_vec(),
       transitive,
     );
   })
@@ -257,12 +265,7 @@ pub extern fn execution_roots(
   scheduler_ptr: *mut RawScheduler,
 ) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |raw| {
-    Box::into_raw(
-      RawNodes::create(
-        &raw.scheduler.tasks.externs,
-        raw.scheduler.root_states()
-      )
-    )
+    Box::into_raw(RawNodes::create(raw.scheduler.root_states()))
   })
 }
 
@@ -340,11 +343,12 @@ pub extern fn task_add_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
   dep_product: TypeConstraint,
-  field: Field,
+  field: Buffer,
+  field_types: TypeIdBuffer,
   transitive: bool,
 ) {
   with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_dependencies(product, dep_product, field, transitive);
+    tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec(), transitive);
   })
 }
 
@@ -353,11 +357,11 @@ pub extern fn task_add_select_projection(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
   projected_subject: TypeId,
-  field: Field,
+  field: Buffer,
   input_product: TypeConstraint,
 ) {
   with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_projection(product, projected_subject, field, input_product);
+    tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
   })
 }
 
@@ -426,15 +430,20 @@ pub extern fn validator_run(
   scheduler_ptr: *mut RawScheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
-) {
+) -> Value {
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
                                         RootSubjectTypes { subject_types: subject_types.clone() });
       let graph = graph_maker.full_graph();
-      if graph.has_errors() {
-        // NB This is just the initial validation message.
-        println!("there were validation errors")
+
+      match graph.validate() {
+        Result::Ok(_) => {
+          externs::store_list(vec![], false)
+        },
+        Result::Err(msg) => {
+          externs::create_exception(&msg)
+        }
       }
     })
   })

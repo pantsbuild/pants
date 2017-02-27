@@ -61,55 +61,6 @@ class TaskRule(datatype('TaskRule', ['input_selectors', 'func', 'product_type', 
                                    self.func.__name__)
 
 
-class RuleValidationResult(datatype('RuleValidationResult', ['rule', 'errors', 'warnings'])):
-  """Container for errors and warnings found during rule validation."""
-
-  def valid(self):
-    return len(self.errors) == 0 and len(self.warnings) == 0
-
-  def has_warnings(self):
-    return len(self.warnings) > 0
-
-  def has_errors(self):
-    return len(self.errors) > 0
-
-
-class RulesetValidator(object):
-  """Validates that the rule index has no missing tasks."""
-
-  def __init__(self, rule_index, goal_to_product, root_subject_types):
-    if not root_subject_types:
-      raise ValueError('root_subject_types must not be empty')
-    self._goal_to_product = goal_to_product
-
-
-    self._graph = GraphMaker(rule_index, root_subject_types).full_graph()
-
-  def validate(self):
-    """ Validates that all tasks can be executed based on the declared product types and selectors.
-
-    It checks
-     - all products selected by tasks are produced by some task or intrinsic, or come from a root
-      subject type
-     - all goal products are also produced
-    """
-
-    # TODO cycles, because it should handle that.
-    error_message = self._graph.error_message()
-    if error_message:
-      raise ValueError(error_message)
-    task_and_intrinsic_product_types = tuple(r.output_product_type for r in self._graph.root_rules)
-    self._validate_goal_products(task_and_intrinsic_product_types)
-
-  def _validate_goal_products(self, task_and_intrinsic_product_types):
-    for goal, goal_product in self._goal_to_product.items():
-      if goal_product not in task_and_intrinsic_product_types:
-        # NB: We could also check goals of the Goal type to see if the products they request are
-        # also available.
-        raise ValueError(
-          'no task for product used by goal "{}": {}'.format(goal, goal_product.__name__))
-
-
 class SingletonRule(datatype('SingletonRule', ['product_type', 'func']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
 

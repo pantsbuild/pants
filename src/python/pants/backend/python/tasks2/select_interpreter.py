@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import os
 
 from pex.interpreter import PythonIdentity, PythonInterpreter
@@ -12,15 +13,13 @@ from pex.interpreter import PythonIdentity, PythonInterpreter
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.base.fingerprint_strategy import (DefaultFingerprintHashingMixin,
-                                             TaskIdentityFingerprintStrategy)
+from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
 
 
-class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin,
-                                           TaskIdentityFingerprintStrategy):
+class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
 
   def compute_fingerprint(self, python_target):
     # Only consider the compatibility requirements in the fingerprint, as only
@@ -30,7 +29,8 @@ class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin,
       hash_elements_for_target.extend(sorted(python_target.compatibility))
     if not hash_elements_for_target:
       return None
-    hasher = self._build_hasher(python_target)
+    hasher = hashlib.sha1()
+    hasher.update(python_target.payload.fingerprint())
     for element in hash_elements_for_target:
       hasher.update(element)
     return hasher.hexdigest()
@@ -63,7 +63,7 @@ class SelectInterpreter(Task):
   def execute(self):
     interpreter = None
     python_tgts = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget))
-    fs = PythonInterpreterFingerprintStrategy(task=self)
+    fs = PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of selecting
       # an interpreter, to prevent downstream tasks from having to check for this special case.

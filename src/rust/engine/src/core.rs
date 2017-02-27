@@ -1,10 +1,13 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use fnv::FnvHasher;
 
 use std::collections::HashMap;
-use std::hash;
+use std::{fmt, hash};
 use std::ops::Drop;
-use std::ptr;
 
+use externs;
 use handles::{Handle, enqueue_drop_handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
@@ -44,11 +47,17 @@ impl Variants {
 
 pub type Id = u64;
 
+// The name of a field.
+pub type Field = String;
+
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);
+
+// On the python side, the 0th type id is used as an anonymous id
+pub const ANY_TYPE: TypeId = TypeId(0);
 
 // A type constraint, which a TypeId may or may-not satisfy.
 #[repr(C)]
@@ -59,11 +68,6 @@ pub struct TypeConstraint(pub Id);
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Function(pub Id);
-
-// The name of a field.
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct Field(pub Key);
 
 /**
  * Wraps a type id for use as a key in HashMaps and sets.
@@ -90,6 +94,10 @@ impl hash::Hash for Key {
 }
 
 impl Key {
+  pub fn new_with_anon_type_id(id: Id) -> Key {
+    Key { id: id, type_id: ANY_TYPE }
+  }
+
   pub fn id(&self) -> Id {
     self.id
   }
@@ -103,16 +111,11 @@ impl Key {
  * Represents a handle to a python object, explicitly without equality or hashing. Whenever
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.
  *
- * Additionally, since a Value corresponds one-to-one with a Python CFFI handle, Value does not
- * directly implement Copy or Clone. Instead, there is an explicit extern `clone_value` that calls
- * back to Python to clone the underlying CFFI handle.
+ * Value implements Clone by calling out to a python extern `clone_val` which clones the
+ * underlying CFFI handle.
  */
 #[repr(C)]
-#[derive(Debug)]
-pub struct Value {
-  handle: Handle,
-  type_id: TypeId,
-}
+pub struct Value(Handle);
 
 // By default, Values would not be marked Send because of the raw pointer they hold.
 // Because the handle is opaque and can't be cloned, we can safely implement Send.
@@ -121,31 +124,32 @@ unsafe impl Sync for Value {}
 
 impl Drop for Value {
   fn drop(&mut self) {
-    enqueue_drop_handle(self.handle);
+    enqueue_drop_handle(self.0);
   }
 }
 
 impl Value {
-  pub fn type_id(&self) -> &TypeId {
-    &self.type_id
-  }
-
   /**
-   * An escape hatch to allow for cloning a Value: you should generally not do this unless you
-   * are certain the cloned Value has been mem::forgotten (otherwise it will be `Drop`ed twice).
+   * An escape hatch to allow for cloning a Value without cloning its handle. You should generally
+   * not do this unless you are certain the input Value has been mem::forgotten (otherwise it
+   * will be `Drop`ed twice).
    */
-  pub unsafe fn clone(&self) -> Value {
-    Value {
-      ..*self
-    }
+  pub unsafe fn clone_without_handle(&self) -> Value {
+    Value(self.0)
   }
 }
 
-impl Default for Value {
-  fn default() -> Self {
-    Value {
-      handle: ptr::null() as Handle,
-      type_id: TypeId(0),
-    }
+/**
+ * Implemented by calling back to python to clone the underlying Handle.
+ */
+impl Clone for Value {
+  fn clone(&self) -> Value {
+    externs::clone_val(self)
+  }
+}
+
+impl fmt::Debug for Value {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", externs::val_to_str(&self))
   }
 }

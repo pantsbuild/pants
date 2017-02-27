@@ -10,8 +10,8 @@ jvm_binary(
 
 java_library(name='lib',
   sources=['Main.java'],
-  resources=['testprojects/maven_layout/resource_collision/example_c/src/main/resources'],
   dependencies=[
     'testprojects/maven_layout/resource_collision/lib/src/main/java/org/pantsbuild/duplicateres/lib',
+    'testprojects/maven_layout/resource_collision/example_c/src/main/resources',
   ],
 )

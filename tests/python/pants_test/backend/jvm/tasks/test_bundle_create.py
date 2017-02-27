@@ -83,8 +83,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          dependencies=[self.java_lib_target, self.jar_lib],
-                                          resources=[self.resources_target.address.spec])
+                                          dependencies=[self.java_lib_target, self.jar_lib, self.resources_target])
 
     self.dist_root = os.path.join(self.build_root, 'dist')
 
