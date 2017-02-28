@@ -170,7 +170,7 @@ impl PathGlob {
       // use of `Path` is strictly for os-independent Path parsing.
       parts.push(
         Pattern::new(&part.to_string_lossy())
-          .map_err(|e| format!("Could not decode {:?} as UTF8: {:?}", filespec, e))?
+          .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?
       );
     }
 
@@ -435,8 +435,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         context.expand_multi(link_globs)
       })
       .map(|mut path_stats| {
-        // Assume either 0 or 1 destination (anything else would imply a symlink to a path
-        // containing an escaped glob character... leaving that as a `TODO` I guess).
+        // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
         path_stats.pop().map(|ps| match ps {
           PathStat::Dir { stat, .. } => PathStat::dir(symbolic_path, stat),
           PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),

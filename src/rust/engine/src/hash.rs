@@ -35,7 +35,6 @@ impl Fingerprint {
  * A Write instance that fingerprints all data that passes through it.
  */
 pub struct WriterHasher<W: Write> {
-  // Faster on 64 bit platforms than the 256 bit output algorithm.
   hasher: Blake2b,
   inner: W,
 }
