@@ -3,6 +3,7 @@
 
 target(
   dependencies=[
+    ':node_build',
     ':node_bundle',
     ':node_repl',
     ':node_resolve',
@@ -14,6 +15,18 @@ target(
 python_library(
   name='node_paths',
   sources=['node_paths.py']
+)
+
+python_library(
+  name='node_build',
+  sources=['node_build.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:workunit',
+    'src/python/pants/task',
+    'src/python/pants/util:contextutil',
+  ]
 )
 
 python_library(

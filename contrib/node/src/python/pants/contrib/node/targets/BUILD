@@ -14,7 +14,7 @@ python_library(
   name='node_bundle',
   sources=['node_bundle.py'],
   dependencies=[
-    ':node_module',
+    ':node_package',
     'src/python/pants/base:payload',
     'src/python/pants/fs',
   ],
