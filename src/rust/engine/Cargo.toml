@@ -13,7 +13,6 @@ crate-type = ["dylib"]
 
 [dependencies]
 blake2-rfc = "0.2.17"
-crossbeam = "0.2.10"
 fnv = "1.0.5"
 # TODO: Waiting for a 0.1.11 release: see https://github.com/alexcrichton/futures-rs/pull/383
 futures = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
