@@ -382,7 +382,6 @@ impl From<Select> for NodeKey {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
-  subject: Key,
   variants: Variants,
   selector: selectors::SelectLiteral,
 }
@@ -609,7 +608,6 @@ impl Task {
         }),
       Selector::SelectLiteral(s) =>
         context.get(SelectLiteral {
-          subject: self.subject.clone(),
           variants: self.variants.clone(),
           selector: s,
         }),
@@ -677,7 +675,7 @@ impl NodeKey {
   pub fn subject(&self) -> &Key {
     match self {
       &NodeKey::Select(ref s) => &s.subject,
-      &NodeKey::SelectLiteral(ref s) => &s.subject,
+      &NodeKey::SelectLiteral(ref s) => &s.selector.subject,
       &NodeKey::SelectDependencies(ref s) => &s.subject,
       &NodeKey::SelectProjection(ref s) => &s.subject,
       &NodeKey::Task(ref t) => &t.subject,
