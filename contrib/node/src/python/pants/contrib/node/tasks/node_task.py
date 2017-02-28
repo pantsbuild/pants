@@ -53,6 +53,14 @@ class NodeTask(Task):
     """Returns `True` if given target is a `NodeBundle`."""
     return isinstance(target, NodeBundle)
 
+  def get_package_manager_for_target(self, target):
+    """Returns package manager string for target argument or global config."""
+    package_manager = target.payload.get_field('package_manager').value
+    package_manager = self.node_distribution.validate_package_manager(
+      package_manager=package_manager
+    ) if package_manager else self.node_distribution.package_manager
+    return package_manager
+
   def execute_node(self, args, workunit_name=None, workunit_labels=None):
     """Executes node passing the given args.
 
@@ -81,6 +89,22 @@ class NodeTask(Task):
 
     npm_command = self.node_distribution.npm_command(args=args)
     return self._execute_command(npm_command,
+                                 workunit_name=workunit_name,
+                                 workunit_labels=workunit_labels)
+
+  def execute_yarnpkg(self, args, workunit_name=None, workunit_labels=None):
+    """Executes npm passing the given args.
+
+    :param list args: The command line args to pass to `yarnpkg`.
+    :param string workunit_name: A name for the execution's work unit; defaults to 'yarnpkg'.
+    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
+    :returns: A tuple of (returncode, command).
+    :rtype: A tuple of (int,
+            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
+    """
+
+    yarnpkg_command = self.node_distribution.yarnpkg_command(args=args)
+    return self._execute_command(yarnpkg_command,
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 

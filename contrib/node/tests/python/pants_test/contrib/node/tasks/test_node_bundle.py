@@ -6,8 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import defaultdict
 
 from pants.base.exceptions import TargetDefinitionException
+from pants.goal.products import MultipleRootedProducts
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import touch
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -42,10 +44,11 @@ class TestNodeBundle(TaskTestBase):
         node_module=self.node_module_target_name_full,
         dependencies=[node_module_target])
 
-      resolved_node_paths = NodePaths()
-      resolved_node_paths.resolved(node_module_target, tmp_dir)
+      bundleable_js_product = defaultdict(MultipleRootedProducts)
+      bundleable_js_product[node_module_target].add_abs_paths(tmp_dir, [tmp_dir])
       task_context = self.context(target_roots=[target])
-      task_context.products.safe_create_data(NodePaths, init_func=lambda: resolved_node_paths)
+      task_context.products.safe_create_data(
+        'bundleable_js', init_func=lambda: bundleable_js_product)
       task = self.create_task(task_context)
 
       task.execute()

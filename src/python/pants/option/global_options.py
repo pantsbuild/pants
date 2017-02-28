@@ -199,3 +199,6 @@ class GlobalOptionsRegistrar(Optionable):
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+             help='Paths that correspond with build roots for any subproject that this '
+                  'project depends on.')
