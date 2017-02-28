@@ -34,7 +34,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
 # Well known metadata file required to register scalac plugins with nsc.
@@ -427,21 +427,19 @@ class BaseZincCompile(JvmCompile):
         ret.append('-S-P:{}:{}'.format(name, arg))
     return ret
 
-  @staticmethod
-  def _find_scalac_plugins(scalac_plugins, classpath):
+  @classmethod
+  def _find_scalac_plugins(cls, scalac_plugins, classpath):
     """Returns a map from plugin name to plugin jar/dir."""
     # Allow multiple flags and also comma-separated values in a single flag.
     plugin_names = set([p for val in scalac_plugins for p in val.split(',')])
+    if not plugin_names:
+      return {}
+
     active_plugins = {}
     buildroot = get_buildroot()
 
-    def process_info_file(classpath_element, plugin_info_file):
-      plugin_info = ElementTree.parse(plugin_info_file).getroot()
-      if plugin_info.tag != 'plugin':
-        raise TaskError(
-          'File {} in {} is not a valid scalac plugin descriptor'.format(
-            _SCALAC_PLUGIN_INFO_FILE, classpath_element))
-      name = plugin_info.find('name').text
+    for classpath_element in classpath:
+      name = cls._maybe_get_plugin_name(classpath_element)
       if name in plugin_names:
         # It's important to use relative paths, as the compiler flags get embedded in the zinc
         # analysis file, and we port those between systems via the artifact cache.
@@ -451,27 +449,44 @@ class BaseZincCompile(JvmCompile):
           raise TaskError('Plugin {} defined in {} and in {}'.format(name, active_plugins[name],
                                                                      classpath_element))
         active_plugins[name] = rel_classpath_element
+        if len(active_plugins) == len(plugin_names):
+          # We've found all the plugins, so return now to spare us from processing
+          # of the rest of the classpath for no reason.
+          return active_plugins
 
-    for c in classpath:
-      if os.path.isdir(c):
-        try:
-          with open(os.path.join(c, _SCALAC_PLUGIN_INFO_FILE)) as plugin_info_file:
-            process_info_file(c, plugin_info_file)
-        except IOError as e:
-          if e.errno != errno.ENOENT:
-            raise
-      else:
-        with open_zip(c, 'r') as jarfile:
-          try:
-            with closing(jarfile.open(_SCALAC_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
-              process_info_file(c, plugin_info_file)
-          except KeyError:
-            pass
-
+    # If we get here we must have unresolved plugins.
     unresolved_plugins = plugin_names - set(active_plugins.keys())
-    if unresolved_plugins:
-      raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
-    return active_plugins
+    raise TaskError('Could not find requested plugins: {}'.format(list(unresolved_plugins)))
+
+  @classmethod
+  @memoized_method
+  def _maybe_get_plugin_name(cls, classpath_element):
+    """If classpath_element is a scalac plugin, returns its name.
+
+    Returns None otherwise.
+    """
+    def process_info_file(cp_elem, info_file):
+      plugin_info = ElementTree.parse(info_file).getroot()
+      if plugin_info.tag != 'plugin':
+        raise TaskError('File {} in {} is not a valid scalac plugin descriptor'.format(
+            _SCALAC_PLUGIN_INFO_FILE, cp_elem))
+      return plugin_info.find('name').text
+
+    if os.path.isdir(classpath_element):
+      try:
+        with open(os.path.join(classpath_element, _SCALAC_PLUGIN_INFO_FILE)) as plugin_info_file:
+          return process_info_file(classpath_element, plugin_info_file)
+      except IOError as e:
+        if e.errno != errno.ENOENT:
+          raise
+    else:
+      with open_zip(classpath_element, 'r') as jarfile:
+        try:
+          with closing(jarfile.open(_SCALAC_PLUGIN_INFO_FILE, 'r')) as plugin_info_file:
+            return process_info_file(classpath_element, plugin_info_file)
+        except KeyError:
+          pass
+    return None
 
 
 class ZincCompile(BaseZincCompile):

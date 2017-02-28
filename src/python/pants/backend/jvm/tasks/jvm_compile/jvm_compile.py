@@ -596,12 +596,16 @@ class JvmCompile(NailgunTaskBase):
     Plugins with no arguments will have an empty list as a value.
 
     Active plugins and their args will be gathered from (in order of precedence):
-    - The <compiler>_plugins and <compiler>_plugins fields of the target, if it has them.
-    - The <compiler>_plugins and <compiler>_plugins options of this task, if it has them.
-    - The <compiler>_plugins and <compiler>_plugins fields of this task, if it has them.
+    - The <compiler>_plugins and <compiler>_plugin_args fields of the target, if it has them.
+    - The <compiler>_plugins and <compiler>_plugin_args options of this task, if it has them.
+    - The <compiler>_plugins and <compiler>_plugin_args fields of this task, if it has them.
 
     Note that in-repo plugins will not be returned, even if requested, when building
     themselves.  Use published versions of those plugins for that.
+
+    See:
+    - examples/src/java/org/pantsbuild/example/javac/plugin/README.md.
+    - examples/src/scala/org/pantsbuild/example/scalac/plugin/README.md
 
     :param compiler: one of 'javac', 'scalac'.
     :param target: The target whose plugins we compute.
