@@ -1,17 +1,17 @@
-`scalac` Plugins with Pants
-===========================
+scalac Plugins with Pants
+=========================
 
-The Scala compiler, `scalac`, has a plugin mechanism.
+The Scala compiler, scalac, has a plugin mechanism.
 
 Plugins allow you to hook into the compiler while it's running, to perform various
 tasks such as custom error checking, code analysis and so on.
 
-Pants supports both building and using `scalac` plugins.
+Pants supports both building and using scalac plugins.
 
-Building `scalac` plugins
--------------------------
+Building scalac plugins
+-----------------------
 
-`scalac` plugins are specified using a `scalac_plugin` target:
+scalac plugins are specified using a `scalac_plugin` target:
 
 ```
 scalac_plugin(
@@ -24,7 +24,7 @@ scalac_plugin(
 )
 ```
 
-A `scalac` plugin target has the same fields as `scala_library` target, 
+A scalac plugin target has the same fields as `scala_library` target, 
 plus two extra:
 
 - `classname`: The name of the `Plugin` implementation class. Required.
@@ -34,14 +34,14 @@ plus two extra:
   
 Building a plugin target will, in addition to compiling the code, generate
 the appropriate metadata into `scalac-plugin.xm`, so
-that `scalac` can load the plugin by name at runtime.
+that scalac can load the plugin by name at runtime.
 
 A plugin may be published for later consumption in any repo. It can also
 be consumed (with some restrictions) from source, in the same repo.
 
 
-Using `scalac` plugins
-----------------------
+Using scalac plugins
+--------------------
 
 Plugins can be integrated in one of two ways:
 
@@ -85,7 +85,7 @@ scala_library(
 
 #### Depending on plugins
 
-In order to load a plugin, it has to be on `scalac`'s classpath. 
+In order to load a plugin, it has to be on scalac's classpath. 
 This can be achieved in one of two ways:
 - Have targets that must be compiled with a plugin depend (directly or indirectly) 
 either on the `scalac_plugin` target, or on a `jar_library` pointing to a published version

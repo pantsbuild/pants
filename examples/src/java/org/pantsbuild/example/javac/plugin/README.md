@@ -1,18 +1,18 @@
-`javac` Plugins with Pants
-==========================
+javac Plugins with Pants
+========================
 
-For Java versions 8 and higher, the Java compiler, `javac`, has a 
+For Java versions 8 and higher, the Java compiler, javac, has a 
 [plugin](https://docs.oracle.com/javase/8/docs/jdk/api/javac/tree/com/sun/source/util/Plugin.html) mechanism.
 
 Plugins allow you to hook into the compiler while it's running, to perform various
 tasks such as custom error checking, code analysis and so on.
 
-Pants supports both building and using `javac` plugins.
+Pants supports both building and using javac plugins.
 
-Building `javac` plugins
-------------------------
+Building javac plugins
+----------------------
 
-`javac` plugins are specified using a `javac_plugin` target:
+javac plugins are specified using a `javac_plugin` target:
 
 ```
 javac_plugin(
@@ -25,7 +25,7 @@ javac_plugin(
 )
 ```
 
-A `javac` plugin target has the same fields as `java_library` target, 
+A javac plugin target has the same fields as `java_library` target, 
 plus two extra:
 
 - `classname`: The name of the `Plugin` implementation class. Required.
@@ -35,14 +35,14 @@ plus two extra:
   
 Building a plugin target will, in addition to compiling the code, generate
 the appropriate metadata into `META-INF/services/com.sun.source.util.Plugin`, so
-that `javac` can load the plugin by name at runtime.
+that javac can load the plugin by name at runtime.
 
 A plugin may be published for later consumption in any repo. It can also
 be consumed (with some restrictions) from source, in the same repo.
 
 
-Using `javac` plugins
----------------------
+Using javac plugins
+-------------------
 
 Plugins can be integrated in one of two ways:
 
@@ -86,7 +86,7 @@ java_library(
 
 #### Depending on plugins
 
-In order to load a plugin, it has to be on `javac`'s classpath. 
+In order to load a plugin, it has to be on javac's classpath. 
 This can be achieved in one of two ways:
 - Have targets that must be compiled with a plugin depend (directly or indirectly) 
 either on the `javac_plugin` target, or on a `jar_library` pointing to a published version

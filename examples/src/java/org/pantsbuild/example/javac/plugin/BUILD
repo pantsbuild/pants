@@ -53,3 +53,8 @@ java_library(
     'simple_javac_plugin': ['args', 'from', 'target', 'local']
   }
 )
+
+page(
+  name='readme',
+  source='README.md',
+)
