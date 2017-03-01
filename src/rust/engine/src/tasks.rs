@@ -71,7 +71,11 @@ impl Tasks {
   }
 
   pub fn all_product_types(&self) -> Vec<TypeConstraint> {
-    self.all_rules().iter().map(|t| t.product).collect()
+    let mut product_types: Vec<_> = self.all_rules().iter().map(|t| t.product).collect();
+    // NB sorted by id so that dedup will consolidate runs of duplicates.
+    product_types.sort_by_key(|tc| tc.0);
+    product_types.dedup();
+    product_types
   }
 
   pub fn is_singleton_task(&self, sought_task: &Task) -> bool {

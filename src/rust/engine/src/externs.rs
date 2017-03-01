@@ -107,6 +107,10 @@ pub fn project_str(value: &Value, field: &str) -> String {
   val_to_str(&name_val)
 }
 
+pub fn key_to_str(key: &Key) -> String {
+  val_to_str(&val_for(key))
+}
+
 pub fn id_to_str(digest: Id) -> String {
   with_externs(|e| {
     (e.id_to_str)(e.context, digest).to_string().unwrap_or_else(|e| {

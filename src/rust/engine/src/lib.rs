@@ -24,6 +24,10 @@ use std::os::raw;
 use std::path::Path;
 use std::sync::Arc;
 
+use std::fs::OpenOptions;
+use std::io::{BufWriter, Write};
+use std::io;
+
 use core::{Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
@@ -51,7 +55,7 @@ use graph::Graph;
 use nodes::Failure;
 use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
-use rule_graph::{GraphMaker, RootSubjectTypes};
+use rule_graph::{GraphMaker, RootSubjectTypes, RuleGraph};
 
 pub struct RawScheduler {
   scheduler: Scheduler,
@@ -447,6 +451,69 @@ pub extern fn validator_run(
       }
     })
   })
+}
+
+#[no_mangle]
+pub extern fn rule_graph_visualize(
+  scheduler_ptr: *mut RawScheduler,
+  subject_types_ptr: *mut TypeId,
+  subject_types_len: u64,
+  path_ptr: *const raw::c_char
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
+      let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+      let path = Path::new(path_str.as_str());
+
+      let graph = graph_full(raw, subject_types);
+      write_to_file(path, &graph).unwrap_or_else(|e| {
+        println!("Failed to visualize to {}: {:?}", path.display(), e);
+      });
+    })
+  })
+}
+
+#[no_mangle]
+pub extern fn rule_subgraph_visualize(
+  scheduler_ptr: *mut RawScheduler,
+  subject_type: TypeId,
+  product_type: TypeConstraint,
+  path_ptr: *const raw::c_char
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = Path::new(path_str.as_str());
+
+    let graph = graph_sub(raw, subject_type, product_type);
+    write_to_file(path, &graph).unwrap_or_else(|e| {
+      println!("Failed to visualize to {}: {:?}", path.display(), e);
+    });
+  })
+}
+
+
+fn graph_full(raw: &mut RawScheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
+                                    RootSubjectTypes { subject_types: subject_types.clone() });
+  graph_maker.full_graph()
+}
+
+fn graph_sub(
+  raw: &mut RawScheduler,
+  subject_type: TypeId,
+  product_type: TypeConstraint
+) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
+                                    RootSubjectTypes { subject_types: vec![subject_type.clone()] });
+  graph_maker.sub_graph(&subject_type, &product_type)
+}
+
+fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
+  let file = try!(OpenOptions::new().append(true).open(path));
+  let mut f = BufWriter::new(file);
+
+  try!(write!(&mut f, "{}\n", format!("{}", graph)));
+  Ok(())
 }
 
 fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
