@@ -350,7 +350,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
         # On failures or timeouts, the .coverage file won't be written.
         if not os.path.exists('.coverage'):
-          logger.warning('No .coverage file was found! Skipping coverage reporting.')
+          self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
         else:
           # Normalize .coverage.raw paths using combine and `paths` config in the rc file.
           # This swaps the /tmp pex chroot source paths for the local original source paths

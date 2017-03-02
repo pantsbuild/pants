@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import logging
 import os
 import re
 import shutil
@@ -368,7 +367,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
           # On failures or timeouts, the .coverage file won't be written.
           if not os.path.exists('.coverage'):
-            logger.warning('No .coverage file was found! Skipping coverage reporting.')
+            self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
           else:
             # Normalize .coverage.raw paths using combine and `paths` config in the rc file.
             # This swaps the /tmp pex chroot source paths for the local original source paths
