@@ -72,9 +72,6 @@ class PythonTestResult(object):
 
 
 class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
-  """
-  :API: public
-  """
 
   @classmethod
   def subsystem_dependencies(cls):
