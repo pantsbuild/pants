@@ -74,7 +74,7 @@ class JsonParserTest(unittest.TestCase):
 
   def test_single(self):
     document = dedent("""
-    # An simple example with a single Bob.
+    # A simple example with a single Bob.
     {
       "type_alias": "pants_test.engine.test_parsers.Bob",
       "hobbies": [1, 2, 3]

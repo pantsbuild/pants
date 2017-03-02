@@ -160,14 +160,14 @@ fi
 if [[ "${skip_jvm:-false}" == "false" ]]; then
   banner "Running core jvm tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} doc test {src,tests}/{java,scala}:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} doc test2 {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
 fi
 
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   banner "Running internal backend python tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --compile-python-eval-skip \
+    ./pants.pex ${PANTS_ARGS[@]} test2 --compile-python-eval-skip \
     pants-plugins/tests/python::
   ) || die "Internal backend python test failure"
 fi
@@ -178,9 +178,9 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   banner "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
-      --coverage=paths:pants/ \
-      --test-pytest-test-shard=${python_unit_shard} \
+    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test2 \
+      --test2-pytest-coverage=paths:pants/ \
+      --test2-pytest-test-shard=${python_unit_shard} \
       --compile-python-eval-skip \
       tests/python::
   ) || die "Core python test failure"
@@ -189,12 +189,8 @@ fi
 if [[ "${skip_contrib:-false}" == "false" ]]; then
   banner "Running contrib python tests"
   (
-    # We run python tests using --no-fast - aka test chroot per target - to work around issues with
-    # test (ie: pants_test.contrib) namespace packages.
-    # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
-    #  https://github.com/pantsbuild/pants/issues/1149
     ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
-    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest --no-fast \
+    --build-ignore=$SKIP_ANDROID_PATTERN test2 \
     --compile-python-eval-skip \
     contrib:: \
   ) || die "Contrib python test failure"
@@ -206,9 +202,9 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   fi
   banner "Running Pants Integration tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
+    ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test2 \
       --compile-python-eval-skip \
-      --test-pytest-test-shard=${python_intg_shard} \
+      --test2-pytest-test-shard=${python_intg_shard} \
       tests/python::
   ) || die "Pants Integration test failure"
 fi
