@@ -26,14 +26,6 @@ pub struct Tasks {
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
-  pub field_name: Field,
-  pub field_products: Field,
-  pub field_variants: Field,
-  pub field_include: Field,
-  pub field_exclude: Field,
-  pub field_dependencies: Field,
-  pub field_path: Field,
-  pub field_fingerprint: Field,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -50,28 +42,11 @@ pub struct Tasks {
  * (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
  */
 impl Tasks {
-  pub fn new(
-    field_name: Field,
-    field_products: Field,
-    field_variants: Field,
-    field_include: Field,
-    field_exclude: Field,
-    field_dependencies: Field,
-    field_path: Field,
-    field_fingerprint: Field,
-  ) -> Tasks {
+  pub fn new() -> Tasks {
     Tasks {
       intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
-      field_name: field_name,
-      field_products: field_products,
-      field_variants: field_variants,
-      field_include: field_include,
-      field_exclude: field_exclude,
-      field_dependencies: field_dependencies,
-      field_path: field_path,
-      field_fingerprint: field_fingerprint,
       preparing: None,
     }
   }

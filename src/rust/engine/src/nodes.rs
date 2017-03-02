@@ -78,11 +78,11 @@ impl Context {
    * TODO: There is no check that the object _has_ a name field.
    */
   fn field_name(&self, item: &Value) -> String {
-    externs::project_str(item, self.core.tasks.field_name.as_str())
+    externs::project_str(item, "name")
   }
 
   fn field_products(&self, item: &Value) -> Vec<Value> {
-    externs::project_multi(item, &self.core.tasks.field_products)
+    externs::project_multi(item, "products")
   }
 
   /**
@@ -182,8 +182,8 @@ impl Context {
   }
 
   fn lift_path_globs(&self, item: &Value) -> Result<PathGlobs, String> {
-    let include = self.project_multi_strs(item, &self.core.tasks.field_include);
-    let exclude = self.project_multi_strs(item, &self.core.tasks.field_exclude);
+    let include = self.project_multi_strs(item, "include");
+    let exclude = self.project_multi_strs(item, "exclude");
     PathGlobs::create(&include, &exclude)
       .map_err(|e| {
         format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)

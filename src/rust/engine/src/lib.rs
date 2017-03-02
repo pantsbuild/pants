@@ -226,16 +226,7 @@ pub extern fn scheduler_create(
       RawScheduler {
         scheduler: Scheduler::new(
           Core::new(
-            Tasks::new(
-              "name".to_string(),
-              "products".to_string(),
-              "variants".to_string(),
-              "include".to_string(),
-              "exclude".to_string(),
-              "dependencies".to_string(),
-              "path".to_string(),
-              "fingerprint".to_string(),
-            ),
+            Tasks::new(),
             Types {
               construct_snapshot: construct_snapshot,
               construct_snapshots: construct_snapshots,
