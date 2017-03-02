@@ -54,8 +54,8 @@ class TargetAdaptor(StructWithDeps):
       if not sources:
         return tuple()
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
-      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
-      return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs, excluded_path_globs),)
+      path_globs = base_globs.to_path_globs(self.address.spec_path)
+      return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
 
   @property
   def default_sources_globs(self):
@@ -70,7 +70,7 @@ class Field(object):
   """A marker for Target(Adaptor) fields for which the engine might perform extra construction."""
 
 
-class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'path_globs', 'excluded_path_globs']), Field):
+class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'path_globs']), Field):
   """Represents the `sources` argument for a particular Target.
 
   Sources are currently eagerly computed in-engine in order to provide the `BuildGraph`
@@ -83,8 +83,6 @@ class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'pat
     case of python resource globs.
   :param filespecs: The merged filespecs dict the describes the paths captured by this field.
   :param path_globs: A PathGlobs describing included files.
-  :param excluded_path_globs: A PathGlobs describing files excluded (ie, subtracted) from the
-    include set.
   """
 
   def __eq__(self, other):
@@ -135,7 +133,7 @@ class JunitTestsAdaptor(TargetAdaptor):
     return self.java_test_globs + self.scala_test_globs
 
 
-class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list', 'excluded_path_globs_list']), Field):
+class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
   """Represents the `bundles` argument, each of which has a PathGlobs to represent its `fileset`."""
 
   def __eq__(self, other):
@@ -184,23 +182,20 @@ class JvmAppAdaptor(TargetAdaptor):
   def _construct_bundles_field(self):
     filespecs_list = []
     path_globs_list = []
-    excluded_path_globs_list = []
     for bundle in self.bundles:
       # NB: if a bundle has a rel_path, then the rel_root of the resulting file globs must be
       # set to that rel_path.
       rel_root = getattr(bundle, 'rel_path', self.address.spec_path)
 
       base_globs = BaseGlobs.from_sources_field(bundle.fileset, rel_root)
-      path_globs, excluded_path_globs = base_globs.to_path_globs(rel_root)
+      path_globs = base_globs.to_path_globs(rel_root)
 
       filespecs_list.append(base_globs.filespecs)
       path_globs_list.append(path_globs)
-      excluded_path_globs_list.append(excluded_path_globs)
     return BundlesField(self.address,
                         self.bundles,
                         filespecs_list,
-                        path_globs_list,
-                        excluded_path_globs_list)
+                        path_globs_list)
 
 
 class RemoteSourcesAdaptor(TargetAdaptor):
@@ -221,12 +216,11 @@ class PythonTargetAdaptor(TargetAdaptor):
       if getattr(self, 'resources', None) is None:
         return field_adaptors
       base_globs = BaseGlobs.from_sources_field(self.resources, self.address.spec_path)
-      path_globs, excluded_path_globs = base_globs.to_path_globs(self.address.spec_path)
+      path_globs = base_globs.to_path_globs(self.address.spec_path)
       sources_field = SourcesField(self.address,
                                    'resources',
                                    base_globs.filespecs,
-                                   path_globs,
-                                   excluded_path_globs)
+                                   path_globs)
       return field_adaptors + (sources_field,)
 
 
@@ -325,10 +319,7 @@ class BaseGlobs(Locatable, AbstractClass):
 
   def to_path_globs(self, relpath):
     """Return two PathGlobs representing the included and excluded Files for these patterns."""
-    return (
-        PathGlobs.create_from_specs(relpath, self._file_globs),
-        PathGlobs.create_from_specs(relpath, self._excluded_file_globs)
-      )
+    return PathGlobs.create(relpath, self._file_globs, self._excluded_file_globs)
 
 
 class Files(BaseGlobs):

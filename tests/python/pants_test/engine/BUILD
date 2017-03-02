@@ -57,7 +57,6 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:nodes',
-    'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test/engine/examples:fs_test',
   ]
 )
@@ -74,7 +73,6 @@ python_tests(
   ]
 )
 
-
 python_tests(
   name='isolated_process',
   sources=['test_isolated_process.py'],
@@ -87,16 +85,6 @@ python_tests(
     'tests/python/pants_test/testutils:git_util',
     'tests/python/pants_test/engine/examples:fs_test',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-  ]
-)
-
-
-python_tests(
-  name='path_globs',
-  sources=['test_path_globs.py'],
-  dependencies=[
-    'src/python/pants/base:project_tree',
-    'src/python/pants/engine:fs',
   ]
 )
 

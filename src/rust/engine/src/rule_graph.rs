@@ -1,16 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
-
-use externs;
-
-use selectors::{Select, Selector};
-use nodes::Runnable;
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 
+use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
+use externs;
+use selectors::{Select, Selector};
 use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -149,14 +146,17 @@ pub struct Diagnostic {
 
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
 // to be found statically rather than dynamically.
-pub struct GraphMaker<'a> {
-    tasks: &'a Tasks,
-    root_subject_types: RootSubjectTypes
+pub struct GraphMaker<'t> {
+  tasks: &'t Tasks,
+  root_subject_types: RootSubjectTypes
 }
 
-impl <'a> GraphMaker<'a> {
-  pub fn new<'t>(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker {
-    GraphMaker { tasks: tasks, root_subject_types: root_subject_types }
+impl <'t> GraphMaker<'t> {
+  pub fn new(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker<'t> {
+    GraphMaker {
+      tasks: tasks,
+      root_subject_types: root_subject_types
+    }
   }
 
   pub fn full_graph(&self) -> RuleGraph {
@@ -478,7 +478,7 @@ fn to_val_from_id(id: Id) -> Value {
 fn repr_of_val(value: &Value) -> String {
   let rpr_val = externs::project_ignoring_type(&value, "__repr__");
 
-  let invoke_result  = externs::invoke_runnable(&Runnable{func: rpr_val, args:vec![], cacheable:false})
+  let invoke_result  = externs::invoke_runnable(&rpr_val, &[], false)
                               .expect("string from calling repr");
   externs::val_to_str(&invoke_result)
 }
