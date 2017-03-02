@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from contextlib import contextmanager
 
 from pants.pantsd.process_manager import ProcessManager
