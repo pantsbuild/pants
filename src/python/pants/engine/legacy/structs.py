@@ -16,6 +16,7 @@ from pants.engine.objects import Locatable
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
+from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -29,26 +30,40 @@ class TargetAdaptor(StructWithDeps):
   Extends StructWithDeps to add a `dependencies` field marked Addressable.
   """
 
-  @property
-  def has_concrete_sources(self):
-    """Returns true if this target has non-deferred sources.
+  @memoized_method
+  def get_sources(self):
+    """Returns target's non-deferred sources if exists or the default sources if defined.
 
     NB: once ivy is implemented in the engine, we can fetch sources natively here, and/or
     refactor how deferred sources are implemented.
       see: https://github.com/pantsbuild/pants/issues/2997
     """
     sources = getattr(self, 'sources', None)
-    return sources is not None
+    if not sources:
+      if self.default_sources_globs:
+        return Globs(*self.default_sources_globs,
+                     spec_path=self.address.spec_path,
+                     exclude=self.default_sources_exclude_globs or [])
+    return sources
 
   @property
   def field_adaptors(self):
     """Returns a tuple of Fields for captured fields which need additional treatment."""
     with exception_logging(logger, 'Exception in `field_adaptors` property'):
-      if not self.has_concrete_sources:
+      sources = self.get_sources()
+      if not sources:
         return tuple()
-      base_globs = BaseGlobs.from_sources_field(self.sources, self.address.spec_path)
+      base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path)
       return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
+
+  @property
+  def default_sources_globs(self):
+    return None
+
+  @property
+  def default_sources_exclude_globs(self):
+    return None
 
 
 class Field(object):
@@ -84,6 +99,38 @@ class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'pat
 
   def __str__(self):
     return 'SourcesField(address={}, arg={}, filespecs={!r})'.format(self.address, self.arg, self.filespecs)
+
+
+class JavaLibraryAdaptor(TargetAdaptor):
+
+  @property
+  def default_sources_globs(self):
+    return ('*.java',)
+
+  @property
+  def default_sources_exclude_globs(self):
+    return JunitTestsAdaptor.java_test_globs
+
+
+class ScalaLibraryAdaptor(TargetAdaptor):
+
+  @property
+  def default_sources_globs(self):
+    return ('*.scala',)
+
+  @property
+  def default_sources_exclude_globs(self):
+    return JunitTestsAdaptor.scala_test_globs
+
+
+class JunitTestsAdaptor(TargetAdaptor):
+
+  java_test_globs = ('*Test.java',)
+  scala_test_globs = ('*Test.scala', '*Spec.scala')
+
+  @property
+  def default_sources_globs(self):
+    return self.java_test_globs + self.scala_test_globs
 
 
 class BundlesField(datatype('BundlesField', ['address', 'bundles', 'filespecs_list', 'path_globs_list']), Field):
@@ -175,6 +222,26 @@ class PythonTargetAdaptor(TargetAdaptor):
                                    base_globs.filespecs,
                                    path_globs)
       return field_adaptors + (sources_field,)
+
+
+class PythonLibraryAdaptor(PythonTargetAdaptor):
+
+  @property
+  def default_sources_globs(self):
+    return ('*.py',)
+
+  @property
+  def default_sources_exclude_globs(self):
+    return PythonTestsAdaptor.python_test_globs
+
+
+class PythonTestsAdaptor(PythonTargetAdaptor):
+
+  python_test_globs = ('test_*.py', '*_test.py')
+
+  @property
+  def default_sources_globs(self):
+    return self.python_test_globs
 
 
 class BaseGlobs(Locatable, AbstractClass):

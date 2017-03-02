@@ -40,6 +40,7 @@ python_library(
     'src/python/pants/engine:struct',
     'src/python/pants/source',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
