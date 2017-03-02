@@ -624,8 +624,7 @@ class Native(object):
     def tc(constraint):
       return TypeConstraint(self.context.to_id(constraint))
 
-    scheduler =\
-      self.lib.scheduler_create(
+    scheduler = self.lib.scheduler_create(
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_snapshots)),

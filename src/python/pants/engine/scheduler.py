@@ -49,8 +49,7 @@ class WrappedNativeScheduler(object):
     has_products_constraint = SubclassesOf(HasProducts)
 
     # Create the ExternContext, and the native Scheduler.
-    self._scheduler =\
-      native.new_scheduler(
+    self._scheduler = native.new_scheduler(
         build_root,
         ignore_patterns,
         Snapshot,
@@ -388,6 +387,11 @@ class LocalScheduler(object):
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
+    # NB: Watchman will never trigger an invalidation event for the root directory that
+    # is being watched. Instead, we treat any invalidation of a path directly in the
+    # root directory as an invalidation of the root.
+    if any(os.path.dirname(f) in ('', '.') for f in filenames):
+      filenames = tuple(filenames) + ('', '.')
     with self._product_graph_lock:
       invalidated = self._scheduler.invalidate(filenames)
       logger.debug('invalidated %d nodes for: %s', invalidated, filenames)

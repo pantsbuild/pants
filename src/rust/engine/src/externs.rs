@@ -204,7 +204,7 @@ pub struct Externs {
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
-  // TODO: Also on `types::Types`
+  // TODO: This type is also declared on `types::Types`.
   py_str_type: TypeId,
 }
 

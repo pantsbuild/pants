@@ -33,10 +33,9 @@ class Path(datatype('Path', ['path', 'stat'])):
 
 
 class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
-  """A helper class (TODO: possibly unnecessary?) for converting various.
+  """A wrapper around sets of filespecs to include and exclude.
 
-  This class consumes the (somewhat hidden) support in FilesetWithSpec for normalizing
-  globs/rglobs/zglobs into 'filespecs' strings.
+  The syntax supported is roughly git's glob syntax.
   """
 
   @staticmethod

@@ -651,6 +651,7 @@ impl Snapshots {
   pub fn new() -> Result<Snapshots, io::Error> {
     Ok(
       Snapshots {
+        // TODO: see https://github.com/pantsbuild/pants/issues/4299
         temp_dir: TempDir::new("snapshots")?,
         next_temp_id: atomic::AtomicUsize::new(0),
       }
