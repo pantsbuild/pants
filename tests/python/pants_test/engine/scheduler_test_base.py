@@ -57,7 +57,7 @@ class SchedulerTestBase(object):
     tasks = tasks or []
     project_tree = project_tree or self.mk_fs_tree()
 
-    tasks = list(tasks) + create_fs_tasks()
+    tasks = list(tasks) + create_fs_tasks(project_tree)
     return LocalScheduler(goals, tasks, project_tree, self._native)
 
   def execute_request(self, scheduler, product, *subjects):

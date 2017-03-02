@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
+from pants.engine.fs import PathGlobs, create_fs_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import GraphMaker, Rule, RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
@@ -118,7 +118,7 @@ class RulesetValidatorTest(unittest.TestCase):
     init_subsystem(Native.Factory)
     rule_index = RuleIndex.create(rules, intrinsic_entries)
     native = Native.Factory.global_instance().create()
-    scheduler = WrappedNativeScheduler(native, rule_index, root_subject_types)
+    scheduler = WrappedNativeScheduler(native, '.', [], rule_index, root_subject_types)
     return scheduler
 
   def test_ruleset_with_missing_product_type(self):
@@ -333,10 +333,10 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_full_graph_for_planner_example(self):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
-    intrinsics = create_fs_intrinsics('Let us pretend that this is a ProjectTree!')
+    project_tree = 'Let us pretend that this is a ProjectTree!'
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks(project_tree)
 
-    rule_index = RuleIndex.create(tasks, intrinsics)
+    rule_index = RuleIndex.create(tasks, intrinsic_entries=[])
     graphmaker = GraphMaker(rule_index,
       root_subject_types={Address,
                           PathGlobs,
@@ -359,8 +359,6 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assertEquals(declared_rule_strings,
       rules_remaining_in_graph_strs
     )
-    # statically assert that the number of dependency keys is fixed
-    self.assertEquals(41, len(fullgraph.rule_dependencies))
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [

@@ -13,6 +13,7 @@ from pants_test.base_test import BaseTest
 
 
 def single(directory, name=None):
+  name = name if name is not None else os.path.basename(directory)
   return SingleAddress(directory, name)
 
 
