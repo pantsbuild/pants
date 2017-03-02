@@ -321,7 +321,7 @@ impl PosixFS {
 
   fn create_pool() -> CpuPool {
     futures_cpupool::Builder::new()
-      .name_prefix("engine-")
+      .name_prefix("vfs-")
       .create()
   }
 
@@ -764,6 +764,45 @@ impl Snapshots {
   }
 
   /**
+   * Retries create_dir_all up to N times before failing. Necessary in concurrent environments.
+   */
+  fn create_dir_all(dir: &Path) -> Result<(), String> {
+    let mut attempts = 16;
+    loop {
+      let res = fs::create_dir_all(dir);
+      if res.is_ok() {
+        return Ok(());
+      } else if attempts <= 0 {
+        return {
+          res.map_err(|e| format!("Failed to create directory {:?}: {:?}", dir, e))
+        }
+      }
+      attempts -= 1;
+    }
+  }
+
+  /**
+   * Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
+   * the case of Snapshots because the destination path is unique to its content.
+   */
+  fn finalize(temp_path: &Path, dest_path: &Path) -> Result<(), String> {
+    if dest_path.is_file() {
+      // The Snapshot has already been created.
+      fs::remove_file(temp_path).unwrap_or(());
+      Ok(())
+    } else {
+      let dest_dir = dest_path.parent().expect("All snapshot paths must have parent directories.");
+      // As long as the destination file gets created, we've succeeded.
+      Snapshots::create_dir_all(dest_dir)?;
+      match fs::rename(temp_path, dest_path) {
+        Ok(_) => Ok(()),
+        Err(_) if dest_path.is_file() => Ok(()),
+        Err(e) => Err(format!("Failed to finalize snapshot at {:?}: {:?}", dest_path, e))
+      }
+    }
+  }
+
+  /**
    * Creates a Snapshot for the given paths under the given VFS.
    */
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
@@ -780,18 +819,14 @@ impl Snapshots {
         Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
 
       // Rename to the final path if it does not already exist.
-      let dest_path = Snapshots::path_under_for(&dest_dir, &fingerprint);
-      if dest_path.is_file() {
-        fs::remove_file(temp_path).unwrap_or(());
-      } else {
-        dest_path.parent().map(|p| fs::create_dir_all(p));
-        fs::rename(temp_path, dest_path)
-          .map_err(|e| format!("Failed to finalize snapshot: {:?}", e))?;
-      }
+      Snapshots::finalize(
+        temp_path.as_path(),
+        Snapshots::path_under_for(&dest_dir, &fingerprint).as_path()
+      )?;
 
       Ok(
         Snapshot {
-          fingerprint: fingerprint,
+         fingerprint: fingerprint,
           path_stats: paths,
         }
       )

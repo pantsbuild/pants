@@ -64,6 +64,10 @@ impl Context {
     self.core.graph.get(self.entry_id, self, node)
   }
 
+  pub fn core(&self) -> Arc<Core> {
+    self.core.clone()
+  }
+
   fn has_products(&self, item: &Value) -> bool {
     externs::satisfied_by(&self.core.types.has_products, item)
   }

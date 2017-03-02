@@ -1,10 +1,12 @@
 
 use std::path::PathBuf;
+use std::sync::{RwLock, RwLockReadGuard};
 
 use graph::Graph;
 use tasks::Tasks;
 use types::Types;
 use fs::{PosixFS, Snapshots};
+use futures_cpupool::{self, CpuPool};
 
 
 /**
@@ -19,6 +21,9 @@ pub struct Core {
   pub types: Types,
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
+  // TODO: This is a second pool (relative to the VFS pool), upon which all work is
+  // submitted in order to avoid https://github.com/alexcrichton/futures-rs/issues/330
+  pool: RwLock<CpuPool>,
 }
 
 impl Core {
@@ -43,13 +48,28 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),
+      pool: RwLock::new(Core::create_pool()),
     }
+  }
+
+  pub fn pool(&self) -> RwLockReadGuard<CpuPool> {
+    self.pool.read().unwrap()
+  }
+
+  fn create_pool() -> CpuPool {
+    futures_cpupool::Builder::new()
+      .name_prefix("engine-")
+      .create()
   }
 
   /**
    * Reinitializes a Core in a new process (basically, recreates its CpuPool).
    */
   pub fn post_fork(&self) {
+    // Reinitialize the VFS pool.
     self.vfs.post_fork();
+    // And our own.
+    let mut pool = self.pool.write().unwrap();
+    *pool = Core::create_pool();
   }
 }

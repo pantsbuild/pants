@@ -69,12 +69,14 @@ impl Entry {
    * outside of the Graph lock.
    */
   fn new(id: EntryId, node: NodeKey, context: Context) -> Entry {
+    let core = context.core();
+    let pool = core.pool();
     Entry {
       id: id,
       node: node.clone(),
       state:
         future::Shared::new(
-          future::lazy(move || {
+          pool.spawn_fn(move || {
             node.run(context)
           })
           .boxed()
