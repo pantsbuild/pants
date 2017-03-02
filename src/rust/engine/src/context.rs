@@ -22,7 +22,7 @@ pub struct Core {
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
   // TODO: This is a second pool (relative to the VFS pool), upon which all work is
-  // submitted in order to avoid https://github.com/alexcrichton/futures-rs/issues/330
+  // submitted. See https://github.com/pantsbuild/pants/issues/4298
   pool: RwLock<CpuPool>,
 }
 

@@ -49,7 +49,7 @@ class SchedulerService(PantsService):
     """Service setup."""
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
-    # Notify the (native) scheduler that we might not be running in a new process.
+    # Notify the (native) scheduler that we might be running in a new process.
     self._scheduler.post_fork()
 
   def _enqueue_fs_event(self, event):
