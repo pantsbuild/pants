@@ -11,6 +11,7 @@ use nodes::Runnable;
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::fmt;
+use std::io;
 
 use tasks::{Task, Tasks};
 
@@ -137,11 +138,6 @@ type RuleDependencyEdges = HashMap<InnerEntry, RuleEdges>;
 type RuleDiagnostics = Vec<Diagnostic>;
 type UnfulfillableRuleMap = HashMap<Entry, RuleDiagnostics>;
 
-#[derive(Debug)]
-pub struct RootSubjectTypes {
-  pub subject_types: Vec<TypeId>
-}
-
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Diagnostic {
   subject_type: TypeId,
@@ -152,11 +148,11 @@ pub struct Diagnostic {
 // to be found statically rather than dynamically.
 pub struct GraphMaker<'a> {
     tasks: &'a Tasks,
-    root_subject_types: RootSubjectTypes
+    root_subject_types: Vec<TypeId>
 }
 
 impl <'a> GraphMaker<'a> {
-  pub fn new<'t>(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker {
+  pub fn new<'t>(tasks: &'t Tasks, root_subject_types: Vec<TypeId>) -> GraphMaker {
     GraphMaker { tasks: tasks, root_subject_types: root_subject_types }
   }
 
@@ -165,15 +161,15 @@ impl <'a> GraphMaker<'a> {
     let mut full_dependency_edges: RuleDependencyEdges = HashMap::new();
     let mut full_unfulfillable_rules: UnfulfillableRuleMap = HashMap::new();
 
-    let beginning_root_opt = self.gen_root_entry(subject_type, product_type);
-    if beginning_root_opt.is_none() {
+    let beginning_root = if let Some(beginning_root) = self.gen_root_entry(subject_type, product_type) {
+      beginning_root
+    } else {
       return RuleGraph {   root_subject_types: vec![],
         root_dependencies: full_root_rule_dependency_edges,
         rule_dependency_edges: full_dependency_edges,
         unfulfillable_rules: full_unfulfillable_rules,
       }
-    }
-    let beginning_root = beginning_root_opt.unwrap();
+    };
 
     let constructed_graph = self._construct_graph(
       beginning_root,
@@ -189,14 +185,15 @@ impl <'a> GraphMaker<'a> {
 
     self.add_unreachable_rule_diagnostics(&full_dependency_edges, &mut full_unfulfillable_rules);
 
-    let unfinished_graph = RuleGraph {
-      root_subject_types: self.root_subject_types.subject_types.clone(),
+    let mut unfinished_graph = RuleGraph {
+      root_subject_types: self.root_subject_types.clone(),
       root_dependencies: full_root_rule_dependency_edges,
       rule_dependency_edges: full_dependency_edges,
       unfulfillable_rules: full_unfulfillable_rules
     };
 
-    self._remove_unfulfillable_rules_and_dependents(unfinished_graph)
+    self._remove_unfulfillable_rules_and_dependents(&mut unfinished_graph);
+    unfinished_graph
   }
 
   pub fn full_graph(&self) -> RuleGraph {
@@ -221,14 +218,15 @@ impl <'a> GraphMaker<'a> {
 
     self.add_unreachable_rule_diagnostics(&full_dependency_edges, &mut full_unfulfillable_rules);
 
-    let unfinished_graph = RuleGraph {
-      root_subject_types: self.root_subject_types.subject_types.clone(),
+    let mut in_progress_graph = RuleGraph {
+      root_subject_types: self.root_subject_types.clone(),
       root_dependencies: full_root_rule_dependency_edges,
       rule_dependency_edges: full_dependency_edges,
       unfulfillable_rules: full_unfulfillable_rules
     };
 
-    self._remove_unfulfillable_rules_and_dependents(unfinished_graph)
+    self._remove_unfulfillable_rules_and_dependents(&mut in_progress_graph);
+    in_progress_graph
   }
 
   fn add_unreachable_rule_diagnostics(&self, full_dependency_edges: &RuleDependencyEdges, full_unfulfillable_rules: &mut UnfulfillableRuleMap) {
@@ -427,7 +425,7 @@ impl <'a> GraphMaker<'a> {
       }
     }
     RuleGraph {
-      root_subject_types: self.root_subject_types.subject_types.clone(),
+      root_subject_types: self.root_subject_types.clone(),
       root_dependencies: root_rule_dependency_edges,
       rule_dependency_edges: rule_dependency_edges,
       unfulfillable_rules: unfulfillable_rules
@@ -435,7 +433,7 @@ impl <'a> GraphMaker<'a> {
   }
 
   fn _remove_unfulfillable_rules_and_dependents(&self,
-                                                mut rule_graph: RuleGraph) -> RuleGraph {
+                                                rule_graph: &mut RuleGraph) {
     // Removes all unfulfillable rules transitively from the roots and the dependency edges.
     //
     // Takes the current root rule set and dependency table and removes all rules that are not
@@ -478,12 +476,11 @@ impl <'a> GraphMaker<'a> {
         }
       }
     }
-    rule_graph
   }
 
-  fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
+  fn gen_root_entries(&self, product_types: &HashSet<TypeConstraint>) -> Vec<RootEntry> {
     let mut result: Vec<RootEntry> = Vec::new();
-    for subj_type in &self.root_subject_types.subject_types {
+    for subj_type in &self.root_subject_types {
       for pt in product_types {
         if let Some(entry) = self.gen_root_entry(subj_type, pt) {
           result.push(entry);
@@ -688,15 +685,13 @@ impl RuleGraph {
       _ => false,
     })
   }
-}
 
-impl fmt::Display for RuleGraph {
   // TODO instead of this, make own fmt thing that accepts externs
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+  pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
     if self.root_dependencies.is_empty() && self.rule_dependency_edges.is_empty() {
-      try!(f.write_str("digraph {\n"));
-      try!(f.write_str("  // empty graph\n"));
-      return f.write_str("}");
+      write!(f, "digraph {{\n")?;
+      write!(f, "  // empty graph\n")?;
+      return write!(f, "}}");
     }
 
 
@@ -704,10 +699,9 @@ impl fmt::Display for RuleGraph {
       .map(|&t| type_str(t))
       .collect::<Vec<String>>();
     root_subject_type_strs.sort();
-    try!(f.write_str("digraph {\n"));
-    try!(write!(f, "  // root subject types: {}\n", root_subject_type_strs
-      .join(", ")));
-    try!(f.write_str("  // root entries\n"));
+    write!(f, "digraph {{\n")?;
+    write!(f, "  // root subject types: {}\n", root_subject_type_strs.join(", "))?;
+    write!(f, "  // root entries\n")?;
     let mut root_rule_strs = self.root_dependencies.iter()
       .map(|(k, deps)| {
         let root_str = entry_str(&Entry::from(k.clone()));
@@ -721,10 +715,10 @@ impl fmt::Display for RuleGraph {
       })
       .collect::<Vec<String>>();
     root_rule_strs.sort();
-    try!(write!(f, "{}\n", root_rule_strs.join("\n")));
+    write!(f, "{}\n", root_rule_strs.join("\n"))?;
 
 
-    try!(f.write_str("  // internal entries\n"));
+    write!(f, "  // internal entries\n")?;
     let mut internal_rule_strs = self.rule_dependency_edges.iter()
       .map(|(k, deps)| format!("    \"{}\" -> {{{}}}", entry_str(&Entry::from(k.clone())), deps.dependencies.iter()
         .map(|d| format!("\"{}\"", entry_str(d)))
@@ -732,9 +726,8 @@ impl fmt::Display for RuleGraph {
         .join(" ")))
       .collect::<Vec<String>>();
     internal_rule_strs.sort();
-    try!(write!(f, "{}\n", internal_rule_strs.join("\n")));
-
-    f.write_str("}")
+    write!(f, "{}\n", internal_rule_strs.join("\n"))?;
+    write!(f, "}}")
   }
 }
 

@@ -24,8 +24,7 @@ use std::os::raw;
 use std::path::Path;
 use std::sync::Arc;
 
-use std::fs::OpenOptions;
-use std::io::{BufWriter, Write};
+use std::fs::File;
 use std::io;
 
 use core::{Function, Key, TypeConstraint, TypeId, Value};
@@ -55,7 +54,7 @@ use graph::Graph;
 use nodes::Failure;
 use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
-use rule_graph::{GraphMaker, RootSubjectTypes, RuleGraph};
+use rule_graph::{GraphMaker, RuleGraph};
 
 pub struct RawScheduler {
   scheduler: Scheduler,
@@ -438,7 +437,7 @@ pub extern fn validator_run(
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
-                                        RootSubjectTypes { subject_types: subject_types.clone() });
+                                        subject_types.clone());
       let graph = graph_maker.full_graph();
 
       match graph.validate() {
@@ -494,7 +493,7 @@ pub extern fn rule_subgraph_visualize(
 
 fn graph_full(raw: &mut RawScheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
-                                    RootSubjectTypes { subject_types: subject_types.clone() });
+                                    subject_types.clone());
   graph_maker.full_graph()
 }
 
@@ -504,15 +503,14 @@ fn graph_sub(
   product_type: TypeConstraint
 ) -> RuleGraph {
   let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
-                                    RootSubjectTypes { subject_types: vec![subject_type.clone()] });
+                                    vec![subject_type.clone()]);
   graph_maker.sub_graph(&subject_type, &product_type)
 }
 
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
-  let file = try!(OpenOptions::new().append(true).open(path));
-  let mut f = BufWriter::new(file);
-
-  try!(write!(&mut f, "{}\n", format!("{}", graph)));
+  let file = File::create(path)?;
+  let mut f = io::BufWriter::new(file);
+  graph.visualize(&mut f)?;
   Ok(())
 }
 

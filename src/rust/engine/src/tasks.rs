@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
 use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
@@ -70,12 +70,9 @@ impl Tasks {
     }
   }
 
-  pub fn all_product_types(&self) -> Vec<TypeConstraint> {
-    let mut product_types: Vec<_> = self.all_rules().iter().map(|t| t.product).collect();
-    // NB sorted by id so that dedup will consolidate runs of duplicates.
-    product_types.sort_by_key(|tc| tc.0);
-    product_types.dedup();
-    product_types
+  pub fn all_product_types(&self) -> HashSet<TypeConstraint> {
+    self.all_rules().iter().map(|t| t.product)
+      .collect::<HashSet<_>>()
   }
 
   pub fn is_singleton_task(&self, sought_task: &Task) -> bool {
