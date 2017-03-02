@@ -2,13 +2,14 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashMap;
+use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
+use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
 use core::{Id, Key, TypeConstraint, TypeId, Value};
-use nodes::Runnable;
 use handles::Handle;
 
 
@@ -81,6 +82,12 @@ pub fn store_list(values: Vec<&Value>, merge: bool) -> Value {
   })
 }
 
+pub fn store_bytes(bytes: &[u8]) -> Value {
+  with_externs(|e|
+    (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64)
+  )
+}
+
 pub fn project(value: &Value, field: &str, type_id: &TypeId) -> Value {
   with_externs(|e|
     (e.project)(e.context, value, field.as_ptr(), field.len() as u64, type_id)
@@ -129,15 +136,15 @@ pub fn create_exception(msg: &str) -> Value {
   )
 }
 
-pub fn invoke_runnable(runnable: &Runnable) -> Result<Value, Value> {
+pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<Value, Value> {
   let result =
     with_externs(|e| {
       (e.invoke_runnable)(
         e.context,
-        &runnable.func,
-        runnable.args.as_ptr(),
-        runnable.args.len() as u64,
-        runnable.cacheable
+        func,
+        args.as_ptr(),
+        args.len() as u64,
+        cacheable
       )
     });
   if result.is_throw {
@@ -189,6 +196,7 @@ pub struct Externs {
   satisfied_by_type: SatisfiedByTypeExtern,
   satisfied_by_type_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
+  store_bytes: StoreBytesExtern,
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -196,6 +204,7 @@ pub struct Externs {
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   invoke_runnable: InvokeRunnable,
+  // TODO: This type is also declared on `types::Types`.
   py_str_type: TypeId,
 }
 
@@ -216,6 +225,7 @@ impl Externs {
     satisfied_by: SatisfiedByExtern,
     satisfied_by_type: SatisfiedByTypeExtern,
     store_list: StoreListExtern,
+    store_bytes: StoreBytesExtern,
     project: ProjectExtern,
     project_ignoring_type: ProjectIgnoringTypeExtern,
     project_multi: ProjectMultiExtern,
@@ -234,6 +244,7 @@ impl Externs {
       satisfied_by_type: satisfied_by_type,
       satisfied_by_type_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
+      store_bytes: store_bytes,
       project: project,
       project_ignoring_type: project_ignoring_type,
       project_multi: project_multi,
@@ -270,6 +281,9 @@ pub type DropHandlesExtern =
 pub type StoreListExtern =
   extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
 
+pub type StoreBytesExtern =
+  extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
+
 pub type ProjectExtern =
   extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64, *const TypeId) -> Value;
 
@@ -286,8 +300,8 @@ pub enum LogLevel {
 #[repr(C)]
 #[derive(Debug)]
 pub struct RunnableComplete {
-  pub value: Value,
-  pub is_throw: bool,
+  value: Value,
+  is_throw: bool,
 }
 
 // Points to an array containing a series of values allocated by Python.
@@ -314,7 +328,7 @@ impl ValueBuffer {
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
   ids_len: u64,
-  // handle to hold the underlying buffer alive
+  // handle to hold the underlying array alive
   handle_: Value
 }
 
@@ -336,7 +350,7 @@ pub type ProjectMultiExtern =
 pub struct Buffer {
   bytes_ptr: *mut u8,
   bytes_len: u64,
-  // A Value handle to hold the underlying buffer alive.
+  // A Value handle to hold the underlying array alive.
   handle_: Value,
 }
 
@@ -347,8 +361,39 @@ impl Buffer {
     })
   }
 
+  pub fn to_os_string(&self) -> OsString {
+    OsString::from_vec(self.to_bytes())
+  }
+
   pub fn to_string(&self) -> Result<String, FromUtf8Error> {
     String::from_utf8(self.to_bytes())
+  }
+}
+
+// Points to an array of (byte) Buffers.
+#[repr(C)]
+pub struct BufferBuffer {
+  bufs_ptr: *mut Buffer,
+  bufs_len: u64,
+  // handle to hold the underlying array alive
+  handle_: Value,
+}
+
+impl BufferBuffer {
+  pub fn to_bytes_vecs(&self) -> Vec<Vec<u8>> {
+    with_vec(self.bufs_ptr, self.bufs_len as usize, |vec| {
+      vec.iter().map(|b| b.to_bytes()).collect()
+    })
+  }
+
+  pub fn to_os_strings(&self) -> Vec<OsString> {
+    self.to_bytes_vecs().into_iter().map(|v| OsString::from_vec(v)).collect()
+  }
+
+  pub fn to_strings(&self) -> Result<Vec<String>,FromUtf8Error> {
+    self.to_bytes_vecs().into_iter()
+      .map(|v| String::from_utf8(v))
+      .collect()
   }
 }
 

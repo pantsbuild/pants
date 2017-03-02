@@ -75,7 +75,8 @@ class GoalRunnerFactory(object):
       self._exiter(result)
 
   def _init_graph(self, use_engine, pants_ignore_patterns, build_ignore_patterns,
-                  exclude_target_regexps, target_specs, graph_helper=None):
+                  exclude_target_regexps, target_specs, graph_helper=None,
+                  subproject_build_roots=None):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
@@ -105,7 +106,8 @@ class GoalRunnerFactory(object):
       address_mapper = BuildFileAddressMapper(self._build_file_parser,
                                               get_project_tree(self._global_options),
                                               build_ignore_patterns,
-                                              exclude_target_regexps)
+                                              exclude_target_regexps,
+                                              subproject_build_roots)
       return MutableBuildGraph(address_mapper), address_mapper, spec_roots
 
   def _determine_goals(self, requested_goals):
@@ -154,7 +156,8 @@ class GoalRunnerFactory(object):
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
         self._options.target_specs,
-        self._daemon_graph_helper
+        self._daemon_graph_helper,
+        self._global_options.subproject_roots
       )
       goals, is_quiet = self._determine_goals(self._requested_goals)
       target_roots = self._specs_to_targets(spec_roots)

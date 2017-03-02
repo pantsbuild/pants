@@ -18,8 +18,10 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
-                                         TargetAdaptor)
+from pants.engine.legacy.structs import (JavaLibraryAdaptor, JunitTestsAdaptor, JvmAppAdaptor,
+                                         PythonLibraryAdaptor, PythonTargetAdaptor,
+                                         PythonTestsAdaptor, RemoteSourcesAdaptor,
+                                         ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -50,10 +52,18 @@ class LegacySymbolTable(SymbolTable):
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
+    for alias in ['java_library', 'java_agent', 'javac_plugin']:
+      aliases[alias] = JavaLibraryAdaptor
+    for alias in ['scala_library', 'scalac_plugin']:
+      aliases[alias] = ScalaLibraryAdaptor
+    for alias in ['python_library', 'pants_plugin']:
+      aliases[alias] = PythonLibraryAdaptor
+
+    aliases['junit_tests'] = JunitTestsAdaptor
     aliases['jvm_app'] = JvmAppAdaptor
+    aliases['python_tests'] = PythonTestsAdaptor
+    aliases['python_binary'] = PythonTargetAdaptor
     aliases['remote_sources'] = RemoteSourcesAdaptor
-    for alias in ('python_library', 'python_tests', 'python_binary'):
-      aliases[alias] = PythonTargetAdaptor
 
     return aliases
 
@@ -138,7 +148,7 @@ class EngineInitializer(object):
     # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
       create_legacy_graph_tasks(symbol_table_cls) +
-      create_fs_tasks() +
+      create_fs_tasks(project_tree) +
       create_graph_tasks(address_mapper, symbol_table_cls)
     )
 

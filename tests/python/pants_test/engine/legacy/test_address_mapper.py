@@ -12,7 +12,7 @@ import mock
 
 from pants.base.specs import SiblingAddresses, SingleAddress
 from pants.bin.engine_initializer import EngineInitializer
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.util.contextutil import temporary_dir
@@ -102,6 +102,12 @@ class LegacyAddressMapperTest(unittest.TestCase):
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))
     self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'path/not_a_build_file'))
     self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'differing-path/BUILD'))
+    self.assertFalse(mapper.is_declaring_file(
+      BuildFileAddress(target_name='name', rel_path='path/BUILD.new'),
+      'path/BUILD'))
+    self.assertTrue(mapper.is_declaring_file(
+      BuildFileAddress(target_name='name', rel_path='path/BUILD'),
+      'path/BUILD'))
 
   def test_addresses_in_spec_path(self):
     with temporary_dir() as build_root:
@@ -117,7 +123,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
       mapper = self.create_address_mapper(build_root)
       with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
         mapper.addresses_in_spec_path('foo')
-      self.assertIn('Directory "foo" does not exist.', str(cm.exception))
+      self.assertIn('does not match any targets.', str(cm.exception))
 
   def test_addresses_in_spec_path_no_build_files(self):
     with temporary_dir() as build_root:
@@ -126,7 +132,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
       mapper = self.create_address_mapper(build_root)
       with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
         mapper.addresses_in_spec_path('foo')
-      self.assertIn('does not contain build files.', str(cm.exception))
+      self.assertIn('does not match any targets.', str(cm.exception))
 
   def test_scan_specs(self):
     with temporary_dir() as build_root:
@@ -142,7 +148,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
       mapper = self.create_address_mapper(build_root)
       with self.assertRaises(AddressMapper.BuildFileScanError) as cm:
         mapper.scan_specs([SingleAddress('dir_a', 'd')])
-      self.assertIn('not found in namespace dir_a for name "d".', str(cm.exception))
+      self.assertIn('does not match any targets.', str(cm.exception))
 
   def test_scan_addresses(self):
     with temporary_dir() as build_root:

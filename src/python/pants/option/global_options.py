@@ -193,8 +193,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
     register('--build-file-rev', advanced=True,
+             removal_hint='Lightly used feature, scheduled for removal.', removal_version='1.5.0.dev0',
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+             help='Paths that correspond with build roots for any subproject that this '
+                  'project depends on.')
