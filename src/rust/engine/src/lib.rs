@@ -510,8 +510,7 @@ fn graph_sub(
 fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
   let file = File::create(path)?;
   let mut f = io::BufWriter::new(file);
-  graph.visualize(&mut f)?;
-  Ok(())
+  graph.visualize(&mut f)
 }
 
 fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
