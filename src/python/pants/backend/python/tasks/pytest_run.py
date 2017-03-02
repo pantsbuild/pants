@@ -38,11 +38,6 @@ from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
 
 
-# Initialize logging, since tests do not run via pants_exe (where it is usually done).
-logging.basicConfig()
-logger = logging.getLogger(__name__)
-
-
 class PythonTestResult(object):
   @staticmethod
   def exception():
