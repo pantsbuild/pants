@@ -83,8 +83,6 @@ impl PathStat {
 }
 
 lazy_static! {
-  static ref CURRENT_DIR: &'static str = ".";
-
   static ref PARENT_DIR: &'static str = "..";
 
   static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
@@ -95,7 +93,6 @@ lazy_static! {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathGlob {
-  Root,
   Wildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
@@ -110,10 +107,6 @@ pub enum PathGlob {
 }
 
 impl PathGlob {
-  pub fn root_stat() -> PathStat {
-    PathStat::dir(PathBuf::new(), Dir(PathBuf::new()))
-  }
-
   fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> PathGlob {
     PathGlob::Wildcard {
       canonical_dir: canonical_dir,
@@ -185,9 +178,8 @@ impl PathGlob {
     symbolic_path: PathBuf,
     parts: &[Pattern]
   ) -> Result<Vec<PathGlob>, String> {
-    if canonical_dir.0.as_os_str() == "." && parts.len() == 1 && *CURRENT_DIR == parts[0].as_str() {
-      // A request for the root path.
-      Ok(vec![PathGlob::Root])
+    if parts.is_empty() {
+      Ok(vec![])
     } else if *DOUBLE_STAR == parts[0].as_str() {
       if parts.len() == 1 {
         // Per https://git-scm.com/docs/gitignore:
@@ -587,9 +579,6 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
    */
   fn expand_single(&self, path_glob: PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
     match path_glob {
-      PathGlob::Root =>
-        // Always results in a single PathStat.
-        future::ok((vec![PathGlob::root_stat()], vec![])).boxed(),
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard)
