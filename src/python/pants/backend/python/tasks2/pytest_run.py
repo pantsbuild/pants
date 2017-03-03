@@ -9,7 +9,6 @@ import itertools
 import os
 import re
 import shutil
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -19,11 +18,11 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.python_task import PythonTask
+from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.hash_utils import Sharder
@@ -66,10 +65,7 @@ class PythonTestResult(object):
     return self._failed_targets
 
 
-class PytestRun(TestRunnerTaskMixin, PythonTask):
-  """
-  :API: public
-  """
+class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -78,10 +74,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
-    register('--fast', type=bool, default=True,
-             help='Run all tests in a single chroot. If turned off, each test target will '
-                  'create a new chroot, which will be much slower, but more correct, as the'
-                  'isolation verifies that all dependencies are correctly declared.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
@@ -108,6 +100,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   def __init__(self, *args, **kwargs):
     super(PytestRun, self).__init__(*args, **kwargs)
 
+  def extra_requirements(self):
+    return PyTest.global_instance().get_requirement_strings()
+
   def _test_target_filter(self):
     def target_filter(target):
       return isinstance(target, PythonTests)
@@ -132,24 +127,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
           self.run_tests(test_targets, workunit)
 
   def run_tests(self, targets, workunit):
-    if self.get_options().fast:
-      result = self._do_run_tests(targets, workunit)
-      if not result.success:
-        raise TestFailedTaskError(failed_targets=result.failed_targets)
-    else:
-      results = {}
-      for target in targets:
-        rv = self._do_run_tests([target], workunit)
-        results[target] = rv
-        if not rv.success and self.get_options().fail_fast:
-          break
-
-      for target in sorted(results):
-        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
-
-      failed_targets = [target for target, _rv in results.items() if not _rv.success]
-      if failed_targets:
-        raise TestFailedTaskError(failed_targets=failed_targets)
+    result = self._do_run_tests(targets, workunit)
+    if not result.success:
+      raise TestFailedTaskError(failed_targets=result.failed_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
@@ -323,7 +303,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
           yield args, coverage_rc
 
   @contextmanager
-  def _maybe_emit_coverage_data(self, targets, chroot, pex, workunit):
+  def _maybe_emit_coverage_data(self, targets, pex, workunit):
     coverage = self.get_options().coverage
     if coverage is None:
       yield []
@@ -352,67 +332,59 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       for path in read_coverage_list('paths:'):
         if not os.path.exists(path) and not os.path.isabs(path):
           # Look for the source in the PEX chroot since its not available from CWD.
-          path = os.path.join(chroot, path)
+          path = os.path.join(pex.path(), path)
         coverage_modules.append(path)
 
     with self._cov_setup(targets,
-                         chroot,
+                         pex.path(),
                          coverage_modules=coverage_modules) as (args, coverage_rc):
       try:
         yield args
       finally:
-        with environment_as(PEX_MODULE='coverage.cmdline:main'):
-          def pex_run(args):
-            return self._pex_run(pex, workunit, args=args)
+        env = {
+          'PEX_MODULE': 'coverage.cmdline:main'
+        }
+        def pex_run(args):
+          return self._pex_run(pex, workunit, args=args, env=env)
 
-          # On failures or timeouts, the .coverage file won't be written.
-          if not os.path.exists('.coverage'):
-            self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
+        # On failures or timeouts, the .coverage file won't be written.
+        if not os.path.exists('.coverage'):
+          self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
+        else:
+          # Normalize .coverage.raw paths using combine and `paths` config in the rc file.
+          # This swaps the /tmp pex chroot source paths for the local original source paths
+          # the pex was generated from and which the user understands.
+          shutil.move('.coverage', '.coverage.raw')
+          pex_run(args=['combine', '--rcfile', coverage_rc])
+          pex_run(args=['report', '-i', '--rcfile', coverage_rc])
+
+          # TODO(wickman): If coverage is enabled and we are not using fast mode, write an
+          # intermediate .html that points to each of the coverage reports generated and
+          # webbrowser.open to that page.
+          # TODO(John Sirois): Possibly apply the same logic to the console report.  In fact,
+          # consider combining coverage files from all runs in this Tasks's execute and then
+          # producing just 1 console and 1 html report whether or not the tests are run in fast
+          # mode.
+          if self.get_options().coverage_output_dir:
+            target_dir = self.get_options().coverage_output_dir
           else:
-            # Normalize .coverage.raw paths using combine and `paths` config in the rc file.
-            # This swaps the /tmp pex chroot source paths for the local original source paths
-            # the pex was generated from and which the user understands.
-            shutil.move('.coverage', '.coverage.raw')
-            pex_run(args=['combine', '--rcfile', coverage_rc])
-            pex_run(args=['report', '-i', '--rcfile', coverage_rc])
-
-            # TODO(wickman): If coverage is enabled and we are not using fast mode, write an
-            # intermediate .html that points to each of the coverage reports generated and
-            # webbrowser.open to that page.
-            # TODO(John Sirois): Possibly apply the same logic to the console report.  In fact,
-            # consider combining coverage files from all runs in this Tasks's execute and then
-            # producing just 1 console and 1 html report whether or not the tests are run in fast
-            # mode.
-            if self.get_options().coverage_output_dir:
-              target_dir = self.get_options().coverage_output_dir
-            else:
-              relpath = Target.maybe_readable_identify(targets)
-              pants_distdir = self.context.options.for_global_scope().pants_distdir
-              target_dir = os.path.join(pants_distdir, 'coverage', relpath)
-            safe_mkdir(target_dir)
-            pex_run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir])
-            coverage_xml = os.path.join(target_dir, 'coverage.xml')
-            pex_run(args=['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml])
+            relpath = Target.maybe_readable_identify(targets)
+            pants_distdir = self.context.options.for_global_scope().pants_distdir
+            target_dir = os.path.join(pants_distdir, 'coverage', relpath)
+          safe_mkdir(target_dir)
+          pex_run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir])
+          coverage_xml = os.path.join(target_dir, 'coverage.xml')
+          pex_run(args=['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml])
 
   @contextmanager
   def _test_runner(self, targets, workunit):
-    interpreter = self.select_interpreter_for_targets(targets)
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
+    pex = self.create_pex(pex_info)
 
-    testing_reqs = [PythonRequirement(s)
-                    for s in PyTest.global_instance().get_requirement_strings()]
-
-    chroot = self.cached_chroot(interpreter=interpreter,
-                                pex_info=pex_info,
-                                targets=targets,
-                                platforms=('current',),
-                                extra_requirements=testing_reqs)
-    pex = chroot.pex()
     with self._maybe_shard() as shard_args:
       with self._maybe_emit_junit_xml(targets) as junit_args:
         with self._maybe_emit_coverage_data(targets,
-                                            chroot.path(),
                                             pex,
                                             workunit) as coverage_args:
           yield pex, shard_args + junit_args + coverage_args
@@ -424,15 +396,15 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       # turn off stdin buffering that otherwise occurs.  Setting the PYTHONUNBUFFERED env var to
       # any value achieves this in python2.7.  We'll need a different solution when we support
       # running pants under CPython 3 which does not unbuffer stdin using this trick.
-      env = {
-        'PYTHONUNBUFFERED': '1',
-      }
+      # TODO: get rid of all the environment_as() calls in this file and have them modify this
+      # env dict directly instead.
+      env = dict(os.environ)
+      env['PYTHONUNBUFFERED'] = '1'
       profile = self.get_options().profile
       if profile:
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
-      with environment_as(**env):
-        rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True)
-        return PythonTestResult.rc(rc)
+      rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True, env=env)
+      return PythonTestResult.rc(rc)
     except TestFailedTaskError:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
       # fail with a TestFailedTaskError. We can't just set PythonTestResult
@@ -491,12 +463,13 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     if not targets:
       return PythonTestResult.rc(0)
 
-    sources = list(itertools.chain(*[t.sources_relative_to_buildroot() for t in targets]))
-    if not sources:
+    rel_sources = list(itertools.chain(*[t.sources_relative_to_source_root() for t in targets]))
+    if not rel_sources:
       return PythonTestResult.rc(0)
+    source_root = self.context.products.get_data(GatherSources.PYTHON_SOURCES).path()
+    sources = [os.path.join(source_root, p) for p in rel_sources]
 
     with self._test_runner(targets, workunit) as (pex, test_args):
-
       def run_and_analyze(resultlog_path):
         result = self._do_run_tests_with_args(pex, workunit, args)
         failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
@@ -527,18 +500,12 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
           args.insert(0, '--resultlog={0}'.format(resultlog_path))
           return run_and_analyze(resultlog_path)
 
-  def _pex_run(self, pex, workunit, args, setsid=False):
-    process = self._spawn(pex, workunit, args, setsid=False)
+  def _pex_run(self, pex, workunit, args, env):
+    process = self._spawn(pex, workunit, args, setsid=False, env=env)
     return process.wait()
 
-  def _spawn(self, pex, workunit, args, setsid=False):
-    # NB: We don't use pex.run(...) here since it makes a point of running in a clean environment,
-    # scrubbing all `PEX_*` environment overrides and we use overrides when running pexes in this
-    # task.
-
-    process = subprocess.Popen(pex.cmdline(args),
-                               preexec_fn=os.setsid if setsid else None,
-                               stdout=workunit.output('stdout'),
-                               stderr=workunit.output('stderr'))
-
+  def _spawn(self, pex, workunit, args, setsid=False, env=None):
+    env = env or {}
+    process = pex.run(args, blocking=False, setsid=setsid, env=env,
+                      stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
     return SubprocessProcessHandler(process)

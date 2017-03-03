@@ -25,6 +25,7 @@ from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import
   JavaThriftLibraryFingerprintStrategy
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
+
 _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 
 

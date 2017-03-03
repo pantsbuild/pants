@@ -53,9 +53,9 @@ class JvmdocGenTest(JvmTaskTestBase):
 
   def test_generate(self):
     def create_jvmdoc_command_fail(classpath, gendir, *targets):
-      return os.path.join(os.path.dirname(__file__), "false.py")
+      return ['python', os.path.join(os.path.dirname(__file__), "false.py")]
     def create_jvmdoc_command_succeed(classpath, gendir, *targets):
-      return os.path.join(os.path.dirname(__file__), "true.py")
+      return ['python', os.path.join(os.path.dirname(__file__), "true.py")]
 
     for generate in [self.task._generate_individual,
                      self.task._generate_combined]:

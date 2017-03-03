@@ -535,10 +535,16 @@ python_tests(
   name = 'jvmdoc_gen',
   sources = ['test_jvmdoc_gen.py'],
   dependencies = [
+    ':jvmdoc_gen_testdata',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:jvm_task_test_base'
   ]
+)
+
+python_library(
+  name='jvmdoc_gen_testdata',
+  sources = ['false.py', 'true.py'],
 )
 
 python_tests(
