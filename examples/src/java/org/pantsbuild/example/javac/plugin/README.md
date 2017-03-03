@@ -25,7 +25,7 @@ javac_plugin(
 )
 ```
 
-A javac plugin target has the same fields as `java_library` target, 
+A javac plugin target has the same fields as a `java_library` target, 
 plus two extra:
 
 - `classname`: The name of the `Plugin` implementation class. Required.

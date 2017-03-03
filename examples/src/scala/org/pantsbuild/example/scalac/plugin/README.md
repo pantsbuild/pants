@@ -24,7 +24,7 @@ scalac_plugin(
 )
 ```
 
-A scalac plugin target has the same fields as `scala_library` target, 
+A scalac plugin target has the same fields as a `scala_library` target, 
 plus two extra:
 
 - `classname`: The name of the `Plugin` implementation class. Required.
