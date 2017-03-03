@@ -29,6 +29,7 @@ Bugfixes
 ~~~~~~~~
 
 * Fix missed native_engine_version.
+  `Commit cbdb97515 <https://github.com/pantsbuild/pants/commit/cbdb97515>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
