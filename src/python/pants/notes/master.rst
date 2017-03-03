@@ -5,6 +5,53 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0.dev12 (3/3/2017)
+----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Completely revamp how we support JVM compiler plugins. (#4287)
+  `PR #4287 <https://github.com/pantsbuild/pants/pull/4287>`_
+
+
+New Features
+~~~~~~~~~~~~
+
+* A PytestRun task for the new Python pipeline. (#4252)
+  `PR #4252 <https://github.com/pantsbuild/pants/pull/4252>`_
+
+* Add ability to specify subprojects (#4088)
+  `PR #4088 <https://github.com/pantsbuild/pants/pull/4088>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix missed native_engine_version.
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [engine] Rust IO (#4265)
+  `PR #4265 <https://github.com/pantsbuild/pants/pull/4265>`_
+
+* [engine] Support implicit sources in v2 engine (#4294)
+  `PR #4294 <https://github.com/pantsbuild/pants/pull/4294>`_
+
+* SelectLiteral isn't tied to the requester's subject: it has its own. (#4293)
+  `PR #4293 <https://github.com/pantsbuild/pants/pull/4293>`_
+
+* Include Javascript files in JVM binary (#4264)
+  `PR #4264 <https://github.com/pantsbuild/pants/pull/4264>`_
+
+* Update errorprone to version 2.0.17 (#4291)
+  `PR #4291 <https://github.com/pantsbuild/pants/pull/4291>`_
+
+* node_modules and node_test support yarnpkg as package manager (#4255)
+  `PR #4255 <https://github.com/pantsbuild/pants/pull/4255>`_
+
+
 1.3.0.dev11 (2/24/2017)
 -----------------------
 A weekly unstable release.
