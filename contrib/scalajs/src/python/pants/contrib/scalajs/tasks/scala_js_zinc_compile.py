@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import BaseZincCompile
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 from pants.contrib.scalajs.targets.scala_js_target import ScalaJSTarget
 
@@ -16,6 +16,8 @@ class ScalaJSZincCompile(BaseZincCompile):
 
   _name = 'scala-js'
   _file_suffix = '.scala'
+
+  scalac_plugins = ['scalajs']
 
   @classmethod
   def register_options(cls, register):
@@ -27,22 +29,9 @@ class ScalaJSZincCompile(BaseZincCompile):
   def product_types(cls):
     return ['scala_js_ir']
 
-  @property
-  def javac_plugin_jars(self):
-    return []
-
-  def javac_plugin_args(self, exclude):
-    return []
-
-  @memoized_property
-  def scalac_plugin_jars(self):
+  @memoized_method
+  def extra_compile_time_classpath_elements(self):
     return self.tool_classpath('scala-js-compiler')
-
-  @memoized_property
-  def scalac_plugin_args(self):
-    # filter the tool classpath to select only the compiler jar
-    return ['-S-Xplugin:{}'.format(jar) for jar in self.scalac_plugin_jars
-            if 'scalajs-compiler_' in jar]
 
   def select(self, target):
     if not isinstance(target, ScalaJSTarget):
