@@ -9,6 +9,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Antoine Tollenaere
 + Benjy Weinberger
 + Bill Farner
++ Brandon Milton
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
@@ -54,6 +55,7 @@ Created by running `build-support/bin/contributors.sh`.
 + James Bench
 + James Mouradian
 + Jason Jackson
++ Jason Song
 + Jeff Jenkins
 + Jeremy Hintz
 + Jessica Rosenfield
