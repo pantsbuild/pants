@@ -25,6 +25,20 @@ class JarDependencyTest(unittest.TestCase):
   def test_scala_jar_dependency_copy(self):
     self._test_copy(self._mkjardep(tpe=ScalaJarDependency))
 
+  def test_get_url(self):
+    """Test using relative url and absolute url are equivalent."""
+    abs_url = 'file:///a/b/c'
+    rel_url = 'file:c'
+    base_path = '/a/b'
+
+    jar_with_rel_url = self._mkjardep(url=rel_url, base_path=base_path)
+    self.assertEquals(abs_url, jar_with_rel_url.get_url())
+    self.assertEquals(rel_url, jar_with_rel_url.get_url(relative=True))
+
+    jar_with_abs_url = self._mkjardep(url=abs_url, base_path=base_path)
+    self.assertEquals(abs_url, jar_with_abs_url.get_url())
+    self.assertEquals(rel_url, jar_with_abs_url.get_url(relative=True))
+
   def _test_copy(self, original):
     # A no-op clone results in an equal object.
     self.assertEqual(original, original.copy())
@@ -35,5 +49,6 @@ class JarDependencyTest(unittest.TestCase):
     self.assertEqual(original.copy(rev='1.2.3'), original.copy(rev='1.2.3'))
 
   def _mkjardep(self, org='foo', name='foo',
-                excludes=(Exclude(org='example.com', name='foo-lib'),), tpe=JarDependency):
-    return tpe(org=org, name=name, excludes=excludes)
+                excludes=(Exclude(org='example.com', name='foo-lib'),), tpe=JarDependency,
+                **kwargs):
+    return tpe(org=org, name=name, excludes=excludes, **kwargs)

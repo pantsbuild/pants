@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  resource_targets=[':templates',],
   dependencies=[
+    ':templates',
     '3rdparty/python:ansicolors',
     '3rdparty/python:setuptools',
     '3rdparty/python:packaging',

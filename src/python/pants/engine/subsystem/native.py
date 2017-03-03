@@ -43,15 +43,12 @@ _FFI.cdef(
 
     typedef struct {
       Handle   handle;
-      TypeId   type_id;
     } Value;
 
     typedef struct {
       Id       id_;
       TypeId   type_id;
     } Key;
-
-    typedef Key Field;
 
     typedef struct {
       uint8_t*  bytes_ptr;
@@ -64,6 +61,18 @@ _FFI.cdef(
       uint64_t   values_len;
       Value      handle_;
     } ValueBuffer;
+
+    typedef struct {
+      TypeId*     ids_ptr;
+      uint64_t    ids_len;
+      Value       handle_;
+    } TypeIdBuffer;
+
+    typedef struct {
+      Buffer*     bufs_ptr;
+      uint64_t    bufs_len;
+      Value       handle_;
+    } BufferBuffer;
 
     typedef struct {
       Value  value;
@@ -81,12 +90,15 @@ _FFI.cdef(
     typedef void             (*extern_drop_handles)(ExternContext*, Handle*, uint64_t);
     typedef Buffer           (*extern_id_to_str)(ExternContext*, Id);
     typedef Buffer           (*extern_val_to_str)(ExternContext*, Value*);
-    typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, TypeId*);
+    typedef bool             (*extern_satisfied_by)(ExternContext*, TypeConstraint*, Value*);
+    typedef bool             (*extern_satisfied_by_type)(ExternContext*, TypeConstraint*, TypeId*);
     typedef Value            (*extern_store_list)(ExternContext*, Value**, uint64_t, bool);
-    typedef Value            (*extern_project)(ExternContext*, Value*, Field*, TypeId*);
-    typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, Field*);
+    typedef Value            (*extern_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+    typedef Value            (*extern_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
+    typedef ValueBuffer      (*extern_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
+    typedef Value            (*extern_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
     typedef Value            (*extern_create_exception)(ExternContext*, uint8_t*, uint64_t);
-    typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Function*, Value*, uint64_t, bool);
+    typedef RunnableComplete (*extern_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, bool);
 
     typedef void RawScheduler;
 
@@ -109,26 +121,48 @@ _FFI.cdef(
       // ignore them because we never have collections of this type.
     } RawNodes;
 
-    RawScheduler* scheduler_create(ExternContext*,
-                                   extern_log,
-                                   extern_key_for,
-                                   extern_val_for,
-                                   extern_clone_val,
-                                   extern_drop_handles,
-                                   extern_id_to_str,
-                                   extern_val_to_str,
-                                   extern_satisfied_by,
-                                   extern_store_list,
-                                   extern_project,
-                                   extern_project_multi,
-                                   extern_create_exception,
-                                   extern_invoke_runnable,
-                                   Field,
-                                   Field,
-                                   Field,
+    void externs_set(ExternContext*,
+                     extern_log,
+                     extern_key_for,
+                     extern_val_for,
+                     extern_clone_val,
+                     extern_drop_handles,
+                     extern_id_to_str,
+                     extern_val_to_str,
+                     extern_satisfied_by,
+                     extern_satisfied_by_type,
+                     extern_store_list,
+                     extern_store_bytes,
+                     extern_project,
+                     extern_project_ignoring_type,
+                     extern_project_multi,
+                     extern_create_exception,
+                     extern_invoke_runnable,
+                     TypeId);
+
+    RawScheduler* scheduler_create(Function,
+                                   Function,
+                                   Function,
+                                   Function,
+                                   Function,
+                                   Function,
+                                   Function,
+                                   Function,
                                    TypeConstraint,
                                    TypeConstraint,
-                                   TypeConstraint);
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeConstraint,
+                                   TypeId,
+                                   TypeId,
+                                   Buffer,
+                                   BufferBuffer);
+    void scheduler_post_fork(RawScheduler*);
     void scheduler_destroy(RawScheduler*);
 
     void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
@@ -138,12 +172,12 @@ _FFI.cdef(
     void task_add_select(RawScheduler*, TypeConstraint);
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Field, bool);
-    void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Field, TypeConstraint);
+    void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer, bool);
+    void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
     void task_end(RawScheduler*);
 
     uint64_t graph_len(RawScheduler*);
-    uint64_t graph_invalidate(RawScheduler*, Key*, uint64_t);
+    uint64_t graph_invalidate(RawScheduler*, BufferBuffer);
     void graph_visualize(RawScheduler*, char*);
     void graph_trace(RawScheduler*, char*);
 
@@ -154,12 +188,13 @@ _FFI.cdef(
                                                 Key,
                                                 TypeConstraint,
                                                 TypeConstraint,
-                                                Field,
+                                                Buffer,
+                                                TypeIdBuffer,
                                                 bool);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 
-    void validator_run(RawScheduler*, TypeId*, uint64_t);
+    Value validator_run(RawScheduler*, TypeId*, uint64_t);
 
     void nodes_destroy(RawNodes*);
     '''
@@ -184,22 +219,21 @@ def extern_log(context_handle, level, msg_ptr, msg_len):
 def extern_key_for(context_handle, val):
   """Return a Key for a Value."""
   c = _FFI.from_handle(context_handle)
-  return c.value_to_key(val)
+  return c.to_key(c.from_value(val))
 
 
 @_FFI.callback("Value(ExternContext*, Key*)")
 def extern_val_for(context_handle, key):
   """Return a Value for a Key."""
   c = _FFI.from_handle(context_handle)
-  return c.key_to_value(key)
+  return c.to_value(c.from_key(key))
 
 
 @_FFI.callback("Value(ExternContext*, Value*)")
 def extern_clone_val(context_handle, val):
   """Clone the given Value."""
   c = _FFI.from_handle(context_handle)
-  item = c.from_value(val)
-  return c.to_value(item, type_id=val.type_id)
+  return c.to_value(c.from_value(val))
 
 
 @_FFI.callback("void(ExternContext*, Handle*, uint64_t)")
@@ -224,9 +258,16 @@ def extern_val_to_str(context_handle, val):
   return c.utf8_buf(six.text_type(c.from_value(val)))
 
 
+@_FFI.callback("bool(ExternContext*, TypeConstraint*, Value*)")
+def extern_satisfied_by(context_handle, constraint_id, val):
+  """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
+  c = _FFI.from_handle(context_handle)
+  return c.from_id(constraint_id.id_).satisfied_by(c.from_value(val))
+
+
 @_FFI.callback("bool(ExternContext*, TypeConstraint*, TypeId*)")
-def extern_satisfied_by(context_handle, constraint_id, cls_id):
-  """Given two TypeIds, return constraint.satisfied_by(cls)."""
+def extern_satisfied_by_type(context_handle, constraint_id, cls_id):
+  """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
   c = _FFI.from_handle(context_handle)
   return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
 
@@ -250,12 +291,19 @@ def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
   return c.to_value(vals)
 
 
-@_FFI.callback("Value(ExternContext*, Value*, Field*, TypeId*)")
-def extern_project(context_handle, val, field, type_id):
+@_FFI.callback("Value(ExternContext*, uint8_t*, uint64_t)")
+def extern_store_bytes(context_handle, bytes_ptr, bytes_len):
+  """Given a context and raw bytes, return a new Value to represent the content."""
+  c = _FFI.from_handle(context_handle)
+  return c.to_value(bytes(_FFI.buffer(bytes_ptr, bytes_len)))
+
+
+@_FFI.callback("Value(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*)")
+def extern_project(context_handle, val, field_str_ptr, field_str_len, type_id):
   """Given a Value for `obj`, a field name, and a type, project the field as a new Value."""
   c = _FFI.from_handle(context_handle)
   obj = c.from_value(val)
-  field_name = c.from_key(field)
+  field_name = to_py_str(field_str_ptr, field_str_len)
   typ = c.from_id(type_id.id_)
 
   projected = getattr(obj, field_name)
@@ -265,12 +313,23 @@ def extern_project(context_handle, val, field, type_id):
   return c.to_value(projected)
 
 
-@_FFI.callback("ValueBuffer(ExternContext*, Value*, Field*)")
-def extern_project_multi(context_handle, val, field):
+@_FFI.callback("Value(ExternContext*, Value*, uint8_t*, uint64_t)")
+def extern_project_ignoring_type(context_handle, val, field_str_ptr, field_str_len):
+  """Given a Value for `obj`, and a field name, project the field as a new Value."""
+  c = _FFI.from_handle(context_handle)
+  obj = c.from_value(val)
+  field_name = to_py_str(field_str_ptr, field_str_len)
+  projected = getattr(obj, field_name)
+
+  return c.to_value(projected)
+
+
+@_FFI.callback("ValueBuffer(ExternContext*, Value*, uint8_t*, uint64_t)")
+def extern_project_multi(context_handle, val, field_str_ptr, field_str_len):
   """Given a Key for `obj`, and a field name, project the field as a list of Keys."""
   c = _FFI.from_handle(context_handle)
   obj = c.from_value(val)
-  field_name = c.from_key(field)
+  field_name = to_py_str(field_str_ptr, field_str_len)
 
   return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
@@ -279,15 +338,19 @@ def extern_project_multi(context_handle, val, field):
 def extern_create_exception(context_handle, msg_ptr, msg_len):
   """Given a utf8 message string, create an Exception object."""
   c = _FFI.from_handle(context_handle)
-  msg = bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+  msg = to_py_str(msg_ptr, msg_len)
   return c.to_value(Exception(msg))
 
 
-@_FFI.callback("RunnableComplete(ExternContext*, Function*, Value*, uint64_t, bool)")
+def to_py_str(msg_ptr, msg_len):
+  return bytes(_FFI.buffer(msg_ptr, msg_len)).decode('utf-8')
+
+
+@_FFI.callback("RunnableComplete(ExternContext*, Value*, Value*, uint64_t, bool)")
 def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
   """Given a destructured rawRunnable, run it."""
   c = _FFI.from_handle(context_handle)
-  runnable = c.from_id(func.id_)
+  runnable = c.from_value(func)
   args = tuple(c.from_value(arg) for arg in _FFI.unpack(args_ptr, args_len))
 
   try:
@@ -300,7 +363,7 @@ def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
   return RunnableComplete(c.to_value(val), is_throw)
 
 
-class Value(datatype('Value', ['handle', 'type_id'])):
+class Value(datatype('Value', ['handle'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -338,7 +401,7 @@ class ObjectIdMap(object):
 
   def __init__(self):
     # Objects indexed by their keys, i.e, content digests
-    self._objects = Storage.create(in_memory=True)
+    self._objects = Storage.create()
     # Memoized object Ids.
     self._id_to_key = dict()
     self._key_to_id = dict()
@@ -374,30 +437,38 @@ class ExternContext(object):
     self._lock = threading.RLock()
 
     # Memoized object Ids.
+    self._id_generator = 0
+    self._id_to_obj = dict()
+    self._obj_to_id = dict()
     self._object_id_map = ObjectIdMap()
-
-    # An anonymous Id for Values that keep *Buffers alive.
-    self.anon_id = TypeId(self.to_id(int))
 
     # Outstanding FFI object handles.
     self._handles = set()
 
   def buf(self, bytestring):
     buf = _FFI.new('uint8_t[]', bytestring)
-    return (buf, len(bytestring), self.to_value(buf, type_id=self.anon_id))
+    return (buf, len(bytestring), self.to_value(buf))
 
   def utf8_buf(self, string):
     return self.buf(string.encode('utf-8'))
 
+  def utf8_buf_buf(self, strings):
+    bufs = [self.utf8_buf(string) for string in strings]
+    buf_buf = _FFI.new('Buffer[]', bufs)
+    return (buf_buf, len(bufs), self.to_value(buf_buf))
+
   def vals_buf(self, keys):
     buf = _FFI.new('Value[]', keys)
-    return (buf, len(keys), self.to_value(buf, type_id=self.anon_id))
+    return (buf, len(keys), self.to_value(buf))
 
-  def to_value(self, obj, type_id=None):
+  def type_ids_buf(self, types):
+    buf = _FFI.new('TypeId[]', types)
+    return (buf, len(types), self.to_value(buf))
+
+  def to_value(self, obj):
     handle = _FFI.new_handle(obj)
     self._handles.add(handle)
-    type_id = type_id or TypeId(self.to_id(type(obj)))
-    return Value(handle, type_id)
+    return Value(handle)
 
   def from_value(self, val):
     return _FFI.from_handle(val.handle)
@@ -415,14 +486,6 @@ class ExternContext(object):
 
   def to_id(self, typ):
     return self.put(typ)
-
-  def value_to_key(self, val):
-    obj = self.from_value(val)
-    type_id = TypeId(val.type_id.id_)
-    return Key(self.put(obj), type_id)
-
-  def key_to_value(self, key):
-    return self.to_value(self.get(key.id_), type_id=key.type_id)
 
   def to_key(self, obj):
     type_id = TypeId(self.put(type(obj)))
@@ -494,7 +557,29 @@ class Native(object):
   def context(self):
     # We statically initialize a ExternContext to correspond to the queue of dropped
     # Handles that the native code maintains.
-    return _FFI.init_once(ExternContext, 'ExternContext singleton')
+    def init_externs():
+      context = ExternContext()
+      self.lib.externs_set(context.handle,
+                           extern_log,
+                           extern_key_for,
+                           extern_val_for,
+                           extern_clone_val,
+                           extern_drop_handles,
+                           extern_id_to_str,
+                           extern_val_to_str,
+                           extern_satisfied_by,
+                           extern_satisfied_by_type,
+                           extern_store_list,
+                           extern_store_bytes,
+                           extern_project,
+                           extern_project_ignoring_type,
+                           extern_project_multi,
+                           extern_create_exception,
+                           extern_invoke_runnable,
+                           TypeId(context.to_id(str)))
+      return context
+
+    return _FFI.init_once(init_externs, 'ExternContext singleton')
 
   def new(self, cdecl, init):
     return _FFI.new(cdecl, init)
@@ -513,30 +598,58 @@ class Native(object):
   def buffer(self, cdata):
     return _FFI.buffer(cdata)
 
-  def new_scheduler(self, has_products_constraint, address_constraint, variants_constraint):
+  def new_scheduler(self,
+                    build_root,
+                    ignore_patterns,
+                    construct_snapshot,
+                    construct_snapshots,
+                    construct_file_content,
+                    construct_files_content,
+                    construct_path_stat,
+                    construct_dir,
+                    construct_file,
+                    construct_link,
+                    constraint_has_products,
+                    constraint_address,
+                    constraint_variants,
+                    constraint_path_globs,
+                    constraint_snapshot,
+                    constraint_snapshots,
+                    constraint_files_content,
+                    constraint_dir,
+                    constraint_file,
+                    constraint_link):
     """Create and return an ExternContext and native Scheduler."""
-    has_products_constraint = TypeConstraint(self.context.to_id(has_products_constraint))
-    address_constraint = TypeConstraint(self.context.to_id(address_constraint))
-    variants_constraint = TypeConstraint(self.context.to_id(variants_constraint))
 
-    scheduler = self.lib.scheduler_create(self.context.handle,
-                                          extern_log,
-                                          extern_key_for,
-                                          extern_val_for,
-                                          extern_clone_val,
-                                          extern_drop_handles,
-                                          extern_id_to_str,
-                                          extern_val_to_str,
-                                          extern_satisfied_by,
-                                          extern_store_list,
-                                          extern_project,
-                                          extern_project_multi,
-                                          extern_create_exception,
-                                          extern_invoke_runnable,
-                                          self.context.to_key('name'),
-                                          self.context.to_key('products'),
-                                          self.context.to_key('default'),
-                                          address_constraint,
-                                          has_products_constraint,
-                                          variants_constraint)
+    def tc(constraint):
+      return TypeConstraint(self.context.to_id(constraint))
+
+    scheduler = self.lib.scheduler_create(
+        # Constructors/functions.
+        Function(self.context.to_id(construct_snapshot)),
+        Function(self.context.to_id(construct_snapshots)),
+        Function(self.context.to_id(construct_file_content)),
+        Function(self.context.to_id(construct_files_content)),
+        Function(self.context.to_id(construct_path_stat)),
+        Function(self.context.to_id(construct_dir)),
+        Function(self.context.to_id(construct_file)),
+        Function(self.context.to_id(construct_link)),
+        # TypeConstraints.
+        tc(constraint_address),
+        tc(constraint_has_products),
+        tc(constraint_variants),
+        tc(constraint_path_globs),
+        tc(constraint_snapshot),
+        tc(constraint_snapshots),
+        tc(constraint_files_content),
+        tc(constraint_dir),
+        tc(constraint_file),
+        tc(constraint_link),
+        # Types.
+        TypeId(self.context.to_id(six.text_type)),
+        TypeId(self.context.to_id(six.binary_type)),
+        # Project tree.
+        self.context.utf8_buf(build_root),
+        self.context.utf8_buf_buf(ignore_patterns),
+      )
     return self.gc(scheduler, self.lib.scheduler_destroy)

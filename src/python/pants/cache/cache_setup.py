@@ -255,7 +255,7 @@ class CacheFactory(object):
 
     deprecated_conditional(
         lambda: compression == 0,
-        '1.4.0',
+        '1.4.0.dev0',
         'compression==0',
         'The artifact cache depends on gzip compression for checksumming: a compression level '
         '==0 disables compression, and can prevent detection of corrupted artifacts.'

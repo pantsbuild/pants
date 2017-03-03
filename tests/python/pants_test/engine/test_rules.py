@@ -15,13 +15,16 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
+from pants.engine.fs import PathGlobs, create_fs_tasks
 from pants.engine.mapper import AddressMapper
-from pants.engine.rules import GraphMaker, Rule, RuleIndex, RulesetValidator
+from pants.engine.rules import GraphMaker, Rule, RuleIndex
+from pants.engine.scheduler import WrappedNativeScheduler
 from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
+from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
 from pants_test.engine.test_mapper import TargetTable
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def assert_equal_with_printing(test_case, expected, actual):
@@ -108,65 +111,71 @@ class RuleIndexTest(unittest.TestCase):
 
 
 class RulesetValidatorTest(unittest.TestCase):
+  def create_validator(self, goal_to_product, intrinsic_entries, root_subject_types, rules):
+    return self.create_native_scheduler(intrinsic_entries, root_subject_types, rules)
+
+  def create_native_scheduler(self, intrinsic_entries, root_subject_types, rules):
+    init_subsystem(Native.Factory)
+    rule_index = RuleIndex.create(rules, intrinsic_entries)
+    native = Native.Factory.global_instance().create()
+    scheduler = WrappedNativeScheduler(native, '.', [], rule_index, root_subject_types)
+    return scheduler
+
   def test_ruleset_with_missing_product_type(self):
     rules = [(A, (Select(B),), noop)]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-                                 goal_to_product={},
-                                 root_subject_types={SubA})
+    intrinsic_entries = tuple()
+    root_subject_types = {SubA}
+    scheduler = self.create_native_scheduler(intrinsic_entries, root_subject_types, rules)
+
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      scheduler.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (A, (Select(B),), noop):
-                         no matches for Select(B) with subject types: SubA
+                       (Exactly(A), (Select(Exactly(B)),), noop):
+                         no matches for Select(Exactly(B)) with subject types: SubA
                      """).strip(),
                                     str(cm.exception))
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
     rules = [(A, (Select(B), Select(C)), noop)]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types={SubA})
+    validator = self.create_validator({}, tuple(), {SubA}, rules)
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (A, (Select(B), Select(C)), noop):
-                         no matches for Select(B) with subject types: SubA
-                         no matches for Select(C) with subject types: SubA
+                       (Exactly(A), (Select(Exactly(B)), Select(Exactly(C))), noop):
+                         no matches for Select(Exactly(B)) with subject types: SubA
+                         no matches for Select(Exactly(C)) with subject types: SubA
                      """).strip(),
       str(cm.exception))
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
     rules = [(A, (Select(B),), noop)]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types={B,})
+    validator = self.create_validator({}, tuple(), {B}, rules)
 
-    validator.validate()
+    validator.assert_ruleset_valid()
 
   def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
     rules = [
       (A, (Select(B),), noop),
       (B, (Select(SubA),), noop)
     ]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types={C,})
+    validator = self.create_validator({}, tuple(), {C}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 2
-                                        (A, (Select(B),), noop):
-                                          depends on unfulfillable (B, (Select(SubA),), noop) of C with subject types: C
-                                        (B, (Select(SubA),), noop):
-                                          no matches for Select(SubA) with subject types: C
+                                        (Exactly(A), (Select(Exactly(B)),), noop):
+                                          depends on unfulfillable (Exactly(B), (Select(Exactly(SubA)),), noop) of C with subject types: C
+                                        (Exactly(B), (Select(Exactly(SubA)),), noop):
+                                          no matches for Select(Exactly(SubA)) with subject types: C
                                       """).strip(),
                                     str(cm.exception))
 
+  @unittest.skip('testing api not used by non-example code')
   def test_ruleset_with_goal_not_produced(self):
     # The graph is complete, but the goal 'goal-name' requests A,
     # which is not produced by any rule.
@@ -174,11 +183,9 @@ class RulesetValidatorTest(unittest.TestCase):
       (B, (Select(SubA),), noop)
     ]
 
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={'goal-name': AGoal},
-      root_subject_types={SubA})
+    validator = self.create_validator({'goal-name': AGoal}, tuple(), {SubA}, rules)
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing("no task for product used by goal \"goal-name\": AGoal",
                                     str(cm.exception))
@@ -188,11 +195,9 @@ class RulesetValidatorTest(unittest.TestCase):
       (Exactly(A), (Select(B),), noop),
       (B, (Select(A),), noop)
     ]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types={SubA})
+    validator = self.create_validator({}, tuple(), {SubA}, rules)
 
-    validator.validate()
+    validator.assert_ruleset_valid()
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_intrinsic(self):
     rules = [
@@ -201,18 +206,16 @@ class RulesetValidatorTest(unittest.TestCase):
     intrinsics = [
       (B, C, noop),
     ]
-    validator = RulesetValidator(RuleIndex.create(rules, intrinsics),
-      goal_to_product={},
-      root_subject_types={A,})
+    validator = self.create_validator({}, intrinsics, {A}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     # This error message could note near matches like the intrinsic.
     self.assert_equal_with_printing(dedent("""
                                       Rules with errors: 1
-                                        (D, (Select(C),), noop):
-                                          no matches for Select(C) with subject types: A
+                                        (Exactly(D), (Select(Exactly(C)),), noop):
+                                          no matches for Select(Exactly(C)) with subject types: A
                                       """).strip(),
                                     str(cm.exception))
 
@@ -223,16 +226,14 @@ class RulesetValidatorTest(unittest.TestCase):
     intrinsics = [
       (B, C, noop),
     ]
-    validator = RulesetValidator(RuleIndex.create(rules, intrinsics),
-      goal_to_product={},
-      root_subject_types={A,})
+    validator = self.create_validator({}, intrinsics, {A}, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                              Rules with errors: 1
-                               (A, (SelectDependencies(B, SubA, field_types=(D,)),), noop):
+                               (Exactly(A), (SelectDependencies(Exactly(B), Exactly(SubA), field_types=(D,)),), noop):
                                  Unreachable with subject types: Any
                              """).strip(),
                                     str(cm.exception))
@@ -245,36 +246,33 @@ class RulesetValidatorTest(unittest.TestCase):
       (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop),
       (A, (Select(SubA),), noop)
     ]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types=_suba_root_subject_types)
+    validator = self.create_validator({}, tuple(), _suba_root_subject_types, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 2
-                        (B, (Select(D),), noop):
-                          depends on unfulfillable (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop) of SubA with subject types: SubA
-                        (D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop):
-                          depends on unfulfillable (A, (Select(SubA),), noop) of C with subject types: SubA""").strip(),
+                        (Exactly(B), (Select(Exactly(D)),), noop):
+                          depends on unfulfillable (Exactly(D), (Select(Exactly(A)), SelectDependencies(Exactly(A), Exactly(SubA), field_types=(C,))), noop) of SubA with subject types: SubA
+                        (Exactly(D), (Select(Exactly(A)), SelectDependencies(Exactly(A), Exactly(SubA), field_types=(C,))), noop):
+                          depends on unfulfillable (Exactly(A), (Select(Exactly(SubA)),), noop) of C with subject types: SubA
+                      """).strip(),
         str(cm.exception))
 
   def test_initial_select_projection_failure(self):
     rules = [
       (Exactly(A), (SelectProjection(B, D, ('some',), C),), noop),
     ]
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types=_suba_root_subject_types)
+    validator = self.create_validator({}, tuple(), _suba_root_subject_types, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 1
-                        (Exactly(A), (SelectProjection(B, D, (u'some',), C),), noop):
-                          no matches for Select(C) when resolving SelectProjection(B, D, (u'some',), C) with subject types: SubA
+                        (Exactly(A), (SelectProjection(Exactly(B), D, ("some",), Exactly(C)),), noop):
+                          no matches for Select(Exactly(C)) when resolving SelectProjection(Exactly(B), D, ("some",), Exactly(C)) with subject types: SubA
                       """).strip(),
                                     str(cm.exception))
 
@@ -284,18 +282,16 @@ class RulesetValidatorTest(unittest.TestCase):
       (C, tuple(), noop)
     ]
 
-    validator = RulesetValidator(RuleIndex.create(rules, tuple()),
-      goal_to_product={},
-      root_subject_types=_suba_root_subject_types)
+    validator = self.create_validator({}, tuple(), _suba_root_subject_types, rules)
 
     with self.assertRaises(ValueError) as cm:
-      validator.validate()
+      validator.assert_ruleset_valid()
 
     self.assert_equal_with_printing(dedent("""
-                      Rules with errors: 1
-                        (Exactly(A), (SelectProjection(B, D, (u'some',), C),), noop):
-                          no matches for Select(B) when resolving SelectProjection(B, D, (u'some',), C) with subject types: D
-                      """).strip(),
+                     Rules with errors: 1
+                       (Exactly(A), (SelectProjection(Exactly(B), D, ("some",), Exactly(C)),), noop):
+                         no matches for Select(Exactly(B)) when resolving SelectProjection(Exactly(B), D, ("some",), Exactly(C)) with subject types: D
+                     """).strip(),
                                     str(cm.exception))
 
   assert_equal_with_printing = assert_equal_with_printing
@@ -337,10 +333,10 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_full_graph_for_planner_example(self):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
-    intrinsics = create_fs_intrinsics('Let us pretend that this is a ProjectTree!')
+    project_tree = 'Let us pretend that this is a ProjectTree!'
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks(project_tree)
 
-    rule_index = RuleIndex.create(tasks, intrinsics)
+    rule_index = RuleIndex.create(tasks, intrinsic_entries=[])
     graphmaker = GraphMaker(rule_index,
       root_subject_types={Address,
                           PathGlobs,
@@ -363,8 +359,6 @@ class RuleGraphMakerTest(unittest.TestCase):
     self.assertEquals(declared_rule_strings,
       rules_remaining_in_graph_strs
     )
-    # statically assert that the number of dependency keys is fixed
-    self.assertEquals(41, len(fullgraph.rule_dependencies))
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [

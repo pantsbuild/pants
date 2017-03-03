@@ -11,6 +11,7 @@ from functools import wraps
 
 import six
 from packaging.version import InvalidVersion, Version
+from pants.util.memo import memoized_method
 
 from pants.version import PANTS_SEMVER
 
@@ -25,6 +26,10 @@ class MissingRemovalVersionError(DeprecationApplicationError):
 
 class BadRemovalVersionError(DeprecationApplicationError):
   """Indicates the supplied removal_version was not a valid semver string."""
+
+
+class NonDevRemovalVersionError(DeprecationApplicationError):
+  """Indicates the supplied removal_version was not a pre-release version."""
 
 
 class CodeRemovedError(Exception):
@@ -46,6 +51,7 @@ def get_deprecated_tense(removal_version, future_tense='will be', past_tense='wa
   return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
 
 
+@memoized_method
 def validate_removal_semver(removal_version):
   """Validates that removal_version is a valid semver.
 
@@ -64,8 +70,12 @@ def validate_removal_semver(removal_version):
     # We explicitly want our versions to be of the form x.y.z.
     v = Version(removal_version)
     if len(v.base_version.split('.')) != 3:
-      raise BadRemovalVersionError('The given removal version {} is not a valid version: '
-                                   '{}'.format(removal_version, removal_version))
+      raise BadRemovalVersionError('The given removal version is not a valid version: '
+                                   '{}'.format(removal_version))
+    if not v.is_prerelease:
+      raise NonDevRemovalVersionError('The given removal version is not a dev version: {}\n'
+                                      'Features should generally be removed in the first `dev` release '
+                                      'of a release cycle.'.format(removal_version))
     return v
   except InvalidVersion as e:
     raise BadRemovalVersionError('The given removal version {} is not a valid version: '

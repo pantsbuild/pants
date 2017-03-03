@@ -9,6 +9,7 @@ from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -60,6 +61,10 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
+    deprecated_conditional(lambda: resources is not None, '1.5.0.dev0',
+                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
+    deprecated_conditional(lambda: resource_targets is not None, '1.5.0.dev0',
+                           'The `resource_targets=` Python target argument', 'Use `dependencies=` instead.')
     self.address = address
     payload = payload or Payload()
     payload.add_fields({
@@ -124,21 +129,12 @@ class PythonTarget(Target):
 
   @property
   def resources(self):
-    resource_targets = []
-
-    if self._resource_target_specs:
-      def get_target(spec):
-        address = Address.parse(spec, relative_to=self.address.spec_path)
-        tgt = self._build_graph.get_target(address)
-        if tgt is None:
-          raise TargetDefinitionException(self, 'No such resource target: {}'.format(address))
-        return tgt
-      resource_targets.extend(get_target(spec) for spec in self._resource_target_specs)
-
-    if self._synthetic_resources_target:
-      resource_targets.append(self._synthetic_resources_target)
-
-    return resource_targets
+    # Note: Will correctly find:
+    #   - Regular dependencies on Resources targets.
+    #   - Resources targets specified via resource_targets=.
+    #   - The synthetic Resources target created from the resources= fileset.
+    # Because these are all in the traversable_dependency_specs.
+    return [dep for dep in self.dependencies if isinstance(dep, Resources)]
 
   def walk(self, work, predicate=None):
     super(PythonTarget, self).walk(work, predicate)

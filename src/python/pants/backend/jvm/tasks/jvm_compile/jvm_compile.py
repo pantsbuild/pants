@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import hashlib
 import os
 from collections import defaultdict
 from multiprocessing import cpu_count
@@ -31,7 +32,7 @@ from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyze
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.worker_pool import WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.resources import Resources
@@ -44,11 +45,11 @@ from pants.util.fileutil import create_size_estimators
 from pants.util.memo import memoized_property
 
 
-class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
+class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
-  def __init__(self, task, classpath_products, dep_context):
-    super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
+  def __init__(self, classpath_products, dep_context):
+    super(ResolvedJarAwareFingerprintStrategy, self).__init__()
     self._classpath_products = classpath_products
     self._dep_context = dep_context
 
@@ -57,7 +58,8 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
       # Just do nothing, this kind of dependency shouldn't affect result's hash.
       return None
 
-    hasher = self._build_hasher(target)
+    hasher = hashlib.sha1()
+    hasher.update(target.payload.fingerprint())
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
@@ -78,14 +80,13 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
   def dependencies(self, target):
     if self.direct(target):
       return strict_dependencies(target, self._dep_context)
-    return super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).dependencies(target)
+    return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):
-    return hash((type(self), self._task.fingerprint))
+    return hash(type(self))
 
   def __eq__(self, other):
-    return (isinstance(other, ResolvedJarAwareTaskIdentityFingerprintStrategy) and
-            super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other))
+    return type(self) == type(other)
 
 
 class JvmCompile(NailgunTaskBase):
@@ -406,7 +407,7 @@ class JvmCompile(NailgunTaskBase):
     return prop
 
   def _fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products, self._dep_context)
+    return ResolvedJarAwareFingerprintStrategy(classpath_products, self._dep_context)
 
   @staticmethod
   def strict_deps_enabled(target):

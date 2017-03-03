@@ -58,12 +58,9 @@ class GraphInvalidationTest(unittest.TestCase):
     graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                         symbol_table_cls=symbol_table_cls,
                                                         native=self._native)
-    try:
-      graph = graph_helper.create_build_graph(target_roots)[0]
-      addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
-      yield graph, addresses, graph_helper.scheduler
-    finally:
-      graph_helper.engine.close()
+    graph = graph_helper.create_build_graph(target_roots)[0]
+    addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+    yield graph, addresses, graph_helper.scheduler
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
@@ -81,6 +78,9 @@ class GraphInvalidationTest(unittest.TestCase):
 
       # Invalidate the '3rdparty/python' DirectoryListing, the `3rdparty` DirectoryListing,
       # and then the root DirectoryListing by "touching" files/dirs.
+      # NB: Invalidation of entries in the root directory is special: because Watchman will
+      # never trigger an event for the root itself, we treat changes to files in the root
+      # directory as events for the root.
       for filename in ('3rdparty/python/BUILD', '3rdparty/python', 'non_existing_file'):
         invalidated_count = scheduler.invalidate_files([filename])
         self.assertGreater(invalidated_count,
@@ -96,6 +96,20 @@ class GraphInvalidationTest(unittest.TestCase):
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
       self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd'],
                         sources)
+
+  def test_implicit_sources(self):
+    expected_sources = {
+      'testprojects/tests/python/pants/file_sets:implicit_sources':
+        ['a.py', 'aa.py', 'aaa.py', 'aabb.py', 'ab.py'],
+      'testprojects/tests/python/pants/file_sets:test_with_implicit_sources':
+        ['test_a.py']
+    }
+
+    for spec, exp_sources in expected_sources.items():
+      with self.open_scheduler([spec]) as (graph, _, _):
+        target = graph.get_target(Address.parse(spec))
+        sources = sorted([os.path.basename(s) for s in target.sources_relative_to_buildroot()])
+        self.assertEquals(exp_sources, sources)
 
   def test_target_macro_override(self):
     """Tests that we can "wrap" an existing target type with additional functionality.

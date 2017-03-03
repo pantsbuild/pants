@@ -17,7 +17,7 @@ from pants.base.project_tree import Dir
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf, addressable_list
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_tasks
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -121,7 +121,7 @@ def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create_from_specs('', specs)
+  return PathGlobs.create('', include=specs)
 
 
 @printing_func
@@ -400,13 +400,15 @@ def setup_json_scheduler(build_root, native):
   source_roots = SourceRoots(('src/java','src/scala'))
   scrooge_tool_address = Address.parse('src/scala/scrooge')
 
+  project_tree = FileSystemProjectTree(build_root)
+
   goals = {
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
       'list': BuildFileAddress,
       GenGoal.name(): GenGoal,
-      'ls': Files,
+      'ls': Snapshot,
       'cat': FilesContent,
     }
   tasks = [
@@ -441,7 +443,7 @@ def setup_json_scheduler(build_root, native):
        extract_scala_imports),
       (BuildFileAddress,
        [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs, field='stats', field_types=(Dir,))],
+        SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))],
        select_package_address),
       (PathGlobs,
        [Select(JVMPackageName),
@@ -476,10 +478,9 @@ def setup_json_scheduler(build_root, native):
     ] + (
       create_graph_tasks(address_mapper, symbol_table_cls)
     ) + (
-      create_fs_tasks()
+      create_fs_tasks(project_tree)
     )
 
-  project_tree = FileSystemProjectTree(build_root)
   return LocalScheduler(goals,
                         tasks,
                         project_tree,

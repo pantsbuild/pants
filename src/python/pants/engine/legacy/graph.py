@@ -18,7 +18,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import Addresses, Collection
-from pants.engine.fs import Files, FilesDigest, PathGlobs
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
@@ -204,8 +204,12 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    for _ in self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]):
-      pass
+    matched = set(self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]))
+    missing = addresses - matched
+    if missing:
+      # TODO: When SingleAddress resolution converted from projection of a directory
+      # and name to a match for PathGlobs, we lost our useful AddressLookupError formatting.
+      raise AddressLookupError('Addresses were not matched: {}'.format(missing))
 
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
@@ -232,10 +236,10 @@ class LegacyBuildGraph(BuildGraph):
     self._index(target_entries)
 
     yielded_addresses = set()
-    for root, state in address_entries.items():
-      if not state.value:
+    for (subject, _), state in address_entries.items():
+      if not state.value.dependencies:
         raise self.InvalidCommandLineSpecError(
-          'Spec {} does not match any targets.'.format(root.subject))
+          'Spec {} does not match any targets.'.format(subject))
       for address in state.value.dependencies:
         if address not in yielded_addresses:
           yielded_addresses.add(address)
@@ -280,11 +284,8 @@ def hydrate_target(target_adaptor, hydrated_fields):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_source_files):
-  excluded = {f.path for f in excluded_source_files.dependencies}
-  file_tuples = [(fast_relpath(fd.path, spec_path), fd.digest)
-                 for fd in source_files_digest.dependencies
-                 if fd.path not in excluded]
+def _eager_fileset_with_spec(spec_path, filespec, snapshot):
+  files = tuple(fast_relpath(fd.path, spec_path) for fd in snapshot.files)
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
   if filespec.has_key('exclude'):
@@ -295,33 +296,30 @@ def _eager_fileset_with_spec(spec_path, filespec, source_files_digest, excluded_
   # independent of the file hash dict.
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
-                              files=tuple(f for f, _ in file_tuples),
-                              file_hashes=dict(file_tuples))
+                              files=files,
+                              files_hash=snapshot.fingerprint)
 
 
-def hydrate_sources(sources_field, source_files_digest, excluded_source_files):
-  """Given a SourcesField and FilesDigest for its path_globs, create an EagerFilesetWithSpec."""
+def hydrate_sources(sources_field, snapshot):
+  """Given a SourcesField and a Snapshot for its path_globs, create an EagerFilesetWithSpec."""
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
                                                sources_field.filespecs,
-                                               source_files_digest,
-                                               excluded_source_files)
+                                               snapshot)
   return HydratedField(sources_field.arg, fileset_with_spec)
 
 
-def hydrate_bundles(bundles_field, files_digest_list, excluded_files_list):
-  """Given a BundlesField and FilesDigest for each of its filesets create a list of BundleAdaptors."""
+def hydrate_bundles(bundles_field, snapshot_list):
+  """Given a BundlesField and a Snapshot for each of its filesets create a list of BundleAdaptors."""
   bundles = []
   zipped = zip(bundles_field.bundles,
                bundles_field.filespecs_list,
-               files_digest_list,
-               excluded_files_list)
-  for bundle, filespecs, files_digest, excluded_files in zipped:
+               snapshot_list)
+  for bundle, filespecs, snapshot in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
     kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
-                                                 files_digest,
-                                                 excluded_files)
+                                                 snapshot)
     bundles.append(BundleAdaptor(**kwargs))
   return HydratedField('bundles', bundles)
 
@@ -345,12 +343,10 @@ def create_legacy_graph_tasks(symbol_table_cls):
      hydrate_target),
     (HydratedField,
      [Select(SourcesField),
-      SelectProjection(FilesDigest, PathGlobs, ('path_globs',), SourcesField),
-      SelectProjection(Files, PathGlobs, ('excluded_path_globs',), SourcesField)],
+      SelectProjection(Snapshot, PathGlobs, ('path_globs',), SourcesField)],
      hydrate_sources),
     (HydratedField,
      [Select(BundlesField),
-      SelectDependencies(FilesDigest, BundlesField, 'path_globs_list', field_types=(PathGlobs,)),
-      SelectDependencies(Files, BundlesField, 'excluded_path_globs_list', field_types=(PathGlobs,))],
+      SelectDependencies(Snapshot, BundlesField, 'path_globs_list', field_types=(PathGlobs,))],
      hydrate_bundles),
   ]

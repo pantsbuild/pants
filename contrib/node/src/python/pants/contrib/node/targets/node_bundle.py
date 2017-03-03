@@ -10,10 +10,10 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.fs import archive as archive_lib
 
-from pants.contrib.node.targets.node_module import NodeModule
+from pants.contrib.node.targets.node_package import NodePackage
 
 
-class NodeBundle(NodeModule):
+class NodeBundle(NodePackage):
   """A bundle of node modules."""
 
   def __init__(self, node_module=None, archive='tgz', address=None, payload=None, **kwargs):

@@ -3,12 +3,10 @@
 
 junit_tests(
   sources=['IvyClassifierTest.java'],
-  resources=[
-    'testprojects/tests/resources/org/pantsbuild/testproject/ivyclassifier',
-  ],
   dependencies=[
    '3rdparty:junit',
    ':jars_with_classifier',
+    'testprojects/tests/resources/org/pantsbuild/testproject/ivyclassifier',
   ],
 )
 

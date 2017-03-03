@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-from contextlib import closing
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.engine import LocalSerialEngine
@@ -58,17 +57,17 @@ class SchedulerTestBase(object):
     tasks = tasks or []
     project_tree = project_tree or self.mk_fs_tree()
 
-    tasks = list(tasks) + create_fs_tasks()
+    tasks = list(tasks) + create_fs_tasks(project_tree)
     return LocalScheduler(goals, tasks, project_tree, self._native)
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
     request = scheduler.execution_request([product], subjects)
-    with closing(LocalSerialEngine(scheduler)) as engine:
-      res = engine.execute(request)
-      if res.error:
-        raise res.error
-      return request
+    engine = LocalSerialEngine(scheduler)
+    res = engine.execute(request)
+    if res.error:
+      raise res.error
+    return request
 
   def execute(self, scheduler, product, *subjects):
     """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""

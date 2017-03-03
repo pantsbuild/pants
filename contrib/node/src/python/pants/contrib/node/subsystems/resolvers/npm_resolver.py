@@ -28,19 +28,43 @@ class NpmResolver(Subsystem, NodeResolverBase):
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
     self._copy_sources(target, results_dir)
-    self._emit_package_descriptor(node_task, target, results_dir, node_paths)
     with pushd(results_dir):
-      result, npm_install = node_task.execute_npm(['install'],
-                                                  workunit_name=target.address.reference(),
-                                                  workunit_labels=[WorkUnitLabel.COMPILER])
-      if result != 0:
-        raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
-                        .format(target.address.reference(), npm_install, result))
+      if not os.path.exists('package.json'):
+        raise TaskError(
+          'Cannot find package.json. Did you forget to put it in target sources?')
+      package_manager = node_task.get_package_manager_for_target(target=target)
+      if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
+        if os.path.exists('npm-shrinkwrap.json'):
+          node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
+        else:
+          node_task.context.log.warn(
+            'Cannot find npm-shrinkwrap.json. Did you forget to put it in target sources? '
+            'This package will fall back to inject package.json with pants BUILD dependencies '
+            'including node_remote_module and other node dependencies. However, this is '
+            'not fully supported.')
+          self._emit_package_descriptor(node_task, target, results_dir, node_paths)
+        result, npm_install = node_task.execute_npm(['install'],
+                                                    workunit_name=target.address.reference(),
+                                                    workunit_labels=[WorkUnitLabel.COMPILER])
+        if result != 0:
+          raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
+                          .format(target.address.reference(), npm_install, result))
+      elif package_manager == node_task.node_distribution.PACKAGE_MANAGER_YARNPKG:
+        if not os.path.exists('yarn.lock'):
+          raise TaskError(
+            'Cannot find yarn.lock. Did you forget to put it in target sources?')
+        returncode, yarnpkg_command = node_task.execute_yarnpkg(
+          args=[],
+          workunit_name=target.address.reference(),
+          workunit_labels=[WorkUnitLabel.COMPILER])
+        if returncode != 0:
+          raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
+                          .format(target.address.reference(), yarnpkg_command, returncode))
 
   def _emit_package_descriptor(self, node_task, target, results_dir, node_paths):
     dependencies = {
       dep.package_name: node_paths.node_path(dep) if node_task.is_node_module(dep) else dep.version
-                        for dep in target.dependencies
+      for dep in target.dependencies
     }
 
     package_json_path = os.path.join(results_dir, 'package.json')
@@ -69,9 +93,13 @@ class NpmResolver(Subsystem, NodeResolverBase):
     dependenciesToRemove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
+    node_task.context.log.debug(
+      'Removing {} from package.json for {}'.format(dependenciesToRemove, package['name']))
     for dependencyType in dependenciesToRemove:
       package.pop(dependencyType, None)
 
+    node_task.context.log.debug(
+      'Adding {} to package.json for {}'.format(dependencies, package['name']))
     package['dependencies'] = dependencies
 
     with open(package_json_path, 'wb') as fp:

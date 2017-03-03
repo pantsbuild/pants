@@ -50,7 +50,7 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
   @Override
   public void schedule(Runnable childStatement) {
     if (shouldMethodsRunParallel()) {
-      executor.submit(childStatement);
+      executor.execute(childStatement);
     } else {
       serialTasks.offer(childStatement);
     }
@@ -62,7 +62,7 @@ public class ConcurrentRunnerScheduler implements RunnerScheduler {
    */
   public void schedule(Runnable childStatement, Class<?> clazz) {
     if (shouldClassRunParallel(clazz)) {
-      executor.submit(childStatement);
+      executor.execute(childStatement);
     } else {
       serialTasks.offer(childStatement);
     }
