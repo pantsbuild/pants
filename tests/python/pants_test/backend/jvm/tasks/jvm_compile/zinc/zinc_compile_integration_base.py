@@ -64,12 +64,12 @@ class BaseZincCompileIntegrationTest(object):
               'org/pantsbuild/testproject/javasources/JavaSource.class'))
 
   def test_scalac_plugin_compile(self):
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
-                              expected_files=['HelloScalac.class', 'scalac-plugin.xml']) as found:
+    with self.do_test_compile('examples/src/scala/org/pantsbuild/example/scalac/plugin:simple_scalac_plugin',
+                              expected_files=['SimpleScalacPlugin.class', 'scalac-plugin.xml']) as found:
 
       self.assertTrue(
-          self.get_only(found, 'HelloScalac.class').endswith(
-              'org/pantsbuild/testproject/scalac/plugin/HelloScalac.class'))
+          self.get_only(found, 'SimpleScalacPlugin.class').endswith(
+              'org/pantsbuild/example/scalac/plugin/SimpleScalacPlugin.class'))
 
       # Ensure that the plugin registration file is written to the root of the classpath.
       path = self.get_only(found, 'scalac-plugin.xml')
@@ -80,13 +80,13 @@ class BaseZincCompileIntegrationTest(object):
       # And that it is well formed.
       root = ET.parse(path).getroot()
       self.assertEqual('plugin', root.tag)
-      self.assertEqual('hello_scalac', root.find('name').text)
-      self.assertEqual('org.pantsbuild.testproject.scalac.plugin.HelloScalac',
+      self.assertEqual('simple_scalac_plugin', root.find('name').text)
+      self.assertEqual('org.pantsbuild.example.scalac.plugin.SimpleScalacPlugin',
                        root.find('classname').text)
 
   def test_scalac_debug_symbol(self):
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
-                         expected_files=['HelloScalac.class', 'scalac-plugin.xml'],
+    with self.do_test_compile('examples/src/scala/org/pantsbuild/example/scalac/plugin:simple_scalac_plugin',
+                         expected_files=['SimpleScalacPlugin.class', 'scalac-plugin.xml'],
                          extra_args=['--compile-zinc-debug-symbols']):
       pass
 

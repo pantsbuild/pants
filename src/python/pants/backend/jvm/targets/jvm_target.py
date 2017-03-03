@@ -14,7 +14,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
-from pants.base.payload_field import ExcludesField, PrimitiveField
+from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
@@ -42,6 +42,14 @@ class JvmTarget(Target, Jarable):
                strict_deps=None,
                fatal_warnings=None,
                zinc_file_manager=None,
+               # Some subclasses can have both .java and .scala sources
+               # (e.g., JUnitTests, JvmBinary, even ScalaLibrary), so it's convenient
+               # to have both plugins settings here, even though for other subclasses
+               # (e.g., JavaLibrary) only one will be relevant.
+               javac_plugins=None,
+               javac_plugin_args=None,
+               scalac_plugins=None,
+               scalac_plugin_args=None,
                **kwargs):
     """
     :API: public
@@ -57,23 +65,25 @@ class JvmTarget(Target, Jarable):
                      by this target that implements the service interface and should be
                      discoverable by the jvm service provider discovery mechanism described here:
                      https://docs.oracle.com/javase/6/docs/api/java/util/ServiceLoader.html
-    :param platform: The name of the platform (defined under the jvm-platform subsystem) to use
-      for compilation (that is, a key into the --jvm-platform-platforms dictionary). If unspecified,
-      the platform will default to the first one of these that exist: (1) the default_platform
-      specified for jvm-platform, (2) a platform constructed from whatever java version is returned
-      by DistributionLocator.cached().version.
-    :type platform: str
-    :param strict_deps: When True, only the directly declared deps of the target will be used at
-      compilation time. This enforces that all direct deps of the target are declared, and can
-      improve compilation speed due to smaller classpaths. Transitive deps are always provided
-      at runtime.
-    :type strict_deps: bool
-    :param fatal_warnings: Whether to turn warnings into errors for this target.  If present,
-                           takes priority over the language's fatal-warnings option.
-    :type fatal_warnings: bool
-    :param zinc_file_manager: Whether to use zinc provided file manager that allows transactional
-                              rollbacks, but in certain cases may conflict with user libraries.
-    :type zinc_file_manager: bool
+    :param str platform: The name of the platform (defined under the jvm-platform subsystem) to use
+                         for compilation (that is, a key into the --jvm-platform-platforms
+                         dictionary). If unspecified, the platform will default to the first one of
+                         these that exist: (1) the default_platform specified for jvm-platform,
+                         (2) a platform constructed from whatever java version is returned by
+                         DistributionLocator.cached().version.
+    :param bool strict_deps: When True, only the directly declared deps of the target will be used
+                             at compilation time. This enforces that all direct deps of the target
+                             are declared, and can improve compilation speed due to smaller
+                             classpaths. Transitive deps are always provided at runtime.
+    :param bool fatal_warnings: Whether to turn warnings into errors for this target.  If present,
+                                takes priority over the language's fatal-warnings option.
+    :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
+                                   transactional rollbacks, but in certain cases may conflict with
+                                   user libraries.
+    :param javac_plugins: names of compiler plugins to use when compiling this target with javac.
+    :param dict javac_plugin_args: Map from javac plugin name to list of arguments for that plugin.
+    :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
+    :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
     """
     deprecated_conditional(lambda: resources is not None, '1.5.0dev0',
                            'The `resources=` JVM target argument', 'Use `dependencies=` instead.')
@@ -90,6 +100,10 @@ class JvmTarget(Target, Jarable):
       'strict_deps': PrimitiveField(strict_deps),
       'fatal_warnings': PrimitiveField(fatal_warnings),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
+      'javac_plugins': SetOfPrimitivesField(javac_plugins),
+      'javac_plugin_args': PrimitiveField(javac_plugin_args),
+      'scalac_plugins': SetOfPrimitivesField(scalac_plugins),
+      'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
     })
     self._resource_specs = self.assert_list(resources, key_arg='resources')
 
@@ -128,6 +142,42 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.zinc_file_manager
+
+  @property
+  def javac_plugins(self):
+    """The names of compiler plugins to use when compiling this target with javac.
+
+    :return: See constructor.
+    :rtype: list of strings.
+    """
+    return self.payload.javac_plugins
+
+  @property
+  def javac_plugin_args(self):
+    """Map from javac plugin name to list of args for that plugin.
+
+    :return: See constructor.
+    :rtype: map from string to list of strings.
+    """
+    return self.payload.javac_plugin_args
+
+  @property
+  def scalac_plugins(self):
+    """The names of compiler plugins to use when compiling this target with scalac.
+
+    :return: See constructor.
+    :rtype: list of strings.
+    """
+    return self.payload.scalac_plugins
+
+  @property
+  def scalac_plugin_args(self):
+    """Map from scalac plugin name to list of args for that plugin.
+
+    :return: See constructor.
+    :rtype: map from string to list of strings.
+    """
+    return self.payload.scalac_plugin_args
 
   @property
   def platform(self):

@@ -15,7 +15,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
 from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import PathGlobs, create_fs_intrinsics, create_fs_tasks
+from pants.engine.fs import PathGlobs, create_fs_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
@@ -118,7 +118,7 @@ class RulesetValidatorTest(unittest.TestCase):
     init_subsystem(Native.Factory)
     rule_index = RuleIndex.create(rules, intrinsic_entries)
     native = Native.Factory.global_instance().create()
-    scheduler = WrappedNativeScheduler(native, rule_index, root_subject_types)
+    scheduler = WrappedNativeScheduler(native, '.', [], rule_index, root_subject_types)
     return scheduler
 
   def test_ruleset_with_missing_product_type(self):
@@ -322,10 +322,10 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_full_graph_for_planner_example(self):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks()
-    intrinsics = create_fs_intrinsics('Let us pretend that this is a ProjectTree!')
+    project_tree = 'Let us pretend that this is a ProjectTree!'
+    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks(project_tree)
 
-    rule_index = RuleIndex.create(tasks, intrinsics)
+    rule_index = RuleIndex.create(tasks, tuple())
     root_subject_types = {Address,
                           PathGlobs,
                           SingleAddress,
@@ -356,8 +356,8 @@ class RuleGraphMakerTest(unittest.TestCase):
       else:
         pass
 
-    self.assertEquals(44, len(all_rules))
-    self.assertEquals(60, len(root_rule_lines)) # 2 lines per entry
+    self.assertEquals(31, len(all_rules))
+    self.assertEquals(56, len(root_rule_lines)) # 2 lines per entry
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [
@@ -813,7 +813,12 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def create_scheduler(self, root_subject_types, rule_index):
     native = Native.Factory.global_instance().create()
-    scheduler = WrappedNativeScheduler(native, rule_index, root_subject_types)
+    scheduler = WrappedNativeScheduler(
+      native=native,
+      build_root='/tmp',
+      ignore_patterns=tuple(),
+      rule_index=rule_index,
+      root_subject_types=root_subject_types)
     return scheduler
 
   def create_full_graph(self, root_subject_types, rule_index):

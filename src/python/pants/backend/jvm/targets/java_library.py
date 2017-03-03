@@ -28,13 +28,12 @@ class JavaLibrary(ExportableJvmLibrary):
   def subsystems(cls):
     return super(JavaLibrary, cls).subsystems()
 
-  def __init__(self, *args, **kwargs):
-    """
-    :param provides: The ``artifact``
-      to publish that represents this target outside the repo.
-    :param resources: An optional list of file paths (DEPRECATED) or
-      ``resources`` targets (which in turn point to file paths). The paths
-      indicate text file resources to place in this module's jar.
-    """
-    super(JavaLibrary, self).__init__(*args, **kwargs)
+  def __init__(self, address=None, **kwargs):
+    super(JavaLibrary, self).__init__(address=address, **kwargs)
     self.add_labels('java')
+    if 'scalac_plugins' in kwargs:
+      raise self.IllegalArgument(address.spec,
+                                 'java_library does not support the scalac_plugins argument.')
+    if 'scalac_plugin_args' in kwargs:
+      raise self.IllegalArgument(address.spec,
+                                 'java_library does not support the scalac_plugin_args argument.')

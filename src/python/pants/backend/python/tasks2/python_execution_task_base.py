@@ -48,7 +48,7 @@ class WrappedPEX(object):
   def run(self, *args, **kwargs):
     kwargs_copy = copy(kwargs)
     env = copy(kwargs_copy.get('env')) if 'env' in kwargs_copy else {}
-    env['PEX_PATH'] = self._extra_pex_paths
+    env['PEX_PATH'] = ':'.join(self._extra_pex_paths)
     kwargs_copy['env'] = env
     return self._pex.run(*args, **kwargs_copy)
 
@@ -111,7 +111,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
 
-        extra_pex_paths = os.pathsep.join([pex.path() for pex in pexes])
+        extra_pex_paths = [pex.path() for pex in pexes]
 
         path_tmp = path + '.tmp'
         safe_rmtree(path_tmp)

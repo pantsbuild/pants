@@ -49,7 +49,7 @@ python_tests(
     'tests/python/pants_test/backend/jvm/tasks:missing_jvm_check',
     'tests/python/pants_test/backend/jvm/tasks/jvm_compile:base_compile_integration_test',
   ],
-  timeout = 120,
+  timeout = 240,
   tags = {'integration'},
 )
 
