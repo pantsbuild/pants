@@ -14,6 +14,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.pytest_run import PytestRun as PytestRun2
 from pants.backend.python.tasks2.python_repl import PythonRepl as PythonRepl2
 from pants.backend.python.tasks2.python_run import PythonRun as PythonRun2
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
@@ -62,4 +63,5 @@ def register_goals():
   task(name='requirements', action=ResolveRequirements).install('pyprep')
   task(name='sources', action=GatherSources).install('pyprep')
   task(name='py', action=PythonRun2).install('run2')
+  task(name='pytest', action=PytestRun2).install('test2')
   task(name='py', action=PythonRepl2).install('repl2')
