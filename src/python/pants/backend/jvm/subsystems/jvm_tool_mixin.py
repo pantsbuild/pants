@@ -76,7 +76,9 @@ class JvmToolMixin(object):
                         custom_rules=None,
                         fingerprint=True,
                         classpath=None,
-                        help=None):
+                        help=None,
+                        removal_version=None,
+                        removal_hint=None):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
     Classpaths can be retrieved in `execute` scope via `tool_classpath`.
@@ -105,6 +107,8 @@ class JvmToolMixin(object):
                            must point to a target defined in a BUILD file that provides the tool
                            classpath.
     :param unicode help: An optional custom help string; otherwise a reasonable one is generated.
+    :param string removal_version: A semver at which this tool will be removed.
+    :param unicode removal_hint: A hint on how to migrate away from this tool.
     """
     def formulate_help():
       if classpath:
@@ -119,7 +123,9 @@ class JvmToolMixin(object):
              type=target_option,
              default='//:{}'.format(key) if classpath_spec is None else classpath_spec,
              help=help,
-             fingerprint=fingerprint)
+             fingerprint=fingerprint,
+             removal_version=removal_version,
+             removal_hint=removal_hint)
 
     # TODO(John Sirois): Move towards requiring tool specs point to jvm_binary targets.
     # These already have a main and are a natural place to house any custom shading rules.  That
