@@ -19,6 +19,15 @@ pub struct SelectDependencies {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SelectTransitive {
+  pub product: TypeConstraint,
+  pub dep_product: TypeConstraint,
+  pub field: Field,
+  pub field_types: Vec<TypeId>,
+  pub transitive: bool,
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
   pub product: TypeConstraint,
   // TODO: This should in theory be a TypeConstraint, but because the `project` operation

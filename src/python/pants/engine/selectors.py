@@ -130,6 +130,11 @@ class SelectDependencies(datatype('Dependencies',
                                      )
 
 
+class SelectTransitive(SelectDependencies):
+  def __new__(cls, product, dep_product, field=SelectDependencies.DEFAULT_FIELD, field_types=tuple(), transitive=True):
+    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field, field_types, transitive)
+
+
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
 
