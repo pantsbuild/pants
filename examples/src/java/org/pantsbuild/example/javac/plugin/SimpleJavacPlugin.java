@@ -1,4 +1,7 @@
-package org.pantsbuild.example.plugin;
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+package org.pantsbuild.example.javac.plugin;
 
 import com.sun.source.util.JavacTask;
 import com.sun.source.util.Plugin;
