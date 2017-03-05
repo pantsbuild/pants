@@ -911,7 +911,8 @@ impl Task {
           variants: self.variants.clone(),
           selector: s,
         }),
-      Selector::SelectDependencies(s) =>
+      Selector::SelectDependencies(s) |
+      Selector::SelectTransitive(s) =>
         context.get(SelectDependencies {
           subject: self.subject.clone(),
           variants: self.variants.clone(),

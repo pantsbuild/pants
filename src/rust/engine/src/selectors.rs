@@ -18,14 +18,6 @@ pub struct SelectDependencies {
   pub transitive: bool,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectTransitive {
-  pub product: TypeConstraint,
-  pub dep_product: TypeConstraint,
-  pub field: Field,
-  pub field_types: Vec<TypeId>,
-  pub transitive: bool,
-}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectProjection {
@@ -48,6 +40,7 @@ pub struct SelectLiteral {
 pub enum Selector {
   Select(Select),
   SelectDependencies(SelectDependencies),
+  SelectTransitive(SelectDependencies),
   SelectProjection(SelectProjection),
   SelectLiteral(SelectLiteral),
 }

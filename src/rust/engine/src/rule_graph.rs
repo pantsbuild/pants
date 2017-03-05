@@ -263,7 +263,8 @@ impl <'t> GraphMaker<'t> {
                                    vec![Entry::new_literal(select.subject.clone(),
                                                                select.product.clone())]);
               },
-              &Selector::SelectDependencies(ref select) => {
+              &Selector::SelectDependencies(ref select) |
+              &Selector::SelectTransitive(ref select) => {
                 let initial_selector = select.dep_product;
                 let initial_rules_or_literals = rhs_for_select(&self.tasks,
                                                                entry.subject_type(),
@@ -506,7 +507,8 @@ fn val_name(val: &Value) -> String {
 fn selector_str(selector: &Selector) -> String {
   match selector {
     &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
-    &Selector::SelectDependencies(ref s) => format!("SelectDependencies({}, {}, {}field_types=({},){})",
+    &Selector::SelectDependencies(ref s) |
+    &Selector::SelectTransitive(ref s) => format!("SelectDependencies({}, {}, {}field_types=({},){})",
                                                     type_constraint_str(s.product),
                                                     type_constraint_str(s.dep_product),
                                                     if s.field == "dependencies" { "".to_string() } else {format!("{:?}, ", s.field)},

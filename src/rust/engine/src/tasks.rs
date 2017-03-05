@@ -146,6 +146,12 @@ impl Tasks {
     ));
   }
 
+  pub fn add_select_transitive(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeId>) {
+    self.clause(Selector::SelectTransitive(
+      SelectDependencies { product: product, dep_product: dep_product, field: field, field_types: field_types, transitive: true }
+    ));
+  }
+
   pub fn add_select_projection(&mut self, product: TypeConstraint, projected_subject: TypeId, field: Field, input_product: TypeConstraint) {
     self.clause(Selector::SelectProjection(
       SelectProjection { product: product, projected_subject: projected_subject, field: field, input_product: input_product }
