@@ -5,17 +5,24 @@
 python_tests(
   sources=globs('test_*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
+    'src/python/pants/backend/python:python_artifact',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python:python_setup',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks2',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/fs',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils'
   ]
 )
 
