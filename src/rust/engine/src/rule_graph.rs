@@ -508,7 +508,8 @@ fn selector_str(selector: &Selector) -> String {
   match selector {
     &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
     &Selector::SelectDependencies(ref s) |
-    &Selector::SelectTransitive(ref s) => format!("SelectDependencies({}, {}, {}field_types=({},){})",
+    &Selector::SelectTransitive(ref s) => format!("{}({}, {}, {}field_types=({},){})",
+                                                   if s.transitive { "SelectTransitive" } else { "SelectDependencies" },
                                                     type_constraint_str(s.product),
                                                     type_constraint_str(s.dep_product),
                                                     if s.field == "dependencies" { "".to_string() } else {format!("{:?}, ", s.field)},
