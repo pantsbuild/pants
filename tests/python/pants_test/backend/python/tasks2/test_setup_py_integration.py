@@ -11,7 +11,7 @@ import tarfile
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class PythonReplIntegrationTest(PantsRunIntegrationTest):
+class SetupPyIntegrationTest(PantsRunIntegrationTest):
 
   def test_setup_py_with_codegen(self):
     self.maxDiff = None
