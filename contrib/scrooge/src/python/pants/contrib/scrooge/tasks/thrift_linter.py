@@ -96,7 +96,7 @@ class ThriftLinter(NailgunTask):
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
                               jvm_options=self.get_options().jvm_options,
-                              workunit_labels=[WorkUnitLabel.COMPILER])  # to let stdout/err through.
+                              workunit_labels=[WorkUnitLabel.MULTITOOL])
 
     if returncode != 0:
       raise ThriftLintError(
