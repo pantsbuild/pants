@@ -25,6 +25,7 @@ from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
+from pants.backend.python.tasks2.setup_py import SetupPy as SetupPy2
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -65,3 +66,4 @@ def register_goals():
   task(name='py', action=PythonRun2).install('run2')
   task(name='pytest', action=PytestRun2).install('test2')
   task(name='py', action=PythonRepl2).install('repl2')
+  task(name='setup-py2', action=SetupPy2).install()
