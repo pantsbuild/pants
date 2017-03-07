@@ -83,6 +83,7 @@ _FFI.cdef(
 
     typedef void ExternContext;
 
+    // On the rust side the integration is defined in externs.rs
     typedef void             (*extern_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
     typedef Key              (*extern_key_for)(ExternContext*, Value*);
     typedef Value            (*extern_val_for)(ExternContext*, Key*);
@@ -195,6 +196,9 @@ _FFI.cdef(
     RawNodes* execution_roots(RawScheduler*);
 
     Value validator_run(RawScheduler*, TypeId*, uint64_t);
+
+    void rule_graph_visualize(RawScheduler*, TypeId*, uint64_t, char*);
+    void rule_subgraph_visualize(RawScheduler*, TypeId, TypeConstraint, char*);
 
     void nodes_destroy(RawNodes*);
     '''
