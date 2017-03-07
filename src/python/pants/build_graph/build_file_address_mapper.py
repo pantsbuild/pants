@@ -23,7 +23,7 @@ from pants.build_graph.address import Address, parse_spec
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.util.dirutil import fast_relpath, longest_dir_prefix, join_specs
+from pants.util.dirutil import fast_relpath, join_specs, longest_dir_prefix
 
 
 logger = logging.getLogger(__name__)

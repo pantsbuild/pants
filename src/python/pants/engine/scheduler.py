@@ -17,7 +17,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import create_snapshot_singletons, _Snapshots
+from pants.engine.isolated_process import _Snapshots, create_snapshot_singletons
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
