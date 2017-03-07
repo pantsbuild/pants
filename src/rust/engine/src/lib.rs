@@ -28,10 +28,13 @@ extern crate tar;
 extern crate tempdir;
 
 use std::ffi::CStr;
+use std::fs::File;
+use std::io;
 use std::mem;
 use std::os::raw;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
 
 use context::Core;
 use core::{Function, Key, TypeConstraint, TypeId, Value};
@@ -60,7 +63,7 @@ use externs::{
   with_vec,
 };
 use nodes::Failure;
-use rule_graph::{GraphMaker, RootSubjectTypes};
+use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
 use types::Types;
@@ -495,7 +498,7 @@ pub extern fn validator_run(
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
-                                        RootSubjectTypes { subject_types: subject_types.clone() });
+                                        subject_types.clone());
       let graph = graph_maker.full_graph();
 
       match graph.validate() {
@@ -508,6 +511,67 @@ pub extern fn validator_run(
       }
     })
   })
+}
+
+#[no_mangle]
+pub extern fn rule_graph_visualize(
+  scheduler_ptr: *mut RawScheduler,
+  subject_types_ptr: *mut TypeId,
+  subject_types_len: u64,
+  path_ptr: *const raw::c_char
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
+      let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+      let path = PathBuf::from(path_str);
+
+      let graph = graph_full(raw, subject_types);
+      write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
+        println!("Failed to visualize to {}: {:?}", path.display(), e);
+      });
+    })
+  })
+}
+
+#[no_mangle]
+pub extern fn rule_subgraph_visualize(
+  scheduler_ptr: *mut RawScheduler,
+  subject_type: TypeId,
+  product_type: TypeConstraint,
+  path_ptr: *const raw::c_char
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = PathBuf::from(path_str);
+
+    let graph = graph_sub(raw, subject_type, product_type);
+    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
+      println!("Failed to visualize to {}: {:?}", path.display(), e);
+    });
+  })
+}
+
+
+fn graph_full(raw: &mut RawScheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                    subject_types.clone());
+  graph_maker.full_graph()
+}
+
+fn graph_sub(
+  raw: &mut RawScheduler,
+  subject_type: TypeId,
+  product_type: TypeConstraint
+) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                    vec![subject_type.clone()]);
+  graph_maker.sub_graph(&subject_type, &product_type)
+}
+
+fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
+  let file = File::create(path)?;
+  let mut f = io::BufWriter::new(file);
+  graph.visualize(&mut f)
 }
 
 fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
