@@ -50,4 +50,4 @@ class ThriftLinterTest(TaskTestBase):
       args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
             'src/thrift/tweet', 'src/thrift/tweet/b.thrift', 'src/thrift/tweet/a.thrift'],
       jvm_options=get_default_jvm_options(),
-      workunit_labels=['COMPILER'])
+      workunit_labels=['MULTITOOL'])
