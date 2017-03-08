@@ -65,6 +65,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
+    super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
@@ -76,7 +77,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return []
 
-  def create_pex(self, pex_info):
+  def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
     with self.invalidated(self.context.targets(
         lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)))) as invalidation_check:
@@ -95,7 +96,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       extra_pex_paths_file_path = path + '.extra_pex_paths'
       extra_pex_paths = None
 
-      # Note that we check for the existence of the directory, instead of for invalid_vts, to cover the empty case.
+      # Note that we check for the existence of the directory, instead of for invalid_vts,
+      # to cover the empty case.
       if not os.path.isdir(path):
         pexes = [
           self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
@@ -111,7 +113,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # in the target set's dependency closure.
           pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
 
-        extra_pex_paths = [pex.path() for pex in pexes]
+        extra_pex_paths = [pex.path() for pex in pexes if pex]
 
         path_tmp = path + '.tmp'
         safe_rmtree(path_tmp)
