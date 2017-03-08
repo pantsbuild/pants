@@ -492,8 +492,11 @@ python_library(
   sources = ['jvmdoc_gen.py'],
   dependencies = [
     ':jvm_task',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/build_graph',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
   ],

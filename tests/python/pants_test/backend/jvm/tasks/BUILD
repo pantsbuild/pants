@@ -536,6 +536,7 @@ python_tests(
   sources = ['test_jvmdoc_gen.py'],
   dependencies = [
     ':jvmdoc_gen_testdata',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:jvmdoc_gen',
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/jvm:jvm_task_test_base'

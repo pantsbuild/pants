@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.base.exceptions import TaskError
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
@@ -39,9 +40,11 @@ class JvmdocGenTest(JvmTaskTestBase):
   def setUp(self):
     super(JvmdocGenTest, self).setUp()
 
-    self.t1 = self.make_target('t1')
-    context = self.context(target_roots=[self.t1])
+    self.t2 = self.make_target('t2')
+    self.t1 = self.make_target('t1', dependencies=[self.t2])
 
+    context = self.context(target_roots=[self.t1])
+    self.context = context
     self.targets = context.targets()
 
     self.populate_runtime_classpath(context)
@@ -60,6 +63,18 @@ class JvmdocGenTest(JvmTaskTestBase):
     for generate in [self.task._generate_individual,
                      self.task._generate_combined]:
       with self.assertRaises(TaskError):
-        generate(self.targets, create_jvmdoc_command_fail)
+        generate(lambda t: True, self.targets, create_jvmdoc_command_fail)
 
-      generate(self.targets, create_jvmdoc_command_succeed)
+      generate(lambda t: True, self.targets, create_jvmdoc_command_succeed)
+
+  def test_classpath_filtered_by_lang_predicate(self):
+
+    def expect_classpath_missing_filtered(classpath, gendir, *targets):
+      self.assertEqual([], classpath)
+      return ['python', os.path.join(os.path.dirname(__file__), "true.py")]
+    classpath = self.context.products.get_data('runtime_classpath', ClasspathProducts.init_func(self.pants_workdir))
+    classpath.add_for_targets([self.t2], [('default', os.path.join(self.pants_workdir, 't2-jar'))])
+
+    for generate in [self.task._generate_individual,
+      self.task._generate_combined]:
+      generate(lambda t: t != self.t2, [self.t1], expect_classpath_missing_filtered)
