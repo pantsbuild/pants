@@ -581,6 +581,7 @@ impl SelectDependencies {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
+    println!("in SelectDependencies.get_dep transitive={}", self.selector.transitive);
 
     let dep_subject_key = externs::key_for(dep_subject);
     if self.selector.transitive {
@@ -600,6 +601,7 @@ impl SelectDependencies {
   }
 
   fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
+    println!("in SelectDependencies.store transitive={}", self.selector.transitive);
     if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
@@ -691,6 +693,7 @@ impl SelectTransitive {
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
 
+    println!("in SelectTransitive.get_dep transitive={}", self.selector.transitive);
     let dep_subject_key = externs::key_for(dep_subject);
     if self.selector.transitive {
       // After the root has been expanded, a traversal continues with dep_product == product.
@@ -709,6 +712,7 @@ impl SelectTransitive {
   }
 
   fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
+    println!("in SelectTransitive.store transitive={}", self.selector.transitive);
     if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.

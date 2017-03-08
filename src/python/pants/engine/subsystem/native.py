@@ -173,6 +173,7 @@ _FFI.cdef(
     void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
     void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
     void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer, bool);
+    void task_add_select_transitive(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
     void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
     void task_end(RawScheduler*);
 
@@ -191,6 +192,12 @@ _FFI.cdef(
                                                 Buffer,
                                                 TypeIdBuffer,
                                                 bool);
+    void execution_add_root_select_transitive(RawScheduler*,
+                                              Key,
+                                              TypeConstraint,
+                                              TypeConstraint,
+                                              Buffer,
+                                              TypeIdBuffer);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 

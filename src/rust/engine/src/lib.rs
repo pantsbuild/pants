@@ -414,6 +414,19 @@ pub extern fn task_add_select_dependencies(
 }
 
 #[no_mangle]
+pub extern fn task_add_select_transitive(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeConstraint,
+  dep_product: TypeConstraint,
+  field: Buffer,
+  field_types: TypeIdBuffer,
+) {
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_transitive(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
+    })
+}
+
+#[no_mangle]
 pub extern fn task_add_select_projection(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,

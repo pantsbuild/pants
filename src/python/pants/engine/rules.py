@@ -15,7 +15,7 @@ from twitter.common.collections import OrderedSet
 from pants.engine.addressable import Exactly
 from pants.engine.isolated_process import SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant, type_or_constraint_repr)
+                                    SelectTransitive, SelectVariant, type_or_constraint_repr)
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -592,7 +592,7 @@ class GraphMaker(object):
           add_rules_to_graph(entry,
                              selector,
                              (RuleGraphLiteral(selector.subject, selector.product),))
-        elif type(selector) is SelectDependencies:
+        elif type(selector) in (SelectDependencies, SelectTransitive):
           initial_selector = selector.input_product_selector
           initial_rules_or_literals = _find_rhs_for_select(entry.subject_type, initial_selector)
           if not initial_rules_or_literals:
