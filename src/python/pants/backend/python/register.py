@@ -15,17 +15,19 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.pytest_run import PytestRun as PytestRun2
+from pants.backend.python.tasks2.python_binary_create import \
+  PythonBinaryCreate as PythonBinaryCreate2
 from pants.backend.python.tasks2.python_repl import PythonRepl as PythonRepl2
 from pants.backend.python.tasks2.python_run import PythonRun as PythonRun2
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
+from pants.backend.python.tasks2.setup_py import SetupPy as SetupPy2
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
 from pants.backend.python.tasks.setup_py import SetupPy
-from pants.backend.python.tasks2.setup_py import SetupPy as SetupPy2
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -66,4 +68,5 @@ def register_goals():
   task(name='py', action=PythonRun2).install('run2')
   task(name='pytest', action=PytestRun2).install('test2')
   task(name='py', action=PythonRepl2).install('repl2')
+  task(name='py', action=PythonBinaryCreate2).install('binary2')
   task(name='setup-py2', action=SetupPy2).install()

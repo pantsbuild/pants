@@ -12,12 +12,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-from pants.build_graph.resources import Resources
+from pants.backend.python.tasks2.pex_build_util import dump_sources, has_python_sources
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 
@@ -46,10 +41,7 @@ class GatherSources(Task):
     round_manager.require_data('python')  # For codegen.
 
   def execute(self):
-    # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
-    # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
-    # we remove the old python pipeline entirely) we want to ignore those target types here.
-    targets = self.context.targets(lambda tgt: isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary, Resources)))
+    targets = self.context.targets(predicate=has_python_sources)
     with self.invalidated(targets) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of gathering
       # an empty set of sources, to prevent downstream tasks from having to check
@@ -63,7 +55,8 @@ class GatherSources(Task):
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.join(self.workdir, target_set_id)
 
-      # Note that we check for the existence of the directory, instead of for invalid_vts, to cover the empty case.
+      # Note that we check for the existence of the directory, instead of for invalid_vts,
+      # to cover the empty case.
       if not os.path.isdir(path):
         path_tmp = path + '.tmp'
         shutil.rmtree(path_tmp, ignore_errors=True)
@@ -76,26 +69,5 @@ class GatherSources(Task):
   def _build_pex(self, interpreter, path, vts):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     for vt in vts:
-      self._dump_sources(builder, vt.target)
+      dump_sources(builder, vt.target, self.context.log)
     builder.freeze()
-
-  def _dump_sources(self, builder, tgt):
-    buildroot = get_buildroot()
-    self.context.log.debug('  Dumping sources: {}'.format(tgt))
-    for relpath in tgt.sources_relative_to_source_root():
-      try:
-        src = os.path.join(buildroot, tgt.target_base, relpath)
-        if isinstance(tgt, Resources):
-          builder.add_resource(src, relpath)
-        else:
-          builder.add_source(src, relpath)
-      except OSError:
-        self.context.log.error('Failed to copy {} for target {}'.format(
-            os.path.join(tgt.target_base, relpath), tgt.address.spec))
-        raise
-
-    if getattr(tgt, '_resource_target_specs', None) or getattr(tgt, '_synthetic_resources_target', None):
-      # No one should be on old-style resources any more.  And if they are,
-      # switching to the new python pipeline will be a great opportunity to fix that.
-      raise TaskError('Old-style resources not supported for target {}.  '
-                      'Depend on resources() targets instead.'.format(tgt.address.spec))

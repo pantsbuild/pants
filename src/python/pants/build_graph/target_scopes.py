@@ -47,9 +47,9 @@ class Scope(frozenset):
     :rtype: bool
     """
     if include_scopes is not None and not isinstance(include_scopes, Scope):
-      raise ValueError('include_scopes must by a Scope instance.')
+      raise ValueError('include_scopes must be a Scope instance.')
     if exclude_scopes is not None and not isinstance(exclude_scopes, Scope):
-      raise ValueError('exclude_scopes must by a Scope instance.')
+      raise ValueError('exclude_scopes must be a Scope instance.')
     if exclude_scopes and any(s in exclude_scopes for s in self):
       return False
     if include_scopes and not any(s in include_scopes for s in self):

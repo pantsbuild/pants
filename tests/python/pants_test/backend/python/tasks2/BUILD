@@ -17,6 +17,7 @@ python_tests(
     'src/python/pants/backend/python/tasks2',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
     'src/python/pants/util:contextutil',
