@@ -121,8 +121,7 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   """
   python_setup = PythonSetup.global_instance()
   python_repos = PythonRepos.global_instance()
-  platforms = [Platform.current() if p == 'current' else p
-               for p in (platforms or python_setup.platforms)]
+  platforms = platforms or python_setup.platforms
   find_links = find_links or []
   distributions = {}
   fetchers = python_repos.get_fetchers()
