@@ -2,6 +2,7 @@
 
 if [ "$TRAVIS_BRANCH" != "master" ]; then
   echo "Not on master. Skip."
+  exit 0
 fi
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
