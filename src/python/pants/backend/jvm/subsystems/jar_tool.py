@@ -30,4 +30,5 @@ class JarTool(JvmToolMixin, Subsystem):
                    jvm_options=self.get_options().jvm_options,
                    args=args,
                    workunit_name='jar-tool',
-                   workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.JVM, WorkUnitLabel.NAILGUN])
+                   workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.JVM,
+                                    WorkUnitLabel.NAILGUN, WorkUnitLabel.IGNORE_LABEL])
