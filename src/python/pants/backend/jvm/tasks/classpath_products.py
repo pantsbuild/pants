@@ -305,6 +305,15 @@ class ClasspathProducts(object):
     return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
             if ClasspathEntry.is_internal_classpath_entry(cp_entry)]
 
+  def update(self, other):
+    """Adds the contents of other to this ClasspathProducts."""
+    if self._pants_workdir != other._pants_workdir:
+      raise ValueError('Other ClasspathProducts from a different pants workdir {}'.format(other._pants_workdir))
+    for target, products in other._classpaths._products_by_target.items():
+      self._classpaths.add_for_target(target, products)
+    for target, products in other._excludes._products_by_target.items():
+      self._excludes.add_for_target(target, products)
+
   def _filter_by_excludes(self, classpath_target_tuples, root_targets):
     # Excludes are always applied transitively, so regardless of whether a transitive
     # set of targets was included here, their closure must be included.

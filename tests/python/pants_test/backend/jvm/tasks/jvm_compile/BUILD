@@ -13,6 +13,17 @@ python_tests(
   ],
 )
 
+python_tests(
+  name = 'jvm_compile',
+  sources = ['test_jvm_compile.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm/tasks/jvm_compile',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+
 python_library(
   name='base_compile_integration_test',
   sources=['base_compile_integration_test.py'],

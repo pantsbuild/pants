@@ -13,4 +13,8 @@ java_thrift_library(name='distance-java',
 
 python_thrift_library(name='distance-python',
   sources=['distance.thrift'],
+  provides=setup_py(
+    name='pantsbuild.pants.distance-thrift-python',
+    version='0.0.1',
+  )
 )

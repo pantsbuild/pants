@@ -440,8 +440,7 @@ class JvmCompile(NailgunTaskBase):
       return
 
     # Clone the compile_classpath to the runtime_classpath.
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    classpath_product = self.create_runtime_classpath()
 
     def classpath_for_context(context):
       if self.get_options().use_classpath_jars:
@@ -483,6 +482,16 @@ class JvmCompile(NailgunTaskBase):
           for conf in self._confs:
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
+
+  def create_runtime_classpath(self):
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    classpath_product = self.context.products.get_data('runtime_classpath')
+    if not classpath_product:
+      classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    else:
+      classpath_product.update(compile_classpath)
+
+    return classpath_product
 
   def do_compile(self,
                  invalidation_check,

@@ -84,13 +84,16 @@ class WrappedNativeScheduler(object):
           yield line.rstrip()
 
   def assert_ruleset_valid(self):
-    listed = list(TypeId(self._to_id(t)) for t in self.root_subject_types)
+    root_type_ids = self._root_type_ids()
 
-    raw_value = self._native.lib.validator_run(self._scheduler, listed, len(listed))
+    raw_value = self._native.lib.validator_run(self._scheduler, root_type_ids, len(root_type_ids))
     value = self._from_value(raw_value)
 
     if isinstance(value, Exception):
       raise ValueError(str(value))
+
+  def _root_type_ids(self):
+    return list(TypeId(self._to_id(t)) for t in sorted(self.root_subject_types))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -203,6 +206,33 @@ class WrappedNativeScheduler(object):
 
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
+
+  def rule_graph_visualization(self):
+    root_type_ids = self._root_type_ids()
+
+    with temporary_file_path() as path:
+      self._native.lib.rule_graph_visualize(
+        self._scheduler,
+        root_type_ids,
+        len(root_type_ids),
+        bytes(path))
+      with open(path) as fd:
+        for line in fd.readlines():
+          yield line.rstrip()
+
+  def rule_subgraph_visualization(self, root_subject_type, product_type):
+    root_type_id = TypeId(self._to_id(root_subject_type))
+
+    product_type_id = TypeConstraint(self._to_id(constraint_for(product_type)))
+    with temporary_file_path() as path:
+      self._native.lib.rule_subgraph_visualize(
+        self._scheduler,
+        root_type_id,
+        product_type_id,
+        bytes(path))
+      with open(path) as fd:
+        for line in fd.readlines():
+          yield line.rstrip()
 
   def invalidate(self, filenames):
     filenames_buf = self._native.context.utf8_buf_buf(filenames)

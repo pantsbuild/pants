@@ -137,6 +137,12 @@ class Exactly(TypeConstraint):
   def satisfied_by_type(self, obj_type):
     return obj_type in self._types
 
+  def graph_str(self):
+    if len(self.types) == 1:
+      return self.types[0].__name__
+    else:
+      return repr(self)
+
 
 class SubclassesOf(TypeConstraint):
   """Objects of the exact type as well as any sub-types are allowed."""
