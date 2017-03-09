@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [ "$TRAVIS_BRANCH" != "master" ]; then
+  echo "Not on master. Skip."
+fi
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
 # Indirectly defines:
