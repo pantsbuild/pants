@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from mock import Mock, patch
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -50,4 +51,4 @@ class ThriftLinterTest(TaskTestBase):
       args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
             'src/thrift/tweet', 'src/thrift/tweet/b.thrift', 'src/thrift/tweet/a.thrift'],
       jvm_options=get_default_jvm_options(),
-      workunit_labels=['COMPILER'])
+      workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.IGNORE_LABEL])
