@@ -20,7 +20,7 @@ class WorkUnitLabelTest(PantsRunIntegrationTest):
   def test_workunit_no_label_ignore(self):
     pants_run = self.run_pants([
       '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
+      '--backend-packages={}'.format('pants_test.logging.data'),
       'run-workunit-label-test',
     ])
 
@@ -30,7 +30,7 @@ class WorkUnitLabelTest(PantsRunIntegrationTest):
   def test_workunit_label_ignore(self):
     pants_run = self.run_pants([
       '--pythonpath={}'.format(os.path.join(os.getcwd(), 'tests', 'python')),
-      '--backend-packages={}'.format('pants_test.goal.data'),
+      '--backend-packages={}'.format('pants_test.logging.data'),
       'run-workunit-label-test',
       '--ignore-label'
     ])
