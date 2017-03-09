@@ -45,6 +45,10 @@ class WorkUnitLabel(object):
   PREP = 'PREP'           # Running a prep command
   LINT = 'LINT'           # Running a lint or static analysis tool.
 
+  # Do not attempt to print workunit's label upon invocation
+  # This has nothing to do with a process's own stderr/stdout.
+  SUPPRESS_LABEL = 'SUPPRESS_LABEL'
+
   @classmethod
   @memoized_method
   def keys(cls):

@@ -8,3 +8,15 @@ python_tests(
     'src/python/pants/util:contextutil',
   ],
 )
+
+python_tests(
+  name='test_workunit_label',
+  sources=[
+    'test_workunit_label.py'
+  ],
+  dependencies=[
+    'src/python/pants/goal:run_tracker',
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
