@@ -31,4 +31,4 @@ class JarTool(JvmToolMixin, Subsystem):
                    args=args,
                    workunit_name='jar-tool',
                    workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.JVM,
-                                    WorkUnitLabel.NAILGUN, WorkUnitLabel.IGNORE_LABEL])
+                                    WorkUnitLabel.NAILGUN, WorkUnitLabel.SUPPRESS_LABEL])

@@ -47,7 +47,7 @@ class WorkUnitLabel(object):
 
   # Do not attempt to print workunit's label upon invocation
   # This has nothing to do with a process's own stderr/stdout.
-  IGNORE_LABEL = 'IGNORE_LABEL'
+  SUPPRESS_LABEL = 'SUPPRESS_LABEL'
 
   @classmethod
   @memoized_method

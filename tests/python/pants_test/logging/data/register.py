@@ -25,7 +25,7 @@ class TestWorkUnitLabelTask(NailgunTask):
   def execute(self):
     labels = [WorkUnitLabel.COMPILER]
     if self.get_options().ignore_label:
-      labels.append(WorkUnitLabel.IGNORE_LABEL)
+      labels.append(WorkUnitLabel.SUPPRESS_LABEL)
 
     with self.context.new_workunit('dummy_workunit') as workunit:
       self.runjava(classpath=[], main='non-existent-main-class', args=['-version'], workunit_labels=labels)

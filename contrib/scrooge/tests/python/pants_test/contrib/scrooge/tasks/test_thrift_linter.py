@@ -47,8 +47,8 @@ class ThriftLinterTest(TaskTestBase):
     task._lint(thrift_target, task.tool_classpath('scrooge-linter'))
 
     self._run_java_mock.assert_called_once_with(classpath='foo_classpath',
-      main='com.twitter.scrooge.linter.Main',
-      args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
+                                                main='com.twitter.scrooge.linter.Main',
+                                                args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
             'src/thrift/tweet', 'src/thrift/tweet/b.thrift', 'src/thrift/tweet/a.thrift'],
-      jvm_options=get_default_jvm_options(),
-      workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.IGNORE_LABEL])
+                                                jvm_options=get_default_jvm_options(),
+                                                workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
