@@ -304,7 +304,57 @@ impl <'t> GraphMaker<'t> {
                                    vec![Entry::new_literal(select.subject.clone(),
                                                                select.product.clone())]);
               },
-              &Selector::SelectDependencies(ref select) |
+              &Selector::SelectDependencies(ref select) => {
+                let initial_selector = select.dep_product;
+                let initial_rules_or_literals = rhs_for_select(&self.tasks,
+                                                               entry.subject_type(),
+                                                               &Select { product: initial_selector, variant_key: None });
+                if initial_rules_or_literals.is_empty() {
+                  mark_unfulfillable(&mut unfulfillable_rules,
+                                     &entry,
+                                     entry.subject_type(),
+                                     format!("no matches for {} when resolving {}",
+                                             selector_str(&Selector::Select(Select { product: initial_selector, variant_key: None})),
+                                             selector_str(selector)));
+                  was_unfulfillable = true;
+                  continue;
+                }
+                let mut rules_for_dependencies = vec![];
+                for field_type in &select.field_types {
+                  let rules_for_field_subjects = rhs_for_select(&self.tasks,
+                                                                field_type.clone(),
+                                                                &Select { product: select.product, variant_key: None });
+                  rules_for_dependencies.extend(rules_for_field_subjects);
+                }
+                if rules_for_dependencies.is_empty() {
+                    for t in &select.field_types {
+                        mark_unfulfillable(&mut unfulfillable_rules,
+                                           &entry,
+                                           t.clone(),
+                                           format!("no matches for {} when resolving {}",
+                                                   selector_str(&Selector::Select(Select { product: select.product, variant_key: None})),
+                                                   selector_str(selector))
+                        );
+                    }
+                  was_unfulfillable = true;
+                  continue;
+                }
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![selector.clone(), Selector::Select(Select { product: select.dep_product, variant_key: None})],
+                                   initial_rules_or_literals);
+
+                add_rules_to_graph(&mut rules_to_traverse,
+                                   &mut rule_dependency_edges,
+                                   &mut unfulfillable_rules,
+                                   &mut root_rule_dependency_edges,
+                                   &entry,
+                                   vec![selector.clone(), Selector::Select(Select { product: select.product, variant_key: None})],
+                                   rules_for_dependencies);
+              },
               &Selector::SelectTransitive(ref select) => {
                 let initial_selector = select.dep_product;
                 let initial_rules_or_literals = rhs_for_select(&self.tasks,
@@ -577,8 +627,7 @@ fn val_name(val: &Value) -> String {
 fn selector_str(selector: &Selector) -> String {
   match selector {
     &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
-    &Selector::SelectDependencies(ref s) |
-    &Selector::SelectTransitive(ref s) => format!("{}({}, {}, {}field_types=({},){})",
+    &Selector::SelectDependencies(ref s) => format!("{}({}, {}, {}field_types=({},){})",
                                                    if s.transitive { "SelectTransitive" } else { "SelectDependencies" },
                                                     type_constraint_str(s.product),
                                                     type_constraint_str(s.dep_product),
@@ -588,6 +637,16 @@ fn selector_str(selector: &Selector) -> String {
                                                                  .collect::<Vec<String>>()
                                                                  .join(", "),
                                                     if s.transitive { ", transitive=True" } else { "" }.to_string()
+    ),
+    &Selector::SelectTransitive(ref s) => format!("{}({}, {}, {}field_types=({},))",
+                                                   "SelectTransitive",
+                                                    type_constraint_str(s.product),
+                                                    type_constraint_str(s.dep_product),
+                                                    if s.field == "dependencies" { "".to_string() } else {format!("'{}', ", s.field)},
+                                                    s.field_types.iter()
+                                                                 .map(|&f| type_str(f))
+                                                                 .collect::<Vec<String>>()
+                                                                 .join(", ")
     ),
     &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, ('{}',), {})",
                                                   type_constraint_str(s.product),

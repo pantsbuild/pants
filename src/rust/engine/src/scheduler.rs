@@ -11,7 +11,7 @@ use context::Core;
 use core::{Field, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
-use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies};
+use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies, SelectTransitive};
 use selectors;
 
 /**
@@ -34,6 +34,7 @@ impl Scheduler {
       .map(|r| match r {
         &Root::Select(ref s) => s.clone().into(),
         &Root::SelectDependencies(ref s) => s.clone().into(),
+        &Root::SelectTransitive(ref s) => s.clone().into(),
       })
       .collect()
   }
@@ -70,6 +71,8 @@ impl Scheduler {
           (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
         &Root::SelectDependencies(ref s) =>
           (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
+        &Root::SelectTransitive(ref s) =>
+          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
       })
       .collect()
   }
@@ -98,6 +101,30 @@ impl Scheduler {
             field: field,
             field_types: field_types,
             transitive: transitive
+          },
+          subject,
+          Default::default(),
+        )
+      )
+    );
+  }
+
+  pub fn add_root_select_transitive(
+    &mut self,
+    subject: Key,
+    product: TypeConstraint,
+    dep_product: TypeConstraint,
+    field: Field,
+    field_types: Vec<TypeId>,
+  ) {
+    self.roots.push(
+      Root::SelectTransitive(
+        SelectTransitive::new(
+          selectors::SelectTransitive {
+            product: product,
+            dep_product: dep_product,
+            field: field,
+            field_types: field_types,
           },
           subject,
           Default::default(),
@@ -143,6 +170,7 @@ impl Scheduler {
 enum Root {
   Select(Select),
   SelectDependencies(SelectDependencies),
+  SelectTransitive(SelectTransitive)
 }
 
 pub type RootResult = Result<Value, Failure>;

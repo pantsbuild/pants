@@ -71,7 +71,12 @@ impl Entry {
   fn new(id: EntryId, node: NodeKey, context: Context) -> Entry {
     let core = context.core();
     let pool = core.pool();
-    Entry {
+    println!("creating entry from node: {:?}", node);
+    match node {
+      NodeKey::SelectDependencies(ref s) =>  (), //assert!(false),
+      _ => ()
+    }
+    let entry = Entry {
       id: id,
       node: node.clone(),
       state:
@@ -84,7 +89,10 @@ impl Entry {
       dependencies: Default::default(),
       dependents: Default::default(),
       cyclic_dependencies: Default::default(),
-    }
+    };
+
+    //assert!(false);
+    return entry
   }
 
   fn unwrap<N: Node>(
@@ -351,8 +359,11 @@ impl InnerGraph {
     for entry in self.walk(root_entries, |_| true, false) {
       let node_str = entry.format::<NodeKey>();
 
+      let color = format_color(entry);
+      println!("Entry {} with color {}.", node_str, color);
+      try!(f.write_fmt(format_args!("/* Entry {} with color {}. */", node_str, color)));
       // Write the node header.
-      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
+      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, color)));
 
       for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
         let style = if cyclic { " [style=dashed]" } else { "" };
