@@ -360,7 +360,6 @@ impl InnerGraph {
       let node_str = entry.format::<NodeKey>();
 
       let color = format_color(entry);
-      println!("Entry {} with color {}.", node_str, color);
       try!(f.write_fmt(format_args!("/* Entry {} with color {}. */", node_str, color)));
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, color)));

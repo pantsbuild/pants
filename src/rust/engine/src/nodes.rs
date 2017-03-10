@@ -584,36 +584,12 @@ impl SelectDependencies {
     println!("in SelectDependencies.get_dep transitive={}", self.selector.transitive);
 
     let dep_subject_key = externs::key_for(dep_subject);
-    if self.selector.transitive {
-      // After the root has been expanded, a traversal continues with dep_product == product.
-      let mut selector = self.selector.clone();
-      selector.dep_product = selector.product;
-      context.get(
-        SelectDependencies {
-          subject: dep_subject_key,
-          variants: self.variants.clone(),
-          selector: selector,
-        }
-      )
-    } else {
-      context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
-    }
+    context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
   }
 
   fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    println!("in SelectDependencies.store transitive={}", self.selector.transitive);
-    if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
-      // If the dep_product is an inner node in the traversal, prepend it to the list of
-      // items to be merged.
-      // TODO: would be nice to do this in one operation.
-      let prepend = externs::store_list(vec![dep_product], false);
-      let mut prepended = dep_values;
-      prepended.insert(0, &prepend);
-      externs::store_list(prepended, self.selector.transitive)
-    } else {
-      // Not an inner node, or not a traversal.
-      externs::store_list(dep_values, self.selector.transitive)
-    }
+    // Not an inner node, or not a traversal.
+    externs::store_list(dep_values, false)
   }
 }
 
