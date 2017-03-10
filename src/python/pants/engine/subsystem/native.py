@@ -193,12 +193,6 @@ _FFI.cdef(
                                                 Buffer,
                                                 TypeIdBuffer,
                                                 bool);
-    void execution_add_root_select_transitive(RawScheduler*,
-                                              Key,
-                                              TypeConstraint,
-                                              TypeConstraint,
-                                              Buffer,
-                                              TypeIdBuffer);
     ExecutionStat execution_execute(RawScheduler*);
     RawNodes* execution_roots(RawScheduler*);
 

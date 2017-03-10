@@ -258,15 +258,6 @@ class WrappedNativeScheduler(object):
                                                               self._to_ids_buf(
                                                                 selector.field_types),
                                                               selector.transitive)
-    elif type(selector) is SelectTransitive:
-      self._native.lib.execution_add_root_select_transitive(self._scheduler,
-                                                            self._to_key(subject),
-                                                            self._to_constraint(selector.product),
-                                                            self._to_constraint(
-                                                              selector.dep_product),
-                                                            self._to_utf8_buf(selector.field),
-                                                            self._to_ids_buf(
-                                                              selector.field_types))
     else:
       raise ValueError('Unsupported root selector type: {}'.format(selector))
 
