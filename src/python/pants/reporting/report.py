@@ -67,7 +67,7 @@ class Report(object):
     self._reporters = {}  # name -> Reporter instance.
 
     # We synchronize on this, to support parallel execution.
-    self._lock = threading.Lock()
+    self._lock = threading.RLock()
 
   def open(self):
     with self._lock:

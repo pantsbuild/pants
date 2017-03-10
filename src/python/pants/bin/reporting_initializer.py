@@ -20,6 +20,7 @@ class ReportingInitializer(object):
   def setup(self):
     """Start up the RunTracker and log reporting details."""
     report = self._reporting.initial_reporting(self._run_tracker)
+    self._run_tracker.setup_logging()
     self._run_tracker.start(report)
 
     url = self._run_tracker.run_info.get_info('report_url')

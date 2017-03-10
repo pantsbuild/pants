@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import logging
 import multiprocessing
 import os
 import sys
@@ -13,6 +14,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
+from logging import Handler
 
 import requests
 
@@ -26,6 +28,15 @@ from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
+
+
+class LogHandler(Handler):
+  def __init__(self, run_tracker):
+    super(LogHandler, self).__init__()
+    self._run_tracker = run_tracker
+
+  def emit(self, record):
+    self._run_tracker.log(Report.log_level_from_string(record.levelname), record.getMessage())
 
 
 class RunTracker(Subsystem):
@@ -143,6 +154,24 @@ class RunTracker(Subsystem):
     SubprocPool.foreground()
 
     self._aborted = False
+
+  def setup_logging(self):
+    # Replace the StreamHandler added to the root logger by pants before full options
+    # parsing with the new logging handler.
+    logger = logging.getLogger(None)
+    if not (len(logger.handlers) == 1 and isinstance(logger.handlers[0], logging.StreamHandler)):
+      print('WARN: Expected to remove only one StreamHandler from root logger. Not replacing '
+            'existing handlers: {!r}'.format(logger.handlers))
+      return
+
+    for old_handler in logger.handlers:
+      logger.removeHandler(old_handler)
+
+    handler = LogHandler(self)
+    # The report ensures the right level,
+    # so we want all messages to pass through to it.
+    handler.setLevel('DEBUG')
+    logger.addHandler(handler)
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.

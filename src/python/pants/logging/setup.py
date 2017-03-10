@@ -14,6 +14,11 @@ from logging.handlers import RotatingFileHandler
 from pants.util.dirutil import safe_mkdir
 
 
+def _reset_handlers(logger):
+  for handler in logger.handlers:
+    logger.removeHandler(handler)
+
+
 def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
   """Configures logging for a given scope, by default the global scope.
 
@@ -41,8 +46,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # standard logging knob.
 
   logger = logging.getLogger(scope)
-  for handler in logger.handlers:
-    logger.removeHandler(handler)
+  _reset_handlers(logger)
 
   if console_stream:
     log_file = None
@@ -53,31 +57,9 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   if log_dir:
     safe_mkdir(log_dir)
+
     log_file = os.path.join(log_dir, log_name or 'pants.log')
-    file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=4)
-
-    class GlogFormatter(Formatter):
-      LEVEL_MAP = {
-          logging.FATAL: 'F',
-          logging.ERROR: 'E',
-          logging.WARN: 'W',
-          logging.INFO: 'I',
-          logging.DEBUG: 'D'}
-
-      def format(self, record):
-        datetime = time.strftime('%m%d %H:%M:%S', time.localtime(record.created))
-        micros = int((record.created - int(record.created)) * 1e6)
-        return '{levelchar}{datetime}.{micros:06d} {process} {filename}:{lineno}] {msg}'.format(
-            levelchar=self.LEVEL_MAP[record.levelno],
-            datetime=datetime,
-            micros=micros,
-            process=record.process,
-            filename=record.filename,
-            lineno=record.lineno,
-            msg=record.getMessage())
-
-    file_handler.setFormatter(GlogFormatter())
-    file_handler.setLevel(level)
+    file_handler = _setup_file_handler(level, log_file)
     logger.addHandler(file_handler)
 
   logger.setLevel(level)
@@ -86,3 +68,31 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   logging.captureWarnings(True)
 
   return log_file
+
+
+def _setup_file_handler(level, log_file):
+  file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=4)
+
+  class GlogFormatter(Formatter):
+    LEVEL_MAP = {
+      logging.FATAL: 'F',
+      logging.ERROR: 'E',
+      logging.WARN: 'W',
+      logging.INFO: 'I',
+      logging.DEBUG: 'D'}
+
+    def format(self, record):
+      datetime = time.strftime('%m%d %H:%M:%S', time.localtime(record.created))
+      micros = int((record.created - int(record.created)) * 1e6)
+      return '{levelchar}{datetime}.{micros:06d} {process} {filename}:{lineno}] {msg}'.format(
+        levelchar=self.LEVEL_MAP[record.levelno],
+        datetime=datetime,
+        micros=micros,
+        process=record.process,
+        filename=record.filename,
+        lineno=record.lineno,
+        msg=record.getMessage())
+
+  file_handler.setFormatter(GlogFormatter())
+  file_handler.setLevel(level)
+  return file_handler
