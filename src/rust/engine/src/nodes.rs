@@ -581,7 +581,6 @@ impl SelectDependencies {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
-    println!("in SelectDependencies.get_dep transitive={}", self.selector.transitive);
 
     let dep_subject_key = externs::key_for(dep_subject);
     context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))

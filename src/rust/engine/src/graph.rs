@@ -71,7 +71,6 @@ impl Entry {
   fn new(id: EntryId, node: NodeKey, context: Context) -> Entry {
     let core = context.core();
     let pool = core.pool();
-    println!("creating entry from node: {:?}", node);
     match node {
       NodeKey::SelectDependencies(ref s) =>  (), //assert!(false),
       _ => ()
