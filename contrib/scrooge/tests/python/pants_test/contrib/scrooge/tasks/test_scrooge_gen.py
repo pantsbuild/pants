@@ -110,7 +110,8 @@ class ScroogeGenTest(TaskTestBase):
         dependencies=[],
         compiler='scrooge',
         language='{language}',
-        rpc_style='{rpc_style}'
+        rpc_style='{rpc_style}',
+        strict_deps=True,
       )
     '''.format(language=language, rpc_style=rpc_style))
 
@@ -141,6 +142,7 @@ class ScroogeGenTest(TaskTestBase):
       self.assertEquals(call_kwargs['provides'], None)
       self.assertEquals(call_kwargs['sources'], [])
       self.assertEquals(call_kwargs['derived_from'], target)
+      self.assertEquals(call_kwargs['strict_deps'], True)
 
     finally:
       Context.add_new_target = saved_add_new_target
