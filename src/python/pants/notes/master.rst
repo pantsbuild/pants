@@ -5,6 +5,46 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0.dev13 (3/10/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Bump pex version to latest. (#4314)
+  `PR #4314 <https://github.com/pantsbuild/pants/pull/4314>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Binary builder task for the new python pipeline. (#4313)
+  `PR #4313 <https://github.com/pantsbuild/pants/pull/4313>`_
+
+* [engine] rm python graphmaker; create dot formatted display (#4295)
+  `PR #4295 <https://github.com/pantsbuild/pants/pull/4295>`_
+
+* A setup_py task for the new python pipeline. (#4308)
+  `PR #4308 <https://github.com/pantsbuild/pants/pull/4308>`_
+
+Bugfixes
+~~~~~~~~
+
+* scrooge_gen task copy strict_deps field (#4321)
+  `PR #4321 <https://github.com/pantsbuild/pants/pull/4321>`_
+
+* [jvm-compile] Copy compile classpath into runtime classpath even if already defined (#4310)
+  `PR #4310 <https://github.com/pantsbuild/pants/pull/4310>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix reliance on symlinks in testdata. (#4320)
+  `PR #4320 <https://github.com/pantsbuild/pants/pull/4320>`_
+
+* Introduce SUPPRESS_LABEL on workunit's console output and have thrift-linter and jar-tool adopt it (#4318)
+  `PR #4318 <https://github.com/pantsbuild/pants/pull/4318>`_
+
 1.3.0.dev12 (3/3/2017)
 ----------------------
 A weekly unstable release.
