@@ -66,8 +66,8 @@ python_library(
   dependencies=[
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
-    'src/python/pants/backend/python:python_setup',
     'src/python/pants/option:option',
+    'src/python/pants/python',
     'src/python/pants/subsystem:subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

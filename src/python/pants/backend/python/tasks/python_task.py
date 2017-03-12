@@ -16,12 +16,12 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.base import hash_utils
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.python.python_setup import PythonRepos, PythonSetup
 from pants.task.task import Task
 
 
