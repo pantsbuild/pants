@@ -13,13 +13,14 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.python.python_setup import PythonRepos, PythonSetup
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 
 
 class TestInterpreterCache(BaseTest):
-  def _make_bad_requirement(self, requirement):
+  @staticmethod
+  def _make_bad_requirement(requirement):
     """Turns a requirement that passes into one we know will fail.
 
     E.g. 'CPython==2.7.5' becomes 'CPython==99.7.5'

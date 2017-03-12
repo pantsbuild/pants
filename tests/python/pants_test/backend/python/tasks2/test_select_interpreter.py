@@ -9,9 +9,9 @@ import mock
 from pex.interpreter import PythonIdentity, PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
+from pants.python.python_setup import PythonSetup
 from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import TaskTestBase
 

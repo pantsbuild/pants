@@ -20,7 +20,6 @@ from six import StringIO
 from six.moves import configparser
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
@@ -73,7 +72,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest, PythonSetup, PythonRepos)
+    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
 
   @classmethod
   def register_options(cls, register):

@@ -27,7 +27,6 @@ python_library(
     ':python_chroot',
     ':python_requirement',
     ':python_requirements',
-    ':python_setup',
     ':sdist_builder',
     ':thrift_builder',
   ]
@@ -38,17 +37,6 @@ page(
   source = 'README.md',
   links = [
     'src/python/pants:readme',
-  ]
-)
-
-python_library(
-  name = 'python_setup',
-  sources = ['python_setup.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
-    'src/python/pants/option',
-    'src/python/pants/subsystem',
   ]
 )
 
