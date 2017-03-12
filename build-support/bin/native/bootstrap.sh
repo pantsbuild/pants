@@ -23,6 +23,7 @@ source ${REPO_ROOT}/build-support/bin/native/utils.sh
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_MODULE="native_engine"
+readonly NATIVE_ENGINE_BINARY="${NATIVE_ENGINE_MODULE}.so"
 readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
 readonly CFFI_BOOTSTRAPPER="${REPO_ROOT}/build-support/native-engine/bootstrap_cffi.py"
 
@@ -102,7 +103,7 @@ function bootstrap_native_code() {
   # Bootstraps the native code and overwrites the native_engine_version to the resulting hash
   # version if needed.
   local native_engine_version="$(calculate_current_hash)"
-  local target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_MODULE}.so"
+  local target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local cffi_output_dir="${NATIVE_ROOT}/src/cffi"
   local cffi_env_script="${cffi_output_dir}/${NATIVE_ENGINE_MODULE}.sh"
   if [ ! -f "${target_binary}" ]
@@ -113,7 +114,7 @@ function bootstrap_native_code() {
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
-    target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_MODULE}.so"
+    target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
 
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" "${target_binary}"
