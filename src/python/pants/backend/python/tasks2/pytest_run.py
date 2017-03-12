@@ -18,7 +18,6 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
@@ -69,7 +68,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest, PythonSetup, PythonRepos)
+    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
 
   @classmethod
   def register_options(cls, register):

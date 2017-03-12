@@ -12,10 +12,10 @@ from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
+from pants.python.python_setup import PythonRepos, PythonSetup
 from pants.util.contextutil import temporary_file
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -104,7 +104,8 @@ class ResolveRequirementsTest(TaskTestBase):
                             requirements=requirements)
 
   def _resolve_requirements(self, target_roots, options=None):
-    context = self.context(target_roots=target_roots, options=options)
+    context = self.context(target_roots=target_roots, options=options,
+                           for_subsystems=[PythonSetup, PythonRepos])
 
     # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
     # to ensure that the interpreter has setuptools and wheel support.
