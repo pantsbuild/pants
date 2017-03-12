@@ -6,7 +6,7 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::Mutex;
 
 use futures::future::{self, Future};
 
@@ -44,6 +44,16 @@ impl EntryStateGetter for EntryStateField {
   }
 }
 
+/**
+ * Because there are guaranteed to be more edges than nodes in Graphs, we mark cyclic
+ * dependencies via a wrapper around the NodeKey (rather than adding a byte to every
+ * valid edge).
+ */
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+enum EntryKey {
+  Valid(NodeKey),
+  Cyclic(NodeKey),
+}
 
 /**
  * An Entry and its adjacencies.
@@ -53,13 +63,11 @@ pub struct Entry {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
-  node: NodeKey,
+  node: EntryKey,
   state: EntryStateField,
   // Sets of all Nodes which have ever been awaited by this Node.
   dependencies: DepSet,
   dependents: DepSet,
-  // Deps that would be illegal to actually provide, since they would be cyclic.
-  cyclic_dependencies: DepSet,
 }
 
 impl Entry {
@@ -68,22 +76,27 @@ impl Entry {
    * a caller actually pulls on it. This indirection exists in order to allow Nodes to start
    * outside of the Graph lock.
    */
-  fn new(id: EntryId, node: NodeKey, context: Context) -> Entry {
-    let core = context.core();
-    let pool = core.pool();
-    Entry {
-      id: id,
-      node: node.clone(),
-      state:
-        future::Shared::new(
+  fn new(id: EntryId, node: EntryKey, context: Context) -> Entry {
+    let state =
+      match node.clone() {
+        EntryKey::Valid(n) => {
+          let core = context.core();
+          let pool = core.pool();
           pool.spawn_fn(move || {
-            node.run(context)
+            n.run(context)
           })
           .boxed()
-        ),
+        },
+        EntryKey::Cyclic(_) =>
+          future::err(Failure::Noop("Dep would be cyclic.", None)).boxed(),
+      };
+
+    Entry {
+      id: id,
+      node: node,
+      state: future::Shared::new(state),
       dependencies: Default::default(),
       dependents: Default::default(),
-      cyclic_dependencies: Default::default(),
     }
   }
 
@@ -123,10 +136,6 @@ impl Entry {
     &self.dependents
   }
 
-  fn cyclic_dependencies(&self) -> &DepSet {
-    &self.cyclic_dependencies
-  }
-
   fn format<N: Node>(&self) -> String {
     let state =
       match self.peek::<N>() {
@@ -139,7 +148,7 @@ impl Entry {
   }
 }
 
-type Nodes = HashMap<NodeKey, EntryId, FNV>;
+type Nodes = HashMap<EntryKey, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
 
 struct InnerGraph {
@@ -149,11 +158,7 @@ struct InnerGraph {
 }
 
 impl InnerGraph {
-  fn cyclic<T: Send + 'static>(&self) -> NodeFuture<T> {
-    future::err(Failure::Noop("Dep would be cyclic.", None)).boxed()
-  }
-
-  fn entry(&self, node: &NodeKey) -> Option<&Entry> {
+  fn entry(&self, node: &EntryKey) -> Option<&Entry> {
     self.nodes.get(node).map(|&id| self.entry_for_id(id))
   }
 
@@ -165,7 +170,7 @@ impl InnerGraph {
     self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  fn ensure_entry(&mut self, context: &ContextFactory, node: NodeKey) -> EntryId {
+  fn ensure_entry(&mut self, context: &ContextFactory, node: EntryKey) -> EntryId {
     InnerGraph::ensure_entry_internal(
       &mut self.entries,
       &mut self.nodes,
@@ -180,7 +185,7 @@ impl InnerGraph {
     nodes: &mut Nodes,
     id_generator: &mut usize,
     context_factory: &ContextFactory,
-    node: NodeKey
+    node: EntryKey
   ) -> EntryId {
     // See TODO on Entry.
     let entry_node = node.clone();
@@ -240,9 +245,9 @@ impl InnerGraph {
    * Begins a topological walk from the given roots. Provides both the current entry as well as the
    * depth from the root.
    */
-  fn leveled_walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
+  fn leveled_walk<P>(&self, roots: Vec<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
     where P: Fn(&Entry, Level) -> bool {
-    let rrr = roots.iter().map(|&r| (r, 0)).collect::<VecDeque<_>>();
+    let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
     LeveledWalk {
       graph: self,
       dependents: dependents,
@@ -306,7 +311,7 @@ impl InnerGraph {
     }
 
     // Filter the Nodes to delete any with matching ids.
-    let filtered: Vec<(NodeKey, EntryId)> =
+    let filtered: Vec<(EntryKey, EntryId)> =
       nodes.drain()
         .filter(|&(_, id)| !ids.contains(&id))
         .collect();
@@ -345,7 +350,10 @@ impl InnerGraph {
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=TB;\n"));
 
-    let root_entries = roots.iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
+    let root_entries =
+      roots.iter()
+        .filter_map(|n| self.entry(&EntryKey::Valid(n.clone())))
+        .map(|e| e.id).collect();
     let predicate = |_| true;
 
     for entry in self.walk(root_entries, |_| true, false) {
@@ -354,18 +362,15 @@ impl InnerGraph {
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
 
-      for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
-        let style = if cyclic { " [style=dashed]" } else { "" };
-        for &dep_id in adjacencies {
-          let dep_entry = self.entry_for_id(dep_id);
-          if !predicate(dep_entry) {
-            continue;
-          }
-
-          // Write an entry per edge.
-          let dep_str = dep_entry.format::<NodeKey>();
-          try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"{}\n", node_str, dep_str, style)));
+      for &dep_id in &entry.dependencies {
+        let dep_entry = self.entry_for_id(dep_id);
+        if !predicate(dep_entry) {
+          continue;
         }
+
+        // Write an entry per edge.
+        let dep_str = dep_entry.format::<NodeKey>();
+        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str)));
       }
     }
 
@@ -418,15 +423,13 @@ impl InnerGraph {
       }
     };
 
-    let root_entries = vec![root].iter().filter_map(|n| self.entry(n)).map(|e| e.id).collect();
+    let root_entries =
+      self.entry(&EntryKey::Valid(root.clone()))
+        .map(|e| vec![e.id])
+        .unwrap_or_else(|| vec![]);
     for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
       let (entry, level) = t;
       try!(write!(&mut f, "{}\n", _format(entry, level)));
-
-      for dep_entry in &entry.cyclic_dependencies {
-        let indent= _indent(level);
-        try!(write!(&mut f, "{}cycle for {:?}\n", indent, dep_entry));
-      }
     }
 
     try!(f.write_all(b"\n"));
@@ -438,7 +441,7 @@ impl InnerGraph {
  * A DAG (enforced on mutation) of Entries.
  */
 pub struct Graph {
-  inner: RwLock<InnerGraph>,
+  inner: Mutex<InnerGraph>,
 }
 
 impl Graph {
@@ -450,12 +453,12 @@ impl Graph {
         entries: HashMap::default(),
       };
     Graph {
-      inner: RwLock::new(inner),
+      inner: Mutex::new(inner),
     }
   }
 
   pub fn len(&self) -> usize {
-    let inner = self.inner.read().unwrap();
+    let inner = self.inner.lock().unwrap();
     inner.entries.len()
   }
 
@@ -464,67 +467,41 @@ impl Graph {
    */
   pub fn peek<N: Node>(&self, node: N) -> Option<Result<N::Output, Failure>> {
     let node = node.into();
-    let inner = self.inner.read().unwrap();
-    inner.entry(&node).and_then(|e| e.peek::<N>())
+    let inner = self.inner.lock().unwrap();
+    inner.entry(&EntryKey::Valid(node)).and_then(|e| e.peek::<N>())
   }
 
   /**
    * In the context of the given src Node, declare a dependency on the given dst Node and
    * begin its execution if it has not already started.
-   *
-   * TODO: Restore the invariant that completed Nodes may only depend on other completed Nodes
-   * to make cycle detection cheaper.
-   *
-   * TODO: The vast majority of `get` calls will occur exactly once per src+dst, so double
-   * checking a RwLock here is probably overkill. Should switch to Mutex and acquire once.
    */
   pub fn get<N: Node>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
     let dst_node = dst_node.into();
 
-    // First, check whether the destination already exists, and the dep is already declared.
-    let dst_state_opt = {
-      let inner = self.inner.read().unwrap();
-      let src_entry = inner.entry_for_id(src_id);
-      if let Some(dst_entry) = inner.entry(&dst_node) {
-        if src_entry.dependencies().contains(&dst_entry.id) {
-          // Declared and valid.
-          Some(dst_entry.state())
-        } else if src_entry.cyclic_dependencies().contains(&dst_entry.id) {
-          // Declared but cyclic.
-          return inner.cyclic();
+    // Get or create the destination, and then insert the dep and return its state.
+    let dst_state = {
+      let mut inner = self.inner.lock().unwrap();
+      let dst_id = {
+        // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+        // without a much more complicated algorithm.
+        let potential_dst_id = inner.ensure_entry(context, EntryKey::Valid(dst_node.clone()));
+        if inner.detect_cycle(src_id, potential_dst_id) {
+          // Cyclic dependency: declare a dependency on a copy of the Node that is marked cyclic.
+          inner.ensure_entry(context, EntryKey::Cyclic(dst_node.clone()))
         } else {
-          // Exists, but isn't declared.
-          None
+          // Valid dependency.
+          potential_dst_id
         }
-      } else {
-        // Hasn't been created.
-        None
-      }
+      };
+
+      inner.entry_for_id_mut(src_id).dependencies.insert(dst_id);
+      let dst_entry = inner.entry_for_id_mut(dst_id);
+      dst_entry.dependents.insert(src_id);
+      dst_entry.state()
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
     // retrieve it.
-    if let Some(dst_state) = dst_state_opt {
-      return dst_state.get::<N>();
-    }
-
-    // Get or create the destination, and then insert the dep and return its state.
-    // TODO: doing cycle detection under the writelock... unfortunate, but probably unavoidable
-    // without a much more complicated algorithm.
-    let dst_state = {
-      let mut inner = self.inner.write().unwrap();
-      let dst_id = inner.ensure_entry(context, dst_node.clone());
-      if inner.detect_cycle(src_id, dst_id) {
-        inner.entry_for_id_mut(src_id).cyclic_dependencies.insert(dst_id);
-        return inner.cyclic();
-      } else {
-        inner.entry_for_id_mut(src_id).dependencies.insert(dst_id);
-        let dst_entry = inner.entry_for_id_mut(dst_id);
-        dst_entry.dependents.insert(src_id);
-        dst_entry.state()
-      }
-    };
-
     dst_state.get::<N>()
   }
 
@@ -534,8 +511,8 @@ impl Graph {
   pub fn create<N: Node>(&self, node: N, context: &ContextFactory) -> NodeFuture<N::Output> {
     // Initialize the state while under the lock...
     let state = {
-      let mut inner = self.inner.write().unwrap();
-      let id = inner.ensure_entry(context, node.into());
+      let mut inner = self.inner.lock().unwrap();
+      let id = inner.ensure_entry(context, EntryKey::Valid(node.into()));
       inner.entry_for_id(id).state()
     };
     // ...but only `get` it outside the lock.
@@ -543,17 +520,17 @@ impl Graph {
   }
 
   pub fn invalidate(&self, paths: HashSet<PathBuf>) -> usize {
-    let mut inner = self.inner.write().unwrap();
+    let mut inner = self.inner.lock().unwrap();
     inner.invalidate(paths)
   }
 
   pub fn trace(&self, root: &NodeKey, path: &Path) -> io::Result<()> {
-    let inner = self.inner.read().unwrap();
+    let inner = self.inner.lock().unwrap();
     inner.trace(root, path)
   }
 
   pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
-    let inner = self.inner.read().unwrap();
+    let inner = self.inner.lock().unwrap();
     inner.visualize(roots, path)
   }
 }
