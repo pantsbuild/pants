@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+# This bootstrap script runs pants from the live sources in this repo.
+#
+# Further support is added for projects wrapping pants with custom external extensions.  In the
+# future this will work differently (see: https://github.com/pantsbuild/pants/issues/5), but
+# currently pants extenders can invoke this script exporting a few environment variables to include
+# the extension source and requirements for development purposes:
+# WRAPPER_SRCPATH       This is a colon separated list of paths containing extension sourcecode.
+# WRAPPER_REQUIREMENTS  This is a colon separated list of pip install compatible requirements.txt
+#                       files.
+#
+# For example, with a wrapping project layed out like so:
+# /src/wrapper/
+#   src/main/python/
+#     wrapper/
+#       ...
+#   dependencies/python/
+#     BUILD
+#     requirements.txt
+#
+# And a pantsbuild/pants clone like so:
+# /src/pantsbuild-pants
+#
+# You could invoke pants in the wrapper with its custom extension enabled using a script like so:
+# /src/wrapper/pants
+# ==
+# #!/usr/bin/env bash
+# WRAPPER_REQUIREMENTS="/src/wrapper/dependencies/python/requirements.txt" \
+# WRAPPER_SRCPATH=/src/wrapper/src/main/python \
+#    exec /src/pantsbuild-pants/pants "$@"
+#
+
+HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
+
+source ${HERE}/build-support/bin/native/bootstrap.sh
+
+bootstrap_native_code 1>&2
