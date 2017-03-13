@@ -2,6 +2,7 @@
 version = "0.0.1"
 name = "engine"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+build = "src/cffi_build.rs"
 
 [profile.release]
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
@@ -10,6 +11,9 @@ debug = true
 
 [lib]
 crate-type = ["dylib"]
+
+[build-dependencies]
+gcc = "0.3"
 
 [dependencies]
 blake2-rfc = "0.2.17"
