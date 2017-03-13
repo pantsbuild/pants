@@ -50,7 +50,7 @@ def load_plugins(build_configuration, plugins, working_set):
 
   * Plugins are loaded in the order they are provided. *
 
-  This is important as loading can add, remove or replace exiting tasks installed by other plugins.
+  This is important as loading can add, remove or replace existing tasks installed by other plugins.
 
   If a plugin needs to assert that another plugin is registered before it, it can define an
   entrypoint "load_after" which can return a list of plugins which must have been loaded before it

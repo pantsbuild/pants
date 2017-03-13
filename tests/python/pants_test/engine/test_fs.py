@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import tarfile
 import unittest
 from contextlib import contextmanager
 
@@ -16,23 +17,27 @@ from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
 
 class DirectoryListing(object):
-  "TODO: See #4027."
+  """TODO: See #4027."""
 
 
 class ReadLink(object):
-  "TODO: See #4027."
+  """TODO: See #4027."""
 
 
 class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
 
-  _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test')
+  _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test/fs_test.tar')
 
   @contextmanager
-  def mk_project_tree(self, build_root_src):
+  def mk_project_tree(self):
     """Construct a ProjectTree for the given src path."""
-    yield self.mk_fs_tree(build_root_src)
+    project_tree = self.mk_fs_tree()
+    with tarfile.open(self._original_src) as tar:
+      tar.extractall(project_tree.build_root)
+    yield project_tree
 
-  def specs(self, relative_to, *filespecs):
+  @staticmethod
+  def specs(relative_to, *filespecs):
     return PathGlobs.create(relative_to, include=filespecs)
 
   def assert_walk_dirs(self, filespecs, paths):
@@ -42,20 +47,20 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
     self.assert_walk_snapshot('files', filespecs, paths)
 
   def assert_walk_snapshot(self, field, filespecs, paths):
-    with self.mk_project_tree(self._original_src) as project_tree:
+    with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
       self.assertEquals(sorted([p.path for p in getattr(result, field)]), sorted(paths))
 
   def assert_content(self, filespecs, expected_content):
-    with self.mk_project_tree(self._original_src) as project_tree:
+    with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
       actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEquals(expected_content, actual_content)
 
   def assert_digest(self, filespecs, expected_files):
-    with self.mk_project_tree(self._original_src) as project_tree:
+    with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
       # Confirm all expected files were digested.
@@ -63,7 +68,7 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
       self.assertTrue(result.fingerprint is not None)
 
   def assert_fsnodes(self, filespecs, subject_product_pairs):
-    with self.mk_project_tree(self._original_src) as project_tree:
+    with self.mk_project_tree() as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       request = self.execute_request(scheduler, Snapshot, self.specs('', *filespecs))
 
