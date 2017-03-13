@@ -1,0 +1,9 @@
+# N.B. On OSX, we force weak linking by passing the param `-undefined dynamic_lookup` to
+# the underlying linker used by cargo/rustc via RUSTFLAGS. This avoids "missing symbol"
+# errors for Python symbols (e.g. `_PyImport_ImportModule`) at build time when bundling
+# the CFFI C sources. The missing symbols will instead by dynamically resolved in the
+# address space of the parent binary (e.g. `python`) at runtime - obviating a need to
+# link to libpython.
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-args=-undefined dynamic_lookup"]
