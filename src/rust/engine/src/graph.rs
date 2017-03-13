@@ -55,6 +55,15 @@ enum EntryKey {
   Cyclic(NodeKey),
 }
 
+impl EntryKey {
+  fn content(&self) -> &NodeKey {
+    match self {
+      &EntryKey::Valid(ref v) => v,
+      &EntryKey::Cyclic(ref v) => v,
+    }
+  }
+}
+
 /**
  * An Entry and its adjacencies.
  */
@@ -144,7 +153,7 @@ impl Entry {
         Some(Err(ref x)) => format!("{:?}", x),
         None => "<None>".to_string(),
       };
-    format!("{} == {}", self.node.format(), state).replace("\"", "\\\"")
+    format!("{} == {}", self.node.content().format(), state).replace("\"", "\\\"")
   }
 }
 
@@ -266,7 +275,7 @@ impl InnerGraph {
       let root_ids =
         self.nodes.iter()
           .filter_map(|(node, &entry_id)| {
-            node.fs_subject().and_then(|path| {
+            node.content().fs_subject().and_then(|path| {
               if paths.contains(path) {
                 Some(entry_id)
               } else {
@@ -338,7 +347,7 @@ impl InnerGraph {
           Some(Err(Failure::Throw(_))) => "4".to_string(),
           Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
-            viz_colors.entry(entry.node.product_str()).or_insert_with(|| {
+            viz_colors.entry(entry.node.content().product_str()).or_insert_with(|| {
               format!("{}", viz_colors_len % viz_max_colors + 1)
             }).clone()
           },
@@ -409,7 +418,7 @@ impl InnerGraph {
 
     let _format = |entry: &Entry, level: u32| -> String {
       let indent = _indent(level);
-      let output = format!("{}Computing {}", indent, entry.node.format());
+      let output = format!("{}Computing {}", indent, entry.node.content().format());
       if is_one_level_above_bottom(entry) {
         let state_str = match entry.peek::<NodeKey>() {
           None => "<None>".to_string(),
@@ -486,7 +495,7 @@ impl Graph {
         // without a much more complicated algorithm.
         let potential_dst_id = inner.ensure_entry(context, EntryKey::Valid(dst_node.clone()));
         if inner.detect_cycle(src_id, potential_dst_id) {
-          // Cyclic dependency: declare a dependency on a copy of the Node that is marked cyclic.
+          // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
           inner.ensure_entry(context, EntryKey::Cyclic(dst_node.clone()))
         } else {
           // Valid dependency.
