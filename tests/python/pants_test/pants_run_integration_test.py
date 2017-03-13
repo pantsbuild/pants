@@ -200,7 +200,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     if self.hermetic():
       env = dict()
       for h in self.hermetic_env_whitelist():
-        env[h] = os.getenv(h)
+        env[h] = os.getenv(h) or ''
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
