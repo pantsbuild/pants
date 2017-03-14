@@ -8,6 +8,8 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
+use petgraph::graphmap::DiGraphMap;
+use petgraph;
 use futures::future::{self, Future};
 
 use externs;
@@ -25,7 +27,7 @@ use nodes::{
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct EntryId(usize);
+pub struct EntryId(u32);
 
 pub type DepSet = HashSet<EntryId, FNV>;
 
@@ -74,9 +76,6 @@ pub struct Entry {
   // maps is painful.
   node: EntryKey,
   state: EntryStateField,
-  // Sets of all Nodes which have ever been awaited by this Node.
-  dependencies: DepSet,
-  dependents: DepSet,
 }
 
 impl Entry {
@@ -164,6 +163,7 @@ struct InnerGraph {
   id_generator: usize,
   nodes: Nodes,
   entries: Entries,
+  pg: DiGraphMap<EntryId, ()>,
 }
 
 impl InnerGraph {
