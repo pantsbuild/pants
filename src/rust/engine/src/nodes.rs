@@ -904,6 +904,7 @@ impl Task {
    * TODO: Can/should inline execution of all of these.
    */
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
+
     match selector {
       Selector::Select(s) =>
         context.get(Select {
@@ -918,16 +919,43 @@ impl Task {
           selector: s,
         }),
       Selector::SelectProjection(s) =>
-        context.get(SelectProjection {
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          selector: s,
-        }),
+        context.get(
+          Select::new(s.input_product, self.subject.clone(), self.variants.clone())
+        )
+        .then(move |dep_product_res| {
+          match dep_product_res {
+            Ok(dep_product) => {
+              // And then project the relevant field.
+              let projected_subject =
+              externs::project(
+                &dep_product,
+                &s.field,
+                &s.projected_subject
+              );
+              context
+                  .get(
+                    Select::new(
+                      s.product,
+                      externs::key_for(&projected_subject),
+                      self.variants.clone()
+                    )
+                  )
+                  .then(move |output_res| {
+                    // If the output product is available, return it.
+                    match output_res {
+                      Ok(output) => Ok(output),
+                      Err(failure) => Err(context.was_required(failure)),
+                    }
+                  })
+                  .boxed()
+            },
+            Err(failure) =>
+              context.err(context.was_optional(failure, "No source of input product.")),
+          }
+        }).boxed(),
+
       Selector::SelectLiteral(s) =>
-        context.get(SelectLiteral {
-          variants: self.variants.clone(),
-          selector: s,
-        }),
+        context.ok(externs::val_for(&s.subject)),
     }
   }
 }
