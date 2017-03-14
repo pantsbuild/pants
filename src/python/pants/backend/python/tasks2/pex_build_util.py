@@ -138,7 +138,7 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       platform=None if platform == 'current' else platform,
       context=python_repos.get_network_context(),
       cache=requirements_cache_dir,
-      cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
+      cache_ttl=python_setup.resolver_cache_ttl,
       allow_prereleases=python_setup.resolver_allow_prereleases)
 
   return distributions

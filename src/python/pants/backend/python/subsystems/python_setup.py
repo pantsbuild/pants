@@ -54,8 +54,6 @@ class PythonSetup(Subsystem):
                   'If unspecified, a standard path under the workdir is used.')
     register('--resolver-cache-ttl', advanced=True, type=int, metavar='<seconds>',
              default=10 * 365 * 86400,  # 10 years.
-             removal_version='1.5.0.dev0',
-             removal_hint='Defunct option.  Resolver cache now never expires.',
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')
     register('--resolver-allow-prereleases', advanced=True, type=bool, default=False,
@@ -95,6 +93,10 @@ class PythonSetup(Subsystem):
   def resolver_cache_dir(self):
     return (self.get_options().resolver_cache_dir or
             os.path.join(self.scratch_dir, 'resolved_requirements'))
+
+  @property
+  def resolver_cache_ttl(self):
+    return self.get_options().resolver_cache_ttl
 
   @property
   def resolver_allow_prereleases(self):
