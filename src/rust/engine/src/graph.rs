@@ -231,20 +231,18 @@ impl InnerGraph {
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, { |_| true }, dependents).any(|e| e.id == needle)
+    self.walk(roots, dependents).any(|eid| eid == needle)
   }
 
   /**
    * Begins a topological Walk from the given roots.
    */
-  fn walk<P>(&self, roots: VecDeque<EntryId>, predicate: P, dependents: bool) -> Walk<P>
-    where P: Fn(&Entry)->bool {
+  fn walk(&self, roots: VecDeque<EntryId>, dependents: bool) -> Walk {
     Walk {
       graph: self,
       direction: if dependents { Direction::Incoming } else { Direction::Outgoing },
       deque: roots,
       walked: HashSet::default(),
-      predicate: predicate,
     }
   }
 
@@ -282,7 +280,7 @@ impl InnerGraph {
             })
           })
           .collect();
-      self.walk(root_ids, { |_| true }, true).map(|e| e.id).collect()
+      self.walk(root_ids, true).map(|eid| eid).collect()
     };
 
     // Then remove all entries in one shot.
@@ -365,7 +363,8 @@ impl InnerGraph {
         .map(|e| e.id).collect();
     let predicate = |_| true;
 
-    for entry in self.walk(root_entries, |_| true, false) {
+    for eid in self.walk(root_entries, false) {
+      let entry = self.entry_for_id(eid);
       let node_str = entry.format::<NodeKey>();
 
       // Write the node header.
@@ -548,32 +547,25 @@ impl Graph {
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
-struct Walk<'a, P: Fn(&Entry)->bool> {
+struct Walk<'a> {
   graph: &'a InnerGraph,
   direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
-  predicate: P,
 }
 
-impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
-  type Item = &'a Entry;
+impl<'a> Iterator for Walk<'a> {
+  type Item = EntryId;
 
-  fn next(&mut self) -> Option<&'a Entry> {
+  fn next(&mut self) -> Option<EntryId> {
     while let Some(id) = self.deque.pop_front() {
-      if self.walked.contains(&id) {
-        continue;
-      }
-      self.walked.insert(id);
-
-      let entry = self.graph.entry_for_id(id);
-      if !(self.predicate)(entry) {
+      if !self.walked.insert(id) {
         continue;
       }
 
-      // Entry matches: queue its neighbors and then return it.
+      // Queue the neighbors of the entry and then return it.
       self.deque.extend(self.graph.pg.neighbors_directed(id, self.direction));
-      return Some(entry);
+      return Some(id);
     }
 
     None
