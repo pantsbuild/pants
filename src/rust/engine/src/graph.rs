@@ -8,8 +8,8 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use petgraph::graphmap::DiGraphMap;
-use petgraph;
+use petgraph::Direction;
+use petgraph::graphmap::{DiGraphMap, GraphMap};
 use futures::future::{self, Future};
 
 use externs;
@@ -25,11 +25,13 @@ use nodes::{
   TryInto
 };
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct EntryId(u32);
+type EntryIdTyp = u32;
+const ID_MAX_VALUE: EntryIdTyp = ::std::u32::MAX;
 
-pub type DepSet = HashSet<EntryId, FNV>;
+// 2^32 Nodes ought to be more than enough for anyone!
+// TODO: But, see the overflow panic in `ensure_entry_internal`.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+pub struct EntryId(EntryIdTyp);
 
 type EntryStateField = future::Shared<NodeFuture<NodeResult>>;
 
@@ -103,8 +105,6 @@ impl Entry {
       id: id,
       node: node,
       state: future::Shared::new(state),
-      dependencies: Default::default(),
-      dependents: Default::default(),
     }
   }
 
@@ -136,14 +136,6 @@ impl Entry {
     self.state().peek().map(|nr| Entry::unwrap::<N>(nr))
   }
 
-  fn dependencies(&self) -> &DepSet {
-    &self.dependencies
-  }
-
-  fn dependents(&self) -> &DepSet {
-    &self.dependents
-  }
-
   fn format<N: Node>(&self) -> String {
     let state =
       match self.peek::<N>() {
@@ -160,7 +152,7 @@ type Nodes = HashMap<EntryKey, EntryId, FNV>;
 type Entries = HashMap<EntryId, Entry, FNV>;
 
 struct InnerGraph {
-  id_generator: usize,
+  id_generator: EntryIdTyp,
   nodes: Nodes,
   entries: Entries,
   pg: DiGraphMap<EntryId, ()>,
@@ -175,12 +167,9 @@ impl InnerGraph {
     self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.entries.get_mut(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
-  }
-
   fn ensure_entry(&mut self, context: &ContextFactory, node: EntryKey) -> EntryId {
     InnerGraph::ensure_entry_internal(
+      &mut self.pg,
       &mut self.entries,
       &mut self.nodes,
       &mut self.id_generator,
@@ -190,9 +179,10 @@ impl InnerGraph {
   }
 
   fn ensure_entry_internal<'a>(
+    pg: &mut DiGraphMap<EntryId, ()>,
     entries: &'a mut Entries,
     nodes: &mut Nodes,
-    id_generator: &mut usize,
+    id_generator: &mut EntryIdTyp,
     context_factory: &ContextFactory,
     node: EntryKey
   ) -> EntryId {
@@ -209,6 +199,11 @@ impl InnerGraph {
     }
 
     // New entry.
+    if *id_generator == ID_MAX_VALUE {
+      // TODO: The memory savings are probably worthwhile.
+      panic!("Overflow: more than {} nodes have been created.", ID_MAX_VALUE);
+    }
+    pg.add_node(id);
     let context = context_factory.create(id);
     *id_generator += 1;
     entries.insert(id, Entry::new(id, entry_node, context));
@@ -223,12 +218,15 @@ impl InnerGraph {
    */
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
     // Search either forward from the dst, or backward from the src.
-    let (root, needle, dependents) =
-      if self.entry_for_id(dst_id).dependencies().len() < self.entry_for_id(src_id).dependents().len() {
+    let (root, needle, dependents) = {
+      let out_from_dst = self.pg.neighbors(dst_id).count();
+      let in_to_src = self.pg.neighbors_directed(src_id, Direction::Incoming).count();
+      if out_from_dst < in_to_src {
         (dst_id, src_id, false)
       } else {
         (src_id, dst_id, true)
-      };
+      }
+    };
 
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
@@ -243,7 +241,7 @@ impl InnerGraph {
     where P: Fn(&Entry)->bool {
     Walk {
       graph: self,
-      dependents: dependents,
+      direction: if dependents { Direction::Incoming } else { Direction::Outgoing },
       deque: roots,
       walked: HashSet::default(),
       predicate: predicate,
@@ -259,7 +257,7 @@ impl InnerGraph {
     let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
     LeveledWalk {
       graph: self,
-      dependents: dependents,
+      direction: if dependents { Direction::Incoming } else { Direction::Outgoing },
       deque: rrr,
       walked: HashSet::default(),
       predicate: predicate,
@@ -288,32 +286,34 @@ impl InnerGraph {
     };
 
     // Then remove all entries in one shot.
+    let result = ids.len();
     InnerGraph::invalidate_internal(
+      &mut self.pg,
       &mut self.entries,
       &mut self.nodes,
-      &ids,
+      ids,
     );
 
     // And return the removed count.
-    ids.len()
+    result
   }
 
-  fn invalidate_internal(entries: &mut Entries, nodes: &mut Nodes, ids: &HashSet<EntryId, FNV>) {
+  fn invalidate_internal(
+    pg: &mut DiGraphMap<EntryId, ()>,
+    entries: &mut Entries,
+    nodes: &mut Nodes,
+    ids: HashSet<EntryId, FNV>
+  ) {
     if ids.is_empty() {
       return;
     }
 
-    for &id in ids {
-      // Remove the entries from their dependencies' dependents lists.
-      let dep_ids = entries[&id].dependencies.clone();
-      for dep_id in dep_ids {
-        entries.get_mut(&dep_id).map(|entry| {
-          entry.dependents.remove(&id);
-        });
-      }
-
+    for &id in &ids {
       // Validate that all dependents of the id are also scheduled for removal.
-      assert!(entries[&id].dependents.iter().all(|dep| ids.contains(dep)));
+      assert!(pg.neighbors_directed(id, Direction::Incoming).all(|dep| ids.contains(&dep)));
+
+      // Remove the entry from the graph (which will also remove dependent edges).
+      pg.remove_node(id);
 
       // Remove the entry itself.
       entries.remove(&id);
@@ -371,7 +371,7 @@ impl InnerGraph {
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
 
-      for &dep_id in &entry.dependencies {
+      for dep_id in self.pg.neighbors(entry.id) {
         let dep_entry = self.entry_for_id(dep_id);
         if !predicate(dep_entry) {
           continue;
@@ -400,15 +400,15 @@ impl InnerGraph {
     };
 
     let is_one_level_above_bottom = |c: &Entry| -> bool {
-      for d in &c.dependencies {
-        if !is_bottom(self.entry_for_id(*d)) {
+      for d in self.pg.neighbors(c.id) {
+        if !is_bottom(self.entry_for_id(d)) {
           return false;
         }
       }
       true
     };
 
-    let _indent = |level: u32| -> String {
+    let _indent = |level: Level| -> String {
       let mut indent = String::new();
       for _ in 0..level {
         indent.push_str("  ");
@@ -416,7 +416,7 @@ impl InnerGraph {
       indent
     };
 
-    let _format = |entry: &Entry, level: u32| -> String {
+    let _format = |entry: &Entry, level: Level| -> String {
       let indent = _indent(level);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
       if is_one_level_above_bottom(entry) {
@@ -460,6 +460,7 @@ impl Graph {
         id_generator: 0,
         nodes: HashMap::default(),
         entries: HashMap::default(),
+        pg: GraphMap::new(),
       };
     Graph {
       inner: Mutex::new(inner),
@@ -503,10 +504,9 @@ impl Graph {
         }
       };
 
-      inner.entry_for_id_mut(src_id).dependencies.insert(dst_id);
-      let dst_entry = inner.entry_for_id_mut(dst_id);
-      dst_entry.dependents.insert(src_id);
-      dst_entry.state()
+      // Declare the dep, and return the state of the destination.
+      inner.pg.add_edge(src_id, dst_id, ());
+      inner.entry_for_id(dst_id).state()
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -550,7 +550,7 @@ impl Graph {
  */
 struct Walk<'a, P: Fn(&Entry)->bool> {
   graph: &'a InnerGraph,
-  dependents: bool,
+  direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
   predicate: P,
@@ -571,12 +571,8 @@ impl<'a, P: Fn(&Entry)->bool> Iterator for Walk<'a, P> {
         continue;
       }
 
-      // Entry matches.
-      if self.dependents {
-        self.deque.extend(&entry.dependents);
-      } else {
-        self.deque.extend(&entry.dependencies);
-      }
+      // Entry matches: queue its neighbors and then return it.
+      self.deque.extend(self.graph.pg.neighbors_directed(id, self.direction));
       return Some(entry);
     }
 
@@ -592,7 +588,7 @@ type Level = u32;
  */
 struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
   graph: &'a InnerGraph,
-  dependents: bool,
+  direction: Direction,
   deque: VecDeque<(EntryId, Level)>,
   walked: HashSet<EntryId, FNV>,
   predicate: P,
@@ -613,16 +609,11 @@ impl<'a, P: Fn(&Entry, Level)->bool> Iterator for LeveledWalk<'a, P> {
         continue;
       }
 
-      // Entry matches.
-      if self.dependents {
-        for d in &entry.dependents {
-          self.deque.push_back((*d, level+1));
-        }
-      } else {
-        for d in &entry.dependencies {
-          self.deque.push_back((*d, level+1));
-        }
-      }
+      // Entry matches: queue its neighbors and then return it.
+      self.deque.extend(
+        self.graph.pg.neighbors_directed(id, self.direction).into_iter()
+          .map(|d| (d, level+1))
+      );
       return Some((entry, level));
     }
 
