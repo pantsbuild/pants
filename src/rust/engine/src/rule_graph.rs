@@ -130,7 +130,6 @@ impl Entry {
 
 type Entries = Vec<Entry>;
 type RootRuleDependencyEdges = HashMap<RootEntry, RuleEdges>;
-type Rule = Task;
 type RuleDependencyEdges = HashMap<InnerEntry, RuleEdges>;
 type RuleDiagnostics = Vec<Diagnostic>;
 type UnfulfillableRuleMap = HashMap<Entry, RuleDiagnostics>;
