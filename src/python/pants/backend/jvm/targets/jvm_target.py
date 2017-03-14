@@ -77,6 +77,10 @@ class JvmTarget(Target, Jarable):
                              at compilation time. This enforces that all direct deps of the target
                              are declared, and can improve compilation speed due to smaller
                              classpaths. Transitive deps are always provided at runtime.
+    :param list exports: A list of exported libraries, which will be accessible to dependents even
+                         with strict_deps turned on. A common use case is for library targets to
+                         export its dependencies. Then any dependents of that library target will
+                         have access to those dependencies even when strict_deps is True.
     :param bool fatal_warnings: Whether to turn warnings into errors for this target.  If present,
                                 takes priority over the language's fatal-warnings option.
     :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
