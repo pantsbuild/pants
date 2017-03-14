@@ -12,7 +12,6 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.tasks2.pex_build_util import dump_requirements
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -26,11 +25,6 @@ class ResolveRequirementsTaskBase(Task):
   This PEX can be merged with other PEXes to create a unified Python environment
   for running the relevant python code.
   """
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return (super(ResolveRequirementsTaskBase, cls).subsystem_dependencies() +
-            (PythonSetup, PythonRepos))
 
   @classmethod
   def prepare(cls, options, round_manager):

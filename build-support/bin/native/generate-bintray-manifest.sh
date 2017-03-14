@@ -66,12 +66,12 @@ function emit_osx_files() {
     # It appears to be the case that upload de-dupes on includePattern keys; so we make a unique
     # includePattern per uploadPattern via a symlink here per OSX version.
     ln -fs \
-      ${CACHE_TARGET_DIR}/${native_engine_version}/native-engine \
-      ${CACHE_TARGET_DIR}/${native_engine_version}/native-engine.10.${version}
+      ${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY} \
+      ${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}.10.${version}
     cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${CACHE_TARGET_DIR}/${native_engine_version}/native-engine.10.${version}",
-      "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${native_engine_version}/native-engine"
+      "includePattern": "${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}.10.${version}",
+      "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     }${sep}
 EOF
   done
@@ -83,11 +83,11 @@ function emit_linux_files() {
   cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
     {
       "includePattern": "${native_engine_32}",
-      "uploadPattern": "build-support/bin/native-engine/linux/i386/${native_engine_version}/native-engine"
+      "uploadPattern": "build-support/bin/native-engine/linux/i386/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     },
     {
       "includePattern": "${native_engine_64}",
-      "uploadPattern": "build-support/bin/native-engine/linux/x86_64/${native_engine_version}/native-engine"
+      "uploadPattern": "build-support/bin/native-engine/linux/x86_64/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     }
 EOF
 }

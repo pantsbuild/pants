@@ -15,12 +15,8 @@ from pex.package import EggPackage, SourcePackage
 from pkg_resources import working_set as global_working_set
 from pkg_resources import Requirement
 
-# TODO(John Sirois): this dependency looks strange although I think it makes sense for pants to
-# ship with the python backend even if all other backends do get broken into seperate sdists.
-# Consider moving PythonRepos and PythonSetup to a non-backend package, perhaps pants.runtime or
-# pants.python
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.option.global_options import GlobalOptionsRegistrar
+from pants.python.python_setup import PythonRepos, PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
