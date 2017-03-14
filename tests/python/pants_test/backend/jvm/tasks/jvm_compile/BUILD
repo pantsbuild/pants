@@ -43,6 +43,17 @@ python_tests(
 )
 
 python_tests(
+  name='dep_exports_integration',
+  sources=['test_dep_exports_integration.py'],
+  dependencies = [
+    'src/python/pants/base:build_environment',
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
+  timeout=300,
+)
+
+python_tests(
   name='missing_dependency_finder',
   sources=['test_missing_dependency_finder.py'],
   dependencies=[

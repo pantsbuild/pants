@@ -15,6 +15,7 @@ from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
+from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
@@ -40,6 +41,7 @@ class JvmTarget(Target, Jarable):
                services=None,
                platform=None,
                strict_deps=None,
+               exports=None,
                fatal_warnings=None,
                zinc_file_manager=None,
                # Some subclasses can have both .java and .scala sources
@@ -98,6 +100,7 @@ class JvmTarget(Target, Jarable):
       'excludes': excludes,
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
+      'exports': SetOfPrimitivesField(exports),
       'fatal_warnings': PrimitiveField(fatal_warnings),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
       'javac_plugins': SetOfPrimitivesField(javac_plugins),
@@ -124,6 +127,16 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.strict_deps
+
+  @property
+  def exports(self):
+    """A list of exported libraries, which will be accessible to dependents.
+
+    :return: See constructor.
+    :rtype: list
+    """
+    exports = [Address.parse(spec, relative_to=self.address.spec_path) for spec in self.payload.exports]
+    return [self._build_graph.get_target(addr) for addr in exports]
 
   @property
   def fatal_warnings(self):

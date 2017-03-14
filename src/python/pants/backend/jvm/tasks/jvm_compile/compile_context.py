@@ -22,6 +22,16 @@ def _resolve_aliases(target):
     else:
       yield declared
 
+    for export in _resolve_exports(declared):
+      yield export
+
+
+def _resolve_exports(target):
+  for export in getattr(target, 'exports', []):
+    for exp in _resolve_exports(export):
+      yield exp
+    yield export
+
 
 def strict_dependencies(target, dep_context):
   """Compute the 'strict' compile target dependencies for this target.
