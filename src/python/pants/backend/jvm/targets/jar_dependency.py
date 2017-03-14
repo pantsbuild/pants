@@ -119,11 +119,12 @@ class JarDependency(datatype('JarDependency', [
       parsed_url = urlparse.urlparse(self.url)
       if parsed_url.scheme == 'file':
         if relative and os.path.isabs(parsed_url.path):
-          relative_path = os.path.relpath(parsed_url.path, self.base_path)
-          return 'file:{path}'.format(path=relative_path)
+          relative_path = os.path.relpath(parsed_url.path,
+                                          os.path.join(get_buildroot(), self.base_path))
+          return 'file:{path}'.format(path=os.path.normpath(relative_path))
         if not relative and not os.path.isabs(parsed_url.path):
           abs_path = os.path.join(get_buildroot(), self.base_path, parsed_url.path)
-          return 'file://{path}'.format(path=abs_path)
+          return 'file://{path}'.format(path=os.path.normpath(abs_path))
     return self.url
 
   @property
