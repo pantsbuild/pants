@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pex.fetcher import Fetcher, PyPIFetcher
-from pex.http import Context
 from pkg_resources import Requirement
 
 from pants.subsystem.subsystem import Subsystem
@@ -21,8 +19,23 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
+    # TODO: On removal, make ['CPython>=2.7,<3'] the default for --constraints.
     register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
+             removal_version='1.5.0.dev0', removal_hint='Use --constraints instead.',
              help='The interpreter requirement string for this python environment.')
+    # Note: This will replace two options:
+    # A) The global --interpreter option in the old python tasks.
+    #    That flag is only relevant in the python backend, and should never have been
+    #    global to begin with.
+    # B) The --interpreter-requirement option above.  That flag merely served to set the
+    #    effective default for when no other constraints were set, so we might as well
+    #    roll that into the more general constraints.
+    register('--constraints', advanced=True, default=[], type=list,
+             metavar='<requirement>',
+             help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
+                  "e.g. 'CPython>=2.6,<3' or 'PyPy'. Multiple constraints will be ORed together. "
+                  "These constraints are applied in addition to any compatibilities required by "
+                  "the relevant targets.")
     register('--setuptools-version', advanced=True, default='30.0.0',
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
@@ -41,6 +54,8 @@ class PythonSetup(Subsystem):
                   'If unspecified, a standard path under the workdir is used.')
     register('--resolver-cache-ttl', advanced=True, type=int, metavar='<seconds>',
              default=10 * 365 * 86400,  # 10 years.
+             removal_version='1.5.0.dev0',
+             removal_hint='Defunct option.  Resolver cache now never expires.',
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')
     register('--resolver-allow-prereleases', advanced=True, type=bool, default=False,
@@ -50,8 +65,9 @@ class PythonSetup(Subsystem):
                   'If unspecified, a standard path under the workdir is used.')
 
   @property
-  def interpreter_requirement(self):
-    return self.get_options().interpreter_requirement
+  def constraints(self):
+    return (self.get_options().constraints or
+            [self.get_options().interpreter_requirement or self.get_options().interpreter or b''])
 
   @property
   def setuptools_version(self):
@@ -79,10 +95,6 @@ class PythonSetup(Subsystem):
   def resolver_cache_dir(self):
     return (self.get_options().resolver_cache_dir or
             os.path.join(self.scratch_dir, 'resolved_requirements'))
-
-  @property
-  def resolver_cache_ttl(self):
-    return self.get_options().resolver_cache_ttl
 
   @property
   def resolver_allow_prereleases(self):
@@ -115,34 +127,3 @@ class PythonSetup(Subsystem):
       return Requirement.parse(requirement, replacement=False)
     except TypeError:
       return Requirement.parse(requirement)
-
-
-class PythonRepos(Subsystem):
-  """A python code repository."""
-  options_scope = 'python-repos'
-
-  @classmethod
-  def register_options(cls, register):
-    super(PythonRepos, cls).register_options(register)
-    register('--repos', advanced=True, type=list, default=[], fingerprint=True,
-             help='URLs of code repositories.')
-    register('--indexes', advanced=True, type=list, fingerprint=True,
-             default=['https://pypi.python.org/simple/'], help='URLs of code repository indexes.')
-
-  @property
-  def repos(self):
-    return self.get_options().repos
-
-  @property
-  def indexes(self):
-    return self.get_options().indexes
-
-  def get_fetchers(self):
-    fetchers = []
-    fetchers.extend(Fetcher([url]) for url in self.repos)
-    fetchers.extend(PyPIFetcher(url) for url in self.indexes)
-    return fetchers
-
-  def get_network_context(self):
-    # TODO(wickman): Add retry, conn_timeout, threads, etc configuration here.
-    return Context.get()

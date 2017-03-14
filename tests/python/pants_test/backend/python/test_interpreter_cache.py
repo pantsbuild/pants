@@ -13,7 +13,8 @@ from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import Unsatisfiable, resolve
 
 from pants.backend.python.interpreter_cache import PythonInterpreter, PythonInterpreterCache
-from pants.python.python_setup import PythonRepos, PythonSetup
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 
@@ -32,12 +33,9 @@ class TestInterpreterCache(BaseTest):
     self._interpreter = PythonInterpreter.get()
 
   @contextmanager
-  def _setup_test(self, interpreter_requirement=None):
+  def _setup_test(self, constraints=None):
     mock_setup = mock.MagicMock().return_value
-
-    # Explicitly set a repo-wide requirement that excludes our one interpreter.
-    type(mock_setup).interpreter_requirement = mock.PropertyMock(
-      return_value=interpreter_requirement)
+    type(mock_setup).constraints = mock.PropertyMock(return_value=constraints)
 
     with temporary_dir() as path:
       mock_setup.interpreter_cache_dir = path
@@ -50,18 +48,18 @@ class TestInterpreterCache(BaseTest):
       cache._setup_paths = mock.Mock()
       yield cache, path
 
-  def _do_test(self, interpreter_requirement, filters, expected):
-    with self._setup_test(interpreter_requirement) as (cache, _):
+  def _do_test(self, constraints, filters, expected):
+    with self._setup_test(constraints) as (cache, _):
       self.assertEqual(cache.setup(filters=filters), expected)
 
   def test_cache_setup_with_no_filters_uses_repo_default_excluded(self):
-    self._do_test(self._make_bad_requirement(self._interpreter.identity.requirement), [], [])
+    self._do_test([self._make_bad_requirement(self._interpreter.identity.requirement)], [], [])
 
   def test_cache_setup_with_no_filters_uses_repo_default(self):
-    self._do_test(None, [], [self._interpreter])
+    self._do_test((b'',), [], [self._interpreter])
 
   def test_cache_setup_with_filter_overrides_repo_default(self):
-    self._do_test(self._make_bad_requirement(self._interpreter.identity.requirement),
+    self._do_test([self._make_bad_requirement(self._interpreter.identity.requirement)],
                   (str(self._interpreter.identity.requirement), ),
                   [self._interpreter])
 
@@ -95,7 +93,7 @@ class TestInterpreterCache(BaseTest):
         PythonSetup.options_scope: {
           'interpreter_cache_dir': None,
           'pants_workdir': os.path.join(root, 'workdir'),
-          'interpreter_requirement': interpreter_requirement,
+          'constraints': [interpreter_requirement],
           'setuptools_version': setuptools_version,
           'wheel_version': wheel_version,
         },

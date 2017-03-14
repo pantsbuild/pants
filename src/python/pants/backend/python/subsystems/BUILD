@@ -3,6 +3,7 @@
 
 python_library(
   dependencies = [
+    '3rdparty/python:setuptools',
     'src/python/pants/subsystem',
   ],
 )
