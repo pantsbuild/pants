@@ -18,7 +18,6 @@ from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
@@ -69,11 +68,17 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest, PythonSetup, PythonRepos)
+    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
 
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
+    register('--fast', type=bool, default=True,
+             removal_version='1.5.0.dev0',
+             removal_hint='Unused. In the new pipeline tests are always run in "fast" mode.',
+             help='Run all tests in a single chroot. If turned off, each test target will '
+                  'create a new chroot, which will be much slower, but more correct, as the '
+                  'isolation verifies that all dependencies are correctly declared.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')

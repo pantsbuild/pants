@@ -85,6 +85,8 @@ python_binary(
 
 resources(
   name='fs_test',
+  # Note that this test data dir is bundled into a tarfile, to preserve symlink structure
+  # when copied into a chroot.
   sources=rglobs('fs_test/*')
 )
 

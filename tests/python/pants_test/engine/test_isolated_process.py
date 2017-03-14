@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import tarfile
 import unittest
 
 from pants.engine.engine import LocalSerialEngine
@@ -203,7 +204,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return state
 
   def mk_example_fs_tree(self):
-    return self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
+    fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
+    test_fs = os.path.join(fs_tree.build_root, 'fs_test')
+    with tarfile.open(os.path.join(test_fs, 'fs_test.tar')) as tar:
+      tar.extractall(test_fs)
+    return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
     return self.mk_scheduler(tasks=rules, project_tree=self.mk_example_fs_tree())

@@ -78,3 +78,16 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                   'testprojects/tests/python/pants/constants_only:constants_only'])
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
+
+  def test_pytest_with_profile(self):
+    with temporary_dir() as profile_dir:
+      prof = os.path.join(profile_dir, 'pants.prof')
+      pants_run = self.run_pants(['clean-all',
+                                  'test.pytest',
+                                  'testprojects/tests/python/pants/constants_only:constants_only'],
+                                 extra_env={'PANTS_PROFILE': prof})
+      self.assert_success(pants_run)
+      # Note that the subprocess profile mechanism will add a ".0" to the profile path.
+      # We won't see a profile at prof itself because PANTS_PROFILE wasn't set when the
+      # current process started.
+      self.assertTrue(os.path.exists('{}.0'.format(prof)))

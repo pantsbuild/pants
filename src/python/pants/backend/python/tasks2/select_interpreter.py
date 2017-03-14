@@ -11,10 +11,10 @@ import os
 from pex.interpreter import PythonIdentity, PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.python.python_setup import PythonRepos, PythonSetup
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
 
