@@ -513,10 +513,9 @@ impl Node for Select {
       );
 
     let variant_value = variant_value.map(|s| s.to_string());
-    let node = self.clone();
     deps_future
       .and_then(move |dep_results| {
-        future::result(node.choose_task_result(context, dep_results, &variant_value))
+        future::result(self.choose_task_result(context, dep_results, &variant_value))
       })
       .boxed()
   }
@@ -673,7 +672,6 @@ impl Node for SelectProjection {
   type Output = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let node = self.clone();
 
     context
       .get(
@@ -687,15 +685,15 @@ impl Node for SelectProjection {
             let projected_subject =
               externs::project(
                 &dep_product,
-                &node.selector.field,
-                &node.selector.projected_subject
+                &self.selector.field,
+                &self.selector.projected_subject
               );
             context
               .get(
                 Select::new(
-                  node.selector.product,
+                  self.selector.product,
                   externs::key_for(&projected_subject),
-                  node.variants.clone()
+                  self.variants.clone()
                 )
               )
               .then(move |output_res| {
