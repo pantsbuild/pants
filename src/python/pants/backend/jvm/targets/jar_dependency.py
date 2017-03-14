@@ -81,7 +81,7 @@ class JarDependency(datatype('JarDependency', [
   in its absolute (for ivy) or relative (for fingerprinting) form. The context wrapper class
   determines the `base_path` from where `jar` is defined at.
 
-  If a relative file url is provided, its absolute form will be (`base_path` + relative url).
+  If a relative file url is provided, its absolute form will be (`buildroot` + `base_path` + relative url).
 
   :API: public
   """
@@ -98,12 +98,12 @@ class JarDependency(datatype('JarDependency', [
               classifier=None, mutable=None, intransitive=False, excludes=None, base_path=None):
     """
 
-    :param string base_path: absolute base path that a relative file url is based from.
+    :param string base_path: base path that's relative to the build root.
     """
     excludes = JarDependency._prepare_excludes(excludes)
-    base_path = base_path or get_buildroot()
-    if not os.path.isabs(base_path):
-      base_path = os.path.join(get_buildroot(), base_path)
+    base_path = base_path or '.'
+    if os.path.isabs(base_path):
+      base_path = os.path.relpath(base_path, get_buildroot())
     return super(JarDependency, cls).__new__(
         cls, org=org, base_name=name, rev=rev, force=force, ext=ext, url=url, apidocs=apidocs,
         classifier=classifier, mutable=mutable, intransitive=intransitive, excludes=excludes,
@@ -119,11 +119,12 @@ class JarDependency(datatype('JarDependency', [
       parsed_url = urlparse.urlparse(self.url)
       if parsed_url.scheme == 'file':
         if relative and os.path.isabs(parsed_url.path):
-          relative_path = os.path.relpath(parsed_url.path, self.base_path)
-          return 'file:{path}'.format(path=relative_path)
+          relative_path = os.path.relpath(parsed_url.path,
+                                          os.path.join(get_buildroot(), self.base_path))
+          return 'file:{path}'.format(path=os.path.normpath(relative_path))
         if not relative and not os.path.isabs(parsed_url.path):
-          abs_path = os.path.join(self.base_path, parsed_url.path)
-          return 'file://{path}'.format(path=abs_path)
+          abs_path = os.path.join(get_buildroot(), self.base_path, parsed_url.path)
+          return 'file://{path}'.format(path=os.path.normpath(abs_path))
     return self.url
 
   @property
