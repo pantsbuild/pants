@@ -22,6 +22,7 @@ from pants.backend.jvm.subsystems.jar_dependency_management import JarDependency
 from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.base.build_environment import get_buildroot
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
@@ -645,3 +646,26 @@ class IvyFrozenResolutionTest(BaseTest):
 
       with self.assertRaises(FrozenResolution.MissingTarget):
         FrozenResolution.load_from_file(resolve_file.name, [])
+
+  def test_jar_relative_url(self):
+    abs_url = 'file://{}/a/b/c'.format(get_buildroot())
+    rel_url = 'file:a/b/c'
+
+    # Three equivalent ways of using absolute/relative url.
+    jar1 = JarDependency('org', 'name', url=abs_url)
+    jar2 = JarDependency('org', 'name', url=rel_url, base_path='.')
+    jar3 = JarDependency('org', 'name', url=abs_url, base_path='a/b')
+
+    self.assertEquals(jar1.get_url(relative=False), jar2.get_url(relative=False))
+    self.assertEquals(jar1.get_url(relative=False), jar3.get_url(relative=False))
+    self.assertEquals(jar1.get_url(relative=True), jar2.get_url(relative=True))
+
+    def verify_url_attributes(spec, jar, expected_attributes):
+      target = self.make_target(spec, JarLibrary, jars=[jar])
+      frozen_resolution = FrozenResolution()
+      frozen_resolution.add_resolved_jars(target, [])
+      self.assertEquals(frozen_resolution.coordinate_to_attributes.values(), expected_attributes)
+
+    verify_url_attributes('t1', jar1, [{'url': 'file:a/b/c', 'base_path': '.'}])
+    verify_url_attributes('t2', jar2, [{'url': 'file:a/b/c', 'base_path': '.'}])
+    verify_url_attributes('t3', jar3, [{'url': 'file:c', 'base_path': 'a/b'}])
