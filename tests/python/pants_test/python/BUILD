@@ -60,7 +60,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:pex',
     'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_setup',
+    'src/python/pants/python',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ],
