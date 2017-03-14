@@ -279,7 +279,7 @@ impl VFS<Failure> for Context {
 pub trait Node: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
-  fn run(&self, context: Context) -> NodeFuture<Self::Output>;
+  fn run(self, context: Context) -> NodeFuture<Self::Output>;
 }
 
 /**
@@ -478,7 +478,7 @@ impl Select {
 impl Node for Select {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -537,7 +537,7 @@ pub struct SelectLiteral {
 impl Node for SelectLiteral {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     context.ok(externs::val_for(&self.selector.subject))
   }
 }
@@ -618,8 +618,7 @@ impl SelectDependencies {
 impl Node for SelectDependencies {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
-    let node = self.clone();
+  fn run(self, context: Context) -> NodeFuture<Value> {
 
     context
       .get(
@@ -632,8 +631,8 @@ impl Node for SelectDependencies {
             // The product and its dependency list are available: project them.
             let deps =
               future::join_all(
-                externs::project_multi(&dep_product, &node.selector.field).iter()
-                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
+                externs::project_multi(&dep_product, &self.selector.field).iter()
+                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
                   .collect::<Vec<_>>()
               );
             deps
@@ -641,7 +640,7 @@ impl Node for SelectDependencies {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    Ok(node.store(&dep_product, dep_values.iter().collect()))
+                    Ok(self.store(&dep_product, dep_values.iter().collect()))
                   },
                   Err(failure) =>
                     Err(context.was_required(failure)),
@@ -673,7 +672,7 @@ pub struct SelectProjection {
 impl Node for SelectProjection {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     let node = self.clone();
 
     context
@@ -734,7 +733,7 @@ pub struct LinkDest(PathBuf);
 impl Node for ReadLink {
   type Output = LinkDest;
 
-  fn run(&self, context: Context) -> NodeFuture<LinkDest> {
+  fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
     context.core.vfs.read_link(&self.0)
       .map(|dest_path| LinkDest(dest_path))
@@ -765,7 +764,7 @@ pub struct Stat(PathBuf);
 impl Node for Stat {
   type Output = ();
 
-  fn run(&self, _: Context) -> NodeFuture<()> {
+  fn run(self, _: Context) -> NodeFuture<()> {
     future::ok(()).boxed()
   }
 }
@@ -789,7 +788,7 @@ pub struct DirectoryListing(Vec<fs::Stat>);
 impl Node for Scandir {
   type Output = DirectoryListing;
 
-  fn run(&self, context: Context) -> NodeFuture<DirectoryListing> {
+  fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
     context.core.vfs.scandir(&self.0)
       .then(move |listing_res| match listing_res {
@@ -859,7 +858,7 @@ impl Snapshot {
 impl Node for Snapshot {
   type Output = fs::Snapshot;
 
-  fn run(&self, context: Context) -> NodeFuture<fs::Snapshot> {
+  fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
     // Compute and parse PathGlobs for the subject.
     context
       .get(
@@ -934,7 +933,7 @@ impl Task {
 impl Node for Task {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     let deps =
       future::join_all(
         self.task.clause.iter()
@@ -1045,17 +1044,17 @@ impl NodeKey {
 impl Node for NodeKey {
   type Output = NodeResult;
 
-  fn run(&self, context: Context) -> NodeFuture<NodeResult> {
+  fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
-      &NodeKey::ReadLink(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Stat(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Scandir(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Select(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectDependencies(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectLiteral(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectProjection(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Snapshot(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Task(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectLiteral(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Task(n) => n.run(context).map(|v| v.into()).boxed(),
     }
   }
 }
