@@ -20,16 +20,18 @@ from pants.util.retry import retry_on_exception
 class Watchman(ProcessManager):
   """Watchman process manager and helper class."""
 
+  STARTUP_TIMEOUT_SECONDS = 30.0
   SOCKET_TIMEOUT_SECONDS = 5.0
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
-  def __init__(self, watchman_path, work_dir, log_level='1', timeout=SOCKET_TIMEOUT_SECONDS,
-               socket_path_override=None, metadata_base_dir=None):
+  def __init__(self, watchman_path, work_dir, log_level='1', startup_timeout=STARTUP_TIMEOUT_SECONDS,
+               timeout=SOCKET_TIMEOUT_SECONDS, socket_path_override=None, metadata_base_dir=None):
     """
     :param str watchman_path: The path to the watchman binary.
     :param str work_dir: The path to the pants work dir.
-    :param float timeout: The watchman socket timeout (in seconds).
+    :param float startup_timeout: The timeout for the initial `watch-project` query (in seconds).
+    :param float timeout: The watchman socket timeout for all subsequent queries (in seconds).
     :param str log_level: The watchman log level. Watchman has 3 log levels: '0' for no logging,
                           '1' for standard logging and '2' for verbose logging.
     :param str socket_path_override: The overridden target path of the watchman socket, if any.
@@ -42,6 +44,7 @@ class Watchman(ProcessManager):
     self._watchman_path = self._normalize_watchman_path(watchman_path)
     self._watchman_work_dir = os.path.join(work_dir, self.name)
     self._log_level = log_level
+    self._startup_timeout = startup_timeout
     self._timeout = timeout
 
     self._state_file = os.path.join(self._watchman_work_dir, '{}.state'.format(self.name))
@@ -60,7 +63,10 @@ class Watchman(ProcessManager):
 
   def _make_client(self):
     """Create a new watchman client using the BSER protocol over a UNIX socket."""
-    return StreamableWatchmanClient(sockpath=self.socket, transport='local', timeout=self._timeout)
+    self._logger.debug('setting initial watchman timeout to %s', self._startup_timeout)
+    return StreamableWatchmanClient(sockpath=self.socket,
+                                    transport='local',
+                                    timeout=self._startup_timeout)
 
   def _is_valid_executable(self, binary_path):
     return os.path.isfile(binary_path) and os.access(binary_path, os.X_OK)
@@ -137,7 +143,12 @@ class Watchman(ProcessManager):
 
     :param string path: the path to the watchman project root/pants build root.
     """
-    return self.client.query('watch-project', os.path.realpath(path))
+    # TODO(kwlzn): Add a client.query(timeout=X) param to the upstream pywatchman project.
+    try:
+      return self.client.query('watch-project', os.path.realpath(path))
+    finally:
+      self.client.setTimeout(self._timeout)
+      self._logger.debug('setting post-startup watchman timeout to %s', self._timeout)
 
   def subscribed(self, build_root, handlers):
     """Bulk subscribe generator for StreamableWatchmanClient.
