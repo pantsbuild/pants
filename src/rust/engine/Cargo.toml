@@ -25,6 +25,7 @@ glob = "0.2.11"
 ignore = "0.1.7"
 lazy_static = "0.2.2"
 ordermap = "0.2.7"
+petgraph = "0.4.4"
 # TODO: Waiting for a 0.4.11 release: https://github.com/alexcrichton/tar-rs/pull/99
 tar = { git = "https://github.com/alexcrichton/tar-rs", branch = "master" }
 tempdir = "0.3"
