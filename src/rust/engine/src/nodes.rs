@@ -736,7 +736,7 @@ impl Node for SelectTransitive {
   }
 
   fn is_inline() -> bool {
-    true
+    false
   }
 }
 
