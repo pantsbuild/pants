@@ -15,7 +15,6 @@ use futures::future::{self, Future};
 use externs;
 use core::FNV;
 use nodes::{
-  Context,
   ContextFactory,
   Failure,
   Node,
@@ -25,14 +24,11 @@ use nodes::{
   TryInto
 };
 
-type EntryIdTyp = u32;
-const ID_MAX_VALUE: EntryIdTyp = ::std::u32::MAX;
 
 // 2^32 Nodes ought to be more than enough for anyone!
-// TODO: But, see the overflow panic in `ensure_entry_internal`.
-pub type EntryId = NodeIndex<EntryIdTyp>;
+pub type EntryId = NodeIndex<u32>;
 
-type PGraph = StableDiGraph<EntryId, (), EntryIdTyp>;
+type PGraph = StableDiGraph<Entry, (), u32>;
 
 type EntryStateField = future::Shared<NodeFuture<NodeResult>>;
 
@@ -73,12 +69,11 @@ impl EntryKey {
  * An Entry and its adjacencies.
  */
 pub struct Entry {
-  id: EntryId,
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
   // maps is painful.
   node: EntryKey,
-  state: EntryStateField,
+  state: Option<EntryStateField>,
 }
 
 impl Entry {
@@ -87,25 +82,10 @@ impl Entry {
    * a caller actually pulls on it. This indirection exists in order to allow Nodes to start
    * outside of the Graph lock.
    */
-  fn new(id: EntryId, node: EntryKey, context: Context) -> Entry {
-    let state =
-      match node.clone() {
-        EntryKey::Valid(n) => {
-          let core = context.core();
-          let pool = core.pool();
-          pool.spawn_fn(move || {
-            n.run(context)
-          })
-          .boxed()
-        },
-        EntryKey::Cyclic(_) =>
-          future::err(Failure::Noop("Dep would be cyclic.", None)).boxed(),
-      };
-
+  fn new(node: EntryKey) -> Entry {
     Entry {
-      id: id,
       node: node,
-      state: future::Shared::new(state),
+      state: None,
     }
   }
 
@@ -124,17 +104,41 @@ impl Entry {
   }
 
   /**
-   * Returns a reference to the Node's Future.
+   * Returns a reference to the Node's Future, starting it if need be.
    */
-  fn state(&self) -> EntryStateField {
-    self.state.clone()
+  fn state(&mut self, context_factory: &ContextFactory, entry_id: EntryId) -> EntryStateField {
+    if let Some(ref state) = self.state {
+      state.clone()
+    } else {
+      let state =
+        match self.node.clone() {
+          EntryKey::Valid(n) => {
+            let pool = context_factory.pool();
+            let context = context_factory.create(entry_id);
+            pool
+              .spawn_fn(move || {
+                n.run(context)
+              })
+              .boxed()
+          },
+          EntryKey::Cyclic(_) =>
+            future::err(Failure::Noop("Dep would be cyclic.", None)).boxed(),
+        };
+
+      self.state = Some(future::Shared::new(state));
+      self.state(context_factory, entry_id)
+    }
   }
 
   /**
    * If the Future for this Node has already completed, returns a clone of its result.
    */
   fn peek<N: Node>(&self) -> Option<Result<N::Output, Failure>> {
-    self.state().peek().map(|nr| Entry::unwrap::<N>(nr))
+    self.state
+      .as_ref()
+      .and_then(|state|
+        state.peek().map(|nr| Entry::unwrap::<N>(nr))
+      )
   }
 
   fn format<N: Node>(&self) -> String {
@@ -149,67 +153,50 @@ impl Entry {
   }
 }
 
-type Nodes = HashMap<EntryKey, EntryId, FNV>;
-type Entries = HashMap<EntryId, Entry, FNV>;
+type Nodes = HashMap<EntryKey, EntryId>;
 
 struct InnerGraph {
-  id_generator: EntryIdTyp,
   nodes: Nodes,
-  entries: Entries,
   pg: PGraph,
 }
 
 impl InnerGraph {
   fn entry(&self, node: &EntryKey) -> Option<&Entry> {
-    self.nodes.get(node).map(|&id| self.entry_for_id(id))
+    self.entry_id(node).map(|&id| self.entry_for_id(id))
+  }
+
+  fn entry_id(&self, node: &EntryKey) -> Option<&EntryId> {
+    self.nodes.get(node)
   }
 
   fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.entries.get(&id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
+    self.pg.node_weight(id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
   }
 
-  fn ensure_entry(&mut self, context: &ContextFactory, node: EntryKey) -> EntryId {
+  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
+    self.pg.node_weight_mut(id).unwrap_or_else(|| panic!("Invalid EntryId: {:?}", id))
+  }
+
+  fn ensure_entry(&mut self, node: EntryKey) -> EntryId {
     InnerGraph::ensure_entry_internal(
       &mut self.pg,
-      &mut self.entries,
       &mut self.nodes,
-      &mut self.id_generator,
-      context,
       node
     )
   }
 
   fn ensure_entry_internal<'a>(
     pg: &mut PGraph,
-    entries: &'a mut Entries,
     nodes: &mut Nodes,
-    id_generator: &mut EntryIdTyp,
-    context_factory: &ContextFactory,
     node: EntryKey
   ) -> EntryId {
-    // See TODO on Entry.
-    let entry_node = node.clone();
-    let id =
-      nodes.entry(node).or_insert_with(|| {
-        NodeIndex::new(*id_generator as usize)
-      }).clone();
-
-    // If this was an existing entry, we're done..
-    if id.index() != *id_generator as usize {
+    if let Some(&id) = nodes.get(&node) {
       return id;
     }
 
     // New entry.
-    if *id_generator == ID_MAX_VALUE {
-      // TODO: The memory savings are probably worthwhile, but compacting or wrapping here
-      // would be preferable.
-      panic!("Overflow: more than {} nodes have been created.", ID_MAX_VALUE);
-    }
-    pg.add_node(id);
-    let context = context_factory.create(id);
-    *id_generator += 1;
-    entries.insert(id, Entry::new(id, entry_node, context));
-
+    let id = pg.add_node(Entry::new(node.clone()));
+    nodes.insert(node, id);
     id
   }
 
@@ -253,7 +240,7 @@ impl InnerGraph {
    * depth from the root.
    */
   fn leveled_walk<P>(&self, roots: Vec<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
-    where P: Fn(&Entry, Level) -> bool {
+    where P: Fn(EntryId, Level) -> bool {
     let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
     LeveledWalk {
       graph: self,
@@ -289,7 +276,6 @@ impl InnerGraph {
     let result = ids.len();
     InnerGraph::invalidate_internal(
       &mut self.pg,
-      &mut self.entries,
       &mut self.nodes,
       ids,
     );
@@ -300,7 +286,6 @@ impl InnerGraph {
 
   fn invalidate_internal(
     pg: &mut PGraph,
-    entries: &mut Entries,
     nodes: &mut Nodes,
     ids: HashSet<EntryId, FNV>
   ) {
@@ -314,9 +299,6 @@ impl InnerGraph {
 
       // Remove the entry from the graph (which will also remove dependent edges).
       pg.remove_node(id);
-
-      // Remove the entry itself.
-      entries.remove(&id);
     }
 
     // Filter the Nodes to delete any with matching ids.
@@ -327,10 +309,10 @@ impl InnerGraph {
     nodes.extend(filtered);
 
     assert!(
-      nodes.len() == entries.len(),
+      nodes.len() == pg.node_count(),
       "The Nodes and Entries maps are mismatched: {} vs {}",
       nodes.len(),
-      entries.len()
+      pg.node_count()
     );
   }
 
@@ -361,8 +343,9 @@ impl InnerGraph {
 
     let root_entries =
       roots.iter()
-        .filter_map(|n| self.entry(&EntryKey::Valid(n.clone())))
-        .map(|e| e.id).collect();
+        .filter_map(|n| self.entry_id(&EntryKey::Valid(n.clone())))
+        .map(|&eid| eid)
+        .collect();
     let predicate = |_| true;
 
     for eid in self.walk(root_entries, false) {
@@ -372,7 +355,7 @@ impl InnerGraph {
       // Write the node header.
       try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
 
-      for dep_id in self.pg.neighbors(entry.id) {
+      for dep_id in self.pg.neighbors(eid) {
         let dep_entry = self.entry_for_id(dep_id);
         if !predicate(dep_entry) {
           continue;
@@ -392,21 +375,16 @@ impl InnerGraph {
     let file = try!(OpenOptions::new().append(true).open(path));
     let mut f = BufWriter::new(file);
 
-    let is_bottom = |entry: &Entry| -> bool {
-      match entry.peek::<NodeKey>() {
+    let is_bottom = |eid: EntryId| -> bool {
+      match self.entry_for_id(eid).peek::<NodeKey>() {
         None | Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(_))) => false,
         Some(Ok(_)) => true,
       }
     };
 
-    let is_one_level_above_bottom = |c: &Entry| -> bool {
-      for d in self.pg.neighbors(c.id) {
-        if !is_bottom(self.entry_for_id(d)) {
-          return false;
-        }
-      }
-      true
+    let is_one_level_above_bottom = |eid: EntryId| -> bool {
+      self.pg.neighbors(eid).all(|d| is_bottom(d))
     };
 
     let _indent = |level: Level| -> String {
@@ -417,10 +395,11 @@ impl InnerGraph {
       indent
     };
 
-    let _format = |entry: &Entry, level: Level| -> String {
+    let _format = |eid: EntryId, level: Level| -> String {
+      let entry = self.entry_for_id(eid);
       let indent = _indent(level);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
-      if is_one_level_above_bottom(entry) {
+      if is_one_level_above_bottom(eid) {
         let state_str = match entry.peek::<NodeKey>() {
           None => "<None>".to_string(),
           Some(Ok(ref x)) => format!("{:?}", x),
@@ -434,12 +413,12 @@ impl InnerGraph {
     };
 
     let root_entries =
-      self.entry(&EntryKey::Valid(root.clone()))
-        .map(|e| vec![e.id])
+      self.entry_id(&EntryKey::Valid(root.clone()))
+        .map(|&eid| vec![eid])
         .unwrap_or_else(|| vec![]);
-    for t in self.leveled_walk(root_entries, |e,_| !is_bottom(e), false) {
-      let (entry, level) = t;
-      try!(write!(&mut f, "{}\n", _format(entry, level)));
+    for t in self.leveled_walk(root_entries, |eid,_| !is_bottom(eid), false) {
+      let (eid, level) = t;
+      try!(write!(&mut f, "{}\n", _format(eid, level)));
     }
 
     try!(f.write_all(b"\n"));
@@ -458,9 +437,7 @@ impl Graph {
   pub fn new() -> Graph {
     let inner =
       InnerGraph {
-        id_generator: 0,
         nodes: HashMap::default(),
-        entries: HashMap::default(),
         pg: StableGraph::new(),
       };
     Graph {
@@ -470,7 +447,7 @@ impl Graph {
 
   pub fn len(&self) -> usize {
     let inner = self.inner.lock().unwrap();
-    inner.entries.len()
+    inner.nodes.len()
   }
 
   /**
@@ -495,10 +472,10 @@ impl Graph {
       let dst_id = {
         // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
         // without a much more complicated algorithm.
-        let potential_dst_id = inner.ensure_entry(context, EntryKey::Valid(dst_node.clone()));
+        let potential_dst_id = inner.ensure_entry(EntryKey::Valid(dst_node.clone()));
         if inner.detect_cycle(src_id, potential_dst_id) {
           // Cyclic dependency: declare a dependency on a copy of the Node that is marked Cyclic.
-          inner.ensure_entry(context, EntryKey::Cyclic(dst_node.clone()))
+          inner.ensure_entry(EntryKey::Cyclic(dst_node.clone()))
         } else {
           // Valid dependency.
           potential_dst_id
@@ -507,7 +484,7 @@ impl Graph {
 
       // Declare the dep, and return the state of the destination.
       inner.pg.add_edge(src_id, dst_id, ());
-      inner.entry_for_id(dst_id).state()
+      inner.entry_for_id_mut(dst_id).state(context, dst_id)
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -522,8 +499,8 @@ impl Graph {
     // Initialize the state while under the lock...
     let state = {
       let mut inner = self.inner.lock().unwrap();
-      let id = inner.ensure_entry(context, EntryKey::Valid(node.into()));
-      inner.entry_for_id(id).state()
+      let id = inner.ensure_entry(EntryKey::Valid(node.into()));
+      inner.entry_for_id_mut(id).state(context, id)
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()
@@ -559,7 +536,7 @@ struct Walk<'a> {
 impl<'a> Iterator for Walk<'a> {
   type Item = EntryId;
 
-  fn next(&mut self) -> Option<EntryId> {
+  fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
       if !self.walked.insert(id) {
         continue;
@@ -580,7 +557,7 @@ type Level = u32;
  * Represents the state of a particular topological walk through a Graph. Implements Iterator and
  * has the same lifetime as the Graph itself.
  */
-struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
+struct LeveledWalk<'a, P: Fn(EntryId, Level)->bool> {
   graph: &'a InnerGraph,
   direction: Direction,
   deque: VecDeque<(EntryId, Level)>,
@@ -588,18 +565,17 @@ struct LeveledWalk<'a, P: Fn(&Entry, Level)->bool> {
   predicate: P,
 }
 
-impl<'a, P: Fn(&Entry, Level)->bool> Iterator for LeveledWalk<'a, P> {
-  type Item = (&'a Entry, Level);
+impl<'a, P: Fn(EntryId, Level)->bool> Iterator for LeveledWalk<'a, P> {
+  type Item = (EntryId, Level);
 
-  fn next(&mut self) -> Option<(&'a Entry, Level)> {
+  fn next(&mut self) -> Option<Self::Item> {
     while let Some((id, level)) = self.deque.pop_front() {
       if self.walked.contains(&id) {
         continue;
       }
       self.walked.insert(id);
 
-      let entry = self.graph.entry_for_id(id);
-      if !(self.predicate)(entry, level) {
+      if !(self.predicate)(id, level) {
         continue;
       }
 
@@ -608,7 +584,7 @@ impl<'a, P: Fn(&Entry, Level)->bool> Iterator for LeveledWalk<'a, P> {
         self.graph.pg.neighbors_directed(id, self.direction).into_iter()
           .map(|d| (d, level+1))
       );
-      return Some((entry, level));
+      return Some((id, level));
     }
 
     None
