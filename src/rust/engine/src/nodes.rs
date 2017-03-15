@@ -697,6 +697,8 @@ impl SelectTransitive {
   }
 }
 
+// TODO Improve the performance of how store_list is used
+// https://github.com/pantsbuild/pants/issues/4283
 impl Node for SelectTransitive {
   type Output = Value;
 
