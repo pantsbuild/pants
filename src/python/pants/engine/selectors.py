@@ -84,8 +84,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
                                repr(self.variant_key))
 
 
-class SelectDependencies(datatype('Dependencies',
-                                  ['product', 'dep_product', 'field', 'field_types']),
+class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']),
                          Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
@@ -128,11 +127,16 @@ class SelectDependencies(datatype('Dependencies',
                                      field_types_portion)
 
 
-class SelectTransitive(datatype('Dependencies',
-                                ['product', 'dep_product', 'field', 'field_types']),
+class SelectTransitive(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']),
                        Selector):
+  """A variation of `SelectDependencies` used to recursively request product.
+
+  One use case is to eagerly walk the entire graph.
+  """
 
   DEFAULT_FIELD = 'dependencies'
+
+  optional = False
 
   def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple()):
     return super(SelectTransitive, cls).__new__(cls, product, dep_product, field, field_types)
