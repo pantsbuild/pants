@@ -585,11 +585,6 @@ impl SelectDependencies {
     let dep_subject_key = externs::key_for(dep_subject);
     context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
   }
-
-  fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    // Not an inner node, or not a traversal.
-    externs::store_list(dep_values, false)
-  }
 }
 
 impl Node for SelectDependencies {
@@ -618,7 +613,7 @@ impl Node for SelectDependencies {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    Ok(node.store(&dep_product, dep_values.iter().collect()))
+                    Ok(externs::store_list(dep_values.iter().collect(), false))
                   },
                   Err(failure) =>
                     Err(context.was_required(failure)),
@@ -641,7 +636,7 @@ impl From<SelectDependencies> for NodeKey {
 }
 
 /**
- * A node that recursively select the dependencies of requested type and merge them.
+ * A node that recursively selects the dependencies of requested type and merge them.
  *
  * TODO Improve the performance of how store_list is used to merge the transitive dependencies
  * https://github.com/pantsbuild/pants/issues/4283

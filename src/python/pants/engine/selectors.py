@@ -127,9 +127,9 @@ class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'fi
                                      field_types_portion)
 
 
-class SelectTransitive(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']),
+class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field', 'field_types']),
                        Selector):
-  """A variation of `SelectDependencies` used to recursively request product.
+  """A variation of `SelectDependencies` that is used to recursively request product.
 
   One use case is to eagerly walk the entire graph.
   """
