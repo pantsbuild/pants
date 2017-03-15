@@ -301,7 +301,6 @@ pub extern fn execution_add_root_select_dependencies(
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
-  transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.add_root_select_dependencies(
@@ -310,7 +309,6 @@ pub extern fn execution_add_root_select_dependencies(
       dep_product,
       field.to_string().expect("field name to be string"),
       field_types.to_vec(),
-      transitive,
     );
   })
 }
@@ -409,10 +407,22 @@ pub extern fn task_add_select_dependencies(
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
-  transitive: bool,
 ) {
   with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec(), transitive);
+    core.tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
+    })
+}
+
+#[no_mangle]
+pub extern fn task_add_select_transitive(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeConstraint,
+  dep_product: TypeConstraint,
+  field: Buffer,
+  field_types: TypeIdBuffer,
+) {
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_transitive(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
     })
 }
 
