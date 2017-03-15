@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use petgraph::Direction;
-use petgraph::graphmap::{DiGraphMap, GraphMap};
+use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
 use futures::future::{self, Future};
 
 use externs;
@@ -30,8 +30,9 @@ const ID_MAX_VALUE: EntryIdTyp = ::std::u32::MAX;
 
 // 2^32 Nodes ought to be more than enough for anyone!
 // TODO: But, see the overflow panic in `ensure_entry_internal`.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
-pub struct EntryId(EntryIdTyp);
+pub type EntryId = NodeIndex<EntryIdTyp>;
+
+type PGraph = StableDiGraph<EntryId, (), EntryIdTyp>;
 
 type EntryStateField = future::Shared<NodeFuture<NodeResult>>;
 
@@ -155,7 +156,7 @@ struct InnerGraph {
   id_generator: EntryIdTyp,
   nodes: Nodes,
   entries: Entries,
-  pg: DiGraphMap<EntryId, ()>,
+  pg: PGraph,
 }
 
 impl InnerGraph {
@@ -179,7 +180,7 @@ impl InnerGraph {
   }
 
   fn ensure_entry_internal<'a>(
-    pg: &mut DiGraphMap<EntryId, ()>,
+    pg: &mut PGraph,
     entries: &'a mut Entries,
     nodes: &mut Nodes,
     id_generator: &mut EntryIdTyp,
@@ -190,17 +191,18 @@ impl InnerGraph {
     let entry_node = node.clone();
     let id =
       nodes.entry(node).or_insert_with(|| {
-        EntryId(*id_generator)
+        NodeIndex::new(*id_generator as usize)
       }).clone();
 
     // If this was an existing entry, we're done..
-    if id.0 != *id_generator {
+    if id.index() != *id_generator as usize {
       return id;
     }
 
     // New entry.
     if *id_generator == ID_MAX_VALUE {
-      // TODO: The memory savings are probably worthwhile.
+      // TODO: The memory savings are probably worthwhile, but compacting or wrapping here
+      // would be preferable.
       panic!("Overflow: more than {} nodes have been created.", ID_MAX_VALUE);
     }
     pg.add_node(id);
@@ -297,7 +299,7 @@ impl InnerGraph {
   }
 
   fn invalidate_internal(
-    pg: &mut DiGraphMap<EntryId, ()>,
+    pg: &mut PGraph,
     entries: &mut Entries,
     nodes: &mut Nodes,
     ids: HashSet<EntryId, FNV>
@@ -459,7 +461,7 @@ impl Graph {
         id_generator: 0,
         nodes: HashMap::default(),
         entries: HashMap::default(),
-        pg: GraphMap::new(),
+        pg: StableGraph::new(),
       };
     Graph {
       inner: Mutex::new(inner),
