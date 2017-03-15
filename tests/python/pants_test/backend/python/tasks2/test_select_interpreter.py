@@ -13,7 +13,6 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
-from pants.python.python_setup import PythonSetup
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
