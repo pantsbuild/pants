@@ -7,6 +7,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/python:interpreter_cache',
+    'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',

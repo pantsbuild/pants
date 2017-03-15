@@ -68,7 +68,7 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/option:option',
     'src/python/pants/python',
-    'src/python/pants/subsystem:subsystem',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants:version',

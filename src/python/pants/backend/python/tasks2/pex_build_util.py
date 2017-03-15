@@ -12,6 +12,7 @@ from pex.platforms import Platform
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -19,7 +20,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
-from pants.python.python_setup import PythonRepos, PythonSetup
+from pants.python.python_repos import PythonRepos
 
 
 def has_python_sources(tgt):

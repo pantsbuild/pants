@@ -12,6 +12,7 @@ python_tests(
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks2',
     'src/python/pants/base:build_root',

@@ -60,6 +60,6 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
     # Avoid some known-to-choke-on interpreters.
     command = ['binary',
                binary_target,
-               '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3']
+               '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+               '--python-setup-interpreter-constraints=CPython>=3.3']
     return self.run_pants(command=command, config=config)
