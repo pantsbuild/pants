@@ -308,7 +308,7 @@ pub extern fn execution_add_root_select_dependencies(
       product,
       dep_product,
       field.to_string().expect("field name to be string"),
-      field_types.to_vec()
+      field_types.to_vec(),
     );
   })
 }

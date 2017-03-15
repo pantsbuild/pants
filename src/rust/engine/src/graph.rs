@@ -351,10 +351,8 @@ impl InnerGraph {
     for entry in self.walk(root_entries, |_| true, false) {
       let node_str = entry.format::<NodeKey>();
 
-      let color = format_color(entry);
-      try!(f.write_fmt(format_args!("/* Entry {} with color {}. */", node_str, color)));
       // Write the node header.
-      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, color)));
+      try!(f.write_fmt(format_args!("  \"{}\" [style=filled, fillcolor={}];\n", node_str, format_color(entry))));
 
       for (cyclic, adjacencies) in vec![(false, &entry.dependencies), (true, &entry.cyclic_dependencies)] {
         let style = if cyclic { " [style=dashed]" } else { "" };
