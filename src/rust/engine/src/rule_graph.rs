@@ -627,16 +627,15 @@ fn val_name(val: &Value) -> String {
 fn selector_str(selector: &Selector) -> String {
   match selector {
     &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
-    &Selector::SelectDependencies(ref s) => format!("{}({}, {}, {}field_types=({},){})",
-                                                   if s.transitive { "SelectTransitive" } else { "SelectDependencies" },
+    &Selector::SelectDependencies(ref s) => format!("{}({}, {}, {}field_types=({},))",
+                                                   "SelectDependencies",
                                                     type_constraint_str(s.product),
                                                     type_constraint_str(s.dep_product),
                                                     if s.field == "dependencies" { "".to_string() } else {format!("'{}', ", s.field)},
                                                     s.field_types.iter()
                                                                  .map(|&f| type_str(f))
                                                                  .collect::<Vec<String>>()
-                                                                 .join(", "),
-                                                    if s.transitive { ", transitive=True" } else { "" }.to_string()
+                                                                 .join(", ")
     ),
     &Selector::SelectTransitive(ref s) => format!("{}({}, {}, {}field_types=({},))",
                                                    "SelectTransitive",

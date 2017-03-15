@@ -71,11 +71,7 @@ impl Entry {
   fn new(id: EntryId, node: NodeKey, context: Context) -> Entry {
     let core = context.core();
     let pool = core.pool();
-    match node {
-      NodeKey::SelectDependencies(ref s) =>  (), //assert!(false),
-      _ => ()
-    }
-    let entry = Entry {
+    Entry {
       id: id,
       node: node.clone(),
       state:
@@ -88,10 +84,7 @@ impl Entry {
       dependencies: Default::default(),
       dependents: Default::default(),
       cyclic_dependencies: Default::default(),
-    };
-
-    //assert!(false);
-    return entry
+    }
   }
 
   fn unwrap<N: Node>(

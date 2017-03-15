@@ -183,8 +183,7 @@ class WrappedNativeScheduler(object):
                                                           product_constraint,
                                                           self._to_constraint(selector.dep_product),
                                                           self._to_utf8_buf(selector.field),
-                                                          self._to_ids_buf(selector.field_types),
-                                                          selector.transitive)
+                                                          self._to_ids_buf(selector.field_types))
           elif selector_type is SelectTransitive:
             self._native.lib.task_add_select_transitive(self._scheduler,
                                                         product_constraint,
@@ -256,8 +255,7 @@ class WrappedNativeScheduler(object):
                                                                 selector.dep_product),
                                                               self._to_utf8_buf(selector.field),
                                                               self._to_ids_buf(
-                                                                selector.field_types),
-                                                              selector.transitive)
+                                                                selector.field_types))
     else:
       raise ValueError('Unsupported root selector type: {}'.format(selector))
 
