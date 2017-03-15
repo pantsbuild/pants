@@ -20,11 +20,12 @@ from pants.util.retry import retry_on_exception
 class Watchman(ProcessManager):
   """Watchman process manager and helper class."""
 
+  STARTUP_TIMEOUT_SECONDS = 30.0
   SOCKET_TIMEOUT_SECONDS = 5.0
 
   EventHandler = namedtuple('EventHandler', ['name', 'metadata', 'callback'])
 
-  def __init__(self, watchman_path, work_dir, log_level='1', startup_timeout=SOCKET_TIMEOUT_SECONDS,
+  def __init__(self, watchman_path, work_dir, log_level='1', startup_timeout=STARTUP_TIMEOUT_SECONDS,
                timeout=SOCKET_TIMEOUT_SECONDS, socket_path_override=None, metadata_base_dir=None):
     """
     :param str watchman_path: The path to the watchman binary.

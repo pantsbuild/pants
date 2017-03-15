@@ -31,7 +31,7 @@ class WatchmanLauncher(object):
       register('--supportdir', advanced=True, default='bin/watchman',
                help='Find watchman binaries under this dir. Used as part of the path to lookup '
                     'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
-      register('--startup-timeout', type=float, advanced=True, default=Watchman.SOCKET_TIMEOUT_SECONDS,
+      register('--startup-timeout', type=float, advanced=True, default=Watchman.STARTUP_TIMEOUT_SECONDS,
                help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
                     'This may need to be set higher for larger repos due to watchman startup cost.')
       register('--socket-timeout', type=float, advanced=True, default=Watchman.SOCKET_TIMEOUT_SECONDS,
