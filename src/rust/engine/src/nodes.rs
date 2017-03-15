@@ -57,15 +57,14 @@ impl Context {
    */
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
     if N::is_inline() {
-      node.run(self.clone());
-      return
+      node.run(self.clone())
+    } else {
+      // TODO: Odd place for this... could do it periodically in the background?
+      maybe_drain_handles().map(|handles| {
+          externs::drop_handles(handles);
+      });
+      self.core.graph.get(self.entry_id, self, node)
     }
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| {
-      externs::drop_handles(handles);
-    });
-
-    self.core.graph.get(self.entry_id, self, node)
   }
 
   pub fn core(&self) -> Arc<Core> {
@@ -444,7 +443,7 @@ impl Select {
           .map(move |snapshot| context.store_snapshot(&snapshot))
           .boxed()
       ]
-    } else if self.product() == &context.core.types.files_content { // this is
+    } else if self.product() == &context.core.types.files_content {
       // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
       let context = context.clone();
       vec![
@@ -602,9 +601,7 @@ impl SelectDependencies {
 impl Node for SelectDependencies {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
-    let node = self.clone();
-
+  fn run(self, context: Context) -> NodeFuture<Value> {
     context
       .get(
         // Select the product holding the dependency list.
@@ -616,8 +613,8 @@ impl Node for SelectDependencies {
             // The product and its dependency list are available: project them.
             let deps =
               future::join_all(
-                externs::project_multi(&dep_product, &node.selector.field).iter()
-                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
+                externs::project_multi(&dep_product, &self.selector.field).iter()
+                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
                   .collect::<Vec<_>>()
               );
             deps
@@ -638,6 +635,10 @@ impl Node for SelectDependencies {
         }
       })
       .boxed()
+  }
+
+  fn is_inline() -> bool {
+    return true
   }
 }
 
@@ -661,18 +662,6 @@ pub struct SelectTransitive {
 }
 
 impl SelectTransitive {
-  pub fn new(
-    selector: selectors::SelectTransitive,
-    subject: Key,
-    variants: Variants
-  ) -> SelectTransitive {
-    SelectTransitive {
-      subject: subject,
-      variants: variants,
-      selector: selector,
-    }
-  }
-
   fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
@@ -1176,8 +1165,8 @@ impl Node for NodeKey {
       NodeKey::Stat(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectLiteral(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
