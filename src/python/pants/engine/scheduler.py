@@ -21,7 +21,7 @@ from pants.engine.isolated_process import _Snapshots, create_snapshot_singletons
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant, constraint_for)
+                                    SelectTransitive, SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
@@ -183,8 +183,13 @@ class WrappedNativeScheduler(object):
                                                           product_constraint,
                                                           self._to_constraint(selector.dep_product),
                                                           self._to_utf8_buf(selector.field),
-                                                          self._to_ids_buf(selector.field_types),
-                                                          selector.transitive)
+                                                          self._to_ids_buf(selector.field_types))
+          elif selector_type is SelectTransitive:
+            self._native.lib.task_add_select_transitive(self._scheduler,
+                                                        product_constraint,
+                                                        self._to_constraint(selector.dep_product),
+                                                        self._to_utf8_buf(selector.field),
+                                                        self._to_ids_buf(selector.field_types))
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
               raise ValueError("TODO: remove support for projecting multiple fields at once.")
@@ -250,8 +255,7 @@ class WrappedNativeScheduler(object):
                                                                 selector.dep_product),
                                                               self._to_utf8_buf(selector.field),
                                                               self._to_ids_buf(
-                                                                selector.field_types),
-                                                              selector.transitive)
+                                                                selector.field_types))
     else:
       raise ValueError('Unsupported root selector type: {}'.format(selector))
 

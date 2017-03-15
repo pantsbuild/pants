@@ -86,8 +86,7 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
-    field_types: Vec<TypeId>,
-    transitive: bool,
+    field_types: Vec<TypeId>
   ) {
     self.roots.push(
       Root::SelectDependencies(
@@ -96,8 +95,7 @@ impl Scheduler {
             product: product,
             dep_product: dep_product,
             field: field,
-            field_types: field_types,
-            transitive: transitive
+            field_types: field_types
           },
           subject,
           Default::default(),
