@@ -85,8 +85,6 @@ typedef struct {
   _Bool  is_throw;
 } RunnableComplete;
 
-typedef uint64_t EntryId;
-
 typedef void ExternContext;
 
 // On the rust side the integration is defined in externs.rs
