@@ -60,7 +60,8 @@ class PythonChrootTest(BaseTest):
 
     interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
     interpreter_cache.setup()
-    interpreters = list(interpreter_cache.matched_interpreters(self.python_setup.constraints))
+    interpreters = list(interpreter_cache.matched_interpreters(
+      self.python_setup.interpreter_constraints))
     self.assertGreater(len(interpreters), 0)
     interpreter = interpreters[0]
 

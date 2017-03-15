@@ -147,7 +147,7 @@ class PythonInterpreterCache(object):
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    filters = self._python_setup.constraints if not any(filters) else filters
+    filters = self._python_setup.interpreter_constraints if not any(filters) else filters
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self._setup_cached(filters)
     def unsatisfied_filters():

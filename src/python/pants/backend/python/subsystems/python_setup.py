@@ -30,7 +30,7 @@ class PythonSetup(Subsystem):
     # B) The --interpreter-requirement option above.  That flag merely served to set the
     #    effective default for when no other constraints were set, so we might as well
     #    roll that into the more general constraints.
-    register('--constraints', advanced=True, default=[], type=list,
+    register('--interpreter-constraints', advanced=True, default=[], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.6,<3' or 'PyPy'. Multiple constraints will be ORed together. "
@@ -63,8 +63,8 @@ class PythonSetup(Subsystem):
                   'If unspecified, a standard path under the workdir is used.')
 
   @property
-  def constraints(self):
-    return (self.get_options().constraints or
+  def interpreter_constraints(self):
+    return (self.get_options().interpreter_constraints or
             [self.get_options().interpreter_requirement or self.get_options().interpreter or b''])
 
   @property

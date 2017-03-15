@@ -35,7 +35,7 @@ class TestInterpreterCache(BaseTest):
   @contextmanager
   def _setup_test(self, constraints=None):
     mock_setup = mock.MagicMock().return_value
-    type(mock_setup).constraints = mock.PropertyMock(return_value=constraints)
+    type(mock_setup).interpreter_constraints = mock.PropertyMock(return_value=constraints)
 
     with temporary_dir() as path:
       mock_setup.interpreter_cache_dir = path

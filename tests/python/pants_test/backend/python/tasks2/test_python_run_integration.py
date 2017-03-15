@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -28,8 +28,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_27)
       pants_run_26 = self.run_pants(
         command=['run2', '{}:echo_interpreter_version_2.6'.format(self.testproject),
-                 '--pyprep-interpreter-constraints=CPython>=2.6,<3',
-                 '--pyprep-interpreter-constraints=CPython>=3.3'],
+                 '--python-setup-constraints=CPython>=2.6,<3',
+                 '--python-setup-constraints=CPython>=3.3'],
         config=pants_ini_config
       )
       self.assert_success(pants_run_26)
@@ -37,8 +37,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def test_die(self):
     command = ['run2',
                '{}:die'.format(self.testproject),
-               '--pyprep-interpreter-constraints=CPython>=2.6,<3',
-               '--pyprep-interpreter-constraints=CPython>=3.3',
+               '--python-setup-constraints=CPython>=2.6,<3',
+               '--python-setup-constraints=CPython>=3.3',
                '--quiet']
     pants_run = self.run_pants(command=command)
     assert pants_run.returncode == 57
@@ -61,8 +61,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     # Avoid some known-to-choke-on interpreters.
     command = ['run2',
                binary_target,
-               '--pyprep-interpreter-constraints=CPython>=2.6,<3',
-               '--pyprep-interpreter-constraints=CPython>=3.3',
+               '--python-setup-constraints=CPython>=2.6,<3',
+               '--python-setup-constraints=CPython>=3.3',
                '--quiet']
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]
