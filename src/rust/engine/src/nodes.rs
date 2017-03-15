@@ -525,7 +525,7 @@ impl Node for Select {
   }
 
   fn is_inline() -> bool {
-    return true
+    true
   }
 }
 
@@ -549,7 +549,7 @@ impl Node for SelectLiteral {
   }
 
   fn is_inline() -> bool {
-    return true
+    true
   }
 }
 
@@ -638,7 +638,7 @@ impl Node for SelectDependencies {
   }
 
   fn is_inline() -> bool {
-    return true
+    true
   }
 }
 
@@ -736,7 +736,7 @@ impl Node for SelectTransitive {
   }
 
   fn is_inline() -> bool {
-    return true
+    true
   }
 }
 
@@ -798,7 +798,7 @@ impl Node for SelectProjection {
   }
 
   fn is_inline() -> bool {
-    return true
+    true
   }
 }
 
@@ -830,7 +830,7 @@ impl Node for ReadLink {
       .boxed()
   }
   fn is_inline() -> bool {
-    return false
+    false
   }
 }
 
@@ -859,7 +859,7 @@ impl Node for Stat {
   }
 
   fn is_inline() -> bool {
-    return false
+    false
   }
 }
 
@@ -895,7 +895,7 @@ impl Node for Scandir {
       .boxed()
   }
   fn is_inline() -> bool {
-    return false
+    false
   }
 }
 
@@ -980,7 +980,7 @@ impl Node for Snapshot {
       .boxed()
   }
   fn is_inline() -> bool {
-    return false
+    false
   }
 }
 
@@ -1064,7 +1064,7 @@ impl Node for Task {
   }
 
   fn is_inline() -> bool {
-    return false
+    false
   }
 }
 
@@ -1175,7 +1175,7 @@ impl Node for NodeKey {
   }
 
   fn is_inline() -> bool {
-    return true
+    true
   }
 }
 
