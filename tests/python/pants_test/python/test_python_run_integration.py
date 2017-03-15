@@ -28,7 +28,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_27)
       pants_run_26 = self.run_pants(
         command=['run', '{}:echo_interpreter_version_2.6'.format(self.testproject),
-                 '--interpreter=CPython>=2.6,<3', '--interpreter=CPython>=3.3'],
+                 '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+                 '--python-setup-interpreter-constraints=CPython>=3.3'],
         config=pants_ini_config
       )
       self.assert_success(pants_run_26)
@@ -36,8 +37,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def test_die(self):
     command = ['run',
                '{}:die'.format(self.testproject),
-               '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3',
+               '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+               '--python-setup-interpreter-constraints=CPython>=3.3',
                '--quiet']
     pants_run = self.run_pants(command=command)
     assert pants_run.returncode == 57
@@ -60,8 +61,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     # Avoid some known-to-choke-on interpreters.
     command = ['run',
                binary_target,
-               '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3',
+               '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+               '--python-setup-interpreter-constraints=CPython>=3.3',
                '--quiet']
     pants_run = self.run_pants(command=command)
     return pants_run.stdout_data.rstrip().split('\n')[-1]

@@ -18,6 +18,7 @@ from pants.backend.codegen.thrift.python.python_thrift_library import PythonThri
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -26,7 +27,7 @@ from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
-from pants.python.python_setup import PythonRepos, PythonSetup
+from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
@@ -59,9 +60,8 @@ class PythonChrootTest(BaseTest):
 
     interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
     interpreter_cache.setup()
-    interpreters = list(interpreter_cache.matched_interpreters([
-      self.python_setup.interpreter_requirement
-    ]))
+    interpreters = list(interpreter_cache.matched_interpreters(
+      self.python_setup.interpreter_constraints))
     self.assertGreater(len(interpreters), 0)
     interpreter = interpreters[0]
 
