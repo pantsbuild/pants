@@ -21,7 +21,7 @@ from pants.engine.addressable import Addresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -321,9 +321,9 @@ def create_legacy_graph_tasks(symbol_table_cls):
   return [
     # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
     (HydratedTargets,
-     [SelectDependencies(HydratedTarget,
-                         Addresses,
-                         field_types=(Address,), transitive=True)],
+     [SelectTransitive(HydratedTarget,
+                       Addresses,
+                       field_types=(Address,))],
      HydratedTargets),
     (HydratedTarget,
      [Select(symbol_table_constraint),

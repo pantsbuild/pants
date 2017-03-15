@@ -16,7 +16,7 @@ from pkg_resources import working_set as global_working_set
 from pkg_resources import Requirement
 
 from pants.option.global_options import GlobalOptionsRegistrar
-from pants.python.python_setup import PythonRepos, PythonSetup
+from pants.python.python_repos import PythonRepos
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_property
@@ -80,14 +80,13 @@ class PluginResolver(object):
     # guaranteed a properly initialized interpreter with wheel support so we enforce eggs only for
     # bdists with this custom precedence.
     precedence = (EggPackage, SourcePackage)
-
     logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
     return resolver.resolve(self._plugin_requirements,
                             fetchers=self._python_repos.get_fetchers(),
                             context=self._python_repos.get_network_context(),
                             precedence=precedence,
                             cache=self.plugin_cache_dir,
-                            cache_ttl=self._python_setup.resolver_cache_ttl,
+                            cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
                             allow_prereleases=PANTS_SEMVER.is_prerelease)
 
   @memoized_property
@@ -99,10 +98,6 @@ class PluginResolver(object):
   def _python_repos(self):
     return self._create_global_subsystem(PythonRepos)
 
-  @memoized_property
-  def _python_setup(self):
-    return self._create_global_subsystem(PythonSetup)
-
   def _create_global_subsystem(self, subsystem_type):
     options_scope = subsystem_type.options_scope
     return subsystem_type(options_scope, self._options.for_scope(options_scope))
@@ -111,9 +106,9 @@ class PluginResolver(object):
   def _options(self):
     # NB: The PluginResolver runs very early in the pants startup sequence before the standard
     # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
-    # (PythonRepos, PythonSetup) returned as `dependencies()`.  Instead it does the minimum possible
-    # work to hand-roll bootstrapping of the Subsystems it needs.
-    subsystems = Subsystem.closure([PythonRepos, PythonSetup])
+    # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
+    # bootstrapping of the Subsystem it needs.
+    subsystems = Subsystem.closure([PythonRepos])
     known_scope_infos = [subsystem.get_scope_info() for subsystem in subsystems]
     options = self._options_bootstrapper.get_full_options(known_scope_infos)
 

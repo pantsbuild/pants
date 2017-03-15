@@ -585,39 +585,107 @@ impl SelectDependencies {
     //   https://github.com/pantsbuild/pants/issues/4020
 
     let dep_subject_key = externs::key_for(dep_subject);
-    if self.selector.transitive {
-      // After the root has been expanded, a traversal continues with dep_product == product.
-      let mut selector = self.selector.clone();
-      selector.dep_product = selector.product;
-      context.get(
-        SelectDependencies {
-          subject: dep_subject_key,
-          variants: self.variants.clone(),
-          selector: selector,
-        }
+    context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
+  }
+}
+
+impl Node for SelectDependencies {
+  type Output = Value;
+
+  fn run(&self, context: Context) -> NodeFuture<Value> {
+    let node = self.clone();
+
+    context
+      .get(
+        // Select the product holding the dependency list.
+        Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
       )
-    } else {
-      context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
-    }
+      .then(move |dep_product_res| {
+        match dep_product_res {
+          Ok(dep_product) => {
+            // The product and its dependency list are available: project them.
+            let deps =
+              future::join_all(
+                externs::project_multi(&dep_product, &node.selector.field).iter()
+                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
+                  .collect::<Vec<_>>()
+              );
+            deps
+              .then(move |dep_values_res| {
+                // Finally, store the resulting values.
+                match dep_values_res {
+                  Ok(dep_values) => {
+                    Ok(externs::store_list(dep_values.iter().collect(), false))
+                  },
+                  Err(failure) =>
+                    Err(context.was_required(failure)),
+                }
+              })
+              .boxed()
+          },
+          Err(failure) =>
+            context.err(context.was_optional(failure, "No source of input product.")),
+        }
+      })
+      .boxed()
+  }
+}
+
+impl From<SelectDependencies> for NodeKey {
+  fn from(n: SelectDependencies) -> Self {
+    NodeKey::SelectDependencies(n)
+  }
+}
+
+/**
+ * A node that recursively selects the dependencies of requested type and merge them.
+ *
+ * TODO Improve the performance of how store_list is used to merge the transitive dependencies
+ * https://github.com/pantsbuild/pants/issues/4283
+ */
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct SelectTransitive {
+  pub subject: Key,
+  pub variants: Variants,
+  pub selector: selectors::SelectTransitive,
+}
+
+impl SelectTransitive {
+  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
+    // TODO: This method needs to consider whether the `dep_subject` is an Address,
+    // and if so, attempt to parse Variants there. See:
+    //   https://github.com/pantsbuild/pants/issues/4020
+
+    let dep_subject_key = externs::key_for(dep_subject);
+    // After the root has been expanded, a traversal continues with dep_product == product.
+    let mut selector = self.selector.clone();
+    selector.dep_product = selector.product;
+    context.get(
+      SelectTransitive {
+        subject: dep_subject_key,
+        variants: self.variants.clone(),
+        selector: selector,
+      }
+    )
   }
 
   fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if self.selector.transitive && externs::satisfied_by(&self.selector.product, dep_product)  {
+    if externs::satisfied_by(&self.selector.product, dep_product)  {
       // If the dep_product is an inner node in the traversal, prepend it to the list of
       // items to be merged.
       // TODO: would be nice to do this in one operation.
       let prepend = externs::store_list(vec![dep_product], false);
       let mut prepended = dep_values;
       prepended.insert(0, &prepend);
-      externs::store_list(prepended, self.selector.transitive)
+      externs::store_list(prepended, true)
     } else {
       // Not an inner node, or not a traversal.
-      externs::store_list(dep_values, self.selector.transitive)
+      externs::store_list(dep_values, true)
     }
   }
 }
 
-impl Node for SelectDependencies {
+impl Node for SelectTransitive {
   type Output = Value;
 
   fn run(&self, context: Context) -> NodeFuture<Value> {
@@ -659,9 +727,9 @@ impl Node for SelectDependencies {
   }
 }
 
-impl From<SelectDependencies> for NodeKey {
-  fn from(n: SelectDependencies) -> Self {
-    NodeKey::SelectDependencies(n)
+impl From<SelectTransitive> for NodeKey {
+  fn from(n: SelectTransitive) -> Self {
+    NodeKey::SelectTransitive(n)
   }
 }
 
@@ -919,6 +987,12 @@ impl Task {
           variants: self.variants.clone(),
           selector: s,
         }),
+      Selector::SelectTransitive(s) =>
+        context.get(SelectTransitive {
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          selector: s,
+        }),
       Selector::SelectProjection(s) =>
         context.get(SelectProjection {
           subject: self.subject.clone(),
@@ -974,6 +1048,7 @@ pub enum NodeKey {
   Stat(Stat),
   Select(Select),
   SelectDependencies(SelectDependencies),
+  SelectTransitive(SelectTransitive),
   SelectLiteral(SelectLiteral),
   SelectProjection(SelectProjection),
   Snapshot(Snapshot),
@@ -1001,6 +1076,8 @@ impl NodeKey {
         format!("Literal({})", keystr(&s.selector.subject)),
       &NodeKey::SelectDependencies(ref s) =>
         format!("Dependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
+      &NodeKey::SelectTransitive(ref s) =>
+        format!("TransitiveDependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectProjection(ref s) =>
         format!("Projection({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::Task(ref s) =>
@@ -1023,6 +1100,7 @@ impl NodeKey {
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectLiteral(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectDependencies(ref s) => typstr(&s.selector.product),
+      &NodeKey::SelectTransitive(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectProjection(ref s) => typstr(&s.selector.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
@@ -1055,6 +1133,7 @@ impl Node for NodeKey {
       &NodeKey::Scandir(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Select(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectDependencies(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      &NodeKey::SelectTransitive(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectLiteral(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::SelectProjection(ref n) => n.run(context).map(|v| v.into()).boxed(),
       &NodeKey::Snapshot(ref n) => n.run(context).map(|v| v.into()).boxed(),

@@ -11,10 +11,11 @@ import os
 from pex.interpreter import PythonIdentity, PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.fingerprint_strategy import DefaultFingerprintHashingMixin, FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.python.python_setup import PythonRepos, PythonSetup
+from pants.python.python_repos import PythonRepos
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
 
@@ -47,19 +48,6 @@ class SelectInterpreter(Task):
   def product_types(cls):
     return [PythonInterpreter]
 
-  @classmethod
-  def register_options(cls, register):
-    super(SelectInterpreter, cls).register_options(register)
-    # Note: This replaces the global --interpreter flag in the old python tasks.
-    # That flag is only relevant in the python backend, and should never have been
-    # global to begin with.
-    register('--constraints', advanced=True, default=[], type=list,
-             metavar='<requirement>',
-             help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
-                  "e.g. 'CPython>=2.6,<3' or 'PyPy'. Multiple constraints will be ORed together. "
-                  "These constraints are applied in addition to any compatibilities required by "
-                  "the relevant targets.")
-
   def execute(self):
     interpreter = None
     python_tgts = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget))
@@ -78,15 +66,10 @@ class SelectInterpreter(Task):
                                                    PythonRepos.global_instance(),
                                                    logger=self.context.log.debug)
 
-        # We filter the interpreter cache itself (and not just the interpreters we pull from it)
-        # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
-        # an escape hatch.
-        filters = self.get_options().constraints or [b'']
-
         # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
         self.context.acquire_lock()
         try:
-          interpreter_cache.setup(filters=filters)
+          interpreter_cache.setup()
         finally:
           self.context.release_lock()
 
