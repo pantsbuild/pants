@@ -86,8 +86,7 @@ class LegacyBuildGraph(BuildGraph):
           HydratedTargets, type(state.value)))
 
       # We have a successful HydratedTargets value (for a particular input Spec).
-      for dep in state.value.dependencies:
-        hydrated_target = dep[0]
+      for hydrated_target in state.value.dependencies:
         target_adaptor = hydrated_target.adaptor
         address = target_adaptor.address
         all_addresses.add(address)

@@ -692,7 +692,7 @@ impl SelectTransitive {
       externs::store_list(prepended, true)
     } else {
       // Not an inner node, or not a traversal.
-      externs::store_list(dep_values, false)
+      externs::store_list(dep_values, true)
     }
   }
 }
