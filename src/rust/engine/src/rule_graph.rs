@@ -9,7 +9,7 @@ use std::io;
 
 use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
 use externs;
-use selectors::{Select, Selector};
+use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
 use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -304,8 +304,9 @@ impl <'t> GraphMaker<'t> {
                                    vec![Entry::new_literal(select.subject.clone(),
                                                                select.product.clone())]);
               },
-              &Selector::SelectDependencies(ref select) => {
-                let initial_selector = select.dep_product;
+              &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
+              &Selector::SelectTransitive(SelectTransitive{ref product, ref dep_product, ref field_types, ..}) => {
+                let initial_selector = *dep_product;
                 let initial_rules_or_literals = rhs_for_select(&self.tasks,
                                                                entry.subject_type(),
                                                                &Select { product: initial_selector, variant_key: None });
@@ -320,19 +321,19 @@ impl <'t> GraphMaker<'t> {
                   continue;
                 }
                 let mut rules_for_dependencies = vec![];
-                for field_type in &select.field_types {
+                for field_type in field_types {
                   let rules_for_field_subjects = rhs_for_select(&self.tasks,
                                                                 field_type.clone(),
-                                                                &Select { product: select.product, variant_key: None });
+                                                                &Select { product: *product, variant_key: None });
                   rules_for_dependencies.extend(rules_for_field_subjects);
                 }
                 if rules_for_dependencies.is_empty() {
-                    for t in &select.field_types {
+                    for t in field_types {
                         mark_unfulfillable(&mut unfulfillable_rules,
                                            &entry,
                                            t.clone(),
                                            format!("no matches for {} when resolving {}",
-                                                   selector_str(&Selector::Select(Select { product: select.product, variant_key: None})),
+                                                   selector_str(&Selector::Select(Select { product: *product, variant_key: None})),
                                                    selector_str(selector))
                         );
                     }
@@ -344,7 +345,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: select.dep_product, variant_key: None})],
+                                   vec![selector.clone(), Selector::Select(Select { product: *dep_product, variant_key: None})],
                                    initial_rules_or_literals);
 
                 add_rules_to_graph(&mut rules_to_traverse,
@@ -352,58 +353,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: select.product, variant_key: None})],
-                                   rules_for_dependencies);
-              },
-              &Selector::SelectTransitive(ref select) => {
-                let initial_selector = select.dep_product;
-                let initial_rules_or_literals = rhs_for_select(&self.tasks,
-                                                               entry.subject_type(),
-                                                               &Select { product: initial_selector, variant_key: None });
-                if initial_rules_or_literals.is_empty() {
-                  mark_unfulfillable(&mut unfulfillable_rules,
-                                     &entry,
-                                     entry.subject_type(),
-                                     format!("no matches for {} when resolving {}",
-                                             selector_str(&Selector::Select(Select { product: initial_selector, variant_key: None})),
-                                             selector_str(selector)));
-                  was_unfulfillable = true;
-                  continue;
-                }
-                let mut rules_for_dependencies = vec![];
-                for field_type in &select.field_types {
-                  let rules_for_field_subjects = rhs_for_select(&self.tasks,
-                                                                field_type.clone(),
-                                                                &Select { product: select.product, variant_key: None });
-                  rules_for_dependencies.extend(rules_for_field_subjects);
-                }
-                if rules_for_dependencies.is_empty() {
-                    for t in &select.field_types {
-                        mark_unfulfillable(&mut unfulfillable_rules,
-                                           &entry,
-                                           t.clone(),
-                                           format!("no matches for {} when resolving {}",
-                                                   selector_str(&Selector::Select(Select { product: select.product, variant_key: None})),
-                                                   selector_str(selector))
-                        );
-                    }
-                  was_unfulfillable = true;
-                  continue;
-                }
-                add_rules_to_graph(&mut rules_to_traverse,
-                                   &mut rule_dependency_edges,
-                                   &mut unfulfillable_rules,
-                                   &mut root_rule_dependency_edges,
-                                   &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: select.dep_product, variant_key: None})],
-                                   initial_rules_or_literals);
-
-                add_rules_to_graph(&mut rules_to_traverse,
-                                   &mut rule_dependency_edges,
-                                   &mut unfulfillable_rules,
-                                   &mut root_rule_dependency_edges,
-                                   &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: select.product, variant_key: None})],
+                                   vec![selector.clone(), Selector::Select(Select { product: *product, variant_key: None})],
                                    rules_for_dependencies);
               },
               &Selector::SelectProjection(ref select) =>{
