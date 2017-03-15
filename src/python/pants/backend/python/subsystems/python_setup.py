@@ -64,8 +64,8 @@ class PythonSetup(Subsystem):
 
   @property
   def interpreter_constraints(self):
-    return (self.get_options().interpreter_constraints or
-            [self.get_options().interpreter or self.get_options().interpreter_requirement or b''])
+    return (self.get_options().interpreter_constraints or self.get_options().interpreter or
+            [self.get_options().interpreter_requirement or b''])
 
   @property
   def setuptools_version(self):
