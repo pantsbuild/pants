@@ -19,9 +19,9 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    # TODO: On removal, make ['CPython>=2.7,<3'] the default for --constraints.
+    # TODO: On removal, make ['CPython>=2.7,<3'] the default for --interpreter-constraints.
     register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
-             removal_version='1.5.0.dev0', removal_hint='Use --constraints instead.',
+             removal_version='1.5.0.dev0', removal_hint='Use --interpreter-constraints instead.',
              help='The interpreter requirement string for this python environment.')
     # Note: This will replace two options:
     # A) The global --interpreter option in the old python tasks.

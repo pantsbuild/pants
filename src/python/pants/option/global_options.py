@@ -155,7 +155,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('-i', '--interpreter', advanced=True, default=[], type=list,
              metavar='<requirement>',
              removal_version='1.5.0.dev0',
-             removal_hint='Use --constraints in scope python-setup instead.',
+             removal_hint='Use --interpreter-constraints in scope python-setup instead.',
              help="Constrain what Python interpreters to use.  Uses Requirement format from "
                   "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
