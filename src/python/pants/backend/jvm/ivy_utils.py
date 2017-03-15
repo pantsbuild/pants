@@ -296,8 +296,9 @@ class FrozenResolution(object):
 
     # Assuming target is a jar library.
     for j in target.jar_dependencies:
-      if j.get_url():
-        self.coordinate_to_attributes[j.coordinate] = {'url': j.get_url()}
+      url = j.get_url(relative=True)
+      if url:
+        self.coordinate_to_attributes[j.coordinate] = {'url': url, 'base_path': j.base_path}
       else:
         self.coordinate_to_attributes[j.coordinate] = {}
 
@@ -353,6 +354,7 @@ class FrozenResolution(object):
                                   .format(spec))
         resolution.add_resolution_coords(t, [m2_for(c) for c in coord_strs])
       result[conf] = resolution
+
     return result
 
   @classmethod
@@ -364,6 +366,7 @@ class FrozenResolution(object):
         ['coord_to_attrs', OrderedDict([str(c), attrs]
                                        for c, attrs in resolution.coordinate_to_attributes.items())]
       ])
+
     with safe_concurrent_creation(filename) as tmp_filename:
       with open(tmp_filename, 'wb') as f:
         json.dump(res, f)
