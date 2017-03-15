@@ -56,18 +56,16 @@ impl Context {
    * Get the future value for the given Node implementation.
    */
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
-    // TODO: Odd place for this... could do it periodically in the background?
     if N::is_inline() {
       node.run(self.clone());
       return
     }
+    // TODO: Odd place for this... could do it periodically in the background?
+    maybe_drain_handles().map(|handles| {
+      externs::drop_handles(handles);
+    });
 
-  maybe_drain_handles().map(|handles| {
-    externs::drop_handles(handles);
-  });
-
-  self.core.graph.get(self.entry_id, self, node)
-
+    self.core.graph.get(self.entry_id, self, node)
   }
 
   pub fn core(&self) -> Arc<Core> {
