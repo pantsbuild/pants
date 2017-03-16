@@ -24,6 +24,7 @@ extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
+extern crate petgraph;
 extern crate tar;
 extern crate tempdir;
 

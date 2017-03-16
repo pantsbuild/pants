@@ -4,9 +4,10 @@
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, RwLockReadGuard};
 
 use futures::future::{self, BoxFuture, Future};
+use futures_cpupool::CpuPool;
 
 use context::Core;
 use core::{Function, Key, TypeConstraint, Value, Variants};
@@ -65,10 +66,6 @@ impl Context {
       });
       self.core.graph.get(self.entry_id, self, node)
     }
-  }
-
-  pub fn core(&self) -> Arc<Core> {
-    self.core.clone()
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -237,6 +234,7 @@ impl Context {
 
 pub trait ContextFactory {
   fn create(&self, entry_id: EntryId) -> Context;
+  fn pool(&self) -> RwLockReadGuard<CpuPool>;
 }
 
 impl ContextFactory for Context {
@@ -249,6 +247,10 @@ impl ContextFactory for Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
+  }
+
+  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+    self.core.pool()
   }
 }
 
