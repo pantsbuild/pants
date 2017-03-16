@@ -57,12 +57,15 @@ impl Context {
    * Get the future value for the given Node implementation.
    */
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| {
-      externs::drop_handles(handles);
-    });
-
-    self.core.graph.get(self.entry_id, self, node)
+    if N::is_inline() {
+      node.run(self.clone())
+    } else {
+      // TODO: Odd place for this... could do it periodically in the background?
+      maybe_drain_handles().map(|handles| {
+          externs::drop_handles(handles);
+      });
+      self.core.graph.get(self.entry_id, self, node)
+    }
   }
 
   fn has_products(&self, item: &Value) -> bool {
@@ -281,7 +284,8 @@ impl VFS<Failure> for Context {
 pub trait Node: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
-  fn run(&self, context: Context) -> NodeFuture<Self::Output>;
+  fn run(self, context: Context) -> NodeFuture<Self::Output>;
+  fn is_inline() -> bool;
 }
 
 /**
@@ -480,7 +484,7 @@ impl Select {
 impl Node for Select {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
@@ -515,12 +519,15 @@ impl Node for Select {
       );
 
     let variant_value = variant_value.map(|s| s.to_string());
-    let node = self.clone();
     deps_future
       .and_then(move |dep_results| {
-        future::result(node.choose_task_result(context, dep_results, &variant_value))
+        future::result(self.choose_task_result(context, dep_results, &variant_value))
       })
       .boxed()
+  }
+
+  fn is_inline() -> bool {
+    true
   }
 }
 
@@ -539,8 +546,12 @@ pub struct SelectLiteral {
 impl Node for SelectLiteral {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     context.ok(externs::val_for(&self.selector.subject))
+  }
+
+  fn is_inline() -> bool {
+    true
   }
 }
 
@@ -592,9 +603,7 @@ impl SelectDependencies {
 impl Node for SelectDependencies {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
-    let node = self.clone();
-
+  fn run(self, context: Context) -> NodeFuture<Value> {
     context
       .get(
         // Select the product holding the dependency list.
@@ -606,8 +615,8 @@ impl Node for SelectDependencies {
             // The product and its dependency list are available: project them.
             let deps =
               future::join_all(
-                externs::project_multi(&dep_product, &node.selector.field).iter()
-                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
+                externs::project_multi(&dep_product, &self.selector.field).iter()
+                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
                   .collect::<Vec<_>>()
               );
             deps
@@ -628,6 +637,10 @@ impl Node for SelectDependencies {
         }
       })
       .boxed()
+  }
+
+  fn is_inline() -> bool {
+    true
   }
 }
 
@@ -688,9 +701,7 @@ impl SelectTransitive {
 impl Node for SelectTransitive {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
-    let node = self.clone();
-
+  fn run(self, context: Context) -> NodeFuture<Value> {
     context
       .get(
         // Select the product holding the dependency list.
@@ -702,8 +713,8 @@ impl Node for SelectTransitive {
             // The product and its dependency list are available: project them.
             let deps =
               future::join_all(
-                externs::project_multi(&dep_product, &node.selector.field).iter()
-                  .map(|dep_subject| node.get_dep(&context, &dep_subject))
+                externs::project_multi(&dep_product, &self.selector.field).iter()
+                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
                   .collect::<Vec<_>>()
               );
             deps
@@ -711,7 +722,7 @@ impl Node for SelectTransitive {
                 // Finally, store the resulting values.
                 match dep_values_res {
                   Ok(dep_values) => {
-                    Ok(node.store(&dep_product, dep_values.iter().collect()))
+                    Ok(self.store(&dep_product, dep_values.iter().collect()))
                   },
                   Err(failure) =>
                     Err(context.was_required(failure)),
@@ -724,6 +735,10 @@ impl Node for SelectTransitive {
         }
       })
       .boxed()
+  }
+
+  fn is_inline() -> bool {
+    false
   }
 }
 
@@ -743,8 +758,7 @@ pub struct SelectProjection {
 impl Node for SelectProjection {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
-    let node = self.clone();
+  fn run(self, context: Context) -> NodeFuture<Value> {
 
     context
       .get(
@@ -758,15 +772,15 @@ impl Node for SelectProjection {
             let projected_subject =
               externs::project(
                 &dep_product,
-                &node.selector.field,
-                &node.selector.projected_subject
+                &self.selector.field,
+                &self.selector.projected_subject
               );
             context
               .get(
                 Select::new(
-                  node.selector.product,
+                  self.selector.product,
                   externs::key_for(&projected_subject),
-                  node.variants.clone()
+                  self.variants.clone()
                 )
               )
               .then(move |output_res| {
@@ -783,6 +797,10 @@ impl Node for SelectProjection {
         }
       })
       .boxed()
+  }
+
+  fn is_inline() -> bool {
+    true
   }
 }
 
@@ -804,7 +822,7 @@ pub struct LinkDest(PathBuf);
 impl Node for ReadLink {
   type Output = LinkDest;
 
-  fn run(&self, context: Context) -> NodeFuture<LinkDest> {
+  fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
     context.core.vfs.read_link(&self.0)
       .map(|dest_path| LinkDest(dest_path))
@@ -812,6 +830,9 @@ impl Node for ReadLink {
         context.throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
       )
       .boxed()
+  }
+  fn is_inline() -> bool {
+    false
   }
 }
 
@@ -835,8 +856,12 @@ pub struct Stat(PathBuf);
 impl Node for Stat {
   type Output = ();
 
-  fn run(&self, _: Context) -> NodeFuture<()> {
+  fn run(self, _: Context) -> NodeFuture<()> {
     future::ok(()).boxed()
+  }
+
+  fn is_inline() -> bool {
+    false
   }
 }
 
@@ -859,7 +884,7 @@ pub struct DirectoryListing(Vec<fs::Stat>);
 impl Node for Scandir {
   type Output = DirectoryListing;
 
-  fn run(&self, context: Context) -> NodeFuture<DirectoryListing> {
+  fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
     context.core.vfs.scandir(&self.0)
       .then(move |listing_res| match listing_res {
@@ -870,6 +895,9 @@ impl Node for Scandir {
           Err(context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .boxed()
+  }
+  fn is_inline() -> bool {
+    false
   }
 }
 
@@ -904,7 +932,7 @@ impl Snapshot {
             future::join_all(
               path_stats.iter()
                 .map(|path_stat|
-                  context.get(Stat(path_stat.path().to_owned()))
+                  context.get(Stat(path_stat.path().to_owned())) // for recording only
                 )
                 .collect::<Vec<_>>()
             );
@@ -929,7 +957,7 @@ impl Snapshot {
 impl Node for Snapshot {
   type Output = fs::Snapshot;
 
-  fn run(&self, context: Context) -> NodeFuture<fs::Snapshot> {
+  fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
     // Compute and parse PathGlobs for the subject.
     context
       .get(
@@ -952,6 +980,9 @@ impl Node for Snapshot {
           context.err(context.was_optional(failure, "No source of PathGlobs."))
       })
       .boxed()
+  }
+  fn is_inline() -> bool {
+    false
   }
 }
 
@@ -1011,7 +1042,7 @@ impl Task {
 impl Node for Task {
   type Output = Value;
 
-  fn run(&self, context: Context) -> NodeFuture<Value> {
+  fn run(self, context: Context) -> NodeFuture<Value> {
     let deps =
       future::join_all(
         self.task.clause.iter()
@@ -1032,6 +1063,10 @@ impl Node for Task {
           Err(context.was_optional(err, "Missing at least one input.")),
       })
       .boxed()
+  }
+
+  fn is_inline() -> bool {
+    false
   }
 }
 
@@ -1126,19 +1161,23 @@ impl NodeKey {
 impl Node for NodeKey {
   type Output = NodeResult;
 
-  fn run(&self, context: Context) -> NodeFuture<NodeResult> {
+  fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
-      &NodeKey::ReadLink(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Stat(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Scandir(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Select(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectDependencies(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectTransitive(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectLiteral(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::SelectProjection(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Snapshot(ref n) => n.run(context).map(|v| v.into()).boxed(),
-      &NodeKey::Task(ref n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectLiteral(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::Task(n) => n.run(context).map(|v| v.into()).boxed(),
     }
+  }
+
+  fn is_inline() -> bool {
+    true
   }
 }
 
