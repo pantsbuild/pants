@@ -3,10 +3,9 @@
 
 use std::io;
 use std::path::Path;
-use std::sync::{Arc, RwLockReadGuard};
+use std::sync::Arc;
 
 use futures::future::{self, Future};
-use futures_cpupool::CpuPool;
 
 use context::Core;
 use core::{Field, Key, TypeConstraint, TypeId, Value};
@@ -149,10 +148,6 @@ pub type RootResult = Result<Value, Failure>;
 impl ContextFactory for Arc<Core> {
   fn create(&self, entry_id: EntryId) -> Context {
     Context::new(entry_id, self.clone())
-  }
-
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
-    Core::pool(self)
   }
 }
 
