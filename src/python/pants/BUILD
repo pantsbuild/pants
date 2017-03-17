@@ -10,6 +10,10 @@ target(
 
 python_library(
   name='pants-packaged',
+  sources=[],
+  dependencies=[
+    ':version',
+  ],
   provides=pants_setup_py(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',

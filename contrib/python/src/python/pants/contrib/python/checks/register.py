@@ -9,8 +9,10 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.python.checks.tasks.checkstyle.checker import PythonCheckStyleTask
 from pants.contrib.python.checks.tasks.python_eval import PythonEval
+from pants.contrib.python.checks.tasks2.python_eval import PythonEval as PythonEval2
 
 
 def register_goals():
   task(name='python-eval', action=PythonEval).install('compile')
+  task(name='python-eval', action=PythonEval2).install('compile2')
   task(name='pythonstyle', action=PythonCheckStyleTask).install('compile')
