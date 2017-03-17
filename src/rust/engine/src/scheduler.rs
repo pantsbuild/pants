@@ -3,9 +3,10 @@
 
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLockReadGuard};
 
 use futures::future::{self, Future};
+use futures_cpupool::CpuPool;
 
 use context::Core;
 use core::{Field, Key, TypeConstraint, TypeId, Value};
@@ -86,8 +87,7 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
-    field_types: Vec<TypeId>,
-    transitive: bool,
+    field_types: Vec<TypeId>
   ) {
     self.roots.push(
       Root::SelectDependencies(
@@ -96,8 +96,7 @@ impl Scheduler {
             product: product,
             dep_product: dep_product,
             field: field,
-            field_types: field_types,
-            transitive: transitive
+            field_types: field_types
           },
           subject,
           Default::default(),
@@ -150,6 +149,10 @@ pub type RootResult = Result<Value, Failure>;
 impl ContextFactory for Arc<Core> {
   fn create(&self, entry_id: EntryId) -> Context {
     Context::new(entry_id, self.clone())
+  }
+
+  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+    Core::pool(self)
   }
 }
 

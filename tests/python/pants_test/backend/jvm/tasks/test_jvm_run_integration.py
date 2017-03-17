@@ -19,8 +19,8 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     # Avoid some known-to-choke-on interpreters.
     command = ['run',
                target,
-               '--interpreter=CPython>=2.6,<3',
-               '--interpreter=CPython>=3.3'] + list(args)
+               '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+               '--python-setup-interpreter-constraints=CPython>=3.3'] + list(args)
     pants_run = self.run_pants(command)
     self.assert_success(pants_run)
     return pants_run.stdout_data
@@ -44,8 +44,8 @@ class JvmRunIntegrationTest(PantsRunIntegrationTest):
     # Make sure the test fails if you don't specify a directory
     pants_run = self.run_pants(['run',
                                 'testprojects/src/java/org/pantsbuild/testproject/cwdexample',
-                                '--interpreter=CPython>=2.6,<3',
-                                '--interpreter=CPython>=3.3'])
+                                '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+                                '--python-setup-interpreter-constraints=CPython>=3.3'])
     self.assert_failure(pants_run)
     self.assertIn('Neither ExampleCwd.java nor readme.txt found.', pants_run.stderr_data)
 

@@ -84,8 +84,7 @@ class SelectVariant(datatype('Variant', ['product', 'variant_key']), Selector):
                                repr(self.variant_key))
 
 
-class SelectDependencies(datatype('Dependencies',
-                                  ['product', 'dep_product', 'field', 'field_types', 'transitive']),
+class SelectDependencies(datatype('Dependencies', ['product', 'dep_product', 'field', 'field_types']),
                          Selector):
   """Selects a product for each of the dependencies of a product for the Subject.
 
@@ -101,8 +100,8 @@ class SelectDependencies(datatype('Dependencies',
 
   optional = False
 
-  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple(), transitive=False):
-    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types, transitive)
+  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple()):
+    return super(SelectDependencies, cls).__new__(cls, product, dep_product, field, field_types)
 
   @property
   def input_product_selector(self):
@@ -121,13 +120,26 @@ class SelectDependencies(datatype('Dependencies',
       field_name_portion = ', {}'.format(repr(self.field))
     else:
       field_name_portion = ''
-    return '{}({}, {}{}{}{})'.format(type(self).__name__,
+    return '{}({}, {}{}{})'.format(type(self).__name__,
                                      type_or_constraint_repr(self.product),
                                      type_or_constraint_repr(self.dep_product),
                                      field_name_portion,
-                                     field_types_portion,
-                                     ', transitive=True' if self.transitive else '',
-                                     )
+                                     field_types_portion)
+
+
+class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field', 'field_types']),
+                       Selector):
+  """A variation of `SelectDependencies` that is used to recursively request product.
+
+  One use case is to eagerly walk the entire graph.
+  """
+
+  DEFAULT_FIELD = 'dependencies'
+
+  optional = False
+
+  def __new__(cls, product, dep_product, field=DEFAULT_FIELD, field_types=tuple()):
+    return super(SelectTransitive, cls).__new__(cls, product, dep_product, field, field_types)
 
 
 class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):

@@ -52,16 +52,3 @@ python_tests(
   ],
   tags = {'integration'},
 )
-
-python_tests(
-  name = 'test_interpreter_cache',
-  sources = ['test_interpreter_cache.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    '3rdparty/python:pex',
-    'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/python',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-  ],
-)
