@@ -8,11 +8,11 @@ use std::sync::{Arc, RwLockReadGuard};
 use futures::future::{self, Future};
 use futures_cpupool::CpuPool;
 
-use context::Core;
-use core::{Field, Key, TypeConstraint, TypeId, Value};
+use context::{Context, ContextFactory, Core};
+use core::{Failure, Field, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
-use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies};
+use nodes::{NodeKey, Select, SelectDependencies};
 use selectors;
 
 /**

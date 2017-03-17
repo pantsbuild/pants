@@ -13,10 +13,9 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
 use futures::future::{self, Future};
 
 use externs;
-use core::FNV;
+use context::ContextFactory;
+use core::{Failure, FNV};
 use nodes::{
-  ContextFactory,
-  Failure,
   Node,
   NodeFuture,
   NodeKey,
@@ -122,7 +121,7 @@ impl Entry {
               .boxed()
           },
           EntryKey::Cyclic(_) =>
-            future::err(Failure::Noop("Dep would be cyclic.", None)).boxed(),
+            future::err(Failure::Noop("Dep would be cyclic.")).boxed(),
         };
 
       self.state = Some(future::Shared::new(state));
@@ -325,7 +324,7 @@ impl InnerGraph {
     let mut format_color =
       |entry: &Entry| {
         match entry.peek::<NodeKey>() {
-          None | Some(Err(Failure::Noop(_, _))) => "white".to_string(),
+          None | Some(Err(Failure::Noop(_))) => "white".to_string(),
           Some(Err(Failure::Throw(_))) => "4".to_string(),
           Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
@@ -404,7 +403,7 @@ impl InnerGraph {
           None => "<None>".to_string(),
           Some(Ok(ref x)) => format!("{:?}", x),
           Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs::val_to_str(x)),
-          Some(Err(Failure::Noop(ref x, ref opt_node))) => format!("Noop({:?}, {:?})", x, opt_node),
+          Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {

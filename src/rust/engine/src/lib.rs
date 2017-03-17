@@ -38,7 +38,7 @@ use std::sync::Arc;
 
 
 use context::Core;
-use core::{Function, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
   BufferBuffer,
@@ -63,7 +63,6 @@ use externs::{
   ValToStrExtern,
   with_vec,
 };
-use nodes::Failure;
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
@@ -106,7 +105,7 @@ impl RawNode {
           (RawStateTag::Return as u8, v),
         Some(Err(Failure::Throw(msg))) =>
           (RawStateTag::Throw as u8, msg),
-        Some(Err(Failure::Noop(msg, _))) =>
+        Some(Err(Failure::Noop(msg))) =>
           (RawStateTag::Noop as u8, externs::create_exception(msg)),
       };
 

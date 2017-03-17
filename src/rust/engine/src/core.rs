@@ -153,3 +153,9 @@ impl fmt::Debug for Value {
     write!(f, "{}", externs::val_to_str(&self))
   }
 }
+
+#[derive(Debug, Clone)]
+pub enum Failure {
+  Noop(&'static str),
+  Throw(Value),
+}

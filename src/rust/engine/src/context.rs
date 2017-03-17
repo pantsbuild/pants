@@ -1,12 +1,15 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::path::PathBuf;
-use std::sync::{RwLock, RwLockReadGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use graph::Graph;
+use futures_cpupool::{self, CpuPool};
+
+use fs::{PosixFS, Snapshots};
+use graph::{EntryId, Graph};
 use tasks::Tasks;
 use types::Types;
-use fs::{PosixFS, Snapshots};
-use futures_cpupool::{self, CpuPool};
 
 
 /**
@@ -71,5 +74,42 @@ impl Core {
     // And our own.
     let mut pool = self.pool.write().unwrap();
     *pool = Core::create_pool();
+  }
+}
+
+#[derive(Clone)]
+pub struct Context {
+  pub entry_id: EntryId,
+  pub core: Arc<Core>,
+}
+
+impl Context {
+  pub fn new(entry_id: EntryId, core: Arc<Core>) -> Context {
+    Context {
+      entry_id: entry_id,
+      core: core,
+    }
+  }
+}
+
+pub trait ContextFactory {
+  fn create(&self, entry_id: EntryId) -> Context;
+  fn pool(&self) -> RwLockReadGuard<CpuPool>;
+}
+
+impl ContextFactory for Context {
+  /**
+   * Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
+   * is a shallow clone.
+   */
+  fn create(&self, entry_id: EntryId) -> Context {
+    Context {
+      entry_id: entry_id,
+      core: self.core.clone(),
+    }
+  }
+
+  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+    self.core.pool()
   }
 }
