@@ -27,11 +27,11 @@ use tasks;
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
-fn ok<O: Send + 'static>(value: O) -> BoxFuture<O, Failure> {
+fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
   future::ok(value).boxed()
 }
 
-fn err<O: Send + 'static>(failure: Failure) -> BoxFuture<O, Failure> {
+fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
   future::err(failure).boxed()
 }
 
@@ -61,14 +61,14 @@ fn was_required(failure: Failure) -> Failure {
 }
 
 trait GetNode {
-  fn get<N: Node>(&self, node: N) -> BoxFuture<N::Output, Failure>;
+  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
 }
 
 impl GetNode for Context {
   /**
    * Get the future value for the given Node implementation.
    */
-  fn get<N: Node>(&self, node: N) -> BoxFuture<N::Output, Failure> {
+  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
     if N::is_inline() {
       node.run(self.clone())
     } else {
