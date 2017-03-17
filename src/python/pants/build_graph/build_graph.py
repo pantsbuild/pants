@@ -102,6 +102,10 @@ class BuildGraph(AbstractClass):
   def __init__(self):
     self.reset()
 
+  @abstractmethod
+  def clone_new(self):
+    """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
+
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.
 

@@ -23,6 +23,10 @@ class MutableBuildGraph(BuildGraph):
     self._address_mapper = address_mapper
     super(MutableBuildGraph, self).__init__()
 
+  def clone_new(self):
+    """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
+    return MutableBuildGraph(self._address_mapper)
+
   def reset(self):
     super(MutableBuildGraph, self).reset()
     self._addresses_already_closed = set()

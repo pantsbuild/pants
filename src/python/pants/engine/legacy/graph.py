@@ -46,7 +46,12 @@ class LegacyBuildGraph(BuildGraph):
   class InvalidCommandLineSpecError(AddressLookupError):
     """Raised when command line spec is not a valid directory"""
 
-  def __init__(self, scheduler, engine, symbol_table_cls):
+  @classmethod
+  def create(cls, scheduler, engine, symbol_table_cls):
+    """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
+    return cls(scheduler, engine, cls._get_target_types(symbol_table_cls))
+
+  def __init__(self, scheduler, engine, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
     :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
@@ -55,11 +60,16 @@ class LegacyBuildGraph(BuildGraph):
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
     self._scheduler = scheduler
-    self._target_types = self._get_target_types(symbol_table_cls)
     self._engine = engine
+    self._target_types = target_types
     super(LegacyBuildGraph, self).__init__()
 
-  def _get_target_types(self, symbol_table_cls):
+  def clone_new(self):
+    """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
+    return LegacyBuildGraph(self._scheduler, self._engine, self._target_types)
+
+  @staticmethod
+  def _get_target_types(symbol_table_cls):
     aliases = symbol_table_cls.aliases()
     target_types = dict(aliases.target_types)
     for alias, factory in aliases.target_macro_factories.items():
