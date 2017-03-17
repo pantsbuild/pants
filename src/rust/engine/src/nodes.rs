@@ -251,76 +251,6 @@ impl Select {
     )
   }
 
-  fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
-    let path_stats: Vec<_> =
-      item.path_stats.iter()
-        .map(|ps| Self::store_path_stat(context, ps))
-        .collect();
-    externs::invoke_unsafe(
-      &context.core.types.construct_snapshot,
-      &vec![
-        externs::store_bytes(&item.fingerprint.0),
-        externs::store_list(path_stats.iter().collect(), false),
-      ],
-    )
-  }
-
-  fn store_snapshots(context: &Context) -> Value {
-    externs::invoke_unsafe(
-      &context.core.types.construct_snapshots,
-      &vec![
-        externs::store_bytes(
-          &context.core.snapshots.path().as_os_str().as_bytes()
-        ),
-      ],
-    )
-  }
-
-  fn store_path(item: &Path) -> Value {
-    externs::store_bytes(item.as_os_str().as_bytes())
-  }
-
-  fn store_dir(context: &Context, item: &Dir) -> Value {
-    let args = vec![Self::store_path(item.0.as_path())];
-    externs::invoke_unsafe(&context.core.types.construct_dir, &args)
-  }
-
-  fn store_file(context: &Context, item: &File) -> Value {
-    let args = vec![Self::store_path(item.0.as_path())];
-    externs::invoke_unsafe(&context.core.types.construct_file, &args)
-  }
-
-  fn store_path_stat(context: &Context, item: &PathStat) -> Value {
-    let args =
-      match item {
-        &PathStat::Dir { ref path, ref stat } =>
-          vec![Self::store_path(path), Self::store_dir(context, stat)],
-        &PathStat::File { ref path, ref stat } =>
-          vec![Self::store_path(path), Self::store_file(context, stat)],
-      };
-    externs::invoke_unsafe(&context.core.types.construct_path_stat, &args)
-  }
-
-  fn store_file_content(context: &Context, item: &FileContent) -> Value {
-    externs::invoke_unsafe(
-      &context.core.types.construct_file_content,
-      &vec![
-        Self::store_path(&item.path),
-        externs::store_bytes(&item.content),
-      ],
-    )
-  }
-
-  fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
-    let entries: Vec<_> = item.iter().map(|e| Self::store_file_content(context, e)).collect();
-    externs::invoke_unsafe(
-      &context.core.types.construct_files_content,
-      &vec![
-        externs::store_list(entries.iter().collect(), false),
-      ],
-    )
-  }
-
   /**
    * Return Futures for each Task/Node that might be able to compute the given product for the
    * given subject and variants.
@@ -330,7 +260,7 @@ impl Select {
     if self.product() == &context.core.types.snapshots {
       // TODO: re-storing the Snapshots object for each request.
       vec![
-        future::ok(Self::store_snapshots(context)).boxed()
+        future::ok(Snapshot::store_snapshots(context)).boxed()
       ]
     } else if self.product() == &context.core.types.snapshot {
       // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
@@ -338,7 +268,7 @@ impl Select {
       let context = context.clone();
       vec![
         self.get_snapshot(&context)
-          .map(move |snapshot| Self::store_snapshot(&context, &snapshot))
+          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
           .boxed()
       ]
     } else if self.product() == &context.core.types.files_content {
@@ -350,7 +280,7 @@ impl Select {
             // Request the file contents of the Snapshot, and then store them.
             context.core.snapshots.contents_for(&context.core.vfs, snapshot)
               .then(move |files_content_res| match files_content_res {
-                Ok(files_content) => Ok(Self::store_files_content(&context, &files_content)),
+                Ok(files_content) => Ok(Snapshot::store_files_content(&context, &files_content)),
                 Err(e) => Err(throw(&e)),
               })
           )
@@ -856,6 +786,76 @@ impl Snapshot {
       .map_err(|e| {
         format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)
       })
+  }
+
+  fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
+    let path_stats: Vec<_> =
+      item.path_stats.iter()
+        .map(|ps| Self::store_path_stat(context, ps))
+        .collect();
+    externs::invoke_unsafe(
+      &context.core.types.construct_snapshot,
+      &vec![
+        externs::store_bytes(&item.fingerprint.0),
+        externs::store_list(path_stats.iter().collect(), false),
+      ],
+    )
+  }
+
+  fn store_snapshots(context: &Context) -> Value {
+    externs::invoke_unsafe(
+      &context.core.types.construct_snapshots,
+      &vec![
+        externs::store_bytes(
+          &context.core.snapshots.path().as_os_str().as_bytes()
+        ),
+      ],
+    )
+  }
+
+  fn store_path(item: &Path) -> Value {
+    externs::store_bytes(item.as_os_str().as_bytes())
+  }
+
+  fn store_dir(context: &Context, item: &Dir) -> Value {
+    let args = vec![Self::store_path(item.0.as_path())];
+    externs::invoke_unsafe(&context.core.types.construct_dir, &args)
+  }
+
+  fn store_file(context: &Context, item: &File) -> Value {
+    let args = vec![Self::store_path(item.0.as_path())];
+    externs::invoke_unsafe(&context.core.types.construct_file, &args)
+  }
+
+  fn store_path_stat(context: &Context, item: &PathStat) -> Value {
+    let args =
+      match item {
+        &PathStat::Dir { ref path, ref stat } =>
+          vec![Self::store_path(path), Self::store_dir(context, stat)],
+        &PathStat::File { ref path, ref stat } =>
+          vec![Self::store_path(path), Self::store_file(context, stat)],
+      };
+    externs::invoke_unsafe(&context.core.types.construct_path_stat, &args)
+  }
+
+  fn store_file_content(context: &Context, item: &FileContent) -> Value {
+    externs::invoke_unsafe(
+      &context.core.types.construct_file_content,
+      &vec![
+        Self::store_path(&item.path),
+        externs::store_bytes(&item.content),
+      ],
+    )
+  }
+
+  fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
+    let entries: Vec<_> = item.iter().map(|e| Self::store_file_content(context, e)).collect();
+    externs::invoke_unsafe(
+      &context.core.types.construct_files_content,
+      &vec![
+        externs::store_list(entries.iter().collect(), false),
+      ],
+    )
   }
 }
 
