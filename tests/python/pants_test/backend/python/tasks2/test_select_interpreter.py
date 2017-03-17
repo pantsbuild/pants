@@ -36,13 +36,13 @@ class SelectInterpreterTest(TaskTestBase):
       fake_interpreter('FakePython 2 99 999')
     ]
 
-    self.tgt1 =self._fake_target('tgt1')
-    self.tgt2 =self._fake_target('tgt2', compatibility=['FakePython>2.77.777'])
-    self.tgt3 =self._fake_target('tgt3', compatibility=['FakePython>2.88.888'])
-    self.tgt4 =self._fake_target('tgt4', compatibility=['FakePython<2.99.999'])
-    self.tgt20 =self._fake_target('tgt20', dependencies=[self.tgt2])
-    self.tgt30 =self._fake_target('tgt30', dependencies=[self.tgt3])
-    self.tgt40 =self._fake_target('tgt40', dependencies=[self.tgt4])
+    self.tgt1 = self._fake_target('tgt1')
+    self.tgt2 = self._fake_target('tgt2', compatibility=['FakePython>2.77.777'])
+    self.tgt3 = self._fake_target('tgt3', compatibility=['FakePython>2.88.888'])
+    self.tgt4 = self._fake_target('tgt4', compatibility=['FakePython<2.99.999'])
+    self.tgt20 = self._fake_target('tgt20', dependencies=[self.tgt2])
+    self.tgt30 = self._fake_target('tgt30', dependencies=[self.tgt3])
+    self.tgt40 = self._fake_target('tgt40', dependencies=[self.tgt4])
 
   def _fake_target(self, spec, compatibility=None, sources=None, dependencies=None):
     return self.make_target(spec=spec, target_type=PythonLibrary, sources=sources or [],
