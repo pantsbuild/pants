@@ -7,4 +7,3 @@ class C extends B {
   def foo_c() {
   }
 }
-

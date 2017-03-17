@@ -9,4 +9,3 @@ public class D {
     c.foo_c();
   }
 }
-
