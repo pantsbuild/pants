@@ -55,3 +55,11 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
       target = '{}:D'.format(path)
       self.modify_exports_and_compile(target, 'A.{}'.format(lang))
       self.modify_exports_and_compile(target, 'B.{}'.format(lang))
+
+  def test_non_exports(self):
+    pants_run = self.run_pants(['compile', '--compile-scalafmt-skip',
+                                'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C'])
+    self.assert_failure(pants_run)
+    self.assertIn('FAILURE: Compilation failure: Failed jobs: '
+                  'compile(testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C)',
+                  pants_run.stdout_data)
