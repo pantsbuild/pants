@@ -673,7 +673,7 @@ class IvyInfo(object):
       return OrderedSet([dep])
     for jar in coordinates:
       classifier = jar.classifier if self._conf == 'default' else self._conf
-      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
+      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
           resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
