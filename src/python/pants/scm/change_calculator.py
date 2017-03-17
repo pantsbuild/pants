@@ -40,6 +40,7 @@ class ChangeCalculator(AbstractClass):
     """Find changed targets, according to SCM."""
 
 
+# TODO: Remove this in 1.5.0dev0 in favor of `EngineChangeCalculator`.
 class BuildGraphChangeCalculator(ChangeCalculator):
   """A `BuildGraph`-based helper for calculating changed target addresses."""
 
