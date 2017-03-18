@@ -49,9 +49,11 @@ class DirutilTest(unittest.TestCase):
     # Find the longest prefix (standard case).
     prefixes = ['hello', 'hello_world', 'hello/world', 'helloworld']
     self.assertEquals(longest_dir_prefix('hello/world/pants', prefixes),
-                      'hello/world/')
+                      'hello/world')
     self.assertEquals(longest_dir_prefix('hello/', prefixes),
-                      'hello/')
+                      'hello')
+    self.assertEquals(longest_dir_prefix('hello', prefixes),
+                      'hello')
     self.assertEquals(longest_dir_prefix('scoobydoobydoo', prefixes),
                       None)
 
@@ -60,6 +62,8 @@ class DirutilTest(unittest.TestCase):
     # prefix, is not tagged.
     prefixes = ['helloworldhowareyou', 'helloworld']
     self.assertEquals(longest_dir_prefix('helloworldhowareyoufine/', prefixes),
+                      None)
+    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine', prefixes),
                       None)
 
   def test_fast_relpath(self):

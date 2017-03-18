@@ -27,10 +27,7 @@ def longest_dir_prefix(path, prefixes):
   """
   longest_match, longest_prefix = 0, None
   for prefix in prefixes:
-    if not prefix.endswith('/'):
-      prefix = prefix + '/'
-
-    if path.startswith(prefix) and len(prefix) > longest_match:
+    if fast_relpath_optional(path, prefix) is not None and len(prefix) > longest_match:
       longest_match, longest_prefix = len(prefix), prefix
 
   return longest_prefix
@@ -59,8 +56,19 @@ def join_specs(parent, *children):
 
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
+  relpath = fast_relpath_optional(path, start)
+  if relpath is None:
+    raise ValueError('{} is not a directory containing {}'.format(start, path))
+  return relpath
+
+
+def fast_relpath_optional(path, start):
+  """A prefix-based relpath, with no normalization or support for returning `..`.
+  
+  Returns None if `start` is not a prefix of `path`.
+  """
   if not path.startswith(start):
-    raise ValueError('{} is not a prefix of {}'.format(start, path))
+    return None
 
   if len(path) == len(start):
     # Items are identical: the relative path is empty.
@@ -75,7 +83,7 @@ def fast_relpath(path, start):
     # The suffix indicates that the prefix is a directory.
     return path[len(start)+1:]
   else:
-    raise ValueError('{} is not a directory containing {}'.format(start, path))
+    return None
 
 
 def safe_mkdir(directory, clean=False):
