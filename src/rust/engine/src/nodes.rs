@@ -40,16 +40,6 @@ fn throw(msg: &str) -> Failure {
 }
 
 /**
- * A helper to indicate that the value represented by the Failure was an optional value.
- */
-fn was_optional(failure: Failure, msg: &'static str) -> Failure {
-  match failure {
-    Failure::Noop(..) => Failure::Noop(msg),
-    f => f,
-  }
-}
-
-/**
  * A helper to indicate that the value represented by the Failure was required, and thus
  * fatal if not present.
  */
@@ -459,7 +449,7 @@ impl Node for SelectDependencies {
               .boxed()
           },
           Err(failure) =>
-            err(was_optional(failure, "No source of input product.")),
+            err(failure),
         }
       })
       .boxed()
@@ -557,7 +547,7 @@ impl Node for SelectTransitive {
               .boxed()
           },
           Err(failure) =>
-            err(was_optional(failure, "No source of input product.")),
+            err(failure),
         }
       })
       .boxed()
@@ -619,7 +609,7 @@ impl Node for SelectProjection {
               .boxed()
           },
           Err(failure) =>
-            err(was_optional(failure, "No source of input product.")),
+            err(failure),
         }
       })
       .boxed()
@@ -882,7 +872,7 @@ impl Node for Snapshot {
           }
         },
         Err(failure) =>
-          err(was_optional(failure, "No source of PathGlobs."))
+          err(failure)
       })
       .boxed()
   }
@@ -965,7 +955,7 @@ impl Node for Task {
             task.cacheable,
           ),
         Err(err) =>
-          Err(was_optional(err, "Missing at least one input.")),
+          Err(err),
       })
       .boxed()
   }
