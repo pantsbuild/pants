@@ -29,6 +29,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Dave Brewster
 + David Taylor
 + David Turner
++ Derek Young
 + Divij Rajkumar
 + Dominic Hamon
 + Dumitru Daniliuc

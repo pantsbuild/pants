@@ -4,6 +4,63 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev14 (3/17/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* [pantsd] Add an option to configure the watchman startup timeout. (#4332)
+  `PR #4332 <https://github.com/pantsbuild/pants/pull/4332>`_
+
+* Relativize jar_dependency.base_path (#4326)
+  `PR #4326 <https://github.com/pantsbuild/pants/pull/4326>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix bad import from race commits (#4335)
+  `PR #4335 <https://github.com/pantsbuild/pants/pull/4335>`_
+
+* Misc fixes to python tasks: (#4323)
+  `PR #4323 <https://github.com/pantsbuild/pants/pull/4323>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix product mapping for ivy resolve when libraries are not jar files (#4339)
+  `PR #4339 <https://github.com/pantsbuild/pants/pull/4339>`_
+
+* Refactor the new SelectInterpreter and GatherSources tasks. (#4337)
+  `PR #4337 <https://github.com/pantsbuild/pants/pull/4337>`_
+
+* Lock down the native-engine-version (#4338)
+  `PR #4338 <https://github.com/pantsbuild/pants/pull/4338>`_
+
+* [engine] Inline execution of Select/Dependencies/Projection/Literal (#4331)
+  `PR #4331 <https://github.com/pantsbuild/pants/pull/4331>`_
+
+* Upgrade to mock 2.0.0. (#4336)
+  `PR #4336 <https://github.com/pantsbuild/pants/pull/4336>`_
+
+* [engine] Improve memory layout for Graph (#4333)
+  `PR #4333 <https://github.com/pantsbuild/pants/pull/4333>`_
+
+* [engine] Split SelectDependencies into SelectDependencies and SelectTransitive (#4334)
+  `PR #4334 <https://github.com/pantsbuild/pants/pull/4334>`_
+
+* Simplify PythonSetup usage (#4328)
+  `PR #4328 <https://github.com/pantsbuild/pants/pull/4328>`_
+
+* Bump native engine version. (#4330)
+  `PR #4330 <https://github.com/pantsbuild/pants/pull/4330>`_
+
+* [engine] Move to new-style CFFI callbacks. (#4324)
+  `PR #4324 <https://github.com/pantsbuild/pants/pull/4324>`_
+
+* Profile the pants invocations in integration tests. (#4325)
+  `PR #4325 <https://github.com/pantsbuild/pants/pull/4325>`_
 
 1.3.0.dev13 (3/10/2017)
 -----------------------
