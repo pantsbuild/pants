@@ -18,8 +18,7 @@ from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
                                 get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
                                 safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch, longest_dir_prefix,
-                                join_specs)
+                                safe_rm_oldest_items_in_dir, safe_rmtree, touch, longest_dir_prefix)
 
 
 def strict_patch(target, **kwargs):
@@ -31,19 +30,6 @@ class DirutilTest(unittest.TestCase):
   def setUp(self):
     # Ensure we start in a clean state.
     _mkdtemp_unregister_cleaner()
-
-  def test_join_specs(self):
-    # Test joining specs with removing slash prefixes
-    parent = '//parent/spec'
-    children = ['//childone', '/childtwo', 'childthree']
-    self.assertEquals(join_specs(parent, *children),
-                      '//parent/spec/childone/childtwo/childthree')
-
-    # Ensure that three slashes is not fixed
-    parent = '//parent/spec'
-    children = ['///woahthere']
-    self.assertEquals(join_specs(parent, *children),
-                      '///woahthere')
 
   def test_longest_dir_prefix(self):
     # Find the longest prefix (standard case).
@@ -77,6 +63,8 @@ class DirutilTest(unittest.TestCase):
     assertRelpath('c/', 'b/c/', 'b/')
     assertRelpath('', 'c/', 'c/')
     assertRelpath('', 'c', 'c')
+    assertRelpath('', 'c/', 'c')
+    assertRelpath('', 'c', 'c/')
     assertRelpath('c/', 'c/', '')
     assertRelpath('c', 'c', '')
 
