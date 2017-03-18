@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jvm_binary import (Duplicate, JarRules, JvmBinary, ManifestEntries,
                                                   Skip)
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload_field import FingerprintedField
 from pants.build_graph.target import Target
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
 

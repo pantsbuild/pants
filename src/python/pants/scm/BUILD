@@ -25,5 +25,6 @@ python_library(
   sources = ['change_calculator.py'],
   dependencies = [
     'src/python/pants/build_graph',
+    'src/python/pants/goal:workspace',
   ],
 )

@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
 

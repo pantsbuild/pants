@@ -7,6 +7,7 @@ python_tests(
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/codegen/wire/java',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',

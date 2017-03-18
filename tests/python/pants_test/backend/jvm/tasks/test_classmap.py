@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from contextlib import contextmanager
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem

@@ -9,13 +9,13 @@ import logging
 import os
 import subprocess
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.android.targets.android_library import AndroidLibrary

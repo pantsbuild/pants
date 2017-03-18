@@ -6,8 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.workunit import WorkUnitLabel
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 
 

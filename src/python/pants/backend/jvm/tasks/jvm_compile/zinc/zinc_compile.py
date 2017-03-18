@@ -19,7 +19,6 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
@@ -32,6 +31,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_method, memoized_property

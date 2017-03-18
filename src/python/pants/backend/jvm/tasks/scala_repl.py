@@ -6,12 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.jar.jar_dependency import JarDependency
 from pants.task.repl_task_mixin import ReplTaskMixin
 
 

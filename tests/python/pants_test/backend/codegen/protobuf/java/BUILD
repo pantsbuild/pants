@@ -5,7 +5,10 @@ python_tests(
   sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies = [
     'src/python/pants/backend/codegen/protobuf/java',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm:plugin',
+    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
     'src/python/pants/util:contextutil',

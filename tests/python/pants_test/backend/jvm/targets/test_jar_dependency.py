@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.base.build_environment import get_buildroot
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 
 
 class JarDependencyTest(unittest.TestCase):
