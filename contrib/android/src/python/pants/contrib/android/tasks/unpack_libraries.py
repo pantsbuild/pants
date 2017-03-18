@@ -8,14 +8,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from hashlib import sha1
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
+from pants.java.jar.jar_dependency import JarDependency
+from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.task import Task
 
 from pants.contrib.android.targets.android_binary import AndroidBinary

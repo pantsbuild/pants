@@ -9,12 +9,12 @@ import logging
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import FileExcluder, Scalastyle
 from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import ensure_cached

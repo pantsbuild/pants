@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import defaultdict
 
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
 

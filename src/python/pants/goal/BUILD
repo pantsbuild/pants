@@ -22,6 +22,7 @@ python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
   dependencies = [
+    'src/python/pants/cache',
     'src/python/pants/util:dirutil',
   ]
 )

@@ -10,9 +10,9 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
 from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util import desktop
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch

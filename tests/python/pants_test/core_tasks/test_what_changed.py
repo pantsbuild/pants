@@ -10,7 +10,6 @@ from textwrap import dedent
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
@@ -22,6 +21,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.workspace import Workspace
+from pants.java.jar.jar_dependency import JarDependency
 from pants.source.wrapped_globs import Globs, RGlobs
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 

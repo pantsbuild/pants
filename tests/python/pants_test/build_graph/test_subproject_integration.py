@@ -5,11 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from contextlib import contextmanager
 from textwrap import dedent
 
-from contextlib import contextmanager
 from pants.util.dirutil import safe_file_dump, safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+
 
 SUBPROJ_SPEC = 'testprojects/src/python/subproject_test/'
 SUBPROJ_ROOT = 'testprojects/src/python/subproject_test/subproject'

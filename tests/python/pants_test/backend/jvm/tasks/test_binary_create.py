@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.binary_create import BinaryCreate
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 
