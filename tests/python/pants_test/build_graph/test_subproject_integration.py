@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from textwrap import dedent
+
 from contextlib import contextmanager
 from pants.util.dirutil import safe_file_dump, safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
@@ -12,28 +14,29 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensur
 SUBPROJ_SPEC = 'testprojects/src/python/subproject_test/'
 SUBPROJ_ROOT = 'testprojects/src/python/subproject_test/subproject'
 
-TEST_BUILD = 'testprojects/src/python/subproject_test/BUILD'
-SUBPROJ_BUILD = 'testprojects/src/python/subproject_test/subproject/src/python/BUILD'
-HELPERSHELPERS_BUILD = 'testprojects/src/python/subproject_test/subproject/src/python/helpershelpers/BUILD'
 
-SUBPROJECT_TEST_CONTENTS = """
-python_library (
-  dependencies = ['//testprojects/src/python/subproject_test/subproject/src/python:helpers'],
-)
-"""
+BUILD_FILES = {
+    'testprojects/src/python/subproject_test/BUILD':
+      """
+      python_library (
+        dependencies = ['//testprojects/src/python/subproject_test/subproject/src/python:helpers'],
+      )
+      """,
+    'testprojects/src/python/subproject_test/subproject/src/python/BUILD':
+      """
+      python_library (
+        name = 'helpers',
+        dependencies = ['//src/python/helpershelpers'],
+      )
+      """,
+    'testprojects/src/python/subproject_test/subproject/src/python/helpershelpers/BUILD':
+      """
+      python_library (
+        name = 'helpershelpers',
+      )
+      """
+  }
 
-SUBPROJECT_TEST_SUBPROJECT_CONTENTS = """
-python_library (
-  name = 'helpers',
-  dependencies = ['//src/python/helpershelpers'],
-)
-"""
-
-SUBPROJECT_TEST_SUBPROJECT_HELPERSHELPERS_CONTENTS = """
-python_library (
-  name = 'helpershelpers',
-)
-"""
 
 """
 Test layout
@@ -56,9 +59,8 @@ testprojects/
 @contextmanager
 def harness():
   try:
-    safe_file_dump(TEST_BUILD, SUBPROJECT_TEST_CONTENTS)
-    safe_file_dump(SUBPROJ_BUILD, SUBPROJECT_TEST_SUBPROJECT_CONTENTS)
-    safe_file_dump(HELPERSHELPERS_BUILD, SUBPROJECT_TEST_SUBPROJECT_HELPERSHELPERS_CONTENTS)
+    for name, content in BUILD_FILES.items():
+      safe_file_dump(name, dedent(content))
     yield
   finally:
     safe_rmtree(SUBPROJ_SPEC)
