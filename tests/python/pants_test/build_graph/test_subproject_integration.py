@@ -26,10 +26,16 @@ BUILD_FILES = {
       """
       target(
         name = 'local',
-        dependencies = ['//:other'],
+        dependencies = [
+          ':relative',
+          '//:absolute',
+        ],
       )
       target(
-        name = 'other',
+        name = 'relative',
+      )
+      target(
+        name = 'absolute',
       )
       """,
     'testprojects/src/python/subproject_test/subproject/src/python/BUILD':
