@@ -13,8 +13,6 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -22,6 +20,8 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete

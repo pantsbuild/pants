@@ -11,13 +11,13 @@ from textwrap import dedent
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
 from pants.backend.jvm.scala_artifact import ScalaArtifact
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

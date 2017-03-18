@@ -16,15 +16,15 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo, IvyModule,
                                          IvyModuleRef, IvyResolveMappingError, IvyResolveResult,
                                          IvyResolveStep, IvyUtils)
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
+from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem

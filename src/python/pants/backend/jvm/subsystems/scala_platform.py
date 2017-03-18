@@ -9,9 +9,9 @@ from collections import namedtuple
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 
 

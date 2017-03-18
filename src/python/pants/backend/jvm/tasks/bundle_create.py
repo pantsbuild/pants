@@ -11,7 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -184,7 +184,7 @@ class BundleCreate(JvmBinaryTask):
     if not app.deployjar:
       os.mkdir(lib_dir)
       consolidated_classpath = self.context.products.get_data('consolidated_classpath')
-      classpath.update(ClasspathUtil.create_canonical_classpath(
+      classpath.update(ClasspathProducts.create_canonical_classpath(
         consolidated_classpath,
         app.target.closure(bfs=True, **self._target_closure_kwargs),
         lib_dir,
