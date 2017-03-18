@@ -9,7 +9,7 @@ import os
 from collections import namedtuple
 
 from pants.base.deprecated import deprecated_conditional
-from pants.util.dirutil import join_specs, longest_dir_prefix
+from pants.util.dirutil import longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
 
@@ -62,10 +62,7 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
   def normalize_absolute_refs(ref):
     return strip_prefix(ref, '//')
 
-  if subproject_roots:
-    subproject_prefix = longest_dir_prefix(relative_to, subproject_roots)
-    if subproject_prefix:
-      spec = join_specs(subproject_prefix, spec)
+  subproject = longest_dir_prefix(relative_to, subproject_roots) if subproject_roots else None
 
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
@@ -76,6 +73,12 @@ def parse_spec(spec, relative_to=None, subproject_roots=None):
     if not spec_path and relative_to:
       spec_path = relative_to
     spec_path = normalize_absolute_refs(spec_path)
+
+  if subproject:
+    if spec_path:
+      spec_path = os.path.join(subproject, spec_path)
+    else:
+      spec_path = os.path.normpath(subproject)
 
   return spec_path, target_name
 
