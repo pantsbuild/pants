@@ -10,12 +10,12 @@ import subprocess
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.shader import Shading
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase

@@ -74,6 +74,7 @@ python_library(
     ':mapper',
     ':objects',
     ':selectors',
+    ':struct',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
   ]

@@ -33,7 +33,7 @@ def contains_exact_files(directory, expected_files, ignore_links=False):
   :API: public
 
   :param str directory: Path to directory to search.
-  :param set expected_files: Set of filepaths relative to directory to search for.
+  :param iterable expected_files: Set of filepaths relative to directory to search for.
   :param bool ignore_links: Indicates to ignore any file links.
   """
 

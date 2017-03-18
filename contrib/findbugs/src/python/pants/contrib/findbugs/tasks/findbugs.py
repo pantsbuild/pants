@@ -9,13 +9,13 @@ import os
 import re
 
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property

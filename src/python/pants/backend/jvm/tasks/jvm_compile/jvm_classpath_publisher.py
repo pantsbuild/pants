@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.util import safe_classpath
 from pants.task.task import Task
@@ -38,7 +39,7 @@ class RuntimeClasspathPublisher(Task):
       # Safely create e.g. dist/export-classpath/manifest.jar
       safe_classpath(classpath, basedir, "manifest.jar")
     else:
-      ClasspathUtil.create_canonical_classpath(runtime_classpath,
-                                               targets,
-                                               basedir,
-                                               save_classpath_file=True)
+      ClasspathProducts.create_canonical_classpath(runtime_classpath,
+                                                   targets,
+                                                   basedir,
+                                                   save_classpath_file=True)
