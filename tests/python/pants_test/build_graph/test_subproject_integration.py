@@ -18,20 +18,30 @@ SUBPROJ_ROOT = 'testprojects/src/python/subproject_test/subproject'
 BUILD_FILES = {
     'testprojects/src/python/subproject_test/BUILD':
       """
-      python_library (
+      python_library(
         dependencies = ['//testprojects/src/python/subproject_test/subproject/src/python:helpers'],
+      )
+      """,
+    'testprojects/src/python/subproject_test/subproject/BUILD':
+      """
+      target(
+        name = 'local',
+        dependencies = ['//:other'],
+      )
+      target(
+        name = 'other',
       )
       """,
     'testprojects/src/python/subproject_test/subproject/src/python/BUILD':
       """
-      python_library (
+      python_library(
         name = 'helpers',
         dependencies = ['//src/python/helpershelpers'],
       )
       """,
     'testprojects/src/python/subproject_test/subproject/src/python/helpershelpers/BUILD':
       """
-      python_library (
+      python_library(
         name = 'helpershelpers',
       )
       """
@@ -77,8 +87,7 @@ class SubprojectIntegrationTest(PantsRunIntegrationTest):
     """
     with harness():
       pants_args = ['dependencies', SUBPROJ_SPEC]
-      pants_run = self.run_pants(pants_args)
-      self.assert_failure(pants_run)
+      self.assert_failure(self.run_pants(pants_args))
 
   @ensure_engine
   def test_subproject_with_flag(self):
@@ -88,7 +97,12 @@ class SubprojectIntegrationTest(PantsRunIntegrationTest):
     go well when that subproject is declared as a subproject
     """
     with harness():
+      # Has dependencies below the subproject.
       pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT), 
                     'dependencies', SUBPROJ_SPEC]
-      pants_run = self.run_pants(pants_args)
-      self.assert_success(pants_run)
+      self.assert_success(self.run_pants(pants_args))
+
+      # A relative path at the root of the subproject.
+      pants_args = ['--subproject-roots={}'.format(SUBPROJ_ROOT),
+                    'dependencies', '{}:local'.format(SUBPROJ_ROOT)]
+      self.assert_success(self.run_pants(pants_args))
