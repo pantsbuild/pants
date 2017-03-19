@@ -6,7 +6,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLockReadGuard};
 
-use futures::future::{self, BoxFuture, Future};
+use futures::future::{self, BoxFuture, loop_fn, Future, Loop};
 use futures_cpupool::CpuPool;
 
 use context::Core;
@@ -727,6 +727,15 @@ impl SelectTransitive {
   }
 }
 
+// Keep track of work items of transitive expansion.
+#[derive(Debug)]
+struct TransitiveExpansion {
+  // BuildFileAddress to be expanded
+  todo: Vec<Value>,
+  // hydrated targets
+  outputs: Vec<Value>,
+}
+
 impl Node for SelectTransitive {
   type Output = Value;
 
@@ -739,25 +748,36 @@ impl Node for SelectTransitive {
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
-            // The product and its dependency list are available: project them.
-            let deps =
-              future::join_all(
-                externs::project_multi(&dep_product, &self.selector.field).iter()
-                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
-                  .collect::<Vec<_>>()
-              );
-            deps
-              .then(move |dep_values_res| {
-                // Finally, store the resulting values.
-                match dep_values_res {
-                  Ok(dep_values) => {
-                    Ok(self.store(&dep_product, dep_values.iter().collect()))
-                  },
-                  Err(failure) =>
-                    Err(context.was_required(failure)),
+            let init = TransitiveExpansion {
+              todo: vec![dep_product.clone()],
+              outputs: vec![],
+            };
+            loop_fn(init, move |mut expansion| {
+              // Each round returns [(hydrated_target, [address]), ...]
+              let round = future::join_all({
+                 expansion.todo.drain(..)
+                   .map(|address| self.expand_transitive(&context, &address, &self.selector.field))
+                   .collect::<Vec<_>>()
+              });
+
+            round
+              .map(move |finished_items| {
+                for (hydrated_target, more_deps) in finished_items.into_iter() {
+                  expansion.outputs.push(hydrated_target);
+                  expansion.todo.extend(more_deps.into_iter())
+                }
+
+                if expansion.todo.is_empty() {
+                  Loop::Break(expansion)
+                } else {
+                  Loop::Continue(expansion)
                 }
               })
-              .boxed()
+            })
+            .map(|expansion| {
+              externs::store_list(expansion.outputs.iter().collect(), true)
+            })
+            .boxed()
           },
           Err(failure) =>
             context.err(context.was_optional(failure, "No source of input product.")),
