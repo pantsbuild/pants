@@ -664,38 +664,6 @@ pub struct SelectTransitive {
 }
 
 impl SelectTransitive {
-  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
-    // TODO: This method needs to consider whether the `dep_subject` is an Address,
-    // and if so, attempt to parse Variants there. See:
-    //   https://github.com/pantsbuild/pants/issues/4020
-
-    let dep_subject_key = externs::key_for(dep_subject);
-    // After the root has been expanded, a traversal continues with dep_product == product.
-    let mut selector = self.selector.clone();
-    selector.dep_product = selector.product;
-    context.get(
-      SelectTransitive {
-        subject: dep_subject_key,
-        variants: self.variants.clone(),
-        selector: selector,
-      }
-    )
-  }
-
-  fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if externs::satisfied_by(&self.selector.product, dep_product)  {
-      // If the dep_product is an inner node in the traversal, prepend it to the list of
-      // items to be merged.
-      // TODO: would be nice to do this in one operation.
-      let prepend = externs::store_list(vec![dep_product], false);
-      let mut prepended = dep_values;
-      prepended.insert(0, &prepend);
-      externs::store_list(prepended, true)
-    } else {
-      // Not an inner node, or not a traversal.
-      externs::store_list(dep_values, true)
-    }
-  }
 
   fn get_hydrated_target(&self, context: &Context, buildfile_address: &Value) -> NodeFuture<Value> {
     let dep_subject_key = externs::key_for(buildfile_address);
@@ -713,7 +681,7 @@ impl SelectTransitive {
   }
 
   // single round expand buildfile_address into tuple(hydrated_target, [buildfile_address])
-  fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Vec<Value>)> {
+  fn expand_transitive(&self, context: &Context, address: &Value) -> NodeFuture<(Value, Vec<Value>)> {
    let context = context.clone();
    let address = address.clone();
    self.get_hydrated_target(&context, &address)
@@ -748,15 +716,19 @@ impl Node for SelectTransitive {
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
+            let addresses = externs::project_multi(&dep_product, &self.selector.field);
+            println!("Initial addresses = {:?}", addresses);
+
             let init = TransitiveExpansion {
-              todo: vec![dep_product.clone()],
+              todo: addresses,
               outputs: vec![],
             };
+
             loop_fn(init, move |mut expansion| {
               // Each round returns [(hydrated_target, [address]), ...]
               let round = future::join_all({
                  expansion.todo.drain(..)
-                   .map(|address| self.expand_transitive(&context, &address, &self.selector.field))
+                   .map(|address| self.expand_transitive(&context, &address))
                    .collect::<Vec<_>>()
               });
 
