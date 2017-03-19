@@ -105,8 +105,8 @@ impl RawNode {
           (RawStateTag::Return as u8, v),
         Some(Err(Failure::Throw(msg))) =>
           (RawStateTag::Throw as u8, msg),
-        Some(Err(Failure::Noop(msg))) =>
-          (RawStateTag::Noop as u8, externs::create_exception(msg)),
+        Some(Err(Failure::Noop(noop))) =>
+          (RawStateTag::Noop as u8, externs::create_exception(&format!("{:?}", noop))),
       };
 
     RawNode {

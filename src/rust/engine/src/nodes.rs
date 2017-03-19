@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use futures::future::{self, BoxFuture, Future};
 
 use context::Context;
-use core::{Failure, Key, TypeConstraint, Value, Variants};
+use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{
   self,
@@ -45,7 +45,8 @@ fn throw(msg: &str) -> Failure {
  */
 fn was_required(failure: Failure) -> Failure {
   match failure {
-    Failure::Noop(..) => throw("No source of required dependencies"),
+    Failure::Noop(noop) =>
+      throw(&format!("No source of required dependency: {:?}", noop)),
     f => f,
   }
 }
@@ -189,6 +190,7 @@ impl Select {
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
     let mut matches = Vec::new();
+    let mut max_noop = Noop::NoTask;
     for result in results {
       match result {
         Ok(value) => {
@@ -198,8 +200,13 @@ impl Select {
         },
         Err(err) => {
           match err {
-            Failure::Noop(_) =>
-              continue,
+            Failure::Noop(noop) => {
+              // Record the highest priority Noop value.
+              if noop > max_noop {
+                max_noop = noop;
+              }
+              continue
+            },
             f @ Failure::Throw(_) =>
               return Err(f),
           }
@@ -219,9 +226,8 @@ impl Select {
         // Exactly one value was available.
         Ok(matched),
       None =>
-        Err(
-          Failure::Noop("No task was available to compute the value.")
-        ),
+        // Propagate the highest priority Noop value.
+        Err(Failure::Noop(max_noop)),
     }
   }
 
@@ -309,9 +315,7 @@ impl Node for Select {
         Some(ref variant_key) => {
           let variant_value = self.variants.find(variant_key);
           if variant_value.is_none() {
-            return err(
-              Failure::Noop("A matching variant key was not configured in variants.")
-            );
+            return err(Failure::Noop(Noop::NoVariant));
           }
           variant_value.map(|v| v.to_string())
         },

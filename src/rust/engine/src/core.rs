@@ -156,6 +156,27 @@ impl fmt::Debug for Value {
 
 #[derive(Debug, Clone)]
 pub enum Failure {
-  Noop(&'static str),
+  Noop(Noop),
   Throw(Value),
+}
+
+// NB: enum members are listed in ascending priority order based on how likely they are
+// to be useful to users.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Noop {
+  NoTask,
+  NoVariant,
+  Cycle,
+}
+
+impl fmt::Debug for Noop {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.write_str(
+      match self {
+        &Noop::Cycle => "Dep graph contained a cycle.",
+        &Noop::NoTask => "No task was available to compute the value.",
+        &Noop::NoVariant => "A matching variant key was not configured in variants.",
+      }
+    )
+  }
 }

@@ -14,7 +14,7 @@ use futures::future::{self, Future};
 
 use externs;
 use context::ContextFactory;
-use core::{Failure, FNV};
+use core::{Failure, FNV, Noop};
 use nodes::{
   Node,
   NodeFuture,
@@ -121,7 +121,7 @@ impl Entry {
               .boxed()
           },
           EntryKey::Cyclic(_) =>
-            future::err(Failure::Noop("Dep would be cyclic.")).boxed(),
+            future::err(Failure::Noop(Noop::Cycle)).boxed(),
         };
 
       self.state = Some(future::Shared::new(state));
