@@ -684,11 +684,11 @@ impl SelectTransitive {
   fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Vec<Value>)> {
    let context = context.clone();
    let address = address.clone();
+   let deps = externs::project_multi(&address, &field);
+   println!("address = {:?}, field = {:?} deps = {:?}", address, field, deps);
    self.get_hydrated_target(&context, &address)
       .map(|hydrated_target| {
-        //let deps = externs::project_multi(&address, &field);
-          // .into_iter().collect::<Vec<_>>());
-        (hydrated_target, vec![])
+        (hydrated_target, deps)
       })        
       .boxed()
   }
@@ -716,7 +716,7 @@ impl Node for SelectTransitive {
         match dep_product_res {
           Ok(dep_product) => {
             let addresses = externs::project_multi(&dep_product, &self.selector.field);
-            println!("Initial addresses = {:?}", addresses);
+            println!("Initial addresses = {:?} from {:?}", addresses, dep_product);
 
             let init = TransitiveExpansion {
               todo: addresses,
