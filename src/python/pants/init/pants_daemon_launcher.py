@@ -9,7 +9,8 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.bin.target_roots import TargetRoots
+from pants.init.target_roots import TargetRoots
+from pants.init.util import clean_global_runtime_state
 from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
@@ -106,7 +107,8 @@ class PantsDaemonLauncher(object):
 
   @testable_memoized_property
   def pantsd(self):
-    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._log_dir)
+    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._log_dir,
+                       reset_func=clean_global_runtime_state)
 
   @testable_memoized_property
   def watchman_launcher(self):
