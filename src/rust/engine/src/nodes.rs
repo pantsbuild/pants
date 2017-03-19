@@ -681,14 +681,13 @@ impl SelectTransitive {
   }
 
   // single round expand buildfile_address into tuple(hydrated_target, [buildfile_address])
-  fn expand_transitive(&self, context: &Context, address: &Value) -> NodeFuture<(Value, Vec<Value>)> {
+  fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Vec<Value>)> {
    let context = context.clone();
    let address = address.clone();
    self.get_hydrated_target(&context, &address)
       .map(|hydrated_target| {
-        // TODO
-        // let deps = future::join_all(externs::project_multi(&address, &field)
-        //   .into_iter().collect::<Vec<_>>());
+        //let deps = externs::project_multi(&address, &field);
+          // .into_iter().collect::<Vec<_>>());
         (hydrated_target, vec![])
       })        
       .boxed()
@@ -728,7 +727,7 @@ impl Node for SelectTransitive {
               // Each round returns [(hydrated_target, [address]), ...]
               let round = future::join_all({
                  expansion.todo.drain(..)
-                   .map(|address| self.expand_transitive(&context, &address))
+                   .map(|address| self.expand_transitive(&context, &address, &self.selector.field))
                    .collect::<Vec<_>>()
               });
 
@@ -739,6 +738,7 @@ impl Node for SelectTransitive {
                   expansion.todo.extend(more_deps.into_iter())
                 }
 
+                println!("expansion = {:?}", expansion);
                 if expansion.todo.is_empty() {
                   Loop::Break(expansion)
                 } else {
@@ -747,7 +747,7 @@ impl Node for SelectTransitive {
               })
             })
             .map(|expansion| {
-              externs::store_list(expansion.outputs.iter().collect(), true)
+              externs::store_list(expansion.outputs.iter().collect(), false)
             })
             .boxed()
           },
