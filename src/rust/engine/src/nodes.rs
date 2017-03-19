@@ -696,6 +696,35 @@ impl SelectTransitive {
       externs::store_list(dep_values, true)
     }
   }
+
+  fn get_hydrated_target(&self, context: &Context, buildfile_address: &Value) -> NodeFuture<Value> {
+    let dep_subject_key = externs::key_for(buildfile_address);
+    let context = context.clone();
+    context.get(
+      Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone())
+    )
+    .then(move |output_res| {
+      match output_res {
+        Ok(output) => Ok(output),
+        Err(failure) => Err(context.was_required(failure)),
+      }
+    })
+    .boxed()
+  }
+
+  // single round expand buildfile_address into tuple(hydrated_target, [buildfile_address])
+  fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Vec<Value>)> {
+   let context = context.clone();
+   let address = address.clone();
+   self.get_hydrated_target(&context, &address)
+      .map(|hydrated_target| {
+        // TODO
+        // let deps = future::join_all(externs::project_multi(&address, &field)
+        //   .into_iter().collect::<Vec<_>>());
+        (hydrated_target, vec![])
+      })        
+      .boxed()
+  }
 }
 
 impl Node for SelectTransitive {

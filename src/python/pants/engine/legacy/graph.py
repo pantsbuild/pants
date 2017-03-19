@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
@@ -323,7 +323,7 @@ def create_legacy_graph_tasks(symbol_table_cls):
     (HydratedTargets,
      [SelectTransitive(HydratedTarget,
                        Addresses,
-                       field_types=(Address,))],
+                       field_types=(BuildFileAddress,))],
      HydratedTargets),
     (HydratedTarget,
      [Select(symbol_table_constraint),
