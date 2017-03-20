@@ -670,15 +670,14 @@ impl SelectTransitive {
    */
   fn expand_transitive(&self, context: &Context, address: &Value) -> NodeFuture<(Value, Value, Vec<Value>)> {
     let address = address.clone();
+    let field_name = self.selector.field.to_owned();
     let dep_subject_key = externs::key_for(&address);
     context
       .get(
         Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone())
       )
       .map(move |hydrated_target| {
-        // TODO not working: field:&str, address:core::Value]>` does not fulfill the required lifetime
-        //let field = &self.selector.field.to_owned();
-        let deps = externs::project_multi(&hydrated_target, "dependencies");
+        let deps = externs::project_multi(&hydrated_target, &field_name);
         (address, hydrated_target, deps)
       })
       .boxed()
