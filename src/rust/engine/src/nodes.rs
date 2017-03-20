@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashSet;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -682,12 +683,10 @@ impl SelectTransitive {
 
   // single round expand buildfile_address into tuple(hydrated_target, [buildfile_address])
   fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Vec<Value>)> {
-   let context = context.clone();
-   let address = address.clone();
-   let deps = externs::project_multi(&address, &field);
-   println!("address = {:?}, field = {:?} deps = {:?}", address, field, deps);
    self.get_hydrated_target(&context, &address)
-      .map(|hydrated_target| {
+      .map(move |hydrated_target| {
+        // TODO not working let field = field.to_owned();
+        let deps = externs::project_multi(&hydrated_target, "dependencies");
         (hydrated_target, deps)
       })        
       .boxed()
@@ -699,6 +698,7 @@ impl SelectTransitive {
 struct TransitiveExpansion {
   // BuildFileAddress to be expanded
   todo: Vec<Value>,
+  completed: HashSet<Key>,
   // hydrated targets
   outputs: Vec<Value>,
 }
@@ -720,6 +720,7 @@ impl Node for SelectTransitive {
 
             let init = TransitiveExpansion {
               todo: addresses,
+              completed: HashSet::default(),
               outputs: vec![],
             };
 
