@@ -666,9 +666,9 @@ impl SelectTransitive {
 
   /**
    * Process/hydrate single buildfile address. This also extracts its dependency addresses
-   * to be process in future iterations.
+   * to be processed in future iterations.
    */
-  fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Value, Vec<Value>)> {
+  fn expand_transitive(&self, context: &Context, address: &Value) -> NodeFuture<(Value, Value, Vec<Value>)> {
     let address = address.clone();
     let dep_subject_key = externs::key_for(&address);
     context
@@ -677,7 +677,7 @@ impl SelectTransitive {
       )
       .map(move |hydrated_target| {
         // TODO not working: field:&str, address:core::Value]>` does not fulfill the required lifetime
-        // let field = field.to_owned();
+        //let field = &self.selector.field.to_owned();
         let deps = externs::project_multi(&hydrated_target, "dependencies");
         (address, hydrated_target, deps)
       })
@@ -686,18 +686,17 @@ impl SelectTransitive {
 }
 
 /**
- * Keep track of state during iterative transitive dependency expansion.
+ * Track states when processing `BuildFileAddress` iteratively.
  */
 #[derive(Debug)]
 struct TransitiveExpansion {
-  // build file addresses to be expanded
+  // `BuildFileAddress`es to be hydrated.
   todo: Vec<Value>,
 
-  // completed build file addresses stored in their `Key`s because `Value` can not
-  // be directly compared.
+  // Processed `BuildFileAddress`es in their `Key` form.
   completed: HashSet<Key>,
 
-  // build file address to hydrated target mapping.
+  // Mapping from `BuildFileAddress` in `Key` to its hydrated target.
   outputs: OrderMap<Key, Value>,
 }
 
@@ -724,7 +723,7 @@ impl Node for SelectTransitive {
             loop_fn(init, move |mut expansion| {
               let round = future::join_all({
                  expansion.todo.drain(..)
-                   .map(|address| self.expand_transitive(&context, &address, &self.selector.field))
+                   .map(|address| self.expand_transitive(&context, &address))
                    .collect::<Vec<_>>()
               });
 
@@ -733,7 +732,9 @@ impl Node for SelectTransitive {
                 for (address, hydrated_target, more_deps) in finished_items.into_iter() {
                   let address_key = externs::key_for(&address);
                   expansion.completed.insert(address_key);
+
                   expansion.outputs.insert(address_key, hydrated_target);
+
                   let completed = &mut expansion.completed;
                   expansion.todo.extend(more_deps.into_iter()
                     .filter(|dep| !completed.contains(&externs::key_for(dep)))
