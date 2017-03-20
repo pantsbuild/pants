@@ -9,6 +9,7 @@ import os
 from collections import namedtuple
 
 from pants.base.deprecated import deprecated_conditional
+from pants.util.dirutil import longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
 
@@ -16,7 +17,7 @@ from pants.util.strutil import strip_prefix
 BANNED_CHARS_IN_TARGET_NAME = frozenset('@')
 
 
-def parse_spec(spec, relative_to=None):
+def parse_spec(spec, relative_to=None, subproject_roots=None):
   """Parses a target address spec and returns the path from the root of the repo to this Target
   and Target name.
 
@@ -25,6 +26,8 @@ def parse_spec(spec, relative_to=None):
   :param string spec: Target address spec.
   :param string relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
     interprets the missing spec_path part as `relative_to`.
+  :param list subproject_roots: Paths that correspond with embedded build roots under
+    the current build root.
 
   For Example::
 
@@ -59,15 +62,25 @@ def parse_spec(spec, relative_to=None):
   def normalize_absolute_refs(ref):
     return strip_prefix(ref, '//')
 
+  subproject = longest_dir_prefix(relative_to, subproject_roots) if subproject_roots else None
+
+  def prefix_subproject(spec_path):
+    if not subproject:
+      return spec_path
+    elif spec_path:
+      return os.path.join(subproject, spec_path)
+    else:
+      return os.path.normpath(subproject)
+
   spec_parts = spec.rsplit(':', 1)
   if len(spec_parts) == 1:
-    spec_path = normalize_absolute_refs(spec_parts[0])
+    spec_path = prefix_subproject(normalize_absolute_refs(spec_parts[0]))
     target_name = os.path.basename(spec_path)
   else:
     spec_path, target_name = spec_parts
-    if not spec_path and relative_to:
+    if not spec_path and not subproject and relative_to:
       spec_path = relative_to
-    spec_path = normalize_absolute_refs(spec_path)
+    spec_path = prefix_subproject(normalize_absolute_refs(spec_path))
 
   return spec_path, target_name
 
@@ -111,16 +124,20 @@ class Address(object):
   """
 
   @classmethod
-  def parse(cls, spec, relative_to=''):
+  def parse(cls, spec, relative_to='', subproject_roots=None):
     """Parses an address from its serialized form.
 
     :param string spec: An address in string form <path>:<name>.
     :param string relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
                                the missing spec_path part as `relative_to`.
+    :param list subproject_roots: Paths that correspond with embedded build roots
+                                  under the current build root.
     :returns: A new address.
     :rtype: :class:`pants.base.address.Address`
     """
-    spec_path, target_name = parse_spec(spec, relative_to=relative_to)
+    spec_path, target_name = parse_spec(spec,
+                                        relative_to=relative_to,
+                                        subproject_roots=subproject_roots)
     return cls(spec_path, target_name)
 
   @classmethod
