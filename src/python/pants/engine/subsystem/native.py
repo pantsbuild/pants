@@ -383,7 +383,7 @@ def _initialize_externs(ffi):
     obj = c.from_value(val)
     field_name = to_py_str(field_str_ptr, field_str_len)
 
-    return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name, [])))
+    return c.vals_buf(tuple(c.to_value(p) for p in getattr(obj, field_name)))
 
   @ffi.def_extern()
   def extern_create_exception(context_handle, msg_ptr, msg_len):

@@ -9,6 +9,7 @@ use std::sync::{Arc, RwLockReadGuard};
 
 use futures::future::{self, BoxFuture, loop_fn, Future, Loop};
 use futures_cpupool::CpuPool;
+use ordermap::OrderMap;
 
 use context::Core;
 use core::{Function, Key, TypeConstraint, Value, Variants};
@@ -682,13 +683,15 @@ impl SelectTransitive {
   }
 
   // single round expand buildfile_address into tuple(hydrated_target, [buildfile_address])
-  fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Vec<Value>)> {
-   self.get_hydrated_target(&context, &address)
+  fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Value, Vec<Value>)> {
+    let address = address.clone();
+    self.get_hydrated_target(&context, &address)
       .map(move |hydrated_target| {
-        // TODO not working let field = field.to_owned();
+        // TODO not working
+        // let field = field.to_owned();
         let deps = externs::project_multi(&hydrated_target, "dependencies");
-        (hydrated_target, deps)
-      })        
+        (address, hydrated_target, deps)
+      })
       .boxed()
   }
 }
@@ -700,7 +703,7 @@ struct TransitiveExpansion {
   todo: Vec<Value>,
   completed: HashSet<Key>,
   // hydrated targets
-  outputs: Vec<Value>,
+  outputs: OrderMap<Key, Value>,
 }
 
 impl Node for SelectTransitive {
@@ -716,12 +719,11 @@ impl Node for SelectTransitive {
         match dep_product_res {
           Ok(dep_product) => {
             let addresses = externs::project_multi(&dep_product, &self.selector.field);
-            println!("Initial addresses = {:?} from {:?}", addresses, dep_product);
 
             let init = TransitiveExpansion {
               todo: addresses,
               completed: HashSet::default(),
-              outputs: vec![],
+              outputs: OrderMap::default()
             };
 
             loop_fn(init, move |mut expansion| {
@@ -734,12 +736,16 @@ impl Node for SelectTransitive {
 
             round
               .map(move |finished_items| {
-                for (hydrated_target, more_deps) in finished_items.into_iter() {
-                  expansion.outputs.push(hydrated_target);
-                  expansion.todo.extend(more_deps.into_iter())
+                for (address, hydrated_target, more_deps) in finished_items.into_iter() {
+                  let address_key = externs::key_for(&address);
+                  expansion.completed.insert(address_key);
+                  expansion.outputs.insert(address_key, hydrated_target);
+                  let completed = &mut expansion.completed;
+                  expansion.todo.extend(more_deps.into_iter()
+                    .filter(|dep| !completed.contains(&externs::key_for(dep)))
+                    .collect::<Vec<_>>());
                 }
 
-                println!("expansion = {:?}", expansion);
                 if expansion.todo.is_empty() {
                   Loop::Break(expansion)
                 } else {
@@ -748,7 +754,7 @@ impl Node for SelectTransitive {
               })
             })
             .map(|expansion| {
-              externs::store_list(expansion.outputs.iter().collect(), false)
+              externs::store_list(expansion.outputs.values().collect::<Vec<_>>(), false)
             })
             .boxed()
           },
