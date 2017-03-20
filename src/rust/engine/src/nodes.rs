@@ -669,17 +669,15 @@ impl SelectTransitive {
    *
    * TODO explain return tuple
    */
-  fn expand_transitive(&self, context: &Context, subject: &Value) -> NodeFuture<(Key, Value, Vec<Value>)> {
-    let subject = subject.clone();
+  fn expand_transitive(&self, context: &Context, subject_key: Key) -> NodeFuture<(Key, Value, Vec<Value>)> {
     let field_name = self.selector.field.to_owned();
-    let dep_subject_key = externs::key_for(&subject);
     context
       .get(
-        Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone())
+        Select::new(self.selector.product.clone(), subject_key, self.variants.clone())
       )
       .map(move |product| {
         let deps = externs::project_multi(&product, &field_name);
-        (dep_subject_key, product, deps)
+        (subject_key, product, deps)
       })
       .boxed()
   }
@@ -691,7 +689,7 @@ impl SelectTransitive {
 #[derive(Debug)]
 struct TransitiveExpansion {
   // Subjects to be processed.
-  todo: Vec<Value>,
+  todo: Vec<Key>,
 
   // Mapping from processed subject in its `Key` to its product.
   // Products will be collected at the end of iterations.
@@ -710,17 +708,19 @@ impl Node for SelectTransitive {
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
-            let products = externs::project_multi(&dep_product, &self.selector.field);
+            let subject_keys = externs::project_multi(&dep_product, &self.selector.field).iter()
+              .map(|subject| externs::key_for(&subject))
+              .collect();
 
             let init = TransitiveExpansion {
-              todo: products,
+              todo: subject_keys,
               outputs: OrderMap::default()
             };
 
             loop_fn(init, move |mut expansion| {
               let round = future::join_all({
                  expansion.todo.drain(..)
-                   .map(|subject| self.expand_transitive(&context, &subject))
+                   .map(|subject_key| self.expand_transitive(&context, subject_key))
                    .collect::<Vec<_>>()
               });
 
@@ -732,7 +732,8 @@ impl Node for SelectTransitive {
 
                     let outputs = &mut expansion.outputs;
                     expansion.todo.extend(more_deps.into_iter()
-                      .filter(|dep| !outputs.contains_key(&externs::key_for(dep)))
+                      .map(|dep| externs::key_for(&dep))
+                      .filter(|dep_key| !outputs.contains_key(dep_key))
                       .collect::<Vec<_>>());
                   }
 
