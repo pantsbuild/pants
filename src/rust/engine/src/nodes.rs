@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -665,37 +664,37 @@ pub struct SelectTransitive {
 impl SelectTransitive {
 
   /**
-   * Process/hydrate single buildfile address. This also extracts its dependency addresses
-   * to be processed in future iterations.
+   * Process single subject. This also extracts its dependency subjects that are to be processed
+   * in future iterations.
+   *
+   * TODO explain return tuple
    */
-  fn expand_transitive(&self, context: &Context, address: &Value) -> NodeFuture<(Value, Value, Vec<Value>)> {
-    let address = address.clone();
+  fn expand_transitive(&self, context: &Context, subject: &Value) -> NodeFuture<(Key, Value, Vec<Value>)> {
+    let subject = subject.clone();
     let field_name = self.selector.field.to_owned();
-    let dep_subject_key = externs::key_for(&address);
+    let dep_subject_key = externs::key_for(&subject);
     context
       .get(
         Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone())
       )
-      .map(move |hydrated_target| {
-        let deps = externs::project_multi(&hydrated_target, &field_name);
-        (address, hydrated_target, deps)
+      .map(move |product| {
+        let deps = externs::project_multi(&product, &field_name);
+        (dep_subject_key, product, deps)
       })
       .boxed()
   }
 }
 
 /**
- * Track states when processing `BuildFileAddress` iteratively.
+ * Track states when processing `SelectTransitive` iteratively.
  */
 #[derive(Debug)]
 struct TransitiveExpansion {
-  // `BuildFileAddress`es to be hydrated.
+  // Subjects to be processed.
   todo: Vec<Value>,
 
-  // Processed `BuildFileAddress`es in their `Key` form.
-  completed: HashSet<Key>,
-
-  // Mapping from `BuildFileAddress` in `Key` to its hydrated target.
+  // Mapping from processed subject in its `Key` to its product.
+  // Products will be collected at the end of iterations.
   outputs: OrderMap<Key, Value>,
 }
 
@@ -711,41 +710,38 @@ impl Node for SelectTransitive {
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
-            let addresses = externs::project_multi(&dep_product, &self.selector.field);
+            let products = externs::project_multi(&dep_product, &self.selector.field);
 
             let init = TransitiveExpansion {
-              todo: addresses,
-              completed: HashSet::default(),
+              todo: products,
               outputs: OrderMap::default()
             };
 
             loop_fn(init, move |mut expansion| {
               let round = future::join_all({
                  expansion.todo.drain(..)
-                   .map(|address| self.expand_transitive(&context, &address))
+                   .map(|subject| self.expand_transitive(&context, &subject))
                    .collect::<Vec<_>>()
               });
 
-            round
-              .map(move |finished_items| {
-                for (address, hydrated_target, more_deps) in finished_items.into_iter() {
-                  let address_key = externs::key_for(&address);
-                  expansion.completed.insert(address_key);
+              round
+                .map(move |finished_items| {
+                  for (subject_key, product, more_deps) in finished_items.into_iter() {
 
-                  expansion.outputs.insert(address_key, hydrated_target);
+                    expansion.outputs.insert(subject_key, product);
 
-                  let completed = &mut expansion.completed;
-                  expansion.todo.extend(more_deps.into_iter()
-                    .filter(|dep| !completed.contains(&externs::key_for(dep)))
-                    .collect::<Vec<_>>());
-                }
+                    let outputs = &mut expansion.outputs;
+                    expansion.todo.extend(more_deps.into_iter()
+                      .filter(|dep| !outputs.contains_key(&externs::key_for(dep)))
+                      .collect::<Vec<_>>());
+                  }
 
-                if expansion.todo.is_empty() {
-                  Loop::Break(expansion)
-                } else {
-                  Loop::Continue(expansion)
-                }
-              })
+                  if expansion.todo.is_empty() {
+                    Loop::Break(expansion)
+                  } else {
+                    Loop::Continue(expansion)
+                  }
+                })
             })
             .map(|expansion| {
               externs::store_list(expansion.outputs.values().collect::<Vec<_>>(), false)
