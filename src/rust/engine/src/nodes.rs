@@ -664,10 +664,9 @@ pub struct SelectTransitive {
 impl SelectTransitive {
 
   /**
-   * Process single subject. This also extracts its dependency subjects that are to be processed
-   * in future iterations.
+   * Process single subject.
    *
-   * TODO explain return tuple
+   * Return tuple of (processed subject_key, product output, dependencies to be processed in future iterations).
    */
   fn expand_transitive(&self, context: &Context, subject_key: Key) -> NodeFuture<(Key, Value, Vec<Value>)> {
     let field_name = self.selector.field.to_owned();
@@ -691,7 +690,7 @@ struct TransitiveExpansion {
   // Subjects to be processed.
   todo: Vec<Key>,
 
-  // Mapping from processed subject in its `Key` to its product.
+  // Mapping from processed subject `Key` to its product.
   // Products will be collected at the end of iterations.
   outputs: OrderMap<Key, Value>,
 }
