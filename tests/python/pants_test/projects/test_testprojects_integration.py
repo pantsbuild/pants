@@ -57,6 +57,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/empty:',
       'testprojects/tests/java/org/pantsbuild/testproject/fail256:fail256',
       'testprojects/tests/python/pants/dummies:failing_target',
+      'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C',
       # These don't pass without special config.
       'testprojects/tests/java/org/pantsbuild/testproject/depman:new-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
