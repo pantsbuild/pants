@@ -654,9 +654,6 @@ impl From<SelectDependencies> for NodeKey {
 
 /**
  * A node that recursively selects the dependencies of requested type and merge them.
- *
- * TODO Improve the performance of how store_list is used to merge the transitive dependencies
- * https://github.com/pantsbuild/pants/issues/4283
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectTransitive {
@@ -667,27 +664,19 @@ pub struct SelectTransitive {
 
 impl SelectTransitive {
 
-  fn get_hydrated_target(&self, context: &Context, buildfile_address: &Value) -> NodeFuture<Value> {
-    let dep_subject_key = externs::key_for(buildfile_address);
-    let context = context.clone();
-    context.get(
-      Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone())
-    )
-    .then(move |output_res| {
-      match output_res {
-        Ok(output) => Ok(output),
-        Err(failure) => Err(context.was_required(failure)),
-      }
-    })
-    .boxed()
-  }
-
-  // single round expand buildfile_address into tuple(hydrated_target, [buildfile_address])
+  /**
+   * Process/hydrate single buildfile address. This also extracts its dependency addresses
+   * to be process in future iterations.
+   */
   fn expand_transitive(&self, context: &Context, address: &Value, field: &str) -> NodeFuture<(Value, Value, Vec<Value>)> {
     let address = address.clone();
-    self.get_hydrated_target(&context, &address)
+    let dep_subject_key = externs::key_for(&address);
+    context
+      .get(
+        Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone())
+      )
       .map(move |hydrated_target| {
-        // TODO not working
+        // TODO not working: field:&str, address:core::Value]>` does not fulfill the required lifetime
         // let field = field.to_owned();
         let deps = externs::project_multi(&hydrated_target, "dependencies");
         (address, hydrated_target, deps)
@@ -696,13 +685,19 @@ impl SelectTransitive {
   }
 }
 
-// Keep track of work items of transitive expansion.
+/**
+ * Keep track of state during iterative transitive dependency expansion.
+ */
 #[derive(Debug)]
 struct TransitiveExpansion {
-  // BuildFileAddress to be expanded
+  // build file addresses to be expanded
   todo: Vec<Value>,
+
+  // completed build file addresses stored in their `Key`s because `Value` can not
+  // be directly compared.
   completed: HashSet<Key>,
-  // hydrated targets
+
+  // build file address to hydrated target mapping.
   outputs: OrderMap<Key, Value>,
 }
 
@@ -727,7 +722,6 @@ impl Node for SelectTransitive {
             };
 
             loop_fn(init, move |mut expansion| {
-              // Each round returns [(hydrated_target, [address]), ...]
               let round = future::join_all({
                  expansion.todo.drain(..)
                    .map(|address| self.expand_transitive(&context, &address, &self.selector.field))
