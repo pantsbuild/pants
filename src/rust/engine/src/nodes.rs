@@ -4,12 +4,11 @@
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 use futures::future::{self, BoxFuture, Future};
 
-use context::Core;
-use core::{Function, Key, TypeConstraint, Value, Variants};
+use context::Context;
+use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{
   self,
@@ -21,37 +20,42 @@ use fs::{
   PathStat,
   VFS,
 };
-use graph::EntryId;
 use handles::maybe_drain_handles;
 use selectors::{self, Selector};
 use tasks;
 
 
-#[derive(Debug, Clone)]
-pub enum Failure {
-  Noop(&'static str, Option<NodeKey>),
-  Throw(Value),
-}
-
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
-/**
- * TODO: Move to the `context` module.
- */
-#[derive(Clone)]
-pub struct Context {
-  entry_id: EntryId,
-  core: Arc<Core>,
+fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
+  future::ok(value).boxed()
 }
 
-impl Context {
-  pub fn new(entry_id: EntryId, core: Arc<Core>) -> Context {
-    Context {
-      entry_id: entry_id,
-      core: core,
-    }
-  }
+fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
+  future::err(failure).boxed()
+}
 
+fn throw(msg: &str) -> Failure {
+  Failure::Throw(externs::create_exception(msg))
+}
+
+/**
+ * A helper to indicate that the value represented by the Failure was required, and thus
+ * fatal if not present.
+ */
+fn was_required(failure: Failure) -> Failure {
+  match failure {
+    Failure::Noop(noop) =>
+      throw(&format!("No source of required dependency: {:?}", noop)),
+    f => f,
+  }
+}
+
+trait GetNode {
+  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
+}
+
+impl GetNode for Context {
   /**
    * Get the future value for the given Node implementation.
    */
@@ -64,186 +68,6 @@ impl Context {
           externs::drop_handles(handles);
       });
       self.core.graph.get(self.entry_id, self, node)
-    }
-  }
-
-  fn has_products(&self, item: &Value) -> bool {
-    externs::satisfied_by(&self.core.types.has_products, item)
-  }
-
-  /**
-   * Returns the `name` field of the given item.
-   *
-   * TODO: There is no check that the object _has_ a name field.
-   */
-  fn field_name(&self, item: &Value) -> String {
-    externs::project_str(item, "name")
-  }
-
-  fn field_products(&self, item: &Value) -> Vec<Value> {
-    externs::project_multi(item, "products")
-  }
-
-  /**
-   * NB: Panics on failure. Only recommended for use with built-in functions, such as
-   * those configured in types::Types.
-   */
-  fn invoke_unsafe(&self, func: &Function, args: &Vec<Value>) -> Value {
-    let func_val = externs::val_for_id(func.0);
-    externs::invoke_runnable(&func_val, args, false)
-      .unwrap_or_else(|e| {
-        panic!(
-          "Core function `{}` failed: {}",
-          externs::id_to_str(func.0),
-          externs::val_to_str(&e)
-        );
-      })
-  }
-
-  fn store_path(&self, item: &Path) -> Value {
-    externs::store_bytes(item.as_os_str().as_bytes())
-  }
-
-  fn store_path_stat(&self, item: &PathStat) -> Value {
-    let args =
-      match item {
-        &PathStat::Dir { ref path, ref stat } =>
-          vec![self.store_path(path), self.store_dir(stat)],
-        &PathStat::File { ref path, ref stat } =>
-          vec![self.store_path(path), self.store_file(stat)],
-      };
-    self.invoke_unsafe(&self.core.types.construct_path_stat, &args)
-  }
-
-  fn store_dir(&self, item: &Dir) -> Value {
-    let args = vec![self.store_path(item.0.as_path())];
-    self.invoke_unsafe(&self.core.types.construct_dir, &args)
-  }
-
-  fn store_file(&self, item: &File) -> Value {
-    let args = vec![self.store_path(item.0.as_path())];
-    self.invoke_unsafe(&self.core.types.construct_file, &args)
-  }
-
-  fn store_snapshot(&self, item: &fs::Snapshot) -> Value {
-    let path_stats: Vec<_> =
-      item.path_stats.iter()
-        .map(|ps| self.store_path_stat(ps))
-        .collect();
-    self.invoke_unsafe(
-      &self.core.types.construct_snapshot,
-      &vec![
-        externs::store_bytes(&item.fingerprint.0),
-        externs::store_list(path_stats.iter().collect(), false),
-      ],
-    )
-  }
-
-  fn store_snapshots(&self) -> Value {
-    self.invoke_unsafe(
-      &self.core.types.construct_snapshots,
-      &vec![
-        externs::store_bytes(
-          &self.core.snapshots.path().as_os_str().as_bytes()
-        ),
-      ],
-    )
-  }
-
-  fn store_file_content(&self, item: &FileContent) -> Value {
-    self.invoke_unsafe(
-      &self.core.types.construct_file_content,
-      &vec![
-        self.store_path(&item.path),
-        externs::store_bytes(&item.content),
-      ],
-    )
-  }
-
-  fn store_files_content(&self, item: &Vec<FileContent>) -> Value {
-    let entries: Vec<_> = item.iter().map(|e| self.store_file_content(e)).collect();
-    self.invoke_unsafe(
-      &self.core.types.construct_files_content,
-      &vec![
-        externs::store_list(entries.iter().collect(), false),
-      ],
-    )
-  }
-
-  fn project_multi_strs(&self, item: &Value, field: &str) -> Vec<String> {
-    externs::project_multi(item, field).iter()
-      .map(|v| externs::val_to_str(v))
-      .collect()
-  }
-
-  fn type_path_globs(&self) -> &TypeConstraint {
-    &self.core.types.path_globs
-  }
-
-  fn lift_path_globs(&self, item: &Value) -> Result<PathGlobs, String> {
-    let include = self.project_multi_strs(item, "include");
-    let exclude = self.project_multi_strs(item, "exclude");
-    PathGlobs::create(&include, &exclude)
-      .map_err(|e| {
-        format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)
-      })
-  }
-
-  /**
-   * Creates a Throw state with the given exception message.
-   */
-  fn throw(&self, msg: &str) -> Failure {
-    Failure::Throw(externs::create_exception(msg))
-  }
-
-  fn invoke_runnable(&self, func: &Value, args: &Vec<Value>, cacheable: bool) -> Result<Value, Failure> {
-    externs::invoke_runnable(func, args, cacheable)
-      .map_err(|v| Failure::Throw(v))
-  }
-
-  /**
-   * A helper to indicate that the value represented by the Failure was an optional value.
-   */
-  fn was_optional(&self, failure: Failure, msg: &'static str) -> Failure {
-    match failure {
-      Failure::Noop(..) => Failure::Noop(msg, None),
-      f => f,
-    }
-  }
-
-  /**
-   * A helper to indicate that the value represented by the Failure was required, and thus
-   * fatal if not present.
-   */
-  fn was_required(&self, failure: Failure) -> Failure {
-    match failure {
-      Failure::Noop(..) => self.throw("No source of required dependencies"),
-      f => f,
-    }
-  }
-
-  fn ok<O: Send + 'static>(&self, value: O) -> NodeFuture<O> {
-    future::ok(value).boxed()
-  }
-
-  fn err<O: Send + 'static>(&self, failure: Failure) -> NodeFuture<O> {
-    future::err(failure).boxed()
-  }
-}
-
-pub trait ContextFactory {
-  fn create(&self, entry_id: EntryId) -> Context;
-}
-
-impl ContextFactory for Context {
-  /**
-   * Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
-   * is a shallow clone.
-   */
-  fn create(&self, entry_id: EntryId) -> Context {
-    Context {
-      entry_id: entry_id,
-      core: self.core.clone(),
     }
   }
 }
@@ -312,7 +136,6 @@ impl Select {
 
   fn select_literal_single<'a>(
     &self,
-    context: &Context,
     candidate: &'a Value,
     variant_value: &Option<String>
   ) -> bool {
@@ -320,7 +143,7 @@ impl Select {
       return false;
     }
     return match variant_value {
-      &Some(ref vv) if context.field_name(candidate) != *vv =>
+      &Some(ref vv) if externs::project_str(candidate, "name") != *vv =>
         // There is a variant value, and it doesn't match.
         false,
       _ =>
@@ -340,16 +163,16 @@ impl Select {
     variant_value: &Option<String>
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
-    if self.select_literal_single(context, &candidate, variant_value) {
+    if self.select_literal_single(&candidate, variant_value) {
       return Some(candidate)
     }
 
     // Else, check whether it has-a instance of the product.
     // TODO: returning only the first literal configuration of a given type/variant. Need to
     // define mergeability for products.
-    if context.has_products(&candidate) {
-      for child in context.field_products(&candidate) {
-        if self.select_literal_single(context, &child, variant_value) {
+    if externs::satisfied_by(&context.core.types.has_products, &candidate) {
+      for child in externs::project_multi(&candidate, "products") {
+        if self.select_literal_single(&child, variant_value) {
           return Some(child);
         }
       }
@@ -367,6 +190,7 @@ impl Select {
     variant_value: &Option<String>,
   ) -> Result<Value, Failure> {
     let mut matches = Vec::new();
+    let mut max_noop = Noop::NoTask;
     for result in results {
       match result {
         Ok(value) => {
@@ -376,8 +200,13 @@ impl Select {
         },
         Err(err) => {
           match err {
-            Failure::Noop(_, _) =>
-              continue,
+            Failure::Noop(noop) => {
+              // Record the highest priority Noop value.
+              if noop > max_noop {
+                max_noop = noop;
+              }
+              continue
+            },
             f @ Failure::Throw(_) =>
               return Err(f),
           }
@@ -386,10 +215,10 @@ impl Select {
     }
 
     if matches.len() > 1 {
-      // TODO: Multiple successful tasks are not currently supported. We should allow for this
+      // TODO: Multiple successful tasks are not currently supported. We could allow for this
       // by adding support for "mergeable" products. see:
       //   https://github.com/pantsbuild/pants/issues/2526
-      return Err(context.throw("Conflicting values produced for subject and type."));
+      return Err(throw("Conflicting values produced for subject and type."));
     }
 
     match matches.pop() {
@@ -397,9 +226,8 @@ impl Select {
         // Exactly one value was available.
         Ok(matched),
       None =>
-        Err(
-          Failure::Noop("No task was available to compute the value.", None)
-        ),
+        // Propagate the highest priority Noop value.
+        Err(Failure::Noop(max_noop)),
     }
   }
 
@@ -428,7 +256,7 @@ impl Select {
     if self.product() == &context.core.types.snapshots {
       // TODO: re-storing the Snapshots object for each request.
       vec![
-        future::ok(context.store_snapshots()).boxed()
+        future::ok(Snapshot::store_snapshots(context)).boxed()
       ]
     } else if self.product() == &context.core.types.snapshot {
       // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
@@ -436,7 +264,7 @@ impl Select {
       let context = context.clone();
       vec![
         self.get_snapshot(&context)
-          .map(move |snapshot| context.store_snapshot(&snapshot))
+          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
           .boxed()
       ]
     } else if self.product() == &context.core.types.files_content {
@@ -448,8 +276,8 @@ impl Select {
             // Request the file contents of the Snapshot, and then store them.
             context.core.snapshots.contents_for(&context.core.vfs, snapshot)
               .then(move |files_content_res| match files_content_res {
-                Ok(files_content) => Ok(context.store_files_content(&files_content)),
-                Err(e) => Err(context.throw(&e)),
+                Ok(files_content) => Ok(Snapshot::store_files_content(&context, &files_content)),
+                Err(e) => Err(throw(&e)),
               })
           )
           .boxed()
@@ -487,9 +315,7 @@ impl Node for Select {
         Some(ref variant_key) => {
           let variant_value = self.variants.find(variant_key);
           if variant_value.is_none() {
-            return context.err(
-              Failure::Noop("A matching variant key was not configured in variants.", None)
-            );
+            return err(Failure::Noop(Noop::NoVariant));
           }
           variant_value.map(|v| v.to_string())
         },
@@ -498,7 +324,7 @@ impl Node for Select {
 
     // If the Subject "is a" or "has a" Product, then we're done.
     if let Some(literal_value) = self.select_literal(&context, externs::val_for(&self.subject), &variant_value) {
-      return context.ok(literal_value);
+      return ok(literal_value);
     }
 
     // Else, attempt to use the configured tasks to compute the value.
@@ -540,8 +366,8 @@ pub struct SelectLiteral {
 impl Node for SelectLiteral {
   type Output = Value;
 
-  fn run(self, context: Context) -> NodeFuture<Value> {
-    context.ok(externs::val_for(&self.selector.subject))
+  fn run(self, _: Context) -> NodeFuture<Value> {
+    ok(externs::val_for(&self.selector.subject))
   }
 
   fn is_inline() -> bool {
@@ -621,13 +447,13 @@ impl Node for SelectDependencies {
                     Ok(externs::store_list(dep_values.iter().collect(), false))
                   },
                   Err(failure) =>
-                    Err(context.was_required(failure)),
+                    Err(was_required(failure)),
                 }
               })
               .boxed()
           },
           Err(failure) =>
-            context.err(context.was_optional(failure, "No source of input product.")),
+            err(failure),
         }
       })
       .boxed()
@@ -719,13 +545,13 @@ impl Node for SelectTransitive {
                     Ok(self.store(&dep_product, dep_values.iter().collect()))
                   },
                   Err(failure) =>
-                    Err(context.was_required(failure)),
+                    Err(was_required(failure)),
                 }
               })
               .boxed()
           },
           Err(failure) =>
-            context.err(context.was_optional(failure, "No source of input product.")),
+            err(failure),
         }
       })
       .boxed()
@@ -781,13 +607,13 @@ impl Node for SelectProjection {
                 // If the output product is available, return it.
                 match output_res {
                   Ok(output) => Ok(output),
-                  Err(failure) => Err(context.was_required(failure)),
+                  Err(failure) => Err(was_required(failure)),
                 }
               })
               .boxed()
           },
           Err(failure) =>
-            context.err(context.was_optional(failure, "No source of input product.")),
+            err(failure),
         }
       })
       .boxed()
@@ -821,7 +647,7 @@ impl Node for ReadLink {
     context.core.vfs.read_link(&self.0)
       .map(|dest_path| LinkDest(dest_path))
       .map_err(move |e|
-        context.throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
+        throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
       )
       .boxed()
   }
@@ -886,7 +712,7 @@ impl Node for Scandir {
           Ok(DirectoryListing(listing))
         },
         Err(e) =>
-          Err(context.throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
+          Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .boxed()
   }
@@ -936,15 +762,94 @@ impl Snapshot {
               context.core.snapshots
                 .create(&context.core.vfs, path_stats)
                 .map_err(move |e| {
-                  context.throw(&format!("Snapshot failed: {}", e))
+                  throw(&format!("Snapshot failed: {}", e))
                 })
             })
             .boxed()
         },
         Err(e) =>
-          context.err(context.throw(&format!("PathGlobs expansion failed: {:?}", e))),
+          err(throw(&format!("PathGlobs expansion failed: {:?}", e))),
       })
       .boxed()
+  }
+
+  fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
+    let include = externs::project_multi_strs(item, "include");
+    let exclude = externs::project_multi_strs(item, "exclude");
+    PathGlobs::create(&include, &exclude)
+      .map_err(|e| {
+        format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)
+      })
+  }
+
+  fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
+    let path_stats: Vec<_> =
+      item.path_stats.iter()
+        .map(|ps| Self::store_path_stat(context, ps))
+        .collect();
+    externs::invoke_unsafe(
+      &context.core.types.construct_snapshot,
+      &vec![
+        externs::store_bytes(&item.fingerprint.0),
+        externs::store_list(path_stats.iter().collect(), false),
+      ],
+    )
+  }
+
+  fn store_snapshots(context: &Context) -> Value {
+    externs::invoke_unsafe(
+      &context.core.types.construct_snapshots,
+      &vec![
+        externs::store_bytes(
+          &context.core.snapshots.path().as_os_str().as_bytes()
+        ),
+      ],
+    )
+  }
+
+  fn store_path(item: &Path) -> Value {
+    externs::store_bytes(item.as_os_str().as_bytes())
+  }
+
+  fn store_dir(context: &Context, item: &Dir) -> Value {
+    let args = vec![Self::store_path(item.0.as_path())];
+    externs::invoke_unsafe(&context.core.types.construct_dir, &args)
+  }
+
+  fn store_file(context: &Context, item: &File) -> Value {
+    let args = vec![Self::store_path(item.0.as_path())];
+    externs::invoke_unsafe(&context.core.types.construct_file, &args)
+  }
+
+  fn store_path_stat(context: &Context, item: &PathStat) -> Value {
+    let args =
+      match item {
+        &PathStat::Dir { ref path, ref stat } =>
+          vec![Self::store_path(path), Self::store_dir(context, stat)],
+        &PathStat::File { ref path, ref stat } =>
+          vec![Self::store_path(path), Self::store_file(context, stat)],
+      };
+    externs::invoke_unsafe(&context.core.types.construct_path_stat, &args)
+  }
+
+  fn store_file_content(context: &Context, item: &FileContent) -> Value {
+    externs::invoke_unsafe(
+      &context.core.types.construct_file_content,
+      &vec![
+        Self::store_path(&item.path),
+        externs::store_bytes(&item.content),
+      ],
+    )
+  }
+
+  fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
+    let entries: Vec<_> = item.iter().map(|e| Self::store_file_content(context, e)).collect();
+    externs::invoke_unsafe(
+      &context.core.types.construct_files_content,
+      &vec![
+        externs::store_list(entries.iter().collect(), false),
+      ],
+    )
   }
 }
 
@@ -956,22 +861,22 @@ impl Node for Snapshot {
     context
       .get(
         Select::new(
-          context.type_path_globs().clone(),
+          context.core.types.path_globs.clone(),
           self.subject.clone(),
           self.variants.clone()
         )
       )
       .then(move |path_globs_res| match path_globs_res {
         Ok(path_globs_val) => {
-          match context.lift_path_globs(&path_globs_val) {
+          match Self::lift_path_globs(&path_globs_val) {
             Ok(pgs) =>
               Snapshot::create(context, pgs),
             Err(e) =>
-              context.err(context.throw(&format!("Failed to parse PathGlobs: {}", e))),
+              err(throw(&format!("Failed to parse PathGlobs: {}", e))),
           }
         },
         Err(failure) =>
-          context.err(context.was_optional(failure, "No source of PathGlobs."))
+          err(failure)
       })
       .boxed()
   }
@@ -1048,13 +953,13 @@ impl Node for Task {
     deps
       .then(move |deps_result| match deps_result {
         Ok(deps) =>
-          context.invoke_runnable(
+          externs::invoke_runnable(
             &externs::val_for_id(task.func.0),
             &deps,
             task.cacheable,
           ),
         Err(err) =>
-          Err(context.was_optional(err, "Missing at least one input.")),
+          Err(err),
       })
       .boxed()
   }

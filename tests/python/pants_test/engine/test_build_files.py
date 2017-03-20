@@ -205,7 +205,7 @@ class InlinedGraphTest(GraphTestBase):
   def do_test_cycle(self, address_str):
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
-    self.do_test_trace_message(scheduler, parsed_address, 'cycle')
+    self.do_test_trace_message(scheduler, parsed_address, 'Dep graph contained a cycle.')
 
   def assert_throws_are_leaves(self, error_msg, throw_name):
     def indent_of(s):
