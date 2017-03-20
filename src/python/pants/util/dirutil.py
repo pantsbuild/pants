@@ -20,62 +20,44 @@ from pants.util.strutil import ensure_text
 
 
 def longest_dir_prefix(path, prefixes):
-  """ Given a list of prefixes, return the one that is the longest prefix to 
-      the given path
+  """Given a list of prefixes, return the one that is the longest prefix to the given path.
 
-      Returns None if there are no matches
+  Returns None if there are no matches.
   """
   longest_match, longest_prefix = 0, None
   for prefix in prefixes:
-    if not prefix.endswith('/'):
-      prefix = prefix + '/'
-
-    if path.startswith(prefix) and len(prefix) > longest_match:
+    if fast_relpath_optional(path, prefix) is not None and len(prefix) > longest_match:
       longest_match, longest_prefix = len(prefix), prefix
 
   return longest_prefix
 
 
-def join_specs(parent, *children):
-  """Join the parent spec with child specs. If the child specs have a leading
-  "/" or "//", they are removed prior to joining.
-
-  :param string parent: The parent spec
-  :param *string children: child specs which should be joined to the parent
-  """
-  current_spec = parent
-  for child in children:
-    # If the child has a third (or more) slash, don't consider fixing it
-    if len(child) <= 2 or child[2] != '/':
-      if child.startswith('//'):
-        child = child[2:]
-      elif child.startswith('/'):
-        child = child[1:]
-
-    current_spec = os.path.join(current_spec, child)
-
-  return current_spec
-
-
 def fast_relpath(path, start):
   """A prefix-based relpath, with no normalization or support for returning `..`."""
-  if not path.startswith(start):
-    raise ValueError('{} is not a prefix of {}'.format(start, path))
+  relpath = fast_relpath_optional(path, start)
+  if relpath is None:
+    raise ValueError('{} is not a directory containing {}'.format(start, path))
+  return relpath
 
-  if len(path) == len(start):
-    # Items are identical: the relative path is empty.
-    return ''
-  elif len(start) == 0:
+
+def fast_relpath_optional(path, start):
+  """A prefix-based relpath, with no normalization or support for returning `..`.
+
+  Returns None if `start` is not a directory-aware prefix of `path`.
+  """
+  if len(start) == 0:
     # Empty prefix.
     return path
-  elif start[-1] == '/':
-    # The prefix indicates that it is a directory.
-    return path[len(start):]
-  elif path[len(start)] == '/':
-    # The suffix indicates that the prefix is a directory.
-    return path[len(start)+1:]
-  else:
-    raise ValueError('{} is not a directory containing {}'.format(start, path))
+
+  # Determine where the matchable prefix ends.
+  pref_end = len(start) - 1 if start[-1] == '/' else len(start)
+  if pref_end > len(path):
+    # The prefix is too long to match.
+    return None
+  elif path[:pref_end] == start[:pref_end] and (len(path) == pref_end or path[pref_end] == '/'):
+    # The prefix matches, and the entries are either identical, or the suffix indicates that
+    # the prefix is a directory.
+    return path[pref_end+1:]
 
 
 def safe_mkdir(directory, clean=False):

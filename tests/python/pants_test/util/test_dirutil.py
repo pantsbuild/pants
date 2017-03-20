@@ -16,10 +16,10 @@ import six
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
-                                get_basedir, join_specs, longest_dir_prefix, read_file,
-                                relative_symlink, relativize_paths, rm_rf, safe_concurrent_creation,
-                                safe_file_dump, safe_mkdir, safe_mkdtemp,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                get_basedir, longest_dir_prefix, read_file, relative_symlink,
+                                relativize_paths, rm_rf, safe_concurrent_creation, safe_file_dump,
+                                safe_mkdir, safe_mkdtemp, safe_rm_oldest_items_in_dir, safe_rmtree,
+                                touch)
 
 
 def strict_patch(target, **kwargs):
@@ -32,26 +32,15 @@ class DirutilTest(unittest.TestCase):
     # Ensure we start in a clean state.
     _mkdtemp_unregister_cleaner()
 
-  def test_join_specs(self):
-    # Test joining specs with removing slash prefixes
-    parent = '//parent/spec'
-    children = ['//childone', '/childtwo', 'childthree']
-    self.assertEquals(join_specs(parent, *children),
-                      '//parent/spec/childone/childtwo/childthree')
-
-    # Ensure that three slashes is not fixed
-    parent = '//parent/spec'
-    children = ['///woahthere']
-    self.assertEquals(join_specs(parent, *children),
-                      '///woahthere')
-
   def test_longest_dir_prefix(self):
     # Find the longest prefix (standard case).
     prefixes = ['hello', 'hello_world', 'hello/world', 'helloworld']
     self.assertEquals(longest_dir_prefix('hello/world/pants', prefixes),
-                      'hello/world/')
+                      'hello/world')
     self.assertEquals(longest_dir_prefix('hello/', prefixes),
-                      'hello/')
+                      'hello')
+    self.assertEquals(longest_dir_prefix('hello', prefixes),
+                      'hello')
     self.assertEquals(longest_dir_prefix('scoobydoobydoo', prefixes),
                       None)
 
@@ -60,6 +49,8 @@ class DirutilTest(unittest.TestCase):
     # prefix, is not tagged.
     prefixes = ['helloworldhowareyou', 'helloworld']
     self.assertEquals(longest_dir_prefix('helloworldhowareyoufine/', prefixes),
+                      None)
+    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine', prefixes),
                       None)
 
   def test_fast_relpath(self):
@@ -73,6 +64,8 @@ class DirutilTest(unittest.TestCase):
     assertRelpath('c/', 'b/c/', 'b/')
     assertRelpath('', 'c/', 'c/')
     assertRelpath('', 'c', 'c')
+    assertRelpath('', 'c/', 'c')
+    assertRelpath('', 'c', 'c/')
     assertRelpath('c/', 'c/', '')
     assertRelpath('c', 'c', '')
 

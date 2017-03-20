@@ -4,10 +4,9 @@
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLockReadGuard};
+use std::sync::Arc;
 
 use futures::future::{self, BoxFuture, loop_fn, Future, Loop};
-use futures_cpupool::CpuPool;
 use ordermap::OrderMap;
 
 use context::Core;
@@ -235,7 +234,6 @@ impl Context {
 
 pub trait ContextFactory {
   fn create(&self, entry_id: EntryId) -> Context;
-  fn pool(&self) -> RwLockReadGuard<CpuPool>;
 }
 
 impl ContextFactory for Context {
@@ -248,10 +246,6 @@ impl ContextFactory for Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
-  }
-
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
-    self.core.pool()
   }
 }
 

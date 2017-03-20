@@ -95,7 +95,8 @@ class GoalRunnerFactory(object):
       graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
         pants_ignore_patterns,
         build_ignore_patterns=build_ignore_patterns,
-        exclude_target_regexps=exclude_target_regexps)
+        exclude_target_regexps=exclude_target_regexps,
+        subproject_roots=subproject_build_roots)
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
                                         change_calculator=graph_helper.change_calculator)
