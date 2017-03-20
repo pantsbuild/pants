@@ -57,7 +57,7 @@ class JvmBinaryTask(JarBuilderTask):
     :param binary: The jvm binary target to list transitive external dependencies for.
     :type binary: :class:`pants.backend.jvm.targets.jvm_binary.JvmBinary`
     :returns: A list of (jar path, coordinate) tuples.
-    :rtype: list of (string, :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`)
+    :rtype: list of (string, :class:`pants.java.jar.M2Coordinate`)
     """
     classpath_products = self.context.products.get_data('runtime_classpath')
     classpath_entries = classpath_products.get_artifact_classpath_entries_for_targets(

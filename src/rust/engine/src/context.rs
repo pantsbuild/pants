@@ -2,9 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use futures_cpupool::{self, CpuPool};
+use std::sync::Arc;
 
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
@@ -24,9 +22,6 @@ pub struct Core {
   pub types: Types,
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
-  // TODO: This is a second pool (relative to the VFS pool), upon which all work is
-  // submitted. See https://github.com/pantsbuild/pants/issues/4298
-  pool: RwLock<CpuPool>,
 }
 
 impl Core {
@@ -51,18 +46,7 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),
-      pool: RwLock::new(Core::create_pool()),
     }
-  }
-
-  pub fn pool(&self) -> RwLockReadGuard<CpuPool> {
-    self.pool.read().unwrap()
-  }
-
-  fn create_pool() -> CpuPool {
-    futures_cpupool::Builder::new()
-      .name_prefix("engine-")
-      .create()
   }
 
   /**
@@ -71,9 +55,6 @@ impl Core {
   pub fn post_fork(&self) {
     // Reinitialize the VFS pool.
     self.vfs.post_fork();
-    // And our own.
-    let mut pool = self.pool.write().unwrap();
-    *pool = Core::create_pool();
   }
 }
 
@@ -94,7 +75,6 @@ impl Context {
 
 pub trait ContextFactory {
   fn create(&self, entry_id: EntryId) -> Context;
-  fn pool(&self) -> RwLockReadGuard<CpuPool>;
 }
 
 impl ContextFactory for Context {
@@ -107,9 +87,5 @@ impl ContextFactory for Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
-  }
-
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
-    self.core.pool()
   }
 }

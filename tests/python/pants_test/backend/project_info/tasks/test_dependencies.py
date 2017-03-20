@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.dependencies import Dependencies
@@ -13,6 +12,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 

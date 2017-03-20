@@ -5,6 +5,6 @@ python_tests(
   name = 'manifest',
   sources = ['test_manifest.py'],
   dependencies = [
-    'src/python/pants/java/jar:manifest',
+    'src/python/pants/java/jar',
   ]
 )

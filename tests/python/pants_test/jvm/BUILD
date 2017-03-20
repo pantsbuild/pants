@@ -24,6 +24,7 @@ python_library(
   sources=['jvm_tool_task_test_base.py'],
   dependencies=[
     ':jvm_task_test_base',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:jvm_tool_mixin',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',

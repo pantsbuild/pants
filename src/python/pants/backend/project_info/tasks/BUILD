@@ -32,7 +32,7 @@ python_library(
   name = 'depmap',
   sources = ['depmap.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/java/jar',
     'src/python/pants/base:exceptions',
     'src/python/pants/task',
   ],

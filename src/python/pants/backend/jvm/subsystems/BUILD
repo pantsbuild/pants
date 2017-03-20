@@ -15,7 +15,7 @@ python_library(
   sources = ['jar_tool.py'],
   dependencies = [
     ':jvm_tool_mixin',
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/java/jar',
     'src/python/pants/base:workunit',
     'src/python/pants/option',
     'src/python/pants/subsystem',
@@ -39,8 +39,8 @@ python_library(
   sources = ['junit.py'],
   dependencies = [
     ':jvm_tool_mixin',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:shader',
-    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:memo',
     'src/python/pants/build_graph',
     'src/python/pants/subsystem',
@@ -61,6 +61,7 @@ python_library(
   name = 'jvm_platform',
   sources = ['jvm_platform.py'],
   dependencies = [
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',
     'src/python/pants/option',
     'src/python/pants/subsystem',
@@ -90,6 +91,7 @@ python_library(
     ':zinc_language_mixin',
     'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:memo',
   ],
@@ -99,7 +101,7 @@ python_library(
   name = 'shader',
   sources = ['shader.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/java/distribution',

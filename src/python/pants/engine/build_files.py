@@ -98,7 +98,7 @@ def _raise_did_you_mean(address_family, name):
                      'Did you mean one of?:\n  {}'.format(address_family.namespace, name, possibilities))
 
 
-def resolve_unhydrated_struct(address_family, address):
+def resolve_unhydrated_struct(address_mapper, address_family, address):
   """Given an Address and its AddressFamily, resolve an UnhydratedStruct.
 
   Recursively collects any embedded addressables within the Struct, but will not walk into a
@@ -114,7 +114,9 @@ def resolve_unhydrated_struct(address_family, address):
   def maybe_append(outer_key, value):
     if isinstance(value, six.string_types):
       if outer_key != 'dependencies':
-        dependencies.append(Address.parse(value, relative_to=address.spec_path))
+        dependencies.append(Address.parse(value,
+                                          relative_to=address.spec_path,
+                                          subproject_roots=address_mapper.subproject_roots))
     elif isinstance(value, Struct):
       collect_dependencies(value)
 
@@ -137,7 +139,7 @@ def resolve_unhydrated_struct(address_family, address):
     filter(lambda build_address: build_address == address, addresses)[0], struct, dependencies)
 
 
-def hydrate_struct(unhydrated_struct, dependencies):
+def hydrate_struct(address_mapper, unhydrated_struct, dependencies):
   """Hydrates a Struct from an UnhydratedStruct and its satisfied embedded addressable deps.
 
   Note that this relies on the guarantee that DependenciesNode provides dependencies in the
@@ -152,7 +154,9 @@ def hydrate_struct(unhydrated_struct, dependencies):
         # Don't recurse into the dependencies field of a Struct, since those will be explicitly
         # requested by tasks. But do ensure that their addresses are absolute, since we're
         # about to lose the context in which they were declared.
-        value = Address.parse(value, relative_to=address.spec_path)
+        value = Address.parse(value,
+                              relative_to=address.spec_path,
+                              subproject_roots=address_mapper.subproject_roots)
       else:
         value = dependencies[maybe_consume.idx]
         maybe_consume.idx += 1
@@ -279,12 +283,14 @@ def create_graph_tasks(address_mapper, symbol_table_cls):
   return [
     # Support for resolving Structs from Addresses
     (symbol_table_constraint,
-     [Select(UnhydratedStruct),
+     [SelectLiteral(address_mapper, AddressMapper),
+      Select(UnhydratedStruct),
       SelectDependencies(
         symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
       hydrate_struct),
     (UnhydratedStruct,
-     [SelectProjection(AddressFamily, Dir, ('spec_path',), Exactly(Address, BuildFileAddress)),
+     [SelectLiteral(address_mapper, AddressMapper),
+      SelectProjection(AddressFamily, Dir, ('spec_path',), Exactly(Address, BuildFileAddress)),
       Select(Exactly(Address, BuildFileAddress))],
      resolve_unhydrated_struct),
   ] + [

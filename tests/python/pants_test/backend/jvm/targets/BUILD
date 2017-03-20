@@ -14,7 +14,7 @@ python_tests(
   name='jar_dependency',
   sources=['test_jar_dependency.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:scala',
   ]
 )
@@ -23,6 +23,7 @@ python_tests(
   name='jar_library',
   sources=['test_jar_library.py'],
   dependencies=[
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
@@ -58,6 +59,7 @@ python_tests(
   name='jvm_binary',
   sources=['test_jvm_binary.py'],
   dependencies=[
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',
@@ -80,6 +82,7 @@ python_tests(
   name='unpacked_jars',
   sources=['test_unpacked_jars.py'],
   dependencies=[
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'tests/python/pants_test:base_test',
   ]
