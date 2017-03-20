@@ -9,7 +9,7 @@ use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Id, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Function, Id, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 
 
@@ -106,6 +106,12 @@ pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
   })
 }
 
+pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
+  project_multi(item, field).iter()
+    .map(|v| val_to_str(v))
+    .collect()
+}
+
 pub fn project_str(value: &Value, field: &str) -> String {
   let name_val =
     with_externs(|e|
@@ -140,7 +146,7 @@ pub fn create_exception(msg: &str) -> Value {
   )
 }
 
-pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<Value, Value> {
+pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<Value, Failure> {
   let result =
     with_externs(|e| {
       (e.invoke_runnable)(
@@ -152,10 +158,21 @@ pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<
       )
     });
   if result.is_throw {
-    Err(result.value)
+    Err(Failure::Throw(result.value))
   } else {
     Ok(result.value)
   }
+}
+
+/**
+ * NB: Panics on failure. Only recommended for use with built-in functions, such as
+ * those configured in types::Types.
+ */
+pub fn invoke_unsafe(func: &Function, args: &Vec<Value>) -> Value {
+  invoke_runnable(&val_for_id(func.0), args, false)
+    .unwrap_or_else(|e| {
+      panic!("Core function `{}` failed: {:?}", id_to_str(func.0), e);
+    })
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

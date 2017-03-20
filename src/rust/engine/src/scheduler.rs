@@ -7,11 +7,11 @@ use std::sync::Arc;
 
 use futures::future::Future;
 
-use context::Core;
-use core::{Field, Key, TypeConstraint, TypeId, Value};
+use context::{Context, ContextFactory, Core};
+use core::{Failure, Field, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
-use nodes::{Context, ContextFactory, Failure, NodeKey, Select, SelectDependencies};
+use nodes::{NodeKey, Select, SelectDependencies};
 use selectors;
 
 /**
