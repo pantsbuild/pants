@@ -12,8 +12,10 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.deprecated import deprecated_conditional
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
+from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
@@ -40,6 +42,7 @@ class JvmTarget(Target, Jarable):
                services=None,
                platform=None,
                strict_deps=None,
+               exports=None,
                fatal_warnings=None,
                zinc_file_manager=None,
                # Some subclasses can have both .java and .scala sources
@@ -75,6 +78,14 @@ class JvmTarget(Target, Jarable):
                              at compilation time. This enforces that all direct deps of the target
                              are declared, and can improve compilation speed due to smaller
                              classpaths. Transitive deps are always provided at runtime.
+    :param list exports: A list of exported targets, which will be accessible to dependents even
+                         with strict_deps turned on. A common use case is for library targets to
+                         to export dependencies that it knows its dependents will need. Then any
+                         dependents of that library target will have access to those dependencies
+                         even when strict_deps is True. Note: exports is transitive, which means
+                         dependents have access to the closure of exports. An example will be that
+                         if A exports B, and B exports C, then any targets that depends on A will
+                         have access to both B and C.
     :param bool fatal_warnings: Whether to turn warnings into errors for this target.  If present,
                                 takes priority over the language's fatal-warnings option.
     :param bool zinc_file_manager: Whether to use zinc provided file manager that allows
@@ -98,6 +109,7 @@ class JvmTarget(Target, Jarable):
       'excludes': excludes,
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
+      'exports': SetOfPrimitivesField(exports),
       'fatal_warnings': PrimitiveField(fatal_warnings),
       'zinc_file_manager': PrimitiveField(zinc_file_manager),
       'javac_plugins': SetOfPrimitivesField(javac_plugins),
@@ -124,6 +136,26 @@ class JvmTarget(Target, Jarable):
     :rtype: bool or None
     """
     return self.payload.strict_deps
+
+  @property
+  def exports(self):
+    """A list of exported targets, which will be accessible to dependents.
+
+    :return: See constructor.
+    :rtype: list
+    """
+    exports = []
+    for spec in self.payload.exports:
+      addr = Address.parse(spec, relative_to=self.address.spec_path)
+      target = self._build_graph.get_target(addr)
+      if target not in self.dependencies:
+        # This means the exported target was not injected before "self",
+        # thus it's not a valid export.
+        raise TargetDefinitionException(self,
+          'Invalid exports: "{}" is not a dependency of {}'.format(spec, self))
+      exports.append(target)
+
+    return exports
 
   @property
   def fatal_warnings(self):
