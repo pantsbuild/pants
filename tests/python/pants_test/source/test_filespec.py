@@ -23,6 +23,9 @@ class GlobToRegexTest(unittest.TestCase):
       asserter(re.match(regex, expected), 'glob_to_regex(`{}`) -> `{}` {} path `{}`'
                                           .format(glob, regex, match_state, expected))
 
+  def test_glob_to_regex_with_dollar_sign(self):
+    self.assert_rule_match('a/b$abc.py', ('a/b$abc.py', ))
+
   def test_glob_to_regex_single_star_0(self):
     self.assert_rule_match('a/b/*/f.py', ('a/b/c/f.py', 'a/b/q/f.py'))
 
