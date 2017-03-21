@@ -4,9 +4,10 @@ node_module(
   package_manager='yarn',
 )
 
-node_test(
-  name='mocha',
-  dependencies=[
-    ':pantsbuild-hello-mocha'
-  ]
-)
+# FIXME: https://github.com/pantsbuild/pants/issues/4355
+# node_test(
+#   name='mocha',
+#   dependencies=[
+#     ':pantsbuild-hello-mocha'
+#   ]
+# )
