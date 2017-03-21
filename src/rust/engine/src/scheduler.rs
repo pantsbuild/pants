@@ -3,9 +3,10 @@
 
 use std::io;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLockReadGuard};
 
-use futures::future::Future;
+use futures::future::{self, Future};
+use futures_cpupool::CpuPool;
 
 use context::{Context, ContextFactory, Core};
 use core::{Failure, Field, Key, TypeConstraint, TypeId, Value};
@@ -114,22 +115,19 @@ impl Scheduler {
 
     // Bootstrap tasks for the roots, and then wait for all of them.
     externs::log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
-    let roots =
-      self.root_nodes().into_iter()
-        .map(|root| {
-          self.core.graph.create(root.clone(), &self.core)
-            .then::<_, Result<(), ()>>(|_| Ok(()))
-        })
-        .collect::<Vec<_>>();
+    let roots_res =
+      future::join_all(
+        self.root_nodes().into_iter()
+          .map(|root| {
+            self.core.graph.create(root.clone(), &self.core)
+              .then::<_, Result<(), ()>>(|_| Ok(()))
+          })
+          .collect::<Vec<_>>()
+      );
 
-    // Wait for each root to complete. Failure here should be impossible, because each
-    // individual Future was mapped into success regardless of its result.
-    // TODO: A join_all here triggers a bug in Shared (...or join_all?), so we wait for the
-    // futures individually:
-    //  https://github.com/pantsbuild/pants/issues/4298 
-    for root in roots {
-      root.wait().expect("Execution failed.");
-    }
+    // Wait for all roots to complete. Failure here should be impossible, because each
+    // individual Future in the join was mapped into success regardless of its result.
+    roots_res.wait().expect("Execution failed.");
 
     ExecutionStat {
       runnable_count: runnable_count,
@@ -151,6 +149,10 @@ pub type RootResult = Result<Value, Failure>;
 impl ContextFactory for Arc<Core> {
   fn create(&self, entry_id: EntryId) -> Context {
     Context::new(entry_id, self.clone())
+  }
+
+  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+    Core::pool(self)
   }
 }
 
