@@ -46,6 +46,8 @@ def glob_to_regex(pattern):
 
 
 def globs_matches(path, patterns):
+  # FIXME: Workaround for `glob_to_regex` bug
+  # https://github.com/pantsbuild/pants/issues/4351
   if path in patterns:
     return True
 
