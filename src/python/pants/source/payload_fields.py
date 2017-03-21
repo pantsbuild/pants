@@ -64,7 +64,7 @@ class SourcesField(PayloadField):
 
   def relative_to_buildroot(self):
     """All sources joined with their relative paths."""
-    return list(self.sources.iter_relative_paths())
+    return list(path for path in self.sources.iter_relative_paths() if self.matches(path))
 
   def _compute_fingerprint(self):
     hasher = sha1()
