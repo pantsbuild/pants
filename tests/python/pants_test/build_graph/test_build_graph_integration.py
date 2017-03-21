@@ -19,7 +19,4 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
       with self.file_renamed(os.path.join(prefix, 'cycle2'), 'TEST_BUILD', 'BUILD'):
         pants_run = self.run_pants(['compile', os.path.join(prefix, 'cycle1')])
         self.assert_failure(pants_run)
-        # FIXME: The output in this test should probably indicate a cycle. Currently, it
-        # receives: "Throw(No source of required dependencies)" - so we'll bind to that
-        # for now to be intentionally ~brittle.
-        self.assertIn('No source of required dependencies', pants_run.stderr_data)
+        self.assertIn('contained a cycle', pants_run.stderr_data)
