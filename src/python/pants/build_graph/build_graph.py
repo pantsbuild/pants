@@ -520,6 +520,13 @@ class BuildGraph(AbstractClass):
     :returns: The Addressable which address points to.
     """
 
+  @abstractmethod
+  def recreate(self):
+    """Recreate a buildgraph of the same type from scratch without copying existing addresses.
+
+    The new buildgraph will be used for a different set of addresses.
+    """
+
 
 class CycleException(Exception):
   """Thrown when a circular dependency is detected.

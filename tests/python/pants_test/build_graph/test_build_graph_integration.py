@@ -7,17 +7,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants.base.build_environment import get_buildroot
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 
 class BuildGraphIntegrationTest(PantsRunIntegrationTest):
 
-  # TODO: Disabled to expedite landing #3821: see #4007.
-  # @ensure_engine
+  @ensure_engine
   def test_cycle(self):
     prefix = 'testprojects/src/java/org/pantsbuild/testproject'
-    with self.file_renamed(os.path.join(prefix, 'cycle1'), 'TEST_BUILD', 'BUILD'):
-      with self.file_renamed(os.path.join(prefix, 'cycle2'), 'TEST_BUILD', 'BUILD'):
+    with self.file_renamed(os.path.join(get_buildroot(), prefix, 'cycle1'),
+                           'TEST_BUILD', 'BUILD'):
+      with self.file_renamed(os.path.join(get_buildroot(), prefix, 'cycle2'),
+                             'TEST_BUILD', 'BUILD'):
         pants_run = self.run_pants(['compile', os.path.join(prefix, 'cycle1')])
         self.assert_failure(pants_run)
-        self.assertIn('Cycle detected', pants_run.stderr_data)
+        self.assertIn('cycle', pants_run.stderr_data.lower())

@@ -16,6 +16,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -126,7 +127,8 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/c:c3',
         'a/b/d:d',
         'a/b/e:e1',
-        'f:alias')
+        'f:alias',
+        targets=self.targets('::'))
 
     self.assert_entries(', ',
         'a:a',
@@ -137,31 +139,33 @@ class ListTargetsTest(BaseListTargetsTest):
         'a/b/d:d',
         'a/b/e:e1',
         'f:alias',
-        options={'sep': ', '})
+        options={'sep': ', '}, targets=self.targets('::'))
 
     self.assert_console_output(
-        'a:a',
-        'a/b:b',
-        'a/b/c:c',
-        'a/b/c:c2',
-        'a/b/c:c3',
-        'a/b/d:d',
-        'a/b/e:e1',
-        'f:alias')
+      'a:a',
+      'a/b:b',
+      'a/b/c:c',
+      'a/b/c:c2',
+      'a/b/c:c3',
+      'a/b/d:d',
+      'a/b/e:e1',
+      'f:alias',
+      targets=self.targets('::'))
 
   def test_list_provides(self):
     self.assert_console_output(
-        'a/b:b com.example#b',
-        'a/b/c:c2 com.example#c2',
-        options={'provides': True})
+      'a/b:b com.example#b',
+      'a/b/c:c2 com.example#c2',
+      options={'provides': True},
+      targets=self.targets('::'))
 
   def test_list_provides_customcols(self):
     self.assert_console_output(
-        '/tmp a/b:b http://maven.example.com public com.example#b',
-        '/tmp a/b/c:c2 http://maven.example.com public com.example#c2',
-        options={'provides': True,
-                 'provides_columns': 'push_db_basedir,address,repo_url,repo_name,artifact_id'}
-    )
+      '/tmp a/b:b http://maven.example.com public com.example#b',
+      '/tmp a/b/c:c2 http://maven.example.com public com.example#c2',
+      options={'provides': True,
+               'provides_columns': 'push_db_basedir,address,repo_url,repo_name,artifact_id'},
+      targets=self.targets('::'))
 
   def test_list_dedups(self):
     targets = []
@@ -187,16 +191,20 @@ class ListTargetsTest(BaseListTargetsTest):
         Exercises alias resolution.
         Further description.
       """).strip(),
-      options={'documented': True}
+      options={'documented': True},
+      targets=self.targets('::')
     )
 
   def test_no_synthetic_resources_in_output(self):
+    # `python_library` w/o `sources` requires initializing the needed subsystem.
+    init_subsystem(Target.Arguments)
     self.add_to_build_file('BUILD', dedent("""
     python_library(
       name = 'lib',
       resources = ['BUILD'],
     )
     """))
-    output = self.execute_console_task()
+
+    output = self.execute_console_task(targets=self.targets('::'))
     self.assertIn('//:lib', output)
     self.assertTrue(all('synthetic' not in line for line in output))
