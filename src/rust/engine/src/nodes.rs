@@ -1,6 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashSet;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -508,7 +509,7 @@ impl SelectTransitive {
 #[derive(Debug)]
 struct TransitiveExpansion {
   // Subjects to be processed.
-  todo: Vec<Key>,
+  todo: HashSet<Key>,
 
   // Mapping from processed subject `Key` to its product.
   // Products will be collected at the end of iterations.
@@ -537,25 +538,31 @@ impl Node for SelectTransitive {
             };
 
             loop_fn(init, move |mut expansion| {
+              // println!("processing todo {:?} items", expansion.todo.len());
+              // let round_time = SystemTime::now();
               let round = future::join_all({
-                 expansion.todo.drain(..)
+                 expansion.todo.drain()
                    .map(|subject_key| self.expand_transitive(&context, subject_key))
                    .collect::<Vec<_>>()
               });
 
               round
                 .map(move |finished_items| {
+                  let mut todo_candidates = Vec::new();
                   for (subject_key, product, more_deps) in finished_items.into_iter() {
-
+                    // println!("  processed {:?} $ {:?} with new deps $ {:?}", subject_key, product, more_deps);
                     expansion.outputs.insert(subject_key, product);
-
-                    let outputs = &mut expansion.outputs;
-                    expansion.todo.extend(more_deps.into_iter()
-                      .map(|dep| externs::key_for(&dep))
-                      .filter(|dep_key| !outputs.contains_key(dep_key))
-                      .collect::<Vec<_>>());
+                    todo_candidates.extend(more_deps);
                   }
 
+                  {
+                  let outputs = &mut expansion.outputs;
+                  expansion.todo.extend(todo_candidates.into_iter()
+                    .map(|dep| { externs::key_for(&dep) })
+                    .filter(|dep_key| !outputs.contains_key(dep_key))
+                    .collect::<Vec<_>>());
+                  // println!("total {:?} outputs, took {:?} seconds", outputs.len(), round_time.elapsed().unwrap());
+                  }
                   if expansion.todo.is_empty() {
                     Loop::Break(expansion)
                   } else {
