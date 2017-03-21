@@ -538,8 +538,6 @@ impl Node for SelectTransitive {
             };
 
             loop_fn(init, move |mut expansion| {
-              // println!("processing todo {:?} items", expansion.todo.len());
-              // let round_time = SystemTime::now();
               let round = future::join_all({
                  expansion.todo.drain()
                    .map(|subject_key| self.expand_transitive(&context, subject_key))
@@ -550,19 +548,20 @@ impl Node for SelectTransitive {
                 .map(move |finished_items| {
                   let mut todo_candidates = Vec::new();
                   for (subject_key, product, more_deps) in finished_items.into_iter() {
-                    // println!("  processed {:?} $ {:?} with new deps $ {:?}", subject_key, product, more_deps);
                     expansion.outputs.insert(subject_key, product);
                     todo_candidates.extend(more_deps);
                   }
 
+                  // NB mutably borrow expansion.outputs because expansion.to.extens implies mutability.
+                  // enclose with {} to limit the borrowing scope.
                   {
-                  let outputs = &mut expansion.outputs;
-                  expansion.todo.extend(todo_candidates.into_iter()
-                    .map(|dep| { externs::key_for(&dep) })
-                    .filter(|dep_key| !outputs.contains_key(dep_key))
-                    .collect::<Vec<_>>());
-                  // println!("total {:?} outputs, took {:?} seconds", outputs.len(), round_time.elapsed().unwrap());
+                    let outputs = &mut expansion.outputs;
+                    expansion.todo.extend(todo_candidates.into_iter()
+                      .map(|dep| { externs::key_for(&dep) })
+                      .filter(|dep_key| !outputs.contains_key(dep_key))
+                      .collect::<Vec<_>>());
                   }
+
                   if expansion.todo.is_empty() {
                     Loop::Break(expansion)
                   } else {
