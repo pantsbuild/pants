@@ -46,6 +46,9 @@ def glob_to_regex(pattern):
 
 
 def globs_matches(path, patterns):
+  if path in patterns:
+    return True
+
   return any(re.match(glob_to_regex(pattern), path) for pattern in patterns)
 
 
