@@ -13,7 +13,7 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class BuildGraphIntegrationTest(PantsRunIntegrationTest):
 
   def test_cycle(self):
-    prefix = os.path.join('testprojects/src/java/org/pantsbuild/testproject')
+    prefix = 'testprojects/src/java/org/pantsbuild/testproject'
     with self.file_renamed(os.path.join(prefix, 'cycle1'), 'TEST_BUILD', 'BUILD'):
       with self.file_renamed(os.path.join(prefix, 'cycle2'), 'TEST_BUILD', 'BUILD'):
         pants_run = self.run_pants(['compile', os.path.join(prefix, 'cycle1')])
