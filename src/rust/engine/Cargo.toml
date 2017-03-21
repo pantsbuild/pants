@@ -22,7 +22,7 @@ fnv = "1.0.5"
 futures = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
 futures-cpupool = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
 glob = "0.2.11"
-ignore = "0.1.7"
+ignore = "0.1.8"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.4"

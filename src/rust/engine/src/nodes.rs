@@ -6,7 +6,7 @@ use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use futures::future::{self, BoxFuture, loop_fn, Future, Loop};
+use futures::future::{self, BoxFuture, Future};
 use ordermap::OrderMap;
 
 use context::Context;
@@ -537,7 +537,7 @@ impl Node for SelectTransitive {
               outputs: OrderMap::default()
             };
 
-            loop_fn(init, move |mut expansion| {
+            future::loop_fn(init, move |mut expansion| {
               let round = future::join_all({
                  expansion.todo.drain()
                    .map(|subject_key| self.expand_transitive(&context, subject_key))
@@ -562,9 +562,9 @@ impl Node for SelectTransitive {
                   }
 
                   if expansion.todo.is_empty() {
-                    Loop::Break(expansion)
+                    future::Loop::Break(expansion)
                   } else {
-                    Loop::Continue(expansion)
+                    future::Loop::Continue(expansion)
                   }
                 })
             })
