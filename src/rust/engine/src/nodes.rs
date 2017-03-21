@@ -82,7 +82,7 @@ impl VFS<Failure> for Context {
   }
 
   fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    !self.core.vfs.ignore.matched(path, is_dir).is_none()
+    self.core.vfs.ignore(path, is_dir)
   }
 
   fn mk_error(msg: &str) -> Failure {

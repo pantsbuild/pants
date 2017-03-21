@@ -276,7 +276,7 @@ pub struct PosixFS {
   build_root: Dir,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
   pool: RwLock<CpuPool>,
-  pub ignore: Gitignore,
+  ignore: Gitignore,
 }
 
 impl PosixFS {
@@ -352,6 +352,13 @@ impl PosixFS {
   pub fn post_fork(&self) {
     let mut pool = self.pool.write().unwrap();
     *pool = PosixFS::create_pool();
+  }
+
+  pub fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
+    match self.ignore.matched(path, is_dir) {
+      ignore::Match::None | ignore::Match::Whitelist(_) => false,
+      ignore::Match::Ignore(_) => true,
+    }
   }
 
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
