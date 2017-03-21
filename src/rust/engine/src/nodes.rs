@@ -552,10 +552,9 @@ impl Node for SelectTransitive {
                     todo_candidates.extend(more_deps);
                   }
 
-                  // NB mutably borrow expansion.outputs because expansion.to.extens implies mutability.
-                  // enclose with {} to limit the borrowing scope.
+                  // NB enclose with {} to limit the borrowing scope.
                   {
-                    let outputs = &mut expansion.outputs;
+                    let outputs = &expansion.outputs;
                     expansion.todo.extend(todo_candidates.into_iter()
                       .map(|dep| { externs::key_for(&dep) })
                       .filter(|dep_key| !outputs.contains_key(dep_key))
