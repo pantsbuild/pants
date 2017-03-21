@@ -71,7 +71,8 @@ class PayloadTest(BaseTest):
   def test_passes_eager_fileset_with_spec_through(self):
     self.create_file('foo/a.txt', 'a_contents')
 
-    fileset = EagerFilesetWithSpec('foo', {'globs': ['foo/a.txt']}, ['foo/a.txt'], {'foo/a.txt': b'12345'})
+    fileset = EagerFilesetWithSpec('foo',
+                                   {'globs': ['foo/foo/a.txt']}, ['foo/a.txt'], {'foo/a.txt': b'12345'})
     sf = SourcesField(sources=fileset)
 
     self.assertIs(fileset, sf.sources)
