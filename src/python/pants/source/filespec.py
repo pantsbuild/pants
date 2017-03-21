@@ -16,7 +16,7 @@ def glob_to_regex(pattern):
   :returns: A regex string that matches same paths as the input glob does.
   """
   out = ['^']
-  components = pattern.strip('/').replace('.', '[.]').split('/')
+  components = pattern.strip('/').replace('.', '[.]').replace('$', '[$]').split('/')
   doublestar = False
   for component in components:
     if len(out) == 1:
@@ -46,11 +46,6 @@ def glob_to_regex(pattern):
 
 
 def globs_matches(path, patterns):
-  # FIXME: Workaround for `glob_to_regex` bug
-  # https://github.com/pantsbuild/pants/issues/4351
-  if path in patterns:
-    return True
-
   return any(re.match(glob_to_regex(pattern), path) for pattern in patterns)
 
 
