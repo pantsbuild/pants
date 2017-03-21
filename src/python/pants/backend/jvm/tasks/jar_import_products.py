@@ -19,7 +19,7 @@ class JarImportProducts(object):
   JarImport = namedtuple('JarImport', ['coordinate', 'jar'])
   """Represents a jar containing source imports.
 
-  Each jar import has a `coordinate` :class:`pants.backend.jvm.jar_dependency_utls.M2Coordinate`
+  Each jar import has a `coordinate` :class:`pants.java.jar_utls.M2Coordinate`
   and a `jar` path that points to the resolved jar import for the `coordinate`.
   """
 
@@ -32,7 +32,7 @@ class JarImportProducts(object):
     :param target: The :class:`pants.backend.jvm.targets.import_jars_mixin.ImportJarsMixin` target
                    whose `imported_jar_library_specs` were resolved.
     :param coordinate: The maven coordinate of the import jar.
-    :type coordinate: :class:`pants.backend.jvm.jar_dependency_utls.M2Coordinate`
+    :type coordinate: :class:`pants.java.jar_utls.M2Coordinate`
     :param string jar: The path of the resolved import jar.
     """
     if not isinstance(target, ImportJarsMixin):

@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass

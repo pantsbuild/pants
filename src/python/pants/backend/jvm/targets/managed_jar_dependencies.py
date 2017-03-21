@@ -8,12 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import copy
 import os
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import JarsField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.memo import memoized_property
 
 

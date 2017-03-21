@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin

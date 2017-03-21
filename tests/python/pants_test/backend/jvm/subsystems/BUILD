@@ -19,7 +19,7 @@ python_tests(
   sources=['test_custom_scala.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',

@@ -113,7 +113,8 @@ class EngineInitializer(object):
                          native=None,
                          symbol_table_cls=None,
                          build_ignore_patterns=None,
-                         exclude_target_regexps=None):
+                         exclude_target_regexps=None,
+                         subproject_roots=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
@@ -125,6 +126,8 @@ class EngineInitializer(object):
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
+    :param list subproject_roots: Paths that correspond with embedded build roots
+                                  under the current build root.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
@@ -139,7 +142,8 @@ class EngineInitializer(object):
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=LegacyPythonCallbacksParser,
                                    build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps)
+                                   exclude_target_regexps=exclude_target_regexps,
+                                   subproject_roots=subproject_roots)
 
     # Load the native backend.
     native = native or Native.Factory.global_instance().create()

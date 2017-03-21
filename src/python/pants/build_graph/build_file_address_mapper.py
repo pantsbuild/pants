@@ -19,11 +19,11 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address, parse_spec
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.util.dirutil import fast_relpath, join_specs, longest_dir_prefix
+from pants.util.dirutil import fast_relpath
 
 
 logger = logging.getLogger(__name__)
@@ -104,15 +104,6 @@ class BuildFileAddressMapper(AddressMapper):
     """Returns only the addresses gathered by `address_map_from_spec_path`, with no values."""
     return self._address_map_from_spec_path(spec_path).keys()
 
-  def determine_subproject_spec(self, spec, relative_to):
-    subproject_prefix = longest_dir_prefix(relative_to, self.subproject_roots)
-    if subproject_prefix:
-      spec = join_specs(subproject_prefix, spec)
-
-      logger.debug('Determined that spec {} relative to {} belongs to '
-                   'subproject {}'.format(spec, relative_to, subproject_prefix))
-    return spec
-
   def spec_to_address(self, spec, relative_to=''):
     """A helper method for mapping a spec to the correct build file address.
 
@@ -124,9 +115,7 @@ class BuildFileAddressMapper(AddressMapper):
     :rtype: :class:`pants.build_graph.address.BuildFileAddress`
     """
     try:
-      spec = self.determine_subproject_spec(spec, relative_to)
-      spec_path, name = parse_spec(spec, relative_to=relative_to)
-      address = Address(spec_path, name)
+      address = Address.parse(spec, relative_to=relative_to, subproject_roots=self.subproject_roots)
       build_file_address, _ = self.resolve(address)
       return build_file_address
     except (ValueError, AddressLookupError) as e:

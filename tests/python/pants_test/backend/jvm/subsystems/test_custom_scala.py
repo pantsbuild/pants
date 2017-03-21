@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 

@@ -64,29 +64,6 @@ class BuildFileAddressMapperTest(BaseTest):
     with self.assertRaises(BuildFileAddressMapper.InvalidRootError):
       self.address_mapper.scan_addresses(root='subdir')
 
-  def test_determine_subproject_spec(self):
-    # Ensure that a spec referring to a subproject gets assigned to that
-    # subproject properly.
-    self.address_mapper.subproject_roots = [
-      'subprojectA',
-      'path/to/subprojectB',
-    ]
-
-    # Ensure that a spec in subprojectA is determined correctly
-    subprojectA_spec = self.address_mapper.determine_subproject_spec(
-      'src/python/alib', 'subprojectA/src/python')
-    self.assertEquals(subprojectA_spec, 'subprojectA/src/python/alib')
-
-    # Ensure that a spec in subprojectB, which is more complex, is correct
-    subprojectB_spec = self.address_mapper.determine_subproject_spec(
-      'src/python/blib', 'path/to/subprojectB/src/python')
-    self.assertEquals(subprojectB_spec, 'path/to/subprojectB/src/python/blib')
-
-    # Ensure that a spec in the parnet project is not mapped
-    parent_spec = self.address_mapper.determine_subproject_spec(
-      'src/python/parent', 'src/python')
-    self.assertEquals(parent_spec, 'src/python/parent')
-
   def test_raises_invalid_build_file_reference(self):
     # reference a BUILD file that doesn't exist
     with self.assertRaisesRegexp(BuildFileAddressMapper.InvalidBuildFileReference,

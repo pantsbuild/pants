@@ -9,8 +9,6 @@ import os
 import shutil
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -18,6 +16,8 @@ from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
