@@ -110,14 +110,17 @@ impl Entry {
       state.clone()
     } else {
       let state =
-        match &self.node {
-          &EntryKey::Valid(ref n) => {
-            // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
+        match self.node.clone() {
+          EntryKey::Valid(n) => {
+            let pool = context_factory.pool();
             let context = context_factory.create(entry_id);
-            let node = n.clone();
-            future::lazy(move || node.run(context)).boxed()
+            pool
+              .spawn_fn(move || {
+                n.run(context)
+              })
+              .boxed()
           },
-          &EntryKey::Cyclic(_) =>
+          EntryKey::Cyclic(_) =>
             future::err(Failure::Noop(Noop::Cycle)).boxed(),
         };
 
