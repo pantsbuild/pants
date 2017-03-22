@@ -152,11 +152,3 @@ class SnapshottedProcess(object):
 
     # Return a task triple that executes the function to produce the product type.
     return (product_type, inputs, func)
-
-
-def create_snapshot_singletons():
-  """Intrinsically replaced on the rust side."""
-  return [
-      # This task is replaced intrinsically, and should never run.
-      SingletonRule(_Snapshots, None)
-    ]

@@ -255,12 +255,7 @@ impl Select {
    */
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshots {
-      // TODO: This should become a Tasks.singleton.
-      vec![
-        future::ok(Snapshot::store_snapshots(context)).boxed()
-      ]
-    } else if self.product() == &context.core.types.snapshot {
+    if self.product() == &context.core.types.snapshot {
       // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
       // for this caller.
       let context = context.clone();
@@ -284,7 +279,7 @@ impl Select {
           )
           .boxed()
       ]
-    } else if let Some(value) = context.core.tasks.gen_singleton(self.product()) {
+    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       vec![
         future::ok(value.clone()).boxed()
       ]
@@ -795,17 +790,6 @@ impl Snapshot {
       &vec![
         externs::store_bytes(&item.fingerprint.0),
         externs::store_list(path_stats.iter().collect(), false),
-      ],
-    )
-  }
-
-  fn store_snapshots(context: &Context) -> Value {
-    externs::invoke_unsafe(
-      &context.core.types.construct_snapshots,
-      &vec![
-        externs::store_bytes(
-          &context.core.snapshots.path().as_os_str().as_bytes()
-        ),
       ],
     )
   }

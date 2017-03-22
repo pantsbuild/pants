@@ -1,11 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use futures_cpupool::{self, CpuPool};
 
+use externs;
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
 use tasks::Tasks;
@@ -31,19 +33,31 @@ pub struct Core {
 
 impl Core {
   pub fn new(
-    tasks: Tasks,
+    mut tasks: Tasks,
     types: Types,
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
   ) -> Core {
+    // TODO: Create the Snapshots (temp) directory, and then expose it as a singleton to python.
+    // See TODO in isolated_process.py: this is an abstraction leak that should likely be plugged
+    // by porting process execution to rust.
+    let snapshots =
+      Snapshots::new()
+        .unwrap_or_else(|e| {
+          panic!("Could not initialize Snapshot directory: {:?}", e);
+        });
+    tasks.singleton_add(
+      externs::invoke_unsafe(
+        &types.construct_snapshots,
+        &vec![externs::store_bytes(snapshots.path().as_os_str().as_bytes())],
+      ),
+      types.snapshots.clone(),
+    );
     Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
-      snapshots: Snapshots::new()
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize Snapshot directory: {:?}", e);
-        }),
+      snapshots: snapshots,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs:

@@ -17,7 +17,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import _Snapshots, create_snapshot_singletons
+from pants.engine.isolated_process import _Snapshots
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
@@ -324,8 +324,7 @@ class LocalScheduler(object):
       SiblingAddresses,
       SingleAddress,
     }
-    rule_entries = tasks + create_snapshot_singletons()
-    rule_index = RuleIndex.create(rule_entries)
+    rule_index = RuleIndex.create(tasks)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
                                              project_tree.ignore_patterns,

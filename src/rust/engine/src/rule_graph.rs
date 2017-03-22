@@ -22,11 +22,6 @@ enum Entry {
 
   InnerEntry(InnerEntry),
 
-  Literal {
-    value: Key,
-    product: TypeConstraint
-  },
-
   Unreachable {
     // NB: unreachable is an error type, it might be better to name it error, but currently
     //     unreachable is the only error entry type.
@@ -34,7 +29,10 @@ enum Entry {
     reason: Diagnostic
   },
 
-  Singleton,
+  Singleton {
+    value: Key,
+    product: TypeConstraint
+  },
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -76,8 +74,11 @@ impl Entry {
     }
   }
 
-  fn new_singleton() -> Entry {
-    Entry::Singleton
+  fn new_singleton(value: Key, product: TypeConstraint) -> Entry {
+    Entry::Singleton {
+      value: value,
+      product: product
+    }
   }
 
   fn new_unreachable(rule: &Task) -> Entry {
@@ -87,32 +88,23 @@ impl Entry {
     }
   }
 
-  fn new_literal(value: Key, product: TypeConstraint) -> Entry {
-    Entry::Literal {
-      value: value,
-      product: product
-    }
-  }
-
   fn can_have_dependencies(&self) -> bool {
     match self {
       &Entry::SubjectIsProduct {..} => false,
-      &Entry::Literal { .. } => false,
+      &Entry::Singleton { .. } => false,
       &Entry::InnerEntry(_) => true,
       &Entry::Root(_) => true,
       &Entry::Unreachable { .. } => false,
-      &Entry::Singleton => false,
     }
   }
 
   fn can_be_dependency(&self) -> bool {
     match self {
       &Entry::SubjectIsProduct { .. } => true,
-      &Entry::Literal { .. } => true,
+      &Entry::Singleton { .. } => true,
       &Entry::InnerEntry(_) => true,
       &Entry::Root(_) => false,
       &Entry::Unreachable { .. } => false,
-      &Entry::Singleton => true,
     }
   }
 
@@ -612,14 +604,11 @@ fn entry_str(entry: &Entry) -> String {
     &Entry::SubjectIsProduct { subject_type } => {
       format!("SubjectIsProduct({})", type_str(subject_type))
     }
-    &Entry::Literal { ref value, product } => {
-      format!("Literal({}, {})", externs::key_to_str(value), type_constraint_str(product))
+    &Entry::Singleton { ref value, product } => {
+      format!("Singleton({}, {})", externs::key_to_str(value), type_constraint_str(product))
     }
     &Entry::Unreachable { ref rule, ref reason } => {
       format!("Unreachable({}, {:?})", task_display(rule), reason)
-    }
-    &Entry::Singleton => {
-      "Singleton".to_string()
     }
   }
 }
@@ -831,8 +820,8 @@ fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entri
   if externs::satisfied_by_type(&select.product, &subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
-  } else if let Some(_) = tasks.gen_singleton(&select.product) {
-    vec![Entry::new_singleton()]
+  } else if let Some(&(ref key, _)) = tasks.gen_singleton(&select.product) {
+    vec![Entry::new_singleton(key.clone(), select.product.clone())]
   } else {
     match tasks.gen_tasks(&select.product) {
       Some(ref matching_tasks) => {

@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId, Value};
+use externs;
 use selectors::{Selector, Select, SelectDependencies, SelectProjection, SelectTransitive};
 
 
@@ -21,7 +22,7 @@ pub struct Task {
  */
 pub struct Tasks {
   // Singleton Values to be returned for a given TypeConstraint.
-  singletons: HashMap<TypeConstraint, Value, FNV>,
+  singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // Used during the construction of the tasks map.
@@ -60,7 +61,7 @@ impl Tasks {
       .collect()
   }
 
-  pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&Value> {
+  pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&(Key, Value)> {
     self.singletons.get(product)
   }
 
@@ -69,7 +70,7 @@ impl Tasks {
   }
 
   pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
-    if let Some(existing_value) = self.singletons.get(&product) {
+    if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
       panic!(
         "More than one singleton rule was installed for the product {:?}: {:?} vs {:?}",
         product,
@@ -77,7 +78,7 @@ impl Tasks {
         value,
       );
     }
-    self.singletons.insert(product, value);
+    self.singletons.insert(product, (externs::key_for(&value), value));
   }
 
   /**
