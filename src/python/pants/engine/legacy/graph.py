@@ -17,7 +17,7 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import Addresses, Collection, Exactly
+from pants.engine.addressable import Addresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return
@@ -343,7 +343,7 @@ def create_legacy_graph_tasks(symbol_table_cls):
   return [
     transitive_hydrated_targets,
     TaskRule(
-      Exactly(HydratedTarget),
+      HydratedTarget,
       [Select(symbol_table_constraint),
        SelectDependencies(HydratedField,
                           symbol_table_constraint,

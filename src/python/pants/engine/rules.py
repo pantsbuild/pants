@@ -75,6 +75,18 @@ class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'fu
 class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
 
+  def __new__(cls, output_type, value):
+    # Validate result type.
+    if isinstance(output_type, Exactly):
+      constraint = output_type
+    elif isinstance(output_type, type):
+      constraint = Exactly(output_type)
+    else:
+      raise TypeError("Expected an output_type for rule; got: {}".format(output_type))
+
+    # Create.
+    return super(SingletonRule, cls).__new__(cls, constraint, value)
+
   @property
   def input_selectors(self):
     return tuple()
@@ -93,25 +105,27 @@ class RuleIndex(datatype('RuleIndex', ['rules'])):
     serializable_rules = OrderedDict()
 
     def add_task(product_type, rule):
-      if product_type not in serializable_tasks:
+      if product_type not in serializable_rules:
         serializable_rules[product_type] = OrderedSet()
       serializable_rules[product_type].add(rule)
 
-    for entry in task_entries:
+    def add_rule(rule):
+      # TODO: The heterogenity here has some confusing implications here:
+      # see https://github.com/pantsbuild/pants/issues/4005
+      for kind in rule.output_constraint.types:
+        # NB Ensure that interior types from SelectDependencies / SelectProjections work by
+        # indexing on the list of types in the constraint.
+        add_task(kind, rule)
+      add_task(rule.output_constraint, rule)
+
+    for entry in rule_entries:
       if isinstance(entry, Rule):
-        add_task(entry.output_product_type, entry)
+        add_rule(entry)
       elif hasattr(entry, '__call__'):
         rule = getattr(entry, '_rule', None)
         if rule is None:
           raise TypeError("Expected callable {} to be decorated with @rule.".format(func))
-
-        # TODO: The heterogenity here has some confusing implications here:
-        # see https://github.com/pantsbuild/pants/issues/4005
-        for kind in constraint.types:
-          # NB Ensure that interior types from SelectDependencies / SelectProjections work by
-          # indexing on the list of types in the constraint.
-          add_task(kind, rule)
-        add_task(constraint, rule)
+        add_rule(rule)
       else:
         raise TypeError("Unexpected rule type: {}. "
                         "Rules either extend Rule, or are static functions "
