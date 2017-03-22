@@ -1,11 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::HashSet;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 use futures::future::{self, BoxFuture, Future};
+use ordermap::OrderMap;
 
 use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
@@ -472,9 +474,6 @@ impl From<SelectDependencies> for NodeKey {
 
 /**
  * A node that recursively selects the dependencies of requested type and merge them.
- *
- * TODO Improve the performance of how store_list is used to merge the transitive dependencies
- * https://github.com/pantsbuild/pants/issues/4283
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectTransitive {
@@ -484,38 +483,37 @@ pub struct SelectTransitive {
 }
 
 impl SelectTransitive {
-  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
-    // TODO: This method needs to consider whether the `dep_subject` is an Address,
-    // and if so, attempt to parse Variants there. See:
-    //   https://github.com/pantsbuild/pants/issues/4020
 
-    let dep_subject_key = externs::key_for(dep_subject);
-    // After the root has been expanded, a traversal continues with dep_product == product.
-    let mut selector = self.selector.clone();
-    selector.dep_product = selector.product;
-    context.get(
-      SelectTransitive {
-        subject: dep_subject_key,
-        variants: self.variants.clone(),
-        selector: selector,
-      }
-    )
+  /**
+   * Process single subject.
+   *
+   * Return tuple of (processed subject_key, product output, dependencies to be processed in future iterations).
+   */
+  fn expand_transitive(&self, context: &Context, subject_key: Key) -> NodeFuture<(Key, Value, Vec<Value>)> {
+    let field_name = self.selector.field.to_owned();
+    context
+      .get(
+        Select::new(self.selector.product.clone(), subject_key, self.variants.clone())
+      )
+      .map(move |product| {
+        let deps = externs::project_multi(&product, &field_name);
+        (subject_key, product, deps)
+      })
+      .boxed()
   }
+}
 
-  fn store(&self, dep_product: &Value, dep_values: Vec<&Value>) -> Value {
-    if externs::satisfied_by(&self.selector.product, dep_product)  {
-      // If the dep_product is an inner node in the traversal, prepend it to the list of
-      // items to be merged.
-      // TODO: would be nice to do this in one operation.
-      let prepend = externs::store_list(vec![dep_product], false);
-      let mut prepended = dep_values;
-      prepended.insert(0, &prepend);
-      externs::store_list(prepended, true)
-    } else {
-      // Not an inner node, or not a traversal.
-      externs::store_list(dep_values, true)
-    }
-  }
+/**
+ * Track states when processing `SelectTransitive` iteratively.
+ */
+#[derive(Debug)]
+struct TransitiveExpansion {
+  // Subjects to be processed.
+  todo: HashSet<Key>,
+
+  // Mapping from processed subject `Key` to its product.
+  // Products will be collected at the end of iterations.
+  outputs: OrderMap<Key, Value>,
 }
 
 impl Node for SelectTransitive {
@@ -530,25 +528,50 @@ impl Node for SelectTransitive {
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
-            // The product and its dependency list are available: project them.
-            let deps =
-              future::join_all(
-                externs::project_multi(&dep_product, &self.selector.field).iter()
-                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
-                  .collect::<Vec<_>>()
-              );
-            deps
-              .then(move |dep_values_res| {
-                // Finally, store the resulting values.
-                match dep_values_res {
-                  Ok(dep_values) => {
-                    Ok(self.store(&dep_product, dep_values.iter().collect()))
-                  },
-                  Err(failure) =>
-                    Err(was_required(failure)),
-                }
-              })
-              .boxed()
+            let subject_keys = externs::project_multi(&dep_product, &self.selector.field).iter()
+              .map(|subject| externs::key_for(&subject))
+              .collect();
+
+            let init = TransitiveExpansion {
+              todo: subject_keys,
+              outputs: OrderMap::default()
+            };
+
+            future::loop_fn(init, move |mut expansion| {
+              let round = future::join_all({
+                 expansion.todo.drain()
+                   .map(|subject_key| self.expand_transitive(&context, subject_key))
+                   .collect::<Vec<_>>()
+              });
+
+              round
+                .map(move |finished_items| {
+                  let mut todo_candidates = Vec::new();
+                  for (subject_key, product, more_deps) in finished_items.into_iter() {
+                    expansion.outputs.insert(subject_key, product);
+                    todo_candidates.extend(more_deps);
+                  }
+
+                  // NB enclose with {} to limit the borrowing scope.
+                  {
+                    let outputs = &expansion.outputs;
+                    expansion.todo.extend(todo_candidates.into_iter()
+                      .map(|dep| { externs::key_for(&dep) })
+                      .filter(|dep_key| !outputs.contains_key(dep_key))
+                      .collect::<Vec<_>>());
+                  }
+
+                  if expansion.todo.is_empty() {
+                    future::Loop::Break(expansion)
+                  } else {
+                    future::Loop::Continue(expansion)
+                  }
+                })
+            })
+            .map(|expansion| {
+              externs::store_list(expansion.outputs.values().collect::<Vec<_>>(), false)
+            })
+            .boxed()
           },
           Err(failure) =>
             err(failure),
