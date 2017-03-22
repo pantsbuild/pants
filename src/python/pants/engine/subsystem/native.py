@@ -572,7 +572,7 @@ class Native(object):
                help='Find native engine binaries under this dir. Used as part of the path to '
                     'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
       register('--visualize-to', default=None, type=dir_option,
-               help='A directory to write execution graphs to as `dot` files. The contents '
+               help='A directory to write execution and rule graphs to as `dot` files. The contents '
                     'of the directory will be overwritten if any filenames collide.')
 
     def create(self):

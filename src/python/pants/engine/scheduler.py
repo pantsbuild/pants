@@ -206,15 +206,18 @@ class WrappedNativeScheduler(object):
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
-  def rule_graph_visualization(self):
+  def visualize_rule_graph_to_file(self, filename):
     root_type_ids = self._root_type_ids()
 
+    self._native.lib.rule_graph_visualize(
+      self._scheduler,
+      root_type_ids,
+      len(root_type_ids),
+      bytes(filename))
+
+  def rule_graph_visualization(self):
     with temporary_file_path() as path:
-      self._native.lib.rule_graph_visualize(
-        self._scheduler,
-        root_type_ids,
-        len(root_type_ids),
-        bytes(path))
+      self.visualize_rule_graph_to_file(path)
       with open(path) as fd:
         for line in fd.readlines():
           yield line.rstrip()
@@ -362,6 +365,9 @@ class LocalScheduler(object):
     with self._product_graph_lock:
       self._scheduler.visualize_graph_to_file(filename)
 
+  def visualize_rule_graph_to_file(self, filename):
+    self._scheduler.visualize_rule_graph_to_file(filename)
+
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
 
@@ -465,8 +471,10 @@ class LocalScheduler(object):
 
       if self._scheduler.visualize_to_dir() is not None:
         name = 'run.{}.dot'.format(self._run_count)
+        rule_graph_name = 'rule_graph.{}.dot'.format(self._run_count)
         self._run_count += 1
         self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
+        self.visualize_rule_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), rule_graph_name))
 
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '
