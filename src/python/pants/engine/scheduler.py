@@ -140,7 +140,6 @@ class WrappedNativeScheduler(object):
         else:
           raise ValueError('Unexpected Rule type: {}'.format(rule))
 
-
   def _register_singleton(self, output_constraint, rule):
     """Register the given SingletonRule.
 

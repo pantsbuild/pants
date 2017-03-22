@@ -19,7 +19,7 @@ from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import SingletonRule, TaskRule, rule
-from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
 

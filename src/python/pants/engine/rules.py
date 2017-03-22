@@ -120,7 +120,7 @@ class RuleIndex(datatype('RuleIndex', ['rules'])):
       elif hasattr(entry, '__call__'):
         rule = getattr(entry, '_rule', None)
         if rule is None:
-          raise TypeError("Expected callable {} to be decorated with @rule.".format(func))
+          raise TypeError("Expected callable {} to be decorated with @rule.".format(entry))
         add_rule(rule)
       else:
         raise TypeError("Unexpected rule type: {}. "
