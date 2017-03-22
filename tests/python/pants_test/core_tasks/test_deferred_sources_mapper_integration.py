@@ -89,7 +89,16 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
       proto7, proto8 = self._emit_targets(workdir)
       pants_run = self._configured_pants_run(['export', proto7, proto8], workdir)
       self.assert_success(pants_run)
-      export_data = json.loads(pants_run.stdout_data)
+      try:
+        export_data = json.loads(pants_run.stdout_data)
+      except Exception:
+        print('*****************************************************************')
+        print('*****************************************************************')
+        print('*****************************************************************')
+        print('failed to parse stdout:\n{}'.format(pants_run.stdout_data))
+        print('*****************************************************************')
+        print('*****************************************************************')
+        print('*****************************************************************')
 
       synthetic_proto_libraries = []
       for target in export_data['targets'].values():
