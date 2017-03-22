@@ -116,7 +116,7 @@ function bootstrap_native_code() {
 
     # If bootstrapping the native engine fails, don't attempt to run pants
     # afterwards.
-    if [ -z $native_binary ]
+    if [ -f $native_binary ]
     then
       die "Failed to build native engine."
     fi
