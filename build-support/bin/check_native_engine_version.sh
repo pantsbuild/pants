@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 REPO_ROOT="$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../.. && pwd -P)"
 
 source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
