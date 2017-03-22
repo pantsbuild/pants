@@ -36,6 +36,7 @@ pub struct SelectProjection {
   pub input_product: TypeConstraint,
 }
 
+// TODO: Now unused.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   pub subject: Key,
@@ -49,15 +50,4 @@ pub enum Selector {
   SelectTransitive(SelectTransitive),
   SelectProjection(SelectProjection),
   SelectLiteral(SelectLiteral),
-}
-
-impl Selector {
-  pub fn select(product: TypeConstraint) -> Selector {
-    Selector::Select(
-      Select {
-        product: product,
-        variant_key: None,
-      }
-    )
-  }
 }

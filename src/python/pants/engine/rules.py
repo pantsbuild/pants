@@ -42,10 +42,6 @@ class Rule(AbstractClass):
   def input_selectors(self):
     """Collection of input selectors."""
 
-  @abstractproperty
-  def func(self):
-    """Rule function."""
-
 
 class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'func']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied."""

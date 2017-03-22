@@ -172,8 +172,7 @@ RawScheduler* scheduler_create(Function,
 void scheduler_post_fork(RawScheduler*);
 void scheduler_destroy(RawScheduler*);
 
-void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
-void singleton_task_add(RawScheduler*, Function, TypeConstraint);
+void singleton_add(RawScheduler*, Value, TypeConstraint);
 
 void task_add(RawScheduler*, Function, TypeConstraint);
 void task_add_select(RawScheduler*, TypeConstraint);

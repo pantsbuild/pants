@@ -142,17 +142,16 @@ class WrappedNativeScheduler(object):
 
 
   def _register_singleton(self, output_constraint, rule):
-    """Register the given singletons dict.
+    """Register the given SingletonRule.
 
-    Singleton tasks are those that are the default for a particular type(product). Like
-    intrinsics, singleton tasks create Runnables that are not cacheable.
+    Singleton tasks are those that are the default for a particular type(product).
     """
-    self._native.lib.singleton_task_add(self._scheduler,
-                                        Function(self._to_id(rule.func)),
-                                        output_constraint)
+    self._native.lib.singleton_add(self._scheduler,
+                                   self._to_value(rule.value),
+                                   output_constraint)
 
   def _register_task(self, output_constraint, rule):
-    """Register the given tasks dict with the native scheduler."""
+    """Register the given TaskRule with the native scheduler."""
     input_selects = rule.input_selectors
     func = rule.func
     self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)

@@ -332,26 +332,13 @@ pub extern fn execution_roots(
 }
 
 #[no_mangle]
-pub extern fn intrinsic_task_add(
+pub extern fn singleton_add(
   scheduler_ptr: *mut RawScheduler,
-  func: Function,
-  input_type: TypeId,
-  input_constraint: TypeConstraint,
+  value: Value,
   output_constraint: TypeConstraint,
 ) {
   with_core(scheduler_ptr, |core| {
-    core.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
-  })
-}
-
-#[no_mangle]
-pub extern fn singleton_task_add(
-  scheduler_ptr: *mut RawScheduler,
-  func: Function,
-  output_constraint: TypeConstraint,
-) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.singleton_add(func, output_constraint);
+    core.tasks.singleton_add(value, output_constraint);
   })
 }
 

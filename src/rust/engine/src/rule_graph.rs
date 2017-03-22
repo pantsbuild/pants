@@ -32,7 +32,9 @@ enum Entry {
     //     unreachable is the only error entry type.
     rule: Task,
     reason: Diagnostic
-  }
+  },
+
+  Singleton,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -71,8 +73,11 @@ impl Entry {
   fn new_subject_is_product(subject_type: TypeId) -> Entry {
     Entry::SubjectIsProduct {
       subject_type: subject_type,
-
     }
+  }
+
+  fn new_singleton() -> Entry {
+    Entry::Singleton
   }
 
   fn new_unreachable(rule: &Task) -> Entry {
@@ -96,6 +101,7 @@ impl Entry {
       &Entry::InnerEntry(_) => true,
       &Entry::Root(_) => true,
       &Entry::Unreachable { .. } => false,
+      &Entry::Singleton => false,
     }
   }
 
@@ -106,6 +112,7 @@ impl Entry {
       &Entry::InnerEntry(_) => true,
       &Entry::Root(_) => false,
       &Entry::Unreachable { .. } => false,
+      &Entry::Singleton => true,
     }
   }
 
@@ -228,12 +235,9 @@ impl <'t> GraphMaker<'t> {
   fn add_unreachable_rule_diagnostics(&self, full_dependency_edges: &RuleDependencyEdges, full_unfulfillable_rules: &mut UnfulfillableRuleMap) {
     let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule.clone()).collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
-    let declared_rules = self.tasks.all_rules();
-    let unreachable_rules: HashSet<_> = declared_rules.iter()
+    let unreachable_rules: HashSet<_> = self.tasks.all_tasks().iter()
       .filter(|r| !rules_in_graph.contains(r))
       .filter(|r| !unfulfillable_discovered_during_construction.contains(r))
-      .filter(|r| !self.tasks.is_singleton_task(r))
-      .filter(|r| !self.tasks.is_intrinsic_task(r))
       .map(|&r| r)
       .collect();
 
@@ -488,7 +492,7 @@ impl <'t> GraphMaker<'t> {
   }
 
   fn gen_root_entry(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> Option<RootEntry> {
-    self.tasks.gen_tasks(subject_type, product_type)
+    self.tasks.gen_tasks(product_type)
       .and_then(|tasks| if !tasks.is_empty() { Some(tasks) } else { None })
       .map(|_| {
         RootEntry {
@@ -626,6 +630,9 @@ fn entry_str(entry: &Entry) -> String {
     }
     &Entry::Unreachable { ref rule, ref reason } => {
       format!("Unreachable({}, {:?})", task_display(rule), reason)
+    }
+    &Entry::Singleton => {
+      "Singleton".to_string()
     }
   }
 }
@@ -837,8 +844,10 @@ fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entri
   if externs::satisfied_by_type(&select.product, &subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
+  } else if let Some(_) = tasks.gen_singleton(&select.product) {
+    vec![Entry::new_singleton()]
   } else {
-    match tasks.gen_tasks(&subject_type, &select.product) {
+    match tasks.gen_tasks(&select.product) {
       Some(ref matching_tasks) => {
         matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t)).collect()
       }

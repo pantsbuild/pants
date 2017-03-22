@@ -256,7 +256,7 @@ impl Select {
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
     if self.product() == &context.core.types.snapshots {
-      // TODO: re-storing the Snapshots object for each request.
+      // TODO: This should become a Tasks.singleton.
       vec![
         future::ok(Snapshot::store_snapshots(context)).boxed()
       ]
@@ -284,8 +284,12 @@ impl Select {
           )
           .boxed()
       ]
+    } else if let Some(value) = context.core.tasks.gen_singleton(self.product()) {
+      vec![
+        future::ok(value.clone()).boxed()
+      ]
     } else {
-      context.core.tasks.gen_tasks(self.subject.type_id(), self.product())
+      context.core.tasks.gen_tasks(self.product())
         .map(|tasks| {
           tasks.iter()
             .map(|task|
