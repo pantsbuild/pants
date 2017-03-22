@@ -91,7 +91,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
+    graph = LegacyBuildGraph.create(self.scheduler, self.engine, self.symbol_table_cls)
     logger.debug('build_graph is: %s', graph)
     with self.scheduler.locked():
       # Ensure the entire generator is unrolled.

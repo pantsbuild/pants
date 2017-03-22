@@ -59,6 +59,7 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
+# TODO: Remove this in 1.5.0dev0, when `--enable-v2-engine` is removed.
 def ensure_engine(f):
   """A decorator for running an integration test with and without the v2 engine enabled via
   temporary environment variables."""

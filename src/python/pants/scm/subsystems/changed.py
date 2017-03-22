@@ -13,6 +13,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.objects import datatype
 
 
+# TODO: Remove this in 1.5.0dev0.
 class _ChainedOptions(object):
   def __init__(self, options_seq):
     self._options_seq = options_seq
@@ -63,6 +64,7 @@ class Changed(object):
       register('--fast', type=bool,
                help='Stop searching for owners once a source is mapped to at least one owning target.')
 
+    # TODO: Remove or reduce this in 1.5.0dev0 - we only need the subsystem's options scope going fwd.
     @classmethod
     def create(cls, alternate_options=None):
       """
@@ -80,6 +82,7 @@ class Changed(object):
   def __init__(self, changed_request):
     self._changed_request = changed_request
 
+  # TODO: Remove this in 1.5.0dev0 in favor of `TargetRoots` use of `EngineChangeCalculator`.
   def change_calculator(self, build_graph, address_mapper, scm=None, workspace=None,
                         exclude_target_regexp=None):
     """Constructs and returns a BuildGraphChangeCalculator.
