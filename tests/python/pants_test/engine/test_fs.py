@@ -29,9 +29,9 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
   _original_src = os.path.join(os.path.dirname(__file__), 'examples/fs_test/fs_test.tar')
 
   @contextmanager
-  def mk_project_tree(self):
+  def mk_project_tree(self, ignore_patterns=None):
     """Construct a ProjectTree for the given src path."""
-    project_tree = self.mk_fs_tree()
+    project_tree = self.mk_fs_tree(ignore_patterns=ignore_patterns)
     with tarfile.open(self._original_src) as tar:
       tar.extractall(project_tree.build_root)
     yield project_tree
@@ -40,14 +40,14 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
   def specs(relative_to, *filespecs):
     return PathGlobs.create(relative_to, include=filespecs)
 
-  def assert_walk_dirs(self, filespecs, paths):
-    self.assert_walk_snapshot('dirs', filespecs, paths)
+  def assert_walk_dirs(self, filespecs, paths, ignore_patterns=None):
+    self.assert_walk_snapshot('dirs', filespecs, paths, ignore_patterns=ignore_patterns)
 
-  def assert_walk_files(self, filespecs, paths):
-    self.assert_walk_snapshot('files', filespecs, paths)
+  def assert_walk_files(self, filespecs, paths, ignore_patterns=None):
+    self.assert_walk_snapshot('files', filespecs, paths, ignore_patterns=ignore_patterns)
 
-  def assert_walk_snapshot(self, field, filespecs, paths):
-    with self.mk_project_tree() as project_tree:
+  def assert_walk_snapshot(self, field, filespecs, paths, ignore_patterns=None):
+    with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
       scheduler = self.mk_scheduler(project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
       self.assertEquals(sorted([p.path for p in getattr(result, field)]), sorted(paths))
@@ -135,6 +135,26 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
                                      'd.ln/4.txt.ln',
                                      'd.ln/b/1.txt',
                                      'd.ln/b/2'])
+
+  def test_walk_ignore(self):
+    # Ignore '*.ln' suffixed items at the root.
+    self.assert_walk_files(['**'],
+                           ['4.txt',
+                            'a/3.txt',
+                            'a/4.txt.ln',
+                            'a/b/1.txt',
+                            'a/b/2',],
+                           ignore_patterns=['/*.ln'])
+    # Whitelist one entry.
+    self.assert_walk_files(['**'],
+                           ['4.txt',
+                            'a/3.txt',
+                            'a/4.txt.ln',
+                            'a/b/1.txt',
+                            'a/b/2',
+                            'c.ln/1.txt',
+                            'c.ln/2',],
+                           ignore_patterns=['/*.ln', '!c.ln'])
 
   def test_walk_recursive_trailing_doublestar(self):
     self.assert_walk_files(['a/**'], ['a/3.txt',
