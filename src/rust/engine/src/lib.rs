@@ -377,17 +377,6 @@ pub extern fn task_add_select_variant(
 }
 
 #[no_mangle]
-pub extern fn task_add_select_literal(
-  scheduler_ptr: *mut RawScheduler,
-  subject: Key,
-  product: TypeConstraint,
-) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_literal(subject, product);
-  })
-}
-
-#[no_mangle]
 pub extern fn task_add_select_dependencies(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,

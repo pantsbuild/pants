@@ -168,13 +168,3 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
                                        repr(self.fields),
                                        getattr(
                                          self.input_product, '__name__', repr(self.input_product)))
-
-
-class SelectLiteral(datatype('Literal', ['subject', 'product']), Selector):
-  """Selects a literal Subject (other than the one applied to the selector)."""
-  optional = False
-
-  def __repr__(self):
-    return '{}({}, {})'.format(type(self).__name__,
-                               repr(self.subject),
-                               type_or_constraint_repr(self.product))

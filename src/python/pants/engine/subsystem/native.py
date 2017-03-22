@@ -177,7 +177,6 @@ void singleton_add(RawScheduler*, Value, TypeConstraint);
 void task_add(RawScheduler*, Function, TypeConstraint);
 void task_add_select(RawScheduler*, TypeConstraint);
 void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
-void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
 void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
 void task_add_select_transitive(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
 void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);

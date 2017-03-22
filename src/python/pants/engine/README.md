@@ -95,11 +95,10 @@ from one type to another, it will be found and executed.
 As demonstrated above, the `Selector` classes select function inputs in the context of a particular
 `Subject` (and its `Variants`: discussed below). For example, it might select a `Product` for the given
 Subject (`Select`), or for other Subject(s) selected from fields of a Product (`SelectDependencies`,
-`SelectProjection`), or a Product for some literal Subject value that is known ahead-of-time
-(`SelectLiteral`).
+`SelectProjection`).
 
-One very important thing to keep in mind is that Selectors like `SelectDependencies`, `SelectProjection`
-and `SelectLiteral` "change" the Subject within a particular subgraph. For example, `SelectDependencies`
+One very important thing to keep in mind is that Selectors like `SelectDependencies` and `SelectProjection`
+"change" the Subject within a particular subgraph. For example, `SelectDependencies`
 results in new subgraphs for each Subject in a list of values that was computed for some original Subject.
 Concretely, a task triple could use SelectDependencies to select FileContent for each entry in a Files list,
 and then concatentate that content into a string:

@@ -363,30 +363,6 @@ impl From<Select> for NodeKey {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectLiteral {
-  variants: Variants,
-  selector: selectors::SelectLiteral,
-}
-
-impl Node for SelectLiteral {
-  type Output = Value;
-
-  fn run(self, _: Context) -> NodeFuture<Value> {
-    ok(externs::val_for(&self.selector.subject))
-  }
-
-  fn is_inline() -> bool {
-    true
-  }
-}
-
-impl From<SelectLiteral> for NodeKey {
-  fn from(n: SelectLiteral) -> Self {
-    NodeKey::SelectLiteral(n)
-  }
-}
-
 /**
  * A Node that selects the given Product for each of the items in `field` on `dep_product`.
  *
@@ -956,11 +932,6 @@ impl Task {
           variants: self.variants.clone(),
           selector: s,
         }),
-      Selector::SelectLiteral(s) =>
-        context.get(SelectLiteral {
-          variants: self.variants.clone(),
-          selector: s,
-        }),
     }
   }
 }
@@ -1010,7 +981,6 @@ pub enum NodeKey {
   Select(Select),
   SelectDependencies(SelectDependencies),
   SelectTransitive(SelectTransitive),
-  SelectLiteral(SelectLiteral),
   SelectProjection(SelectProjection),
   Snapshot(Snapshot),
   Task(Task),
@@ -1033,8 +1003,6 @@ impl NodeKey {
         format!("Stat({:?})", s.0),
       &NodeKey::Select(ref s) =>
         format!("Select({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
-      &NodeKey::SelectLiteral(ref s) =>
-        format!("Literal({})", keystr(&s.selector.subject)),
       &NodeKey::SelectDependencies(ref s) =>
         format!("Dependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectTransitive(ref s) =>
@@ -1059,7 +1027,6 @@ impl NodeKey {
     }
     match self {
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
-      &NodeKey::SelectLiteral(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectDependencies(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectTransitive(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectProjection(ref s) => typstr(&s.selector.product),
@@ -1095,7 +1062,6 @@ impl Node for NodeKey {
       NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectLiteral(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).boxed(),

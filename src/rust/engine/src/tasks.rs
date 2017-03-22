@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId, Value};
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, SelectTransitive};
+use selectors::{Selector, Select, SelectDependencies, SelectProjection, SelectTransitive};
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -121,12 +121,6 @@ impl Tasks {
   pub fn add_select_projection(&mut self, product: TypeConstraint, projected_subject: TypeId, field: Field, input_product: TypeConstraint) {
     self.clause(Selector::SelectProjection(
       SelectProjection { product: product, projected_subject: projected_subject, field: field, input_product: input_product }
-    ));
-  }
-
-  pub fn add_select_literal(&mut self, subject: Key, product: TypeConstraint) {
-    self.clause(Selector::SelectLiteral(
-      SelectLiteral { subject: subject, product: product }
     ));
   }
 

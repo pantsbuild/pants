@@ -20,8 +20,8 @@ from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.isolated_process import _Snapshots, create_snapshot_singletons
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectTransitive, SelectVariant, constraint_for)
+from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
+                                    SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
@@ -165,11 +165,6 @@ class WrappedNativeScheduler(object):
         self._native.lib.task_add_select_variant(self._scheduler,
                                                   product_constraint,
                                                   key_buf)
-      elif selector_type is SelectLiteral:
-        # NB: Intentionally ignores subject parameter to provide a literal subject.
-        self._native.lib.task_add_select_literal(self._scheduler,
-                                                  self._to_key(selector.subject),
-                                                  product_constraint)
       elif selector_type is SelectDependencies:
         self._native.lib.task_add_select_dependencies(self._scheduler,
                                                       product_constraint,

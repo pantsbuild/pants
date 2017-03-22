@@ -297,16 +297,6 @@ impl <'t> GraphMaker<'t> {
                                    vec![Selector::Select(select.clone())],
                                    rules_or_literals_for_selector);
               },
-              &Selector::SelectLiteral(ref select) =>{
-                add_rules_to_graph(&mut rules_to_traverse,
-                                   &mut rule_dependency_edges,
-                                   &mut unfulfillable_rules,
-                                   &mut root_rule_dependency_edges,
-                                   &entry,
-                                   vec![selector.clone()],
-                                   vec![Entry::new_literal(select.subject.clone(),
-                                                               select.product.clone())]);
-              },
               &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
               &Selector::SelectTransitive(SelectTransitive{ref product, ref dep_product, ref field_types, ..}) => {
                 let initial_selector = *dep_product;
@@ -606,9 +596,6 @@ fn selector_str(selector: &Selector) -> String {
                                                   s.field,
                                                   type_constraint_str(s.input_product),
     ),
-    &Selector::SelectLiteral(ref s) => format!("SelectLiteral({}, {})",
-                                               externs::key_to_str(&s.subject),
-                                               type_constraint_str(s.product))
   }
 }
 

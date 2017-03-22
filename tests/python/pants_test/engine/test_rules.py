@@ -19,7 +19,7 @@ from pants.engine.fs import PathGlobs, create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
-from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
@@ -746,25 +746,6 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "(A, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
                          "(B, (Select(A),), noop) of SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
                          "(C, (Select(A),), noop) of SubA" -> {"(A, (Select(SubA),), noop) of SubA"}
-                     }""").strip(),
-      subgraph)
-
-  def test_select_literal(self):
-    literally_a = A()
-    rules = [
-      (B, (SelectLiteral(literally_a, A),), noop)
-    ]
-
-    subgraph = self.create_subgraph(B, rules, SubA())
-
-    self.assert_equal_with_printing(dedent("""
-                     digraph {
-                       // root subject types: SubA
-                       // root entries
-                         "Select(B) for SubA" [color=blue]
-                         "Select(B) for SubA" -> {"(B, (SelectLiteral(A(), A),), noop) of SubA"}
-                       // internal entries
-                         "(B, (SelectLiteral(A(), A),), noop) of SubA" -> {"Literal(A(), A)"}
                      }""").strip(),
       subgraph)
 
