@@ -12,6 +12,7 @@ import subprocess
 from abc import abstractproperty
 from binascii import hexlify
 
+from pants.engine.rules import SingletonRule
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
@@ -127,10 +128,6 @@ class _Snapshots(datatype('_Snapshots', ['root'])):
   """
 
 
-def snapshots_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
-
-
 class SnapshottedProcess(object):
   """A static helper for defining a task rule to execute a snapshotted process."""
 
@@ -160,5 +157,6 @@ class SnapshottedProcess(object):
 def create_snapshot_singletons():
   """Intrinsically replaced on the rust side."""
   return [
-      (_Snapshots, snapshots_noop)
+      # This task is replaced intrinsically, and should never run.
+      SingletonRule(_Snapshots, None)
     ]

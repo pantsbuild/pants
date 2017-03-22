@@ -16,8 +16,8 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf, addressable_list
-from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_tasks
+from pants.engine.build_files import create_graph_rules
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -476,9 +476,9 @@ def setup_json_scheduler(build_root, native):
         SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))],
        scalac),
     ] + (
-      create_graph_tasks(address_mapper, symbol_table_cls)
+      create_graph_rules(address_mapper, symbol_table_cls)
     ) + (
-      create_fs_tasks(project_tree)
+      create_fs_rules()
     )
 
   return LocalScheduler(goals,

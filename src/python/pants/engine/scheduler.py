@@ -72,7 +72,6 @@ class WrappedNativeScheduler(object):
         constraint_for(Link),
       )
     self._register_tasks(rule_index.tasks)
-    self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
     self.root_subject_types = root_subject_types
 
@@ -133,19 +132,6 @@ class WrappedNativeScheduler(object):
                                           Function(self._to_id(rule.func)),
                                           self._to_constraint(product_type))
 
-  def _register_intrinsics(self, intrinsics):
-    """Register the given intrinsics dict.
-
-    Intrinsic tasks are those that are the default for a particular type(subject), type(product)
-    pair. By default, intrinsic tasks create Runnables that are not cacheable.
-    """
-    for (subject_type, product_type), rule in intrinsics.items():
-      self._native.lib.intrinsic_task_add(self._scheduler,
-                                          Function(self._to_id(rule.func)),
-                                          TypeId(self._to_id(subject_type)),
-                                          self._to_constraint(subject_type),
-                                          self._to_constraint(product_type))
-
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
     registered = set()
@@ -160,7 +146,8 @@ class WrappedNativeScheduler(object):
           continue
         registered.add(key)
 
-        _, input_selects, func = rule.as_triple()
+        input_selects = rule.input_selectors
+        func = rule.func
         self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)
         for selector in input_selects:
           selector_type = type(selector)
@@ -337,8 +324,8 @@ class LocalScheduler(object):
       SiblingAddresses,
       SingleAddress,
     }
-    singletons = create_snapshot_singletons()
-    rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=singletons)
+    rule_entries = tasks + create_snapshot_singletons()
+    rule_index = RuleIndex.create(rule_entries)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
                                              project_tree.ignore_patterns,

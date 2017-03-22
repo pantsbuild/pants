@@ -10,7 +10,7 @@ import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import create_fs_tasks
+from pants.engine.fs import create_fs_rules
 from pants.engine.nodes import Return
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -57,7 +57,7 @@ class SchedulerTestBase(object):
     tasks = tasks or []
     project_tree = project_tree or self.mk_fs_tree()
 
-    tasks = list(tasks) + create_fs_tasks(project_tree)
+    tasks = list(tasks) + create_fs_rules()
     return LocalScheduler(goals, tasks, project_tree, self._native)
 
   def execute_request(self, scheduler, product, *subjects):

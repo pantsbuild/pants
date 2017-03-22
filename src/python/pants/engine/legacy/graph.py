@@ -17,10 +17,11 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import Addresses, Collection
+from pants.engine.addressable import Addresses, Collection, Exactly
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return
+from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
@@ -266,8 +267,13 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
     return hash(self.address)
 
 
-# TODO: Only used (currently) to represent transitive hydrated targets. Consider renaming.
 HydratedTargets = Collection.of(HydratedTarget)
+
+
+@rule(HydratedTargets, [SelectTransitive(HydratedTarget, Addresses, field_types=(BuildFileAddress,))])
+def transitive_hydrated_targets(targets):
+  """Recursively requests HydratedTargets, which will result in an eager, transitive graph walk."""
+  return HydratedTargets(targets)
 
 
 class HydratedField(datatype('HydratedField', ['name', 'value'])):
@@ -301,6 +307,9 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot):
                               files_hash=snapshot.fingerprint)
 
 
+@rule(HydratedField,
+      [Select(SourcesField),
+       SelectProjection(Snapshot, PathGlobs, ('path_globs',), SourcesField)])
 def hydrate_sources(sources_field, snapshot):
   """Given a SourcesField and a Snapshot for its path_globs, create an EagerFilesetWithSpec."""
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,
@@ -309,6 +318,9 @@ def hydrate_sources(sources_field, snapshot):
   return HydratedField(sources_field.arg, fileset_with_spec)
 
 
+@rule(HydratedField,
+      [Select(BundlesField),
+       SelectDependencies(Snapshot, BundlesField, 'path_globs_list', field_types=(PathGlobs,))])
 def hydrate_bundles(bundles_field, snapshot_list):
   """Given a BundlesField and a Snapshot for each of its filesets create a list of BundleAdaptors."""
   bundles = []
@@ -329,25 +341,16 @@ def create_legacy_graph_tasks(symbol_table_cls):
   """Create tasks to recursively parse the legacy graph."""
   symbol_table_constraint = symbol_table_cls.constraint()
   return [
-    # Recursively requests HydratedTargets, which will result in an eager, transitive graph walk.
-    (HydratedTargets,
-     [SelectTransitive(HydratedTarget,
-                       Addresses,
-                       field_types=(BuildFileAddress,))],
-     HydratedTargets),
-    (HydratedTarget,
-     [Select(symbol_table_constraint),
-      SelectDependencies(HydratedField,
-                         symbol_table_constraint,
-                         'field_adaptors',
-                         field_types=(SourcesField, BundlesField,))],
-     hydrate_target),
-    (HydratedField,
-     [Select(SourcesField),
-      SelectProjection(Snapshot, PathGlobs, ('path_globs',), SourcesField)],
-     hydrate_sources),
-    (HydratedField,
-     [Select(BundlesField),
-      SelectDependencies(Snapshot, BundlesField, 'path_globs_list', field_types=(PathGlobs,))],
-     hydrate_bundles),
+    transitive_hydrated_targets,
+    TaskRule(
+      Exactly(HydratedTarget),
+      [Select(symbol_table_constraint),
+       SelectDependencies(HydratedField,
+                          symbol_table_constraint,
+                          'field_adaptors',
+                          field_types=(SourcesField, BundlesField,))],
+      hydrate_target
+    ),
+    hydrate_sources,
+    hydrate_bundles,
   ]

@@ -14,8 +14,8 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
                               SingleAddress)
 from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
-from pants.engine.build_files import create_graph_tasks
-from pants.engine.fs import PathGlobs, create_fs_tasks
+from pants.engine.build_files import create_graph_rules
+from pants.engine.fs import PathGlobs, create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
@@ -322,10 +322,9 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_full_graph_for_planner_example(self):
     symbol_table_cls = TargetTable
     address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    project_tree = 'Let us pretend that this is a ProjectTree!'
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls) + create_fs_tasks(project_tree)
+    tasks = create_graph_rules(address_mapper, symbol_table_cls) + create_fs_rules()
 
-    rule_index = RuleIndex.create(tasks, tuple())
+    rule_index = RuleIndex.create(tasks)
     root_subject_types = {Address,
                           PathGlobs,
                           SingleAddress,

@@ -20,6 +20,25 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
+def rule(output_type, input_selectors):
+  def wrapper(func):
+    # Validate result type.
+    if isinstance(output_type, Exactly):
+      constraint = output_type
+    elif isinstance(output_type, type):
+      constraint = Exactly(output_type)
+    else:
+      raise TypeError("Expected an output_type for rule {}, got: {}".format(func, output_type))
+
+    # Validate selectors.
+    if not isinstance(input_selectors, (list, tuple)):
+      raise TypeError("Expected a list of Selectors for rule {}, got: {}".format(func, input_selectors))
+
+    # Annotate the function with its Rule.
+    func._rule = TaskRule(constraint, tuple(input_selectors), func)
+  return wrapper
+
+
 class Rule(AbstractClass):
   """Rules declare how to produce products for the product graph.
 
@@ -28,123 +47,70 @@ class Rule(AbstractClass):
   """
 
   @abstractproperty
+  def output_constraint(self):
+    """An output Constraint type for the rule."""
+
+  @abstractproperty
   def input_selectors(self):
-    """Collection of input selectors"""
+    """Collection of input selectors."""
 
   @abstractproperty
   def func(self):
     """Rule function."""
 
-  @abstractproperty
-  def output_product_type(self):
-    """The product type produced by this rule."""
 
-  def as_triple(self):
-    """Constructs an (output, input, func) triple for this rule."""
-    return (self.output_product_type, self.input_selectors, self.func)
-
-
-class TaskRule(datatype('TaskRule', ['input_selectors', 'func', 'product_type', 'constraint']),
-               Rule):
+class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'func']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied."""
 
-  @property
-  def output_product_type(self):
-    return self.product_type
-
   def __str__(self):
-    return '({}, {!r}, {})'.format(type_or_constraint_repr(self.product_type),
+    return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
                                    self.input_selectors,
                                    self.func.__name__)
 
 
-class SingletonRule(datatype('SingletonRule', ['product_type', 'func']), Rule):
+class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), Rule):
   """A default rule for a product, which is thus a singleton for that product."""
 
   @property
   def input_selectors(self):
     return tuple()
 
-  @property
-  def output_product_type(self):
-    return self.product_type
-
   def __repr__(self):
-    return '{}({}, {})'.format(type(self).__name__,
-                               self.product_type.__name__,
-                               self.func.__name__)
+    return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
 
 
-class IntrinsicRule(datatype('IntrinsicRule', ['subject_type', 'product_type', 'func']), Rule):
-  """A default rule for a pair of subject+product."""
-
-  @property
-  def input_selectors(self):
-    return tuple()
-
-  @property
-  def output_product_type(self):
-    return self.product_type
-
-  def __repr__(self):
-    return '{}(({}, {}), {})'.format(type(self).__name__,
-                                     self.subject_type.__name__,
-                                     self.output_product_type.__name__,
-                                     self.func.__name__)
-
-
-class RuleIndex(datatype('RuleIndex', ['tasks', 'intrinsics', 'singletons'])):
+class RuleIndex(datatype('RuleIndex', ['rules'])):
   """Holds an index of tasks and intrinsics used to instantiate Nodes."""
 
   @classmethod
-  def create(cls, task_entries, intrinsic_entries=None, singleton_entries=None):
+  def create(cls, rule_entries):
     """Creates a NodeBuilder with tasks indexed by their output type."""
-    intrinsic_entries = intrinsic_entries or tuple()
-    singleton_entries = singleton_entries or tuple()
     # NB make tasks ordered so that gen ordering is deterministic.
-    serializable_tasks = OrderedDict()
+    serializable_rules = OrderedDict()
 
     def add_task(product_type, rule):
       if product_type not in serializable_tasks:
-        serializable_tasks[product_type] = OrderedSet()
-      serializable_tasks[product_type].add(rule)
+        serializable_rules[product_type] = OrderedSet()
+      serializable_rules[product_type].add(rule)
 
     for entry in task_entries:
       if isinstance(entry, Rule):
         add_task(entry.output_product_type, entry)
-      elif isinstance(entry, (tuple, list)) and len(entry) == 3:
-        output_type, input_selectors, task = entry
-        if isinstance(output_type, Exactly):
-          constraint = output_type
-        elif isinstance(output_type, type):
-          constraint = Exactly(output_type)
-        else:
-          raise TypeError("Unexpected product_type type {}, for rule {}".format(output_type, entry))
+      elif hasattr(entry, '__call__'):
+        rule = getattr(entry, '_rule', None)
+        if rule is None:
+          raise TypeError("Expected callable {} to be decorated with @rule.".format(func))
 
-        factory = TaskRule(tuple(input_selectors), task, output_type, constraint)
         # TODO: The heterogenity here has some confusing implications here:
         # see https://github.com/pantsbuild/pants/issues/4005
         for kind in constraint.types:
           # NB Ensure that interior types from SelectDependencies / SelectProjections work by
           # indexing on the list of types in the constraint.
-          add_task(kind, factory)
-        add_task(constraint, factory)
+          add_task(kind, rule)
+        add_task(constraint, rule)
       else:
-        raise TypeError("Unexpected rule type: {}."
-                        " Rules either extend Rule, or are 3 elem tuples.".format(type(entry)))
+        raise TypeError("Unexpected rule type: {}. "
+                        "Rules either extend Rule, or are static functions "
+                        "decorated with @rule.".format(type(entry)))
 
-    intrinsics = dict()
-    for output_type, input_type, func in intrinsic_entries:
-      key = (input_type, output_type)
-      if key in intrinsics:
-        raise ValueError('intrinsic provided by {} has already been provided by: {}'.format(
-          func.__name__, intrinsics[key]))
-      intrinsics[key] = IntrinsicRule(input_type, output_type, func)
-
-    singletons = dict()
-    for output_type, func in singleton_entries:
-      if output_type in singletons:
-        raise ValueError('singleton provided by {} has already been provided by: {}'.format(
-          func.__name__, singletons[output_type]))
-      singletons[output_type] = SingletonRule(output_type, func)
-    return cls(serializable_tasks, intrinsics, singletons)
+    return cls(serializable_rules)
