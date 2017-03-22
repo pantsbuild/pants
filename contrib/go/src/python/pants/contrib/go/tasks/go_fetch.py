@@ -53,27 +53,7 @@ class GoFetch(GoTask):
     if not go_remote_libs:
       return
 
-    # We cache mappings from import path to root (e.g., example.org/pkg/foo -> example.org),
-    # otherwise we may have to fetch them over the network via the meta tag protocol.
-    # Note that this caching is unversioned: The mapping is defined as "whatever meta tag is
-    # currently being served at the relevant URL", which is inherently unversioned.
-    import_root_map_path = os.path.join(self.workdir, 'pkg_root_map.txt')
-
-    if os.path.exists(import_root_map_path):
-      with open(import_root_map_path, 'r') as fp:
-        import_root_map = dict({import_path: root for import_path, root in
-                                (x.decode('utf8').strip().split('\t') for x in fp.readlines())})
-    else:
-      import_root_map = {}
-
-    undeclared_deps = self._transitive_download_remote_libs(set(go_remote_libs), import_root_map)
-
-    # Write the updated import_root_map back out.
-    safe_mkdir_for(import_root_map_path)
-    with open(import_root_map_path, 'w') as fp:
-      for import_path, root in sorted(import_root_map.items()):
-        fp.write('{}\t{}\n'.format(import_path, root).encode('utf8'))
-
+    undeclared_deps = self._transitive_download_remote_libs(set(go_remote_libs))
     if undeclared_deps:
       self._log_undeclared_deps(undeclared_deps)
       raise TaskError('Failed to resolve transitive Go remote dependencies.')
@@ -168,8 +148,7 @@ class GoFetch(GoTask):
           undeclared_deps[go_remote_lib].add((remote_import_path, e.address))
       self.context.build_graph.inject_dependency(go_remote_lib.address, address)
 
-  def _transitive_download_remote_libs(self, go_remote_libs, import_root_map,
-                                       all_known_remote_libs=None):
+  def _transitive_download_remote_libs(self, go_remote_libs, all_known_remote_libs=None):
     """Recursively attempt to resolve / download all remote transitive deps of go_remote_libs.
 
     Returns a dict<GoRemoteLibrary, set<tuple<str, Address>>>, which maps a go remote library to a
@@ -196,7 +175,19 @@ class GoFetch(GoTask):
     go_remote_lib_src = self.context.products.get_data('go_remote_lib_src')
 
     with self.invalidated(go_remote_libs) as invalidation_check:
+      # We accumulate mappings from import path to root (e.g., example.org/pkg/foo -> example.org)
+      # from all targets in this map, so that targets share as much of this information as
+      # possible during this run.
+      # We cache these mappings. to avoid repeatedly fetching them over the network via the
+      # meta tag protocol. Note that this mapping is unversioned: It's defined as "whatever meta
+      # tag is currently being served at the relevant URL", which is inherently independent of
+      # the rev of the remote library.  We (and the entire Go ecosystem) assume that this mapping
+      # never changes, in practice.
+      import_root_map = {}
       for vt in invalidation_check.all_vts:
+        import_root_map_path = os.path.join(vt.results_dir, 'pkg_root_map.txt')
+        import_root_map.update(self._read_import_root_map_file(import_root_map_path))
+
         go_remote_lib = vt.target
         gopath = os.path.join(vt.results_dir, 'gopath')
         if not vt.valid:
@@ -205,10 +196,15 @@ class GoFetch(GoTask):
                                         resolved_remote_libs, undeclared_deps, import_root_map)
         go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', go_remote_lib.import_path)
 
+        # Cache the mapping against this target's key.  Note that because we accumulate
+        # mappings across targets, the file may contain mappings that this target doesn't
+        # need or care about (although it will contain all the mappings this target does need).
+        # But the file is small, so there's no harm in this redundancy.
+        self._write_import_root_map_file(import_root_map_path, import_root_map)
+
     # Recurse after the invalidated block, so the libraries we downloaded are now "valid"
     # and thus we don't try to download a library twice.
     trans_undeclared_deps = self._transitive_download_remote_libs(resolved_remote_libs,
-                                                                  import_root_map,
                                                                   all_known_remote_libs)
     undeclared_deps.update(trans_undeclared_deps)
 
@@ -267,3 +263,21 @@ class GoFetch(GoTask):
                 # We assume relative imports are local to the package and skip attempts to
                 # recursively resolve them.
                 not self._is_relative(imp))]
+
+  @staticmethod
+  def _read_import_root_map_file(path):
+    """Reads a file mapping import paths to roots (e.g., example.org/pkg/foo -> example.org)."""
+    if os.path.exists(path):
+      with open(path, 'r') as fp:
+        return dict({import_path: root for import_path, root in
+                     (x.decode('utf8').strip().split('\t') for x in fp.readlines())})
+    else:
+      return {}
+
+  @staticmethod
+  def _write_import_root_map_file(path, import_root_map):
+    """Writes a file mapping import paths to roots."""
+    safe_mkdir_for(path)
+    with open(path, 'w') as fp:
+      for import_path, root in sorted(import_root_map.items()):
+        fp.write('{}\t{}\n'.format(import_path, root).encode('utf8'))
