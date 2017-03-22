@@ -22,20 +22,8 @@ logger = logging.getLogger(__name__)
 
 def rule(output_type, input_selectors):
   def wrapper(func):
-    # Validate result type.
-    if isinstance(output_type, Exactly):
-      constraint = output_type
-    elif isinstance(output_type, type):
-      constraint = Exactly(output_type)
-    else:
-      raise TypeError("Expected an output_type for rule {}, got: {}".format(func, output_type))
-
-    # Validate selectors.
-    if not isinstance(input_selectors, (list, tuple)):
-      raise TypeError("Expected a list of Selectors for rule {}, got: {}".format(func, input_selectors))
-
-    # Annotate the function with its Rule.
-    func._rule = TaskRule(constraint, tuple(input_selectors), func)
+    func._rule = TaskRule(output_type, input_selectors, func)
+    return func
   return wrapper
 
 
@@ -61,6 +49,22 @@ class Rule(AbstractClass):
 
 class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'func']), Rule):
   """A Rule that runs a task function when all of its input selectors are satisfied."""
+
+  def __new__(cls, output_type, input_selectors, func):
+    # Validate result type.
+    if isinstance(output_type, Exactly):
+      constraint = output_type
+    elif isinstance(output_type, type):
+      constraint = Exactly(output_type)
+    else:
+      raise TypeError("Expected an output_type for rule {}, got: {}".format(func, output_type))
+
+    # Validate selectors.
+    if not isinstance(input_selectors, (list, tuple)):
+      raise TypeError("Expected a list of Selectors for rule {}, got: {}".format(func, input_selectors))
+
+    # Create.
+    return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), func)
 
   def __str__(self):
     return '({}, {!r}, {})'.format(type_or_constraint_repr(self.output_constraint),
