@@ -13,7 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for
+from pants.util.dirutil import safe_mkdir, safe_concurrent_creation
 
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -41,10 +41,7 @@ class GoFetch(GoTask):
 
   @property
   def cache_target_dirs(self):
-    # TODO(John Sirois): See TODO in _transitive_download_remote_libs, re-consider how artifact
-    # caching works for fetches.
-    # TODO(Benjy): There is no TODO that I can see in _transitive_download_remote_libs, so
-    # figure out of the TODO above this one is still relevant.
+    # TODO(John Sirois): See TODO in _fetch_pkg, re-consider how artifact caching works for fetches.
     return True
 
   def execute(self):
@@ -110,9 +107,10 @@ class GoFetch(GoTask):
     else:
       remote_import_paths = self._get_remote_import_paths(go_remote_lib.import_path,
                                                           gopath=gopath)
-      with open(remote_import_paths_cache, 'w') as fp:
-        for path in remote_import_paths:
-          fp.write('{}\n'.format(path).encode('utf8'))
+      with safe_concurrent_creation(remote_import_paths_cache) as safe_path:
+        with open(safe_path, 'w') as fp:
+          for path in remote_import_paths:
+            fp.write('{}\n'.format(path).encode('utf8'))
 
     for remote_import_path in remote_import_paths:
       remote_root = import_root_map.get(remote_import_path)
@@ -277,7 +275,7 @@ class GoFetch(GoTask):
   @staticmethod
   def _write_import_root_map_file(path, import_root_map):
     """Writes a file mapping import paths to roots."""
-    safe_mkdir_for(path)
-    with open(path, 'w') as fp:
-      for import_path, root in sorted(import_root_map.items()):
-        fp.write('{}\t{}\n'.format(import_path, root).encode('utf8'))
+    with safe_concurrent_creation(path) as safe_path:
+      with open(safe_path, 'w') as fp:
+        for import_path, root in sorted(import_root_map.items()):
+          fp.write('{}\t{}\n'.format(import_path, root).encode('utf8'))
