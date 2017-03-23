@@ -452,8 +452,7 @@ impl From<Select> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectLiteral {
   variants: Variants,
-  selector: selectors::SelectLiteral,
-  edges: rule_graph::RuleEdges
+  selector: selectors::SelectLiteral
 }
 
 impl Node for SelectLiteral {
@@ -1103,7 +1102,6 @@ impl Task {
         context.get(SelectLiteral {
           variants: self.variants.clone(),
           selector: s,
-          edges: self.edges.clone()
         }),
     }
   }
