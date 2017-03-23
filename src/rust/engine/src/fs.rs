@@ -644,7 +644,7 @@ pub struct Snapshots {
 }
 
 impl Snapshots {
-  pub fn new() -> Result<Snapshots, io::Error> {
+  pub fn new(workdir: PathBuf) -> Result<Snapshots, io::Error> {
     Ok(
       Snapshots {
         // TODO: see https://github.com/pantsbuild/pants/issues/4299

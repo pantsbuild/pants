@@ -35,12 +35,13 @@ impl Core {
     types: Types,
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
+    work_dir: PathBuf,
   ) -> Core {
     Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
-      snapshots: Snapshots::new()
+      snapshots: Snapshots::new(work_dir)
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
         }),

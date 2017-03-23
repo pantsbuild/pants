@@ -75,7 +75,7 @@ class GoalRunnerFactory(object):
       self._exiter(result)
 
   def _init_graph(self, use_engine, pants_ignore_patterns, build_ignore_patterns,
-                  exclude_target_regexps, target_specs, graph_helper=None,
+                  exclude_target_regexps, target_specs, workdir, graph_helper=None,
                   subproject_build_roots=None):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
@@ -83,6 +83,7 @@ class GoalRunnerFactory(object):
     :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
     :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
                                        applied during BUILD file searching.
+    :param str workdir: The pants workdir.
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param list target_specs: The original target specs.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
@@ -92,11 +93,14 @@ class GoalRunnerFactory(object):
     # N.B. Use of the daemon implies use of the v2 engine.
     if graph_helper or use_engine:
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-      graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
-        pants_ignore_patterns,
-        build_ignore_patterns=build_ignore_patterns,
-        exclude_target_regexps=exclude_target_regexps,
-        subproject_roots=subproject_build_roots)
+      graph_helper = (
+        graph_helper
+        or EngineInitializer.setup_legacy_graph(pants_ignore_patterns,
+                                                build_ignore_patterns=build_ignore_patterns,
+                                                exclude_target_regexps=exclude_target_regexps,
+                                                subproject_roots=subproject_build_roots,
+                                                workdir=workdir)
+      )
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
                                         change_calculator=graph_helper.change_calculator)
@@ -157,7 +161,8 @@ class GoalRunnerFactory(object):
         self._global_options.exclude_target_regexp,
         self._options.target_specs,
         self._daemon_graph_helper,
-        self._global_options.subproject_roots
+        self._global_options.subproject_roots,
+        self._global_options.workdir
       )
       goals, is_quiet = self._determine_goals(self._requested_goals)
       target_roots = self._specs_to_targets(spec_roots)
