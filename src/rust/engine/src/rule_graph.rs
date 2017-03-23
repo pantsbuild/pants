@@ -22,17 +22,17 @@ enum Entry {
 
   InnerEntry(InnerEntry),
 
+  Singleton {
+    value: Key,
+    product: TypeConstraint
+  },
+
   Unreachable {
     // NB: unreachable is an error type, it might be better to name it error, but currently
     //     unreachable is the only error entry type.
     rule: Task,
     reason: Diagnostic
-  },
-
-  Singleton {
-    value: Key,
-    product: TypeConstraint
-  },
+  }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -74,17 +74,17 @@ impl Entry {
     }
   }
 
-  fn new_singleton(value: Key, product: TypeConstraint) -> Entry {
-    Entry::Singleton {
-      value: value,
-      product: product
-    }
-  }
-
   fn new_unreachable(rule: &Task) -> Entry {
     Entry::Unreachable {
       rule: rule.clone(),
       reason: Diagnostic { subject_type: ANY_TYPE, reason: "".to_string() },
+    }
+  }
+
+  fn new_singleton(value: Key, product: TypeConstraint) -> Entry {
+    Entry::Singleton {
+      value: value,
+      product: product
     }
   }
 
