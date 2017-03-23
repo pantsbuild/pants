@@ -16,7 +16,7 @@ from pex.installer import Packager
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
-from pants.bin.plugin_resolver import PluginResolver
+from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open, safe_rmtree, touch
@@ -26,7 +26,8 @@ req = Requirement.parse
 
 
 class PluginResolverTest(unittest.TestCase):
-  def create_plugin(self, distribution_repo_dir, plugin, version=None):
+  @staticmethod
+  def create_plugin(distribution_repo_dir, plugin, version=None):
     with safe_open(os.path.join(distribution_repo_dir, plugin, 'setup.py'), 'w') as fp:
       fp.write(dedent("""
         from setuptools import setup

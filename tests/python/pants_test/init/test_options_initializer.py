@@ -10,7 +10,7 @@ import unittest
 from pkg_resources import WorkingSet
 
 from pants.base.exceptions import BuildConfigurationError
-from pants.bin.options_initializer import OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
 

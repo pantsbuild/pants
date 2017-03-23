@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import mock
 
+from pants.init.pants_daemon_launcher import PantsDaemonLauncher
 from pants.pantsd.pants_daemon import PantsDaemon
-from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
