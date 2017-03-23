@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 from copy import copy
 
 from pex.interpreter import PythonInterpreter
@@ -22,7 +21,7 @@ from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRe
 from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.util.dirutil import safe_rmtree
+from pants.util.dirutil import safe_concurrent_creation
 
 
 class WrappedPEX(object):
@@ -79,8 +78,9 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
-    with self.invalidated(self.context.targets(
-        lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)))) as invalidation_check:
+    relevant_targets = self.context.targets(
+      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)))
+    with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
@@ -115,12 +115,9 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 
-        path_tmp = path + '.tmp'
-        safe_rmtree(path_tmp)
-        builder = PEXBuilder(path_tmp, interpreter, pex_info=pex_info)
-        builder.freeze()
-        safe_rmtree(path)
-        shutil.move(path_tmp, path)
+        with safe_concurrent_creation(path) as safe_path:
+          builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
+          builder.freeze()
 
         with open(extra_pex_paths_file_path, 'w') as outfile:
           for epp in extra_pex_paths:
