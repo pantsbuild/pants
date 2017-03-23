@@ -4,6 +4,7 @@
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
+use std::hash;
 use std::fmt;
 use std::io;
 
@@ -12,8 +13,56 @@ use externs;
 use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
 use tasks::{Task, Tasks};
 
+pub struct RuleGraphContainer {
+  rule_graph: Option<RuleGraph>
+}
+
+impl RuleGraphContainer {
+  pub fn new() -> RuleGraphContainer {
+    RuleGraphContainer { rule_graph: None }
+  }
+  pub fn setup(&mut self, tasks: &Tasks, root_subject_types: Vec<TypeId>) {
+    let maker = GraphMaker::new(tasks, root_subject_types);
+
+    let graph = Some(maker.full_graph());
+    self.rule_graph = graph;
+  }
+  pub fn print_matching_entries(&self, task: &Task) {
+    if let Some(ref rule_graph) = self.rule_graph {
+      let entries = rule_graph.rule_dependency_edges.keys()
+        .filter(|k| k.rule == *task)
+        .collect::<Vec<_>>();
+      println!("  entries w/ task {}\n  {}", entries.len(),
+      entries.iter().map(|&e| entry_str(&Entry::from(e.clone())))
+        .collect::<Vec<_>>()
+        .join("\n  ")
+      )
+    }
+  }
+  pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> {
+    if let Some(ref rule_graph) = self.rule_graph {
+      let root = RootEntry { subject_type: subject_type, clause: vec![selector] };
+      // could do something if None, since we might need to. Or could let caller deal
+      rule_graph.root_dependencies.get(&root).map(|e|e.clone())
+    } else {
+      // this means we need to do subgraph gen.
+      panic!("no root edge known here for {} with {}", type_str(subject_type.clone()), selector_str(&selector));
+      //None
+    }
+  }
+
+  pub fn edges_for_inner_entry(&self, inner_entry: &InnerEntry) -> Option<RuleEdges> {
+    if let Some(ref rule_graph) = self.rule_graph {
+      // could also not clone here, but then I would need to do som other things
+      rule_graph.rule_dependency_edges.get(inner_entry).map(|e| e.clone())
+    } else {
+      panic!("no inner edge known here for {}", entry_str(&Entry::from(inner_entry.clone())));
+    }
+  }
+}
+
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-enum Entry {
+pub enum Entry {
   SubjectIsProduct {
     subject_type: TypeId
   },
@@ -48,9 +97,9 @@ impl From<RootEntry> for Entry {
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct InnerEntry {
-  subject_type: TypeId,
-  rule: Task
+pub struct InnerEntry {
+  pub subject_type: TypeId,
+  pub rule: Task
 }
 
 impl From<InnerEntry> for Entry {
@@ -304,6 +353,9 @@ impl <'t> GraphMaker<'t> {
                                                                select.product.clone())]);
               },
               &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
+              // TODO This is incorrect because SelectTransitive works differently than SelectDependencies.
+              // See line nodes.rs:710, select transitive depends on itself w/ a different subject
+              // // TODO TODO I think ^^ the above todo is incorrect. Need to think it through again.
               &Selector::SelectTransitive(SelectTransitive{ref product, ref dep_product, ref field_types, ..}) => {
                 let initial_selector = *dep_product;
                 let initial_rules_or_literals = rhs_for_select(&self.tasks,
@@ -314,7 +366,7 @@ impl <'t> GraphMaker<'t> {
                                      &entry,
                                      entry.subject_type(),
                                      format!("no matches for {} when resolving {}",
-                                             selector_str(&Selector::Select(Select { product: initial_selector, variant_key: None})),
+                                             selector_str(&Selector::select(initial_selector)),
                                              selector_str(selector)));
                   was_unfulfillable = true;
                   continue;
@@ -344,7 +396,10 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: *dep_product, variant_key: None})],
+                                   vec![
+                                     selector.clone(),
+                                     Selector::select(*dep_product)
+                                   ],
                                    initial_rules_or_literals);
 
                 add_rules_to_graph(&mut rules_to_traverse,
@@ -352,7 +407,10 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: *product, variant_key: None})],
+                                   vec![
+                                     selector.clone(),
+                                     Selector::select(*product)
+                                   ],
                                    rules_for_dependencies);
               },
               &Selector::SelectProjection(ref select) =>{
@@ -379,7 +437,7 @@ impl <'t> GraphMaker<'t> {
                                      &entry,
                                      select.projected_subject,
                                      format!("no matches for {} when resolving {}",
-                                             selector_str(&Selector::Select(Select{product: select.product, variant_key: None})),
+                                             selector_str(&Selector::select(select.product)),
                                              selector_str(selector)));
                   was_unfulfillable = true;
                   continue
@@ -390,8 +448,8 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![Selector::SelectProjection(select.clone()),
-                                        Selector::Select(Select { product: initial_selector, variant_key: None })
+                                   vec![selector.clone(),
+                                        Selector::select(initial_selector)
                                    ],
                                    initial_rules_or_literals);
                 add_rules_to_graph(&mut rules_to_traverse,
@@ -399,8 +457,8 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![Selector::SelectProjection(select.clone()),
-                                        Selector::Select(Select { product: select.product, variant_key: None })
+                                   vec![selector.clone(),
+                                        Selector::select(select.product)
                                    ],
                                    projected_rules_or_literals);
               },
@@ -528,7 +586,7 @@ pub struct RuleGraph {
   unfulfillable_rules: UnfulfillableRuleMap,
 }
 
-fn type_constraint_str(type_constraint: TypeConstraint) -> String {
+pub fn type_constraint_str(type_constraint: TypeConstraint) -> String {
   let val = to_val(type_constraint);
   call_on_val(&val, "graph_str")
 }
@@ -560,7 +618,7 @@ fn function_str(func: &Function) -> String {
 }
 
 
-fn type_str(type_id: TypeId) -> String {
+pub fn type_str(type_id: TypeId) -> String {
   if type_id == ANY_TYPE {
     "Any".to_string()
   } else {
@@ -573,7 +631,7 @@ fn val_name(val: &Value) -> String {
   externs::project_str(val, "__name__")
 }
 
-fn selector_str(selector: &Selector) -> String {
+pub fn selector_str(selector: &Selector) -> String {
   match selector {
     &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
     &Selector::SelectDependencies(ref s) => format!("{}({}, {}, {}field_types=({},))",
@@ -608,7 +666,7 @@ fn selector_str(selector: &Selector) -> String {
   }
 }
 
-fn entry_str(entry: &Entry) -> String {
+pub fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::InnerEntry(ref inner) => {
       format!("{} of {}", task_display(&inner.rule), type_str(inner.subject_type))
@@ -630,7 +688,7 @@ fn entry_str(entry: &Entry) -> String {
   }
 }
 
-fn task_display(task: &Task) -> String {
+pub fn task_display(task: &Task) -> String {
   let product = type_constraint_str(task.product);
   let mut clause_portion = task.clause.iter().map(|c| selector_str(c)).collect::<Vec<_>>().join(", ");
   if task.clause.len() <= 1 {
@@ -744,9 +802,16 @@ pub struct RuleEdges {
   selector_to_dependencies: HashMap<Vec<Selector>, Entries>
 }
 
+impl hash::Hash for RuleEdges {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.dependencies.hash(state);
+    self.selector_to_dependencies.keys().collect::<Vec<_>>().hash(state);
+  }
+}
+
 impl RuleEdges {
 
-  fn new() -> RuleEdges {
+  pub fn new() -> RuleEdges {
     RuleEdges {
       dependencies: vec![],
       selector_to_dependencies: HashMap::new()
@@ -768,8 +833,8 @@ impl RuleEdges {
     }
   }
 
-  fn has_edges_for(&self, selector_path: Vec<Selector>) -> bool {
-    self.selector_to_dependencies.contains_key(&selector_path)
+  fn has_edges_for(&self, selector_path: &Vec<Selector>) -> bool {
+    self.selector_to_dependencies.contains_key(selector_path)
   }
 
   fn makes_unfulfillable(&self, dep_to_eliminate: &Entry) -> bool {
@@ -793,6 +858,38 @@ impl RuleEdges {
       new_selector_deps.insert(selector.clone(), deps.iter().filter(|&d| d != dep).map(|d| d.clone()).collect());
     }
     RuleEdges { dependencies: new_deps, selector_to_dependencies: new_selector_deps }
+  }
+
+  pub fn entries_for(&self, selectors: &Vec<Selector>) -> Entries {
+    let r = self.selector_to_dependencies.get(selectors).map(|x|x.clone()).unwrap_or_else(|| Vec::new());
+
+    if false {
+      println!("genning for {:?} found {}. total avail {}", selectors.iter().map(|x| selector_str(x)).collect::<Vec<_>>(), r.len(), self.dependencies.len());
+      if selectors.len() > 1 {
+        println!("{}",
+                 self.selector_to_dependencies
+                   .keys()
+                   .map(|ss|
+                     ss.iter()
+                       .map(|s| selector_str(s))
+                       .collect::<Vec<_>>()
+                       .join(", "))
+                   .collect::<Vec<_>>()
+                   .join("\n   __ ")
+        );
+
+        let w_first = self.selector_to_dependencies.iter()
+          .filter(|&(k, _)| k.len() >= 1 && k[0] == selectors[0])
+          .collect::<Vec<_>>();
+        println!("with first selector {} found {}", selector_str(&selectors[0]), w_first.len());
+      }
+    }
+
+    r
+  }
+
+  pub fn len(&self) -> usize {
+    self.dependencies.len()
   }
 }
 
@@ -879,7 +976,7 @@ fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
     },
     &Entry::InnerEntry(ref inner_entry) => {
       let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(RuleEdges::new());
-      if edges.has_edges_for(selector_path.clone()) {
+      if edges.has_edges_for(&selector_path) {
         // This is an error that should only happen if there's a bug in the algorithm, but it
         // might make sense to expose it in a more friendly way.
         panic!("Rule {:?} already has dependencies set for selector {:?}", entry, selector_path)

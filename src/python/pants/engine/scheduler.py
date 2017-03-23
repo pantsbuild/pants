@@ -74,6 +74,7 @@ class WrappedNativeScheduler(object):
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
+    self._register_root_subject_types(root_subject_types)
     self.root_subject_types = root_subject_types
 
   def graph_trace(self):
@@ -296,6 +297,10 @@ class WrappedNativeScheduler(object):
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
+
+  def _register_root_subject_types(self, root_subject_types):
+    type_ids = list(TypeId(self._to_id(t)) for t in sorted(root_subject_types))
+    self._native.lib.scheduler_root_subject_types(self._scheduler, type_ids, len(type_ids))
 
 
 class LocalScheduler(object):

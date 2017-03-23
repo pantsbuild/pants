@@ -22,6 +22,7 @@ pub struct Scheduler {
   pub core: Arc<Core>,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Root>,
+  expected_root_subject_types: Vec<TypeId>
 }
 
 impl Scheduler {
@@ -46,6 +47,7 @@ impl Scheduler {
     Scheduler {
       core: Arc::new(core),
       roots: Vec::new(),
+      expected_root_subject_types: Vec::new()
     }
   }
 
@@ -76,10 +78,23 @@ impl Scheduler {
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
+
+    // find the edges for the root in the rule graph
+    // then add a node that contains those edges to the roots
+    // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
+    // TODO up front.
+    let edges = self.core.rule_graph.find_root_edges(
+      subject.type_id().clone(),
+      selectors::Selector::select(product)
+    );
     self.roots.push(
-      Root::Select(Select::new(product, subject, Default::default()))
+      Root::Select(Select::new(product,
+                               subject,
+                               Default::default(),
+                               edges.expect("Edges to have been found TODO handle this")))
     );
   }
+
 
   pub fn add_root_select_dependencies(
     &mut self,
@@ -89,22 +104,48 @@ impl Scheduler {
     field: Field,
     field_types: Vec<TypeId>
   ) {
+    // find the edges for the root in the rule graph
+    // then add a node that contains those edges to the roots
+
+    let selector = selectors::SelectDependencies {
+      product: product,
+      dep_product: dep_product,
+      field: field,
+      field_types: field_types,
+    };
+
+    let edges = self.core.rule_graph.find_root_edges(
+      subject.type_id().clone(),
+      selectors::Selector::SelectDependencies(selector.clone()));
+
     self.roots.push(
       Root::SelectDependencies(
         SelectDependencies::new(
-          selectors::SelectDependencies {
-            product: product,
-            dep_product: dep_product,
-            field: field,
-            field_types: field_types
-          },
+          selector,
           subject,
           Default::default(),
+          edges.expect("Edges to have been found TODO handle this")
         )
       )
     );
   }
 
+  pub fn task_end(&mut self) {
+    Arc::get_mut(&mut self.core)
+      .expect("The core may not be mutated after init. We're in task_end")
+      .task_end()
+  }
+
+  fn finish(&mut self) {
+    Arc::get_mut(&mut self.core)
+      .expect("The core may not be mutated after init. We're in finish")
+      .finish(self.expected_root_subject_types.clone());
+  }
+
+  pub fn set_root_subject_types(&mut self, subject_types: Vec<TypeId>) {
+    self.expected_root_subject_types = subject_types;
+    self.finish();
+  }
   /**
    * Starting from existing roots, execute a graph to completion.
    */

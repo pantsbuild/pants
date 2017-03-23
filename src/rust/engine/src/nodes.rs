@@ -23,6 +23,7 @@ use fs::{
   VFS,
 };
 use handles::maybe_drain_handles;
+use rule_graph;
 use selectors::{self, Selector};
 use tasks;
 
@@ -106,6 +107,12 @@ pub trait Node: Into<NodeKey> {
 
   fn run(self, context: Context) -> NodeFuture<Self::Output>;
   fn is_inline() -> bool;
+
+  // for tasks, this could look things up in a context obj
+  // for selectors it should use a copy of the edges
+  // alternatively all nodes could have a copy of edges, so when you construct a node,
+  // you find the edges. Not sure which is better
+  //fn rule_entry_edges(&self) -> rule_graph::RuleEdges;
 }
 
 /**
@@ -121,14 +128,52 @@ pub struct Select {
   pub subject: Key,
   pub variants: Variants,
   pub selector: selectors::Select,
+  pub selector_path: Vec<selectors::Selector>,
+  // might need an optional selector list for this so we know the parent--maybe a parent selector
+  edges: rule_graph::RuleEdges // or maybe just Entries? hm. Select only needs the entries that it will expand into nodes
 }
 
 impl Select {
-  pub fn new(product: TypeConstraint, subject: Key, variants: Variants) -> Select {
+  pub fn new(product: TypeConstraint,
+             subject: Key,
+             variants: Variants,
+             edges: rule_graph::RuleEdges) -> Select {
     Select {
       selector: selectors::Select { product: product, variant_key: None },
       subject: subject,
       variants: variants,
+      selector_path: vec![Selector::select(product)],
+      edges: edges
+    }
+  }
+
+  pub fn new_with_selector(
+    selector: selectors::Select,
+    subject: Key,
+    variants: Variants,
+    edges: rule_graph::RuleEdges
+  ) -> Select {
+    Select {
+      selector: selector.clone(),
+      subject: subject,
+      variants: variants,
+      selector_path: vec![Selector::Select(selector.clone())],
+      edges: edges
+    }
+  }
+
+  pub fn new_nested(parent: Selector,
+                    product: TypeConstraint,
+                    subject: Key,
+                    variants: Variants,
+                    edges: rule_graph::RuleEdges
+  ) -> Select {
+    Select {
+      selector: selectors::Select { product: product, variant_key: None },
+      subject: subject,
+      variants: variants,
+      selector_path: vec![parent, Selector::select(product)],
+      edges: edges
     }
   }
 
@@ -179,7 +224,7 @@ impl Select {
         }
       }
     }
-    return None;
+    None
   }
 
   /**
@@ -240,11 +285,30 @@ impl Select {
     // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
     // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
     // different subjects but identical PathGlobs will cause redundant work.
+    let entries = self.edges.entries_for(&self.selector_path);
+    if entries.len() > 1 {
+      // TODO do something better than this.
+      panic!("we're supposed to get a snapshot, but there's more than one entry!");
+    } else if entries.is_empty() {
+      panic!("we're supposed to get a snapshot, but there are no matching rule entries!");
+    }
+
     context.get(
       Snapshot {
         subject: self.subject.clone(),
         product: self.product().clone(),
         variants: self.variants.clone(),
+        edges: context.core.rule_graph.edges_for_inner_entry(
+          match entries[0] {
+            rule_graph::Entry::InnerEntry(ref inner) => {
+              if inner.subject_type != self.subject.type_id().clone() {
+                panic!("wrong subject type!");
+              }
+              inner
+            },
+            _ => panic!("expected inner entry!")
+          }
+        ).expect("these edges exist for the snapshot entry")
       }
     )
   }
@@ -285,22 +349,108 @@ impl Select {
           .boxed()
       ]
     } else {
-      context.core.tasks.gen_tasks(self.subject.type_id(), self.product())
-        .map(|tasks| {
-          tasks.iter()
-            .map(|task|
+      let subject_type = self.subject.type_id();
+      let product = self.selector.product;
+      let entries = self.edges.entries_for(&self.selector_path);
+      // if it's a short circuit entry, ie
+      //   SubjectIsProduct or Literal
+      //   then we should create a special node with the value
+
+      // get the matching entries for the current selector path
+      // for each of those
+      //   - lookup their edges in the rule graph
+      //   - extract the task from the entry
+      //   - construct a new task node from the edges + task
+
+// debug printing------------------
+      if false{
+        let orig_tasks = context.core.tasks.gen_tasks(&subject_type, &product)
+          .map(|t|t.clone())
+          .unwrap_or_else(|| Vec::new());
+
+        let tasks_from_entries: Vec<_> = entries.iter()
+          .map(|e|
+            match e {
+              &rule_graph::Entry::InnerEntry(ref i) => Some(i.rule.clone()),
+              _ => {
+                println!("aaaaaargh {}", rule_graph::entry_str(e));
+                None
+              }
+            })
+          .filter(|e| e.is_some())
+          .map(|e| e.expect("no remaining Nones"))
+          .collect();
+
+
+        let eq_tasks = tasks_from_entries == orig_tasks;
+        println!("node gen:\n  edges len {}\n  subject_type {}\n  selector_path {}\n  orig tasks len {}\n  new_entries {}\n  equal tasks? {}",
+                 self.edges.len(),
+                 rule_graph::type_str(self.subject.type_id().clone()),
+                 self.selector_path.iter().map(|x| rule_graph::selector_str(x)).collect::<Vec<_>>().join(", "),
+                 orig_tasks.len(),
+                 entries.len(),
+                 eq_tasks
+        );
+
+        if !eq_tasks {
+          // TODO find inner nodes with the tasks here
+          // maybe I can narrow it down better that way
+          // context.core.
+          println!(
+            "  Tasks\n    {}",
+            orig_tasks.iter()
+              .map(|t| rule_graph::task_display(t))
+              .collect::<Vec<_>>()
+              .join("\n    ")
+          );
+          for t in orig_tasks.iter() {
+            context.core.rule_graph.print_matching_entries(t);
+          }
+        }
+      }
+// debug printing------------------
+  //aoeu
+      entries.into_iter()
+        .map(|entry| {
+          let r: Option<NodeFuture<Value>> = match entry {
+            rule_graph::Entry::InnerEntry(ref inner) => {
+              let task = inner.rule.clone();
+              let edges = context.core.rule_graph.edges_for_inner_entry(inner);
+
+              Some(
               context.get(
                 Task {
                   subject: self.subject.clone(),
                   product: self.product().clone(),
                   variants: self.variants.clone(),
                   task: task.clone(),
-                }
+                  edges: edges.expect("There should be edges here, or something went wrong. We could impl something to try again w/ a new rule graph, or just fail")
+                    .clone()
+                })
               )
-            )
-            .collect()
+            },
+
+            rule_graph::Entry::SubjectIsProduct { subject_type } => {
+              // TODO explicit subject is product node
+              // Or, alternatively, if we get here, it means it didn't match?
+              // probably the second
+              if self.subject.type_id().clone() == subject_type {
+                panic!("actual subject type {}, expected subject type {}",
+                     rule_graph::type_str(self.subject.type_id().clone()),
+                     rule_graph::type_str(subject_type.clone()))
+              } else {
+                None
+              }
+            },
+            // SubjectIsProduct
+            // Literal
+            _ => { panic!("TODO handle {:?}", entry) }
+          };
+          r
         })
-        .unwrap_or_else(|| Vec::new())
+        .filter(|x|x.is_some())
+        .map(|x| x.unwrap())
+        .collect::<Vec<NodeFuture<Value>>>()
     }
   }
 }
@@ -363,6 +513,7 @@ impl From<Select> for NodeKey {
 pub struct SelectLiteral {
   variants: Variants,
   selector: selectors::SelectLiteral,
+  edges: rule_graph::RuleEdges
 }
 
 impl Node for SelectLiteral {
@@ -397,18 +548,21 @@ pub struct SelectDependencies {
   pub subject: Key,
   pub variants: Variants,
   pub selector: selectors::SelectDependencies,
+  pub edges: rule_graph::RuleEdges
 }
 
 impl SelectDependencies {
   pub fn new(
     selector: selectors::SelectDependencies,
     subject: Key,
-    variants: Variants
+    variants: Variants,
+    edges: rule_graph::RuleEdges
   ) -> SelectDependencies {
     SelectDependencies {
       subject: subject,
       variants: variants,
       selector: selector,
+      edges: edges
     }
   }
 
@@ -418,7 +572,14 @@ impl SelectDependencies {
     //   https://github.com/pantsbuild/pants/issues/4020
 
     let dep_subject_key = externs::key_for(dep_subject);
-    context.get(Select::new(self.selector.product.clone(), dep_subject_key, self.variants.clone()))
+    context.get(
+      Select::new_nested(
+        selectors::Selector::SelectDependencies(self.selector.clone()),
+        self.selector.product.clone(),
+        dep_subject_key,
+        self.variants.clone(),
+        self.edges.clone()
+      ))
   }
 }
 
@@ -429,7 +590,13 @@ impl Node for SelectDependencies {
     context
       .get(
         // Select the product holding the dependency list.
-        Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
+        Select::new_nested(
+          selectors::Selector::SelectDependencies(self.selector.clone()),
+          self.selector.dep_product,
+          self.subject.clone(),
+          self.variants.clone(),
+          self.edges.clone()
+        )
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -473,6 +640,17 @@ impl From<SelectDependencies> for NodeKey {
 }
 
 /**
+ * A node that selects for the dep_product type, then recursively selects for the product type of the result
+ * Both the product and the dep_product must have the same "field" and the types of products in that
+ * field must match the field type.
+ *
+ * Select(DepProd) of CurSubj -> List of FieldType
+ * SelectT(Prod, Prod, FieldType)
+ * for each of its dependencies
+ *   it selects transitively for the product type
+ *   if the result of selecting for the product type has dependencies, it continues recursing
+ * if those dependencies are
+ *
  * A node that recursively selects the dependencies of requested type and merge them.
  */
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -480,6 +658,7 @@ pub struct SelectTransitive {
   pub subject: Key,
   pub variants: Variants,
   pub selector: selectors::SelectTransitive,
+  edges: rule_graph::RuleEdges
 }
 
 impl SelectTransitive {
@@ -493,7 +672,13 @@ impl SelectTransitive {
     let field_name = self.selector.field.to_owned();
     context
       .get(
-        Select::new(self.selector.product.clone(), subject_key, self.variants.clone())
+        Select::new_nested(
+          selectors::Selector::SelectTransitive(self.selector.clone()),
+          self.selector.product.clone(),
+          subject_key,
+          self.variants.clone(),
+          self.edges.clone()
+        )
       )
       .map(move |product| {
         let deps = externs::project_multi(&product, &field_name);
@@ -523,7 +708,13 @@ impl Node for SelectTransitive {
     context
       .get(
         // Select the product holding the dependency list.
-        Select::new(self.selector.dep_product, self.subject.clone(), self.variants.clone())
+        Select::new_nested(
+          selectors::Selector::SelectTransitive(self.selector.clone()),
+          self.selector.dep_product,
+          self.subject.clone(),
+          self.variants.clone(),
+          self.edges.clone()
+        )
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -596,6 +787,7 @@ pub struct SelectProjection {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectProjection,
+  edges: rule_graph::RuleEdges
 }
 
 impl Node for SelectProjection {
@@ -606,7 +798,13 @@ impl Node for SelectProjection {
     context
       .get(
         // Request the product we need to compute the subject.
-        Select::new(self.selector.input_product, self.subject.clone(), self.variants.clone())
+        Select::new_nested(
+          selectors::Selector::SelectProjection(self.selector.clone()),
+          self.selector.input_product,
+          self.subject.clone(),
+          self.variants.clone(),
+          self.edges.clone()
+        )
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -620,10 +818,12 @@ impl Node for SelectProjection {
               );
             context
               .get(
-                Select::new(
+                Select::new_nested(
+                  selectors::Selector::SelectProjection(self.selector.clone()),
                   self.selector.product,
                   externs::key_for(&projected_subject),
-                  self.variants.clone()
+                  self.variants.clone(),
+                  self.edges.clone()
                 )
               )
               .then(move |output_res| {
@@ -761,6 +961,7 @@ pub struct Snapshot {
   subject: Key,
   product: TypeConstraint,
   variants: Variants,
+  edges: rule_graph::RuleEdges
 }
 
 impl Snapshot {
@@ -886,7 +1087,8 @@ impl Node for Snapshot {
         Select::new(
           context.core.types.path_globs.clone(),
           self.subject.clone(),
-          self.variants.clone()
+          self.variants.clone(),
+          self.edges.clone()
         )
       )
       .then(move |path_globs_res| match path_globs_res {
@@ -920,6 +1122,7 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
+  edges: rule_graph::RuleEdges
 }
 
 impl Task {
@@ -929,33 +1132,38 @@ impl Task {
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
     match selector {
       Selector::Select(s) =>
-        context.get(Select {
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          selector: s,
-        }),
+        context.get(Select::new_with_selector(
+          s,
+          self.subject.clone(),
+          self.variants.clone(),
+          self.edges.clone()
+        )),
       Selector::SelectDependencies(s) =>
         context.get(SelectDependencies {
           subject: self.subject.clone(),
           variants: self.variants.clone(),
           selector: s,
+          edges: self.edges.clone()
         }),
       Selector::SelectTransitive(s) =>
         context.get(SelectTransitive {
           subject: self.subject.clone(),
           variants: self.variants.clone(),
-          selector: s,
+          selector: s.clone(),
+          edges: self.edges.clone()
         }),
       Selector::SelectProjection(s) =>
         context.get(SelectProjection {
           subject: self.subject.clone(),
           variants: self.variants.clone(),
           selector: s,
+          edges: self.edges.clone()
         }),
       Selector::SelectLiteral(s) =>
         context.get(SelectLiteral {
           variants: self.variants.clone(),
           selector: s,
+          edges: self.edges.clone()
         }),
     }
   }
@@ -1034,7 +1242,9 @@ impl NodeKey {
       &NodeKey::SelectDependencies(ref s) =>
         format!("Dependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectTransitive(ref s) =>
-        format!("TransitiveDependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
+        format!("TransitiveDependencies( {}, {})",
+                typstr(&s.selector.product),
+                typstr(&s.selector.dep_product)),
       &NodeKey::SelectProjection(ref s) =>
         format!("Projection({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::Task(ref s) =>

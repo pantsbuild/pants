@@ -6,11 +6,12 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use futures_cpupool::{self, CpuPool};
 
+use core::TypeId;
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
+use rule_graph::RuleGraphContainer;
 use tasks::Tasks;
 use types::Types;
-
 
 /**
  * The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -21,6 +22,7 @@ use types::Types;
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
+  pub rule_graph: RuleGraphContainer,
   pub types: Types,
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
@@ -40,6 +42,7 @@ impl Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
+      rule_graph: RuleGraphContainer::new(),
       snapshots: Snapshots::new()
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
@@ -75,6 +78,15 @@ impl Core {
     let mut pool = self.pool.write().unwrap();
     *pool = Core::create_pool();
   }
+
+  pub fn task_end(&mut self) {
+    self.tasks.task_end();
+  }
+
+  pub fn finish(&mut self, root_types: Vec<TypeId>) {
+    self.rule_graph.setup(&self.tasks, root_types)
+  }
+
 }
 
 #[derive(Clone)]

@@ -184,6 +184,8 @@ void task_add_select_transitive(RawScheduler*, TypeConstraint, TypeConstraint, B
 void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
 void task_end(RawScheduler*);
 
+void scheduler_root_subject_types(RawScheduler*, TypeId*, uint64_t);
+
 uint64_t graph_len(RawScheduler*);
 uint64_t graph_invalidate(RawScheduler*, BufferBuffer);
 void graph_visualize(RawScheduler*, char*);

@@ -262,6 +262,18 @@ pub extern fn scheduler_create(
 }
 
 #[no_mangle]
+pub extern fn scheduler_root_subject_types(
+  scheduler_ptr: *mut RawScheduler,
+  subject_types_ptr: *mut TypeId,
+  subject_types_len: u64) {
+  with_scheduler(scheduler_ptr, |raw| {
+    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
+      raw.scheduler.set_root_subject_types(subject_types.clone())
+    })
+  })
+}
+
+#[no_mangle]
 pub extern fn scheduler_post_fork(scheduler_ptr: *mut RawScheduler) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.core.post_fork();
@@ -441,8 +453,8 @@ pub extern fn task_add_select_projection(
 
 #[no_mangle]
 pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.task_end();
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.task_end()
   })
 }
 

@@ -19,7 +19,7 @@ from pants.engine.fs import PathGlobs, create_fs_tasks
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
-from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
+from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection, SelectTransitive)
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
@@ -541,6 +541,28 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" -> {"(A, (,), noop) of SubA"}
                        // internal entries
                          "(A, (,), noop) of SubA" -> {}
+                     }""").strip(),
+      subgraph)
+
+  def test_select_transitive_with_separate_types_for_subselectors(self):
+    rules = [
+      (Exactly(A), (SelectTransitive(B, C, field_types=(D,)),), noop),
+      (B, (Select(D),), noop),
+      (C, (Select(SubA),), noop)
+    ]
+
+    subgraph = self.create_subgraph(A, rules, SubA())
+
+    self.assert_equal_with_printing(dedent("""
+                     digraph {
+                       // root subject types: SubA
+                       // root entries
+                         "Select(A) for SubA" [color=blue]
+                         "Select(A) for SubA" -> {"(A, (SelectTransitive(B, C, field_types=(D,)),), noop) of SubA"}
+                       // internal entries
+                         "(A, (SelectTransitive(B, C, field_types=(D,)),), noop) of SubA" -> {"(C, (Select(SubA),), noop) of SubA" "(B, (Select(D),), noop) of D"}
+                         "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
+                         "(C, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
                      }""").strip(),
       subgraph)
 
