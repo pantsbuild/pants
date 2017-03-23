@@ -21,33 +21,23 @@ impl RuleGraphContainer {
   pub fn new() -> RuleGraphContainer {
     RuleGraphContainer { rule_graph: None }
   }
+
   pub fn setup(&mut self, tasks: &Tasks, root_subject_types: Vec<TypeId>) {
     let maker = GraphMaker::new(tasks, root_subject_types);
 
     let graph = Some(maker.full_graph());
     self.rule_graph = graph;
   }
-  pub fn print_matching_entries(&self, task: &Task) {
-    if let Some(ref rule_graph) = self.rule_graph {
-      let entries = rule_graph.rule_dependency_edges.keys()
-        .filter(|k| k.rule == *task)
-        .collect::<Vec<_>>();
-      println!("  entries w/ task {}\n  {}", entries.len(),
-      entries.iter().map(|&e| entry_str(&Entry::from(e.clone())))
-        .collect::<Vec<_>>()
-        .join("\n  ")
-      )
-    }
-  }
+
   pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> {
     if let Some(ref rule_graph) = self.rule_graph {
       let root = RootEntry { subject_type: subject_type, clause: vec![selector] };
       // could do something if None, since we might need to. Or could let caller deal
       rule_graph.root_dependencies.get(&root).map(|e|e.clone())
     } else {
-      // this means we need to do subgraph gen.
+      // this means we need to do subgraph gen. Currently, this just fails,
+      // but we should have it generate a subgraph on the fly for use.
       panic!("no root edge known here for {} with {}", type_str(subject_type.clone()), selector_str(&selector));
-      //None
     }
   }
 
@@ -85,7 +75,7 @@ pub enum Entry {
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct RootEntry {
+pub struct RootEntry {
   subject_type: TypeId,
   clause: Vec<Selector>,
 }
@@ -177,7 +167,7 @@ impl Entry {
   }
 }
 
-type Entries = Vec<Entry>;
+pub type Entries = Vec<Entry>;
 type RootRuleDependencyEdges = HashMap<RootEntry, RuleEdges>;
 type RuleDependencyEdges = HashMap<InnerEntry, RuleEdges>;
 type RuleDiagnostics = Vec<Diagnostic>;
@@ -888,9 +878,6 @@ impl RuleEdges {
     r
   }
 
-  pub fn len(&self) -> usize {
-    self.dependencies.len()
-  }
 }
 
 fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, RuleEdges>,

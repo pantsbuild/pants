@@ -91,7 +91,7 @@ impl Scheduler {
       Root::Select(Select::new(product,
                                subject,
                                Default::default(),
-                               edges.expect("Edges to have been found TODO handle this")))
+                               &edges.expect("Edges to have been found. TODO handle this. Right now, find_root_edges will panic. But we should have a better response.")))
     );
   }
 
