@@ -21,6 +21,13 @@ logger = logging.getLogger(__name__)
 
 
 def rule(output_type, input_selectors):
+  """A @decorator that declares that a particular static function may be used as a TaskRule.
+
+  :param Constraint output_type: The return/output type for the Rule. This may be either a
+    concrete Python type, or an instance of `Exactly` representing a union of multiple types.
+  :param list input_selectors: A list of Selector instances that matches the number of arguments
+    to the @decorated function.
+  """
   def wrapper(func):
     func._rule = TaskRule(output_type, input_selectors, func)
     return func
