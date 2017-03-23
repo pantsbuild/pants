@@ -471,7 +471,8 @@ class LocalScheduler(object):
 
       if self._scheduler.visualize_to_dir() is not None:
         name = 'run.{}.dot'.format(self._run_count)
-        rule_graph_name = 'rule_graph.{}.dot'.format(self._run_count)
+        rule_graph_name = 'rule_graph.dot'
+
         self._run_count += 1
         self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
         self.visualize_rule_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), rule_graph_name))
