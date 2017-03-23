@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.bin.options_initializer import OptionsInitializer
 from pants.build_graph.intermediate_target_factory import IntermediateTargetFactoryBase
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
+from pants.init.options_initializer import OptionsInitializer
 from pants.subsystem.subsystem import Subsystem
 
 

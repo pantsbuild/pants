@@ -12,7 +12,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import SingleAddress
-from pants.bin.options_initializer import OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedRequest
 
@@ -54,7 +54,8 @@ class TargetRoots(object):
     # Determine the literal target roots.
     spec_roots = cls.parse_specs(options.target_specs, build_root)
 
-    # Determine `Changed` arguments directly from options to support pre-`Subsystem` initialization paths.
+    # Determine `Changed` arguments directly from options to support pre-`Subsystem`
+    # initialization paths.
     changed_options = options.for_scope('changed')
     changed_request = ChangedRequest.from_options(changed_options)
 
