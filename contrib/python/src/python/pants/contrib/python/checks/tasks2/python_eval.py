@@ -8,27 +8,25 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import os
 import pkgutil
-import shutil
-
-from pex.pex import PEX
-from pex.pex_builder import PEXBuilder
-from pex.pex_info import PexInfo
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.tasks.python_task import PythonTask
-from pants.backend.python.tasks2.pex_build_util import has_python_requirements, dump_sources, \
-  has_python_sources, dump_requirements
+from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
+                                                        has_python_requirements, has_python_sources)
 from pants.backend.python.tasks2.python_execution_task_base import WrappedPEX
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.python.python_repos import PythonRepos
-from pants.util.dirutil import safe_rmtree, safe_mkdir, safe_concurrent_creation
+from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_method
+from pex.pex import PEX
+from pex.pex_builder import PEXBuilder
+from pex.pex_info import PexInfo
 
 
 class PythonEval(ResolveRequirementsTaskBase):
@@ -116,23 +114,26 @@ class PythonEval(ResolveRequirementsTaskBase):
       return compiled
 
   def _compile_target(self, vt):
-    # "Compiles" a target by forming an isolated chroot of its sources and transitive deps and then
-    # attempting to import each of the target's sources in the case of a python library or else the
-    # entry point in the case of a python binary.
-    #
-    # For a library with sources lib/core.py and lib/util.py a "compiler" main file would look like:
-    #
-    #   if __name__ == '__main__':
-    #     import lib.core
-    #     import lib.util
-    #
-    # For a binary with entry point lib.bin:main the "compiler" main file would look like:
-    #
-    #   if __name__ == '__main__':
-    #     from lib.bin import main
-    #
-    # In either case the main file is executed within the target chroot to reveal missing BUILD
-    # dependencies.
+    """'Compiles' a python target.
+
+    'Compiling' means forming an isolated chroot of its sources and transitive deps and then
+    attempting to import each of the target's sources in the case of a python library or else the
+    entry point in the case of a python binary.
+
+    For a library with sources lib/core.py and lib/util.py a "compiler" main file would look like:
+
+      if __name__ == '__main__':
+        import lib.core
+        import lib.util
+
+    For a binary with entry point lib.bin:main the "compiler" main file would look like:
+
+      if __name__ == '__main__':
+        from lib.bin import main
+
+    In either case the main file is executed within the target chroot to reveal missing BUILD
+    dependencies.
+    """
     target = vt.target
     with self.context.new_workunit(name=target.address.spec):
       modules = self._get_modules(target)
@@ -152,20 +153,18 @@ class PythonEval(ResolveRequirementsTaskBase):
       exec_file_hash = hasher.hexdigest()
       exec_pex_path = os.path.realpath(os.path.join(exec_pex_parent, exec_file_hash))
       if not os.path.isdir(exec_pex_path):
-        # Write the entry point.
-        exec_pex_path_tmp = '{}.tmp'.format(exec_pex_path)
-        safe_rmtree(exec_pex_path_tmp)
-        safe_mkdir(exec_pex_path_tmp)
-        with open(os.path.join(exec_pex_path_tmp, '{}.py'.format(self._EXEC_NAME)), 'w') as outfile:
-          outfile.write(executable_file_content)
-        pex_info = (target.pexinfo if isinstance(target, PythonBinary) else None) or PexInfo()
-        # Override any user-specified entry point, under the assumption that the
-        # executable_file_content does what the user intends (including, probably, calling that
-        # underlying entry point).
-        pex_info.entry_point = self._EXEC_NAME
-        builder = PEXBuilder(exec_pex_path_tmp, interpreter, pex_info=pex_info)
-        builder.freeze()
-        shutil.move(exec_pex_path_tmp, exec_pex_path)
+        with safe_concurrent_creation(exec_pex_path) as safe_path:
+          # Write the entry point.
+          safe_mkdir(safe_path)
+          with open(os.path.join(safe_path, '{}.py'.format(self._EXEC_NAME)), 'w') as outfile:
+            outfile.write(executable_file_content)
+          pex_info = (target.pexinfo if isinstance(target, PythonBinary) else None) or PexInfo()
+          # Override any user-specified entry point, under the assumption that the
+          # executable_file_content does what the user intends (including, probably, calling that
+          # underlying entry point).
+          pex_info.entry_point = self._EXEC_NAME
+          builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
+          builder.freeze()
 
       exec_pex = PEX(exec_pex_path, interpreter)
       extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]

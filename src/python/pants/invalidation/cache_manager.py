@@ -146,20 +146,6 @@ class VersionedTargetSet(object):
       if self.has_previous_results_dir:
         yield self.previous_results_dir
 
-  def for_closure(self, target):
-    """Returns a VersionedTargetSet for the intersection of this one with the target's closure.
-
-    Useful primarily when the target and all (relevant) targets in its closure are already in
-    this VersionedTargetSet.
-    """
-    target_to_vt = self._target_to_vt()
-    vts = []
-    for t in target.closure():
-      vt = target_to_vt.get(t)
-      if vt:
-        vts.append(vt)
-    return self.from_versioned_targets(vts)
-
   @memoized_method
   def _target_to_vt(self):
     return {vt.target: vt for vt in self.versioned_targets}
