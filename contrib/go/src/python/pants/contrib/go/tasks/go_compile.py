@@ -56,10 +56,11 @@ class GoCompile(GoWorkspaceTask):
 
   def _go_install(self, target, gopath):
     args = self.get_options().build_flags.split() + [target.import_path]
-    self.context.log.info('Installing {}'.format(target.address.spec))
-    result, go_cmd = self.go_dist.execute_go_cmd('install', gopath=gopath, args=args,
-                                                 workunit_factory=self.context.new_workunit,
-                                                 workunit_labels=[WorkUnitLabel.COMPILER])
+    result, go_cmd = self.go_dist.execute_go_cmd(
+      'install', gopath=gopath, args=args,
+      workunit_factory=self.context.new_workunit,
+      workunit_name='install {}'.format(target.address.spec),
+      workunit_labels=[WorkUnitLabel.COMPILER])
     if result != 0:
       raise TaskError('{} failed with exit code {}'.format(go_cmd, result))
 

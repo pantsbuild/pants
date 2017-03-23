@@ -77,10 +77,11 @@ class GoFetch(GoTask):
     # Only fetch each remote root once.
     if not os.path.exists(root_dir):
       with temporary_dir() as tmp_fetch_root:
-        fetcher.fetch(dest=tmp_fetch_root, rev=rev)
-        safe_mkdir(root_dir)
-        for path in os.listdir(tmp_fetch_root):
-          shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
+        with self.context.new_workunit('fetch {}'.format(pkg)):
+          fetcher.fetch(dest=tmp_fetch_root, rev=rev)
+          safe_mkdir(root_dir)
+          for path in os.listdir(tmp_fetch_root):
+            shutil.move(os.path.join(tmp_fetch_root, path), os.path.join(root_dir, path))
 
     # TODO(John Sirois): Circle back and get get rid of this symlink tree.
     # GoWorkspaceTask will further symlink a single package from the tree below into a
@@ -97,6 +98,7 @@ class GoFetch(GoTask):
     for path in os.listdir(root_dir):
       os.symlink(os.path.join(root_dir, path), os.path.join(dest_dir, path))
 
+  # Note: Will update import_root_map.
   def _map_fetched_remote_source(self, go_remote_lib, gopath, all_known_remote_libs,
                                  resolved_remote_libs, undeclared_deps, import_root_map):
     # See if we've computed the remote import paths for this rev of this lib in a previous run.
@@ -190,6 +192,7 @@ class GoFetch(GoTask):
         gopath = os.path.join(vt.results_dir, 'gopath')
         if not vt.valid:
           self._fetch_pkg(gopath, go_remote_lib.import_path, go_remote_lib.rev)
+        # _map_fetched_remote_source() will modify import_root_map.
         self._map_fetched_remote_source(go_remote_lib, gopath, all_known_remote_libs,
                                         resolved_remote_libs, undeclared_deps, import_root_map)
         go_remote_lib_src[go_remote_lib] = os.path.join(gopath, 'src', go_remote_lib.import_path)
