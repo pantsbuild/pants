@@ -41,5 +41,6 @@ target(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info:plugin',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python2:plugin',
   ],
 )
