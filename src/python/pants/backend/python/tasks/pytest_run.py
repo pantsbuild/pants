@@ -211,6 +211,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     exclude_lines =
         def __repr__
         raise NotImplementedError
+        pragma: no cover
+        pragma: no branch
+        pragma: recursive coverage
     """)
 
   @staticmethod

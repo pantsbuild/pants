@@ -143,13 +143,13 @@ class RoundEngine(Engine):
       tasktypes_by_name[task_name] = task_type
       visited_task_types.add(task_type)
 
-      alternate_target_roots = task_type._alternate_target_roots(context.options,
-                                                                 context.address_mapper,
-                                                                 context.build_graph)
+      alternate_target_roots = task_type.get_alternate_target_roots(context.options,
+                                                                    context.address_mapper,
+                                                                    context.build_graph)
       target_roots_replacement.propose_alternates(task_type, alternate_target_roots)
 
       round_manager = RoundManager(context)
-      task_type._prepare(context.options, round_manager)
+      task_type.invoke_prepare(context.options, round_manager)
       try:
         dependencies = round_manager.get_dependencies()
         for producer_info in dependencies:
