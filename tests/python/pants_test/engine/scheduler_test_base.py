@@ -33,13 +33,13 @@ class SchedulerTestBase(object):
 
   _native = init_native()
 
-  def mk_fs_tree(self, build_root_src=None, ignore_patterns=None):
+  def mk_fs_tree(self, work_dir, build_root_src=None, ignore_patterns=None):
     """Create a temporary FilesystemProjectTree.
 
+    :param work_dir: The pants workdir.
     :param build_root_src: Optional directory to pre-populate from; otherwise, empty.
     :returns: A FilesystemProjectTree.
     """
-    work_dir = safe_mkdtemp()
     self.addCleanup(safe_rmtree, work_dir)
     build_root = os.path.join(work_dir, 'build_root')
     if build_root_src is not None:
@@ -55,10 +55,11 @@ class SchedulerTestBase(object):
     """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
     goals = goals or dict()
     tasks = tasks or []
-    project_tree = project_tree or self.mk_fs_tree()
+    work_dir = safe_mkdtemp()
+    project_tree = project_tree or self.mk_fs_tree(work_dir)
 
     tasks = list(tasks) + create_fs_tasks(project_tree)
-    return LocalScheduler(goals, tasks, project_tree, self._native)
+    return LocalScheduler(work_dir, goals, tasks, project_tree, self._native)
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
