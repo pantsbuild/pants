@@ -34,7 +34,6 @@ use std::io;
 use std::mem;
 use std::os::raw;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 
 use context::Core;
@@ -182,8 +181,15 @@ pub extern fn externs_set(
   );
 }
 
+/**
+ * Given a set of Tasks and type information, creates a Scheduler.
+ *
+ * The given Tasks struct will be cloned, so no additional mutation of the reference will
+ * affect the created Scheduler.
+ */
 #[no_mangle]
 pub extern fn scheduler_create(
+  tasks_ptr: *mut Tasks,
   construct_snapshot: Function,
   construct_snapshots: Function,
   construct_file_content: Function,
@@ -213,12 +219,16 @@ pub extern fn scheduler_create(
       .unwrap_or_else(|e|
         panic!("Failed to decode ignore patterns as UTF8: {:?}", e)
       );
+  let tasks =
+    with_tasks(tasks_ptr, |tasks| {
+      tasks.clone()
+    });
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       Scheduler::new(
         Core::new(
-          Tasks::new(),
+          tasks,
           Types {
             construct_snapshot: construct_snapshot,
             construct_snapshots: construct_snapshots,
@@ -320,118 +330,131 @@ pub extern fn execution_roots(
 }
 
 #[no_mangle]
-pub extern fn intrinsic_task_add(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_create() -> *const Tasks {
+  // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
+  Box::into_raw(Box::new(Tasks::new()))
+}
+
+#[no_mangle]
+pub extern fn tasks_intrinsic_add(
+  tasks_ptr: *mut Tasks,
   func: Function,
   input_type: TypeId,
   input_constraint: TypeConstraint,
   output_constraint: TypeConstraint,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
   })
 }
 
 #[no_mangle]
-pub extern fn singleton_task_add(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_singleton_add(
+  tasks_ptr: *mut Tasks,
   func: Function,
   output_constraint: TypeConstraint,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.singleton_add(func, output_constraint);
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.singleton_add(func, output_constraint);
   })
 }
 
 #[no_mangle]
-pub extern fn task_add(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_task_begin(
+  tasks_ptr: *mut Tasks,
   func: Function,
   output_type: TypeConstraint,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.task_add(func, output_type);
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.task_begin(func, output_type);
   })
 }
 
 #[no_mangle]
-pub extern fn task_add_select(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_add_select(
+  tasks_ptr: *mut Tasks,
   product: TypeConstraint,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select(product, None);
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select(product, None);
   })
 }
 
 #[no_mangle]
-pub extern fn task_add_select_variant(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_add_select_variant(
+  tasks_ptr: *mut Tasks,
   product: TypeConstraint,
   variant_key_buf: Buffer,
 ) {
   let variant_key =
     variant_key_buf.to_string().expect("Failed to decode key for select_variant");
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select(product, Some(variant_key));
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select(product, Some(variant_key));
   })
 }
 
 #[no_mangle]
-pub extern fn task_add_select_literal(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_add_select_literal(
+  tasks_ptr: *mut Tasks,
   subject: Key,
   product: TypeConstraint,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_literal(subject, product);
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select_literal(subject, product);
   })
 }
 
 #[no_mangle]
-pub extern fn task_add_select_dependencies(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_add_select_dependencies(
+  tasks_ptr: *mut Tasks,
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
     })
 }
 
 #[no_mangle]
-pub extern fn task_add_select_transitive(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_add_select_transitive(
+  tasks_ptr: *mut Tasks,
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_transitive(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select_transitive(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
     })
 }
 
 #[no_mangle]
-pub extern fn task_add_select_projection(
-  scheduler_ptr: *mut Scheduler,
+pub extern fn tasks_add_select_projection(
+  tasks_ptr: *mut Tasks,
   product: TypeConstraint,
   projected_subject: TypeId,
   field: Buffer,
   input_product: TypeConstraint,
 ) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
   })
 }
 
 #[no_mangle]
-pub extern fn task_end(scheduler_ptr: *mut Scheduler) {
-  with_core(scheduler_ptr, |core| {
-    core.tasks.task_end();
+pub extern fn tasks_task_end(tasks_ptr: *mut Tasks) {
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.task_end();
   })
+}
+
+#[no_mangle]
+pub extern fn tasks_destroy(tasks_ptr: *mut Tasks) {
+  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
+  // to be destroyed at the end of this function.
+  let _ = unsafe { Box::from_raw(tasks_ptr) };
 }
 
 #[no_mangle]
@@ -479,7 +502,6 @@ pub extern fn graph_trace(scheduler_ptr: *mut Scheduler, path_ptr: *const raw::c
   });
 }
 
-
 #[no_mangle]
 pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
@@ -489,13 +511,13 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 
 #[no_mangle]
 pub extern fn validator_run(
-  scheduler_ptr: *mut Scheduler,
+  tasks_ptr: *mut Tasks,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
 ) -> Value {
-  with_scheduler(scheduler_ptr, |scheduler| {
+  with_tasks(tasks_ptr, |tasks| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let graph_maker = GraphMaker::new(&scheduler.core.tasks,
+      let graph_maker = GraphMaker::new(&tasks,
                                         subject_types.clone());
       let graph = graph_maker.full_graph();
 
@@ -578,21 +600,10 @@ fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
   t
 }
 
-/**
- * A helper to allow for mutation of the Tasks struct. This method is unsafe because
- * it must only be called while the Scheduler is not executing any work (usually during
- * initialization).
- *
- * TODO: An alternative to this method would be to move construction of the Tasks struct
- * before construction of the Scheduler, which would allow it to be mutated before it
- * needed to become atomic for usage in the Scheduler.
- */
-fn with_core<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
-    where F: FnOnce(&mut Core)->T {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    let core =
-      Arc::get_mut(&mut scheduler.core)
-        .expect("The Core may not be mutated once the Scheduler has started.");
-    f(core)
-  })
+fn with_tasks<F, T>(tasks_ptr: *mut Tasks, f: F) -> T
+    where F: FnOnce(&mut Tasks)->T {
+  let mut tasks = unsafe { Box::from_raw(tasks_ptr) };
+  let t = f(&mut tasks);
+  mem::forget(tasks);
+  t
 }

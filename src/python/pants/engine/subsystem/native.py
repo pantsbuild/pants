@@ -148,42 +148,44 @@ void externs_set(ExternContext*,
                  extern_ptr_invoke_runnable,
                  TypeId);
 
-Scheduler* scheduler_create(Function,
-                               Function,
-                               Function,
-                               Function,
-                               Function,
-                               Function,
-                               Function,
-                               Function,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeConstraint,
-                               TypeId,
-                               TypeId,
-                               Buffer,
-                               BufferBuffer);
+Tasks* tasks_create();
+void tasks_task_begin(Tasks*, Function, TypeConstraint);
+void tasks_add_select(Tasks*, TypeConstraint);
+void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
+void tasks_add_select_literal(Tasks*, Key, TypeConstraint);
+void tasks_add_select_dependencies(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
+void tasks_add_select_transitive(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
+void tasks_add_select_projection(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
+void tasks_task_end(Tasks*);
+void tasks_intrinsic_add(Tasks*, Function, TypeId, TypeConstraint, TypeConstraint);
+void tasks_singleton_add(Tasks*, Function, TypeConstraint);
+void tasks_destroy(Tasks*);
+
+Scheduler* scheduler_create(Tasks*,
+                            Function,
+                            Function,
+                            Function,
+                            Function,
+                            Function,
+                            Function,
+                            Function,
+                            Function,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeConstraint,
+                            TypeId,
+                            TypeId,
+                            Buffer,
+                            BufferBuffer);
 void scheduler_post_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
-
-void intrinsic_task_add(Scheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
-void singleton_task_add(Scheduler*, Function, TypeConstraint);
-
-void task_add(Scheduler*, Function, TypeConstraint);
-void task_add_select(Scheduler*, TypeConstraint);
-void task_add_select_variant(Scheduler*, TypeConstraint, Buffer);
-void task_add_select_literal(Scheduler*, Key, TypeConstraint);
-void task_add_select_dependencies(Scheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
-void task_add_select_transitive(Scheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
-void task_add_select_projection(Scheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
-void task_end(Scheduler*);
 
 uint64_t graph_len(Scheduler*);
 uint64_t graph_invalidate(Scheduler*, BufferBuffer);
@@ -201,7 +203,7 @@ void execution_add_root_select_dependencies(Scheduler*,
 ExecutionStat execution_execute(Scheduler*);
 RawNodes* execution_roots(Scheduler*);
 
-Value validator_run(Scheduler*, TypeId*, uint64_t);
+Value validator_run(Tasks*, TypeId*, uint64_t);
 
 void rule_graph_visualize(Scheduler*, TypeId*, uint64_t, char*);
 void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
@@ -674,7 +676,11 @@ class Native(object):
   def buffer(self, cdata):
     return self.ffi.buffer(cdata)
 
+  def new_tasks(self):
+    return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
+
   def new_scheduler(self,
+                    tasks,
                     build_root,
                     ignore_patterns,
                     construct_snapshot,
@@ -701,6 +707,7 @@ class Native(object):
       return TypeConstraint(self.context.to_id(constraint))
 
     scheduler = self.lib.scheduler_create(
+        tasks,
         # Constructors/functions.
         Function(self.context.to_id(construct_snapshot)),
         Function(self.context.to_id(construct_snapshots)),
