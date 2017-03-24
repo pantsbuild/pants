@@ -140,7 +140,7 @@ impl Scheduler {
           selector.clone(),
           subject,
           Default::default(),
-          edges.expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject))
+          &edges.expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject))
         )
       )
     );

@@ -77,6 +77,22 @@ pub enum Entry {
   }
 }
 
+impl Entry {
+
+  pub fn matches_subject_type(&self, actual_subject_type: TypeId) -> bool {
+    match *self {
+      Entry::SubjectIsProduct { subject_type } |
+      Entry::Root(RootEntry { subject_type, .. }) |
+      Entry::InnerEntry(InnerEntry { subject_type, .. }) =>
+        subject_type == actual_subject_type,
+      Entry::Literal { .. } =>
+        true,
+      Entry::Unreachable { .. }=>
+        panic!("Shouldn't compare to an unreachable entry!")
+    }
+  }
+}
+
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct RootEntry {
   subject_type: TypeId,

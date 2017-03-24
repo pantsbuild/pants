@@ -479,7 +479,8 @@ pub struct SelectDependencies {
   pub subject: Key,
   pub variants: Variants,
   pub selector: selectors::SelectDependencies,
-  pub edges: rule_graph::RuleEdges
+  pub dep_product_entries: rule_graph::Entries,
+  pub product_entries: rule_graph::Entries,
 }
 
 impl SelectDependencies {
@@ -487,13 +488,41 @@ impl SelectDependencies {
     selector: selectors::SelectDependencies,
     subject: Key,
     variants: Variants,
-    edges: rule_graph::RuleEdges
+    edges: &rule_graph::RuleEdges
   ) -> SelectDependencies {
+    let dep_p_entries = edges.entries_for(
+      &vec![
+      Selector::SelectDependencies(selector.clone()),
+      Selector::select(selector.clone().dep_product)
+      ]);
+    let p_entries = edges.entries_for(
+      &vec![
+      Selector::SelectDependencies(selector.clone()),
+      Selector::select(selector.clone().product)
+      ]);
+
     SelectDependencies {
       subject: subject,
       variants: variants,
-      selector: selector,
-      edges: edges
+      selector: selector.clone(),
+      // filters entries by whether the subject type is the right subject type
+      dep_product_entries:
+        dep_p_entries.into_iter()
+          // TODO these filters fail rn because of the Address thing
+        /*.filter(|e|
+          e.matches_subject_type(subject.type_id().clone())
+        )*/
+          .collect::<Vec<_>>(),
+
+      product_entries: p_entries.into_iter()
+        /*
+        .filter(|e|
+          selector.clone().field_types
+            .iter()
+            .any(|f| e.matches_subject_type(f.clone()))
+        )
+        */
+        .collect::<Vec<_>>(),
     }
   }
 
@@ -504,13 +533,13 @@ impl SelectDependencies {
 
     let dep_subject_key = externs::key_for(dep_subject);
     context.get(
-      Select::new_nested(
-        selectors::Selector::SelectDependencies(self.selector.clone()),
-        self.selector.product.clone(),
-        dep_subject_key,
-        self.variants.clone(),
-        &self.edges,
-      ))
+      Select {
+        selector: selectors::Select { product: self.selector.product, variant_key: None },
+        subject: dep_subject_key,
+        variants: self.variants.clone(),
+        entries: self.product_entries.clone()
+      }
+    )
   }
 }
 
@@ -521,13 +550,15 @@ impl Node for SelectDependencies {
     context
       .get(
         // Select the product holding the dependency list.
-        Select::new_nested(
-          selectors::Selector::SelectDependencies(self.selector.clone()),
-          self.selector.dep_product,
-          self.subject.clone(),
-          self.variants.clone(),
-          &self.edges,
-        )
+        Select {
+          selector: selectors::Select {
+            product: self.selector.dep_product,
+            variant_key: None
+          },
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          entries: self.dep_product_entries.clone()
+        }
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -1070,12 +1101,13 @@ impl Task {
           &self.edges,
         )),
       Selector::SelectDependencies(s) =>
-        context.get(SelectDependencies {
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          selector: s,
-          edges: self.edges.clone()
-        }),
+        context.get(
+          SelectDependencies::new(
+            s,
+            self.subject.clone(),
+            self.variants.clone(),
+            &self.edges
+          )),
       Selector::SelectTransitive(s) =>
         context.get(SelectTransitive {
           subject: self.subject.clone(),
