@@ -13,11 +13,11 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources)
 from pants.backend.python.tasks2.python_execution_task_base import WrappedPEX
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
-from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -217,7 +217,7 @@ class PythonEval(ResolveRequirementsTaskBase):
     return generator.render()
 
   def _get_interpreter_for_target_closure(self, target):
-    targets = [t for t in target.closure() if isinstance(t, PythonTask)]
+    targets = [t for t in target.closure() if isinstance(t, PythonTarget)]
     return self._interpreter_cache().select_interpreter_for_targets(targets)
 
   def _resolve_requirements_for_versioned_target_closure(self, interpreter, vt):

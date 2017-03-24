@@ -9,15 +9,13 @@ import re
 from collections import namedtuple
 
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.option.custom_types import file_option
-
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
-
+from pants.option.custom_types import file_option
+from pants.task.task import Task
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
 _NOQA_FILE_SEARCH = re.compile(r'# (flake8|checkstyle): noqa$').search
@@ -39,7 +37,7 @@ def noqa_file_filter(python_file):
   return any(_NOQA_FILE_SEARCH(line) is not None for line in python_file.lines)
 
 
-class PythonCheckStyleTask(PythonTask):
+class PythonCheckStyleTask(Task):
   _PYTHON_SOURCE_EXTENSION = '.py'
   _plugins = []
   _subsystems = tuple()
@@ -52,7 +50,7 @@ class PythonCheckStyleTask(PythonTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PythonTask, cls).subsystem_dependencies() + cls._subsystems
+    return super(Task, cls).subsystem_dependencies() + cls._subsystems
 
   @classmethod
   def register_options(cls, register):
