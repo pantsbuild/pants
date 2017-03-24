@@ -10,7 +10,6 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.bin.options_initializer import OptionsInitializer
 from pants.engine.build_files import create_graph_tasks
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import create_fs_tasks
@@ -26,6 +25,7 @@ from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.engine.subsystem.native import Native
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
@@ -91,7 +91,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
+    graph = LegacyBuildGraph.create(self.scheduler, self.engine, self.symbol_table_cls)
     logger.debug('build_graph is: %s', graph)
     with self.scheduler.locked():
       # Ensure the entire generator is unrolled.

@@ -102,6 +102,18 @@ class DeprecatedTest(unittest.TestCase):
       self.assertEqual(expected_return, deprecated_function())
       self.assertIn(hint_message, str(extract_deprecation_warning()))
 
+  def test_deprecation_subject(self):
+    subject = '`./pants blah`'
+    expected_return = 'deprecated_function'
+
+    @deprecated(self.FUTURE_VERSION, subject=subject)
+    def deprecated_function():
+      return expected_return
+
+    with self._test_deprecation() as extract_deprecation_warning:
+      self.assertEqual(expected_return, deprecated_function())
+      self.assertIn(subject, str(extract_deprecation_warning()))
+
   def test_removal_version_required(self):
     with self.assertRaises(MissingRemovalVersionError):
       @deprecated(None)

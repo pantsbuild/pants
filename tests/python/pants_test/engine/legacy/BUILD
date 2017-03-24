@@ -97,6 +97,7 @@ python_tests(
     '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
+    'src/python/pants/init',
     'tests/python/pants_test/engine:util',
   ]
 )

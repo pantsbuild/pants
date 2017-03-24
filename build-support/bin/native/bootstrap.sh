@@ -114,6 +114,13 @@ function bootstrap_native_code() {
     source "${cffi_env_script}"
     local readonly native_binary="$(build_native_code)"
 
+    # If bootstrapping the native engine fails, don't attempt to run pants
+    # afterwards.
+    if ! [ -f "${native_binary}" ]
+    then
+      die "Failed to build native engine."
+    fi
+
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
     target_binary="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"

@@ -39,7 +39,9 @@ class TargetAdaptor(StructWithDeps):
       see: https://github.com/pantsbuild/pants/issues/2997
     """
     sources = getattr(self, 'sources', None)
-    if not sources:
+    # N.B. Here we check specifically for `sources is None`, as it's possible for sources
+    # to be e.g. an explicit empty list (sources=[]).
+    if sources is None:
       if self.default_sources_globs:
         return Globs(*self.default_sources_globs,
                      spec_path=self.address.spec_path,

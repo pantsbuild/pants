@@ -130,7 +130,7 @@ def deprecated_conditional(predicate,
     warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
 
 
-def deprecated(removal_version, hint_message=None):
+def deprecated(removal_version, hint_message=None, subject=None):
   """Marks a function or method as deprecated.
 
   A removal version must be supplied and it must be greater than the current 'pantsbuild.pants'
@@ -146,6 +146,8 @@ def deprecated(removal_version, hint_message=None):
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated
                               function.
   :param str hint_message: An optional hint pointing to alternatives to the deprecation.
+  :param str subject: The name of the subject that has been deprecated for logging clarity. Defaults
+                      to the name of the decorated function/method.
   :raises DeprecationApplicationError if the @deprecation is applied improperly.
   """
   validate_removal_semver(removal_version)
@@ -158,7 +160,7 @@ def deprecated(removal_version, hint_message=None):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-      warn_or_error(removal_version, func_full_name, hint_message)
+      warn_or_error(removal_version, subject or func_full_name, hint_message)
       return func(*args, **kwargs)
     return wrapper
   return decorator

@@ -38,9 +38,10 @@ class GoFmt(GoWorkspaceTask):
         try:
           output = subprocess.check_output(args)
         except subprocess.CalledProcessError as e:
-          raise TaskError('{} failed with exit code {}'.format(args, e.returncode), exit_code=e.returncode)
+          raise TaskError('{} failed with exit code {}'.format(' '.join(args), e.returncode),
+                          exit_code=e.returncode)
         if output:
-          raise TaskError('gofmt command {} failed with output {}'.format(args, output))
+          raise TaskError('gofmt command {} failed with output {}'.format(' '.join(args), output))
 
   def calculate_sources(self, targets):
     sources = set()

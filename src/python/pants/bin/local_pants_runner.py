@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
-from pants.bin.options_initializer import OptionsInitializer
 from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.contextutil import hard_exit_handler, maybe_profiled
 

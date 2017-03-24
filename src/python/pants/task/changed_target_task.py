@@ -11,6 +11,9 @@ from pants.scm.subsystems.changed import Changed
 from pants.task.noop_exec_task import NoopExecTask
 
 
+# TODO: Remove this entire file in 1.5.0dev0.
+
+
 logger = logging.getLogger(__name__)
 
 
