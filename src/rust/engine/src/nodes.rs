@@ -784,7 +784,52 @@ pub struct SelectProjection {
   subject: Key,
   variants: Variants,
   selector: selectors::SelectProjection,
-  edges: rule_graph::RuleEdges
+  input_product_entries: rule_graph::Entries,
+  projected_entries: rule_graph::Entries
+}
+
+impl SelectProjection {
+  fn new(selector: selectors::SelectProjection,
+         subject: Key,
+         variants: Variants,
+         edges: &rule_graph::RuleEdges) -> SelectProjection {
+
+    // filters entries by whether the subject type is the right subject type
+    let dep_p_entries = edges.entries_for(
+      &vec![
+      Selector::SelectProjection(selector.clone()),
+      Selector::select(selector.clone().input_product)
+      ]);
+    let dep_p_entries = dep_p_entries.into_iter()
+      // TODO these filters fail rn because of the Address thing
+      /*.filter(|e|
+        e.matches_subject_type(subject.type_id().clone())
+      )*/
+      .collect::<Vec<_>>();
+
+    let p_entries = edges.entries_for(
+      &vec![
+      Selector::SelectProjection(selector.clone()),
+      Selector::select(selector.clone().product)
+      ]);
+
+    let p_entries = p_entries.into_iter()
+      /*
+      .filter(|e|
+        selector.clone().field_types
+          .iter()
+          .any(|f| e.matches_subject_type(f.clone()))
+      )
+      */
+      .collect::<Vec<_>>();
+    SelectProjection {
+      subject: subject,
+      variants: variants,
+      selector: selector.clone(),
+      input_product_entries: dep_p_entries,
+      projected_entries: p_entries,
+    }
+  }
 }
 
 impl Node for SelectProjection {
@@ -795,13 +840,12 @@ impl Node for SelectProjection {
     context
       .get(
         // Request the product we need to compute the subject.
-        Select::new_nested(
-          selectors::Selector::SelectProjection(self.selector.clone()),
-          self.selector.input_product,
-          self.subject.clone(),
-          self.variants.clone(),
-          &self.edges,
-        )
+        Select {
+          selector: selectors::Select { product: self.selector.input_product, variant_key: None },
+          subject: self.subject.clone(),
+          variants: self.variants.clone(),
+          entries: self.input_product_entries.clone()
+        }
       )
       .then(move |dep_product_res| {
         match dep_product_res {
@@ -815,13 +859,12 @@ impl Node for SelectProjection {
               );
             context
               .get(
-                Select::new_nested(
-                  selectors::Selector::SelectProjection(self.selector.clone()),
-                  self.selector.product,
-                  externs::key_for(&projected_subject),
-                  self.variants.clone(),
-                  &self.edges,
-                )
+                Select {
+                  selector: selectors::Select { product: self.selector.product, variant_key: None },
+                  subject: externs::key_for(&projected_subject),
+                  variants: self.variants.clone(),
+                  entries: self.projected_entries.clone()
+                }
               )
               .then(move |output_res| {
                 // If the output product is available, return it.
@@ -1150,12 +1193,12 @@ impl Task {
           self.variants.clone(),
           &self.edges)),
       Selector::SelectProjection(s) =>
-        context.get(SelectProjection {
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          selector: s,
-          edges: self.edges.clone()
-        }),
+        context.get(SelectProjection::new(
+          s,
+          self.subject.clone(),
+          self.variants.clone(),
+          &self.edges
+        )),
       Selector::SelectLiteral(s) =>
         context.get(SelectLiteral {
           variants: self.variants.clone(),
