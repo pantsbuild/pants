@@ -78,7 +78,7 @@ class GlobToRegexTest(unittest.TestCase):
     self.assert_rule_match('/**', ('/a', '/a/b/c/d/e/f'))
 
   def test_glob_to_regex_match_subdir(self):
-    self.assert_rule_match('*/**', ('a/b/c.go', 'a/b.go', 'a/b/c/d.go'))
+    self.assert_rule_match('*/**', ('a/b.go', 'a/b/c.go', 'a/b/c/d.go'))
     self.assert_rule_match('*/**', ('a.go'), negate=True)
 
   def test_glob_to_regex_leading_slash_2_neg(self):
