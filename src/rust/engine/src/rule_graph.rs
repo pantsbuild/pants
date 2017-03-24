@@ -17,6 +17,9 @@ pub struct RuleGraphContainer {
   rule_graph: Option<RuleGraph>
 }
 
+// TODO This is here partly because we can't construct the graph until Tasks is initialized, but
+// scheduler needs to have a handle on the graph before Tasks are initialized.
+// https://github.com/pantsbuild/pants/issues/4375
 impl RuleGraphContainer {
   pub fn new() -> RuleGraphContainer {
     RuleGraphContainer { rule_graph: None }
@@ -576,7 +579,7 @@ pub struct RuleGraph {
   unfulfillable_rules: UnfulfillableRuleMap,
 }
 
-pub fn type_constraint_str(type_constraint: TypeConstraint) -> String {
+fn type_constraint_str(type_constraint: TypeConstraint) -> String {
   let val = to_val(type_constraint);
   call_on_val(&val, "graph_str")
 }
@@ -656,7 +659,7 @@ pub fn selector_str(selector: &Selector) -> String {
   }
 }
 
-pub fn entry_str(entry: &Entry) -> String {
+fn entry_str(entry: &Entry) -> String {
   match entry {
     &Entry::InnerEntry(ref inner) => {
       format!("{} of {}", task_display(&inner.rule), type_str(inner.subject_type))
@@ -678,7 +681,7 @@ pub fn entry_str(entry: &Entry) -> String {
   }
 }
 
-pub fn task_display(task: &Task) -> String {
+fn task_display(task: &Task) -> String {
   let product = type_constraint_str(task.product);
   let mut clause_portion = task.clause.iter().map(|c| selector_str(c)).collect::<Vec<_>>().join(", ");
   if task.clause.len() <= 1 {
@@ -851,31 +854,7 @@ impl RuleEdges {
   }
 
   pub fn entries_for(&self, selectors: &Vec<Selector>) -> Entries {
-    let r = self.selector_to_dependencies.get(selectors).map(|x|x.clone()).unwrap_or_else(|| Vec::new());
-
-    if false {
-      println!("genning for {:?} found {}. total avail {}", selectors.iter().map(|x| selector_str(x)).collect::<Vec<_>>(), r.len(), self.dependencies.len());
-      if selectors.len() > 1 {
-        println!("{}",
-                 self.selector_to_dependencies
-                   .keys()
-                   .map(|ss|
-                     ss.iter()
-                       .map(|s| selector_str(s))
-                       .collect::<Vec<_>>()
-                       .join(", "))
-                   .collect::<Vec<_>>()
-                   .join("\n   __ ")
-        );
-
-        let w_first = self.selector_to_dependencies.iter()
-          .filter(|&(k, _)| k.len() >= 1 && k[0] == selectors[0])
-          .collect::<Vec<_>>();
-        println!("with first selector {} found {}", selector_str(&selectors[0]), w_first.len());
-      }
-    }
-
-    r
+    self.selector_to_dependencies.get(selectors).map(|x|x.clone()).unwrap_or_else(|| Vec::new())
   }
 
 }

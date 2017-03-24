@@ -104,8 +104,13 @@ impl Scheduler {
     field: Field,
     field_types: Vec<TypeId>
   ) {
-    // find the edges for the root in the rule graph
-    // then add a node that contains those edges to the roots
+    // TODO Handle the case where the requested root is not in the list of roots that the graph was
+    //      created with.
+    //
+    //      Options
+    //        1. Toss the graph and make a subgraph specific graph, blowing up if that fails.
+    //           I can do this with minimal changes.
+    //        2. Update the graph & check result,
 
     let selector = selectors::SelectDependencies {
       product: product,
@@ -114,17 +119,28 @@ impl Scheduler {
       field_types: field_types,
     };
 
+    //let mut edges = self.core.rule_graph.find_root_edges(
     let edges = self.core.rule_graph.find_root_edges(
       subject.type_id().clone(),
       selectors::Selector::SelectDependencies(selector.clone()));
-
+/*
+    if edges.is_none() {
+      self.core.rule_graph.update_graph_with_subgraph_for(
+        subject.type_id().clone(),
+        selectors::Selector::SelectDependencies(selector.clone()));
+      );
+      edges = self.core.rule_graph.find_root_edges(
+      subject.type_id().clone(),
+      selectors::Selector::SelectDependencies(selector.clone()));
+    }
+    */
     self.roots.push(
       Root::SelectDependencies(
         SelectDependencies::new(
-          selector,
+          selector.clone(),
           subject,
           Default::default(),
-          edges.expect("Edges to have been found TODO handle this")
+          edges.expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject))
         )
       )
     );

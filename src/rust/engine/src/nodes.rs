@@ -340,56 +340,48 @@ impl Select {
           .boxed()
       ]
     } else {
-      // if it's a short circuit entry, ie
-      //   SubjectIsProduct or Literal
-      //   then we should create a special node with the value
-
-      // get the matching entries for the current selector path
-      // for each of those
-      //   - lookup their edges in the rule graph
-      //   - extract the task from the entry
-      //   - construct a new task node from the edges + task
-
       self.entries.iter()
-        .map(|entry| {
-          let r: Option<NodeFuture<Value>> = match entry {
-            &rule_graph::Entry::InnerEntry(ref inner) => {
-              let task = inner.rule.clone();
-              let edges = context.core.rule_graph.edges_for_inner_entry(inner);
-
-              Some(
-              context.get(
-                Task {
-                  subject: self.subject.clone(),
-                  product: self.product().clone(),
-                  variants: self.variants.clone(),
-                  task: task.clone(),
-                  edges: edges.expect("There should be edges here, or something went wrong. We could impl something to try again w/ a new rule graph, or just fail")
-                    .clone()
-                })
-              )
-            },
+        .filter(|entry|
+          match entry {
+            // TODO The entries here may be for Select selectors that have different Subject Types
+            // That's a break in the RuleGraph model that needs to be fixed.
+            // There's currently a place where things are broken due to this with the usage of Address
+            &&rule_graph::Entry::InnerEntry(ref inner) =>
+              self.subject.type_id().clone() == inner.subject_type ||
+                externs::satisfied_by(&context.core.types.address, &externs::val_for(&self.subject)),
             // NB Both SubjectIsProduct and Literal should have been handled before we get here
             // So if we get here and there is one of those, then it is not going to match,
-            // so use None.
-            &rule_graph::Entry::SubjectIsProduct { subject_type } => {
-              // TODO explicit subject is product node
-              // Or, alternatively, if we get here, it means it didn't match?
-              // probably the second
+            // TODO subject is product shouldn't get here because Select's run should have evaled it
+            // before. It does for the same reason we have the above check.
+            &&rule_graph::Entry::SubjectIsProduct { subject_type } => {
               if self.subject.type_id().clone() == subject_type {
                 panic!("actual subject type {}, expected subject type {}",
-                     rule_graph::type_str(self.subject.type_id().clone()),
-                     rule_graph::type_str(subject_type.clone()))
-              } else {
-                None
+                       rule_graph::type_str(self.subject.type_id().clone()),
+                       rule_graph::type_str(subject_type.clone()))
               }
+              false
             },
-            _ => { panic!("TODO handle {:?}", entry) }
-          };
-          r
-        })
-        .filter(|x|x.is_some())
-        .map(|x| x.unwrap())
+            _ => { panic!("Can't handle this entry type {:?}", entry) }
+          })
+        .map(|entry|
+          if let &rule_graph::Entry::InnerEntry(ref inner) = entry {
+            let task = inner.rule.clone();
+            let edges = context.core.rule_graph
+              .edges_for_inner_entry(inner)
+              .expect("No edges means the graph is incomplete. That's a bug.");
+
+            context.get(
+              Task {
+                subject: self.subject.clone(),
+                product: self.product().clone(),
+                variants: self.variants.clone(),
+                task: task.clone(),
+                edges: edges.clone()
+              })
+          } else {
+            panic!("maybe there's a way around this with types?")
+          }
+        )
         .collect::<Vec<NodeFuture<Value>>>()
     }
   }
