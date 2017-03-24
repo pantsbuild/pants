@@ -305,10 +305,10 @@ class LocalScheduler(object):
   """A scheduler that expands a product Graph by executing user defined tasks."""
 
   def __init__(self,
+               work_dir,
                goals,
                tasks,
                project_tree,
-               work_dir,
                native,
                graph_lock=None):
     """

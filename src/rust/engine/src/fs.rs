@@ -13,7 +13,6 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore;
 use ordermap::OrderMap;
 use tar;
-use tempdir::TempDir;
 
 use hash::{Fingerprint, WriterHasher};
 
@@ -636,26 +635,26 @@ impl fmt::Debug for Snapshot {
 }
 
 /**
- * A facade for the snapshot directory, which is currently thrown away at the end of each run.
+ * A facade for the snapshot directory, which lives under the pants workdir.
  */
 pub struct Snapshots {
-  temp_dir: TempDir,
+  snapshots_dir: PathBuf,
   next_temp_id: atomic::AtomicUsize,
 }
 
 impl Snapshots {
-  pub fn new(workdir: PathBuf) -> Result<Snapshots, io::Error> {
+  pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, io::Error> {
+    fs::create_dir_all(snapshots_dir.to_owned())?;
     Ok(
       Snapshots {
-        // TODO: see https://github.com/pantsbuild/pants/issues/4299
-        temp_dir: TempDir::new("snapshots")?,
+        snapshots_dir: snapshots_dir,
         next_temp_id: atomic::AtomicUsize::new(0),
       }
     )
   }
 
   pub fn path(&self) -> &Path {
-    self.temp_dir.path()
+    self.snapshots_dir.as_path()
   }
 
   /**
@@ -752,7 +751,7 @@ impl Snapshots {
   }
 
   fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
-    Snapshots::path_under_for(self.temp_dir.path(), fingerprint)
+    Snapshots::path_under_for(self.path(), fingerprint)
   }
 
   fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
@@ -803,11 +802,11 @@ impl Snapshots {
    * Creates a Snapshot for the given paths under the given VFS.
    */
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
-    let dest_dir = self.temp_dir.path().to_owned();
+    let dest_dir = self.path().to_owned();
     let build_root = fs.build_root.clone();
     let temp_path = {
       let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
-      self.temp_dir.path().join(format!("{}.tar.tmp", next_temp_id))
+      self.path().join(format!("{}.tar.tmp", next_temp_id))
     };
 
     fs.pool().spawn_fn(move || {

@@ -96,10 +96,10 @@ class GoalRunnerFactory(object):
       graph_helper = (
         graph_helper
         or EngineInitializer.setup_legacy_graph(pants_ignore_patterns,
+                                                workdir,
                                                 build_ignore_patterns=build_ignore_patterns,
                                                 exclude_target_regexps=exclude_target_regexps,
-                                                subproject_roots=subproject_build_roots,
-                                                workdir=workdir)
+                                                subproject_roots=subproject_build_roots)
       )
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
@@ -160,9 +160,9 @@ class GoalRunnerFactory(object):
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
         self._options.target_specs,
+        self._global_options.pants_workdir,
         self._daemon_graph_helper,
         self._global_options.subproject_roots,
-        self._global_options.workdir
       )
       goals, is_quiet = self._determine_goals(self._requested_goals)
       target_roots = self._specs_to_targets(spec_roots)

@@ -144,10 +144,10 @@ class PantsDaemonLauncher(object):
 
       legacy_graph_helper = self._engine_initializer.setup_legacy_graph(
         self._pants_ignore_patterns,
+        self._pants_workdir,
         build_ignore_patterns=self._build_ignore_patterns,
         exclude_target_regexps=self._exclude_target_regexps,
         subproject_roots=self._subproject_build_roots,
-        workdir=self._pants_workdir
       )
       scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
       services.extend((fs_event_service, scheduler_service))
