@@ -48,6 +48,7 @@ python_library(
   dependencies = [
     '3rdparty/python:setproctitle',
     'src/python/pants/goal:run_tracker',
+    'src/python/pants/logging',
     ':process_manager',
   ]
 )

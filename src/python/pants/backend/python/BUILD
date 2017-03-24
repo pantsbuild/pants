@@ -19,6 +19,7 @@ python_library(
 
 python_library(
   name = 'all_utils',
+  sources = globs('*.py', exclude=[['__init__.py', 'register.py']]),
   dependencies = [
     ':antlr_builder',
     ':code_generator',
