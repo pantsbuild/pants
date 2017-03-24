@@ -16,6 +16,9 @@ from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 class GoCheckstyle(GoWorkspaceTask):
   """Checks Go code matches gofmt style."""
 
+  deprecated_options_scope = 'compile.gofmt'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
+
   @classmethod
   def register_options(cls, register):
     super(GoCheckstyle, cls).register_options(register)
