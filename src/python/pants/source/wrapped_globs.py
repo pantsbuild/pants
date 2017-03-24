@@ -6,13 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import abstractproperty
+from abc import abstractmethod, abstractproperty
 from hashlib import sha1
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
+from pants.source.filespec import matches_filespec
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -64,10 +65,9 @@ class FilesetWithSpec(AbstractClass):
   def __getitem__(self, index):
     return self.files[index]
 
+  @abstractmethod
   def iter_relative_paths(self):
     """An alternative `__iter__` that joins files with the relative root."""
-    for f in self:
-      yield os.path.join(self.rel_root, f)
 
 
 class EagerFilesetWithSpec(FilesetWithSpec):
@@ -90,6 +90,11 @@ class EagerFilesetWithSpec(FilesetWithSpec):
   @property
   def files_hash(self):
     return self._files_hash
+
+  def iter_relative_paths(self):
+    """An alternative `__iter__` that joins files with the relative root."""
+    for f in self:
+      yield os.path.join(self.rel_root, f)
 
   def __repr__(self):
     return 'EagerFilesetWithSpec(rel_root={!r}, files={!r})'.format(self.rel_root, self.files)
@@ -119,6 +124,13 @@ class LazyFilesetWithSpec(FilesetWithSpec):
       with open(os.path.join(get_buildroot(), self.rel_root, path), 'rb') as f:
         h.update(f.read())
     return h.digest()
+
+  def iter_relative_paths(self):
+    """An alternative `__iter__` that joins files with the relative root."""
+    for f in self:
+      path_from_buildroot = os.path.join(self.rel_root, f)
+      if matches_filespec(path_from_buildroot, self.filespec):
+        yield path_from_buildroot
 
 
 class FilesetRelPathWrapper(AbstractClass):
