@@ -7,6 +7,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

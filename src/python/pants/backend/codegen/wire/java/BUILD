@@ -13,6 +13,7 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/base:revision',
     'src/python/pants/base:validation',
+    'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],

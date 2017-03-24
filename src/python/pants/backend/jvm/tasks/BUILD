@@ -592,6 +592,7 @@ python_library(
     ':jvm_task',
     ':jvm_tool_task_mixin',
     'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/java/distribution',
     'src/python/pants/task',
@@ -629,6 +630,7 @@ python_library(
   sources = ['scalastyle.py'],
   dependencies = [
     ':nailgun_task',
+    'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/option',

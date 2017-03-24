@@ -8,6 +8,7 @@ python_library(
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/goal:task_registrar',
     'src/python/pants/java:util',
     'src/python/pants/option',
     'src/python/pants/task',
