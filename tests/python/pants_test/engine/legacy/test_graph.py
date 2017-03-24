@@ -13,10 +13,10 @@ from contextlib import contextmanager
 import mock
 
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
-from pants.bin.target_roots import TargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
+from pants.init.target_roots import TargetRoots
 from pants_test.engine.util import init_native
 
 

@@ -12,9 +12,9 @@ import pkg_resources
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError
-from pants.bin.extension_loader import load_backends_and_plugins
-from pants.bin.plugin_resolver import PluginResolver
 from pants.goal.goal import Goal
+from pants.init.extension_loader import load_backends_and_plugins
+from pants.init.plugin_resolver import PluginResolver
 from pants.logging.setup import setup_logging
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.subsystem.subsystem import Subsystem

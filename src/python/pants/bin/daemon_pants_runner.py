@@ -15,10 +15,10 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.bin.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.pantsd.util import clean_global_runtime_state
 from pants.util.contextutil import HardSystemExit, stdio_as
 
 

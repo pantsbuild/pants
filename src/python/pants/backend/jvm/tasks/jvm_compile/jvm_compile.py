@@ -595,7 +595,7 @@ class JvmCompile(NailgunTaskBase):
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
             if logs:
-              self._find_missing_deps('\n'.join([read_file(log) for log in logs]), target)
+              self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
           raise
 
   def _get_plugin_map(self, compiler, target):

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import os
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -26,9 +25,6 @@ from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
-
-
-logger = logging.getLogger(__name__)
 
 
 class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
@@ -126,9 +122,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return options[cls.options_scope]
 
   @classmethod
-  def _alternate_target_roots(cls, options, address_mapper, build_graph):
+  def get_alternate_target_roots(cls, options, address_mapper, build_graph):
     # Subclasses should not generally need to override this method.
-    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
     return cls.alternate_target_roots(cls._scoped_options(options), address_mapper, build_graph)
 
   @classmethod
@@ -144,9 +139,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
 
   @classmethod
-  def _prepare(cls, options, round_manager):
+  def invoke_prepare(cls, options, round_manager):
     # Subclasses should not generally need to override this method.
-    # TODO(John Sirois): Kill when killing GroupTask as part of RoundEngine parallelization.
     return cls.prepare(cls._scoped_options(options), round_manager)
 
   @classmethod
@@ -317,10 +311,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
 
-    :param targets:               The targets to check for changes.
-    :param invalidate_dependents: If True then any targets depending on changed targets are invalidated.
-    :param fingerprint_strategy:   A FingerprintStrategy instance, which can do per task, finer grained
-                                  fingerprinting of a given Target.
+    :param targets: The targets to check for changes.
+    :param invalidate_dependents: If True then any targets depending on changed targets are
+                                  invalidated.
+    :param silent: If true, suppress logging information about target invalidation.
+    :param fingerprint_strategy: A FingerprintStrategy instance, which can do per task,
+                                finer grained fingerprinting of a given Target.
+    :param topological_order: Whether to invalidate in dependency order.
 
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
@@ -374,8 +371,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
       if len(targets):
         msg_elements = ['Invalidated ',
-                        items_to_report_element([t.address.reference() for t in targets], 'target')]
-        msg_elements.append('.')
+                        items_to_report_element([t.address.reference() for t in targets], 'target'),
+                        '.']
         self.context.log.info(*msg_elements)
 
     invalidation_report = self.context.invalidation_report
@@ -568,9 +565,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :param callable predicate: The predicate to pass to `context.scan().targets(predicate=X)`.
     """
     if not self.context.target_roots and not self.get_options().enable_v2_engine:
-      logger.warn('The behavior of `./pants {0}` (no explicit targets) will soon become a no-op. '
-                  'To remove this warning, please specify one or more explicit target specs (e.g. '
-                  '`./pants {0} ::`).'.format(goal_name))
+      self.context.log.warn(
+        'The behavior of `./pants {0}` (no explicit targets) will soon become a no-op. '
+        'To remove this warning, please specify one or more explicit target specs (e.g. '
+        '`./pants {0} ::`).'.format(goal_name))
       # For the v1 path, continue the behavior of e.g. `./pants list` implies `./pants list ::`.
       return self.context.scan().targets(predicate=predicate)
 

@@ -109,7 +109,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return cls.ToolResolveError(msg)
 
   @classmethod
-  def _alternate_target_roots(cls, options, address_mapper, build_graph):
+  def get_alternate_target_roots(cls, options, address_mapper, build_graph):
     processed = set()
     for jvm_tool in JvmToolMixin.get_registered_tools():
       dep_spec = jvm_tool.dep_spec(options)
