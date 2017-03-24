@@ -154,21 +154,6 @@ impl Select {
     }
   }
 
-  pub fn new_nested(parent: Selector,
-                    product: TypeConstraint,
-                    subject: Key,
-                    variants: Variants,
-                    edges: &rule_graph::RuleEdges
-  ) -> Select {
-    let selector_path = vec![parent, Selector::select(product)];
-    Select {
-      selector: selectors::Select { product: product, variant_key: None },
-      subject: subject,
-      variants: variants,
-      entries: edges.entries_for(&selector_path)
-    }
-  }
-
   fn product(&self) -> &TypeConstraint {
     &self.selector.product
   }
