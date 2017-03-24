@@ -105,7 +105,8 @@ typedef Value            (*extern_ptr_project_ignoring_type)(ExternContext*, Val
 typedef Value            (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
 typedef RunnableComplete (*extern_ptr_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, _Bool);
 
-typedef void RawScheduler;
+typedef void Tasks;
+typedef void Scheduler;
 
 typedef struct {
   uint64_t runnable_count;
@@ -147,7 +148,7 @@ void externs_set(ExternContext*,
                  extern_ptr_invoke_runnable,
                  TypeId);
 
-RawScheduler* scheduler_create(Function,
+Scheduler* scheduler_create(Function,
                                Function,
                                Function,
                                Function,
@@ -169,41 +170,41 @@ RawScheduler* scheduler_create(Function,
                                TypeId,
                                Buffer,
                                BufferBuffer);
-void scheduler_post_fork(RawScheduler*);
-void scheduler_destroy(RawScheduler*);
+void scheduler_post_fork(Scheduler*);
+void scheduler_destroy(Scheduler*);
 
-void intrinsic_task_add(RawScheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
-void singleton_task_add(RawScheduler*, Function, TypeConstraint);
+void intrinsic_task_add(Scheduler*, Function, TypeId, TypeConstraint, TypeConstraint);
+void singleton_task_add(Scheduler*, Function, TypeConstraint);
 
-void task_add(RawScheduler*, Function, TypeConstraint);
-void task_add_select(RawScheduler*, TypeConstraint);
-void task_add_select_variant(RawScheduler*, TypeConstraint, Buffer);
-void task_add_select_literal(RawScheduler*, Key, TypeConstraint);
-void task_add_select_dependencies(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
-void task_add_select_transitive(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
-void task_add_select_projection(RawScheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
-void task_end(RawScheduler*);
+void task_add(Scheduler*, Function, TypeConstraint);
+void task_add_select(Scheduler*, TypeConstraint);
+void task_add_select_variant(Scheduler*, TypeConstraint, Buffer);
+void task_add_select_literal(Scheduler*, Key, TypeConstraint);
+void task_add_select_dependencies(Scheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
+void task_add_select_transitive(Scheduler*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
+void task_add_select_projection(Scheduler*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
+void task_end(Scheduler*);
 
-uint64_t graph_len(RawScheduler*);
-uint64_t graph_invalidate(RawScheduler*, BufferBuffer);
-void graph_visualize(RawScheduler*, char*);
-void graph_trace(RawScheduler*, char*);
+uint64_t graph_len(Scheduler*);
+uint64_t graph_invalidate(Scheduler*, BufferBuffer);
+void graph_visualize(Scheduler*, char*);
+void graph_trace(Scheduler*, char*);
 
-void execution_reset(RawScheduler*);
-void execution_add_root_select(RawScheduler*, Key, TypeConstraint);
-void execution_add_root_select_dependencies(RawScheduler*,
+void execution_reset(Scheduler*);
+void execution_add_root_select(Scheduler*, Key, TypeConstraint);
+void execution_add_root_select_dependencies(Scheduler*,
                                             Key,
                                             TypeConstraint,
                                             TypeConstraint,
                                             Buffer,
                                             TypeIdBuffer);
-ExecutionStat execution_execute(RawScheduler*);
-RawNodes* execution_roots(RawScheduler*);
+ExecutionStat execution_execute(Scheduler*);
+RawNodes* execution_roots(Scheduler*);
 
-Value validator_run(RawScheduler*, TypeId*, uint64_t);
+Value validator_run(Scheduler*, TypeId*, uint64_t);
 
-void rule_graph_visualize(RawScheduler*, TypeId*, uint64_t, char*);
-void rule_subgraph_visualize(RawScheduler*, TypeId, TypeConstraint, char*);
+void rule_graph_visualize(Scheduler*, TypeId*, uint64_t, char*);
+void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 
 void nodes_destroy(RawNodes*);
 '''

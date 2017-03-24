@@ -68,16 +68,6 @@ use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
 use types::Types;
 
-pub struct RawScheduler {
-  scheduler: Scheduler,
-}
-
-impl RawScheduler {
-  fn reset(&mut self) {
-    self.scheduler.reset();
-  }
-}
-
 #[repr(C)]
 enum RawStateTag {
   Empty = 0,
@@ -216,7 +206,7 @@ pub extern fn scheduler_create(
   type_bytes: TypeId,
   build_root_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
-) -> *const RawScheduler {
+) -> *const Scheduler {
   let build_root = PathBuf::from(build_root_buf.to_os_string());
   let ignore_patterns =
     ignore_patterns_buf.to_strings()
@@ -226,84 +216,82 @@ pub extern fn scheduler_create(
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
-      RawScheduler {
-        scheduler: Scheduler::new(
-          Core::new(
-            Tasks::new(),
-            Types {
-              construct_snapshot: construct_snapshot,
-              construct_snapshots: construct_snapshots,
-              construct_file_content: construct_file_content,
-              construct_files_content: construct_files_content,
-              construct_path_stat: construct_path_stat,
-              construct_dir: construct_dir,
-              construct_file: construct_file,
-              construct_link: construct_link,
-              address: type_address,
-              has_products: type_has_products,
-              has_variants: type_has_variants,
-              path_globs: type_path_globs,
-              snapshot: type_snapshot,
-              snapshots: type_snapshots,
-              files_content: type_files_content,
-              dir: type_dir,
-              file: type_file,
-              link: type_link,
-              string: type_string,
-              bytes: type_bytes,
-            },
-            build_root,
-            ignore_patterns,
-          ),
-        )
-      }
+      Scheduler::new(
+        Core::new(
+          Tasks::new(),
+          Types {
+            construct_snapshot: construct_snapshot,
+            construct_snapshots: construct_snapshots,
+            construct_file_content: construct_file_content,
+            construct_files_content: construct_files_content,
+            construct_path_stat: construct_path_stat,
+            construct_dir: construct_dir,
+            construct_file: construct_file,
+            construct_link: construct_link,
+            address: type_address,
+            has_products: type_has_products,
+            has_variants: type_has_variants,
+            path_globs: type_path_globs,
+            snapshot: type_snapshot,
+            snapshots: type_snapshots,
+            files_content: type_files_content,
+            dir: type_dir,
+            file: type_file,
+            link: type_link,
+            string: type_string,
+            bytes: type_bytes,
+          },
+          build_root,
+          ignore_patterns,
+        ),
+      )
     )
   )
 }
 
 #[no_mangle]
-pub extern fn scheduler_post_fork(scheduler_ptr: *mut RawScheduler) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.core.post_fork();
+pub extern fn scheduler_post_fork(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.core.post_fork();
   })
 }
 
 #[no_mangle]
-pub extern fn scheduler_destroy(scheduler_ptr: *mut RawScheduler) {
+pub extern fn scheduler_destroy(scheduler_ptr: *mut Scheduler) {
   // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
   // to be destroyed at the end of this function.
   let _ = unsafe { Box::from_raw(scheduler_ptr) };
 }
 
 #[no_mangle]
-pub extern fn execution_reset(scheduler_ptr: *mut RawScheduler) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.reset();
+pub extern fn execution_reset(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.reset();
   })
 }
 
 #[no_mangle]
 pub extern fn execution_add_root_select(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   subject: Key,
   product: TypeConstraint,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.add_root_select(subject, product);
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.add_root_select(subject, product);
   })
 }
 
 #[no_mangle]
 pub extern fn execution_add_root_select_dependencies(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   subject: Key,
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.add_root_select_dependencies(
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.add_root_select_dependencies(
       subject,
       product,
       dep_product,
@@ -315,25 +303,25 @@ pub extern fn execution_add_root_select_dependencies(
 
 #[no_mangle]
 pub extern fn execution_execute(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
 ) -> ExecutionStat {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.execute()
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.execute()
   })
 }
 
 #[no_mangle]
 pub extern fn execution_roots(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
 ) -> *const RawNodes {
-  with_scheduler(scheduler_ptr, |raw| {
-    Box::into_raw(RawNodes::create(raw.scheduler.root_states()))
+  with_scheduler(scheduler_ptr, |scheduler| {
+    Box::into_raw(RawNodes::create(scheduler.root_states()))
   })
 }
 
 #[no_mangle]
 pub extern fn intrinsic_task_add(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   func: Function,
   input_type: TypeId,
   input_constraint: TypeConstraint,
@@ -346,7 +334,7 @@ pub extern fn intrinsic_task_add(
 
 #[no_mangle]
 pub extern fn singleton_task_add(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   func: Function,
   output_constraint: TypeConstraint,
 ) {
@@ -357,7 +345,7 @@ pub extern fn singleton_task_add(
 
 #[no_mangle]
 pub extern fn task_add(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   func: Function,
   output_type: TypeConstraint,
 ) {
@@ -368,7 +356,7 @@ pub extern fn task_add(
 
 #[no_mangle]
 pub extern fn task_add_select(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   product: TypeConstraint,
 ) {
   with_core(scheduler_ptr, |core| {
@@ -378,7 +366,7 @@ pub extern fn task_add_select(
 
 #[no_mangle]
 pub extern fn task_add_select_variant(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   product: TypeConstraint,
   variant_key_buf: Buffer,
 ) {
@@ -391,7 +379,7 @@ pub extern fn task_add_select_variant(
 
 #[no_mangle]
 pub extern fn task_add_select_literal(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   subject: Key,
   product: TypeConstraint,
 ) {
@@ -402,7 +390,7 @@ pub extern fn task_add_select_literal(
 
 #[no_mangle]
 pub extern fn task_add_select_dependencies(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Buffer,
@@ -415,7 +403,7 @@ pub extern fn task_add_select_dependencies(
 
 #[no_mangle]
 pub extern fn task_add_select_transitive(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   product: TypeConstraint,
   dep_product: TypeConstraint,
   field: Buffer,
@@ -428,7 +416,7 @@ pub extern fn task_add_select_transitive(
 
 #[no_mangle]
 pub extern fn task_add_select_projection(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   product: TypeConstraint,
   projected_subject: TypeId,
   field: Buffer,
@@ -440,7 +428,7 @@ pub extern fn task_add_select_projection(
 }
 
 #[no_mangle]
-pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
+pub extern fn task_end(scheduler_ptr: *mut Scheduler) {
   with_core(scheduler_ptr, |core| {
     core.tasks.task_end();
   })
@@ -448,44 +436,44 @@ pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
 
 #[no_mangle]
 pub extern fn graph_invalidate(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   paths_buf: BufferBuffer,
 ) -> u64 {
-  with_scheduler(scheduler_ptr, |raw| {
+  with_scheduler(scheduler_ptr, |scheduler| {
     let paths =
       paths_buf.to_os_strings().into_iter()
         .map(|os_str| PathBuf::from(os_str))
         .collect();
-    raw.scheduler.core.graph.invalidate(paths) as u64
+    scheduler.core.graph.invalidate(paths) as u64
   })
 }
 
 #[no_mangle]
-pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
-  with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.core.graph.len() as u64
+pub extern fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.core.graph.len() as u64
   })
 }
 
 #[no_mangle]
-pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
-  with_scheduler(scheduler_ptr, |raw| {
+pub extern fn graph_visualize(scheduler_ptr: *mut Scheduler, path_ptr: *const raw::c_char) {
+  with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
     // TODO: This should likely return an error condition to python.
     //   see https://github.com/pantsbuild/pants/issues/4025
-    raw.scheduler.visualize(path.as_path()).unwrap_or_else(|e| {
+    scheduler.visualize(path.as_path()).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
   })
 }
 
 #[no_mangle]
-pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
+pub extern fn graph_trace(scheduler_ptr: *mut Scheduler, path_ptr: *const raw::c_char) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
-  with_scheduler(scheduler_ptr, |raw| {
-     raw.scheduler.trace(path.as_path()).unwrap_or_else(|e| {
+  with_scheduler(scheduler_ptr, |scheduler| {
+     scheduler.trace(path.as_path()).unwrap_or_else(|e| {
        println!("Failed to write trace to {}: {:?}", path.display(), e);
      });
   });
@@ -501,13 +489,13 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 
 #[no_mangle]
 pub extern fn validator_run(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64
 ) -> Value {
-  with_scheduler(scheduler_ptr, |raw| {
+  with_scheduler(scheduler_ptr, |scheduler| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+      let graph_maker = GraphMaker::new(&scheduler.core.tasks,
                                         subject_types.clone());
       let graph = graph_maker.full_graph();
 
@@ -525,17 +513,17 @@ pub extern fn validator_run(
 
 #[no_mangle]
 pub extern fn rule_graph_visualize(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   subject_types_ptr: *mut TypeId,
   subject_types_len: u64,
   path_ptr: *const raw::c_char
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
+  with_scheduler(scheduler_ptr, |scheduler| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
       let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
       let path = PathBuf::from(path_str);
 
-      let graph = graph_full(raw, subject_types);
+      let graph = graph_full(scheduler, subject_types);
       write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
         println!("Failed to visualize to {}: {:?}", path.display(), e);
       });
@@ -545,16 +533,16 @@ pub extern fn rule_graph_visualize(
 
 #[no_mangle]
 pub extern fn rule_subgraph_visualize(
-  scheduler_ptr: *mut RawScheduler,
+  scheduler_ptr: *mut Scheduler,
   subject_type: TypeId,
   product_type: TypeConstraint,
   path_ptr: *const raw::c_char
 ) {
-  with_scheduler(scheduler_ptr, |raw| {
+  with_scheduler(scheduler_ptr, |scheduler| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
     let path = PathBuf::from(path_str);
 
-    let graph = graph_sub(raw, subject_type, product_type);
+    let graph = graph_sub(scheduler, subject_type, product_type);
     write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
@@ -562,19 +550,17 @@ pub extern fn rule_subgraph_visualize(
 }
 
 
-fn graph_full(raw: &mut RawScheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
-                                    subject_types.clone());
+fn graph_full(scheduler: &mut Scheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types.clone());
   graph_maker.full_graph()
 }
 
 fn graph_sub(
-  raw: &mut RawScheduler,
+  scheduler: &mut Scheduler,
   subject_type: TypeId,
   product_type: TypeConstraint
 ) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
-                                    vec![subject_type.clone()]);
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, vec![subject_type.clone()]);
   graph_maker.sub_graph(&subject_type, &product_type)
 }
 
@@ -584,8 +570,8 @@ fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
   graph.visualize(&mut f)
 }
 
-fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
-    where F: FnOnce(&mut RawScheduler)->T {
+fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
+    where F: FnOnce(&mut Scheduler)->T {
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);
   mem::forget(scheduler);
@@ -601,11 +587,11 @@ fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
  * before construction of the Scheduler, which would allow it to be mutated before it
  * needed to become atomic for usage in the Scheduler.
  */
-fn with_core<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+fn with_core<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
     where F: FnOnce(&mut Core)->T {
-  with_scheduler(scheduler_ptr, |raw| {
+  with_scheduler(scheduler_ptr, |scheduler| {
     let core =
-      Arc::get_mut(&mut raw.scheduler.core)
+      Arc::get_mut(&mut scheduler.core)
         .expect("The Core may not be mutated once the Scheduler has started.");
     f(core)
   })
