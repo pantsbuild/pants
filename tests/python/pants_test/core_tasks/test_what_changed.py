@@ -300,12 +300,14 @@ class WhatChangedTest(WhatChangedTestBasic):
     )
 
   def test_diffspec_removed_files(self):
+    file_in_target = 'root/src/java/a/b/c/Foo.java'
+    self.create_file(relpath=file_in_target, contents='', mode='a')
     self.assert_console_output(
       'root/src/java/a:a_java',
       options={'diffspec': '42'},
       workspace=self.workspace(
         diffspec='42',
-        diff_files=['root/src/java/a/b/c/Foo.java'],
+        diff_files=[file_in_target],
       ),
     )
 
@@ -374,28 +376,38 @@ class WhatChangedTest(WhatChangedTestBasic):
       workspace=self.workspace(files=['root/proto/BUILD'])
     )
 
-  def test_rglobs_in_sources(self):
+  def test_rglobs_in_sources_1(self):
+    file_in_target = 'root/src/java/a/foo.java'
+    self.create_file(file_in_target, contents='', mode='w')
     self.assert_console_output(
       'root/src/java/a:a_java',
-      workspace=self.workspace(files=['root/src/java/a/foo.java'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
+  def test_rglobs_in_sources_2(self):
+    file_in_target = 'root/src/java/a/b/foo.java'
+    self.create_file(file_in_target, contents='', mode='w')
     self.assert_console_output(
       'root/src/java/a:a_java',
-      workspace=self.workspace(files=['root/src/java/a/b/foo.java'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
-  def test_globs_in_sources(self):
+  def test_globs_in_sources_1(self):
+    file_in_target = 'root/src/java/b/foo.java'
+    self.create_file(file_in_target, contents='', mode='w')
     self.assert_console_output(
       'root/src/java/b:b_java',
-      workspace=self.workspace(files=['root/src/java/b/foo.java'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
+  def test_globs_in_sources_2(self):
+    file_in_target = 'root/src/java/b/b/foo.java'
+    self.create_file(file_in_target, contents='', mode='w')
     self.assert_console_output(
       workspace=self.workspace(files=['root/src/java/b/b/foo.java'])
     )
 
-  def test_globs_in_resources(self):
+  def test_globs_in_resources_1(self):
     self.add_to_build_file('root/resources', dedent("""
       resources(
         name='resources',
@@ -403,19 +415,34 @@ class WhatChangedTest(WhatChangedTestBasic):
       )
     """))
 
+    file_in_target = 'root/resources/foo/bar/baz.yml'
+    self.create_file(file_in_target, contents='', mode='w')
     self.assert_console_output(
-      workspace=self.workspace(files=['root/resources/foo/bar/baz.yml'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
+  def test_globs_in_resources_2(self):
+    self.add_to_build_file('root/resources', dedent("""
+      resources(
+        name='resources',
+        sources=globs('*')
+      )
+    """))
+
+    file_in_target = 'root/resources/baz.yml'
+
+    self.create_file(file_in_target, contents='', mode='w')
     self.assert_console_output(
       'root/resources:resources',
-      workspace=self.workspace(files=['root/resources/baz.yml'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
   def test_root_config(self):
+    file_in_target = 'pants.ini'
+    self.create_file(relpath=file_in_target, contents='', mode='a')
     self.assert_console_output(
       '//:pants-config',
-      workspace=self.workspace(files=['pants.ini'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
 
