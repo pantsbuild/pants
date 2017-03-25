@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import abstractproperty, abstractmethod
+from abc import abstractmethod, abstractproperty
 from hashlib import sha1
 
 from six import string_types
@@ -104,7 +104,8 @@ class EagerFilesetWithSpec(FilesetWithSpec):
     return 'EagerFilesetWithSpec(rel_root={!r}, files={!r})'.format(self.rel_root, self.files)
 
   def matches(self, path_from_buildroot):
-    return path_from_buildroot in self._files
+    path_relative_to_rel_root = os.path.relpath(path_from_buildroot, self.rel_root)
+    return path_relative_to_rel_root in self._files
 
 
 class LazyFilesetWithSpec(FilesetWithSpec):
