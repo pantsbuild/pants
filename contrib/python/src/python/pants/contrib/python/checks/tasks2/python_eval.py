@@ -88,7 +88,7 @@ class PythonEval(ResolveRequirementsTaskBase):
     return interpreter_cache
 
   def _compile_targets(self, invalid_vts):
-    with self.context.new_workunit(name='eval-targets', labels=[WorkUnitLabel.MULTITOOL]):
+    with self.context.new_workunit(name='eval-targets', labels=[WorkUnitLabel.MULTITOOL, WorkUnitLabel.SUPPRESS_LABEL]):
       compiled = []
       failed = []
       for vt in invalid_vts:
