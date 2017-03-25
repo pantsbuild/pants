@@ -36,6 +36,10 @@ class SourcesField(PayloadField):
     return self.sources.matches(path)
 
   @property
+  def filespec(self):
+    return self.sources.filespec
+
+  @property
   def rel_path(self):
     return self.sources.rel_root
 
