@@ -68,7 +68,7 @@ class GoLocalSource(GoTarget):
     globs = Globs(ParseContext(rel_path=address.spec_path, type_aliases={}))
     sources = globs('*', exclude=[globs('BUILD*'),
                                   # This skips dirents.
-                                  globs('*/')])
+                                  globs('*/**')])
 
     payload = payload or Payload()
     payload.add_fields({
