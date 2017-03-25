@@ -13,6 +13,7 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ignore;
 use ordermap::OrderMap;
 use tar;
+use tempdir::TempDir;
 
 use hash::{Fingerprint, WriterHasher};
 
@@ -639,22 +640,36 @@ impl fmt::Debug for Snapshot {
  */
 pub struct Snapshots {
   snapshots_dir: PathBuf,
-  next_temp_id: atomic::AtomicUsize,
+  snapshots_tmpdir: TempDir,
+  next_temp_id: atomic::AtomicUsize
 }
 
 impl Snapshots {
   pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, io::Error> {
-    fs::create_dir_all(snapshots_dir.to_owned())?;
+    let mut snapshots_tmpdir_base = snapshots_dir.clone();
+    snapshots_tmpdir_base.push(".tmp");
+
+    fs::create_dir_all(snapshots_dir.as_path())?;
+    fs::create_dir_all(snapshots_tmpdir_base.as_path())?;
+
+    let snapshots_tmpdir =
+      TempDir::new_in(snapshots_tmpdir_base, "snapshots")?;
+
     Ok(
       Snapshots {
         snapshots_dir: snapshots_dir,
-        next_temp_id: atomic::AtomicUsize::new(0),
+        snapshots_tmpdir: snapshots_tmpdir,
+        next_temp_id: atomic::AtomicUsize::new(0)
       }
     )
   }
 
-  pub fn path(&self) -> &Path {
+  pub fn snapshot_path(&self) -> &Path {
     self.snapshots_dir.as_path()
+  }
+
+  fn tmp_path(&self) -> &Path {
+    self.snapshots_tmpdir.path()
   }
 
   /**
@@ -750,8 +765,29 @@ impl Snapshots {
     )
   }
 
+  /**
+   * Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
+   * the case of Snapshots because the destination path is unique to its content.
+   */
+  fn finalize(temp_path: &Path, dest_path: &Path) -> Result<(), String> {
+    if dest_path.is_file() {
+      // The Snapshot has already been created.
+      fs::remove_file(temp_path).unwrap_or(());
+      Ok(())
+    } else {
+      let dest_dir = dest_path.parent().expect("All snapshot paths must have parent directories.");
+      // As long as the destination file gets created, we've succeeded.
+      Snapshots::create_dir_all(dest_dir)?;
+      match fs::rename(temp_path, dest_path) {
+        Ok(_) => Ok(()),
+        Err(_) if dest_path.is_file() => Ok(()),
+        Err(e) => Err(format!("Failed to finalize snapshot at {:?}: {:?}", dest_path, e))
+      }
+    }
+  }
+
   fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
-    Snapshots::path_under_for(self.path(), fingerprint)
+    Snapshots::path_under_for(self.snapshot_path(), fingerprint)
   }
 
   fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
@@ -778,35 +814,14 @@ impl Snapshots {
   }
 
   /**
-   * Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
-   * the case of Snapshots because the destination path is unique to its content.
-   */
-  fn finalize(temp_path: &Path, dest_path: &Path) -> Result<(), String> {
-    if dest_path.is_file() {
-      // The Snapshot has already been created.
-      fs::remove_file(temp_path).unwrap_or(());
-      Ok(())
-    } else {
-      let dest_dir = dest_path.parent().expect("All snapshot paths must have parent directories.");
-      // As long as the destination file gets created, we've succeeded.
-      Snapshots::create_dir_all(dest_dir)?;
-      match fs::rename(temp_path, dest_path) {
-        Ok(_) => Ok(()),
-        Err(_) if dest_path.is_file() => Ok(()),
-        Err(e) => Err(format!("Failed to finalize snapshot at {:?}: {:?}", dest_path, e))
-      }
-    }
-  }
-
-  /**
    * Creates a Snapshot for the given paths under the given VFS.
    */
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
-    let dest_dir = self.path().to_owned();
+    let dest_dir = self.snapshot_path().to_owned();
     let build_root = fs.build_root.clone();
     let temp_path = {
       let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
-      self.path().join(format!("{}.tar.tmp", next_temp_id))
+      self.tmp_path().join(format!("{}.tar.tmp", next_temp_id))
     };
 
     fs.pool().spawn_fn(move || {

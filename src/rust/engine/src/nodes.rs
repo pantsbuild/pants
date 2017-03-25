@@ -824,7 +824,7 @@ impl Snapshot {
       &context.core.types.construct_snapshots,
       &vec![
         externs::store_bytes(
-          &context.core.snapshots.path().as_os_str().as_bytes()
+          &context.core.snapshots.snapshot_path().as_os_str().as_bytes()
         ),
       ],
     )

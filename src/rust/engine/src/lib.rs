@@ -26,6 +26,7 @@ extern crate lazy_static;
 extern crate ordermap;
 extern crate petgraph;
 extern crate tar;
+extern crate tempdir;
 
 use std::ffi::CStr;
 use std::fs::File;
