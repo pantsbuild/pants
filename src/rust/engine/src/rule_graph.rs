@@ -1,16 +1,15 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
-
-use externs;
-
-use selectors::{Select, Selector};
-use nodes::Runnable;
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
+use std::fmt;
+use std::io;
 
+use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
+use externs;
+use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
 use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -131,15 +130,9 @@ impl Entry {
 
 type Entries = Vec<Entry>;
 type RootRuleDependencyEdges = HashMap<RootEntry, RuleEdges>;
-type Rule = Task;
 type RuleDependencyEdges = HashMap<InnerEntry, RuleEdges>;
 type RuleDiagnostics = Vec<Diagnostic>;
 type UnfulfillableRuleMap = HashMap<Entry, RuleDiagnostics>;
-
-#[derive(Debug)]
-pub struct RootSubjectTypes {
-  pub subject_types: Vec<TypeId>
-}
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct Diagnostic {
@@ -149,14 +142,54 @@ pub struct Diagnostic {
 
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
 // to be found statically rather than dynamically.
-pub struct GraphMaker<'a> {
-    tasks: &'a Tasks,
-    root_subject_types: RootSubjectTypes
+pub struct GraphMaker<'t> {
+    tasks: &'t Tasks,
+    root_subject_types: Vec<TypeId>
 }
 
-impl <'a> GraphMaker<'a> {
-  pub fn new<'t>(tasks: &'t Tasks, root_subject_types: RootSubjectTypes) -> GraphMaker {
+impl <'t> GraphMaker<'t> {
+  pub fn new(tasks: &'t Tasks, root_subject_types: Vec<TypeId>) -> GraphMaker<'t> {
     GraphMaker { tasks: tasks, root_subject_types: root_subject_types }
+  }
+
+  pub fn sub_graph(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> RuleGraph {
+    let mut full_root_rule_dependency_edges: RootRuleDependencyEdges = HashMap::new();
+    let mut full_dependency_edges: RuleDependencyEdges = HashMap::new();
+    let mut full_unfulfillable_rules: UnfulfillableRuleMap = HashMap::new();
+
+    let beginning_root = if let Some(beginning_root) = self.gen_root_entry(subject_type, product_type) {
+      beginning_root
+    } else {
+      return RuleGraph {   root_subject_types: vec![],
+        root_dependencies: full_root_rule_dependency_edges,
+        rule_dependency_edges: full_dependency_edges,
+        unfulfillable_rules: full_unfulfillable_rules,
+      }
+    };
+
+    let constructed_graph = self._construct_graph(
+      beginning_root,
+      full_root_rule_dependency_edges,
+      full_dependency_edges,
+      full_unfulfillable_rules
+    );
+
+    // less than ideal, the copying
+    full_root_rule_dependency_edges = constructed_graph.root_dependencies.clone();
+    full_dependency_edges = constructed_graph.rule_dependency_edges.clone();
+    full_unfulfillable_rules = constructed_graph.unfulfillable_rules.clone();
+
+    self.add_unreachable_rule_diagnostics(&full_dependency_edges, &mut full_unfulfillable_rules);
+
+    let mut unfinished_graph = RuleGraph {
+      root_subject_types: self.root_subject_types.clone(),
+      root_dependencies: full_root_rule_dependency_edges,
+      rule_dependency_edges: full_dependency_edges,
+      unfulfillable_rules: full_unfulfillable_rules
+    };
+
+    self._remove_unfulfillable_rules_and_dependents(&mut unfinished_graph);
+    unfinished_graph
   }
 
   pub fn full_graph(&self) -> RuleGraph {
@@ -178,6 +211,21 @@ impl <'a> GraphMaker<'a> {
       full_dependency_edges = constructed_graph.rule_dependency_edges.clone();
       full_unfulfillable_rules = constructed_graph.unfulfillable_rules.clone();
     }
+
+    self.add_unreachable_rule_diagnostics(&full_dependency_edges, &mut full_unfulfillable_rules);
+
+    let mut in_progress_graph = RuleGraph {
+      root_subject_types: self.root_subject_types.clone(),
+      root_dependencies: full_root_rule_dependency_edges,
+      rule_dependency_edges: full_dependency_edges,
+      unfulfillable_rules: full_unfulfillable_rules
+    };
+
+    self._remove_unfulfillable_rules_and_dependents(&mut in_progress_graph);
+    in_progress_graph
+  }
+
+  fn add_unreachable_rule_diagnostics(&self, full_dependency_edges: &RuleDependencyEdges, full_unfulfillable_rules: &mut UnfulfillableRuleMap) {
     let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule.clone()).collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
     let declared_rules = self.tasks.all_rules();
@@ -193,14 +241,6 @@ impl <'a> GraphMaker<'a> {
       let diagnostics = full_unfulfillable_rules.entry(Entry::new_unreachable(rule)).or_insert(vec![]);
       diagnostics.push(Diagnostic { subject_type: ANY_TYPE, reason: "Unreachable".to_string() });
     }
-
-    let unfinished_graph = RuleGraph {
-      root_dependencies: full_root_rule_dependency_edges,
-      rule_dependency_edges: full_dependency_edges,
-      unfulfillable_rules: full_unfulfillable_rules
-    };
-
-    self._remove_unfulfillable_rules_and_dependents(unfinished_graph)
   }
 
   fn _construct_graph(&self,
@@ -263,8 +303,9 @@ impl <'a> GraphMaker<'a> {
                                    vec![Entry::new_literal(select.subject.clone(),
                                                                select.product.clone())]);
               },
-              &Selector::SelectDependencies(ref select) => {
-                let initial_selector = select.dep_product;
+              &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
+              &Selector::SelectTransitive(SelectTransitive{ref product, ref dep_product, ref field_types, ..}) => {
+                let initial_selector = *dep_product;
                 let initial_rules_or_literals = rhs_for_select(&self.tasks,
                                                                entry.subject_type(),
                                                                &Select { product: initial_selector, variant_key: None });
@@ -279,19 +320,19 @@ impl <'a> GraphMaker<'a> {
                   continue;
                 }
                 let mut rules_for_dependencies = vec![];
-                for field_type in &select.field_types {
+                for field_type in field_types {
                   let rules_for_field_subjects = rhs_for_select(&self.tasks,
                                                                 field_type.clone(),
-                                                                &Select { product: select.product, variant_key: None });
+                                                                &Select { product: *product, variant_key: None });
                   rules_for_dependencies.extend(rules_for_field_subjects);
                 }
                 if rules_for_dependencies.is_empty() {
-                    for t in &select.field_types {
+                    for t in field_types {
                         mark_unfulfillable(&mut unfulfillable_rules,
                                            &entry,
                                            t.clone(),
                                            format!("no matches for {} when resolving {}",
-                                                   selector_str(&Selector::Select(Select { product: select.product, variant_key: None})),
+                                                   selector_str(&Selector::Select(Select { product: *product, variant_key: None})),
                                                    selector_str(selector))
                         );
                     }
@@ -303,7 +344,7 @@ impl <'a> GraphMaker<'a> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: select.dep_product, variant_key: None})],
+                                   vec![selector.clone(), Selector::Select(Select { product: *dep_product, variant_key: None})],
                                    initial_rules_or_literals);
 
                 add_rules_to_graph(&mut rules_to_traverse,
@@ -311,7 +352,7 @@ impl <'a> GraphMaker<'a> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   vec![selector.clone(), Selector::Select(Select { product: select.product, variant_key: None})],
+                                   vec![selector.clone(), Selector::Select(Select { product: *product, variant_key: None})],
                                    rules_for_dependencies);
               },
               &Selector::SelectProjection(ref select) =>{
@@ -380,11 +421,16 @@ impl <'a> GraphMaker<'a> {
                            vec![]);
       }
     }
-    RuleGraph {root_dependencies: root_rule_dependency_edges, rule_dependency_edges: rule_dependency_edges, unfulfillable_rules: unfulfillable_rules}
+    RuleGraph {
+      root_subject_types: self.root_subject_types.clone(),
+      root_dependencies: root_rule_dependency_edges,
+      rule_dependency_edges: rule_dependency_edges,
+      unfulfillable_rules: unfulfillable_rules
+    }
   }
 
   fn _remove_unfulfillable_rules_and_dependents(&self,
-                                                mut rule_graph: RuleGraph) -> RuleGraph {
+                                                rule_graph: &mut RuleGraph) {
     // Removes all unfulfillable rules transitively from the roots and the dependency edges.
     //
     // Takes the current root rule set and dependency table and removes all rules that are not
@@ -427,32 +473,56 @@ impl <'a> GraphMaker<'a> {
         }
       }
     }
-    rule_graph
   }
 
-  fn gen_root_entries(&self, product_types: &Vec<TypeConstraint>) -> Vec<RootEntry> {
+  fn gen_root_entries(&self, product_types: &HashSet<TypeConstraint>) -> Vec<RootEntry> {
     let mut result: Vec<RootEntry> = Vec::new();
-    for subj_type in &self.root_subject_types.subject_types {
+    for subj_type in &self.root_subject_types {
       for pt in product_types {
-        if let Some(tasks) = self.tasks.gen_tasks(subj_type, pt) {
-          if !tasks.is_empty() {
-            result.push(RootEntry {
-              subject_type: subj_type.clone(),
-              clause: vec![Selector::Select(Select {
-                product: pt.clone(),
-                variant_key: None
-              })]
-            });
-          }
+        if let Some(entry) = self.gen_root_entry(subj_type, pt) {
+          result.push(entry);
         }
       }
     }
     result
   }
+
+  fn gen_root_entry(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> Option<RootEntry> {
+    self.tasks.gen_tasks(subject_type, product_type)
+      .and_then(|tasks| if !tasks.is_empty() { Some(tasks) } else { None })
+      .map(|_| {
+        RootEntry {
+          subject_type: subject_type.clone(),
+          clause: vec![
+            Selector::Select(Select {
+              product: product_type.clone(),
+              variant_key: None
+            })
+          ]
+        }
+      })
+  }
 }
 
+
+///
+/// A graph containing rules mapping rules to their dependencies taking into account subject types.
+///
+/// This is a graph of rules. It models dependencies between rules, along with the subject types for
+/// those rules. This allows the resulting graph to include cases where a selector is fulfilled by the
+/// subject of the graph.
+///
+///
+/// `root_subject_types` the root subject types this graph was generated with.
+/// `root_dependencies` A map from root rules, ie rules representing the expected selector / subject types
+///   for requests, to the rules that can fulfill them.
+/// `rule_dependency_edges` A map from rule entries to the rule entries they depend on.
+///   The collections of dependencies are contained by RuleEdges objects.
+/// `unfulfillable_rules` A map of rule entries to collections of Diagnostics
+///   containing the reasons why they were eliminated from the graph.
 #[derive(Debug)]
 pub struct RuleGraph {
+  root_subject_types: Vec<TypeId>,
   root_dependencies: RootRuleDependencyEdges,
   rule_dependency_edges: RuleDependencyEdges,
   unfulfillable_rules: UnfulfillableRuleMap,
@@ -460,7 +530,7 @@ pub struct RuleGraph {
 
 fn type_constraint_str(type_constraint: TypeConstraint) -> String {
   let val = to_val(type_constraint);
-  repr_of_val(&val)
+  call_on_val(&val, "graph_str")
 }
 
 fn to_val(type_constraint: TypeConstraint) -> Value {
@@ -475,10 +545,10 @@ fn to_val_from_id(id: Id) -> Value {
   externs::val_for_id(id)
 }
 
-fn repr_of_val(value: &Value) -> String {
-  let rpr_val = externs::project_ignoring_type(&value, "__repr__");
+fn call_on_val(value: &Value, method: &str) -> String {
+  let rpr_val = externs::project_ignoring_type(&value, method);
 
-  let invoke_result  = externs::invoke_runnable(&Runnable{func: rpr_val, args:vec![], cacheable:false})
+  let invoke_result  = externs::invoke_runnable(&rpr_val, &[], false)
                               .expect("string from calling repr");
   externs::val_to_str(&invoke_result)
 }
@@ -506,24 +576,35 @@ fn val_name(val: &Value) -> String {
 fn selector_str(selector: &Selector) -> String {
   match selector {
     &Selector::Select(ref s) => format!("Select({})", type_constraint_str(s.product)).to_string(), // TODO variant key
-    &Selector::SelectDependencies(ref s) => format!("SelectDependencies({}, {}, {}field_types=({},){})",
+    &Selector::SelectDependencies(ref s) => format!("{}({}, {}, {}field_types=({},))",
+                                                   "SelectDependencies",
                                                     type_constraint_str(s.product),
                                                     type_constraint_str(s.dep_product),
-                                                    if s.field == "dependencies" { "".to_string() } else {format!("{:?}, ", s.field)},
+                                                    if s.field == "dependencies" { "".to_string() } else {format!("'{}', ", s.field)},
                                                     s.field_types.iter()
                                                                  .map(|&f| type_str(f))
                                                                  .collect::<Vec<String>>()
-                                                                 .join(", "),
-                                                    if s.transitive { ", transitive=True" } else { "" }.to_string()
-
+                                                                 .join(", ")
     ),
-    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, ({:?},), {})",
+    &Selector::SelectTransitive(ref s) => format!("{}({}, {}, {}field_types=({},))",
+                                                   "SelectTransitive",
+                                                    type_constraint_str(s.product),
+                                                    type_constraint_str(s.dep_product),
+                                                    if s.field == "dependencies" { "".to_string() } else {format!("'{}', ", s.field)},
+                                                    s.field_types.iter()
+                                                                 .map(|&f| type_str(f))
+                                                                 .collect::<Vec<String>>()
+                                                                 .join(", ")
+    ),
+    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, ('{}',), {})",
                                                   type_constraint_str(s.product),
                                                   type_str(s.projected_subject),
                                                   s.field,
                                                   type_constraint_str(s.input_product),
     ),
-    &Selector::SelectLiteral(ref s) => format!("SelectLiteral({:?})", s)
+    &Selector::SelectLiteral(ref s) => format!("SelectLiteral({}, {})",
+                                               externs::key_to_str(&s.subject),
+                                               type_constraint_str(s.product))
   }
 }
 
@@ -532,8 +613,19 @@ fn entry_str(entry: &Entry) -> String {
     &Entry::InnerEntry(ref inner) => {
       format!("{} of {}", task_display(&inner.rule), type_str(inner.subject_type))
     }
-    other => {
-      format!("{:?}", other)
+    &Entry::Root(ref root) => {
+      format!("{} for {}",
+             root.clause.iter().map(|s| selector_str(s)).collect::<Vec<_>>().join(", "),
+             type_str(root.subject_type))
+    }
+    &Entry::SubjectIsProduct { subject_type } => {
+      format!("SubjectIsProduct({})", type_str(subject_type))
+    }
+    &Entry::Literal { ref value, product } => {
+      format!("Literal({}, {})", externs::key_to_str(value), type_constraint_str(product))
+    }
+    &Entry::Unreachable { ref rule, ref reason } => {
+      format!("Unreachable({}, {:?})", task_display(rule), reason)
     }
   }
 }
@@ -600,6 +692,50 @@ impl RuleGraph {
       _ => false,
     })
   }
+
+  // TODO instead of this, make own fmt thing that accepts externs
+  pub fn visualize(&self, f: &mut io::Write) -> io::Result<()> {
+    if self.root_dependencies.is_empty() && self.rule_dependency_edges.is_empty() {
+      write!(f, "digraph {{\n")?;
+      write!(f, "  // empty graph\n")?;
+      return write!(f, "}}");
+    }
+
+
+    let mut root_subject_type_strs = self.root_subject_types.iter()
+      .map(|&t| type_str(t))
+      .collect::<Vec<String>>();
+    root_subject_type_strs.sort();
+    write!(f, "digraph {{\n")?;
+    write!(f, "  // root subject types: {}\n", root_subject_type_strs.join(", "))?;
+    write!(f, "  // root entries\n")?;
+    let mut root_rule_strs = self.root_dependencies.iter()
+      .map(|(k, deps)| {
+        let root_str = entry_str(&Entry::from(k.clone()));
+        format!("    \"{}\" [color=blue]\n    \"{}\" -> {{{}}}",
+                root_str,
+                root_str,
+                deps.dependencies.iter()
+                  .map(|d| format!("\"{}\"", entry_str(d)))
+                  .collect::<Vec<String>>()
+                  .join(" "))
+      })
+      .collect::<Vec<String>>();
+    root_rule_strs.sort();
+    write!(f, "{}\n", root_rule_strs.join("\n"))?;
+
+
+    write!(f, "  // internal entries\n")?;
+    let mut internal_rule_strs = self.rule_dependency_edges.iter()
+      .map(|(k, deps)| format!("    \"{}\" -> {{{}}}", entry_str(&Entry::from(k.clone())), deps.dependencies.iter()
+        .map(|d| format!("\"{}\"", entry_str(d)))
+        .collect::<Vec<String>>()
+        .join(" ")))
+      .collect::<Vec<String>>();
+    internal_rule_strs.sort();
+    write!(f, "{}\n", internal_rule_strs.join("\n"))?;
+    write!(f, "}}")
+  }
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -623,8 +759,12 @@ impl RuleEdges {
     }
     let mut deps_for_selector = self.selector_to_dependencies.entry(selector_path).or_insert(vec![]);
     for d in new_dependencies {
-      deps_for_selector.push(d.clone());
-      self.dependencies.push(d.clone());
+      if !deps_for_selector.contains(d) {
+        deps_for_selector.push(d.clone());
+      }
+      if !self.dependencies.contains(d) {
+        self.dependencies.push(d.clone());
+      }
     }
   }
 
@@ -652,7 +792,7 @@ impl RuleEdges {
     for (selector, deps) in &self.selector_to_dependencies {
       new_selector_deps.insert(selector.clone(), deps.iter().filter(|&d| d != dep).map(|d| d.clone()).collect());
     }
-    RuleEdges { dependencies: new_deps, selector_to_dependencies: new_selector_deps}
+    RuleEdges { dependencies: new_deps, selector_to_dependencies: new_selector_deps }
   }
 }
 
@@ -662,15 +802,17 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
                                                 unfulfillable_entry: &Entry
 )
   where Entry: From<K>,
-        K: Eq + Hash + Clone
+        K: Eq + Hash + Clone + fmt::Debug
 {
   let keys: Vec<_> = edge_container.keys()
-    .filter(|&c| !new_unfulfillable_rules.contains_key(&Entry::from(c.clone())))
     .map(|c| c.clone())
     .collect();
+
   for current_entry in keys {
     if let hash_map::Entry::Occupied(mut o) = edge_container.entry(current_entry) {
-      if o.get().makes_unfulfillable(&unfulfillable_entry) {
+      if new_unfulfillable_rules.contains_key(&Entry::from(o.key().clone())) {
+        o.remove();
+      } else if o.get().makes_unfulfillable(&unfulfillable_entry) {
         let key_entry = Entry::from(o.key().clone());
 
         let entry_subject = key_entry.subject_type();

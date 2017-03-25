@@ -1,10 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection};
+use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, SelectTransitive};
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -26,12 +26,6 @@ pub struct Tasks {
   singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
-  pub field_name: Field,
-  pub field_products: Field,
-  pub field_variants: Field,
-  pub type_address: TypeConstraint,
-  pub type_has_products: TypeConstraint,
-  pub type_has_variants: TypeConstraint,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
 }
@@ -48,30 +42,18 @@ pub struct Tasks {
  * (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
  */
 impl Tasks {
-  pub fn new(
-    field_name: Field,
-    field_products: Field,
-    field_variants: Field,
-    type_address: TypeConstraint,
-    type_has_products: TypeConstraint,
-    type_has_variants: TypeConstraint,
-  ) -> Tasks {
+  pub fn new() -> Tasks {
     Tasks {
       intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
-      field_name: field_name,
-      field_products: field_products,
-      field_variants: field_variants,
-      type_address: type_address,
-      type_has_products: type_has_products,
-      type_has_variants: type_has_variants,
       preparing: None,
     }
   }
 
-  pub fn all_product_types(&self) -> Vec<TypeConstraint> {
-    self.all_rules().iter().map(|t| t.product).collect()
+  pub fn all_product_types(&self) -> HashSet<TypeConstraint> {
+    self.all_rules().iter().map(|t| t.product)
+      .collect::<HashSet<_>>()
   }
 
   pub fn is_singleton_task(&self, sought_task: &Task) -> bool {
@@ -159,9 +141,15 @@ impl Tasks {
     ));
   }
 
-  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeId>, transitive: bool) {
+  pub fn add_select_dependencies(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeId>) {
     self.clause(Selector::SelectDependencies(
-      SelectDependencies { product: product, dep_product: dep_product, field: field, field_types: field_types, transitive: transitive }
+      SelectDependencies { product: product, dep_product: dep_product, field: field, field_types: field_types}
+    ));
+  }
+
+  pub fn add_select_transitive(&mut self, product: TypeConstraint, dep_product: TypeConstraint, field: Field, field_types: Vec<TypeId>) {
+    self.clause(Selector::SelectTransitive(
+      SelectTransitive { product: product, dep_product: dep_product, field: field, field_types: field_types}
     ));
   }
 

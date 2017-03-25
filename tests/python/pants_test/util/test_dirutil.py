@@ -16,9 +16,10 @@ import six
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
-                                get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
-                                safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                get_basedir, longest_dir_prefix, read_file, relative_symlink,
+                                relativize_paths, rm_rf, safe_concurrent_creation, safe_file_dump,
+                                safe_mkdir, safe_mkdtemp, safe_rm_oldest_items_in_dir, safe_rmtree,
+                                touch)
 
 
 def strict_patch(target, **kwargs):
@@ -31,6 +32,27 @@ class DirutilTest(unittest.TestCase):
     # Ensure we start in a clean state.
     _mkdtemp_unregister_cleaner()
 
+  def test_longest_dir_prefix(self):
+    # Find the longest prefix (standard case).
+    prefixes = ['hello', 'hello_world', 'hello/world', 'helloworld']
+    self.assertEquals(longest_dir_prefix('hello/world/pants', prefixes),
+                      'hello/world')
+    self.assertEquals(longest_dir_prefix('hello/', prefixes),
+                      'hello')
+    self.assertEquals(longest_dir_prefix('hello', prefixes),
+                      'hello')
+    self.assertEquals(longest_dir_prefix('scoobydoobydoo', prefixes),
+                      None)
+
+  def test_longest_dir_prefix_special(self):
+    # Ensure that something that is a longest prefix, but not a longest dir
+    # prefix, is not tagged.
+    prefixes = ['helloworldhowareyou', 'helloworld']
+    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine/', prefixes),
+                      None)
+    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine', prefixes),
+                      None)
+
   def test_fast_relpath(self):
     def assertRelpath(expected, path, start):
       self.assertEquals(expected, fast_relpath(path, start))
@@ -42,6 +64,8 @@ class DirutilTest(unittest.TestCase):
     assertRelpath('c/', 'b/c/', 'b/')
     assertRelpath('', 'c/', 'c/')
     assertRelpath('', 'c', 'c')
+    assertRelpath('', 'c/', 'c')
+    assertRelpath('', 'c', 'c/')
     assertRelpath('c/', 'c/', '')
     assertRelpath('c', 'c', '')
 

@@ -68,3 +68,13 @@ python_library(
                 ),
   dependencies=[]
 )
+
+python_library(
+  name='implicit_sources',
+  dependencies=[]
+)
+
+python_tests(
+  name='test_with_implicit_sources',
+  dependencies=[]
+)

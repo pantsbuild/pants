@@ -88,6 +88,7 @@ python_tests(
     'src/python/pants/backend/codegen/protobuf/java',
     'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/codegen/thrift/python',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',

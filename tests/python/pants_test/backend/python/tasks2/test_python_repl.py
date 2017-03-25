@@ -116,26 +116,25 @@ class PythonReplTest(PythonTaskTestBase):
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
     context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type],
                            target_roots=targets)
-    with temporary_dir() as tmpdir:
-      si_task_type(context, os.path.join(tmpdir, 'si')).execute()
-      rr_task_type(context, os.path.join(tmpdir, 'rr')).execute()
-      gs_task_type(context, os.path.join(tmpdir, 'gs')).execute()
-      python_repl = self.create_task(context)
+    si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
+    rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
+    gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
+    python_repl = self.create_task(context)
 
-      original_launcher = python_repl.launch_repl
-      with self.new_io('\n'.join(code)) as (inp, out, err):
-        def custom_io_patched_launcher(pex):
-          return original_launcher(pex, stdin=inp, stdout=out, stderr=err)
-        python_repl.launch_repl = custom_io_patched_launcher
+    original_launcher = python_repl.launch_repl
+    with self.new_io('\n'.join(code)) as (inp, out, err):
+      def custom_io_patched_launcher(pex):
+        return original_launcher(pex, stdin=inp, stdout=out, stderr=err)
+      python_repl.launch_repl = custom_io_patched_launcher
 
-        python_repl.execute()
-        with open(out.name) as fp:
-          lines = fp.read()
-          if not expected:
-            self.assertEqual('', lines)
-          else:
-            for expectation in expected:
-              self.assertIn(expectation, lines)
+      python_repl.execute()
+      with open(out.name) as fp:
+        lines = fp.read()
+        if not expected:
+          self.assertEqual('', lines)
+        else:
+          for expectation in expected:
+            self.assertIn(expectation, lines)
 
   def do_test_library(self, *targets):
     self.do_test_repl(code=['from lib.lib import go',

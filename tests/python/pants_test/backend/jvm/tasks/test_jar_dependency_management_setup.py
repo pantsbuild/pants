@@ -5,15 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     JarDependencyManagementSetup)
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
                                                                 ManagedJarLibraries)
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
+from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 

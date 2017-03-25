@@ -8,5 +8,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ],
 )

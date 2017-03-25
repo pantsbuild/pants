@@ -11,16 +11,17 @@ import threading
 import time
 from contextlib import contextmanager
 
+from pants.base.project_tree import Dir, File, Link
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
-from pants.engine.fs import PathGlobs, create_fs_intrinsics, generate_fs_subjects
-from pants.engine.isolated_process import create_snapshot_intrinsics, create_snapshot_singletons
+from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
+from pants.engine.isolated_process import _Snapshots, create_snapshot_singletons
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex
 from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant, constraint_for)
+                                    SelectTransitive, SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
@@ -42,14 +43,34 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
 
 
 class WrappedNativeScheduler(object):
-  def __init__(self, native, rule_index, root_subject_types):
+  def __init__(self, native, build_root, ignore_patterns, rule_index, root_subject_types):
+    self._native = native
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
 
-    self._native = native
-    self._scheduler = native.new_scheduler(has_products_constraint,
-                                           constraint_for(Address),
-                                           constraint_for(Variants))
+    # Create the ExternContext, and the native Scheduler.
+    self._scheduler = native.new_scheduler(
+        build_root,
+        ignore_patterns,
+        Snapshot,
+        _Snapshots,
+        FileContent,
+        FilesContent,
+        Path,
+        Dir,
+        File,
+        Link,
+        has_products_constraint,
+        constraint_for(Address),
+        constraint_for(Variants),
+        constraint_for(PathGlobs),
+        constraint_for(Snapshot),
+        constraint_for(_Snapshots),
+        constraint_for(FilesContent),
+        constraint_for(Dir),
+        constraint_for(File),
+        constraint_for(Link),
+      )
     self._register_tasks(rule_index.tasks)
     self._register_intrinsics(rule_index.intrinsics)
     self._register_singletons(rule_index.singletons)
@@ -63,13 +84,16 @@ class WrappedNativeScheduler(object):
           yield line.rstrip()
 
   def assert_ruleset_valid(self):
-    listed = list(TypeId(self._to_id(t)) for t in self.root_subject_types)
+    root_type_ids = self._root_type_ids()
 
-    raw_value = self._native.lib.validator_run(self._scheduler, listed, len(listed))
+    raw_value = self._native.lib.validator_run(self._scheduler, root_type_ids, len(root_type_ids))
     value = self._from_value(raw_value)
 
     if isinstance(value, Exception):
       raise ValueError(str(value))
+
+  def _root_type_ids(self):
+    return list(TypeId(self._to_id(t)) for t in sorted(self.root_subject_types))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -159,8 +183,13 @@ class WrappedNativeScheduler(object):
                                                           product_constraint,
                                                           self._to_constraint(selector.dep_product),
                                                           self._to_utf8_buf(selector.field),
-                                                          self._to_ids_buf(selector.field_types),
-                                                          selector.transitive)
+                                                          self._to_ids_buf(selector.field_types))
+          elif selector_type is SelectTransitive:
+            self._native.lib.task_add_select_transitive(self._scheduler,
+                                                        product_constraint,
+                                                        self._to_constraint(selector.dep_product),
+                                                        self._to_utf8_buf(selector.field),
+                                                        self._to_ids_buf(selector.field_types))
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
               raise ValueError("TODO: remove support for projecting multiple fields at once.")
@@ -177,10 +206,39 @@ class WrappedNativeScheduler(object):
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
-  def invalidate_via_keys(self, subject_keys):
-    return self._native.lib.graph_invalidate(self._scheduler,
-                                             subject_keys,
-                                             len(subject_keys))
+  def visualize_rule_graph_to_file(self, filename):
+    root_type_ids = self._root_type_ids()
+
+    self._native.lib.rule_graph_visualize(
+      self._scheduler,
+      root_type_ids,
+      len(root_type_ids),
+      bytes(filename))
+
+  def rule_graph_visualization(self):
+    with temporary_file_path() as path:
+      self.visualize_rule_graph_to_file(path)
+      with open(path) as fd:
+        for line in fd.readlines():
+          yield line.rstrip()
+
+  def rule_subgraph_visualization(self, root_subject_type, product_type):
+    root_type_id = TypeId(self._to_id(root_subject_type))
+
+    product_type_id = TypeConstraint(self._to_id(constraint_for(product_type)))
+    with temporary_file_path() as path:
+      self._native.lib.rule_subgraph_visualize(
+        self._scheduler,
+        root_type_id,
+        product_type_id,
+        bytes(path))
+      with open(path) as fd:
+        for line in fd.readlines():
+          yield line.rstrip()
+
+  def invalidate(self, filenames):
+    filenames_buf = self._native.context.utf8_buf_buf(filenames)
+    return self._native.lib.graph_invalidate(self._scheduler, filenames_buf)
 
   def graph_len(self):
     return self._native.lib.graph_len(self._scheduler)
@@ -200,8 +258,7 @@ class WrappedNativeScheduler(object):
                                                                 selector.dep_product),
                                                               self._to_utf8_buf(selector.field),
                                                               self._to_ids_buf(
-                                                                selector.field_types),
-                                                              selector.transitive)
+                                                                selector.field_types))
     else:
       raise ValueError('Unsupported root selector type: {}'.format(selector))
 
@@ -213,6 +270,9 @@ class WrappedNativeScheduler(object):
 
   def to_keys(self, subjects):
     return list(self._to_key(subject) for subject in subjects)
+
+  def post_fork(self):
+    self._native.lib.scheduler_post_fork(self._scheduler)
 
   def root_entries(self, execution_request):
     raw_roots = self._native.lib.execution_roots(self._scheduler)
@@ -280,10 +340,13 @@ class LocalScheduler(object):
       SiblingAddresses,
       SingleAddress,
     }
-    intrinsics = create_fs_intrinsics(project_tree) + create_snapshot_intrinsics(project_tree)
-    singletons = create_snapshot_singletons(project_tree)
-    rule_index = RuleIndex.create(tasks, intrinsics, singletons)
-    self._scheduler = WrappedNativeScheduler(native, rule_index, root_subject_types)
+    singletons = create_snapshot_singletons()
+    rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=singletons)
+    self._scheduler = WrappedNativeScheduler(native,
+                                             project_tree.build_root,
+                                             project_tree.ignore_patterns,
+                                             rule_index,
+                                             root_subject_types)
 
     self._scheduler.assert_ruleset_valid()
 
@@ -301,6 +364,9 @@ class LocalScheduler(object):
     """
     with self._product_graph_lock:
       self._scheduler.visualize_graph_to_file(filename)
+
+  def visualize_rule_graph_to_file(self, filename):
+    self._scheduler.visualize_rule_graph_to_file(filename)
 
   def build_request(self, goals, subjects):
     """Translate the given goal names into product types, and return an ExecutionRequest.
@@ -361,11 +427,14 @@ class LocalScheduler(object):
 
   def invalidate_files(self, filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    subjects = set(generate_fs_subjects(filenames))
-    subject_keys = self._scheduler.to_keys(subjects)
+    # NB: Watchman will never trigger an invalidation event for the root directory that
+    # is being watched. Instead, we treat any invalidation of a path directly in the
+    # root directory as an invalidation of the root.
+    if any(os.path.dirname(f) in ('', '.') for f in filenames):
+      filenames = tuple(filenames) + ('', '.')
     with self._product_graph_lock:
-      invalidated = self._scheduler.invalidate_via_keys(subject_keys)
-      logger.debug('invalidated %d nodes for subjects: %s', invalidated, subjects)
+      invalidated = self._scheduler.invalidate(filenames)
+      logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
       return invalidated
 
   def node_count(self):
@@ -378,6 +447,9 @@ class LocalScheduler(object):
     self._execution_request = execution_request
     for subject, selector in execution_request.roots:
       self._scheduler.add_root_selection(subject, selector)
+
+  def post_fork(self):
+    self._scheduler.post_fork()
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.
@@ -399,8 +471,11 @@ class LocalScheduler(object):
 
       if self._scheduler.visualize_to_dir() is not None:
         name = 'run.{}.dot'.format(self._run_count)
+        rule_graph_name = 'rule_graph.dot'
+
         self._run_count += 1
         self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
+        self.visualize_rule_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), rule_graph_name))
 
       logger.debug(
         'ran %s scheduling iterations and %s runnables in %f seconds. '

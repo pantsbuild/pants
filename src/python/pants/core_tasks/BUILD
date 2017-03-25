@@ -19,7 +19,6 @@ python_library(
     'src/python/pants/help',
     'src/python/pants/option',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/pantsd/subsystem:pants_daemon_launcher',
     'src/python/pants/reporting',
     'src/python/pants/source',
     'src/python/pants/task',

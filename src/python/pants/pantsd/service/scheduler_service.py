@@ -49,6 +49,8 @@ class SchedulerService(PantsService):
     """Service setup."""
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
+    # Notify the (native) scheduler that we might be running in a new process.
+    self._scheduler.post_fork()
 
   def _enqueue_fs_event(self, event):
     """Watchman filesystem event handler for BUILD/requirements.txt updates. Called via a thread."""
@@ -98,8 +100,3 @@ class SchedulerService(PantsService):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
-
-  def terminate(self):
-    """An extension of PantsService.terminate() that tears down the engine."""
-    self._engine.close()
-    super(SchedulerService, self).terminate()

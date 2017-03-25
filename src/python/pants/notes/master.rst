@@ -4,6 +4,203 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev14 (3/17/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* [pantsd] Add an option to configure the watchman startup timeout. (#4332)
+  `PR #4332 <https://github.com/pantsbuild/pants/pull/4332>`_
+
+* Relativize jar_dependency.base_path (#4326)
+  `PR #4326 <https://github.com/pantsbuild/pants/pull/4326>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix bad import from race commits (#4335)
+  `PR #4335 <https://github.com/pantsbuild/pants/pull/4335>`_
+
+* Misc fixes to python tasks: (#4323)
+  `PR #4323 <https://github.com/pantsbuild/pants/pull/4323>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix product mapping for ivy resolve when libraries are not jar files (#4339)
+  `PR #4339 <https://github.com/pantsbuild/pants/pull/4339>`_
+
+* Refactor the new SelectInterpreter and GatherSources tasks. (#4337)
+  `PR #4337 <https://github.com/pantsbuild/pants/pull/4337>`_
+
+* Lock down the native-engine-version (#4338)
+  `PR #4338 <https://github.com/pantsbuild/pants/pull/4338>`_
+
+* [engine] Inline execution of Select/Dependencies/Projection/Literal (#4331)
+  `PR #4331 <https://github.com/pantsbuild/pants/pull/4331>`_
+
+* Upgrade to mock 2.0.0. (#4336)
+  `PR #4336 <https://github.com/pantsbuild/pants/pull/4336>`_
+
+* [engine] Improve memory layout for Graph (#4333)
+  `PR #4333 <https://github.com/pantsbuild/pants/pull/4333>`_
+
+* [engine] Split SelectDependencies into SelectDependencies and SelectTransitive (#4334)
+  `PR #4334 <https://github.com/pantsbuild/pants/pull/4334>`_
+
+* Simplify PythonSetup usage (#4328)
+  `PR #4328 <https://github.com/pantsbuild/pants/pull/4328>`_
+
+* Bump native engine version. (#4330)
+  `PR #4330 <https://github.com/pantsbuild/pants/pull/4330>`_
+
+* [engine] Move to new-style CFFI callbacks. (#4324)
+  `PR #4324 <https://github.com/pantsbuild/pants/pull/4324>`_
+
+* Profile the pants invocations in integration tests. (#4325)
+  `PR #4325 <https://github.com/pantsbuild/pants/pull/4325>`_
+
+1.3.0.dev13 (3/10/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Bump pex version to latest. (#4314)
+  `PR #4314 <https://github.com/pantsbuild/pants/pull/4314>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Binary builder task for the new python pipeline. (#4313)
+  `PR #4313 <https://github.com/pantsbuild/pants/pull/4313>`_
+
+* [engine] rm python graphmaker; create dot formatted display (#4295)
+  `PR #4295 <https://github.com/pantsbuild/pants/pull/4295>`_
+
+* A setup_py task for the new python pipeline. (#4308)
+  `PR #4308 <https://github.com/pantsbuild/pants/pull/4308>`_
+
+Bugfixes
+~~~~~~~~
+
+* scrooge_gen task copy strict_deps field (#4321)
+  `PR #4321 <https://github.com/pantsbuild/pants/pull/4321>`_
+
+* [jvm-compile] Copy compile classpath into runtime classpath even if already defined (#4310)
+  `PR #4310 <https://github.com/pantsbuild/pants/pull/4310>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix reliance on symlinks in testdata. (#4320)
+  `PR #4320 <https://github.com/pantsbuild/pants/pull/4320>`_
+
+* Introduce SUPPRESS_LABEL on workunit's console output and have thrift-linter and jar-tool adopt it (#4318)
+  `PR #4318 <https://github.com/pantsbuild/pants/pull/4318>`_
+
+1.3.0.dev12 (3/3/2017)
+----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Completely revamp how we support JVM compiler plugins. (#4287)
+  `PR #4287 <https://github.com/pantsbuild/pants/pull/4287>`_
+
+
+New Features
+~~~~~~~~~~~~
+
+* A PytestRun task for the new Python pipeline. (#4252)
+  `PR #4252 <https://github.com/pantsbuild/pants/pull/4252>`_
+
+* Add ability to specify subprojects (#4088)
+  `PR #4088 <https://github.com/pantsbuild/pants/pull/4088>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix missed native_engine_version.
+  `Commit cbdb97515 <https://github.com/pantsbuild/pants/commit/cbdb97515>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [engine] Rust IO (#4265)
+  `PR #4265 <https://github.com/pantsbuild/pants/pull/4265>`_
+
+* [engine] Support implicit sources in v2 engine (#4294)
+  `PR #4294 <https://github.com/pantsbuild/pants/pull/4294>`_
+
+* SelectLiteral isn't tied to the requester's subject: it has its own. (#4293)
+  `PR #4293 <https://github.com/pantsbuild/pants/pull/4293>`_
+
+* Include Javascript files in JVM binary (#4264)
+  `PR #4264 <https://github.com/pantsbuild/pants/pull/4264>`_
+
+* Update errorprone to version 2.0.17 (#4291)
+  `PR #4291 <https://github.com/pantsbuild/pants/pull/4291>`_
+
+* node_modules and node_test support yarnpkg as package manager (#4255)
+  `PR #4255 <https://github.com/pantsbuild/pants/pull/4255>`_
+
+
+1.3.0.dev11 (2/24/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Support local jar with relative path in JarDependency (#4279)
+  `PR #4279 <https://github.com/pantsbuild/pants/pull/4279>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Upgrade default jarjar to 1.6.4. (#4271)
+  `Issue #26 <https://github.com/pantsbuild/jarjar/issues/26>`_
+  `PR #4271 <https://github.com/pantsbuild/pants/pull/4271>`_
+
+* Memoize validation of deprecated versions (#4273)
+  `PR #4273 <https://github.com/pantsbuild/pants/pull/4273>`_
+
+* [engine] Remove type_id field from Value (#4274)
+  `PR #4274 <https://github.com/pantsbuild/pants/pull/4274>`_
+
+* [New Python Pipeline] Add resources to PEXes correctly. (#4275)
+  `PR #4275 <https://github.com/pantsbuild/pants/pull/4275>`_
+
+* Upgrade default go to 1.8. (#4272)
+  `PR #4272 <https://github.com/pantsbuild/pants/pull/4272>`_
+
+* Fix missed native_engine_version commit.
+  `Commit d966f9592 <https://github.com/pantsbuild/pants/commit/d966f9592fba2040429fc8a64f8aa4deb5e61f2c>`_
+
+* Make options fingerprinting very difficult to disable (#4262)
+  `PR #4262 <https://github.com/pantsbuild/pants/pull/4262>`_
+
+* Bump pex requirement to 1.2.3 (#4277)
+  `PR #4277 <https://github.com/pantsbuild/pants/pull/4277>`_
+
+* Strip the root-level __init__.py that apache thrift generates. (#4281)
+  `PR #4281 <https://github.com/pantsbuild/pants/pull/4281>`_
+
+* Small tweak to the Dockerfile. (#4263)
+  `PR #4263 <https://github.com/pantsbuild/pants/pull/4263>`_
+
+* Make "./pants changed" output correct results when BUILD files are modified (#4282)
+  `PR #4282 <https://github.com/pantsbuild/pants/pull/4282>`_
+
+* [engine] minor clean up `engine.close` usage in `visualizer` (#4284)
+  `PR #4284 <https://github.com/pantsbuild/pants/pull/4284>`_
+
+
 1.3.0.dev10 (2/17/2017)
 -----------------------
 

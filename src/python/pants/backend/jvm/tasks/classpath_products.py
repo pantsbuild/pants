@@ -6,14 +6,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.exclude import Exclude
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_graph import BuildGraph
 from pants.goal.products import UnionProducts
+from pants.java.jar.exclude import Exclude
+from pants.util.dirutil import safe_delete, safe_open
 
 
 class ClasspathEntry(object):
@@ -88,7 +91,7 @@ class ArtifactClasspathEntry(ClasspathEntry):
   def coordinate(self):
     """Returns the maven coordinate that used to resolve this classpath entry's artifact.
 
-    :rtype: :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
+    :rtype: :class:`pants.java.jar.M2Coordinate`
     """
     return self._coordinate
 
@@ -147,6 +150,10 @@ def _not_excluded_filter(excludes):
   return not_excluded
 
 
+class MissingClasspathEntryError(Exception):
+  """Indicates an unexpected problem finding a classpath entry."""
+
+
 class ClasspathProducts(object):
   """
   :API: public
@@ -163,6 +170,113 @@ class ClasspathProducts(object):
     :API: public
     """
     return lambda: ClasspathProducts(pants_workdir)
+
+  @classmethod
+  def create_canonical_classpath(cls, classpath_products, targets, basedir,
+                                 save_classpath_file=False,
+                                 internal_classpath_only=True,
+                                 excludes=None):
+    """Create a stable classpath of symlinks with standardized names.
+
+    By default symlinks are created for each target under `basedir` based on its `target.id`.
+    Unique suffixes are added to further disambiguate classpath products from the same target.
+
+    It also optionally saves the classpath products to be used externally (by intellij plugin),
+    one output file for each target.
+
+    Note calling this function will refresh the symlinks and output files for the target under
+    `basedir` if they exist, but it will NOT delete/cleanup the contents for *other* targets.
+    Caller wants that behavior can make the similar calls for other targets or just remove
+    the `basedir` first.
+
+    :param classpath_products: Classpath products.
+    :param targets: Targets to create canonical classpath for.
+    :param basedir: Directory to create symlinks.
+    :param save_classpath_file: An optional file with original classpath entries that symlinks
+      are created from.
+    :param internal_classpath_only: whether to create symlinks just for internal classpath or
+       all classpath.
+    :param excludes: classpath entries should be excluded.
+
+    :returns: Converted canonical classpath.
+    :rtype: list of strings
+    """
+    def delete_old_target_output_files(classpath_prefix):
+      """Delete existing output files or symlinks for target."""
+      directory, basename = os.path.split(classpath_prefix)
+      pattern = re.compile(r'^{basename}(([0-9]+)(\.jar)?|classpath\.txt)$'
+                           .format(basename=re.escape(basename)))
+      files = [filename for filename in os.listdir(directory) if pattern.match(filename)]
+      for rel_path in files:
+        path = os.path.join(directory, rel_path)
+        if os.path.islink(path) or os.path.isfile(path):
+          safe_delete(path)
+
+    def prepare_target_output_folder(basedir, target):
+      """Prepare directory that will contain canonical classpath for the target.
+
+      This includes creating directories if it does not already exist, cleaning up
+      previous classpath output related to the target.
+      """
+      output_dir = basedir
+      # TODO(peiyu) improve readability once we deprecate the old naming style.
+      # For example, `-` is commonly placed in string format as opposed to here.
+      classpath_prefix_for_target = '{basedir}/{target_id}-'.format(basedir=basedir,
+                                                                    target_id=target.id)
+
+      if os.path.exists(output_dir):
+        delete_old_target_output_files(classpath_prefix_for_target)
+      else:
+        os.makedirs(output_dir)
+      return classpath_prefix_for_target
+
+    excludes = excludes or set()
+    canonical_classpath = []
+    target_to_classpath = ClasspathUtil.classpath_by_targets(targets, classpath_products)
+
+    processed_entries = set()
+    for target, classpath_entries_for_target in target_to_classpath.items():
+      if internal_classpath_only:
+        classpath_entries_for_target = filter(ClasspathEntry.is_internal_classpath_entry,
+                                              classpath_entries_for_target)
+      if len(classpath_entries_for_target) > 0:
+        classpath_prefix_for_target = prepare_target_output_folder(basedir, target)
+
+        # Note: for internal targets pants has only one classpath entry, but user plugins
+        # might generate additional entries, for example, build.properties for the target.
+        # Also it's common to have multiple classpath entries associated with 3rdparty targets.
+        for (index, entry) in enumerate(classpath_entries_for_target):
+          if entry.is_excluded_by(excludes):
+            continue
+
+          # Avoid creating symlink for the same entry twice, only the first entry on
+          # classpath will get a symlink. The resulted symlinks as a whole are still stable,
+          # but may have non-consecutive suffixes because the 'missing' ones are those
+          # have already been created symlinks by previous targets.
+          if entry in processed_entries:
+            continue
+          processed_entries.add(entry)
+
+          # Create a unique symlink path by prefixing the base file name with a monotonic
+          # increasing `index` to avoid name collisions.
+          _, ext = os.path.splitext(entry.path)
+          symlink_path = '{}{}{}'.format(classpath_prefix_for_target, index, ext)
+          real_entry_path = os.path.realpath(entry.path)
+          if not os.path.exists(real_entry_path):
+            raise MissingClasspathEntryError('Could not find {realpath} when attempting to link '
+                                             '{src} into {dst}'
+                                             .format(realpath=real_entry_path, src=entry.path, dst=symlink_path))
+
+          os.symlink(real_entry_path, symlink_path)
+          canonical_classpath.append(symlink_path)
+
+        if save_classpath_file:
+          classpath = [entry.path for entry in classpath_entries_for_target]
+          with safe_open('{}classpath.txt'.format(classpath_prefix_for_target), 'wb') as classpath_file:
+            classpath_file.write(os.pathsep.join(classpath).encode('utf-8'))
+            classpath_file.write('\n')
+
+    return canonical_classpath
 
   def copy(self):
     """Returns a copy of this ClasspathProducts.
@@ -304,6 +418,15 @@ class ClasspathProducts(object):
                                                               respect_excludes=respect_excludes)
     return [(conf, cp_entry) for conf, cp_entry in classpath_tuples
             if ClasspathEntry.is_internal_classpath_entry(cp_entry)]
+
+  def update(self, other):
+    """Adds the contents of other to this ClasspathProducts."""
+    if self._pants_workdir != other._pants_workdir:
+      raise ValueError('Other ClasspathProducts from a different pants workdir {}'.format(other._pants_workdir))
+    for target, products in other._classpaths._products_by_target.items():
+      self._classpaths.add_for_target(target, products)
+    for target, products in other._excludes._products_by_target.items():
+      self._excludes.add_for_target(target, products)
 
   def _filter_by_excludes(self, classpath_target_tuples, root_targets):
     # Excludes are always applied transitively, so regardless of whether a transitive

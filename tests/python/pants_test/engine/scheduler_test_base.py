@@ -33,7 +33,7 @@ class SchedulerTestBase(object):
 
   _native = init_native()
 
-  def mk_fs_tree(self, build_root_src=None):
+  def mk_fs_tree(self, build_root_src=None, ignore_patterns=None):
     """Create a temporary FilesystemProjectTree.
 
     :param build_root_src: Optional directory to pre-populate from; otherwise, empty.
@@ -46,7 +46,7 @@ class SchedulerTestBase(object):
       shutil.copytree(build_root_src, build_root, symlinks=True)
     else:
       os.mkdir(build_root)
-    return FileSystemProjectTree(build_root)
+    return FileSystemProjectTree(build_root, ignore_patterns=ignore_patterns)
 
   def mk_scheduler(self,
                    tasks=None,
@@ -57,7 +57,7 @@ class SchedulerTestBase(object):
     tasks = tasks or []
     project_tree = project_tree or self.mk_fs_tree()
 
-    tasks = list(tasks) + create_fs_tasks()
+    tasks = list(tasks) + create_fs_tasks(project_tree)
     return LocalScheduler(goals, tasks, project_tree, self._native)
 
   def execute_request(self, scheduler, product, *subjects):

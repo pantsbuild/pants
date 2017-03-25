@@ -10,7 +10,7 @@ python_library(
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
-    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/java/jar',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',

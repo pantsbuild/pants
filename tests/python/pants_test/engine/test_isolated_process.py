@@ -6,16 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import tarfile
 import unittest
 
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import Files, PathGlobs
-from pants.engine.isolated_process import (Binary, Snapshot, SnapshottedProcess,
-                                           SnapshottedProcessRequest, _snapshot_path,
-                                           create_snapshot_tasks)
+from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.nodes import Return, Throw
 from pants.engine.selectors import Select, SelectLiteral
-from pants.util.contextutil import open_tar
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -30,8 +28,8 @@ class ShellCat(Binary):
     return '/bin/cat'
 
 
-def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(files, snapshot):
-  return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in files.dependencies)),
+def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
+  return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in snapshot.files)),
                                    snapshots=(snapshot,))
 
 
@@ -77,9 +75,9 @@ class Javac(Binary):
     return '/usr/bin/javac'
 
 
-def java_sources_to_javac_args(java_sources, sources_snapshot, out_dir):
+def java_sources_to_javac_args(sources_snapshot, out_dir):
   return SnapshottedProcessRequest(args=('-d', out_dir.path)+
-                                        tuple(f.path for f in java_sources.dependencies),
+                                        tuple(f.path for f in sources_snapshot.files),
                                    snapshots=(sources_snapshot,),
                                    directories_to_create=(out_dir.path,))
 
@@ -107,36 +105,19 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
-  # TODO test exercising what happens if a snapshot file doesn't exist after hitting cache for snapshot node.
-  def test_gather_snapshot_of_pathglobs(self):
-    project_tree = self.mk_example_fs_tree()
-    scheduler = self.mk_scheduler(project_tree=project_tree, tasks=create_snapshot_tasks(project_tree))
-    snapshot_archive_root = os.path.join(project_tree.build_root, '.snapshots')
-
-    request = scheduler.execution_request([Snapshot],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
-    LocalSerialEngine(scheduler).reduce(request)
-
-    root_entries = scheduler.root_entries(request).items()
-    self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
-    snapshot = state.value
-    self.assert_archive_files(['fs_test/a/b/1.txt', 'fs_test/a/b/2'], snapshot,
-                              snapshot_archive_root)
-
   def test_integration_concat_with_snapshot_subjects_test(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
                                 binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Files), Select(Snapshot)),
+                                input_selectors=(Select(Snapshot),),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=process_result_to_concatted_from_outfile),
       [ShellCatToOutFile, [], ShellCatToOutFile],
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -147,12 +128,12 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
   def test_javac_compilation_example(self):
-    sources = PathGlobs.create('', files=['scheduler_inputs/src/java/simple/Simple.java'])
+    sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Simple.java'])
 
     scheduler = self.mk_scheduler_in_example_fs([
       SnapshottedProcess.create(ClasspathEntry,
                                 Javac,
-                                (Select(Files), Select(Snapshot), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
+                                (Select(Snapshot), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
                                 java_sources_to_javac_args,
                                 process_result_to_classpath_entry),
       [Javac, [], Javac]
@@ -182,7 +163,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
@@ -195,24 +176,20 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
                                 binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Files), Select(Snapshot)),
+                                input_selectors=(Select(Snapshot),),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=fail_process_result),
       [ShellCatToOutFile, [], ShellCatToOutFile]
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', globs=['fs_test/a/b/*'])])
+                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
     LocalSerialEngine(scheduler).reduce(request)
 
     root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Failed in output conversion!')
-
-  def assert_archive_files(self, expected_archive_files, snapshot, snapshot_archive_root):
-    with open_tar(_snapshot_path(snapshot, snapshot_archive_root), errorlevel=1) as tar:
-      self.assertEqual(sorted(expected_archive_files), sorted(tar.getnames()))
 
   def assertFirstEntryIsReturn(self, root_entries, scheduler):
     root, state = root_entries[0]
@@ -227,14 +204,14 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return state
 
   def mk_example_fs_tree(self):
-    return self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
+    fs_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
+    test_fs = os.path.join(fs_tree.build_root, 'fs_test')
+    with tarfile.open(os.path.join(test_fs, 'fs_test.tar')) as tar:
+      tar.extractall(test_fs)
+    return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    project_tree = self.mk_example_fs_tree()
-    # TODO: remove `create_snapshot_tasks`: see TODO there.
-    scheduler = self.mk_scheduler(tasks=(rules + create_snapshot_tasks(project_tree)),
-                                  project_tree=project_tree)
-    return scheduler
+    return self.mk_scheduler(tasks=rules, project_tree=self.mk_example_fs_tree())
 
   def assertReturn(self, state, scheduler):
     is_return = isinstance(state, Return)
@@ -242,7 +219,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       return
     else:
       self.fail('Expected a Return, but found a {}. trace below:\n{}'
-                .format(state, scheduler.trace()))
+                .format(state, '\n'.join(scheduler.trace())))
 
   def assertPathContains(self, expected_files, path):
     for i in expected_files:

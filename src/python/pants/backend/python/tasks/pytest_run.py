@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import logging
 import os
 import re
 import shutil
@@ -21,7 +20,6 @@ from six import StringIO
 from six.moves import configparser
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
@@ -36,11 +34,6 @@ from pants.util.contextutil import (environment_as, temporary_dir, temporary_fil
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
-
-
-# Initialize logging, since tests do not run via pants_exe (where it is usually done).
-logging.basicConfig()
-logger = logging.getLogger(__name__)
 
 
 class PythonTestResult(object):
@@ -79,7 +72,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest, PythonSetup, PythonRepos)
+    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
 
   @classmethod
   def register_options(cls, register):
@@ -218,6 +211,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     exclude_lines =
         def __repr__
         raise NotImplementedError
+        pragma: no cover
+        pragma: no branch
+        pragma: recursive coverage
     """)
 
   @staticmethod
@@ -373,7 +369,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
           # On failures or timeouts, the .coverage file won't be written.
           if not os.path.exists('.coverage'):
-            logger.warning('No .coverage file was found! Skipping coverage reporting.')
+            self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
           else:
             # Normalize .coverage.raw paths using combine and `paths` config in the rc file.
             # This swaps the /tmp pex chroot source paths for the local original source paths

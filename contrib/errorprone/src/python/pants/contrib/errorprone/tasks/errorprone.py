@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
-from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.subsystems.shader import Shader, Shading
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_split
@@ -42,11 +42,12 @@ class ErrorProne(NailgunTask):
                           classpath=[
                             JarDependency(org='com.google.errorprone',
                                           name='error_prone_core',
-                                          rev='2.0.15'),
+                                          rev='2.0.17'),
                           ],
                           main=cls._ERRORPRONE_MAIN,
                           custom_rules=[
                             Shader.exclude_package('com.google.errorprone', recursive=True),
+                            Shading.create_exclude('*'), # https://github.com/pantsbuild/pants/issues/4288
                           ]
                          )
 

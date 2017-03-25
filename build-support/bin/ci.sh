@@ -97,13 +97,14 @@ fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
+# TODO: This doesn't seem necessary? We set this in pants.ini.
 INTERPRETER_CONSTRAINTS=(
   "CPython>=2.7,<3"
 )
 for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
   INTERPRETER_ARGS=(
     ${INTERPRETER_ARGS[@]}
-    --interpreter="${constraint}"
+    --python-setup-interpreter-constraints="${constraint}"
   )
 done
 

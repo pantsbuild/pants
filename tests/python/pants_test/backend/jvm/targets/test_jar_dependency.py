@@ -7,9 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
+from pants.base.build_environment import get_buildroot
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 
 
 class JarDependencyTest(unittest.TestCase):
@@ -27,9 +28,9 @@ class JarDependencyTest(unittest.TestCase):
 
   def test_get_url(self):
     """Test using relative url and absolute url are equivalent."""
-    abs_url = 'file:///a/b/c'
+    abs_url = 'file://{}/a/b/c'.format(get_buildroot())
     rel_url = 'file:c'
-    base_path = '/a/b'
+    base_path = 'a/b'
 
     jar_with_rel_url = self._mkjardep(url=rel_url, base_path=base_path)
     self.assertEquals(abs_url, jar_with_rel_url.get_url())

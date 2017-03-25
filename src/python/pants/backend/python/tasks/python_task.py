@@ -16,11 +16,12 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.base import hash_utils
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.python.python_repos import PythonRepos
 from pants.task.task import Task
 
 
@@ -39,7 +40,6 @@ class PythonTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
-    self._compatibilities = self.get_options().interpreter or [b'']
     self._interpreter_cache = None
     self._interpreter = None
 
@@ -53,9 +53,7 @@ class PythonTask(Task):
       # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
       self.context.acquire_lock()
       try:
-        # We pass in filters=compatibilities because setting up some python versions
-        # (e.g., 3<=python<3.3) crashes, and this gives us an escape hatch.
-        self._interpreter_cache.setup(filters=self._compatibilities)
+        self._interpreter_cache.setup()
       finally:
         self.context.release_lock()
     return self._interpreter_cache

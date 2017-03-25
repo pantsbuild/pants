@@ -1,32 +1,47 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+mod context;
 mod core;
 mod externs;
+mod fs;
 mod graph;
 mod handles;
+mod hash;
 mod nodes;
 mod rule_graph;
 mod scheduler;
 mod selectors;
 mod tasks;
+mod types;
 
-extern crate crossbeam;
+extern crate blake2_rfc;
 extern crate fnv;
 extern crate futures;
 extern crate futures_cpupool;
+extern crate glob;
+extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
+extern crate ordermap;
+extern crate petgraph;
+extern crate tar;
+extern crate tempdir;
 
 use std::ffi::CStr;
+use std::fs::File;
+use std::io;
 use std::mem;
 use std::os::raw;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use core::{Function, Key, TypeConstraint, TypeId, Value};
+
+use context::Core;
+use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{
   Buffer,
+  BufferBuffer,
   CloneValExtern,
   DropHandlesExtern,
   CreateExceptionExtern,
@@ -42,16 +57,16 @@ use externs::{
   SatisfiedByExtern,
   SatisfiedByTypeExtern,
   StoreListExtern,
+  StoreBytesExtern,
   TypeIdBuffer,
   ValForExtern,
   ValToStrExtern,
   with_vec,
 };
-use graph::Graph;
-use nodes::Failure;
+use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
 use tasks::Tasks;
-use rule_graph::{GraphMaker, RootSubjectTypes};
+use types::Types;
 
 pub struct RawScheduler {
   scheduler: Scheduler,
@@ -90,8 +105,8 @@ impl RawNode {
           (RawStateTag::Return as u8, v),
         Some(Err(Failure::Throw(msg))) =>
           (RawStateTag::Throw as u8, msg),
-        Some(Err(Failure::Noop(msg, _))) =>
-          (RawStateTag::Noop as u8, externs::create_exception(msg)),
+        Some(Err(Failure::Noop(noop))) =>
+          (RawStateTag::Noop as u8, externs::create_exception(&format!("{:?}", noop))),
       };
 
     RawNode {
@@ -145,6 +160,7 @@ pub extern fn externs_set(
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
   store_list: StoreListExtern,
+  store_bytes: StoreBytesExtern,
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -165,6 +181,7 @@ pub extern fn externs_set(
       satisfied_by,
       satisfied_by_type,
       store_list,
+      store_bytes,
       project,
       project_ignoring_type,
       project_multi,
@@ -177,31 +194,78 @@ pub extern fn externs_set(
 
 #[no_mangle]
 pub extern fn scheduler_create(
-  field_name: Buffer,
-  field_products: Buffer,
-  field_variants: Buffer,
+  construct_snapshot: Function,
+  construct_snapshots: Function,
+  construct_file_content: Function,
+  construct_files_content: Function,
+  construct_path_stat: Function,
+  construct_dir: Function,
+  construct_file: Function,
+  construct_link: Function,
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
+  type_path_globs: TypeConstraint,
+  type_snapshot: TypeConstraint,
+  type_snapshots: TypeConstraint,
+  type_files_content: TypeConstraint,
+  type_dir: TypeConstraint,
+  type_file: TypeConstraint,
+  type_link: TypeConstraint,
+  type_string: TypeId,
+  type_bytes: TypeId,
+  build_root_buf: Buffer,
+  ignore_patterns_buf: BufferBuffer,
 ) -> *const RawScheduler {
+  let build_root = PathBuf::from(build_root_buf.to_os_string());
+  let ignore_patterns =
+    ignore_patterns_buf.to_strings()
+      .unwrap_or_else(|e|
+        panic!("Failed to decode ignore patterns as UTF8: {:?}", e)
+      );
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       RawScheduler {
         scheduler: Scheduler::new(
-          Graph::new(),
-          Tasks::new(
-            field_name.to_string().expect("field_name to be a string"),
-            field_products.to_string().expect("field_products to be a string"),
-            field_variants.to_string().expect("field_variants to be a string"),
-            type_address,
-            type_has_products,
-            type_has_variants,
+          Core::new(
+            Tasks::new(),
+            Types {
+              construct_snapshot: construct_snapshot,
+              construct_snapshots: construct_snapshots,
+              construct_file_content: construct_file_content,
+              construct_files_content: construct_files_content,
+              construct_path_stat: construct_path_stat,
+              construct_dir: construct_dir,
+              construct_file: construct_file,
+              construct_link: construct_link,
+              address: type_address,
+              has_products: type_has_products,
+              has_variants: type_has_variants,
+              path_globs: type_path_globs,
+              snapshot: type_snapshot,
+              snapshots: type_snapshots,
+              files_content: type_files_content,
+              dir: type_dir,
+              file: type_file,
+              link: type_link,
+              string: type_string,
+              bytes: type_bytes,
+            },
+            build_root,
+            ignore_patterns,
           ),
-        ),
+        )
       }
     )
   )
+}
+
+#[no_mangle]
+pub extern fn scheduler_post_fork(scheduler_ptr: *mut RawScheduler) {
+  with_scheduler(scheduler_ptr, |raw| {
+    raw.scheduler.core.post_fork();
+  })
 }
 
 #[no_mangle]
@@ -237,7 +301,6 @@ pub extern fn execution_add_root_select_dependencies(
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
-  transitive: bool,
 ) {
   with_scheduler(scheduler_ptr, |raw| {
     raw.scheduler.add_root_select_dependencies(
@@ -246,7 +309,6 @@ pub extern fn execution_add_root_select_dependencies(
       dep_product,
       field.to_string().expect("field name to be string"),
       field_types.to_vec(),
-      transitive,
     );
   })
 }
@@ -277,8 +339,8 @@ pub extern fn intrinsic_task_add(
   input_constraint: TypeConstraint,
   output_constraint: TypeConstraint,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
   })
 }
 
@@ -288,8 +350,8 @@ pub extern fn singleton_task_add(
   func: Function,
   output_constraint: TypeConstraint,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.singleton_add(func, output_constraint);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.singleton_add(func, output_constraint);
   })
 }
 
@@ -299,8 +361,8 @@ pub extern fn task_add(
   func: Function,
   output_type: TypeConstraint,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.task_add(func, output_type);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.task_add(func, output_type);
   })
 }
 
@@ -309,8 +371,8 @@ pub extern fn task_add_select(
   scheduler_ptr: *mut RawScheduler,
   product: TypeConstraint,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select(product, None);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select(product, None);
   })
 }
 
@@ -322,8 +384,8 @@ pub extern fn task_add_select_variant(
 ) {
   let variant_key =
     variant_key_buf.to_string().expect("Failed to decode key for select_variant");
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select(product, Some(variant_key));
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select(product, Some(variant_key));
   })
 }
 
@@ -333,8 +395,8 @@ pub extern fn task_add_select_literal(
   subject: Key,
   product: TypeConstraint,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_literal(subject, product);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_literal(subject, product);
   })
 }
 
@@ -345,11 +407,23 @@ pub extern fn task_add_select_dependencies(
   dep_product: TypeConstraint,
   field: Buffer,
   field_types: TypeIdBuffer,
-  transitive: bool,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec(), transitive);
-  })
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_dependencies(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
+    })
+}
+
+#[no_mangle]
+pub extern fn task_add_select_transitive(
+  scheduler_ptr: *mut RawScheduler,
+  product: TypeConstraint,
+  dep_product: TypeConstraint,
+  field: Buffer,
+  field_types: TypeIdBuffer,
+) {
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_transitive(product, dep_product, field.to_string().expect("field to be a string"), field_types.to_vec());
+    })
 }
 
 #[no_mangle]
@@ -360,36 +434,36 @@ pub extern fn task_add_select_projection(
   field: Buffer,
   input_product: TypeConstraint,
 ) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
+  with_core(scheduler_ptr, |core| {
+    core.tasks.add_select_projection(product, projected_subject, field.to_string().expect("field to be a string"), input_product);
   })
 }
 
 #[no_mangle]
 pub extern fn task_end(scheduler_ptr: *mut RawScheduler) {
-  with_tasks(scheduler_ptr, |tasks| {
-    tasks.task_end();
+  with_core(scheduler_ptr, |core| {
+    core.tasks.task_end();
   })
 }
 
 #[no_mangle]
 pub extern fn graph_invalidate(
   scheduler_ptr: *mut RawScheduler,
-  subjects_ptr: *mut Key,
-  subjects_len: u64,
+  paths_buf: BufferBuffer,
 ) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
-   with_vec(subjects_ptr, subjects_len as usize, |subjects| {
-      let subjects_set = subjects.iter().collect();
-      raw.scheduler.graph.invalidate(subjects_set) as u64
-    })
+    let paths =
+      paths_buf.to_os_strings().into_iter()
+        .map(|os_str| PathBuf::from(os_str))
+        .collect();
+    raw.scheduler.core.graph.invalidate(paths) as u64
   })
 }
 
 #[no_mangle]
 pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
   with_scheduler(scheduler_ptr, |raw| {
-    raw.scheduler.graph.len() as u64
+    raw.scheduler.core.graph.len() as u64
   })
 }
 
@@ -397,10 +471,10 @@ pub extern fn graph_len(scheduler_ptr: *mut RawScheduler) -> u64 {
 pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
   with_scheduler(scheduler_ptr, |raw| {
     let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-    let path = Path::new(path_str.as_str());
+    let path = PathBuf::from(path_str);
     // TODO: This should likely return an error condition to python.
     //   see https://github.com/pantsbuild/pants/issues/4025
-    raw.scheduler.visualize(&path).unwrap_or_else(|e| {
+    raw.scheduler.visualize(path.as_path()).unwrap_or_else(|e| {
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
   })
@@ -409,9 +483,9 @@ pub extern fn graph_visualize(scheduler_ptr: *mut RawScheduler, path_ptr: *const
 #[no_mangle]
 pub extern fn graph_trace(scheduler_ptr: *mut RawScheduler, path_ptr: *const raw::c_char) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-  let path = Path::new(path_str.as_str());
+  let path = PathBuf::from(path_str);
   with_scheduler(scheduler_ptr, |raw| {
-     raw.scheduler.trace(path).unwrap_or_else(|e| {
+     raw.scheduler.trace(path.as_path()).unwrap_or_else(|e| {
        println!("Failed to write trace to {}: {:?}", path.display(), e);
      });
   });
@@ -433,8 +507,8 @@ pub extern fn validator_run(
 ) -> Value {
   with_scheduler(scheduler_ptr, |raw| {
     with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let graph_maker = GraphMaker::new(&raw.scheduler.tasks,
-                                        RootSubjectTypes { subject_types: subject_types.clone() });
+      let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                        subject_types.clone());
       let graph = graph_maker.full_graph();
 
       match graph.validate() {
@@ -447,6 +521,67 @@ pub extern fn validator_run(
       }
     })
   })
+}
+
+#[no_mangle]
+pub extern fn rule_graph_visualize(
+  scheduler_ptr: *mut RawScheduler,
+  subject_types_ptr: *mut TypeId,
+  subject_types_len: u64,
+  path_ptr: *const raw::c_char
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
+      let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+      let path = PathBuf::from(path_str);
+
+      let graph = graph_full(raw, subject_types);
+      write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
+        println!("Failed to visualize to {}: {:?}", path.display(), e);
+      });
+    })
+  })
+}
+
+#[no_mangle]
+pub extern fn rule_subgraph_visualize(
+  scheduler_ptr: *mut RawScheduler,
+  subject_type: TypeId,
+  product_type: TypeConstraint,
+  path_ptr: *const raw::c_char
+) {
+  with_scheduler(scheduler_ptr, |raw| {
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = PathBuf::from(path_str);
+
+    let graph = graph_sub(raw, subject_type, product_type);
+    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
+      println!("Failed to visualize to {}: {:?}", path.display(), e);
+    });
+  })
+}
+
+
+fn graph_full(raw: &mut RawScheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                    subject_types.clone());
+  graph_maker.full_graph()
+}
+
+fn graph_sub(
+  raw: &mut RawScheduler,
+  subject_type: TypeId,
+  product_type: TypeConstraint
+) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&raw.scheduler.core.tasks,
+                                    vec![subject_type.clone()]);
+  graph_maker.sub_graph(&subject_type, &product_type)
+}
+
+fn write_to_file(path: &Path, graph: &RuleGraph) -> io::Result<()> {
+  let file = File::create(path)?;
+  let mut f = io::BufWriter::new(file);
+  graph.visualize(&mut f)
 }
 
 fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
@@ -466,12 +601,12 @@ fn with_scheduler<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
  * before construction of the Scheduler, which would allow it to be mutated before it
  * needed to become atomic for usage in the Scheduler.
  */
-fn with_tasks<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
-    where F: FnOnce(&mut Tasks)->T {
+fn with_core<F, T>(scheduler_ptr: *mut RawScheduler, f: F) -> T
+    where F: FnOnce(&mut Core)->T {
   with_scheduler(scheduler_ptr, |raw| {
-    let tasks =
-      Arc::get_mut(&mut raw.scheduler.tasks)
-        .expect("Tasks may not be mutated once the Scheduler has started.");
-    f(tasks)
+    let core =
+      Arc::get_mut(&mut raw.scheduler.core)
+        .expect("The Core may not be mutated once the Scheduler has started.");
+    f(core)
   })
 }

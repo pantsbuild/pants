@@ -183,7 +183,8 @@ class AddressMapper(object):
                parser_cls,
                build_patterns=None,
                build_ignore_patterns=None,
-               exclude_target_regexps=None):
+               exclude_target_regexps=None,
+               subproject_roots=None):
     """Create an AddressMapper.
 
     Both the set of files that define a mappable BUILD files and the parser used to parse those
@@ -200,10 +201,11 @@ class AddressMapper(object):
     """
     self.symbol_table_cls = symbol_table_cls
     self.parser_cls = parser_cls
-    self.build_patterns = build_patterns or ('BUILD', 'BUILD.*')
+    self.build_patterns = build_patterns or (b'BUILD', b'BUILD.*')
     self.build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
     self._exclude_target_regexps = exclude_target_regexps or []
     self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
+    self.subproject_roots = subproject_roots or []
 
   def __eq__(self, other):
     if self is other:

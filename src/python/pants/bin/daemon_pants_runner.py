@@ -15,10 +15,10 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.bin.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.pantsd.util import clean_global_runtime_state
 from pants.util.contextutil import HardSystemExit, stdio_as
 
 
@@ -150,6 +150,10 @@ class DaemonPantsRunner(ProcessManager):
       try:
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
+
+        # Reinitialize scheduler threads.
+        if self._graph_helper:
+          self._graph_helper.scheduler.post_fork()
 
         # Re-raise any deferred exceptions, if present.
         self._raise_deferred_exc()

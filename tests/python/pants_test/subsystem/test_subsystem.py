@@ -120,12 +120,14 @@ class SubsystemTest(unittest.TestCase):
         Subsystem.closure((root,))
 
   def test_uninitialized_global(self):
-
+    Subsystem.reset()
     with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,
                                  r'UninitializedSubsystem.*uninitialized-scope'):
       UninitializedSubsystem.global_instance()
 
   def test_uninitialized_scoped_instance(self):
+    Subsystem.reset()
+
     class UninitializedOptional(Optionable):
       options_scope = 'optional'
 

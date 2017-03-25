@@ -12,13 +12,13 @@ import subprocess
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
+from pants.task.task import Task
 
 
-class IsortPythonTask(PythonTask):
+class IsortPythonTask(Task):
   """Autoformats Python source files with isort.
 
   isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort, then uploaded to
@@ -33,6 +33,10 @@ class IsortPythonTask(PythonTask):
   NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE = "No-op: no Python source file found in target(s)."
 
   _PYTHON_SOURCE_EXTENSION = '.py'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(IsortPythonTask, cls).subsystem_dependencies() + (BinaryUtil.Factory.scoped(cls), )
 
   def __init__(self, *args, **kwargs):
     super(IsortPythonTask, self).__init__(*args, **kwargs)

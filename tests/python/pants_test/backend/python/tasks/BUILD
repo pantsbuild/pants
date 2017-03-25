@@ -46,7 +46,6 @@ python_tests(
     '3rdparty/python:mock',
     ':python_task_test_base',
     'src/python/pants/backend/python/tasks:python',
-    'src/python/pants/backend/python:python_setup',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:timeout',
   ]

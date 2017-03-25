@@ -35,9 +35,9 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                'embedded in the Java distribution we run on.')
 
     register('--compiler-plugin-deps', advanced=True, type=list, member_type=target_option,
-             fingerprint=True,
-             help='Requested javac plugins will be found in these targets, as well as in any '
-                  'dependencies of the targets being compiled.')
+             removal_version='1.5.0.dev0',
+             removal_hint='Use --compile-zinc-javac-plugin-deps instead.',
+             fingerprint=True)
 
   @classmethod
   def global_javac_spec(cls, buildgraph):

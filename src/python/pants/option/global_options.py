@@ -126,9 +126,10 @@ class GlobalOptionsRegistrar(Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
-    # This facilitates use of the v2 engine for BuildGraph construction, sans daemon.
-    register('--enable-v2-engine', advanced=True, type=bool, default=False,
-             help='Enables use of the v2 engine. (Beta)')
+    # This facilitates use of the v2 engine, sans daemon.
+    # TODO: Add removal_version='1.5.0dev0' before 1.4 lands.
+    register('--enable-v2-engine', advanced=True, type=bool, default=True,
+             help='Enables use of the v2 engine.')
 
   @classmethod
   def register_options(cls, register):
@@ -154,6 +155,8 @@ class GlobalOptionsRegistrar(Optionable):
              help='Kill nailguns before exiting')
     register('-i', '--interpreter', advanced=True, default=[], type=list,
              metavar='<requirement>',
+             removal_version='1.5.0.dev0',
+             removal_hint='Use --interpreter-constraints in scope python-setup instead.',
              help="Constrain what Python interpreters to use.  Uses Requirement format from "
                   "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
@@ -193,8 +196,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
     register('--build-file-rev', advanced=True,
+             removal_hint='Lightly used feature, scheduled for removal.', removal_version='1.5.0.dev0',
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+             help='Paths that correspond with build roots for any subproject that this '
+                  'project depends on.')
