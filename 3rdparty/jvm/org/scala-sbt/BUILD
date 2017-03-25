@@ -1,7 +1,7 @@
 jar_library(
   name='zinc',
   jars=[
-    scala_jar(org='org.scala-sbt', name='zinc', rev='1.0.0-X9',
+    scala_jar(org='org.scala-sbt', name='zinc', rev='1.0.0-X7',
               excludes=[
                 exclude(org='org.scala-sbt', name='io_2.11'),
                 exclude(org='org.scala-sbt', name='util-logging_2.11'),

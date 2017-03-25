@@ -9,7 +9,7 @@ from pants.backend.jvm.zinc.zinc_analysis_element import ZincAnalysisElement
 
 
 class CompileSetup(ZincAnalysisElement):
-  headers = ('output mode', 'output directories', 'classpath options', 'compile options', 'javac options',
+  headers = ('output mode', 'output directories', 'classpath hash', 'compile options', 'javac options',
              'compiler version', 'compile order', 'name hashing', 'skip Api storing', 'extra')
 
   # Output directories can obviously contain directories under pants_home. Compile/javac options may

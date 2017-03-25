@@ -186,7 +186,7 @@ class BaseZincCompile(JvmCompile):
                   'only clean/cold builds.')
 
     def sbt_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X5', **kwargs)
+      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X7', **kwargs)
 
     shader_rules = [
         # The compiler-interface and compiler-bridge tool jars carry xsbt and
@@ -201,7 +201,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.5'),
+                            JarDependency('org.pantsbuild', 'zinc_2.11', '0.0.1'),
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)
@@ -209,7 +209,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            sbt_jar(name='compiler-bridge_2.10',
+                            sbt_jar(name='compiler-bridge_2.11',
                                     classifier='sources',
                                     intransitive=True)
                           ])
