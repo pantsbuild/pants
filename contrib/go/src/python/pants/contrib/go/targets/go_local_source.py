@@ -67,8 +67,8 @@ class GoLocalSource(GoTarget):
     #    for example via plain old filesystem access.
     globs = Globs(ParseContext(rel_path=address.spec_path, type_aliases={}))
     sources = globs('*', exclude=[globs('BUILD*'),
-                                  # skip subdir contents
-                                  globs('*/**')])
+                                  # This skips dirents.
+                                  globs('*/')])
 
     payload = payload or Payload()
     payload.add_fields({

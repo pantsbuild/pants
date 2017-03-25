@@ -6,14 +6,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from abc import abstractmethod, abstractproperty
+from abc import abstractproperty, abstractmethod
 from hashlib import sha1
 
 from six import string_types
 from twitter.common.dirutil.fileset import Fileset
 
 from pants.base.build_environment import get_buildroot
-from pants.source.filespec import matches_filespec
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -30,6 +29,15 @@ class FilesetWithSpec(AbstractClass):
   def empty(rel_root):
     """Creates an empty FilesetWithSpec object for the given rel_root."""
     return EagerFilesetWithSpec(rel_root, {'globs': []}, tuple(), '<empty>')
+
+  @abstractmethod
+  def matches(self, path_from_buildroot):
+    """
+    Takes in any relative path from build root, and return whether it belongs to this filespec
+
+    :param path_from_buildroot: path relative to build root
+    :return: True if the path matches, else False.
+    """
 
   def __init__(self, rel_root, filespec):
     """
@@ -65,9 +73,10 @@ class FilesetWithSpec(AbstractClass):
   def __getitem__(self, index):
     return self.files[index]
 
-  @abstractmethod
-  def iter_relative_paths(self):
+  def paths_from_buildroot_iter(self):
     """An alternative `__iter__` that joins files with the relative root."""
+    for f in self:
+      yield os.path.join(self.rel_root, f)
 
 
 class EagerFilesetWithSpec(FilesetWithSpec):
@@ -91,13 +100,11 @@ class EagerFilesetWithSpec(FilesetWithSpec):
   def files_hash(self):
     return self._files_hash
 
-  def iter_relative_paths(self):
-    """An alternative `__iter__` that joins files with the relative root."""
-    for f in self:
-      yield os.path.join(self.rel_root, f)
-
   def __repr__(self):
     return 'EagerFilesetWithSpec(rel_root={!r}, files={!r})'.format(self.rel_root, self.files)
+
+  def matches(self, path_from_buildroot):
+    return path_from_buildroot in self._files
 
 
 class LazyFilesetWithSpec(FilesetWithSpec):
@@ -125,12 +132,8 @@ class LazyFilesetWithSpec(FilesetWithSpec):
         h.update(f.read())
     return h.digest()
 
-  def iter_relative_paths(self):
-    """An alternative `__iter__` that joins files with the relative root."""
-    for f in self:
-      path_from_buildroot = os.path.join(self.rel_root, f)
-      if matches_filespec(path_from_buildroot, self.filespec):
-        yield path_from_buildroot
+  def matches(self, path_from_buildroot):
+    return any(path_from_buildroot == path_in_spec for path_in_spec in self.paths_from_buildroot_iter())
 
 
 class FilesetRelPathWrapper(AbstractClass):
@@ -200,6 +203,7 @@ class FilesetRelPathWrapper(AbstractClass):
       # BUILD file's filesets should contain only files, not folders.
       return [path for path in result
               if not cls.validate_files or os.path.isfile(os.path.join(root, path))]
+
     return files_calculator
 
   @staticmethod

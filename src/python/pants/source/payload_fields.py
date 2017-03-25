@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
-from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.util.memo import memoized_property
@@ -33,12 +32,8 @@ class SourcesField(PayloadField):
     # this into the target, rather than have it reach out for global singletons.
     return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
-  @property
-  def filespec(self):
-    return self.sources.filespec
-
   def matches(self, path):
-    return matches_filespec(path, self.filespec)
+    return self.sources.matches(path)
 
   @property
   def rel_path(self):
@@ -64,7 +59,7 @@ class SourcesField(PayloadField):
 
   def relative_to_buildroot(self):
     """All sources joined with their relative paths."""
-    return list(self.sources.iter_relative_paths())
+    return list(self.sources.paths_from_buildroot_iter())
 
   def _compute_fingerprint(self):
     hasher = sha1()
