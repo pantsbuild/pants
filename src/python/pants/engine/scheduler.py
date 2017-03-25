@@ -61,7 +61,8 @@ class WrappedNativeScheduler(object):
         File,
         Link,
         has_products_constraint,
-        constraint_for(Address),
+        # TODO fix this
+        SubclassesOf(Address),
         constraint_for(Variants),
         constraint_for(PathGlobs),
         constraint_for(Snapshot),

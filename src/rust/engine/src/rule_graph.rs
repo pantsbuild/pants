@@ -79,12 +79,18 @@ pub enum Entry {
 
 impl Entry {
 
-  pub fn matches_subject_type(&self, actual_subject_type: TypeId) -> bool {
+  pub fn matches_subject_type(&self, actual_subject_type: TypeId, address_type: &TypeConstraint) -> bool {
     match *self {
       Entry::SubjectIsProduct { subject_type } |
       Entry::Root(RootEntry { subject_type, .. }) |
       Entry::InnerEntry(InnerEntry { subject_type, .. }) =>
-        subject_type == actual_subject_type,
+        subject_type == actual_subject_type ||
+          ( // TODO fix the subclass check used by address type
+            // check subject_type is address,
+            // if so, then do a subclass check
+            externs::satisfied_by_type(address_type, &subject_type) &&
+              externs::satisfied_by_type(address_type, &actual_subject_type)
+          ),
       Entry::Literal { .. } =>
         true,
       Entry::Unreachable { .. }=>
