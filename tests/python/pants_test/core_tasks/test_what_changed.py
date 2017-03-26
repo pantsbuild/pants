@@ -78,7 +78,6 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
-
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 
@@ -432,8 +431,8 @@ class WhatChangedTest(WhatChangedTestBasic):
     """))
 
     file_in_target = 'root/resources/baz.yml'
-
     self.create_file(file_in_target, contents='', mode='w')
+
     self.assert_console_output(
       'root/resources:resources',
       workspace=self.workspace(files=[file_in_target])
@@ -441,7 +440,7 @@ class WhatChangedTest(WhatChangedTestBasic):
 
   def test_root_config(self):
     file_in_target = 'pants.ini'
-    self.create_file(relpath=file_in_target, contents='', mode='a')
+    self.create_file(relpath=file_in_target, contents='', mode='w')
     self.assert_console_output(
       '//:pants-config',
       workspace=self.workspace(files=[file_in_target])
