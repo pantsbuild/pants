@@ -33,9 +33,4 @@ do
   esac
 done
 
-to_sort=$(mktemp -t changed.isort.XXXXX)
-trap "rm -f ${to_sort}" EXIT
-if [[ "$(./pants changed | tee ${to_sort})" != "" ]]
-then
-  ./pants -q --target-spec-file=${to_sort} fmt.isort -- ${isort_args[@]}
-fi
+./pants -q --changed-parent=HEAD fmt.isort -- ${isort_args[@]}
