@@ -282,17 +282,9 @@ impl Select {
         subject: self.subject.clone(),
         product: self.product().clone(),
         variants: self.variants.clone(),
-        edges: context.core.rule_graph.edges_for_inner_entry(
-          match self.entries[0] {
-            rule_graph::Entry::InnerEntry(ref inner) => {
-              if inner.subject_type != self.subject.type_id().clone() {
-                panic!("wrong subject type!");
-              }
-              inner
-            },
-            _ => panic!("expected inner entry!")
-          }
-        ).expect("these edges exist for the snapshot entry")
+        edges: context.core.rule_graph
+          .edges_for_inner(&self.entries[0])
+          .expect("these edges exist for the snapshot entry")
       }
     )
   }
@@ -334,25 +326,19 @@ impl Select {
       ]
     } else {
       self.entries.iter()
-        .map(|entry|
-          if let &rule_graph::Entry::InnerEntry(ref inner) = entry {
-            let task = inner.rule.clone();
-            let edges = context.core.rule_graph
-              .edges_for_inner_entry(inner)
-              .expect("No edges means the graph is incomplete. That's a bug.");
+        .map(|entry| {
+          let (task, edges) = context.core.rule_graph.edges_and_task_for_inner(entry);
+          let edges = edges.expect("No edges found for Select's entry. Graph must be incomplete.");
 
-            context.get(
-              Task {
-                subject: self.subject.clone(),
-                product: self.product().clone(),
-                variants: self.variants.clone(),
-                task: task,
-                edges: edges
-              })
-          } else {
-            panic!("maybe there's a way around this with types?")
-          }
-        )
+          context.get(
+            Task {
+              subject: self.subject.clone(),
+              product: self.product().clone(),
+              variants: self.variants.clone(),
+              task: task,
+              edges: edges
+            })
+        })
         .collect::<Vec<NodeFuture<Value>>>()
     }
   }

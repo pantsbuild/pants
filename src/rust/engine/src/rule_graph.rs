@@ -44,6 +44,22 @@ impl RuleGraphContainer {
     }
   }
 
+  pub fn edges_and_task_for_inner(&self, entry: &Entry) -> (Task, Option<RuleEdges>) {
+    if let &Entry::InnerEntry(ref inner) = entry {
+      (inner.rule.clone(), self.edges_for_inner_entry(inner))
+    } else {
+      panic!("not an inner entry!")
+    }
+  }
+
+  pub fn edges_for_inner(&self, entry: &Entry) -> Option<RuleEdges> {
+    if let &Entry::InnerEntry(ref inner) = entry {
+      self.edges_for_inner_entry(inner)
+    } else {
+      panic!("not an inner entry!")
+    }
+  }
+
   pub fn edges_for_inner_entry(&self, inner_entry: &InnerEntry) -> Option<RuleEdges> {
     if let Some(ref rule_graph) = self.rule_graph {
       // could also not clone here, but then I would need to do som other things
