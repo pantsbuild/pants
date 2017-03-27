@@ -49,7 +49,14 @@ class WrappedNativeScheduler(object):
     has_products_constraint = SubclassesOf(HasProducts)
 
     # Create the ExternContext, and the native Scheduler.
+    self._tasks = native.new_tasks()
+    self._register_tasks(rule_index.tasks)
+    self._register_intrinsics(rule_index.intrinsics)
+    self._register_singletons(rule_index.singletons)
+    self.root_subject_types = root_subject_types
+
     self._scheduler = native.new_scheduler(
+        self._tasks,
         build_root,
         ignore_patterns,
         Snapshot,
@@ -71,10 +78,6 @@ class WrappedNativeScheduler(object):
         constraint_for(File),
         constraint_for(Link),
       )
-    self._register_tasks(rule_index.tasks)
-    self._register_intrinsics(rule_index.intrinsics)
-    self._register_singletons(rule_index.singletons)
-    self.root_subject_types = root_subject_types
 
   def graph_trace(self):
     with temporary_file_path() as path:
@@ -86,7 +89,7 @@ class WrappedNativeScheduler(object):
   def assert_ruleset_valid(self):
     root_type_ids = self._root_type_ids()
 
-    raw_value = self._native.lib.validator_run(self._scheduler, root_type_ids, len(root_type_ids))
+    raw_value = self._native.lib.validator_run(self._tasks, root_type_ids, len(root_type_ids))
     value = self._from_value(raw_value)
 
     if isinstance(value, Exception):
@@ -129,9 +132,9 @@ class WrappedNativeScheduler(object):
     intrinsics, singleton tasks create Runnables that are not cacheable.
     """
     for product_type, rule in singletons.items():
-      self._native.lib.singleton_task_add(self._scheduler,
-                                          Function(self._to_id(rule.func)),
-                                          self._to_constraint(product_type))
+      self._native.lib.tasks_singleton_add(self._tasks,
+                                           Function(self._to_id(rule.func)),
+                                           self._to_constraint(product_type))
 
   def _register_intrinsics(self, intrinsics):
     """Register the given intrinsics dict.
@@ -140,11 +143,11 @@ class WrappedNativeScheduler(object):
     pair. By default, intrinsic tasks create Runnables that are not cacheable.
     """
     for (subject_type, product_type), rule in intrinsics.items():
-      self._native.lib.intrinsic_task_add(self._scheduler,
-                                          Function(self._to_id(rule.func)),
-                                          TypeId(self._to_id(subject_type)),
-                                          self._to_constraint(subject_type),
-                                          self._to_constraint(product_type))
+      self._native.lib.tasks_intrinsic_add(self._tasks,
+                                           Function(self._to_id(rule.func)),
+                                           TypeId(self._to_id(subject_type)),
+                                           self._to_constraint(subject_type),
+                                           self._to_constraint(product_type))
 
   def _register_tasks(self, tasks):
     """Register the given tasks dict with the native scheduler."""
@@ -161,47 +164,46 @@ class WrappedNativeScheduler(object):
         registered.add(key)
 
         _, input_selects, func = rule.as_triple()
-        self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)
+        self._native.lib.tasks_task_begin(self._tasks, Function(self._to_id(func)), output_constraint)
         for selector in input_selects:
           selector_type = type(selector)
           product_constraint = self._to_constraint(selector.product)
           if selector_type is Select:
-            self._native.lib.task_add_select(self._scheduler,
-                                             product_constraint)
+            self._native.lib.tasks_add_select(self._tasks, product_constraint)
           elif selector_type is SelectVariant:
             key_buf = self._to_utf8_buf(selector.variant_key)
-            self._native.lib.task_add_select_variant(self._scheduler,
-                                                     product_constraint,
-                                                     key_buf)
+            self._native.lib.tasks_add_select_variant(self._tasks,
+                                                      product_constraint,
+                                                      key_buf)
           elif selector_type is SelectLiteral:
             # NB: Intentionally ignores subject parameter to provide a literal subject.
-            self._native.lib.task_add_select_literal(self._scheduler,
-                                                     self._to_key(selector.subject),
-                                                     product_constraint)
+            self._native.lib.tasks_add_select_literal(self._tasks,
+                                                      self._to_key(selector.subject),
+                                                      product_constraint)
           elif selector_type is SelectDependencies:
-            self._native.lib.task_add_select_dependencies(self._scheduler,
-                                                          product_constraint,
-                                                          self._to_constraint(selector.dep_product),
-                                                          self._to_utf8_buf(selector.field),
-                                                          self._to_ids_buf(selector.field_types))
+            self._native.lib.tasks_add_select_dependencies(self._tasks,
+                                                           product_constraint,
+                                                           self._to_constraint(selector.dep_product),
+                                                           self._to_utf8_buf(selector.field),
+                                                           self._to_ids_buf(selector.field_types))
           elif selector_type is SelectTransitive:
-            self._native.lib.task_add_select_transitive(self._scheduler,
-                                                        product_constraint,
-                                                        self._to_constraint(selector.dep_product),
-                                                        self._to_utf8_buf(selector.field),
-                                                        self._to_ids_buf(selector.field_types))
+            self._native.lib.tasks_add_select_transitive(self._tasks,
+                                                         product_constraint,
+                                                         self._to_constraint(selector.dep_product),
+                                                         self._to_utf8_buf(selector.field),
+                                                         self._to_ids_buf(selector.field_types))
           elif selector_type is SelectProjection:
             if len(selector.fields) != 1:
               raise ValueError("TODO: remove support for projecting multiple fields at once.")
             field = selector.fields[0]
-            self._native.lib.task_add_select_projection(self._scheduler,
-                                                        self._to_constraint(selector.product),
-                                                        TypeId(self._to_id(selector.projected_subject)),
-                                                        self._to_utf8_buf(field),
-                                                        self._to_constraint(selector.input_product))
+            self._native.lib.tasks_add_select_projection(self._tasks,
+                                                         self._to_constraint(selector.product),
+                                                         TypeId(self._to_id(selector.projected_subject)),
+                                                         self._to_utf8_buf(field),
+                                                         self._to_constraint(selector.input_product))
           else:
             raise ValueError('Unrecognized Selector type: {}'.format(selector))
-        self._native.lib.task_end(self._scheduler)
+        self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
