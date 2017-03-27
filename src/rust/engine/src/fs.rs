@@ -672,7 +672,7 @@ impl Snapshots {
     // we double check existence of the dir (by creating it, to avoid an extra stat) when the path
     // is accessed.
     let path = self.snapshots_tmpdir.path();
-    util::safe_create_dir_all(&path).expect("Could not create dir.");
+    util::safe_create_dir_all(&path).expect("Could not create snapshot temp dir.");
     &path
   }
 
