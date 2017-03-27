@@ -19,6 +19,7 @@ pub struct Task {
  * Registry of tasks able to produce each type, along with a few fundamental python
  * types that the engine must be aware of.
  */
+#[derive(Clone)]
 pub struct Tasks {
   // subject_type, selector -> list of tasks implementing it
   intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,
@@ -32,7 +33,7 @@ pub struct Tasks {
 
 /**
  * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
- *   1. task_add() - once per task
+ *   1. task_begin() - once per task
  *   2. add_*() - zero or more times per task to add input clauses
  *   3. task_end() - once per task
  *
@@ -118,7 +119,7 @@ impl Tasks {
   /**
    * The following methods define the Task registration lifecycle.
    */
-  pub fn task_add(&mut self, func: Function, product: TypeConstraint) {
+  pub fn task_begin(&mut self, func: Function, product: TypeConstraint) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
