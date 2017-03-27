@@ -60,7 +60,7 @@ class EngineSourceMapper(SourceMapper):
     # Handle `sources`-declaring targets.
     target_sources = target_kwargs.get('sources', [])
     if target_sources:
-      for f in target_sources.iter_relative_paths():
+      for f in target_sources.paths_from_buildroot_iter():
         yield f
 
     # Handle `resources`-declaring targets.
@@ -74,7 +74,7 @@ class EngineSourceMapper(SourceMapper):
       #      python_library(..., resources=['file.txt', 'file2.txt'])
       #
       if isinstance(target_resources, EagerFilesetWithSpec):
-        for f in target_resources.iter_relative_paths():
+        for f in target_resources.paths_from_buildroot_iter():
           yield f
       # 2) Strings of addresses, which are represented in kwargs by a list of strings:
       #
