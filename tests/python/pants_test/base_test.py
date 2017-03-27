@@ -24,7 +24,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
-from pants.pantsd.util import clean_global_runtime_state
+from pants.init.util import clean_global_runtime_state
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree

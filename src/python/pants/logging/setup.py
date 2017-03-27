@@ -14,6 +14,8 @@ from logging.handlers import RotatingFileHandler
 from pants.util.dirutil import safe_mkdir
 
 
+# TODO: Once pantsd had a separate launcher entry point, and so no longer needs to call this
+# function, move this into the pants.init package, and remove the pants.logging package.
 def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name=None):
   """Configures logging for a given scope, by default the global scope.
 

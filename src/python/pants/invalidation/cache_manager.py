@@ -14,6 +14,7 @@ from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_rmtree
+from pants.util.memo import memoized_method
 
 
 class VersionedTargetSet(object):
@@ -144,6 +145,10 @@ class VersionedTargetSet(object):
       yield self.current_results_dir
       if self.has_previous_results_dir:
         yield self.previous_results_dir
+
+  @memoized_method
+  def _target_to_vt(self):
+    return {vt.target: vt for vt in self.versioned_targets}
 
   def __repr__(self):
     return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),

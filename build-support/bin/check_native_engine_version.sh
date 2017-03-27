@@ -11,7 +11,7 @@ readonly current_native_engine_version="$(cat ${NATIVE_ENGINE_VERSION_RESOURCE} 
 
 
 if [ "${actual_native_engine_version}" != "${current_native_engine_version}" ]; then
-  die "native_engine_version failed verification: ${current_native_engine_version} != ${actual_native_engine_version}";
+  die "failed verification: ${current_native_engine_version} != ${actual_native_engine_version}";
 else
-  echo "native_engine_version verified: ${current_native_engine_version}"
+  echo "verified: ${current_native_engine_version}"
 fi

@@ -24,6 +24,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils'
   ]
 )

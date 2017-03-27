@@ -8,10 +8,10 @@ python_library(
     '3rdparty/python:pep8',
     '3rdparty/python:pyflakes',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
     'src/python/pants/subsystem',
+    'src/python/pants/task',
     'src/python/pants/util:meta',
   ]
 )

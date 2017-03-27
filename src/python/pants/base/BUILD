@@ -17,6 +17,7 @@ python_library(
   sources = ['file_system_project_tree.py', 'project_tree.py', 'project_tree_factory.py',
              'scm_project_tree.py'],
   dependencies = [
+    ':deprecated',
     '3rdparty/python:pathspec',
     '3rdparty/python:scandir',
     '3rdparty/python:six',
@@ -63,6 +64,7 @@ python_library(
     '3rdparty/python:six',
     ':revision',
     'src/python/pants:version',
+    'src/python/pants/util:memo',
   ]
 )
 
