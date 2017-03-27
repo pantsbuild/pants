@@ -282,9 +282,7 @@ impl Select {
         subject: self.subject.clone(),
         product: self.product().clone(),
         variants: self.variants.clone(),
-        edges: context.core.rule_graph
-          .edges_for_inner(&self.entries[0])
-          .expect("these edges exist for the snapshot entry")
+        entry: self.entries[0].clone()
       }
     )
   }
@@ -328,15 +326,13 @@ impl Select {
       self.entries.iter()
         .map(|entry| {
           let (task, edges) = context.core.rule_graph.edges_and_task_for_inner(entry);
-          let edges = edges.expect("No edges found for Select's entry. Graph must be incomplete.");
-
           context.get(
             Task {
               subject: self.subject.clone(),
               product: self.product().clone(),
               variants: self.variants.clone(),
               task: task,
-              edges: edges
+              entry: entry.clone()
             })
         })
         .collect::<Vec<NodeFuture<Value>>>()
@@ -945,7 +941,7 @@ pub struct Snapshot {
   subject: Key,
   product: TypeConstraint,
   variants: Variants,
-  edges: rule_graph::RuleEdges
+  entry: rule_graph::Entry
 }
 
 impl Snapshot {
@@ -1065,6 +1061,7 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
+    let ref edges = context.core.rule_graph.edges_for_inner(&self.entry).expect("edges for snapshot exist.");
     // Compute and parse PathGlobs for the subject.
     context
       .get(
@@ -1072,7 +1069,7 @@ impl Node for Snapshot {
           context.core.types.path_globs.clone(),
           self.subject.clone(),
           self.variants.clone(),
-          &self.edges,
+          edges,
           &context.core.types.address
         )
       )
@@ -1107,7 +1104,8 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
-  edges: rule_graph::RuleEdges
+  //edges: rule_graph::RuleEdges
+  entry: rule_graph::Entry
 }
 
 impl Task {
@@ -1115,13 +1113,14 @@ impl Task {
    * TODO: Can/should inline execution of all of these.
    */
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
+    let ref edges = context.core.rule_graph.edges_for_inner(&self.entry).expect("edges for task exist.");
     match selector {
       Selector::Select(s) =>
         context.get(Select::new_with_selector(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          &self.edges,
+          edges,
           &context.core.types.address
         )),
       Selector::SelectDependencies(s) =>
@@ -1130,7 +1129,7 @@ impl Task {
             s,
             self.subject.clone(),
             self.variants.clone(),
-            &self.edges,
+            edges,
             &context.core.types.address
           )),
       Selector::SelectTransitive(s) =>
@@ -1138,14 +1137,14 @@ impl Task {
           s,
           self.subject.clone(),
           self.variants.clone(),
-          &self.edges,
+          edges,
           &context.core.types.address)),
       Selector::SelectProjection(s) =>
         context.get(SelectProjection::new(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          &self.edges,
+          edges,
           &context.core.types.address
         )),
       Selector::SelectLiteral(s) =>

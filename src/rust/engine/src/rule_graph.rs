@@ -833,12 +833,6 @@ pub struct RuleEdges {
   selector_to_dependencies: HashMap<Vec<Selector>, Entries>
 }
 
-impl hash::Hash for RuleEdges {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.dependencies.hash(state);
-    self.selector_to_dependencies.keys().collect::<Vec<_>>().hash(state);
-  }
-}
 
 impl RuleEdges {
 
