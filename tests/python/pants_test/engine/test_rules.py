@@ -815,6 +815,7 @@ class RuleGraphMakerTest(unittest.TestCase):
     native = Native.Factory.global_instance().create()
     scheduler = WrappedNativeScheduler(
       native=native,
+      work_dir='/tmp/.pants.d',
       build_root='/tmp',
       ignore_patterns=tuple(),
       rule_index=rule_index,
