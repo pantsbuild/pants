@@ -87,7 +87,7 @@ occur in master, while version changes generally only occur in the relevant rele
 Releasing from different release branches
 -----------------------------------------
 Every week we do a release from master.  In most cases we will use the `dev` naming convention
-detailed in [Release Strategy](http://pantsbuild.org/release_strategy.html). When we are
+detailed in [Release Strategy](http://www.pantsbuild.org/release_strategy.html). When we are
 ready to create a new stable branch we will release under the `rc` naming convention instead of
 `dev`.  For example releases in master should look similar to the following: 1.1.0dev0, 1.1.0dev1,
 1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. *In addition to a release from master
@@ -106,7 +106,7 @@ the release manager may also need to do a release from a stable branch.*
          * Add the new notes file to `src/docs/docsite.json`.
          * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
        For additional information on generating documentation see the
-       [docs reference](http://pantsbuild.org/docs#generating-the-site)
+       [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
     4. Bring the CONTRIBUTORS roster (from master) in
        [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
        up to date by running `build-support/bin/contributors.sh`.
@@ -117,7 +117,7 @@ the release manager may also need to do a release from a stable branch.*
        `1.2.x` from your release commit.
 
 * ###Preparation for the release from the stable branch
-  See [Release Strategy](http://pantsbuild.org/release_strategy.html) for more details about
+  See [Release Strategy](http://www.pantsbuild.org/release_strategy.html) for more details about
   whether a release is needed from a stable branch.
     1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
        directly to the stable branch.

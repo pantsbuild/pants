@@ -40,7 +40,7 @@ is derived from the docstrings of the classes implementing those symbols.
 Generating the site
 -------------------
 
-To see http://pantsbuild.org/ site's content as it would be generated based on your local
+To see http://www.pantsbuild.org/ site's content as it would be generated based on your local
 copy of the pants repo, enter the command
 
     :::bash
@@ -59,16 +59,16 @@ worry—you'll get a chance to abort the publish just before it's committed remo
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
     # and then prompts you to confirm you want to publish these docs remotely before
-    # proceeding to publish to http://pantsbuild.org
+    # proceeding to publish to http://www.pantsbuild.org
     ./build-support/bin/publish_docs.sh -op
 
 If you'd like to publish remotely for others to preview your changes easily, the `-d` option creates
-a copy of the site in a subdir of <http://pantsbuild.org/>:
+a copy of the site in a subdir of <http://www.pantsbuild.org/>:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
     # and then prompts you to confirm you want to publish these docs remotely before
-    # proceeding to publish to http://pantsbuild.org/sirois-test-site
+    # proceeding to publish to http://www.pantsbuild.org/sirois-test-site
     ./build-support/bin/publish_docs.sh -opd sirois-test-site
 
 Cross References
