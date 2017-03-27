@@ -1,28 +1,9 @@
-python_tests(
-  name='go_binary',
-  sources=['test_go_binary.py'],
-  dependencies=[
-    ':go_local_source_test_base',
-    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name='go_library',
-  sources=['test_go_library.py'],
-  dependencies=[
-    ':go_local_source_test_base',
-    'contrib/go/src/python/pants/contrib/go/targets:go_library',
-    'tests/python/pants_test:base_test',
-  ]
-)
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='go_local_source_test_base',
-  sources=['go_local_source_test_base.py'],
+  name='lib',
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/build_graph',
     'src/python/pants/util:meta',
@@ -31,11 +12,10 @@ python_library(
 )
 
 python_tests(
-  name='go_remote_library',
-  sources=['test_go_remote_library.py'],
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
+    ':lib',
     'contrib/go/src/python/pants/contrib/go:plugin',
+    'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
   ]
