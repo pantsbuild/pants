@@ -400,7 +400,7 @@ def setup_json_scheduler(build_root, native):
   source_roots = SourceRoots(('src/java','src/scala'))
   scrooge_tool_address = Address.parse('src/scala/scrooge')
 
-  work_dir = os.path.join(build_root, '.pants.d')
+  work_dir = os_path_join(build_root, '.pants.d')
   project_tree = FileSystemProjectTree(build_root)
 
   goals = {

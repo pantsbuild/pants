@@ -33,14 +33,18 @@ class SchedulerTestBase(object):
 
   _native = init_native()
 
-  def mk_fs_tree(self, work_dir, build_root_src=None, ignore_patterns=None):
+  def _create_work_dir(self):
+    work_dir = safe_mkdtemp()
+    self.addCleanup(safe_rmtree, work_dir)
+    return work_dir
+
+  def mk_fs_tree(self, build_root_src=None, ignore_patterns=None, work_dir=None):
     """Create a temporary FilesystemProjectTree.
 
-    :param work_dir: The pants workdir.
     :param build_root_src: Optional directory to pre-populate from; otherwise, empty.
     :returns: A FilesystemProjectTree.
     """
-    self.addCleanup(safe_rmtree, work_dir)
+    work_dir = work_dir or self._create_work_dir()
     build_root = os.path.join(work_dir, 'build_root')
     if build_root_src is not None:
       shutil.copytree(build_root_src, build_root, symlinks=True)
@@ -51,13 +55,13 @@ class SchedulerTestBase(object):
   def mk_scheduler(self,
                    tasks=None,
                    goals=None,
-                   project_tree=None):
+                   project_tree=None,
+                   work_dir=None):
     """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
     goals = goals or dict()
     tasks = tasks or []
-    work_dir = safe_mkdtemp()
-    project_tree = project_tree or self.mk_fs_tree(work_dir)
-
+    work_dir = work_dir or self._create_work_dir()
+    project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
     tasks = list(tasks) + create_fs_tasks(project_tree)
     return LocalScheduler(work_dir, goals, tasks, project_tree, self._native)
 
