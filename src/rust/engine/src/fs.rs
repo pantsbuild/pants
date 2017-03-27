@@ -16,6 +16,8 @@ use tar;
 use tempdir::TempDir;
 
 use hash::{Fingerprint, WriterHasher};
+use util;
+
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -645,15 +647,11 @@ pub struct Snapshots {
 }
 
 impl Snapshots {
-  pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, io::Error> {
+  pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, String> {
     let mut snapshots_tmpdir_base = snapshots_dir.clone();
     snapshots_tmpdir_base.push(".tmp");
 
-    fs::create_dir_all(snapshots_dir.as_path())?;
-    fs::create_dir_all(snapshots_tmpdir_base.as_path())?;
-
-    let snapshots_tmpdir =
-      TempDir::new_in(snapshots_tmpdir_base, "snapshots")?;
+    let snapshots_tmpdir = util::safe_create_tmpdir_in(&snapshots_tmpdir_base, "snapshots")?;
 
     Ok(
       Snapshots {
@@ -669,7 +667,13 @@ impl Snapshots {
   }
 
   fn tmp_path(&self) -> &Path {
-    self.snapshots_tmpdir.path()
+    // N.B. Sometimes, in e.g. a `./pants clean-all test ...` the snapshot tempdir created at
+    // the beginning of a run can be removed out from under us by e.g. the clean-all task. Here,
+    // we double check existence of the dir (by creating it, to avoid an extra stat) when the path
+    // is accessed.
+    let path = self.snapshots_tmpdir.path();
+    util::safe_create_dir_all(&path).expect("Could not create dir.");
+    &path
   }
 
   /**
@@ -776,8 +780,7 @@ impl Snapshots {
       Ok(())
     } else {
       let dest_dir = dest_path.parent().expect("All snapshot paths must have parent directories.");
-      // As long as the destination file gets created, we've succeeded.
-      Snapshots::create_dir_all(dest_dir)?;
+      util::safe_create_dir_all(dest_dir)?;
       match fs::rename(temp_path, dest_path) {
         Ok(_) => Ok(()),
         Err(_) if dest_path.is_file() => Ok(()),
@@ -793,24 +796,6 @@ impl Snapshots {
   fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
     let hex = fingerprint.to_hex();
     path.join(&hex[0..2]).join(&hex[2..4]).join(format!("{}.tar", hex))
-  }
-
-  /**
-   * Retries create_dir_all up to N times before failing. Necessary in concurrent environments.
-   */
-  fn create_dir_all(dir: &Path) -> Result<(), String> {
-    let mut attempts = 16;
-    loop {
-      let res = fs::create_dir_all(dir);
-      if res.is_ok() {
-        return Ok(());
-      } else if attempts <= 0 {
-        return {
-          res.map_err(|e| format!("Failed to create directory {:?}: {:?}", dir, e))
-        }
-      }
-      attempts -= 1;
-    }
   }
 
   /**

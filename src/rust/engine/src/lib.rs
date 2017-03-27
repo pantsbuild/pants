@@ -14,6 +14,7 @@ mod scheduler;
 mod selectors;
 mod tasks;
 mod types;
+mod util;
 
 extern crate blake2_rfc;
 extern crate fnv;
