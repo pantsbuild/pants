@@ -49,7 +49,7 @@ class SchedulerTestBase(object):
     if build_root_src is not None:
       shutil.copytree(build_root_src, build_root, symlinks=True)
     else:
-      os.mkdirs(build_root)
+      os.makedirs(build_root)
     return FileSystemProjectTree(build_root, ignore_patterns=ignore_patterns)
 
   def mk_scheduler(self,
