@@ -40,6 +40,7 @@ python_library(
   name = 'compile_context',
   sources = ['compile_context.py'],
   dependencies = [
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
   ]
