@@ -49,7 +49,12 @@ class WrappedNativeScheduler(object):
     has_products_constraint = SubclassesOf(HasProducts)
 
     # Create the ExternContext, and the native Scheduler.
+    self._tasks = native.new_tasks()
+    self._register_rules(rule_index)
+    self.root_subject_types = root_subject_types
+
     self._scheduler = native.new_scheduler(
+        self._tasks,
         build_root,
         ignore_patterns,
         Snapshot,
@@ -71,8 +76,6 @@ class WrappedNativeScheduler(object):
         constraint_for(File),
         constraint_for(Link),
       )
-    self._register_rules(rule_index)
-    self.root_subject_types = root_subject_types
 
   def graph_trace(self):
     with temporary_file_path() as path:
@@ -84,7 +87,7 @@ class WrappedNativeScheduler(object):
   def assert_ruleset_valid(self):
     root_type_ids = self._root_type_ids()
 
-    raw_value = self._native.lib.validator_run(self._scheduler, root_type_ids, len(root_type_ids))
+    raw_value = self._native.lib.validator_run(self._tasks, root_type_ids, len(root_type_ids))
     value = self._from_value(raw_value)
 
     if isinstance(value, Exception):
@@ -121,6 +124,7 @@ class WrappedNativeScheduler(object):
     return self._native.context.utf8_buf(string)
 
   def _register_rules(self, rule_index):
+    """Record the given RuleIndex on `self._tasks`."""
     registered = set()
     for product_type, rules in rule_index.rules.items():
       # TODO: The rules map has heterogeneous keys, so we normalize them to type constraints
@@ -145,34 +149,33 @@ class WrappedNativeScheduler(object):
 
     Singleton tasks are those that are the default for a particular type(product).
     """
-    self._native.lib.singleton_add(self._scheduler,
-                                   self._to_value(rule.value),
-                                   output_constraint)
+    self._native.lib.tasks_singleton_add(self._tasks,
+                                         self._to_value(rule.value),
+                                         output_constraint)
 
   def _register_task(self, output_constraint, rule):
     """Register the given TaskRule with the native scheduler."""
     input_selects = rule.input_selectors
     func = rule.func
-    self._native.lib.task_add(self._scheduler, Function(self._to_id(func)), output_constraint)
+    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_id(func)), output_constraint)
     for selector in input_selects:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
       if selector_type is Select:
-        self._native.lib.task_add_select(self._scheduler,
-                                          product_constraint)
+        self._native.lib.tasks_add_select(self._tasks, product_constraint)
       elif selector_type is SelectVariant:
         key_buf = self._to_utf8_buf(selector.variant_key)
-        self._native.lib.task_add_select_variant(self._scheduler,
-                                                  product_constraint,
-                                                  key_buf)
+        self._native.lib.tasks_add_select_variant(self._tasks,
+                                                 product_constraint,
+                                                 key_buf)
       elif selector_type is SelectDependencies:
-        self._native.lib.task_add_select_dependencies(self._scheduler,
+        self._native.lib.tasks_add_select_dependencies(self._tasks,
                                                       product_constraint,
                                                       self._to_constraint(selector.dep_product),
                                                       self._to_utf8_buf(selector.field),
                                                       self._to_ids_buf(selector.field_types))
       elif selector_type is SelectTransitive:
-        self._native.lib.task_add_select_transitive(self._scheduler,
+        self._native.lib.tasks_add_select_transitive(self._tasks,
                                                     product_constraint,
                                                     self._to_constraint(selector.dep_product),
                                                     self._to_utf8_buf(selector.field),
@@ -181,21 +184,20 @@ class WrappedNativeScheduler(object):
         if len(selector.fields) != 1:
           raise ValueError("TODO: remove support for projecting multiple fields at once.")
         field = selector.fields[0]
-        self._native.lib.task_add_select_projection(self._scheduler,
+        self._native.lib.tasks_add_select_projection(self._tasks,
                                                     self._to_constraint(selector.product),
                                                     TypeId(self._to_id(selector.projected_subject)),
                                                     self._to_utf8_buf(field),
                                                     self._to_constraint(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
-    self._native.lib.task_end(self._scheduler)
+    self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
   def visualize_rule_graph_to_file(self, filename):
     root_type_ids = self._root_type_ids()
-
     self._native.lib.rule_graph_visualize(
       self._scheduler,
       root_type_ids,

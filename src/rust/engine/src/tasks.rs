@@ -20,6 +20,7 @@ pub struct Task {
  * Registry of Tasks able to produce each type, and Singletons which are the default/only
  * provider of a type.
  */
+#[derive(Clone)]
 pub struct Tasks {
   // Singleton Values to be returned for a given TypeConstraint.
   singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
@@ -31,7 +32,7 @@ pub struct Tasks {
 
 /**
  * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
- *   1. task_add() - once per task
+ *   1. task_begin() - once per task
  *   2. add_*() - zero or more times per task to add input clauses
  *   3. task_end() - once per task
  *
@@ -84,7 +85,7 @@ impl Tasks {
   /**
    * The following methods define the Task registration lifecycle.
    */
-  pub fn task_add(&mut self, func: Function, product: TypeConstraint) {
+  pub fn task_begin(&mut self, func: Function, product: TypeConstraint) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"

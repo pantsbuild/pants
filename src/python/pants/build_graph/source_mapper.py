@@ -57,8 +57,8 @@ class SpecSourceMapper(SourceMapper):
     for address in self._address_mapper.addresses_in_spec_path(spec_path):
       self._build_graph.inject_address_closure(address)
       target = self._build_graph.get_target(address)
-      sources = target.payload.get_field('sources')
-      if self._sources_match(source, sources):
+      sources_field = target.payload.get_field('sources')
+      if sources_field and sources_field.matches(source):
         yield address
       elif self._address_mapper.is_declaring_file(address, source):
         yield address
@@ -70,11 +70,6 @@ class SpecSourceMapper(SourceMapper):
           if resource.payload.sources.matches(source):
             yield address
             break
-
-  def _sources_match(self, source, sources):
-    if not sources:
-      return False
-    return sources.matches(source)
 
 
 class LazySourceMapper(SourceMapper):

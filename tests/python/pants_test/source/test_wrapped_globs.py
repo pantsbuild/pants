@@ -249,5 +249,5 @@ class FilesetWithSpecTest(BaseTest):
 
   def test_iter_relative_paths(self):
     efws = EagerFilesetWithSpec('test_root', {'globs': []}, files=['a', 'b', 'c'], files_hash='deadbeef')
-    result = list(efws.iter_relative_paths())
+    result = list(efws.paths_from_buildroot_iter())
     self.assertEquals(result, ['test_root/a', 'test_root/b', 'test_root/c'])

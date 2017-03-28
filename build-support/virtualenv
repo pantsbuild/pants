@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Wrapper for self-bootstrapping virtualenv
+
 set -e
-VIRTUALENV_VERSION=15.0.2
+
+VIRTUALENV_VERSION=15.1.0
 VIRTUALENV_PACKAGE_LOCATION=${VIRTUALENV_PACKAGE_LOCATION:-https://pypi.io/packages/source/v/virtualenv}
 
 if [[ $GIT_HOOK == 1 ]] ; then
@@ -11,7 +13,6 @@ else
 fi
 source ${REPO_ROOT}/build-support/common.sh
 
-
 if [[ -z "${PY}" ]]; then
   if which python2.7 >/dev/null; then
     PY=`which python2.7`
@@ -20,23 +21,23 @@ if [[ -z "${PY}" ]]; then
   fi
 fi
 
-log "Using ${PY}"
+log "Using python at ${PY}"
 
 HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 if ! [ -f "${HERE}/virtualenv.dist/BOOTSTRAPPED-${VIRTUALENV_VERSION}" ]; then
-  pushd "${HERE}"
-  VIRTUALENV_PACKAGE_FULL_URL=${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-${VIRTUALENV_VERSION}.tar.gz
-  log "Downloading ${VIRTUALENV_PACKAGE_FULL_URL}..."
-  curl -L -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
-    die "Failed to download ${VIRTUALENV_PACKAGE_FULL_URL}."
-  rm -rf virtualenv-${VIRTUALENV_VERSION} && \
-  tar zxvf virtualenv-${VIRTUALENV_VERSION}.tar.gz || \
-    die "Failed to extract ${VIRTUALENV_PACKAGE_FULL_URL}."
-  # TODO(ksweeney): Checksum
-  touch virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED-${VIRTUALENV_VERSION} && \
-    rm -rf virtualenv.dist && \
-    mv -v virtualenv-${VIRTUALENV_VERSION} virtualenv.dist
-  popd
+  pushd "${HERE}" >/dev/null
+    VIRTUALENV_PACKAGE_FULL_URL="${VIRTUALENV_PACKAGE_LOCATION}/virtualenv-${VIRTUALENV_VERSION}.tar.gz"
+    log "Downloading ${VIRTUALENV_PACKAGE_FULL_URL}..."
+    curl -#L -O ${VIRTUALENV_PACKAGE_FULL_URL} || \
+      die "Failed to download ${VIRTUALENV_PACKAGE_FULL_URL}."
+    rm -rf virtualenv-${VIRTUALENV_VERSION} && \
+    tar zxf virtualenv-${VIRTUALENV_VERSION}.tar.gz || \
+      die "Failed to extract ${VIRTUALENV_PACKAGE_FULL_URL}."
+    # TODO(ksweeney): Checksum
+    touch virtualenv-${VIRTUALENV_VERSION}/BOOTSTRAPPED-${VIRTUALENV_VERSION} && \
+      rm -rf virtualenv.dist && \
+      mv -f virtualenv-${VIRTUALENV_VERSION} virtualenv.dist
+  popd >/dev/null
 fi
 
 exec "${PY}" "${HERE}/virtualenv.dist/virtualenv.py" "$@"
