@@ -673,21 +673,16 @@ fn safe_create_tmpdir_in(base_dir: &Path, prefix: &str) -> Result<TempDir, Strin
  */
 pub struct Snapshots {
   snapshots_dir: PathBuf,
-  snapshots_tmpdir_base: PathBuf,
   snapshots_generator: Arc<Mutex<(TempDir, usize)>>,
 }
 
 impl Snapshots {
   pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, String> {
-    let mut snapshots_tmpdir_base = snapshots_dir.clone();
-    snapshots_tmpdir_base.push(".tmp");
-
-    let snapshots_tmpdir = safe_create_tmpdir_in(&snapshots_tmpdir_base, "snapshots")?;
+    let snapshots_tmpdir = safe_create_tmpdir_in(&snapshots_dir, ".tmp")?;
 
     Ok(
       Snapshots {
         snapshots_dir: snapshots_dir,
-        snapshots_tmpdir_base: snapshots_tmpdir_base,
         snapshots_generator: Arc::new(Mutex::new((snapshots_tmpdir, 0))),
       }
     )
@@ -706,7 +701,7 @@ impl Snapshots {
     // we double check existence of the `TempDir`'s path when the path is accessed and replace if
     // necessary.
     if !gen.0.path().exists() {
-      gen.0 = safe_create_tmpdir_in(&self.snapshots_tmpdir_base, "snapshots")?;
+      gen.0 = safe_create_tmpdir_in(&self.snapshots_dir, ".tmp")?;
     }
 
     Ok(
