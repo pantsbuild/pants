@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use std::sync::{Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -673,7 +673,7 @@ fn safe_create_tmpdir_in(base_dir: &Path, prefix: &str) -> Result<TempDir, Strin
  */
 pub struct Snapshots {
   snapshots_dir: PathBuf,
-  snapshots_generator: Arc<Mutex<(TempDir, usize)>>,
+  snapshots_generator: Mutex<(TempDir, usize)>,
 }
 
 impl Snapshots {
@@ -683,7 +683,7 @@ impl Snapshots {
     Ok(
       Snapshots {
         snapshots_dir: snapshots_dir,
-        snapshots_generator: Arc::new(Mutex::new((snapshots_tmpdir, 0))),
+        snapshots_generator: Mutex::new((snapshots_tmpdir, 0)),
       }
     )
   }
@@ -837,7 +837,7 @@ impl Snapshots {
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
     let dest_dir = self.snapshot_path().to_owned();
     let build_root = fs.build_root.clone();
-    let temp_path = self.next_temp_path().expect("Couldnt get the next temp path.");
+    let temp_path = self.next_temp_path().expect("Couldn't get the next temp path.");
 
     fs.pool().spawn_fn(move || {
       // Write the tar deterministically to a temporary file while fingerprinting.
