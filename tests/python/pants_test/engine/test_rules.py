@@ -102,7 +102,7 @@ class RulesetValidatorTest(unittest.TestCase):
     return scheduler
 
   def test_ruleset_with_missing_product_type(self):
-    rules = [TaskRule(A, (Select(B),), noop)]
+    rules = [TaskRule(A, [Select(B)], noop)]
     root_subject_types = {SubA}
     scheduler = self.create_native_scheduler(root_subject_types, rules)
 
@@ -117,7 +117,7 @@ class RulesetValidatorTest(unittest.TestCase):
                                     str(cm.exception))
 
   def test_ruleset_with_rule_with_two_missing_selects(self):
-    rules = [TaskRule(A, (Select(B), Select(C)), noop)]
+    rules = [TaskRule(A, [Select(B), Select(C)], noop)]
     validator = self.create_validator({}, {SubA}, rules)
     with self.assertRaises(ValueError) as cm:
       validator.assert_ruleset_valid()
@@ -131,15 +131,15 @@ class RulesetValidatorTest(unittest.TestCase):
       str(cm.exception))
 
   def test_ruleset_with_selector_only_provided_as_root_subject(self):
-    rules = [TaskRule(A, (Select(B),), noop)]
+    rules = [TaskRule(A, [Select(B)], noop)]
     validator = self.create_validator({}, {B}, rules)
 
     validator.assert_ruleset_valid()
 
   def test_ruleset_with_superclass_of_selected_type_produced_fails(self):
     rules = [
-      TaskRule(A, (Select(B),), noop),
-      TaskRule(B, (Select(SubA),), noop)
+      TaskRule(A, [Select(B)], noop),
+      TaskRule(B, [Select(SubA)], noop)
     ]
     validator = self.create_validator({}, {C}, rules)
 
@@ -159,7 +159,7 @@ class RulesetValidatorTest(unittest.TestCase):
     # The graph is complete, but the goal 'goal-name' requests A,
     # which is not produced by any rule.
     rules = [
-      TaskRule(B, (Select(SubA),), noop)
+      TaskRule(B, [Select(SubA)], noop)
     ]
 
     validator = self.create_validator({'goal-name': AGoal}, {SubA}, rules)
@@ -171,8 +171,8 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_explicit_type_constraint(self):
     rules = [
-      TaskRule(Exactly(A), (Select(B),), noop),
-      TaskRule(B, (Select(A),), noop)
+      TaskRule(Exactly(A), [Select(B)], noop),
+      TaskRule(B, [Select(A)], noop)
     ]
     validator = self.create_validator({}, {SubA}, rules)
 
@@ -180,7 +180,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_with_failure_due_to_incompatible_subject_for_singleton(self):
     rules = [
-      TaskRule(D, (Select(C),), noop),
+      TaskRule(D, [Select(C)], noop),
       SingletonRule(B, B()),
     ]
     validator = self.create_validator({}, {A}, rules)
@@ -198,7 +198,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_ruleset_unreachable_due_to_product_of_select_dependencies(self):
     rules = [
-      TaskRule(A, (SelectDependencies(B, SubA, field_types=(D,)),), noop),
+      TaskRule(A, [SelectDependencies(B, SubA, field_types=(D,))], noop),
     ]
     validator = self.create_validator({}, {A}, rules)
 
@@ -216,9 +216,9 @@ class RulesetValidatorTest(unittest.TestCase):
     # If a rule depends on another rule+subject in two ways, and one of them is unfulfillable
     # Only the unfulfillable one should be in the errors.
     rules = [
-      TaskRule(B, (Select(D),), noop),
-      TaskRule(D, (Select(A), SelectDependencies(A, SubA, field_types=(C,))), noop),
-      TaskRule(A, (Select(SubA),), noop)
+      TaskRule(B, [Select(D)], noop),
+      TaskRule(D, [Select(A), SelectDependencies(A, SubA, field_types=(C,))], noop),
+      TaskRule(A, [Select(SubA)], noop)
     ]
     validator = self.create_validator({}, _suba_root_subject_types, rules)
 
@@ -236,7 +236,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_initial_select_projection_failure(self):
     rules = [
-      TaskRule(Exactly(A), (SelectProjection(B, D, 'some', C),), noop),
+      TaskRule(Exactly(A), [SelectProjection(B, D, 'some', C)], noop),
     ]
     validator = self.create_validator({}, _suba_root_subject_types, rules)
 
@@ -252,8 +252,8 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_secondary_select_projection_failure(self):
     rules = [
-      TaskRule(Exactly(A), (SelectProjection(B, D, 'some', C),), noop),
-      TaskRule(C, tuple(), noop)
+      TaskRule(Exactly(A), [SelectProjection(B, D, 'some', C)], noop),
+      TaskRule(C, [], noop)
     ]
 
     validator = self.create_validator({}, _suba_root_subject_types, rules)
@@ -279,7 +279,7 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_smallest_full_test(self):
     rules = [
-      TaskRule(Exactly(A), (Select(SubA),), noop)
+      TaskRule(Exactly(A), [Select(SubA)], noop)
     ]
     fullgraph = self.create_full_graph({SubA}, RuleIndex.create(rules))
 
@@ -334,8 +334,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [
-      TaskRule(A, (Select(SubA),), noop),
-      TaskRule(B, (Select(A),), noop)
+      TaskRule(A, [Select(SubA)], noop),
+      TaskRule(B, [Select(A)], noop)
     ]
     fullgraph = self.create_full_graph(OrderedSet([SubA, A]), RuleIndex.create(rules))
 
@@ -360,7 +360,7 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_single_rule_depending_on_subject_selection(self):
     rules = [
-      TaskRule(Exactly(A), (Select(SubA),), noop)
+      TaskRule(Exactly(A), [Select(SubA)], noop)
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -378,8 +378,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_multiple_selects(self):
     rules = [
-      TaskRule(Exactly(A), (Select(SubA), Select(B)), noop),
-      TaskRule(B, tuple(), noop)
+      TaskRule(Exactly(A), [Select(SubA), Select(B)], noop),
+      TaskRule(B, [], noop)
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -398,8 +398,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_one_level_of_recursion(self):
     rules = [
-      TaskRule(Exactly(A), (Select(B),), noop),
-      TaskRule(B, (Select(SubA),), noop)
+      TaskRule(Exactly(A), [Select(B)], noop),
+      TaskRule(B, [Select(SubA)], noop)
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -418,8 +418,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_noop_removal_in_subgraph(self):
     rules = [
-      TaskRule(Exactly(A), (Select(C),), noop),
-      TaskRule(Exactly(A), tuple(), noop),
+      TaskRule(Exactly(A), [Select(C)], noop),
+      TaskRule(Exactly(A), [], noop),
       SingletonRule(B, B()),
     ]
 
@@ -438,8 +438,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_noop_removal_full_single_subject_type(self):
     rules = [
-      TaskRule(Exactly(A), (Select(C),), noop),
-      TaskRule(Exactly(A), tuple(), noop),
+      TaskRule(Exactly(A), [Select(C)], noop),
+      TaskRule(Exactly(A), [], noop),
     ]
 
     fullgraph = self.create_full_graph(_suba_root_subject_types, RuleIndex.create(rules))
@@ -458,8 +458,8 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_root_tuple_removed_when_no_matches(self):
     root_subjects = {C, D}
     rules = [
-      TaskRule(Exactly(A), (Select(C),), noop),
-      TaskRule(Exactly(B), (Select(D), Select(A)), noop),
+      TaskRule(Exactly(A), [Select(C)], noop),
+      TaskRule(Exactly(B), [Select(D), Select(A)], noop),
     ]
 
     fullgraph = self.create_full_graph(root_subjects, RuleIndex.create(rules))
@@ -479,9 +479,9 @@ class RuleGraphMakerTest(unittest.TestCase):
     # If a noop-able rule has rules that depend on it,
     # they should be removed from the graph.
     rules = [
-      TaskRule(Exactly(B), (Select(C),), noop),
-      TaskRule(Exactly(A), (Select(B),), noop),
-      TaskRule(Exactly(A), tuple(), noop),
+      TaskRule(Exactly(B), [Select(C)], noop),
+      TaskRule(Exactly(A), [Select(B)], noop),
+      TaskRule(Exactly(A), [], noop),
     ]
     subgraph = self.create_subgraph(A, rules, SubA())
 
@@ -498,9 +498,9 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_with_separate_types_for_subselectors(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, C, field_types=(D,)),), noop),
-      TaskRule(B, (Select(D),), noop),
-      TaskRule(C, (Select(SubA),), noop)
+      TaskRule(Exactly(A), [SelectDependencies(B, C, field_types=(D,))], noop),
+      TaskRule(B, [Select(D)], noop),
+      TaskRule(C, [Select(SubA)], noop)
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -520,8 +520,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_with_subject_as_first_subselector(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop),
-      TaskRule(B, (Select(D),), noop),
+      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(D,))], noop),
+      TaskRule(B, [Select(D)], noop),
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -540,8 +540,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_multiple_field_types_all_resolvable(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop),
-      TaskRule(B, (Select(Exactly(C, D)),), noop),
+      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C, D,))], noop),
+      TaskRule(B, [Select(Exactly(C, D))], noop),
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -561,10 +561,10 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_multiple_field_types_all_resolvable_with_deps(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop),
+      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C, D,))], noop),
       # for the C type, it'll just be a literal, but for D, it'll traverse one more edge
-      TaskRule(B, (Select(C),), noop),
-      TaskRule(C, (Select(D),), noop),
+      TaskRule(B, [Select(C)], noop),
+      TaskRule(C, [Select(D)], noop),
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -585,10 +585,10 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_recurse_with_different_type(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, SubA, field_types=(C, D,)),), noop),
-      TaskRule(B, (Select(A),), noop),
-      TaskRule(C, (Select(SubA),), noop),
-      TaskRule(SubA, tuple(), noop)
+      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C, D,))], noop),
+      TaskRule(B, [Select(A)], noop),
+      TaskRule(C, [Select(SubA)], noop),
+      TaskRule(SubA, [], noop)
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -612,7 +612,7 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_non_matching_subselector_because_of_singleton(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, SubA, field_types=(D,)),), noop),
+      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(D,))], noop),
       SingletonRule(C, C()),
     ]
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -630,7 +630,7 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_dependencies_with_matching_singleton(self):
     rules = [
-      TaskRule(Exactly(A), (SelectDependencies(B, SubA, field_types=(C,)),), noop),
+      TaskRule(Exactly(A), [SelectDependencies(B, SubA, field_types=(C,))], noop),
       SingletonRule(B, B()),
     ]
 
@@ -650,9 +650,9 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_depends_on_multiple_one_noop(self):
     rules = [
-      TaskRule(B, (Select(A),), noop),
-      TaskRule(A, (Select(C),), noop),
-      TaskRule(A, (Select(SubA),), noop)
+      TaskRule(B, [Select(A)], noop),
+      TaskRule(A, [Select(C)], noop),
+      TaskRule(A, [Select(SubA)], noop)
     ]
 
     subgraph = self.create_subgraph(B, rules, SubA())
@@ -671,9 +671,9 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_multiple_depend_on_same_rule(self):
     rules = [
-      TaskRule(B, (Select(A),), noop),
-      TaskRule(C, (Select(A),), noop),
-      TaskRule(A, (Select(SubA),), noop)
+      TaskRule(B, [Select(A)], noop),
+      TaskRule(C, [Select(A)], noop),
+      TaskRule(A, [Select(SubA)], noop)
     ]
 
     subgraph = self.create_full_graph(_suba_root_subject_types, RuleIndex.create(rules))
@@ -697,8 +697,8 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_projection_simple(self):
     rules = [
-      TaskRule(Exactly(A), (SelectProjection(B, D, 'some', SubA),), noop),
-      TaskRule(B, (Select(D),), noop),
+      TaskRule(Exactly(A), [SelectProjection(B, D, 'some', SubA)], noop),
+      TaskRule(B, [Select(D)], noop),
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
@@ -718,8 +718,8 @@ class RuleGraphMakerTest(unittest.TestCase):
   def test_successful_when_one_field_type_is_unfulfillable(self):
     # NB We may want this to be a warning, since it may not be intentional
     rules = [
-      TaskRule(B, (Select(SubA),), noop),
-      TaskRule(D, (Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C))), noop)
+      TaskRule(B, [Select(SubA)], noop),
+      TaskRule(D, [Select(Exactly(B)), SelectDependencies(B, SubA, field_types=(SubA, C))], noop)
     ]
 
     subgraph = self.create_subgraph(D, rules, SubA())

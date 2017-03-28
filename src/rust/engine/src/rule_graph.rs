@@ -582,7 +582,7 @@ fn selector_str(selector: &Selector) -> String {
                                                                  .collect::<Vec<String>>()
                                                                  .join(", ")
     ),
-    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, ('{}',), {})",
+    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, '{}', {})",
                                                   type_constraint_str(s.product),
                                                   type_str(s.projected_subject),
                                                   s.field,

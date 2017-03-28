@@ -139,7 +139,7 @@ class SnapshottedProcess(object):
     """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
 
     # Select the concatenation of the snapshot directory, binary, and input selectors.
-    inputs = (Select(_Snapshots), Select(binary_type)) + tuple(input_selectors)
+    inputs = [Select(_Snapshots), Select(binary_type)] + list(input_selectors)
 
     # Apply the input/output conversions to a top-level process-execution function which
     # will receive all inputs, convert in, execute, and convert out.
