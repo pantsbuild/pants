@@ -142,7 +142,7 @@ class SelectTransitive(datatype('Transitive', ['product', 'dep_product', 'field'
     return super(SelectTransitive, cls).__new__(cls, product, dep_product, field, field_types)
 
 
-class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'fields', 'input_product']), Selector):
+class SelectProjection(datatype('Projection', ['product', 'projected_subject', 'field', 'input_product']), Selector):
   """Selects a field of the given Subject to produce a Subject, Product dependency from.
 
   Projecting an input allows for deduplication in the graph, where multiple Subjects
@@ -152,6 +152,11 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
   is projected directly rather than attempting to use it to construct the projected type.
   """
   optional = False
+
+  def __new__(cls, product, projected_subject, field, input_product):
+    if not isinstance(field, six.string_types):
+      raise ValueError('Expected `field` to be a string, but was: {!r}'.format(field))
+    return super(SelectProjection, cls).__new__(cls, product, projected_subject, field, input_product)
 
   @property
   def input_product_selector(self):
@@ -165,6 +170,6 @@ class SelectProjection(datatype('Projection', ['product', 'projected_subject', '
     return '{}({}, {}, {}, {})'.format(type(self).__name__,
                                        type_or_constraint_repr(self.product),
                                        self.projected_subject.__name__,
-                                       repr(self.fields),
+                                       repr(self.field),
                                        getattr(
                                          self.input_product, '__name__', repr(self.input_product)))

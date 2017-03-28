@@ -236,7 +236,7 @@ class RulesetValidatorTest(unittest.TestCase):
 
   def test_initial_select_projection_failure(self):
     rules = [
-      TaskRule(Exactly(A), (SelectProjection(B, D, ('some',), C),), noop),
+      TaskRule(Exactly(A), (SelectProjection(B, D, 'some', C),), noop),
     ]
     validator = self.create_validator({}, _suba_root_subject_types, rules)
 
@@ -245,14 +245,14 @@ class RulesetValidatorTest(unittest.TestCase):
 
     self.assert_equal_with_printing(dedent("""
                       Rules with errors: 1
-                        (A, (SelectProjection(B, D, ('some',), C),), noop):
-                          no matches for Select(C) when resolving SelectProjection(B, D, ('some',), C) with subject types: SubA
+                        (A, (SelectProjection(B, D, 'some', C),), noop):
+                          no matches for Select(C) when resolving SelectProjection(B, D, 'some', C) with subject types: SubA
                       """).strip(),
                                     str(cm.exception))
 
   def test_secondary_select_projection_failure(self):
     rules = [
-      TaskRule(Exactly(A), (SelectProjection(B, D, ('some',), C),), noop),
+      TaskRule(Exactly(A), (SelectProjection(B, D, 'some', C),), noop),
       TaskRule(C, tuple(), noop)
     ]
 
@@ -263,8 +263,8 @@ class RulesetValidatorTest(unittest.TestCase):
 
     self.assert_equal_with_printing(dedent("""
                      Rules with errors: 1
-                       (A, (SelectProjection(B, D, ('some',), C),), noop):
-                         no matches for Select(B) when resolving SelectProjection(B, D, ('some',), C) with subject types: D
+                       (A, (SelectProjection(B, D, 'some', C),), noop):
+                         no matches for Select(B) when resolving SelectProjection(B, D, 'some', C) with subject types: D
                      """).strip(),
                                     str(cm.exception))
 
@@ -697,7 +697,7 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_projection_simple(self):
     rules = [
-      TaskRule(Exactly(A), (SelectProjection(B, D, ('some',), SubA),), noop),
+      TaskRule(Exactly(A), (SelectProjection(B, D, 'some', SubA),), noop),
       TaskRule(B, (Select(D),), noop),
     ]
 
@@ -708,9 +708,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                        // root subject types: SubA
                        // root entries
                          "Select(A) for SubA" [color=blue]
-                         "Select(A) for SubA" -> {"(A, (SelectProjection(B, D, ('some',), SubA),), noop) of SubA"}
+                         "Select(A) for SubA" -> {"(A, (SelectProjection(B, D, 'some', SubA),), noop) of SubA"}
                        // internal entries
-                         "(A, (SelectProjection(B, D, ('some',), SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(D),), noop) of D"}
+                         "(A, (SelectProjection(B, D, 'some', SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)" "(B, (Select(D),), noop) of D"}
                          "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
                      }""").strip(),
                                     subgraph)

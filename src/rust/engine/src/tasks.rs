@@ -17,7 +17,7 @@ pub struct Task {
 }
 
 /**
- * Registry of Tasks able to produce each type, and Singletons which are the default/only
+ * Registry of Tasks able to produce each type, and Singletons, which are the only
  * provider of a type.
  */
 #[derive(Clone)]

@@ -32,8 +32,8 @@ class SelectorsTest(unittest.TestCase):
                      SelectDependencies(AClass, AClass))
 
   def test_projection_repr(self):
-    self.assert_repr("SelectProjection(AClass, AClass, (u'field',), AClass)",
-                     SelectProjection(AClass, AClass, ('field',), AClass))
+    self.assert_repr("SelectProjection(AClass, AClass, u'field', AClass)",
+                     SelectProjection(AClass, AClass, 'field', AClass))
 
   def assert_repr(self, expected, selector):
     self.assertEqual(expected, repr(selector))

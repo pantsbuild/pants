@@ -309,7 +309,7 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot):
 
 @rule(HydratedField,
       [Select(SourcesField),
-       SelectProjection(Snapshot, PathGlobs, ('path_globs',), SourcesField)])
+       SelectProjection(Snapshot, PathGlobs, 'path_globs', SourcesField)])
 def hydrate_sources(sources_field, snapshot):
   """Given a SourcesField and a Snapshot for its path_globs, create an EagerFilesetWithSpec."""
   fileset_with_spec = _eager_fileset_with_spec(sources_field.address.spec_path,

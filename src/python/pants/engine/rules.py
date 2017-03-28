@@ -63,8 +63,9 @@ class TaskRule(datatype('TaskRule', ['output_constraint', 'input_selectors', 'fu
       raise TypeError("Expected an output_type for rule {}, got: {}".format(func, output_type))
 
     # Validate selectors.
-    if not isinstance(input_selectors, (list, tuple)):
-      raise TypeError("Expected a list of Selectors for rule {}, got: {}".format(func, input_selectors))
+    if not isinstance(input_selectors, list):
+      raise TypeError(
+          "Expected a list of Selectors for rule {}, got: {}".format(func, type(input_selectors)))
 
     # Create.
     return super(TaskRule, cls).__new__(cls, constraint, tuple(input_selectors), func)
@@ -99,7 +100,7 @@ class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), R
 
 
 class RuleIndex(datatype('RuleIndex', ['rules'])):
-  """Holds an index of tasks and intrinsics used to instantiate Nodes."""
+  """Holds an index of Tasks and Singletons used to instantiate Nodes."""
 
   @classmethod
   def create(cls, rule_entries):

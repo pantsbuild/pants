@@ -52,7 +52,7 @@ class BuildFileGlobs(datatype('BuildFilesGlobs', ['path_globs'])):
 
 
 @rule(BuildFiles,
-      [SelectProjection(FilesContent, PathGlobs, ('path_globs',), BuildFileGlobs)])
+      [SelectProjection(FilesContent, PathGlobs, 'path_globs', BuildFileGlobs)])
 def build_files(files_content):
   return BuildFiles(files_content)
 
@@ -115,7 +115,7 @@ def _raise_did_you_mean(address_family, name):
 
 @rule(UnhydratedStruct,
       [Select(AddressMapper),
-       SelectProjection(AddressFamily, Dir, ('spec_path',), Exactly(Address, BuildFileAddress)),
+       SelectProjection(AddressFamily, Dir, 'spec_path', Exactly(Address, BuildFileAddress)),
        Select(Exactly(Address, BuildFileAddress))])
 def resolve_unhydrated_struct(address_mapper, address_family, address):
   """Given an Address and its AddressFamily, resolve an UnhydratedStruct.

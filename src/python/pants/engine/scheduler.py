@@ -147,7 +147,7 @@ class WrappedNativeScheduler(object):
   def _register_singleton(self, output_constraint, rule):
     """Register the given SingletonRule.
 
-    Singleton tasks are those that are the default for a particular type(product).
+    A SingletonRule installed for a type will be the only provider for that type.
     """
     self._native.lib.tasks_singleton_add(self._tasks,
                                          self._to_value(rule.value),
@@ -166,29 +166,26 @@ class WrappedNativeScheduler(object):
       elif selector_type is SelectVariant:
         key_buf = self._to_utf8_buf(selector.variant_key)
         self._native.lib.tasks_add_select_variant(self._tasks,
-                                                 product_constraint,
-                                                 key_buf)
+                                                  product_constraint,
+                                                  key_buf)
       elif selector_type is SelectDependencies:
         self._native.lib.tasks_add_select_dependencies(self._tasks,
-                                                      product_constraint,
-                                                      self._to_constraint(selector.dep_product),
-                                                      self._to_utf8_buf(selector.field),
-                                                      self._to_ids_buf(selector.field_types))
+                                                       product_constraint,
+                                                       self._to_constraint(selector.dep_product),
+                                                       self._to_utf8_buf(selector.field),
+                                                       self._to_ids_buf(selector.field_types))
       elif selector_type is SelectTransitive:
         self._native.lib.tasks_add_select_transitive(self._tasks,
-                                                    product_constraint,
-                                                    self._to_constraint(selector.dep_product),
-                                                    self._to_utf8_buf(selector.field),
-                                                    self._to_ids_buf(selector.field_types))
+                                                     product_constraint,
+                                                     self._to_constraint(selector.dep_product),
+                                                     self._to_utf8_buf(selector.field),
+                                                     self._to_ids_buf(selector.field_types))
       elif selector_type is SelectProjection:
-        if len(selector.fields) != 1:
-          raise ValueError("TODO: remove support for projecting multiple fields at once.")
-        field = selector.fields[0]
         self._native.lib.tasks_add_select_projection(self._tasks,
-                                                    self._to_constraint(selector.product),
-                                                    TypeId(self._to_id(selector.projected_subject)),
-                                                    self._to_utf8_buf(field),
-                                                    self._to_constraint(selector.input_product))
+                                                     self._to_constraint(selector.product),
+                                                     TypeId(self._to_id(selector.projected_subject)),
+                                                     self._to_utf8_buf(selector.field),
+                                                     self._to_constraint(selector.input_product))
       else:
         raise ValueError('Unrecognized Selector type: {}'.format(selector))
     self._native.lib.tasks_task_end(self._tasks)

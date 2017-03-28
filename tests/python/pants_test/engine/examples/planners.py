@@ -133,7 +133,7 @@ def calculate_package_search_path(jvm_package_name, source_roots):
 
 
 @rule(ImportedJVMPackages,
-      [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)])
+      [SelectProjection(FilesContent, PathGlobs, 'path_globs', ScalaInferredDepsSources)])
 @printing_func
 def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
@@ -318,7 +318,7 @@ class ScroogeJavaConfiguration(ScroogeConfiguration):
 @rule(ScalaSources,
       [Select(ThriftSources),
        SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-       SelectProjection(Classpath, Address, ('tool_address',), Scrooge)])
+       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
 def gen_scrooge_scala_thrift(sources, config, scrooge_classpath):
   return gen_scrooge_thrift(sources, config, scrooge_classpath)
 
@@ -326,7 +326,7 @@ def gen_scrooge_scala_thrift(sources, config, scrooge_classpath):
 @rule(JavaSources,
       [Select(ThriftSources),
        SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-       SelectProjection(Classpath, Address, ('tool_address',), Scrooge)])
+       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
 def gen_scrooge_java_thrift(sources, config, scrooge_classpath):
   return gen_scrooge_thrift(sources, config, scrooge_classpath)
 
