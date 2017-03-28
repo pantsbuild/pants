@@ -35,19 +35,23 @@ impl Core {
     types: Types,
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
+    work_dir: PathBuf,
   ) -> Core {
-    // TODO: Create the Snapshots (temp) directory, and then expose it as a singleton to python.
+    let mut snapshots_dir = work_dir.clone();
+    snapshots_dir.push("snapshots");
+
+    // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
     // See TODO in isolated_process.py: this is an abstraction leak that should likely be plugged
     // by porting process execution to rust.
     let snapshots =
-      Snapshots::new()
+      Snapshots::new(snapshots_dir)
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
         });
     tasks.singleton_add(
       externs::invoke_unsafe(
         &types.construct_snapshots,
-        &vec![externs::store_bytes(snapshots.path().as_os_str().as_bytes())],
+        &vec![externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes())],
       ),
       types.snapshots.clone(),
     );

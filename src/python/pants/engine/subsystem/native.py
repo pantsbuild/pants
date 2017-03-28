@@ -181,6 +181,7 @@ Scheduler* scheduler_create(Tasks*,
                             TypeId,
                             TypeId,
                             Buffer,
+                            Buffer,
                             BufferBuffer);
 void scheduler_post_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
@@ -680,6 +681,7 @@ class Native(object):
   def new_scheduler(self,
                     tasks,
                     build_root,
+                    work_dir,
                     ignore_patterns,
                     construct_snapshot,
                     construct_snapshots,
@@ -731,6 +733,7 @@ class Native(object):
         TypeId(self.context.to_id(six.binary_type)),
         # Project tree.
         self.context.utf8_buf(build_root),
+        self.context.utf8_buf(work_dir),
         self.context.utf8_buf_buf(ignore_patterns),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)

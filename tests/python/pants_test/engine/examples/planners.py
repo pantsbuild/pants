@@ -447,6 +447,7 @@ def setup_json_scheduler(build_root, native):
                                  build_patterns=('BLD.json',),
                                  parser_cls=JsonParser)
 
+  work_dir = os_path_join(build_root, '.pants.d')
   project_tree = FileSystemProjectTree(build_root)
 
   goals = {
@@ -489,7 +490,8 @@ def setup_json_scheduler(build_root, native):
       create_fs_rules()
     )
 
-  return LocalScheduler(goals,
+  return LocalScheduler(work_dir,
+                        goals,
                         tasks,
                         project_tree,
                         native,

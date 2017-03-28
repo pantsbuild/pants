@@ -43,7 +43,7 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
 
 
 class WrappedNativeScheduler(object):
-  def __init__(self, native, build_root, ignore_patterns, rule_index, root_subject_types):
+  def __init__(self, native, build_root, work_dir, ignore_patterns, rule_index, root_subject_types):
     self._native = native
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
@@ -56,6 +56,7 @@ class WrappedNativeScheduler(object):
     self._scheduler = native.new_scheduler(
         self._tasks,
         build_root,
+        work_dir,
         ignore_patterns,
         Snapshot,
         _Snapshots,
@@ -288,6 +289,7 @@ class LocalScheduler(object):
   """A scheduler that expands a product Graph by executing user defined tasks."""
 
   def __init__(self,
+               work_dir,
                goals,
                tasks,
                project_tree,
@@ -299,6 +301,7 @@ class LocalScheduler(object):
     :param tasks: A set of (output, input selection clause, task function) triples which
            is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
+    :param work_dir: The pants work dir.
     :param native: An instance of engine.subsystem.native.Native.
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
                        instance. Defaults to creating a new threading.RLock().
@@ -329,6 +332,7 @@ class LocalScheduler(object):
     rule_index = RuleIndex.create(tasks)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
+                                             work_dir,
                                              project_tree.ignore_patterns,
                                              rule_index,
                                              root_subject_types)
