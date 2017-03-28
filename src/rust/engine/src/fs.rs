@@ -16,7 +16,6 @@ use tar;
 use tempdir::TempDir;
 
 use hash::{Fingerprint, WriterHasher};
-use util;
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -637,6 +636,38 @@ impl fmt::Debug for Snapshot {
   }
 }
 
+// Like std::fs::create_dir_all, except handles concurrent calls among multiple
+// threads or processes. Originally lifted from rustc.
+fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
+  match fs::create_dir(path) {
+    Ok(()) => return Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::NotFound => {}
+    Err(e) => return Err(e),
+  }
+  match path.parent() {
+    Some(p) => try!(safe_create_dir_all_ioerror(p)),
+    None => return Ok(()),
+  }
+  match fs::create_dir(path) {
+    Ok(()) => Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+    Err(e) => Err(e),
+  }
+}
+
+fn safe_create_dir_all(path: &Path) -> Result<(), String> {
+  safe_create_dir_all_ioerror(path).map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
+}
+
+fn safe_create_tmpdir_in(base_dir: &Path, prefix: &str) -> Result<TempDir, String> {
+  safe_create_dir_all(&base_dir)?;
+  Ok(
+    TempDir::new_in(&base_dir, prefix)
+      .map_err(|e| format!("Failed to create tempdir {:?} due to {:?}", base_dir, e))?
+  )
+}
+
 /**
  * A facade for the snapshot directory, which lives under the pants workdir.
  */
@@ -651,7 +682,7 @@ impl Snapshots {
     let mut snapshots_tmpdir_base = snapshots_dir.clone();
     snapshots_tmpdir_base.push(".tmp");
 
-    let snapshots_tmpdir = util::safe_create_tmpdir_in(&snapshots_tmpdir_base, "snapshots")?;
+    let snapshots_tmpdir = safe_create_tmpdir_in(&snapshots_tmpdir_base, "snapshots")?;
 
     Ok(
       Snapshots {
@@ -675,7 +706,7 @@ impl Snapshots {
     // we double check existence of the `TempDir`'s path when the path is accessed and replace if
     // necessary.
     if !gen.0.path().exists() {
-      gen.0 = util::safe_create_tmpdir_in(&self.snapshots_tmpdir_base, "snapshots")?;
+      gen.0 = safe_create_tmpdir_in(&self.snapshots_tmpdir_base, "snapshots")?;
     }
 
     Ok(
@@ -787,7 +818,7 @@ impl Snapshots {
       Ok(())
     } else {
       let dest_dir = dest_path.parent().expect("All snapshot paths must have parent directories.");
-      util::safe_create_dir_all(dest_dir)?;
+      safe_create_dir_all(dest_dir)?;
       match fs::rename(temp_path, dest_path) {
         Ok(_) => Ok(()),
         Err(_) if dest_path.is_file() => Ok(()),
