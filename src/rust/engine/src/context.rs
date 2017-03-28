@@ -41,14 +41,13 @@ impl Core {
     snapshots_dir.push("snapshots");
 
     // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
-    // See TODO in isolated_process.py: this is an abstraction leak that should likely be plugged
-    // by porting process execution to rust.
+    //   see: https://github.com/pantsbuild/pants/issues/4397
     let snapshots =
       Snapshots::new(snapshots_dir)
         .unwrap_or_else(|e| {
           panic!("Could not initialize Snapshot directory: {:?}", e);
         });
-    tasks.singleton_add(
+    tasks.singleton_replace(
       externs::invoke_unsafe(
         &types.construct_snapshots,
         &vec![externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes())],

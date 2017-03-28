@@ -12,7 +12,7 @@ import subprocess
 from abc import abstractproperty
 from binascii import hexlify
 
-from pants.engine.rules import TaskRule
+from pants.engine.rules import SingletonRule, TaskRule
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
@@ -152,3 +152,10 @@ class SnapshottedProcess(object):
 
     # Return a task triple that executes the function to produce the product type.
     return TaskRule(product_type, inputs, func)
+
+
+def create_snapshot_rules():
+  """Intrinsically replaced on the rust side."""
+  return [
+      SingletonRule(_Snapshots, _Snapshots('/dev/null'))
+    ]

@@ -17,7 +17,7 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import _Snapshots
+from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
@@ -286,20 +286,19 @@ class WrappedNativeScheduler(object):
 
 
 class LocalScheduler(object):
-  """A scheduler that expands a product Graph by executing user defined tasks."""
+  """A scheduler that expands a product Graph by executing user defined Rules."""
 
   def __init__(self,
                work_dir,
                goals,
-               tasks,
+               rules,
                project_tree,
                native,
                graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
-    :param tasks: A set of (output, input selection clause, task function) triples which
-           is used to compute values in the product graph.
+    :param rules: A set of Rules which is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
     :param native: An instance of engine.subsystem.native.Native.
@@ -329,7 +328,8 @@ class LocalScheduler(object):
       SiblingAddresses,
       SingleAddress,
     }
-    rule_index = RuleIndex.create(tasks)
+    rules = list(rules) + create_snapshot_rules()
+    rule_index = RuleIndex.create(rules)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
                                              work_dir,
