@@ -482,8 +482,8 @@ def setup_json_scheduler(build_root, native):
       create_fs_tasks(project_tree)
     )
 
-  return LocalScheduler(goals,
-                        work_dir,
+  return LocalScheduler(work_dir,
+                        goals,
                         tasks,
                         project_tree,
                         native,
