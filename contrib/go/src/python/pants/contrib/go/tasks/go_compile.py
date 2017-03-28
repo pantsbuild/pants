@@ -25,7 +25,7 @@ class GoCompile(GoWorkspaceTask):
   @classmethod
   def register_options(cls, register):
     super(GoCompile, cls).register_options(register)
-    register('--build-flags', default='',
+    register('--build-flags', default='', fingerprint=True,
              help='Build flags to pass to Go compiler.')
 
   @classmethod
