@@ -17,8 +17,6 @@ use types::Types;
 /**
  * The core context shared (via Arc) between the Scheduler and the Context objects of
  * all running Nodes.
- *
- * TODO: Move `nodes.Context` to this module and rename both of these.
  */
 pub struct Core {
   pub graph: Graph,
