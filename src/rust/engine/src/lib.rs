@@ -212,8 +212,8 @@ pub extern fn scheduler_create(
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
-  ignore_patterns_buf: BufferBuffer,
   work_dir_buf: Buffer,
+  ignore_patterns_buf: BufferBuffer,
 ) -> *const Scheduler {
   let build_root = PathBuf::from(build_root_buf.to_os_string());
   let work_dir = PathBuf::from(work_dir_buf.to_os_string());

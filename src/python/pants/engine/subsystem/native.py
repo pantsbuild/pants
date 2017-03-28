@@ -183,8 +183,8 @@ Scheduler* scheduler_create(Tasks*,
                             TypeId,
                             TypeId,
                             Buffer,
-                            BufferBuffer,
-                            Buffer);
+                            Buffer,
+                            BufferBuffer);
 void scheduler_post_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
 
@@ -735,7 +735,7 @@ class Native(object):
         TypeId(self.context.to_id(six.binary_type)),
         # Project tree.
         self.context.utf8_buf(build_root),
-        self.context.utf8_buf_buf(ignore_patterns),
         self.context.utf8_buf(work_dir),
+        self.context.utf8_buf_buf(ignore_patterns),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)

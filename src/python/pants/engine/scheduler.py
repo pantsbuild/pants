@@ -349,8 +349,8 @@ class LocalScheduler(object):
     rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=singletons)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
-                                             project_tree.ignore_patterns,
                                              work_dir,
+                                             project_tree.ignore_patterns,
                                              rule_index,
                                              root_subject_types)
 
