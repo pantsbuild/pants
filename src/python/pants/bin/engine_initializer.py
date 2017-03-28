@@ -109,6 +109,7 @@ class EngineInitializer(object):
 
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
+                         workdir,
                          build_root=None,
                          native=None,
                          symbol_table_cls=None,
@@ -119,6 +120,7 @@ class EngineInitializer(object):
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
+    :param str workdir: The pants workdir.
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
@@ -157,7 +159,7 @@ class EngineInitializer(object):
     )
 
     # TODO: Do not use the cache yet, as it incurs a high overhead.
-    scheduler = LocalScheduler(dict(), tasks, project_tree, native)
+    scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native)
     engine = LocalSerialEngine(scheduler, use_cache=False)
     change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 
