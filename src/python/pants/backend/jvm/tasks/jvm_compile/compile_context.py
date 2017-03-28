@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import zipfile
 from contextlib import contextmanager
 
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
@@ -15,11 +16,12 @@ from pants.util.contextutil import open_zip
 
 def _resolve_strict_dependencies(target):
   for declared in target.dependencies:
-    if type(declared) in (AliasTarget, Target):
+    if type(declared) in (AliasTarget, JarLibrary, Target):
       # Is an alias. Recurse to expand.
       for r in _resolve_strict_dependencies(declared):
         yield r
-    else:
+
+    if type(declared) not in (AliasTarget, Target):
       yield declared
 
     for export in _resolve_exports(declared):
