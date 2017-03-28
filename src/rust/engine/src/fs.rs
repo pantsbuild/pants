@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{atomic, RwLock, RwLockReadGuard};
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -642,8 +642,8 @@ impl fmt::Debug for Snapshot {
  */
 pub struct Snapshots {
   snapshots_dir: PathBuf,
-  snapshots_tmpdir: TempDir,
-  next_temp_id: atomic::AtomicUsize
+  snapshots_tmpdir_base: PathBuf,
+  snapshots_generator: Arc<Mutex<(TempDir, usize)>>,
 }
 
 impl Snapshots {
@@ -656,8 +656,8 @@ impl Snapshots {
     Ok(
       Snapshots {
         snapshots_dir: snapshots_dir,
-        snapshots_tmpdir: snapshots_tmpdir,
-        next_temp_id: atomic::AtomicUsize::new(0)
+        snapshots_tmpdir_base: snapshots_tmpdir_base,
+        snapshots_generator: Arc::new(Mutex::new((snapshots_tmpdir, 0))),
       }
     )
   }
@@ -666,14 +666,21 @@ impl Snapshots {
     self.snapshots_dir.as_path()
   }
 
-  fn tmp_path(&self) -> &Path {
-    // N.B. Sometimes, in e.g. a `./pants clean-all test ...` the snapshot tempdir created at
-    // the beginning of a run can be removed out from under us by e.g. the clean-all task. Here,
-    // we double check existence of the dir (by creating it, to avoid an extra stat) when the path
-    // is accessed.
-    let path = self.snapshots_tmpdir.path();
-    util::safe_create_dir_all(&path).expect("Could not create snapshot temp dir.");
-    &path
+  fn next_temp_path(&self) -> Result<PathBuf, String> {
+    let mut gen = self.snapshots_generator.lock().unwrap();
+    gen.1 += 1;
+
+    // N.B. Sometimes, in e.g. a `./pants clean-all test ...` the snapshot tempdir created at the
+    // beginning of a run can be removed out from under us by e.g. the `clean-all` task. Here, we
+    // we double check existence of the `TempDir`'s path when the path is accessed and replace if
+    // necessary.
+    if !gen.0.path().exists() {
+      gen.0 = util::safe_create_tmpdir_in(&self.snapshots_tmpdir_base, "snapshots")?;
+    }
+
+    Ok(
+      gen.0.path().join(format!("{}.tmp", gen.1))
+    )
   }
 
   /**
@@ -804,10 +811,7 @@ impl Snapshots {
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
     let dest_dir = self.snapshot_path().to_owned();
     let build_root = fs.build_root.clone();
-    let temp_path = {
-      let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
-      self.tmp_path().join(format!("{}.tar.tmp", next_temp_id))
-    };
+    let temp_path = self.next_temp_path().expect("Couldnt get the next temp path.");
 
     fs.pool().spawn_fn(move || {
       // Write the tar deterministically to a temporary file while fingerprinting.
