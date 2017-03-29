@@ -339,26 +339,13 @@ pub extern fn tasks_create() -> *const Tasks {
 }
 
 #[no_mangle]
-pub extern fn tasks_intrinsic_add(
-  tasks_ptr: *mut Tasks,
-  func: Function,
-  input_type: TypeId,
-  input_constraint: TypeConstraint,
-  output_constraint: TypeConstraint,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.intrinsic_add(func, input_type, input_constraint, output_constraint);
-  })
-}
-
-#[no_mangle]
 pub extern fn tasks_singleton_add(
   tasks_ptr: *mut Tasks,
-  func: Function,
+  value: Value,
   output_constraint: TypeConstraint,
 ) {
   with_tasks(tasks_ptr, |tasks| {
-    tasks.singleton_add(func, output_constraint);
+    tasks.singleton_add(value, output_constraint);
   })
 }
 
@@ -393,17 +380,6 @@ pub extern fn tasks_add_select_variant(
     variant_key_buf.to_string().expect("Failed to decode key for select_variant");
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product, Some(variant_key));
-  })
-}
-
-#[no_mangle]
-pub extern fn tasks_add_select_literal(
-  tasks_ptr: *mut Tasks,
-  subject: Key,
-  product: TypeConstraint,
-) {
-  with_tasks(tasks_ptr, |tasks| {
-    tasks.add_select_literal(subject, product);
   })
 }
 

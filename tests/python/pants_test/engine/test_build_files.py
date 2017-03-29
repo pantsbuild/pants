@@ -11,7 +11,7 @@ import unittest
 from pants.build_graph.address import Address
 from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                       addressable_list)
-from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_tasks
+from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_rules
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
@@ -99,7 +99,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
                                    build_patterns=build_patterns,
                                    parser_cls=parser_cls)
 
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
+    tasks = create_graph_rules(address_mapper, symbol_table_cls)
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
     return scheduler

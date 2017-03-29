@@ -152,13 +152,11 @@ Tasks* tasks_create();
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
-void tasks_add_select_literal(Tasks*, Key, TypeConstraint);
 void tasks_add_select_dependencies(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
 void tasks_add_select_transitive(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
 void tasks_add_select_projection(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
 void tasks_task_end(Tasks*);
-void tasks_intrinsic_add(Tasks*, Function, TypeId, TypeConstraint, TypeConstraint);
-void tasks_singleton_add(Tasks*, Function, TypeConstraint);
+void tasks_singleton_add(Tasks*, Value, TypeConstraint);
 void tasks_destroy(Tasks*);
 
 Scheduler* scheduler_create(Tasks*,
