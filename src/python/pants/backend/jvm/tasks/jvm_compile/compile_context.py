@@ -15,9 +15,6 @@ from pants.util.contextutil import open_zip
 
 def _resolve_strict_dependencies(target):
   for declared in target.dependencies:
-    # The transitive dependencies of JarLibrary targets have
-    # to be included regardless of strict_deps setting,
-    # because they are always required for compilation.
     if type(declared) in (AliasTarget, Target):
       # Is an alias. Recurse to expand.
       for r in _resolve_strict_dependencies(declared):
@@ -31,9 +28,14 @@ def _resolve_strict_dependencies(target):
 
 def _resolve_exports(target):
   for export in getattr(target, 'exports', []):
-    for exp in _resolve_exports(export):
-      yield exp
-    yield export
+    if type(export) in (AliasTarget, Target):
+      # If exported target is an alias, expand its dependencies.
+      for dep in _resolve_strict_dependencies(export):
+        yield dep
+    else:
+      for exp in _resolve_exports(export):
+        yield exp
+      yield export
 
 
 def strict_dependencies(target, dep_context):
