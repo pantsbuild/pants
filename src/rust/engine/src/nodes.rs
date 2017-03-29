@@ -934,12 +934,28 @@ impl Node for Task {
     let task = self.task.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) =>
-          externs::invoke_runnable(
-            &externs::val_for_id(task.func.0),
-            &deps,
-            task.cacheable,
-          ),
+        Ok(deps) => {
+          let res =
+            externs::invoke_runnable(
+              &externs::val_for_id(task.func.0),
+              &deps,
+              task.cacheable,
+            );
+          // Confirm the return type of the runnable, and fail if it mismatches the declared type.
+          match res {
+            Ok(ref v) if !externs::satisfied_by(&self.product, v) =>
+              Err(
+                throw(
+                  &format!(
+                    "Return value '{:?}' does not satisfy declared type {:?}.",
+                    v,
+                    self.product
+                  )
+                )
+              ),
+            r => r,
+          }
+        },
         Err(err) =>
           Err(err),
       })
