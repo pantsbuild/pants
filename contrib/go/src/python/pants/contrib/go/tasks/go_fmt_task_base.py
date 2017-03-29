@@ -10,6 +10,7 @@ import subprocess
 from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
+
 from pants.contrib.go.targets.go_local_source import GoLocalSource
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
@@ -25,7 +26,8 @@ class GoFmtTaskBase(GoWorkspaceTask):
   def calculate_sources(cls, targets):
     sources = set()
     for target in targets:
-      sources.update(source for source in target.sources_relative_to_buildroot())
+      sources.update(source for source in target.sources_relative_to_buildroot()
+                     if GoLocalSource.is_go_source(source))
     return sources
 
   @contextmanager

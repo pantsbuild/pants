@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TaskError
+
 from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 
 
