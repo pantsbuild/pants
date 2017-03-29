@@ -67,39 +67,32 @@ class ScalaFix(NailgunTask):
     relative_symlink(vt.current_results_dir, dest_dir)
 
   def _run(self, target, results_dir, classpaths):
-    # All options aside from the input filename will be the same for a target: create
-    # them once and freeze them.
-    baseargs = []
+    # We operate on copies of the files, so we execute in place.
+    args = ['--in-place', '--files={}'.format(results_dir)]
     if self.get_options().config:
-      baseargs.append('--config={}'.format(self.get_options().config))
+      args.append('--config={}'.format(self.get_options().config))
     if self.get_options().level == 'debug':
-      baseargs.append('--debug')
-    baseargs = tuple(baseargs)
+      args.append('--debug')
 
     classpath = [jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True))]
     classpath.extend(self.tool_classpath('scalafix'))
-    classpath = tuple(classpath)
 
+    # Clone all sources to relative names in their destination directory.
     for source, short_name in zip(target.sources_relative_to_buildroot(),
                                   target.sources_relative_to_target_base()):
       abs_path = os.path.join(get_buildroot(), source)
-
-      args = baseargs + tuple(['--files={}'.format(abs_path)])
-      result = self.runjava(classpath=classpath, main=self._SCALAFIX_MAIN,
-                            jvm_options=self.get_options().jvm_options,
-                            args=args, workunit_name='scalafix')
-
-      if result != 0:
-        raise TaskError(
-            'java {main} ... exited non-zero ({result}) for {target} and {source}'.format(
-              main=self._SCALA_JS_CLI_MAIN,
-              result=result,
-              target=target.address.spec,
-              source=source),
-            failed_targets=[target])
-
-      # FIXME: Need to capture the workunit output and store it in the results_dir: currently
-      # just copying the existing file.
       dest_file = os.path.join(results_dir, short_name)
       safe_mkdir_for(dest_file)
       shutil.copy(abs_path, dest_file)
+
+    # Execute.
+    result = self.runjava(classpath=classpath, main=self._SCALAFIX_MAIN,
+                          jvm_options=self.get_options().jvm_options,
+                          args=args, workunit_name='scalafix')
+    if result != 0:
+      raise TaskError(
+          'java {main} ... exited non-zero ({result}) for {target}'.format(
+            main=self._SCALA_JS_CLI_MAIN,
+            result=result,
+            target=target.address.spec),
+          failed_targets=[target])
