@@ -9,11 +9,11 @@ import os
 import unittest
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import Addresses
+from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return, Throw
-from pants.engine.selectors import Select, SelectDependencies, SelectVariant
+from pants.engine.selectors import Select, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                  Jar, ThriftSources, setup_json_scheduler)
@@ -186,34 +186,34 @@ class SchedulerTest(unittest.TestCase):
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm::')
-    selector = SelectDependencies(BuildFileAddress, Addresses, field_types=(Address,))
+    selector = Select(BuildFileAddresses)
     build_request = self.scheduler.selection_request([(selector, spec)])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
     self.assertEqual(spec, subject)
-    self.assertEqual(tuple, type(root.value))
+    self.assertEqual(BuildFileAddresses, type(root.value))
 
     # Confirm that a few expected addresses are in the list.
-    self.assertIn(self.guava, root.value)
-    self.assertIn(self.managed_guava, root.value)
-    self.assertIn(self.managed_resolve_latest, root.value)
+    self.assertIn(self.guava, root.value.dependencies)
+    self.assertIn(self.managed_guava, root.value.dependencies)
+    self.assertIn(self.managed_resolve_latest, root.value.dependencies)
 
   def test_sibling_specs(self):
     """Test that sibling Addresses are parsed in the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm:')
-    selector = SelectDependencies(BuildFileAddress, Addresses, field_types=(Address,))
+    selector = Select(BuildFileAddresses)
     build_request = self.scheduler.selection_request([(selector,spec)])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
     self.assertEqual(spec, subject)
-    self.assertEqual(tuple, type(root.value))
+    self.assertEqual(BuildFileAddresses, type(root.value))
 
     # Confirm that an expected address is in the list.
-    self.assertIn(self.guava, root.value)
+    self.assertIn(self.guava, root.value.dependencies)
     # And that a subdirectory address is not.
-    self.assertNotIn(self.managed_guava, root.value)
+    self.assertNotIn(self.managed_guava, root.value.dependencies)
 
   def test_scheduler_visualize(self):
     spec = self.spec_parser.parse_spec('3rdparty/jvm:')

@@ -13,8 +13,9 @@ import six
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import AddressableDescriptor, Addresses, Exactly, TypeConstraintError
+from pants.build_graph.address import Address
+from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Exactly,
+                                      TypeConstraintError)
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -115,8 +116,8 @@ def _raise_did_you_mean(address_family, name):
 
 @rule(UnhydratedStruct,
       [Select(AddressMapper),
-       SelectProjection(AddressFamily, Dir, 'spec_path', Exactly(Address, BuildFileAddress)),
-       Select(Exactly(Address, BuildFileAddress))])
+       SelectProjection(AddressFamily, Dir, 'spec_path', Address),
+       Select(Address)])
 def resolve_unhydrated_struct(address_mapper, address_family, address):
   """Given an Address and its AddressFamily, resolve an UnhydratedStruct.
 
@@ -228,7 +229,7 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
-@rule(Addresses,
+@rule(BuildFileAddresses,
       [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
        Select(_SPECS_CONSTRAINT)])
 def addresses_from_address_families(address_families, spec):
@@ -241,7 +242,7 @@ def addresses_from_address_families(address_families, spec):
                       for a in af.addressables.keys() if a.target_name == spec.name)
   else:
     raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return Addresses(addresses)
+  return BuildFileAddresses(addresses)
 
 
 @rule(BuildDirs, [Select(AddressMapper), Select(Snapshot)])
