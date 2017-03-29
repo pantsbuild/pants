@@ -2,6 +2,17 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name = 'compile_context',
+  sources = ['test_compile_context.py'],
+  dependencies = [
+    '3rdparty/python:mock',
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/backend/jvm/tasks/jvm_compile:compile_context',
+    'tests/python/pants_test:base_test',
+  ],
+)
+
+python_tests(
   name = 'jvm_classpath_published',
   sources = ['test_jvm_classpath_published.py'],
   dependencies = [
