@@ -25,3 +25,23 @@ scala_library(
   dependencies=[':C'],
   strict_deps=True,
 )
+
+target(
+  name='TB',
+  dependencies=[':B'],
+)
+
+scala_library(
+  name='TC',
+  sources = ['C.scala'],
+  dependencies=[':TB'],
+  exports=[':TB'],
+  strict_deps=True,
+)
+
+scala_library(
+  name='TD',
+  sources = ['D.scala'],
+  dependencies=[':TC'],
+  strict_deps=True,
+)
