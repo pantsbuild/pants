@@ -127,37 +127,46 @@ class ParseError(Exception):
     return self._cause
 
 
-def parse_failed_targets(test_registry, junit_xml_dir, error_handler):
+def parse_failed_targets(test_registry, junit_xml_path, error_handler):
   """Parses junit xml reports and maps targets to the set of individual tests that failed.
 
   Targets with no failed tests are omitted from the returned mapping.
 
   :param test_registry: A registry of tests that were run.
   :type test_registry: :class:`TestRegistry`
-  :param string junit_xml_dir: A path to a directory containing test junit xml reports to analyze.
+  :param string junit_xml_path: A path to a file or directory containing test junit xml reports
+                                to analyze.
   :param error_handler: An error handler that will be called with any junit xml parsing errors.
   :type error_handler: callable that accepts a single :class:`ParseError` argument.
   :returns: A mapping from targets to the set of individual tests that failed.
   :rtype: dict from :class:`pants.build_graph.target.Target` to a set of :class:`Test`
   """
   failed_targets = defaultdict(set)
-  for name in os.listdir(junit_xml_dir):
-    if _JUNIT_XML_MATCHER.match(name):
-      try:
-        path = os.path.join(junit_xml_dir, name)
-        xml = XmlParser.from_file(path)
-        failures = int(xml.get_attribute('testsuite', 'failures'))
-        errors = int(xml.get_attribute('testsuite', 'errors'))
-        if failures or errors:
-          for testcase in xml.parsed.getElementsByTagName('testcase'):
-            test_failed = testcase.getElementsByTagName('failure')
-            test_errored = testcase.getElementsByTagName('error')
-            if test_failed or test_errored:
-              test = Test(classname=testcase.getAttribute('classname'),
-                          methodname=testcase.getAttribute('name'))
-              target = test_registry.get_owning_target(test)
-              failed_targets[target].add(test)
-      except (XmlParser.XmlError, ValueError) as e:
-        error_handler(ParseError(path, e))
+
+  def parse_junit_xml_file(path):
+    try:
+      xml = XmlParser.from_file(path)
+      failures = int(xml.get_attribute('testsuite', 'failures'))
+      errors = int(xml.get_attribute('testsuite', 'errors'))
+      if failures or errors:
+        for testcase in xml.parsed.getElementsByTagName('testcase'):
+          test_failed = testcase.getElementsByTagName('failure')
+          test_errored = testcase.getElementsByTagName('error')
+          if test_failed or test_errored:
+            test = Test(classname=testcase.getAttribute('classname'),
+                        methodname=testcase.getAttribute('name'))
+            target = test_registry.get_owning_target(test)
+            #if not target:
+            #  raise ValueError('No target found for test: {}'.format(test.render_test_spec()))
+            failed_targets[target].add(test)
+    except (XmlParser.XmlError, ValueError) as e:
+      error_handler(ParseError(path, e))
+
+  if os.path.isdir(junit_xml_path):
+    for name in os.listdir(junit_xml_path):
+      if _JUNIT_XML_MATCHER.match(name):
+        parse_junit_xml_file(os.path.join(junit_xml_path, name))
+  else:
+    parse_junit_xml_file(junit_xml_path)
 
   return dict(failed_targets)
