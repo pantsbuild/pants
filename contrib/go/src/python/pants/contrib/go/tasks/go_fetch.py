@@ -13,7 +13,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_concurrent_creation
+from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
