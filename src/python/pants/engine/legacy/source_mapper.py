@@ -81,11 +81,17 @@ class EngineSourceMapper(SourceMapper):
       #      java_library(..., resources=['testprojects/src/resources/...:resource'])
       #
       #    which is closer in premise to the `resource_targets` param.
+      elif isinstance(target_resources, list):
+        resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
+                                                        target_resources)
+        for hydrated_targets in self._engine.product_request(HydratedTargets, resource_dep_subjects):
+          for hydrated_target in hydrated_targets.dependencies:
+            resource_sources = hydrated_target.adaptor.kwargs().get('sources')
+            if resource_sources:
+              for f in resource_sources.paths_from_buildroot_iter():
+                yield f
       else:
-        # TODO: this case should be impossible... resource targets are located in the `resource_targets`
-        # kwarg.
-        #   see https://github.com/pantsbuild/pants/issues/4010
-        raise ValueError('TODO: Not supported: see #4010.')
+        raise AssertionError('Could not process target_resources with type {}'.format(type(target_resources)))
 
   def iter_target_addresses_for_sources(self, sources):
     """Bulk, iterable form of `target_addresses_for_source`."""

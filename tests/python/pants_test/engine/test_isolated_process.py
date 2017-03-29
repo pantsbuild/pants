@@ -13,7 +13,8 @@ from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.nodes import Return, Throw
-from pants.engine.selectors import Select, SelectLiteral
+from pants.engine.rules import SingletonRule
+from pants.engine.selectors import Select
 from pants.util.objects import datatype
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -113,7 +114,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                                 input_selectors=(Select(Snapshot),),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=process_result_to_concatted_from_outfile),
-      [ShellCatToOutFile, [], ShellCatToOutFile],
+      SingletonRule(ShellCatToOutFile, ShellCatToOutFile()),
     ])
 
     request = scheduler.execution_request([Concatted],
@@ -133,10 +134,11 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     scheduler = self.mk_scheduler_in_example_fs([
       SnapshottedProcess.create(ClasspathEntry,
                                 Javac,
-                                (Select(Snapshot), SelectLiteral(JavaOutputDir('build'), JavaOutputDir)),
+                                (Select(Snapshot), Select(JavaOutputDir)),
                                 java_sources_to_javac_args,
                                 process_result_to_classpath_entry),
-      [Javac, [], Javac]
+      SingletonRule(JavaOutputDir, JavaOutputDir('build')),
+      SingletonRule(Javac, Javac()),
     ])
 
     request = scheduler.execution_request(
@@ -159,7 +161,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                                 input_selectors=tuple(),
                                 input_conversion=empty_process_request,
                                 output_conversion=fail_process_result),
-      [ShellFailCommand, [], ShellFailCommand]
+      SingletonRule(ShellFailCommand, ShellFailCommand()),
     ])
 
     request = scheduler.execution_request([Concatted],
@@ -179,7 +181,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
                                 input_selectors=(Select(Snapshot),),
                                 input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
                                 output_conversion=fail_process_result),
-      [ShellCatToOutFile, [], ShellCatToOutFile]
+      SingletonRule(ShellCatToOutFile, ShellCatToOutFile()),
     ])
 
     request = scheduler.execution_request([Concatted],

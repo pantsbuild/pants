@@ -3,8 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use core::{Field, Function, FNV, Key, TypeConstraint, TypeId};
-use selectors::{Selector, Select, SelectDependencies, SelectLiteral, SelectProjection, SelectTransitive};
+use core::{Field, Function, FNV, Key, TypeConstraint, TypeId, Value};
+use externs;
+use selectors::{Selector, Select, SelectDependencies, SelectProjection, SelectTransitive};
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -16,15 +17,13 @@ pub struct Task {
 }
 
 /**
- * Registry of tasks able to produce each type, along with a few fundamental python
- * types that the engine must be aware of.
+ * Registry of Tasks able to produce each type, and Singletons, which are the only
+ * provider of a type.
  */
 #[derive(Clone)]
 pub struct Tasks {
-  // subject_type, selector -> list of tasks implementing it
-  intrinsics: HashMap<(TypeId, TypeConstraint), Vec<Task>, FNV>,
-  // any-subject, selector -> list of tasks implementing it
-  singletons: HashMap<TypeConstraint, Vec<Task>, FNV>,
+  // Singleton Values to be returned for a given TypeConstraint.
+  singletons: HashMap<TypeConstraint, (Key, Value), FNV>,
   // any-subject, selector -> list of tasks implementing it
   tasks: HashMap<TypeConstraint, Vec<Task>, FNV>,
   // Used during the construction of the tasks map.
@@ -37,15 +36,14 @@ pub struct Tasks {
  *   2. add_*() - zero or more times per task to add input clauses
  *   3. task_end() - once per task
  *
- * Also has a one-shot method for adding an intrinsic Task (which have no Selectors):
- *   1. intrinsic_add()
+ * Also has a one-shot method for adding a singleton (which has no Selectors):
+ *   1. singleton_add()
  *
  * (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
  */
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
-      intrinsics: Default::default(),
       singletons: Default::default(),
       tasks: Default::default(),
       preparing: None,
@@ -53,67 +51,42 @@ impl Tasks {
   }
 
   pub fn all_product_types(&self) -> HashSet<TypeConstraint> {
-    self.all_rules().iter().map(|t| t.product)
+    self.singletons.keys().chain(self.tasks.keys())
+      .cloned()
       .collect::<HashSet<_>>()
   }
 
-  pub fn is_singleton_task(&self, sought_task: &Task) -> bool {
-    self.singletons.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
-  }
-
-  pub fn is_intrinsic_task(&self, sought_task: &Task) -> bool {
-    self.intrinsics.values().any(|tasks| tasks.iter().any(|t| t == sought_task))
-  }
-
-  pub fn all_rules(&self) -> Vec<&Task> {
-    self.singletons.values()
-      .chain(self.intrinsics.values())
-      .chain(self.tasks.values())
+  pub fn all_tasks(&self) -> Vec<&Task> {
+    self.tasks.values()
       .flat_map(|tasks| tasks)
       .collect()
   }
 
-  pub fn gen_tasks(&self, subject_type: &TypeId, product: &TypeConstraint) -> Option<&Vec<Task>> {
-    // Use singletons, then intrinsics, otherwise tasks.
+  pub fn gen_singleton(&self, product: &TypeConstraint) -> Option<&(Key, Value)> {
     self.singletons.get(product)
-      .or(self.intrinsics.get(&(*subject_type, *product)))
-      .or(self.tasks.get(product))
   }
 
-  pub fn intrinsic_add(
-    &mut self,
-    func: Function,
-    // TODO: The subject_type and subject_constraint are redundant here, but we don't currently
-    // have a way to lift a TypeId into a TypeConstraint for that type.
-    subject_type: TypeId,
-    subject_constraint: TypeConstraint,
-    product: TypeConstraint
-  ) {
-    self.intrinsics.entry((subject_type, product))
-      .or_insert_with(||
-        vec![
-          Task {
-            cacheable: false,
-            product: product,
-            clause: vec![Selector::select(subject_constraint)],
-            func: func,
-          }
-        ]
-      );
+  pub fn gen_tasks(&self, product: &TypeConstraint) -> Option<&Vec<Task>> {
+    self.tasks.get(product)
   }
 
-  pub fn singleton_add(&mut self, func: Function, product: TypeConstraint) {
-    self.singletons.entry(product)
-      .or_insert_with(||
-        vec![
-          Task {
-            cacheable: false,
-            product: product,
-            clause: Vec::new(),
-            func: func,
-          }
-        ]
+  pub fn singleton_add(&mut self, value: Value, product: TypeConstraint) {
+    if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
+      panic!(
+        "More than one singleton rule was installed for the product {:?}: {:?} vs {:?}",
+        product,
+        existing_value,
+        value,
       );
+    }
+    self.singletons.insert(product, (externs::key_for(&value), value));
+  }
+
+  // TODO: Only exists in order to support the `Snapshots` singleton replacement in `context.rs`:
+  // Fix by porting isolated processes to rust:
+  //   see: https://github.com/pantsbuild/pants/issues/4397
+  pub fn singleton_replace(&mut self, value: Value, product: TypeConstraint) {
+    self.singletons.insert(product, (externs::key_for(&value), value));
   }
 
   /**
@@ -157,12 +130,6 @@ impl Tasks {
   pub fn add_select_projection(&mut self, product: TypeConstraint, projected_subject: TypeId, field: Field, input_product: TypeConstraint) {
     self.clause(Selector::SelectProjection(
       SelectProjection { product: product, projected_subject: projected_subject, field: field, input_product: input_product }
-    ));
-  }
-
-  pub fn add_select_literal(&mut self, subject: Key, product: TypeConstraint) {
-    self.clause(Selector::SelectLiteral(
-      SelectLiteral { subject: subject, product: product }
     ));
   }
 

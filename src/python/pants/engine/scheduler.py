@@ -17,11 +17,11 @@ from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAd
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import _Snapshots, create_snapshot_singletons
+from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import RuleIndex
-from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectTransitive, SelectVariant, constraint_for)
+from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
+from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
+                                    SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
@@ -50,9 +50,7 @@ class WrappedNativeScheduler(object):
 
     # Create the ExternContext, and the native Scheduler.
     self._tasks = native.new_tasks()
-    self._register_tasks(rule_index.tasks)
-    self._register_intrinsics(rule_index.intrinsics)
-    self._register_singletons(rule_index.singletons)
+    self._register_rules(rule_index)
     self.root_subject_types = root_subject_types
 
     self._scheduler = native.new_scheduler(
@@ -126,92 +124,78 @@ class WrappedNativeScheduler(object):
   def _to_utf8_buf(self, string):
     return self._native.context.utf8_buf(string)
 
-  def _register_singletons(self, singletons):
-    """Register the given singletons dict.
-
-    Singleton tasks are those that are the default for a particular type(product). Like
-    intrinsics, singleton tasks create Runnables that are not cacheable.
-    """
-    for product_type, rule in singletons.items():
-      self._native.lib.tasks_singleton_add(self._tasks,
-                                           Function(self._to_id(rule.func)),
-                                           self._to_constraint(product_type))
-
-  def _register_intrinsics(self, intrinsics):
-    """Register the given intrinsics dict.
-
-    Intrinsic tasks are those that are the default for a particular type(subject), type(product)
-    pair. By default, intrinsic tasks create Runnables that are not cacheable.
-    """
-    for (subject_type, product_type), rule in intrinsics.items():
-      self._native.lib.tasks_intrinsic_add(self._tasks,
-                                           Function(self._to_id(rule.func)),
-                                           TypeId(self._to_id(subject_type)),
-                                           self._to_constraint(subject_type),
-                                           self._to_constraint(product_type))
-
-  def _register_tasks(self, tasks):
-    """Register the given tasks dict with the native scheduler."""
+  def _register_rules(self, rule_index):
+    """Record the given RuleIndex on `self._tasks`."""
     registered = set()
-    for output_type, rules in tasks.items():
-      output_constraint = self._to_constraint(output_type)
+    for product_type, rules in rule_index.rules.items():
+      # TODO: The rules map has heterogeneous keys, so we normalize them to type constraints
+      # and dedupe them before registering to the native engine:
+      #   see: https://github.com/pantsbuild/pants/issues/4005
+      output_constraint = self._to_constraint(product_type)
       for rule in rules:
-        # TODO: The task map has heterogeneous keys, so we normalize them to type constraints
-        # and dedupe them before registering to the native engine:
-        #   see: https://github.com/pantsbuild/pants/issues/4005
         key = (output_constraint, rule)
         if key in registered:
           continue
         registered.add(key)
 
-        _, input_selects, func = rule.as_triple()
-        self._native.lib.tasks_task_begin(self._tasks, Function(self._to_id(func)), output_constraint)
-        for selector in input_selects:
-          selector_type = type(selector)
-          product_constraint = self._to_constraint(selector.product)
-          if selector_type is Select:
-            self._native.lib.tasks_add_select(self._tasks, product_constraint)
-          elif selector_type is SelectVariant:
-            key_buf = self._to_utf8_buf(selector.variant_key)
-            self._native.lib.tasks_add_select_variant(self._tasks,
-                                                      product_constraint,
-                                                      key_buf)
-          elif selector_type is SelectLiteral:
-            # NB: Intentionally ignores subject parameter to provide a literal subject.
-            self._native.lib.tasks_add_select_literal(self._tasks,
-                                                      self._to_key(selector.subject),
-                                                      product_constraint)
-          elif selector_type is SelectDependencies:
-            self._native.lib.tasks_add_select_dependencies(self._tasks,
-                                                           product_constraint,
-                                                           self._to_constraint(selector.dep_product),
-                                                           self._to_utf8_buf(selector.field),
-                                                           self._to_ids_buf(selector.field_types))
-          elif selector_type is SelectTransitive:
-            self._native.lib.tasks_add_select_transitive(self._tasks,
-                                                         product_constraint,
-                                                         self._to_constraint(selector.dep_product),
-                                                         self._to_utf8_buf(selector.field),
-                                                         self._to_ids_buf(selector.field_types))
-          elif selector_type is SelectProjection:
-            if len(selector.fields) != 1:
-              raise ValueError("TODO: remove support for projecting multiple fields at once.")
-            field = selector.fields[0]
-            self._native.lib.tasks_add_select_projection(self._tasks,
-                                                         self._to_constraint(selector.product),
-                                                         TypeId(self._to_id(selector.projected_subject)),
-                                                         self._to_utf8_buf(field),
-                                                         self._to_constraint(selector.input_product))
-          else:
-            raise ValueError('Unrecognized Selector type: {}'.format(selector))
-        self._native.lib.tasks_task_end(self._tasks)
+        if type(rule) is SingletonRule:
+          self._register_singleton(output_constraint, rule)
+        elif type(rule) is TaskRule:
+          self._register_task(output_constraint, rule)
+        else:
+          raise ValueError('Unexpected Rule type: {}'.format(rule))
+
+  def _register_singleton(self, output_constraint, rule):
+    """Register the given SingletonRule.
+
+    A SingletonRule installed for a type will be the only provider for that type.
+    """
+    self._native.lib.tasks_singleton_add(self._tasks,
+                                         self._to_value(rule.value),
+                                         output_constraint)
+
+  def _register_task(self, output_constraint, rule):
+    """Register the given TaskRule with the native scheduler."""
+    input_selects = rule.input_selectors
+    func = rule.func
+    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_id(func)), output_constraint)
+    for selector in input_selects:
+      selector_type = type(selector)
+      product_constraint = self._to_constraint(selector.product)
+      if selector_type is Select:
+        self._native.lib.tasks_add_select(self._tasks, product_constraint)
+      elif selector_type is SelectVariant:
+        key_buf = self._to_utf8_buf(selector.variant_key)
+        self._native.lib.tasks_add_select_variant(self._tasks,
+                                                  product_constraint,
+                                                  key_buf)
+      elif selector_type is SelectDependencies:
+        self._native.lib.tasks_add_select_dependencies(self._tasks,
+                                                       product_constraint,
+                                                       self._to_constraint(selector.dep_product),
+                                                       self._to_utf8_buf(selector.field),
+                                                       self._to_ids_buf(selector.field_types))
+      elif selector_type is SelectTransitive:
+        self._native.lib.tasks_add_select_transitive(self._tasks,
+                                                     product_constraint,
+                                                     self._to_constraint(selector.dep_product),
+                                                     self._to_utf8_buf(selector.field),
+                                                     self._to_ids_buf(selector.field_types))
+      elif selector_type is SelectProjection:
+        self._native.lib.tasks_add_select_projection(self._tasks,
+                                                     self._to_constraint(selector.product),
+                                                     TypeId(self._to_id(selector.projected_subject)),
+                                                     self._to_utf8_buf(selector.field),
+                                                     self._to_constraint(selector.input_product))
+      else:
+        raise ValueError('Unrecognized Selector type: {}'.format(selector))
+    self._native.lib.tasks_task_end(self._tasks)
 
   def visualize_graph_to_file(self, filename):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
   def visualize_rule_graph_to_file(self, filename):
     root_type_ids = self._root_type_ids()
-
     self._native.lib.rule_graph_visualize(
       self._scheduler,
       root_type_ids,
@@ -302,20 +286,19 @@ class WrappedNativeScheduler(object):
 
 
 class LocalScheduler(object):
-  """A scheduler that expands a product Graph by executing user defined tasks."""
+  """A scheduler that expands a product Graph by executing user defined Rules."""
 
   def __init__(self,
                work_dir,
                goals,
-               tasks,
+               rules,
                project_tree,
                native,
                graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
-    :param tasks: A set of (output, input selection clause, task function) triples which
-           is used to compute values in the product graph.
+    :param rules: A set of Rules which is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
     :param native: An instance of engine.subsystem.native.Native.
@@ -345,8 +328,8 @@ class LocalScheduler(object):
       SiblingAddresses,
       SingleAddress,
     }
-    singletons = create_snapshot_singletons()
-    rule_index = RuleIndex.create(tasks, intrinsic_entries=[], singleton_entries=singletons)
+    rules = list(rules) + create_snapshot_rules()
+    rule_index = RuleIndex.create(rules)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
                                              work_dir,
