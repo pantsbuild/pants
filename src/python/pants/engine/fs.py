@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import functools
 from binascii import hexlify
 from os.path import join
 
 from pants.base.project_tree import Dir, File
 from pants.engine.addressable import Collection
+from pants.engine.rules import rule
 from pants.engine.selectors import Select
 from pants.util.objects import datatype
 
@@ -83,27 +83,22 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
     return repr(self)
 
 
+FilesContent = Collection.of(FileContent)
+
+
+@rule(Snapshot, [Select(PathGlobs)])
 def snapshot_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')
 
 
+@rule(FilesContent, [Select(Snapshot)])
 def files_content_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')
 
 
-FilesContent = Collection.of(FileContent)
-
-
-def create_fs_tasks(project_tree):
-  """Creates tasks that consume the intrinsic filesystem types."""
-  def ptree(func):
-    p = functools.partial(func, project_tree)
-    p.__name__ = '{}_intrinsic'.format(func.__name__)
-    return p
+def create_fs_rules():
+  """Creates rules that consume the intrinsic filesystem types."""
   return [
-    # File content.
-    (FilesContent, [Select(Snapshot)], files_content_noop),
-  ] + [
-    # Snapshot creation.
-    (Snapshot, [Select(PathGlobs)], snapshot_noop),
+    files_content_noop,
+    snapshot_noop,
   ]

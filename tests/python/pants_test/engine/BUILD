@@ -169,11 +169,14 @@ python_tests(
   coverage=['pants.engine.rules'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':mapper',
     ':scheduler_test_base',
     'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
+    'tests/python/pants_test/engine/examples:parsers',
+    'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

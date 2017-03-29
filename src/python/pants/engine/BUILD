@@ -56,6 +56,7 @@ python_library(
   sources=['fs.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':rules',
     ':selectors',
     'src/python/pants/base:project_tree',
     'src/python/pants/source',
@@ -146,9 +147,7 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':addressable',
-    ':fs',
-    ':isolated_process',
-    ':nodes',
+    ':selectors',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',

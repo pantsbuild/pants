@@ -12,6 +12,7 @@ import subprocess
 from abc import abstractproperty
 from binascii import hexlify
 
+from pants.engine.rules import SingletonRule, TaskRule
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
@@ -127,10 +128,6 @@ class _Snapshots(datatype('_Snapshots', ['root'])):
   """
 
 
-def snapshots_noop(*args):
-  raise Exception('This task is replaced intrinsically, and should never run.')
-
-
 class SnapshottedProcess(object):
   """A static helper for defining a task rule to execute a snapshotted process."""
 
@@ -142,7 +139,7 @@ class SnapshottedProcess(object):
     """TODO: Not clear that `binary_type` needs to be separate from the input selectors."""
 
     # Select the concatenation of the snapshot directory, binary, and input selectors.
-    inputs = (Select(_Snapshots), Select(binary_type)) + tuple(input_selectors)
+    inputs = [Select(_Snapshots), Select(binary_type)] + list(input_selectors)
 
     # Apply the input/output conversions to a top-level process-execution function which
     # will receive all inputs, convert in, execute, and convert out.
@@ -154,11 +151,11 @@ class SnapshottedProcess(object):
       )
 
     # Return a task triple that executes the function to produce the product type.
-    return (product_type, inputs, func)
+    return TaskRule(product_type, inputs, func)
 
 
-def create_snapshot_singletons():
+def create_snapshot_rules():
   """Intrinsically replaced on the rust side."""
   return [
-      (_Snapshots, snapshots_noop)
+      SingletonRule(_Snapshots, _Snapshots('/dev/null'))
     ]
