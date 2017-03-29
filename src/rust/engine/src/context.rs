@@ -1,11 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use futures_cpupool::{self, CpuPool};
 
+use externs;
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
 use tasks::Tasks;
@@ -15,8 +17,6 @@ use types::Types;
 /**
  * The core context shared (via Arc) between the Scheduler and the Context objects of
  * all running Nodes.
- *
- * TODO: Move `nodes.Context` to this module and rename both of these.
  */
 pub struct Core {
   pub graph: Graph,
@@ -31,19 +31,34 @@ pub struct Core {
 
 impl Core {
   pub fn new(
-    tasks: Tasks,
+    mut tasks: Tasks,
     types: Types,
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
+    work_dir: PathBuf,
   ) -> Core {
+    let mut snapshots_dir = work_dir.clone();
+    snapshots_dir.push("snapshots");
+
+    // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
+    //   see: https://github.com/pantsbuild/pants/issues/4397
+    let snapshots =
+      Snapshots::new(snapshots_dir)
+        .unwrap_or_else(|e| {
+          panic!("Could not initialize Snapshot directory: {:?}", e);
+        });
+    tasks.singleton_replace(
+      externs::invoke_unsafe(
+        &types.construct_snapshots,
+        &vec![externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes())],
+      ),
+      types.snapshots.clone(),
+    );
     Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
-      snapshots: Snapshots::new()
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize Snapshot directory: {:?}", e);
-        }),
+      snapshots: snapshots,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs:

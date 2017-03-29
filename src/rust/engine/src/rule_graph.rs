@@ -22,7 +22,7 @@ enum Entry {
 
   InnerEntry(InnerEntry),
 
-  Literal {
+  Singleton {
     value: Key,
     product: TypeConstraint
   },
@@ -71,7 +71,6 @@ impl Entry {
   fn new_subject_is_product(subject_type: TypeId) -> Entry {
     Entry::SubjectIsProduct {
       subject_type: subject_type,
-
     }
   }
 
@@ -82,8 +81,8 @@ impl Entry {
     }
   }
 
-  fn new_literal(value: Key, product: TypeConstraint) -> Entry {
-    Entry::Literal {
+  fn new_singleton(value: Key, product: TypeConstraint) -> Entry {
+    Entry::Singleton {
       value: value,
       product: product
     }
@@ -92,7 +91,7 @@ impl Entry {
   fn can_have_dependencies(&self) -> bool {
     match self {
       &Entry::SubjectIsProduct {..} => false,
-      &Entry::Literal { .. } => false,
+      &Entry::Singleton { .. } => false,
       &Entry::InnerEntry(_) => true,
       &Entry::Root(_) => true,
       &Entry::Unreachable { .. } => false,
@@ -102,7 +101,7 @@ impl Entry {
   fn can_be_dependency(&self) -> bool {
     match self {
       &Entry::SubjectIsProduct { .. } => true,
-      &Entry::Literal { .. } => true,
+      &Entry::Singleton { .. } => true,
       &Entry::InnerEntry(_) => true,
       &Entry::Root(_) => false,
       &Entry::Unreachable { .. } => false,
@@ -228,12 +227,9 @@ impl <'t> GraphMaker<'t> {
   fn add_unreachable_rule_diagnostics(&self, full_dependency_edges: &RuleDependencyEdges, full_unfulfillable_rules: &mut UnfulfillableRuleMap) {
     let rules_in_graph: HashSet<_> = full_dependency_edges.keys().map(|f| f.rule.clone()).collect();
     let unfulfillable_discovered_during_construction: HashSet<_> = full_unfulfillable_rules.keys().map(|f| f.rule().clone()).collect();
-    let declared_rules = self.tasks.all_rules();
-    let unreachable_rules: HashSet<_> = declared_rules.iter()
+    let unreachable_rules: HashSet<_> = self.tasks.all_tasks().iter()
       .filter(|r| !rules_in_graph.contains(r))
       .filter(|r| !unfulfillable_discovered_during_construction.contains(r))
-      .filter(|r| !self.tasks.is_singleton_task(r))
-      .filter(|r| !self.tasks.is_intrinsic_task(r))
       .map(|&r| r)
       .collect();
 
@@ -292,16 +288,6 @@ impl <'t> GraphMaker<'t> {
                                    &entry,
                                    vec![Selector::Select(select.clone())],
                                    rules_or_literals_for_selector);
-              },
-              &Selector::SelectLiteral(ref select) =>{
-                add_rules_to_graph(&mut rules_to_traverse,
-                                   &mut rule_dependency_edges,
-                                   &mut unfulfillable_rules,
-                                   &mut root_rule_dependency_edges,
-                                   &entry,
-                                   vec![selector.clone()],
-                                   vec![Entry::new_literal(select.subject.clone(),
-                                                               select.product.clone())]);
               },
               &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
               &Selector::SelectTransitive(SelectTransitive{ref product, ref dep_product, ref field_types, ..}) => {
@@ -488,7 +474,7 @@ impl <'t> GraphMaker<'t> {
   }
 
   fn gen_root_entry(&self, subject_type: &TypeId, product_type: &TypeConstraint) -> Option<RootEntry> {
-    self.tasks.gen_tasks(subject_type, product_type)
+    self.tasks.gen_tasks(product_type)
       .and_then(|tasks| if !tasks.is_empty() { Some(tasks) } else { None })
       .map(|_| {
         RootEntry {
@@ -596,15 +582,12 @@ fn selector_str(selector: &Selector) -> String {
                                                                  .collect::<Vec<String>>()
                                                                  .join(", ")
     ),
-    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, ('{}',), {})",
+    &Selector::SelectProjection(ref s) => format!("SelectProjection({}, {}, '{}', {})",
                                                   type_constraint_str(s.product),
                                                   type_str(s.projected_subject),
                                                   s.field,
                                                   type_constraint_str(s.input_product),
     ),
-    &Selector::SelectLiteral(ref s) => format!("SelectLiteral({}, {})",
-                                               externs::key_to_str(&s.subject),
-                                               type_constraint_str(s.product))
   }
 }
 
@@ -621,8 +604,8 @@ fn entry_str(entry: &Entry) -> String {
     &Entry::SubjectIsProduct { subject_type } => {
       format!("SubjectIsProduct({})", type_str(subject_type))
     }
-    &Entry::Literal { ref value, product } => {
-      format!("Literal({}, {})", externs::key_to_str(value), type_constraint_str(product))
+    &Entry::Singleton { ref value, product } => {
+      format!("Singleton({}, {})", externs::key_to_str(value), type_constraint_str(product))
     }
     &Entry::Unreachable { ref rule, ref reason } => {
       format!("Unreachable({}, {:?})", task_display(rule), reason)
@@ -837,8 +820,10 @@ fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entri
   if externs::satisfied_by_type(&select.product, &subject_type) {
     // NB a matching subject is always picked first
     vec![Entry::new_subject_is_product(subject_type)]
+  } else if let Some(&(ref key, _)) = tasks.gen_singleton(&select.product) {
+    vec![Entry::new_singleton(key.clone(), select.product.clone())]
   } else {
-    match tasks.gen_tasks(&subject_type, &select.product) {
+    match tasks.gen_tasks(&select.product) {
       Some(ref matching_tasks) => {
         matching_tasks.iter().map(|t| Entry::new_inner(subject_type, t)).collect()
       }

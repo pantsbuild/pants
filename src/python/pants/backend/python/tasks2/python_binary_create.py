@@ -76,8 +76,8 @@ class PythonBinaryCreate(Task):
           self.context.log.debug('using cache for {}'.format(vt.target))
 
         basename = os.path.basename(pex_path)
-        python_pex_product.add(binary, os.path.dirname(pex_path)).append(basename)
-        python_deployable_archive.add(binary, os.path.dirname(pex_path)).append(basename)
+        python_pex_product.add(vt.target, os.path.dirname(pex_path)).append(basename)
+        python_deployable_archive.add(vt.target, os.path.dirname(pex_path)).append(basename)
         self.context.log.debug('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
         # Create a copy for pex.

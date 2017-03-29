@@ -18,7 +18,6 @@ class JavaAgent(JavaLibrary):
                name,
                sources=None,
                excludes=None,
-               resources=None,
                premain=None,
                agent_class=None,
                can_redefine=False,
@@ -44,7 +43,6 @@ class JavaAgent(JavaLibrary):
         sources=sources,
         provides=None,
         excludes=self.assert_list(excludes, key_arg='excludes'),
-        resources=self.assert_list(resources, key_arg='resources'),
         **kwargs)
 
     if not (premain or agent_class):

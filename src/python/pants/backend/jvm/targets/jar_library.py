@@ -76,6 +76,16 @@ class JarLibrary(Target):
     """
     return self.payload.excludes
 
+  @property
+  def exports(self):
+    """
+    :API: public
+    """
+
+    # It is currently aliased to dependencies. For future work see
+    # https://github.com/pantsbuild/pants/issues/4398
+    return self.dependencies
+
   @staticmethod
   def to_jar_dependencies(relative_to, jar_library_specs, build_graph):
     """Convenience method to resolve a list of specs to JarLibraries and return its jars attributes.

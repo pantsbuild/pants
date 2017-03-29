@@ -10,9 +10,9 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.build_files import create_graph_tasks
+from pants.engine.build_files import create_graph_rules
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import create_fs_tasks
+from pants.engine.fs import create_fs_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
@@ -109,6 +109,7 @@ class EngineInitializer(object):
 
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
+                         workdir,
                          build_root=None,
                          native=None,
                          symbol_table_cls=None,
@@ -119,6 +120,7 @@ class EngineInitializer(object):
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
+    :param str workdir: The pants workdir.
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
@@ -152,12 +154,12 @@ class EngineInitializer(object):
     # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
       create_legacy_graph_tasks(symbol_table_cls) +
-      create_fs_tasks(project_tree) +
-      create_graph_tasks(address_mapper, symbol_table_cls)
+      create_fs_rules() +
+      create_graph_rules(address_mapper, symbol_table_cls)
     )
 
     # TODO: Do not use the cache yet, as it incurs a high overhead.
-    scheduler = LocalScheduler(dict(), tasks, project_tree, native)
+    scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native)
     engine = LocalSerialEngine(scheduler, use_cache=False)
     change_calculator = EngineChangeCalculator(engine, scm) if scm else None
 

@@ -17,6 +17,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.target_roots import TargetRoots
+from pants.util.contextutil import temporary_dir
 from pants_test.engine.util import init_native
 
 
@@ -53,14 +54,16 @@ class GraphInvalidationTest(unittest.TestCase):
 
   @contextmanager
   def open_scheduler(self, specs, symbol_table_cls=None):
-    path_ignore_patterns = ['.*']
-    target_roots = TargetRoots.create(options=self._make_setup_args(specs))
-    graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
-                                                        symbol_table_cls=symbol_table_cls,
-                                                        native=self._native)
-    graph = graph_helper.create_build_graph(target_roots)[0]
-    addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
-    yield graph, addresses, graph_helper.scheduler
+    with temporary_dir() as work_dir:
+      path_ignore_patterns = ['.*']
+      target_roots = TargetRoots.create(options=self._make_setup_args(specs))
+      graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
+                                                          work_dir,
+                                                          symbol_table_cls=symbol_table_cls,
+                                                          native=self._native)
+      graph = graph_helper.create_build_graph(target_roots)[0]
+      addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+      yield graph, addresses, graph_helper.scheduler
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):
