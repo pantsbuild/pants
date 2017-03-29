@@ -12,8 +12,8 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import Addresses, SubclassesOf, addressable_list
+from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
 from pants.engine.build_files import UnhydratedStruct, create_graph_rules
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
@@ -247,7 +247,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    select = SelectDependencies(UnhydratedStruct, Addresses, field_types=(Address, BuildFileAddress))
+    select = SelectDependencies(UnhydratedStruct, BuildFileAddresses, field_types=(Address,), field='addresses')
     request = self.scheduler.selection_request([(select, spec)])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:

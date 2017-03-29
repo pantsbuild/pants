@@ -14,8 +14,8 @@ from os.path import join as os_path_join
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.base.project_tree import Dir
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
@@ -106,7 +106,7 @@ class SourceRoots(datatype('SourceRoots', ['srcroots'])):
   """Placeholder for the SourceRoot subsystem."""
 
 
-@rule(BuildFileAddress,
+@rule(Address,
       [Select(JVMPackageName),
        SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))])
 @printing_func
@@ -120,7 +120,7 @@ def select_package_address(jvm_package_name, address_families):
   elif len(addresses) > 1:
     raise ValueError('Multiple targets might be able to provide {}:\n  {}'.format(
       jvm_package_name, '\n  '.join(str(a) for a in addresses)))
-  return addresses[0]
+  return addresses[0].to_address()
 
 
 @rule(PathGlobs, [Select(JVMPackageName), Select(SourceRoots)])
@@ -149,7 +149,7 @@ def extract_scala_imports(source_files_content):
 
 @rule(ScalaSources,
       [Select(ScalaInferredDepsSources),
-       SelectDependencies(BuildFileAddress, ImportedJVMPackages, field_types=(JVMPackageName,))])
+       SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))])
 @printing_func
 def reify_scala_sources(sources, dependency_addresses):
   """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
@@ -454,7 +454,7 @@ def setup_json_scheduler(build_root, native):
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
-      'list': BuildFileAddress,
+      'list': BuildFileAddresses,
       GenGoal.name(): GenGoal,
       'ls': Snapshot,
       'cat': FilesContent,
