@@ -32,6 +32,7 @@ class EngineTest(unittest.TestCase):
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
+    self.scheduler.visualize_graph_to_file('blah/run.0.dot')
     self.assertEqual([Return(Classpath(creator='javac'))], result.root_products.values())
     self.assertIsNone(result.error)
 

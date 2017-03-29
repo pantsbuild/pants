@@ -152,12 +152,12 @@ class LazySourceMapper(SourceMapper):
       if target.has_resources:
         for resource in target.resources:
           for item in resource.sources_relative_to_buildroot():
-            self._source_to_address[item].add(target.address)
+            self._source_to_address[item].add(address)
 
       for target_source in target.sources_relative_to_buildroot():
-        self._source_to_address[target_source].add(target.address)
+        self._source_to_address[target_source].add(address)
       if not target.is_synthetic:
-        self._source_to_address[target.address.build_file.relpath].add(target.address)
+        self._source_to_address[address.rel_path].add(address)
 
   def target_addresses_for_source(self, source):
     """Attempt to find targets which own a source by searching up directory structure to buildroot.

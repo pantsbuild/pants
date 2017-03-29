@@ -13,11 +13,11 @@ from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
-from pants.engine.addressable import Addresses, Collection
+from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.nodes import Return
@@ -226,14 +226,14 @@ class LegacyBuildGraph(BuildGraph):
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to %s: %s', self, subjects)
-    request = self._scheduler.execution_request([HydratedTargets, Addresses], subjects)
+    request = self._scheduler.execution_request([HydratedTargets, BuildFileAddresses], subjects)
 
     result = self._engine.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
     root_entries = self._scheduler.root_entries(request)
-    address_entries = {k: v for k, v in root_entries.items() if k[1].product is Addresses}
+    address_entries = {k: v for k, v in root_entries.items() if k[1].product is BuildFileAddresses}
     target_entries = {k: v for k, v in root_entries.items() if k[1].product is HydratedTargets}
     self._index(target_entries)
 
@@ -255,6 +255,10 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
 
+  @property
+  def addresses(self):
+    return self.dependencies
+
   def __eq__(self, other):
     if type(self) != type(other):
       return False
@@ -270,7 +274,7 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
 HydratedTargets = Collection.of(HydratedTarget)
 
 
-@rule(HydratedTargets, [SelectTransitive(HydratedTarget, Addresses, field_types=(BuildFileAddress,))])
+@rule(HydratedTargets, [SelectTransitive(HydratedTarget, BuildFileAddresses, field_types=(Address,), field='addresses')])
 def transitive_hydrated_targets(targets):
   """Recursively requests HydratedTargets, which will result in an eager, transitive graph walk."""
   return HydratedTargets(targets)
