@@ -32,12 +32,6 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(['compile', '--compile-scalafmt-skip', target])
         self.assert_success(pants_run)
 
-  def test_exports_target_alias(self):
-    path = os.path.join(self.SRC_PREFIX, 'scala', self.SRC_PACKAGE)
-    target = '{}:TD'.format(path)
-    pants_run = self.run_pants(['compile', '--compile-scalafmt-skip', target])
-    self.assert_success(pants_run)
-
   def modify_exports_and_compile(self, target, modify_file):
     with self.temporary_sourcedir() as tmp_src:
       src_dir = os.path.relpath(os.path.join(tmp_src, os.path.basename(self.SRC_PACKAGE)), get_buildroot())
