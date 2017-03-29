@@ -11,4 +11,4 @@ from pants.contrib.scalafix.tasks.scalafix import ScalaFix
 
 
 def register_goals():
-  task(name='scalafix', action=ScalaFix)
+  task(name='scalafix', action=ScalaFix).install()
