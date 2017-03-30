@@ -80,8 +80,6 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
                   'create a new chroot, which will be much slower, but more correct, as the '
                   'isolation verifies that all dependencies are correctly declared.')
     register('--junit-xml-dir', metavar='<DIR>',
-             removal_version='1.5.0.dev0',
-             removal_hint='Unused. We always use JUnit XML results files.',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
     register('--profile', metavar='<FILE>',
@@ -431,8 +429,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
     # Now grab the classnames from the xml file.
     xml = XmlParser.from_file(junitxml)
-    classname_and_names = [(testcase.getAttribute('classname'), testcase.getAttribute('name'))
-                           for testcase in xml.parsed.getElementsByTagName('testcase')]
+    classname_and_names = ((testcase.getAttribute('classname'), testcase.getAttribute('name'))
+                           for testcase in xml.parsed.getElementsByTagName('testcase'))
 
     # Now find which module each classname belongs to, and map it to its target.
     test_target_pairs = []
@@ -488,6 +486,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       args.extend(sources)
 
       result = self._do_run_tests_with_args(pex, workunit, args)
+      external_junit_xml_dir = self.get_options().junit_xml_dir
+      if external_junit_xml_dir:
+        safe_mkdir(external_junit_xml_dir)
+        shutil.copy(junitxml_path, external_junit_xml_dir)
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
       return result.with_failed_targets(failed_targets)
 

@@ -156,8 +156,8 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
             test = Test(classname=testcase.getAttribute('classname'),
                         methodname=testcase.getAttribute('name'))
             target = test_registry.get_owning_target(test)
-            #if not target:
-            #  raise ValueError('No target found for test: {}'.format(test.render_test_spec()))
+            if not target:
+              raise ValueError('No target found for test: {}'.format(test.render_test_spec()))
             failed_targets[target].add(test)
     except (XmlParser.XmlError, ValueError) as e:
       error_handler(ParseError(path, e))
