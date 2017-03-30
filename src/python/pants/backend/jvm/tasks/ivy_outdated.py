@@ -37,16 +37,9 @@ class IvyOutdated(NailgunTask):
     cls.register_jvm_tool(register,
                           'dependency-update-checker',
                           classpath=[
-                            # TODO: Add jar dependency after the jar has been released
-                            # JarDependency(org='org.pantsbuild',
-                            #               name='ivy-dependency-update-checker',
-                            #               rev='0.0.1'),
-                            # First run ./pants binary src/java/org/pantsbuild/tools/ivy:ivy-dependency-update-checker
-                            JarDependency(org = 'org.pantsbuild',
-                                          name = 'ivy-dependency-update-checker',
-                                          rev = 'none',
-                                          mutable = True,
-                                url = 'file://<fullpath-to>/pants/dist/ivy-dependency-update-checker.jar'),
+                            JarDependency(org='org.pantsbuild',
+                                          name='ivy-dependency-update-checker',
+                                          rev='0.0.1'),
                           ],
                           main=cls._IVY_DEPENDENCY_UPDATE_MAIN,
                           custom_rules=[
