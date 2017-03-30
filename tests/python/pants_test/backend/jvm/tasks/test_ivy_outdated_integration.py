@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -16,7 +15,6 @@ from pants.util.contextutil import temporary_dir
 
 class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
 
-  @unittest.skip("Pending release of ivy-dependency-update-checker jar")
   def test_with_no_dependencies(self):
     with temporary_dir(root_dir=get_buildroot()) as tmpdir:
       with open(os.path.join(tmpdir, 'BUILD'), 'w+') as f:
@@ -29,7 +27,6 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
       self.assertIn('Dependency updates available:', pants_run.stdout_data)
       self.assertIn('All dependencies are up to date', pants_run.stdout_data)
 
-  @unittest.skip("Pending release of ivy-dependency-update-checker jar")
   def test_with_available_updates(self):
     with temporary_dir(root_dir=get_buildroot()) as tmpdir:
       with open(os.path.join(tmpdir, 'BUILD'), 'w+') as f:
@@ -49,7 +46,6 @@ class IvyOutdatedIntegrationTest(PantsRunIntegrationTest):
       self.assertIn('commons-io#commons-io  2.4 -> ', pants_run.stdout_data)
       self.assertIn('org.scala-lang#scala-library  2.11.8 -> ', pants_run.stdout_data)
 
-  @unittest.skip("Pending release of ivy-dependency-update-checker jar")
   def test_with_exclude_coordinates(self):
     with temporary_dir(root_dir=get_buildroot()) as tmpdir:
       with open(os.path.join(tmpdir, 'BUILD'), 'w+') as f:
