@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from contextlib import contextmanager
 
 from pants.pantsd.process_manager import ProcessManager
@@ -78,7 +77,6 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       for line in read_pantsd_log(workdir):
         print(line)
 
-  @unittest.skip('TODO: See https://github.com/pantsbuild/pants/issues/4301')
   def test_pantsd_run_with_watchman(self):
     config = {'pantsd': {'fs_event_detection': True},
               # The absolute paths in CI can exceed the UNIX socket path limitation
