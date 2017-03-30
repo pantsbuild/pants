@@ -24,7 +24,7 @@ major_version_info = namedtuple('major_version_info', ['full_version'])
 scala_build_info = {
   '2.10': major_version_info(full_version='2.10.6'),
   '2.11': major_version_info(full_version='2.11.9'),
-  '2.12': major_version_info(full_version='2.12.1'),
+  '2.12': major_version_info(full_version='2.12.2'),
 }
 
 
