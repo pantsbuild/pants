@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import os
-import re
 import shutil
 import time
 import traceback
@@ -27,12 +26,13 @@ from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.java.junit.junit_xml_parser import parse_failed_targets, Test, TestRegistry
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
-from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
-                                    temporary_file_path)
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.contextutil import environment_as, temporary_dir, temporary_file
+from pants.util.dirutil import safe_mkdir, safe_open, safe_mkdir_for
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
+from pants.util.xml_parser import XmlParser
 
 
 class PythonTestResult(object):
@@ -177,16 +177,11 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     except Sharder.InvalidShardSpec as e:
       raise self.InvalidShardSpecification(e)
 
-  @contextmanager
-  def _maybe_emit_junit_xml(self, targets):
-    args = []
-    xml_base = self.get_options().junit_xml_dir
-    if xml_base and targets:
-      xml_base = os.path.realpath(xml_base)
-      xml_path = os.path.join(xml_base, Target.maybe_readable_identify(targets) + '.xml')
-      safe_mkdir(os.path.dirname(xml_path))
-      args.append('--junitxml={}'.format(xml_path))
-    yield args
+  def _get_junit_xml_path(self, targets):
+    xml_path = os.path.join(self.workdir, 'junitxml',
+                            'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
+    safe_mkdir_for(xml_path)
+    return xml_path
 
   DEFAULT_COVERAGE_CONFIG = dedent(b"""
     [run]
@@ -252,9 +247,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @contextmanager
   def _cov_setup(self, targets, chroot, coverage_modules=None):
-    def compute_coverage_modules(target):
-      if target.coverage:
-        return target.coverage
+    def compute_coverage_modules(tgt):
+      if tgt.coverage:
+        return tgt.coverage
       else:
         # This makes the assumption that tests/python/<target> will be testing src/python/<target>.
         # Note in particular that this doesn't work for pants' own tests, as those are under
@@ -264,7 +259,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         # dirs/packages or some arbitrary function that can be registered that takes a test target
         # and hands back the source packages or paths under test.
         return set(os.path.dirname(source).replace(os.sep, '.')
-                   for source in target.sources_relative_to_source_root())
+                   for source in tgt.sources_relative_to_source_root())
 
     if coverage_modules is None:
       coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
@@ -334,11 +329,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       coverage_modules = read_coverage_list('modules:')
     elif coverage.startswith('paths:'):
       coverage_modules = []
+      pex_src_root = os.path.relpath(
+        self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
       for path in read_coverage_list('paths:'):
-        if not os.path.exists(path) and not os.path.isabs(path):
-          # Look for the source in the PEX chroot since its not available from CWD.
-          path = os.path.join(pex.path(), path)
-        coverage_modules.append(path)
+        coverage_modules.append(os.path.join(pex_src_root, path))
 
     with self._cov_setup(targets,
                          pex.path(),
@@ -388,11 +382,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     pex = self.create_pex(pex_info)
 
     with self._maybe_shard() as shard_args:
-      with self._maybe_emit_junit_xml(targets) as junit_args:
-        with self._maybe_emit_coverage_data(targets,
-                                            pex,
-                                            workunit) as coverage_args:
-          yield pex, shard_args + junit_args + coverage_args
+      with self._maybe_emit_coverage_data(targets, pex, workunit) as coverage_args:
+        yield pex, shard_args + coverage_args
 
   def _do_run_tests_with_args(self, pex, workunit, args):
     try:
@@ -422,49 +413,46 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       self.context.log.info(traceback.format_exc())
       return PythonTestResult.exception()
 
-  # Pattern for lines such as ones below.  The second one is from a test inside a class.
-  # F testprojects/tests/python/pants/constants_only/test_fail.py::test_boom
-  # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
+  def _get_failed_targets_from_junitxml(self, junitxml, targets):
+    # Note that unlike in Java, we can't easily map targets to test classnames up-front.
+    # Instead we grab the classnames seen in practice and work backwards to the targets.
 
+    # First map the dotted paths of the modules to their respective targets.
+    pex_src_root = os.path.relpath(
+      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
+    dotted_module_path_to_target = {}
+    for target in targets:
+      for src in target.sources_relative_to_source_root():
+        pex_src = os.path.join(pex_src_root, src)
+        dotted_path = os.path.splitext(pex_src)[0].replace(os.path.sep, '.')
+        dotted_module_path_to_target[dotted_path] = target
 
-  # If a failure happens outside a function, then the resultlog will have a pattern like this:
-  # F testprojects/tests/python/pants/constants_only/test_fail.py
+    # Now grab the classnames from the xml file.
+    xml = XmlParser.from_file(junitxml)
+    classname_and_names = ((testcase.getAttribute('classname'), testcase.getAttribute('name'))
+                           for testcase in xml.parsed.getElementsByTagName('testcase'))
 
-  # 'E' is here as well to catch test errors, not just test failures.
-  RESULTLOG_FAILED_PATTERN = re.compile(r'^[EF] +(?P<file>.+?)(::.+)?$')
+    # Now find which module each classname belongs to, and map it to its target.
+    test_target_pairs = []
+    for classname, name in classname_and_names:
+      # if the classname is empty, it means that there was an error in the module body,
+      # outside any class or method body.  In this case the module name in its entirety
+      # ends up in the 'name' attribute.
+      dotted_path = classname or name
+      while dotted_path and dotted_path not in dotted_module_path_to_target:
+        dotted_path = dotted_path.rpartition('.')[0]
+      if dotted_path:
+        target = dotted_module_path_to_target[dotted_path]
+        test_target_pairs.append((Test(classname), target))
 
-  @classmethod
-  def _get_failed_targets_from_resultlogs(cls, filename, targets):
-    with open(filename, 'r') as fp:
-      lines = fp.readlines()
-
-    failed_files = {
-      m.group('file') for m in map(cls.RESULTLOG_FAILED_PATTERN.match, lines) if m and m.groups()
-    }
-
-    failed_targets = set()
-    for failed_file in failed_files:
-      failed_targets.update(
-        t for t in targets if failed_file in t.sources_relative_to_buildroot()
-      )
-
-    return list(failed_targets)
+    # Now parse the junit xml the usual way.
+    def error_handler(e):
+      raise TaskError(e)
+    failed_targets_map = parse_failed_targets(TestRegistry(test_target_pairs),
+                                              junitxml, error_handler)
+    return failed_targets_map.keys()
 
   def _do_run_tests(self, targets, workunit):
-
-    def _extract_resultlog_filename(args):
-      resultlogs = [arg[arg.find('=') + 1:] for arg in args if arg.startswith('--resultlog=')]
-      if resultlogs:
-        return resultlogs[0]
-      else:
-        try:
-          return args[args.index('--resultlog') + 1]
-        except IndexError:
-          self.context.log.error('--resultlog specified without an argument')
-          return None
-        except ValueError:
-          return None
-
     if not targets:
       return PythonTestResult.rc(0)
 
@@ -475,15 +463,17 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     sources = [os.path.join(source_root, p) for p in rel_sources]
 
     with self._test_runner(targets, workunit) as (pex, test_args):
-      def run_and_analyze(resultlog_path):
-        result = self._do_run_tests_with_args(pex, workunit, args)
-        failed_targets = self._get_failed_targets_from_resultlogs(resultlog_path, targets)
-        return result.with_failed_targets(failed_targets)
+      # Validate that the user didn't provide any passthru args that conflict
+      # with those we must set ourselves.
+      for arg in self.get_passthru_args():
+        if arg.startswith('--junitxml') or arg.startswith('--confcutdir'):
+          raise TaskError('Cannot pass this arg through to pytest: {}'.format(arg))
 
+      junitxml_path = self._get_junit_xml_path(targets)
       # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
-      args = ['--confcutdir', get_buildroot()]
+      args = ['--junitxml', junitxml_path, '--confcutdir', get_buildroot()]
       if self.get_options().fail_fast:
         args.extend(['-x'])
       if self._debug:
@@ -495,15 +485,13 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       args.extend(test_args)
       args.extend(sources)
 
-      # The user might have already specified the resultlog option. In such case, reuse it.
-      resultlog_arg = _extract_resultlog_filename(args)
-
-      if resultlog_arg:
-        return run_and_analyze(resultlog_arg)
-      else:
-        with temporary_file_path() as resultlog_path:
-          args.insert(0, '--resultlog={0}'.format(resultlog_path))
-          return run_and_analyze(resultlog_path)
+      result = self._do_run_tests_with_args(pex, workunit, args)
+      external_junit_xml_dir = self.get_options().junit_xml_dir
+      if external_junit_xml_dir:
+        safe_mkdir(external_junit_xml_dir)
+        shutil.copy(junitxml_path, external_junit_xml_dir)
+      failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
+      return result.with_failed_targets(failed_targets)
 
   def _pex_run(self, pex, workunit, args, env):
     process = self._spawn(pex, workunit, args, setsid=False, env=env)
