@@ -1,0 +1,9 @@
+<ivy-module version="1.0">
+  <info organisation="org"
+      module="invalidivy"
+      revision="1.0"
+      status="integration"
+      publication="20170120100000"
+  />
+  <invalid-tag/>
+</ivy-module>

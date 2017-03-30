@@ -58,6 +58,11 @@ jar_library(name='cucumber-java',
               jar(org='info.cukes', name='cucumber-java', rev='1.1.7'),
             ])
 
+jar_library(name='ivy',
+            jars=[
+              jar(org='org.apache.ivy', name='ivy', rev='2.4.0'),
+            ])
+
 jar_library(name='log4j',
             jars = [
               jar(org='log4j', name='log4j', rev='1.2.15',
