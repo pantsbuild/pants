@@ -1,0 +1,23 @@
+<ivysettings>
+  <properties file="${ivy.settings.dir}/ivysettings.properties" />
+  <settings defaultResolver="test"/>
+  <caches defaultCacheDir="${cache.dir}" />
+  <resolvers>
+    <chain name="test">
+      <filesystem name="test-repository">
+        <ivy pattern="${ivy.settings.dir}/repositories/test/[organisation]/[module]/ivys/ivy-[revision].xml"/>
+        <artifact pattern="${ivy.settings.dir}/repositories/test/[organisation]/[module]/[type]s/[artifact]-[revision].[ext]"/>
+      </filesystem>
+      <ibiblio name="m2" m2compatible="true" useMavenMetadata="true"
+          root="file:${ivy.settings.dir}/m2" />
+    </chain>
+    <filesystem name="install">
+      <ivy pattern="${ivy.basedir}/build/test/install/[organisation]/[module]/[artifact]-[revision].[ext]"/>
+      <artifact pattern="${ivy.basedir}/build/test/install/[organisation]/[module]/[artifact]-[revision].[ext]"/>
+    </filesystem>
+    <filesystem name="transactional">
+      <ivy pattern="${ivy.basedir}/build/test/transactional/[organisation]/[module]/[revision]/[artifact]-[revision].[ext]"/>
+      <artifact pattern="${ivy.basedir}/build/test/transactional/[organisation]/[module]/[revision]/[artifact]-[revision].[ext]"/>
+    </filesystem>
+  </resolvers>
+</ivysettings>

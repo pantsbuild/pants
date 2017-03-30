@@ -1,0 +1,8 @@
+<ivy-module version="1.0">
+  <info organisation="org"
+      module="invalidivy"
+      revision="1.1"
+      status="invalid-status"
+      publication="20170120100000"
+  />
+</ivy-module>

@@ -39,6 +39,7 @@ from pants.backend.jvm.tasks.classmap import ClassmapTask
 from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
+from pants.backend.jvm.tasks.ivy_outdated import IvyOutdated
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
@@ -157,6 +158,7 @@ def register_goals():
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
   task(name='ivy-imports', action=IvyImports).install('imports')
   task(name='unpack-jars', action=UnpackJars).install()
+  task(name='ivy', action=IvyOutdated).install('outdated')
 
   # Resource preparation.
   task(name='prepare', action=PrepareResources).install('resources')
