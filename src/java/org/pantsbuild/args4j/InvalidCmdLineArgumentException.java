@@ -45,6 +45,6 @@ public class InvalidCmdLineArgumentException extends RuntimeException {
       String message) {
 
     super(String.format("Invalid option value '%s' for option '%s': %s",
-        optionName, optionValue, message));
+        optionValue, optionName, message));
   }
 }
