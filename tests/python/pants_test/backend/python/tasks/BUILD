@@ -75,15 +75,6 @@ python_tests(
 )
 
 python_tests(
-  name='pytest_run_integration',
-  sources=['test_pytest_run_integration.py'],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name='python_isort_task',
   sources=['test_python_isort.py'],
   dependencies=[
