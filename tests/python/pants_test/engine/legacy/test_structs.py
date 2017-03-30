@@ -14,7 +14,7 @@ class StructTest(unittest.TestCase):
 
   def test_filespec_with_excludes(self):
     files = Files(spec_path='')
-    self.assertEqual({'exclude':[], 'globs':[]}, files.filespecs)
+    self.assertEqual({'globs':[]}, files.filespecs)
     files = Files(exclude=['*.md'], spec_path='')
     self.assertEqual({'exclude':[{u'globs': [u'*.md']}], 'globs':[]}, files.filespecs)
 

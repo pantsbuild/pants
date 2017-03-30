@@ -56,6 +56,7 @@ class ProtobufGenTest(TaskTestBase):
     self.assertEquals('protobuf-java', javadeps.pop().name)
 
   def test_calculate_sources(self):
+    self.create_file(relpath='proto-lib/foo.proto', contents='')
     self.add_to_build_file('proto-lib', dedent("""
       java_protobuf_library(name='proto-target',
         sources=['foo.proto'],
@@ -69,6 +70,7 @@ class ProtobufGenTest(TaskTestBase):
     self.assertEquals(OrderedSet(['proto-lib/foo.proto']), result['proto-lib'])
 
   def test_calculate_sources_with_source_root(self):
+    self.create_file(relpath='project/src/main/proto/proto-lib/foo.proto', contents='')
     self.add_to_build_file('project/src/main/proto/proto-lib', dedent("""
       java_protobuf_library(name='proto-target',
         sources=['foo.proto'],
