@@ -10,10 +10,12 @@ import shutil
 
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
 from pants.util.dirutil import relative_symlink, safe_mkdir_for
+from pants.util.memo import memoized_method
 
 
 class ScalaFix(NailgunTask):
@@ -27,12 +29,17 @@ class ScalaFix(NailgunTask):
     super(ScalaFix, cls).register_options(register)
     register('--config', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
+    # NB: Because we mix the compiler classpath into the scalafix classpath later, we
+    # don't shade (ie, specify a `main=`) here.
     cls.register_jvm_tool(register,
                           'scalafix',
-                          main=cls._SCALAFIX_MAIN,
                           classpath=[
-                            ScalaJarDependency(org='ch.epfl.scala', name='scalafix-cli', rev='0.3.2')
+                            ScalaJarDependency(org='ch.epfl.scala', name='scalafix-cli', rev='0.3.3-SNAPSHOT-mirror-3')
                           ])
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ScalaFix, cls).subsystem_dependencies() + (ScalaPlatform,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -66,16 +73,34 @@ class ScalaFix(NailgunTask):
     safe_mkdir_for(dest_dir)
     relative_symlink(vt.current_results_dir, dest_dir)
 
+  @memoized_method
+  def _complete_tool_classpath(self):
+    """Include the compiler with the scalafix classpath."""
+    cp = list(ScalaPlatform.global_instance().compiler_classpath(self.context.products))
+    cp.extend(self.tool_classpath('scalafix'))
+    return cp
+
+  @memoized_method
+  def _jvm_options(self):
+    """Extends the user provided jvm_options to specify the location of the scalahost jar."""
+    opts = list(self.get_options().jvm_options)
+    tool_classpath = [cpe for cpe in self.tool_classpath('scalafix')
+                      if 'scalahost' in cpe and '-javadoc' not in cpe and '-sources' not in cpe]
+    if not len(tool_classpath) == 1:
+      raise TaskError('Expected exactly one classpath entry for scalafix: got {}'.format(tool_classpath))
+    opts.append('-Dscalahost.jar={}'.format(tool_classpath[0]))
+    return tuple(opts)
+
   def _run(self, target, results_dir, classpaths):
     # We operate on copies of the files, so we execute in place.
     args = ['--in-place', '--files={}'.format(results_dir)]
+    args.append('--sourcepath={}'.format(results_dir))
+    args.append('--classpath={}'.format(
+      ':'.join(jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True)))))
     if self.get_options().config:
       args.append('--config={}'.format(self.get_options().config))
     if self.get_options().level == 'debug':
       args.append('--debug')
-
-    classpath = [jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True))]
-    classpath.extend(self.tool_classpath('scalafix'))
 
     # Clone all sources to relative names in their destination directory.
     for source, short_name in zip(target.sources_relative_to_buildroot(),
@@ -86,13 +111,14 @@ class ScalaFix(NailgunTask):
       shutil.copy(abs_path, dest_file)
 
     # Execute.
-    result = self.runjava(classpath=classpath, main=self._SCALAFIX_MAIN,
-                          jvm_options=self.get_options().jvm_options,
+    result = self.runjava(classpath=self._complete_tool_classpath(),
+                          main=self._SCALAFIX_MAIN,
+                          jvm_options=self._jvm_options(),
                           args=args, workunit_name='scalafix')
     if result != 0:
       raise TaskError(
           'java {main} ... exited non-zero ({result}) for {target}'.format(
-            main=self._SCALA_JS_CLI_MAIN,
+            main=self._SCALAFIX_MAIN,
             result=result,
             target=target.address.spec),
           failed_targets=[target])

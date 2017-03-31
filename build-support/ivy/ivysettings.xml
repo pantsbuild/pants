@@ -42,6 +42,12 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            We setup the maven central resolver to require successful pom downloads here. -->
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
 
+      <!-- TODO: Temporary: a stable version of scalameta will go to maven central before merge. -->
+      <url name="scalameta">
+        <ivy pattern="https://dl.bintray.com/scalameta/maven/[organisation]/[module]/[revision]/ivys/ivy.xml"/>
+        <artifact pattern="https://dl.bintray.com/scalameta/maven/[organisation]/[module]/[revision]/jars/[module].[ext]"/>
+      </url>
+
       <!-- NB: Although url resolvers (like <ibiblio/>) can be pointed at local file:// system
            URLs, this leads to issues resolving any <dependency/> with a custom artifact that
            defines a file:// url itself.  We stick to <filesystem/> resolvers here for the
