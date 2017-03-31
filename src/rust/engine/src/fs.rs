@@ -371,8 +371,7 @@ impl PosixFS {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
     let pool_opt = self.pool();
-    let pool = pool_opt.as_ref().unwrap();
-    pool
+    pool_opt.as_ref().unwrap()
       .spawn_fn(move || {
         link_abs
           .read_link()
@@ -401,8 +400,7 @@ impl PosixFS {
     let dir = dir.to_owned();
     let dir_abs = self.build_root.0.join(dir.0.as_path());
     let pool_opt = self.pool();
-    let pool = pool_opt.as_ref().unwrap();
-    pool
+    pool_opt.as_ref().unwrap()
       .spawn_fn(move || {
         PosixFS::scandir_sync(dir, dir_abs)
       })
@@ -849,26 +847,25 @@ impl Snapshots {
     let temp_path = self.next_temp_path().expect("Couldn't get the next temp path.");
 
     let pool_opt = fs.pool();
-    let pool = pool_opt.as_ref().unwrap();
+    pool_opt.as_ref().unwrap()
+      .spawn_fn(move || {
+        // Write the tar deterministically to a temporary file while fingerprinting.
+        let fingerprint =
+          Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
 
-    pool.spawn_fn(move || {
-      // Write the tar deterministically to a temporary file while fingerprinting.
-      let fingerprint =
-        Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
+        // Rename to the final path if it does not already exist.
+        Snapshots::finalize(
+          temp_path.as_path(),
+          Snapshots::path_under_for(&dest_dir, &fingerprint).as_path()
+        )?;
 
-      // Rename to the final path if it does not already exist.
-      Snapshots::finalize(
-        temp_path.as_path(),
-        Snapshots::path_under_for(&dest_dir, &fingerprint).as_path()
-      )?;
-
-      Ok(
-        Snapshot {
-         fingerprint: fingerprint,
-          path_stats: paths,
-        }
-      )
-    })
+        Ok(
+          Snapshot {
+           fingerprint: fingerprint,
+            path_stats: paths,
+          }
+        )
+      })
   }
 
   fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
@@ -899,14 +896,12 @@ impl Snapshots {
 
   pub fn contents_for(&self, fs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-
     let pool_opt = fs.pool();
-    let pool = pool_opt.as_ref().unwrap();
-
-    pool.spawn_fn(move || {
-      let snapshot_str = format!("{:?}", snapshot);
-      Snapshots::contents_for_sync(snapshot, archive_path)
-        .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))
-    })
+    pool_opt.as_ref().unwrap()
+      .spawn_fn(move || {
+        let snapshot_str = format!("{:?}", snapshot);
+        Snapshots::contents_for_sync(snapshot, archive_path)
+          .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))
+      })
   }
 }
