@@ -183,6 +183,7 @@ Scheduler* scheduler_create(Tasks*,
                             Buffer,
                             Buffer,
                             BufferBuffer);
+void scheduler_pre_fork(Scheduler*);
 void scheduler_post_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
 
