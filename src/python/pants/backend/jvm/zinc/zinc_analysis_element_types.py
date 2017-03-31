@@ -14,7 +14,9 @@ class CompileSetup(ZincAnalysisElement):
 
   # Output directories can obviously contain directories under pants_home. Compile/javac options may
   # refer to directories under pants_home.
-  pants_home_anywhere = ('output directories', 'classpath options')
+  pants_home_anywhere = ('output directories')
+
+  pants_home_anywhere_base64 = ('classpath hash')
 
   def __init__(self, args):
     # Most sections in CompileSetup are arrays represented as maps from index to item:
@@ -25,8 +27,9 @@ class CompileSetup(ZincAnalysisElement):
     # We ensure these are sorted, in case any reading code makes assumptions about the order.
     # These are very small sections, so there's no performance impact to sorting them.
     super(CompileSetup, self).__init__(args, always_sort=True)
-    (self.output_mode, self.output_dirs, self.compile_options, self.javac_options,
-     self.compiler_version, self.compile_order, self.name_hashing, self.extra) = self.args
+    (self.output_mode, self.output_dirs, self.classpath_hash, self.compile_options,
+     self.javac_options, self.compiler_version, self.compile_order, self.name_hashing,
+     self.skip_api_storing, self.extra) = self.args
 
   def translate(self, token_translator):
     self.translate_values(token_translator, self.output_dirs)
