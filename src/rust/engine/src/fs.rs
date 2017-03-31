@@ -370,8 +370,8 @@ impl PosixFS {
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
-    let pool_opt = self.pool();
-    pool_opt.as_ref().unwrap()
+    let pool = self.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
         link_abs
           .read_link()
@@ -399,8 +399,8 @@ impl PosixFS {
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
     let dir_abs = self.build_root.0.join(dir.0.as_path());
-    let pool_opt = self.pool();
-    pool_opt.as_ref().unwrap()
+    let pool = self.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
         PosixFS::scandir_sync(dir, dir_abs)
       })
@@ -846,8 +846,8 @@ impl Snapshots {
     let build_root = fs.build_root.clone();
     let temp_path = self.next_temp_path().expect("Couldn't get the next temp path.");
 
-    let pool_opt = fs.pool();
-    pool_opt.as_ref().unwrap()
+    let pool = fs.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
         // Write the tar deterministically to a temporary file while fingerprinting.
         let fingerprint =
@@ -896,8 +896,8 @@ impl Snapshots {
 
   pub fn contents_for(&self, fs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    let pool_opt = fs.pool();
-    pool_opt.as_ref().unwrap()
+    let pool = fs.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
         let snapshot_str = format!("{:?}", snapshot);
         Snapshots::contents_for_sync(snapshot, archive_path)
