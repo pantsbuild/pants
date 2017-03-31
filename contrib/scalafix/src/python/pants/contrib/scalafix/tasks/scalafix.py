@@ -8,11 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import shutil
 
+from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.util.dirutil import relative_symlink, safe_mkdir_for
 from pants.util.memo import memoized_method
@@ -23,6 +24,7 @@ class ScalaFix(NailgunTask):
 
   _SCALAFIX_MAIN = 'scalafix.cli.Cli'
   _SCALA_SOURCE_EXTENSION = '.scala'
+  _SCALAHOST_NAME = 'scalahost-nsc'
 
   @classmethod
   def register_options(cls, register):
@@ -34,7 +36,7 @@ class ScalaFix(NailgunTask):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            ScalaJarDependency(org='ch.epfl.scala', name='scalafix-cli', rev='0.3.3-SNAPSHOT-mirror-3')
+                            ScalaJarDependency(org='ch.epfl.scala', name='scalafix-cli', rev='0.3.3-SNAPSHOT-mirror-4'),
                           ])
 
   @classmethod
@@ -85,7 +87,7 @@ class ScalaFix(NailgunTask):
     """Extends the user provided jvm_options to specify the location of the scalahost jar."""
     opts = list(self.get_options().jvm_options)
     tool_classpath = [cpe for cpe in self.tool_classpath('scalafix')
-                      if 'scalahost' in cpe and '-javadoc' not in cpe and '-sources' not in cpe]
+                      if self._SCALAHOST_NAME in cpe and '-javadoc' not in cpe and '-sources' not in cpe]
     if not len(tool_classpath) == 1:
       raise TaskError('Expected exactly one classpath entry for scalafix: got {}'.format(tool_classpath))
     opts.append('-Dscalahost.jar={}'.format(tool_classpath[0]))
