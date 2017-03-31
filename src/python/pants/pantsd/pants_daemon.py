@@ -182,6 +182,9 @@ class PantsDaemon(ProcessManager):
 
   def pre_fork(self):
     """Pre-fork() callback for ProcessManager.daemonize()."""
+    for service in self._services:
+      service.pre_fork()
+
     # Teardown the RunTracker's SubprocPool pre-fork.
     RunTracker.global_instance().shutdown_worker_pool()
     # TODO(kwlzn): This currently aborts tracking of the remainder of the pants run that launched
