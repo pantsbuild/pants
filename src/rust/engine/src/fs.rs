@@ -276,7 +276,7 @@ struct PathGlobsExpansion<T: Sized> {
 pub struct PosixFS {
   build_root: Dir,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
-  pool: RwLock<CpuPool>,
+  pool: RwLock<Option<CpuPool>>,
   ignore: Gitignore,
 }
 
@@ -285,7 +285,7 @@ impl PosixFS {
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
   ) -> Result<PosixFS, String> {
-    let pool = RwLock::new(PosixFS::create_pool());
+    let pool = RwLock::new(Some(PosixFS::create_pool()));
     let canonical_build_root =
       build_root.canonicalize().and_then(|canonical|
         canonical.metadata().and_then(|metadata|
@@ -346,13 +346,18 @@ impl PosixFS {
     Ok(stats)
   }
 
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
     self.pool.read().unwrap()
+  }
+
+  pub fn pre_fork(&self) {
+    let mut pool = self.pool.write().unwrap();
+    *pool = None;
   }
 
   pub fn post_fork(&self) {
     let mut pool = self.pool.write().unwrap();
-    *pool = PosixFS::create_pool();
+    *pool = Some(PosixFS::create_pool());
   }
 
   pub fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
@@ -365,7 +370,9 @@ impl PosixFS {
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
-    self.pool()
+    let pool_opt = self.pool();
+    let pool = pool_opt.as_ref().unwrap();
+    pool
       .spawn_fn(move || {
         link_abs
           .read_link()
@@ -393,7 +400,9 @@ impl PosixFS {
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
     let dir_abs = self.build_root.0.join(dir.0.as_path());
-    self.pool()
+    let pool_opt = self.pool();
+    let pool = pool_opt.as_ref().unwrap();
+    pool
       .spawn_fn(move || {
         PosixFS::scandir_sync(dir, dir_abs)
       })
@@ -839,7 +848,10 @@ impl Snapshots {
     let build_root = fs.build_root.clone();
     let temp_path = self.next_temp_path().expect("Couldn't get the next temp path.");
 
-    fs.pool().spawn_fn(move || {
+    let pool_opt = fs.pool();
+    let pool = pool_opt.as_ref().unwrap();
+
+    pool.spawn_fn(move || {
       // Write the tar deterministically to a temporary file while fingerprinting.
       let fingerprint =
         Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
@@ -887,7 +899,11 @@ impl Snapshots {
 
   pub fn contents_for(&self, fs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    fs.pool().spawn_fn(move || {
+
+    let pool_opt = fs.pool();
+    let pool = pool_opt.as_ref().unwrap();
+
+    pool.spawn_fn(move || {
       let snapshot_str = format!("{:?}", snapshot);
       Snapshots::contents_for_sync(snapshot, archive_path)
         .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))

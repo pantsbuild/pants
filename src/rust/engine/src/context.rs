@@ -81,6 +81,7 @@ impl Core {
   }
 
   pub fn pre_fork(&self) {
+    self.vfs.pre_fork();
     let mut pool = self.pool.write().unwrap();
     *pool = None;
   }
