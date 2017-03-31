@@ -209,7 +209,7 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'compiler-bridge',
                           classpath=[
-                            sbt_jar(name='compiler-bridge_2.11',
+                            sbt_jar(name='compiler-bridge_2.10',
                                     classifier='sources',
                                     intransitive=True)
                           ])
