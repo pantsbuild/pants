@@ -22,7 +22,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.exceptions import TaskError, ErrorWhileTesting
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -133,7 +133,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def run_tests(self, targets, workunit):
     result = self._do_run_tests(targets, workunit)
     if not result.success:
-      raise TestFailedTaskError(failed_targets=result.failed_targets)
+      raise ErrorWhileTesting(failed_targets=result.failed_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
@@ -389,9 +389,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True, env=env)
       return PythonTestResult.rc(rc)
-    except TestFailedTaskError:
+    except ErrorWhileTesting:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
-      # fail with a TestFailedTaskError. We can't just set PythonTestResult
+      # fail with a ErrorWhileTesting. We can't just set PythonTestResult
       # to a failure because the resultslog doesn't have all the failures
       # when tests are killed with a timeout. Therefore we need to re-raise
       # here.

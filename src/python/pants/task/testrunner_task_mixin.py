@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod
 from threading import Timer
 
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting
 from pants.util.timeout import Timeout, TimeoutReached
 
 
@@ -53,7 +53,7 @@ class TestRunnerTaskMixin(object):
         self.get_options().timeout_default
       )
       self.context.log.error(message)
-      raise TestFailedTaskError(message)
+      raise ErrorWhileTesting(message)
 
     if not self.get_options().skip:
       test_targets = self._get_test_targets()
@@ -111,7 +111,7 @@ class TestRunnerTaskMixin(object):
                                                      self.get_options().timeout_terminate_wait)):
         return process_handler.wait()
     except TimeoutReached as e:
-      raise TestFailedTaskError(str(e), failed_targets=test_targets)
+      raise ErrorWhileTesting(str(e), failed_targets=test_targets)
 
   @abstractmethod
   def _spawn(self, *args, **kwargs):

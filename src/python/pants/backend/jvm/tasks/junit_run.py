@@ -25,7 +25,7 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TargetDefinitionException, TaskError, TestFailedTaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError, ErrorWhileTesting
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
@@ -450,7 +450,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           .format(main=JUnit.RUNNER_MAIN, code=result, failed=len(failed_targets),
                   targets=pluralize(len(failed_targets), 'target'))
       )
-      raise TestFailedTaskError('\n'.join(error_message_lines), failed_targets=list(failed_targets))
+      raise ErrorWhileTesting('\n'.join(error_message_lines), failed_targets=list(failed_targets))
 
   def _partition(self, tests):
     stride = min(self._batch_size, len(tests))

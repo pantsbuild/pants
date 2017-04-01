@@ -9,7 +9,7 @@ import os
 from textwrap import dedent
 
 from mock import patch
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting
 from pants.util.timeout import TimeoutReached
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -73,7 +73,7 @@ class NodeTestTest(TaskTestBase):
     with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(5)
 
-      with self.assertRaises(TestFailedTaskError):
+      with self.assertRaises(ErrorWhileTesting):
         task.execute()
 
       # Ensures that Timeout is instantiated with a 5 second timeout.
@@ -97,7 +97,7 @@ class NodeTestTest(TaskTestBase):
     with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(5)
 
-      with self.assertRaises(TestFailedTaskError) as cm:
+      with self.assertRaises(ErrorWhileTesting) as cm:
         task.execute()
 
       # Verify that only the first target is in the failed_targets list, not all test targets.

@@ -14,7 +14,7 @@ import coverage
 from mock import patch
 
 from pants.backend.python.tasks.pytest_run import PytestRun
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting
 from pants.util.contextutil import pushd
 from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
@@ -38,7 +38,7 @@ class PythonTestBuilderTestBase(PythonTaskTestBase):
       pytest_run_task.execute()
 
   def run_failing_tests(self, targets, failed_targets, **options):
-    with self.assertRaises(TestFailedTaskError) as cm:
+    with self.assertRaises(ErrorWhileTesting) as cm:
       self.run_tests(targets=targets, **options)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
@@ -249,7 +249,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.all_with_coverage = self.target('tests:all-with-coverage')
 
   def test_error(self):
-    """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
+    """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
 
     self.run_failing_tests(targets=[self.red, self.green, self.error],
                            failed_targets=[self.red, self.error])
