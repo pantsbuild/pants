@@ -27,7 +27,7 @@ from pants.build_graph.target import Target
 from pants.init.util import clean_global_runtime_state
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context
 from pants_test.option.util.fakes import create_options_for_optionables
 
@@ -216,7 +216,7 @@ class BaseTest(unittest.TestCase):
 
     self.build_root = os.path.realpath(mkdtemp(suffix='_BUILD_ROOT'))
     self.subprocess_dir = os.path.join(self.build_root, '.pids')
-    #self.addCleanup(safe_rmtree, self.build_root)
+    self.addCleanup(safe_rmtree, self.build_root)
 
     self.pants_workdir = os.path.join(self.build_root, '.pants.d')
     safe_mkdir(self.pants_workdir)
