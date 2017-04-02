@@ -304,23 +304,11 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
     coverage_modules = None
     if coverage.startswith('modules:'):
-      # NB: pytest-cov maps these modules to the `[run] sources` config.  So for
-      # `modules:pants.base,pants.util` the config emitted has:
-      # [run]
-      # source =
-      #   pants.base
-      #   pants.util
-      #
-      # Now even though these are not paths, coverage sees the dots and switches to a module
-      # prefix-matching mode.  Unfortunately, neither wildcards nor top-level module prefixes
-      # like `pants.` serve to engage this module prefix-matching as one might hope.  It
-      # appears that `pants.` is treated as a path and `pants.*` is treated as a literal
-      # module prefix name.
       coverage_modules = read_coverage_list('modules:')
     elif coverage.startswith('paths:'):
       coverage_modules = []
       for path in read_coverage_list('paths:'):
-        coverage_modules.append(os.path.join(pex_src_root, path))
+        coverage_modules.append(path)
 
     with self._cov_setup(targets,
                          pex_src_root,
@@ -451,7 +439,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
-      args = ['--junitxml', junitxml_path, '--confcutdir', get_buildroot()]
+      args = ['--junitxml', junitxml_path, '--confcutdir', get_buildroot(),
+              '--continue-on-collection-errors']
       if self.get_options().fail_fast:
         args.extend(['-x'])
       if self._debug:

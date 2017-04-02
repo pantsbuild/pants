@@ -339,6 +339,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.assertTrue(os.path.isfile(data_file))
     coverage_data = coverage.coverage(data_file=data_file)
     coverage_data.load()
+    coverage_data.report()
     _, all_statements, not_run_statements, _ = coverage_data.analysis(path)
     return all_statements, not_run_statements
 
@@ -409,7 +410,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_coverage_paths_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='paths:core.py')
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='paths:lib/')
     all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
