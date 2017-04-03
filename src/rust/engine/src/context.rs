@@ -80,7 +80,9 @@ impl Core {
     // If we get to here, the pool is None and needs re-initializing.
     {
       let mut pool = self.pool.write().unwrap();
-      *pool = Some(Core::create_pool());
+      if pool.is_none() {
+        *pool = Some(Core::create_pool());
+      }
     }
     self.pool.read().unwrap()
   }
