@@ -31,6 +31,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
@@ -201,7 +202,12 @@ class BaseZincCompile(JvmCompile):
     cls.register_jvm_tool(register,
                           'zinc',
                           classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.11', '0.0.1'),
+                            # Use older util-interface to be jdk7 compatible.
+                            # TODO decide whether to keep the compatibility or stop supporting jdk7
+                            # https://github.com/sbt/util/issues/75
+                            JarDependency('org.pantsbuild', 'zinc_2.11', '0.0.1',
+                                          excludes=(Exclude(org='org.scala-sbt', name='util-interface'),)),
+                            JarDependency('org.scala-sbt', 'util-interface', '0.1.0-M15')
                           ],
                           main=cls._ZINC_MAIN,
                           custom_rules=shader_rules)
