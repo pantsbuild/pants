@@ -285,7 +285,6 @@ impl PosixFS {
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
   ) -> Result<PosixFS, String> {
-    let pool = RwLock::new(Some(PosixFS::create_pool()));
     let canonical_build_root =
       build_root.canonicalize().and_then(|canonical|
         canonical.metadata().and_then(|metadata|
@@ -306,7 +305,7 @@ impl PosixFS {
     Ok(
       PosixFS {
         build_root: canonical_build_root,
-        pool: pool,
+        pool: RwLock::new(None),
         ignore: ignore,
       }
     )
@@ -347,17 +346,25 @@ impl PosixFS {
   }
 
   fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
+    {
+      let pool = self.pool.read().unwrap();
+      if pool.is_some() {
+        return pool;
+      }
+    }
+    // If we get to here, the pool is None and needs re-initializing.
+    {
+      let mut pool = self.pool.write().unwrap();
+      if pool.is_none() {
+        *pool = Some(PosixFS::create_pool());
+      }
+    }
     self.pool.read().unwrap()
   }
 
   pub fn pre_fork(&self) {
     let mut pool = self.pool.write().unwrap();
     *pool = None;
-  }
-
-  pub fn post_fork(&self) {
-    let mut pool = self.pool.write().unwrap();
-    *pool = Some(PosixFS::create_pool());
   }
 
   pub fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
