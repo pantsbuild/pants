@@ -33,10 +33,12 @@ class ScalaFix(NailgunTask):
              help='The config file to use (in HOCON format).')
     # NB: Because we mix the compiler classpath into the scalafix classpath later, we
     # don't shade (ie, specify a `main=`) here.
+    # TODO: This is full-versioned, which we don't have great support for in ScalaPlatform.
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            ScalaJarDependency(org='ch.epfl.scala', name='scalafix-cli', rev='0.3.3-SNAPSHOT-mirror-4'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.8', rev='0.3.3-ASNAPSHOT-mirror-7'),
+                            JarDependency(org='org.scalameta', name='scalahost-nsc_2.11.8', rev='1.7.0-485-086c4ac9', classifier='compile'),
                           ])
 
   @classmethod
@@ -72,7 +74,7 @@ class ScalaFix(NailgunTask):
 
   def _link_to_dist(self, vt):
     dest_dir = os.path.join(self.get_options().pants_distdir, 'scalafix', vt.target.id)
-    safe_mkdir_for(dest_dir)
+    safe_mkdir_for(dest_dir, clean=True)
     relative_symlink(vt.current_results_dir, dest_dir)
 
   @memoized_method
@@ -89,7 +91,8 @@ class ScalaFix(NailgunTask):
     tool_classpath = [cpe for cpe in self.tool_classpath('scalafix')
                       if self._SCALAHOST_NAME in cpe and '-javadoc' not in cpe and '-sources' not in cpe]
     if not len(tool_classpath) == 1:
-      raise TaskError('Expected exactly one classpath entry for scalafix: got {}'.format(tool_classpath))
+      raise TaskError('Expected exactly one classpath entry for scalahost: got {} from {}'.format(
+        tool_classpath, self.tool_classpath('scalafix')))
     opts.append('-Dscalahost.jar={}'.format(tool_classpath[0]))
     return tuple(opts)
 
