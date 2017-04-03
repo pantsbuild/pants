@@ -14,6 +14,7 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/invalidation',
+    'src/python/pants/java/junit',
     'src/python/pants/python',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
@@ -22,5 +23,6 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:memo',
     'src/python/pants/util:process_handler',
+    'src/python/pants/util:xml_parser',
   ]
 )

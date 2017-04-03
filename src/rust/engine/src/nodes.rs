@@ -293,12 +293,7 @@ impl Select {
    */
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
-    if self.product() == &context.core.types.snapshots {
-      // TODO: re-storing the Snapshots object for each request.
-      vec![
-        future::ok(Snapshot::store_snapshots(context)).boxed()
-      ]
-    } else if self.product() == &context.core.types.snapshot {
+    if self.product() == &context.core.types.snapshot {
       // If the requested product is a Snapshot, execute a Snapshot Node and then lower to a Value
       // for this caller.
       let context = context.clone();
@@ -321,6 +316,10 @@ impl Select {
               })
           )
           .boxed()
+      ]
+    } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
+      vec![
+        future::ok(value.clone()).boxed()
       ]
     } else {
       self.entries.iter()
@@ -391,30 +390,6 @@ impl Node for Select {
 impl From<Select> for NodeKey {
   fn from(n: Select) -> Self {
     NodeKey::Select(n)
-  }
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectLiteral {
-  variants: Variants,
-  selector: selectors::SelectLiteral
-}
-
-impl Node for SelectLiteral {
-  type Output = Value;
-
-  fn run(self, _: Context) -> NodeFuture<Value> {
-    ok(externs::val_for(&self.selector.subject))
-  }
-
-  fn is_inline() -> bool {
-    true
-  }
-}
-
-impl From<SelectLiteral> for NodeKey {
-  fn from(n: SelectLiteral) -> Self {
-    NodeKey::SelectLiteral(n)
   }
 }
 
@@ -1000,17 +975,6 @@ impl Snapshot {
     )
   }
 
-  fn store_snapshots(context: &Context) -> Value {
-    externs::invoke_unsafe(
-      &context.core.types.construct_snapshots,
-      &vec![
-        externs::store_bytes(
-          &context.core.snapshots.path().as_os_str().as_bytes()
-        ),
-      ],
-    )
-  }
-
   fn store_path(item: &Path) -> Value {
     externs::store_bytes(item.as_os_str().as_bytes())
   }
@@ -1147,11 +1111,6 @@ impl Task {
           edges,
           &context.core.types.address
         )),
-      Selector::SelectLiteral(s) =>
-        context.get(SelectLiteral {
-          variants: self.variants.clone(),
-          selector: s,
-        }),
     }
   }
 }
@@ -1201,7 +1160,6 @@ pub enum NodeKey {
   Select(Select),
   SelectDependencies(SelectDependencies),
   SelectTransitive(SelectTransitive),
-  SelectLiteral(SelectLiteral),
   SelectProjection(SelectProjection),
   Snapshot(Snapshot),
   Task(Task),
@@ -1224,8 +1182,6 @@ impl NodeKey {
         format!("Stat({:?})", s.0),
       &NodeKey::Select(ref s) =>
         format!("Select({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
-      &NodeKey::SelectLiteral(ref s) =>
-        format!("Literal({})", keystr(&s.selector.subject)),
       &NodeKey::SelectDependencies(ref s) =>
         format!("Dependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
       &NodeKey::SelectTransitive(ref s) =>
@@ -1252,7 +1208,6 @@ impl NodeKey {
     }
     match self {
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
-      &NodeKey::SelectLiteral(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectDependencies(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectTransitive(ref s) => typstr(&s.selector.product),
       &NodeKey::SelectProjection(ref s) => typstr(&s.selector.product),
@@ -1288,7 +1243,6 @@ impl Node for NodeKey {
       NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectLiteral(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).boxed(),

@@ -278,6 +278,10 @@ class BuildFileAddress(Address):
     self.rel_path = rel_path
     self._build_file = build_file
 
+  def to_address(self):
+    """Convert this BuildFileAddress to an Address."""
+    return Address(spec_path=self.spec_path, target_name=self.target_name)
+
   @property
   def build_file(self):
     """The build file that contains the object this address points to.

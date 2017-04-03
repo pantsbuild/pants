@@ -11,7 +11,7 @@ import os
 from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_mapper import AddressMapper
-from pants.engine.addressable import Addresses
+from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import BuildFilesCollection
 from pants.util.dirutil import fast_relpath
 
@@ -67,7 +67,7 @@ class LegacyAddressMapper(AddressMapper):
     return self._internal_scan_specs(specs, fail_fast=fail_fast, missing_is_fatal=True)
 
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
-    request = self._scheduler.execution_request([Addresses], specs)
+    request = self._scheduler.execution_request([BuildFileAddresses], specs)
     result = self._engine.execute(request)
     if result.error:
       raise self.BuildFileScanError(str(result.error))

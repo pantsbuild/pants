@@ -1,12 +1,14 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use futures_cpupool::{self, CpuPool};
 
 use core::TypeId;
+use externs;
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
 use rule_graph::RuleGraphContainer;
@@ -16,8 +18,6 @@ use types::Types;
 /**
  * The core context shared (via Arc) between the Scheduler and the Context objects of
  * all running Nodes.
- *
- * TODO: Move `nodes.Context` to this module and rename both of these.
  */
 pub struct Core {
   pub graph: Graph,
@@ -28,25 +28,40 @@ pub struct Core {
   pub vfs: PosixFS,
   // TODO: This is a second pool (relative to the VFS pool), upon which all work is
   // submitted. See https://github.com/pantsbuild/pants/issues/4298
-  pool: RwLock<CpuPool>,
+  pool: RwLock<Option<CpuPool>>,
 }
 
 impl Core {
   pub fn new(
-    tasks: Tasks,
+    mut tasks: Tasks,
     types: Types,
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
+    work_dir: PathBuf,
   ) -> Core {
+    let mut snapshots_dir = work_dir.clone();
+    snapshots_dir.push("snapshots");
+
+    // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
+    //   see: https://github.com/pantsbuild/pants/issues/4397
+    let snapshots =
+      Snapshots::new(snapshots_dir)
+        .unwrap_or_else(|e| {
+          panic!("Could not initialize Snapshot directory: {:?}", e);
+        });
+    tasks.singleton_replace(
+      externs::invoke_unsafe(
+        &types.construct_snapshots,
+        &vec![externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes())],
+      ),
+      types.snapshots.clone(),
+    );
     Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
       rule_graph: RuleGraphContainer::new(),
-      snapshots: Snapshots::new()
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize Snapshot directory: {:?}", e);
-        }),
+      snapshots: snapshots,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs:
@@ -54,11 +69,11 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),
-      pool: RwLock::new(Core::create_pool()),
+      pool: RwLock::new(Some(Core::create_pool())),
     }
   }
 
-  pub fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  pub fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
     self.pool.read().unwrap()
   }
 
@@ -66,6 +81,12 @@ impl Core {
     futures_cpupool::Builder::new()
       .name_prefix("engine-")
       .create()
+  }
+
+  pub fn pre_fork(&self) {
+    self.vfs.pre_fork();
+    let mut pool = self.pool.write().unwrap();
+    *pool = None;
   }
 
   /**
@@ -76,7 +97,7 @@ impl Core {
     self.vfs.post_fork();
     // And our own.
     let mut pool = self.pool.write().unwrap();
-    *pool = Core::create_pool();
+    *pool = Some(Core::create_pool());
   }
 
   pub fn task_end(&mut self) {
@@ -106,7 +127,7 @@ impl Context {
 
 pub trait ContextFactory {
   fn create(&self, entry_id: EntryId) -> Context;
-  fn pool(&self) -> RwLockReadGuard<CpuPool>;
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>>;
 }
 
 impl ContextFactory for Context {
@@ -121,7 +142,7 @@ impl ContextFactory for Context {
     }
   }
 
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
     self.core.pool()
   }
 }

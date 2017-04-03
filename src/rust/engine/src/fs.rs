@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{atomic, RwLock, RwLockReadGuard};
+use std::sync::{Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, BoxFuture, Future};
@@ -16,6 +16,7 @@ use tar;
 use tempdir::TempDir;
 
 use hash::{Fingerprint, WriterHasher};
+
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -275,7 +276,7 @@ struct PathGlobsExpansion<T: Sized> {
 pub struct PosixFS {
   build_root: Dir,
   // The pool needs to be reinitialized after a fork, so it is protected by a lock.
-  pool: RwLock<CpuPool>,
+  pool: RwLock<Option<CpuPool>>,
   ignore: Gitignore,
 }
 
@@ -284,7 +285,7 @@ impl PosixFS {
     build_root: PathBuf,
     ignore_patterns: Vec<String>,
   ) -> Result<PosixFS, String> {
-    let pool = RwLock::new(PosixFS::create_pool());
+    let pool = RwLock::new(Some(PosixFS::create_pool()));
     let canonical_build_root =
       build_root.canonicalize().and_then(|canonical|
         canonical.metadata().and_then(|metadata|
@@ -345,13 +346,18 @@ impl PosixFS {
     Ok(stats)
   }
 
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
     self.pool.read().unwrap()
+  }
+
+  pub fn pre_fork(&self) {
+    let mut pool = self.pool.write().unwrap();
+    *pool = None;
   }
 
   pub fn post_fork(&self) {
     let mut pool = self.pool.write().unwrap();
-    *pool = PosixFS::create_pool();
+    *pool = Some(PosixFS::create_pool());
   }
 
   pub fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
@@ -364,7 +370,8 @@ impl PosixFS {
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
-    self.pool()
+    let pool = self.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
         link_abs
           .read_link()
@@ -392,7 +399,8 @@ impl PosixFS {
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
     let dir_abs = self.build_root.0.join(dir.0.as_path());
-    self.pool()
+    let pool = self.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
         PosixFS::scandir_sync(dir, dir_abs)
       })
@@ -635,27 +643,77 @@ impl fmt::Debug for Snapshot {
   }
 }
 
+// Like std::fs::create_dir_all, except handles concurrent calls among multiple
+// threads or processes. Originally lifted from rustc.
+fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
+  match fs::create_dir(path) {
+    Ok(()) => return Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::NotFound => {}
+    Err(e) => return Err(e),
+  }
+  match path.parent() {
+    Some(p) => try!(safe_create_dir_all_ioerror(p)),
+    None => return Ok(()),
+  }
+  match fs::create_dir(path) {
+    Ok(()) => Ok(()),
+    Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(()),
+    Err(e) => Err(e),
+  }
+}
+
+fn safe_create_dir_all(path: &Path) -> Result<(), String> {
+  safe_create_dir_all_ioerror(path).map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
+}
+
+fn safe_create_tmpdir_in(base_dir: &Path, prefix: &str) -> Result<TempDir, String> {
+  safe_create_dir_all(&base_dir)?;
+  Ok(
+    TempDir::new_in(&base_dir, prefix)
+      .map_err(|e| format!("Failed to create tempdir {:?} due to {:?}", base_dir, e))?
+  )
+}
+
 /**
- * A facade for the snapshot directory, which is currently thrown away at the end of each run.
+ * A facade for the snapshot directory, which lives under the pants workdir.
  */
 pub struct Snapshots {
-  temp_dir: TempDir,
-  next_temp_id: atomic::AtomicUsize,
+  snapshots_dir: PathBuf,
+  snapshots_generator: Mutex<(TempDir, usize)>,
 }
 
 impl Snapshots {
-  pub fn new() -> Result<Snapshots, io::Error> {
+  pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, String> {
+    let snapshots_tmpdir = safe_create_tmpdir_in(&snapshots_dir, ".tmp")?;
+
     Ok(
       Snapshots {
-        // TODO: see https://github.com/pantsbuild/pants/issues/4299
-        temp_dir: TempDir::new("snapshots")?,
-        next_temp_id: atomic::AtomicUsize::new(0),
+        snapshots_dir: snapshots_dir,
+        snapshots_generator: Mutex::new((snapshots_tmpdir, 0)),
       }
     )
   }
 
-  pub fn path(&self) -> &Path {
-    self.temp_dir.path()
+  pub fn snapshot_path(&self) -> &Path {
+    self.snapshots_dir.as_path()
+  }
+
+  fn next_temp_path(&self) -> Result<PathBuf, String> {
+    let mut gen = self.snapshots_generator.lock().unwrap();
+    gen.1 += 1;
+
+    // N.B. Sometimes, in e.g. a `./pants clean-all test ...` the snapshot tempdir created at the
+    // beginning of a run can be removed out from under us by e.g. the `clean-all` task. Here, we
+    // we double check existence of the `TempDir`'s path when the path is accessed and replace if
+    // necessary.
+    if !gen.0.path().exists() {
+      gen.0 = safe_create_tmpdir_in(&self.snapshots_dir, ".tmp")?;
+    }
+
+    Ok(
+      gen.0.path().join(format!("{}.tmp", gen.1))
+    )
   }
 
   /**
@@ -751,33 +809,6 @@ impl Snapshots {
     )
   }
 
-  fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
-    Snapshots::path_under_for(self.temp_dir.path(), fingerprint)
-  }
-
-  fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
-    let hex = fingerprint.to_hex();
-    path.join(&hex[0..2]).join(&hex[2..4]).join(format!("{}.tar", hex))
-  }
-
-  /**
-   * Retries create_dir_all up to N times before failing. Necessary in concurrent environments.
-   */
-  fn create_dir_all(dir: &Path) -> Result<(), String> {
-    let mut attempts = 16;
-    loop {
-      let res = fs::create_dir_all(dir);
-      if res.is_ok() {
-        return Ok(());
-      } else if attempts <= 0 {
-        return {
-          res.map_err(|e| format!("Failed to create directory {:?}: {:?}", dir, e))
-        }
-      }
-      attempts -= 1;
-    }
-  }
-
   /**
    * Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
    * the case of Snapshots because the destination path is unique to its content.
@@ -789,8 +820,7 @@ impl Snapshots {
       Ok(())
     } else {
       let dest_dir = dest_path.parent().expect("All snapshot paths must have parent directories.");
-      // As long as the destination file gets created, we've succeeded.
-      Snapshots::create_dir_all(dest_dir)?;
+      safe_create_dir_all(dest_dir)?;
       match fs::rename(temp_path, dest_path) {
         Ok(_) => Ok(()),
         Err(_) if dest_path.is_file() => Ok(()),
@@ -799,35 +829,43 @@ impl Snapshots {
     }
   }
 
+  fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
+    Snapshots::path_under_for(self.snapshot_path(), fingerprint)
+  }
+
+  fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
+    let hex = fingerprint.to_hex();
+    path.join(&hex[0..2]).join(&hex[2..4]).join(format!("{}.tar", hex))
+  }
+
   /**
    * Creates a Snapshot for the given paths under the given VFS.
    */
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
-    let dest_dir = self.temp_dir.path().to_owned();
+    let dest_dir = self.snapshot_path().to_owned();
     let build_root = fs.build_root.clone();
-    let temp_path = {
-      let next_temp_id = self.next_temp_id.fetch_add(1, atomic::Ordering::SeqCst);
-      self.temp_dir.path().join(format!("{}.tar.tmp", next_temp_id))
-    };
+    let temp_path = self.next_temp_path().expect("Couldn't get the next temp path.");
 
-    fs.pool().spawn_fn(move || {
-      // Write the tar deterministically to a temporary file while fingerprinting.
-      let fingerprint =
-        Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
+    let pool = fs.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
+      .spawn_fn(move || {
+        // Write the tar deterministically to a temporary file while fingerprinting.
+        let fingerprint =
+          Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &build_root)?;
 
-      // Rename to the final path if it does not already exist.
-      Snapshots::finalize(
-        temp_path.as_path(),
-        Snapshots::path_under_for(&dest_dir, &fingerprint).as_path()
-      )?;
+        // Rename to the final path if it does not already exist.
+        Snapshots::finalize(
+          temp_path.as_path(),
+          Snapshots::path_under_for(&dest_dir, &fingerprint).as_path()
+        )?;
 
-      Ok(
-        Snapshot {
-         fingerprint: fingerprint,
-          path_stats: paths,
-        }
-      )
-    })
+        Ok(
+          Snapshot {
+           fingerprint: fingerprint,
+            path_stats: paths,
+          }
+        )
+      })
   }
 
   fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
@@ -858,10 +896,12 @@ impl Snapshots {
 
   pub fn contents_for(&self, fs: &PosixFS, snapshot: Snapshot) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    fs.pool().spawn_fn(move || {
-      let snapshot_str = format!("{:?}", snapshot);
-      Snapshots::contents_for_sync(snapshot, archive_path)
-        .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))
-    })
+    let pool = fs.pool();
+    pool.as_ref().expect("Uninitialized CpuPool!")
+      .spawn_fn(move || {
+        let snapshot_str = format!("{:?}", snapshot);
+        Snapshots::contents_for_sync(snapshot, archive_path)
+          .map_err(|e| format!("Failed to open Snapshot {}: {:?}", snapshot_str, e))
+      })
   }
 }

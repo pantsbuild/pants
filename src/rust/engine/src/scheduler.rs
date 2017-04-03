@@ -211,7 +211,7 @@ impl ContextFactory for Arc<Core> {
     Context::new(entry_id, self.clone())
   }
 
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
     Core::pool(self)
   }
 }

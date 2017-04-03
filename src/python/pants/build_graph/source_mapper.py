@@ -57,8 +57,8 @@ class SpecSourceMapper(SourceMapper):
     for address in self._address_mapper.addresses_in_spec_path(spec_path):
       self._build_graph.inject_address_closure(address)
       target = self._build_graph.get_target(address)
-      sources = target.payload.get_field('sources')
-      if self._sources_match(source, sources):
+      sources_field = target.payload.get_field('sources')
+      if sources_field and sources_field.matches(source):
         yield address
       elif self._address_mapper.is_declaring_file(address, source):
         yield address
@@ -70,11 +70,6 @@ class SpecSourceMapper(SourceMapper):
           if resource.payload.sources.matches(source):
             yield address
             break
-
-  def _sources_match(self, source, sources):
-    if not sources:
-      return False
-    return sources.matches(source)
 
 
 class LazySourceMapper(SourceMapper):
@@ -157,12 +152,12 @@ class LazySourceMapper(SourceMapper):
       if target.has_resources:
         for resource in target.resources:
           for item in resource.sources_relative_to_buildroot():
-            self._source_to_address[item].add(target.address)
+            self._source_to_address[item].add(address)
 
       for target_source in target.sources_relative_to_buildroot():
-        self._source_to_address[target_source].add(target.address)
+        self._source_to_address[target_source].add(address)
       if not target.is_synthetic:
-        self._source_to_address[target.address.build_file.relpath].add(target.address)
+        self._source_to_address[address.rel_path].add(address)
 
   def target_addresses_for_source(self, source):
     """Attempt to find targets which own a source by searching up directory structure to buildroot.

@@ -1,7 +1,7 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use core::{Field, Key, TypeConstraint, TypeId};
+use core::{Field, TypeConstraint, TypeId};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -37,20 +37,14 @@ pub struct SelectProjection {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectLiteral {
-  pub subject: Key,
-  pub product: TypeConstraint,
-}
-
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Selector {
   Select(Select),
   SelectDependencies(SelectDependencies),
   SelectTransitive(SelectTransitive),
   SelectProjection(SelectProjection),
-  SelectLiteral(SelectLiteral),
 }
 
+// TODO master removed this
 impl Selector {
   pub fn select(product: TypeConstraint) -> Selector {
     Selector::Select(

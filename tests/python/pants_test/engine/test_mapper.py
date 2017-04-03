@@ -12,9 +12,9 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import Addresses, SubclassesOf, addressable_list
-from pants.engine.build_files import UnhydratedStruct, create_graph_tasks
+from pants.build_graph.address import Address
+from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
+from pants.engine.build_files import UnhydratedStruct, create_graph_rules
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
@@ -234,7 +234,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
                                    build_patterns=('*.BUILD.json',))
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
+    tasks = create_graph_rules(address_mapper, symbol_table_cls)
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root
@@ -247,7 +247,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    select = SelectDependencies(UnhydratedStruct, Addresses, field_types=(Address, BuildFileAddress))
+    select = SelectDependencies(UnhydratedStruct, BuildFileAddresses, field_types=(Address,), field='addresses')
     request = self.scheduler.selection_request([(select, spec)])
     result = LocalSerialEngine(self.scheduler).execute(request)
     if result.error:

@@ -13,15 +13,22 @@ import six
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.addressable import (AddressableDescriptor, Addresses, Collection, Exactly,
-                                      TypeConstraintError)
+from pants.build_graph.address import Address
+from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Collection,
+                                      Exactly, TypeConstraintError)
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.selectors import Select, SelectDependencies, SelectLiteral, SelectProjection
+from pants.engine.rules import SingletonRule, TaskRule, rule
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
+
+
+_SPECS_CONSTRAINT = Exactly(SingleAddress,
+                            SiblingAddresses,
+                            DescendantAddresses,
+                            AscendantAddresses)
 
 
 class ResolvedTypeMismatchError(ResolveError):
@@ -45,11 +52,19 @@ class BuildFileGlobs(datatype('BuildFilesGlobs', ['path_globs'])):
   """A wrapper around PathGlobs that are known to match a build file pattern."""
 
 
+@rule(BuildFiles,
+      [SelectProjection(FilesContent, PathGlobs, 'path_globs', BuildFileGlobs)])
+def build_files(files_content):
+  return BuildFiles(files_content)
+
+
+@rule(BuildFileGlobs, [Select(AddressMapper), Select(Dir)])
 def buildfile_path_globs_for_dir(address_mapper, directory):
   patterns = address_mapper.build_patterns
   return BuildFileGlobs(PathGlobs.create(directory.path, include=patterns, exclude=()))
 
 
+@rule(AddressFamily, [Select(AddressMapper), Select(Dir), Select(BuildFiles)])
 def parse_address_family(address_mapper, path, build_files):
   """Given the contents of the build files in one directory, return an AddressFamily.
 
@@ -99,6 +114,10 @@ def _raise_did_you_mean(address_family, name):
                      'Did you mean one of?:\n  {}'.format(address_family.namespace, name, possibilities))
 
 
+@rule(UnhydratedStruct,
+      [Select(AddressMapper),
+       SelectProjection(AddressFamily, Dir, 'spec_path', Address),
+       Select(Address)])
 def resolve_unhydrated_struct(address_mapper, address_family, address):
   """Given an Address and its AddressFamily, resolve an UnhydratedStruct.
 
@@ -210,10 +229,9 @@ def _hydrate(item_type, spec_path, **kwargs):
   return item
 
 
-def identity(v):
-  return v
-
-
+@rule(BuildFileAddresses,
+      [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
+       Select(_SPECS_CONSTRAINT)])
 def addresses_from_address_families(address_families, spec):
   """Given a list of AddressFamilies and a Spec, return matching Addresses."""
   if type(spec) in (DescendantAddresses, SiblingAddresses, AscendantAddresses):
@@ -224,9 +242,10 @@ def addresses_from_address_families(address_families, spec):
                       for a in af.addressables.keys() if a.target_name == spec.name)
   else:
     raise ValueError('Unrecognized Spec type: {}'.format(spec))
-  return Addresses(addresses)
+  return BuildFileAddresses(addresses)
 
 
+@rule(BuildDirs, [Select(AddressMapper), Select(Snapshot)])
 def filter_build_dirs(address_mapper, snapshot):
   """Given a Snapshot matching a build pattern, return parent directories as BuildDirs."""
   dirnames = set(dirname(f.stat.path) for f in snapshot.files)
@@ -235,6 +254,7 @@ def filter_build_dirs(address_mapper, snapshot):
   return BuildDirs(tuple(Dir(d) for d in dirnames if d not in ignored_dirnames))
 
 
+@rule(PathGlobs, [Select(AddressMapper), Select(_SPECS_CONSTRAINT)])
 def spec_to_globs(address_mapper, spec):
   """Given a Spec object, return a PathGlobs object for the build files that it matches."""
   if type(spec) is DescendantAddresses:
@@ -273,61 +293,33 @@ def _recursive_dirname(f):
 BuildFilesCollection = Collection.of(BuildFiles)
 
 
-def create_graph_tasks(address_mapper, symbol_table_cls):
+def create_graph_rules(address_mapper, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
   :param address_mapper_key: The subject key for an AddressMapper instance.
   :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
   """
   symbol_table_constraint = symbol_table_cls.constraint()
-  specs_constraint = Exactly(SingleAddress,
-                             SiblingAddresses,
-                             DescendantAddresses,
-                             AscendantAddresses)
   return [
-    # Support for gathering a collection of build files. Used by AddressMapper
-    (BuildFilesCollection,
-     [SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))],
-     BuildFilesCollection),
-    # Support for resolving Structs from Addresses
-    (symbol_table_constraint,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(UnhydratedStruct),
-      SelectDependencies(
-        symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
-      hydrate_struct),
-    (UnhydratedStruct,
-     [SelectLiteral(address_mapper, AddressMapper),
-      SelectProjection(AddressFamily, Dir, ('spec_path',), Exactly(Address, BuildFileAddress)),
-      Select(Exactly(Address, BuildFileAddress))],
-     resolve_unhydrated_struct),
-  ] + [
+    # A singleton to provide the AddressMapper.
+    SingletonRule(AddressMapper, address_mapper),
+    # Support for resolving Structs from Addresses.
+    TaskRule(
+      symbol_table_constraint,
+      [Select(AddressMapper),
+       Select(UnhydratedStruct),
+       SelectDependencies(symbol_table_constraint, UnhydratedStruct, field_types=(Address,))],
+      hydrate_struct
+    ),
+    resolve_unhydrated_struct,
+#>>>>>>> master
     # BUILD file parsing.
-    (AddressFamily,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(Dir),
-      Select(BuildFiles)],
-     parse_address_family),
-    (BuildFiles,
-     [SelectProjection(FilesContent, PathGlobs, ('path_globs',), BuildFileGlobs)],
-     BuildFiles),
-    (BuildFileGlobs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(Dir)],
-     buildfile_path_globs_for_dir),
-  ] + [
+    parse_address_family,
+    build_files,
+    buildfile_path_globs_for_dir,
     # Spec handling: locate directories that contain build files, and request
     # AddressFamilies for each of them.
-    (Addresses,
-     [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
-      Select(specs_constraint)],
-     addresses_from_address_families),
-    (BuildDirs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(Snapshot)],
-     filter_build_dirs),
-    (PathGlobs,
-     [SelectLiteral(address_mapper, AddressMapper),
-      Select(specs_constraint)],
-     spec_to_globs),
+    addresses_from_address_families,
+    filter_build_dirs,
+    spec_to_globs,
   ]
