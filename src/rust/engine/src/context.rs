@@ -66,11 +66,24 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),
-      pool: RwLock::new(Some(Core::create_pool())),
+      pool: RwLock::new(None),
     }
   }
 
   pub fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
+    {
+      let pool = self.pool.read().unwrap();
+      if pool.is_some() {
+        return pool;
+      }
+    }
+    // If we get to here, the pool is None and needs re-initializing.
+    {
+      let mut pool = self.pool.write().unwrap();
+      if pool.is_none() {
+        *pool = Some(Core::create_pool());
+      }
+    }
     self.pool.read().unwrap()
   }
 
@@ -84,17 +97,6 @@ impl Core {
     self.vfs.pre_fork();
     let mut pool = self.pool.write().unwrap();
     *pool = None;
-  }
-
-  /**
-   * Reinitializes a Core in a new process (basically, recreates its CpuPool).
-   */
-  pub fn post_fork(&self) {
-    // Reinitialize the VFS pool.
-    self.vfs.post_fork();
-    // And our own.
-    let mut pool = self.pool.write().unwrap();
-    *pool = Some(Core::create_pool());
   }
 }
 
