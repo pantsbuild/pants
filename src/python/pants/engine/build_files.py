@@ -312,7 +312,6 @@ def create_graph_rules(address_mapper, symbol_table_cls):
       hydrate_struct
     ),
     resolve_unhydrated_struct,
-#>>>>>>> master
     # BUILD file parsing.
     parse_address_family,
     build_files,
