@@ -82,6 +82,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Kevin Sweeney
 + Kris Wilson
 + Kushal Dave
++ Kyle Derr
 + Larry Hosken
 + Lei Wang
 + Leo Kim
@@ -140,5 +141,6 @@ Created by running `build-support/bin/contributors.sh`.
 + Ugo Di Girolamo
 + Wei An
 + Wolfram Arnold
++ Xaelias
 + Yi Cheng
 + Yujie Chen
