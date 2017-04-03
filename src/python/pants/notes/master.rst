@@ -12,8 +12,8 @@ This release contains multiple significant new features, including the "exports"
 on JVM targets (to better support common cases in repositories using "strict_deps"), the
 initial release of the new python backend with caching support, a new "outdated.ivy" goal
 to report which JVM dependencies are out of date, speedups for go builds, and last but not
-least: the first release with the v2 enabled by default (to enable stabilization of the pants
-daemon before the 1.3.0.x stable releases).
+least: the first release with the v2 engine enabled by default (to enable stabilization of
+the pants daemon before the 1.3.0.x stable releases).
 
 Thanks to the contributors!
 
