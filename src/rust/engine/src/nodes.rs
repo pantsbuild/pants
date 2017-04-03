@@ -129,8 +129,7 @@ impl Select {
   pub fn new(product: TypeConstraint,
              subject: Key,
              variants: Variants,
-             edges: &rule_graph::RuleEdges,
-             address_type: &TypeConstraint) -> Select {
+             edges: &rule_graph::RuleEdges) -> Select {
     let selector_path = vec![Selector::select(product)];
     Select {
       selector: selectors::Select { product: product, variant_key: None },
@@ -138,7 +137,7 @@ impl Select {
       variants: variants,
       entries: edges.entries_for(&selector_path)
         .into_iter()
-        .filter(|e| e.matches_subject_type(subject.type_id().clone(), address_type))
+        .filter(|e| e.matches_subject_type(subject.type_id().clone()))
         .collect()
     }
   }
@@ -147,8 +146,7 @@ impl Select {
     selector: selectors::Select,
     subject: Key,
     variants: Variants,
-    edges: &rule_graph::RuleEdges,
-    address_type: &TypeConstraint
+    edges: &rule_graph::RuleEdges
   ) -> Select {
     let selector_path = vec![Selector::Select(selector.clone())];
     Select {
@@ -157,7 +155,7 @@ impl Select {
       variants: variants,
       entries: edges.entries_for(&selector_path)
         .into_iter()
-        .filter(|e| e.matches_subject_type(subject.type_id().clone(), address_type))
+        .filter(|e| e.matches_subject_type(subject.type_id().clone()))
         .collect()
     }
   }
@@ -416,8 +414,7 @@ impl SelectDependencies {
     selector: selectors::SelectDependencies,
     subject: Key,
     variants: Variants,
-    edges: &rule_graph::RuleEdges,
-    address_type: &TypeConstraint
+    edges: &rule_graph::RuleEdges
   ) -> SelectDependencies {
     // filters entries by whether the subject type is the right subject type
     let dep_p_entries = edges.entries_for(
@@ -426,7 +423,7 @@ impl SelectDependencies {
       Selector::select(selector.clone().dep_product)
       ]);
     let dep_p_entries = dep_p_entries.into_iter()
-      .filter(|e| e.matches_subject_type(subject.type_id().clone(), address_type))
+      .filter(|e| e.matches_subject_type(subject.type_id().clone()))
       .collect::<Vec<_>>();
 
     let p_entries = edges.entries_for(
@@ -439,7 +436,7 @@ impl SelectDependencies {
       .filter(|e|
         selector.clone().field_types
           .iter()
-          .any(|f| e.matches_subject_type(f.clone(), address_type))
+          .any(|f| e.matches_subject_type(f.clone()))
       )
       .collect::<Vec<_>>();
 
@@ -546,8 +543,7 @@ impl SelectTransitive {
     selector: selectors::SelectTransitive,
     subject: Key,
     variants: Variants,
-    edges: &rule_graph::RuleEdges,
-    address_type: &TypeConstraint
+    edges: &rule_graph::RuleEdges
   ) -> SelectTransitive {
 
     // filters entries by whether the subject type is the right subject type
@@ -557,7 +553,7 @@ impl SelectTransitive {
       Selector::select(selector.clone().dep_product)
       ]);
     let dep_p_entries = dep_p_entries.into_iter()
-      .filter(|e| e.matches_subject_type(subject.type_id().clone(), address_type))
+      .filter(|e| e.matches_subject_type(subject.type_id().clone()))
       .collect::<Vec<_>>();
 
     let p_entries = edges.entries_for(
@@ -570,7 +566,7 @@ impl SelectTransitive {
       .filter(|e|
         selector.clone().field_types
           .iter()
-          .any(|f| e.matches_subject_type(f.clone(), address_type))
+          .any(|f| e.matches_subject_type(f.clone()))
       )
       .collect::<Vec<_>>();
     SelectTransitive {
@@ -712,8 +708,7 @@ impl SelectProjection {
   fn new(selector: selectors::SelectProjection,
          subject: Key,
          variants: Variants,
-         edges: &rule_graph::RuleEdges,
-         address_type: &TypeConstraint
+         edges: &rule_graph::RuleEdges
   ) -> SelectProjection {
 
     // filters entries by whether the subject type is the right subject type
@@ -723,7 +718,7 @@ impl SelectProjection {
       Selector::select(selector.clone().input_product)
       ]);
     let dep_p_entries = dep_p_entries.into_iter()
-      .filter(|e| e.matches_subject_type(subject.type_id().clone(), address_type))
+      .filter(|e| e.matches_subject_type(subject.type_id().clone()))
       .collect::<Vec<_>>();
 
     let p_entries = edges.entries_for(
@@ -734,7 +729,7 @@ impl SelectProjection {
 
     let p_entries = p_entries.into_iter()
       .filter(|e|
-        e.matches_subject_type(selector.projected_subject.clone(), address_type)
+        e.matches_subject_type(selector.projected_subject.clone())
       )
       .collect::<Vec<_>>();
     SelectProjection {
@@ -1033,8 +1028,7 @@ impl Node for Snapshot {
           context.core.types.path_globs.clone(),
           self.subject.clone(),
           self.variants.clone(),
-          edges,
-          &context.core.types.address
+          edges
         )
       )
       .then(move |path_globs_res| match path_globs_res {
@@ -1084,33 +1078,25 @@ impl Task {
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges,
-          &context.core.types.address
-        )),
+          edges)),
       Selector::SelectDependencies(s) =>
-        context.get(
-          SelectDependencies::new(
-            s,
-            self.subject.clone(),
-            self.variants.clone(),
-            edges,
-            &context.core.types.address
-          )),
+        context.get(SelectDependencies::new(
+          s,
+          self.subject.clone(),
+          self.variants.clone(),
+          edges)),
       Selector::SelectTransitive(s) =>
         context.get(SelectTransitive::new(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges,
-          &context.core.types.address)),
+          edges)),
       Selector::SelectProjection(s) =>
         context.get(SelectProjection::new(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges,
-          &context.core.types.address
-        )),
+          edges)),
     }
   }
 }

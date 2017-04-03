@@ -91,8 +91,7 @@ impl Scheduler {
       Root::Select(Select::new(product,
                                subject,
                                Default::default(),
-                               &edges.expect("Edges to have been found. TODO handle this. Right now, find_root_edges will panic. But we should have a better response."),
-                               &self.core.types.address)
+                               &edges.expect("Edges to have been found. TODO handle this. Right now, find_root_edges will panic. But we should have a better response."))
       )
     );
   }
@@ -142,8 +141,7 @@ impl Scheduler {
           selector.clone(),
           subject,
           Default::default(),
-          &edges.expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject)),
-          &self.core.types.address
+          &edges.expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject))
         )
       )
     );
