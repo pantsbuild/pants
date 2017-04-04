@@ -10,10 +10,10 @@ import re
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.workunit import WorkUnitLabel
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.memo import memoized_property
 
 
