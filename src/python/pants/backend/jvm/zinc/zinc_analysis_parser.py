@@ -94,6 +94,11 @@ class ZincAnalysisParser(object):
         self.rebase(infile, outfile, rebase_mappings, java_home)
 
   def rebase(self, infile, outfile, rebase_mappings, java_home=None):
+    """Rebase from/to absolute paths with placeholders so analysis files can be cached and reused.
+
+    TODO with https://github.com/sbt/zinc/issues/218 for zinc to generate machine independent analysis
+    first rebase from absolute paths to placeholders will move into zinc.
+    """
     self._verify_version(infile)
     outfile.write(ZincAnalysis.FORMAT_VERSION_LINE)
 
@@ -138,11 +143,15 @@ class ZincAnalysisParser(object):
           for rebased_from, rebased_to in rebase_mappings:
             rebased_line = rebased_line.replace(rebased_from, rebased_to)
         elif rebase_pants_home_anywhere_base64:
-          key, val = rebased_line.rstrip().split(' -> ')
+          val_pos = rebased_line.find(' -> ')
+          if val_pos >= 0:
+            prefix, val = rebased_line[:val_pos+4], rebased_line[val_pos+4:-1]
+          else:
+            prefix, val = '', rebased_line.rstrip()
           val = base64.b64decode(val)
           for rebased_from, rebased_to in rebase_mappings:
             val = val.replace(rebased_from, rebased_to)
-          rebased_line = '{} -> {}\n'.format(key, base64.b64encode(val))
+          rebased_line = '{}{}\n'.format(prefix, base64.b64encode(val))
         elif rebase_pants_home_prefix:
           for rebased_from, rebased_to in rebase_mappings:
             if line.startswith(rebased_from):
