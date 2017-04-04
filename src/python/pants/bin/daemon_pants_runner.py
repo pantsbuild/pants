@@ -130,6 +130,11 @@ class DaemonPantsRunner(ProcessManager):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     self.daemonize(write_pid=False)
 
+  def pre_fork(self):
+    """Pre-fork callback executed via ProcessManager.daemonize()."""
+    if self._graph_helper:
+      self._graph_helper.scheduler.pre_fork()
+
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""
     # Set the Exiter exception hook post-fork so as not to affect the pantsd processes exception
@@ -150,10 +155,6 @@ class DaemonPantsRunner(ProcessManager):
       try:
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
-
-        # Reinitialize scheduler threads.
-        if self._graph_helper:
-          self._graph_helper.scheduler.post_fork()
 
         # Re-raise any deferred exceptions, if present.
         self._raise_deferred_exc()

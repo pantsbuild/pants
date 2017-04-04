@@ -26,7 +26,7 @@ pub struct Core {
   pub vfs: PosixFS,
   // TODO: This is a second pool (relative to the VFS pool), upon which all work is
   // submitted. See https://github.com/pantsbuild/pants/issues/4298
-  pool: RwLock<CpuPool>,
+  pool: RwLock<Option<CpuPool>>,
 }
 
 impl Core {
@@ -66,11 +66,24 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),
-      pool: RwLock::new(Core::create_pool()),
+      pool: RwLock::new(None),
     }
   }
 
-  pub fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  pub fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
+    {
+      let pool = self.pool.read().unwrap();
+      if pool.is_some() {
+        return pool;
+      }
+    }
+    // If we get to here, the pool is None and needs re-initializing.
+    {
+      let mut pool = self.pool.write().unwrap();
+      if pool.is_none() {
+        *pool = Some(Core::create_pool());
+      }
+    }
     self.pool.read().unwrap()
   }
 
@@ -80,15 +93,10 @@ impl Core {
       .create()
   }
 
-  /**
-   * Reinitializes a Core in a new process (basically, recreates its CpuPool).
-   */
-  pub fn post_fork(&self) {
-    // Reinitialize the VFS pool.
-    self.vfs.post_fork();
-    // And our own.
+  pub fn pre_fork(&self) {
+    self.vfs.pre_fork();
     let mut pool = self.pool.write().unwrap();
-    *pool = Core::create_pool();
+    *pool = None;
   }
 }
 
@@ -109,7 +117,7 @@ impl Context {
 
 pub trait ContextFactory {
   fn create(&self, entry_id: EntryId) -> Context;
-  fn pool(&self) -> RwLockReadGuard<CpuPool>;
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>>;
 }
 
 impl ContextFactory for Context {
@@ -124,7 +132,7 @@ impl ContextFactory for Context {
     }
   }
 
-  fn pool(&self) -> RwLockReadGuard<CpuPool> {
+  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
     self.core.pool()
   }
 }

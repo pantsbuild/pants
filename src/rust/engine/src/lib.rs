@@ -263,9 +263,9 @@ pub extern fn scheduler_create(
 }
 
 #[no_mangle]
-pub extern fn scheduler_post_fork(scheduler_ptr: *mut Scheduler) {
+pub extern fn scheduler_pre_fork(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.core.post_fork();
+    scheduler.core.pre_fork();
   })
 }
 

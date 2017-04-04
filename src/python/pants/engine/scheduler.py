@@ -258,8 +258,8 @@ class WrappedNativeScheduler(object):
   def to_keys(self, subjects):
     return list(self._to_key(subject) for subject in subjects)
 
-  def post_fork(self):
-    self._native.lib.scheduler_post_fork(self._scheduler)
+  def pre_fork(self):
+    self._native.lib.scheduler_pre_fork(self._scheduler)
 
   def root_entries(self, execution_request):
     raw_roots = self._native.lib.execution_roots(self._scheduler)
@@ -442,8 +442,8 @@ class LocalScheduler(object):
     for subject, selector in execution_request.roots:
       self._scheduler.add_root_selection(subject, selector)
 
-  def post_fork(self):
-    self._scheduler.post_fork()
+  def pre_fork(self):
+    self._scheduler.pre_fork()
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.

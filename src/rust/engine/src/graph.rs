@@ -112,7 +112,8 @@ impl Entry {
       let state =
         match self.node.clone() {
           EntryKey::Valid(n) => {
-            let pool = context_factory.pool();
+            let pool_opt = context_factory.pool();
+            let pool = pool_opt.as_ref().expect("Uninitialized CpuPool!");
             let context = context_factory.create(entry_id);
             pool
               .spawn_fn(move || {

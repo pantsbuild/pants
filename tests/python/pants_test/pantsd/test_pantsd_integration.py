@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
+import time
 from contextlib import contextmanager
 
 from pants.pantsd.process_manager import ProcessManager
@@ -21,10 +21,12 @@ class PantsDaemonMonitor(ProcessManager):
     self._pid = self.await_pid(timeout)
     self.assert_running()
 
-  def assert_running(self):
+  def assert_running(self, sleep=0):
+    time.sleep(sleep)
     assert self._pid is not None and self.is_alive(), 'pantsd should be running!'
 
-  def assert_stopped(self):
+  def assert_stopped(self, sleep=0):
+    time.sleep(sleep)
     assert self._pid is not None and self.is_dead(), 'pantsd should be stopped!'
 
 
@@ -78,7 +80,6 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       for line in read_pantsd_log(workdir):
         print(line)
 
-  @unittest.skip('TODO: See https://github.com/pantsbuild/pants/issues/4301')
   def test_pantsd_run_with_watchman(self):
     config = {'pantsd': {'fs_event_detection': True},
               # The absolute paths in CI can exceed the UNIX socket path limitation
@@ -98,17 +99,29 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
         # This run should execute via pantsd testing the end to end client/server.
         print('list')
-        self.assert_success(self.run_pants_with_workdir(['list', '3rdparty/python::'],
+        self.assert_success(self.run_pants_with_workdir(['list', '3rdparty:'],
                                                         workdir,
                                                         pantsd_config))
-        checker.assert_running()
+        checker.assert_running(3)
+
+        print('list')
+        self.assert_success(self.run_pants_with_workdir(['list', ':'],
+                                                        workdir,
+                                                        pantsd_config))
+        checker.assert_running(3)
+
+        print('list')
+        self.assert_success(self.run_pants_with_workdir(['list', ':'],
+                                                        workdir,
+                                                        pantsd_config))
+        checker.assert_running(3)
 
         # And again using the cached BuildGraph.
         print('cached list')
-        self.assert_success(self.run_pants_with_workdir(['list', '3rdparty/python::'],
+        self.assert_success(self.run_pants_with_workdir(['list', '::'],
                                                         workdir,
                                                         pantsd_config))
-        checker.assert_running()
+        checker.assert_running(3)
       finally:
         for line in read_pantsd_log(workdir):
           print(line)
