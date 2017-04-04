@@ -3,6 +3,6 @@
 
 jar_library(name='burst-junit4',
   jars=[
-    jar(org='com.squareup.burst', name='burst-junit4', rev='1.1.0'),
+    jar(org='com.squareup.burst', name='burst-junit4', rev='1.1.1'),
   ],
 )

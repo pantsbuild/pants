@@ -16,7 +16,7 @@
 
 jar_library(name='args4j',
             jars=[
-              jar('args4j', 'args4j', '2.32')
+              jar('args4j', 'args4j', '2.33')
             ])
 
 jar_library(name='guava',
@@ -32,7 +32,7 @@ jar_library(name='jansi',
 
 jar_library(name='jsr305',
             jars=[
-              jar('com.google.code.findbugs', 'jsr305', '3.0.0'),
+              jar('com.google.code.findbugs', 'jsr305', '3.0.2'),
             ],
             scope='compile')
 
@@ -134,13 +134,13 @@ target(name='thrift-0.6.1',
 
 jar_library(name='easymock',
             jars=[
-              jar('org.easymock', 'easymock', '3.3.1')
+              jar('org.easymock', 'easymock', '3.4')
             ])
 
 jar_library(name='gson',
-	    jars = [
-	      jar(org='com.google.code.gson', name='gson', rev='2.3.1')
-	    ])
+            jars = [
+              jar(org='com.google.code.gson', name='gson', rev='2.3.1')
+            ])
 
 jar_library(name='guava-testlib',
             jars=[
