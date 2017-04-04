@@ -120,7 +120,10 @@ impl Scheduler {
         self.root_nodes().into_iter()
           .map(|root| {
             self.core.graph.create(root.clone(), &self.core)
-              .then::<_, Result<(), ()>>(|_| Ok(()))
+              .then::<_, Result<(), ()>>(move |_| {
+                externs::log(LogLevel::Debug, &format!("Root {} completed.", root.format()));
+                Ok(())
+              })
           })
           .collect::<Vec<_>>()
       );
