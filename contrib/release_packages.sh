@@ -132,6 +132,17 @@ function pkg_errorprone_install_test() {
       --explain compile | grep "errorprone" &> /dev/null
 }
 
+PKG_JAXWS=(
+  "pantsbuild.pants.contrib.jax_ws"
+  "//contrib/jax_ws/src/python/pants/contrib/jax_ws:plugin"
+  "pkg_jax_ws_install_test"
+)
+function pkg_jax_ws_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.jax_ws==$(local_version)']" \
+      --explain gen | grep "jax-ws" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -144,4 +155,5 @@ CONTRIB_PACKAGES=(
   PKG_FINDBUGS
   PKG_CPP
   PKG_ERRORPRONE
+  PKG_JAXWS
 )
