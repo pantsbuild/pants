@@ -4,6 +4,160 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev15 (4/03/2017)
+-----------------------
+A weekly unstable release, delayed by a week!
+
+This release contains multiple significant new features, including the "exports" literal
+on JVM targets (to better support common cases in repositories using "strict_deps"), the
+initial release of the new python backend with caching support, a new "outdated.ivy" goal
+to report which JVM dependencies are out of date, speedups for go builds, and last but not
+least: the first release with the v2 engine enabled by default (to enable stabilization of
+the pants daemon before the 1.3.x stable releases).
+
+Thanks to the contributors!
+
+New Features
+~~~~~~~~~~~~
+
+* Add outdated.ivy command that looks for 3rd party jar updates with Ivy (#4386)
+  `PR #4386 <https://github.com/pantsbuild/pants/pull/4386>`_
+
+* Implement exports literal in jvm_target (#4329)
+  `PR #4329 <https://github.com/pantsbuild/pants/pull/4329>`_
+
+* Make jar_library target export all its dependencies (#4395)
+  `PR #4395 <https://github.com/pantsbuild/pants/pull/4395>`_
+
+* A temporary `python2` backend with just the new python pipeline tasks. (#4378)
+  `PR #4378 <https://github.com/pantsbuild/pants/pull/4378>`_
+
+* [engine] include rule graph in dot files generated with --visualize-to (#4367)
+  `PR #4367 <https://github.com/pantsbuild/pants/pull/4367>`_
+
+* Speed up typical go builds. (#4362)
+  `PR #4362 <https://github.com/pantsbuild/pants/pull/4362>`_
+
+* Enable v2 engine by default. (#4340)
+  `PR #4340 <https://github.com/pantsbuild/pants/pull/4340>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Use released ivy-dependency-update-checker jar tool for outdated.ivy command (#4406)
+  `PR #4406 <https://github.com/pantsbuild/pants/pull/4406>`_
+
+* Improve our use of gofmt. (#4379)
+  `PR #4379 <https://github.com/pantsbuild/pants/pull/4379>`_
+
+* Bump the default scala 2.12 minor version to 2.12.1. (#4383)
+  `PR #4383 <https://github.com/pantsbuild/pants/pull/4383>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Lazily initialize `CpuPool` for `Core` and `PosixFS` to address `SchedulerService` crash on Linux. (#4412)
+  `PR #4412 <https://github.com/pantsbuild/pants/pull/4412>`_
+
+* [pantsd] Address pantsd-runner hang on Linux and re-enable integration test. (#4407)
+  `PR #4407 <https://github.com/pantsbuild/pants/pull/4407>`_
+
+* Switch the new PytestRun task to use junitxml output. (#4403)
+  `Issue #3837 <https://github.com/pantsbuild/pants/issues/3837>`_
+  `PR #4403 <https://github.com/pantsbuild/pants/pull/4403>`_
+
+* [contrib/go] only pass go sources to gofmt (#4402)
+  `PR #4402 <https://github.com/pantsbuild/pants/pull/4402>`_
+
+* Remove Address/BuildFileAddress ambiguity and fix list-owners (#4399)
+  `PR #4399 <https://github.com/pantsbuild/pants/pull/4399>`_
+
+* Avoid creating deprecated resources in JavaAgent's constructor (#4400)
+  `PR #4400 <https://github.com/pantsbuild/pants/pull/4400>`_
+
+* Invalidate all go compiles when the go version changes. (#4382)
+  `PR #4382 <https://github.com/pantsbuild/pants/pull/4382>`_
+
+* Repair handling on resources kwargs for changed. (#4396)
+  `PR #4396 <https://github.com/pantsbuild/pants/pull/4396>`_
+
+* python-binary-create task maps all product directories to the same target (#4390)
+  `PR #4390 <https://github.com/pantsbuild/pants/pull/4390>`_
+
+* Fix Go source excludes; Cleanup old filespec matching (#4350)
+  `PR #4350 <https://github.com/pantsbuild/pants/pull/4350>`_
+
+* inserted a www. into some pantsbuild links to un-break them (#4388)
+  `PR #4388 <https://github.com/pantsbuild/pants/pull/4388>`_
+
+* Switch to using the new PythonEval task instead of the old one. (#4374)
+  `PR #4374 <https://github.com/pantsbuild/pants/pull/4374>`_
+
+* Adding pragma back in the default coverage config (#4232)
+  `PR #4232 <https://github.com/pantsbuild/pants/pull/4232>`_
+
+* decode compile logs (#4368)
+  `PR #4368 <https://github.com/pantsbuild/pants/pull/4368>`_
+
+* Skip cycle detection test (#4361)
+  `PR #4361 <https://github.com/pantsbuild/pants/pull/4361>`_
+
+* [engine] Fix whitelisting of files in `pants_ignore` (#4357)
+  `PR #4357 <https://github.com/pantsbuild/pants/pull/4357>`_
+
+* Revert the shared workaround (#4354)
+  `PR #4348 <https://github.com/pantsbuild/pants/pull/4348>`_
+  `PR #4354 <https://github.com/pantsbuild/pants/pull/4354>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Cleanup and give better debug output for exclude patterns in findbugs and errorprone (#4408)
+  `PR #4408 <https://github.com/pantsbuild/pants/pull/4408>`_
+
+* [engine] Rules as decorators (#4369)
+  `PR #4369 <https://github.com/pantsbuild/pants/pull/4369>`_
+
+* [engine] Move snapshots from /tmp to pants workdir. (#4373)
+  `PR #4373 <https://github.com/pantsbuild/pants/pull/4373>`_
+
+* [engine] Init Tasks before Scheduler (#4381)
+  `PR #4381 <https://github.com/pantsbuild/pants/pull/4381>`_
+
+* TravisCI tuning. (#4385)
+  `PR #4385 <https://github.com/pantsbuild/pants/pull/4385>`_
+
+* Switch the pants repo entirely over to the new python pipeline. (#4316)
+  `PR #4316 <https://github.com/pantsbuild/pants/pull/4316>`_
+
+* Fix missing deps. (#4372)
+  `PR #4372 <https://github.com/pantsbuild/pants/pull/4372>`_
+
+* A PythonEval task that uses the new pipeline. (#4341)
+  `PR #4341 <https://github.com/pantsbuild/pants/pull/4341>`_
+
+* Create a pants.init package. (#4356)
+  `PR #4356 <https://github.com/pantsbuild/pants/pull/4356>`_
+
+* [engine] short circuit native engine build failures (#4353)
+  `PR #4353 <https://github.com/pantsbuild/pants/pull/4353>`_
+
+* Check for stale native_engine_version. (#4360)
+  `PR #4360 <https://github.com/pantsbuild/pants/pull/4360>`_
+
+* [engine] Improving performance by iteratively expanding products within SelectTransitive (#4349)
+  `PR #4349 <https://github.com/pantsbuild/pants/pull/4349>`_
+
+* Move all logic out of Context (#4343)
+  `PR #4343 <https://github.com/pantsbuild/pants/pull/4343>`_
+
+* Add support for subprojects in v2 (#4346)
+  `PR #4346 <https://github.com/pantsbuild/pants/pull/4346>`_
+
+* Fix missing and circular deps. (#4345)
+  `Issue #4138 <https://github.com/pantsbuild/pants/issues/4138>`_
+  `PR #4345 <https://github.com/pantsbuild/pants/pull/4345>`_
+
 1.3.0.dev14 (3/17/2017)
 -----------------------
 A weekly unstable release.
