@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import base64
 import os
 import re
 from collections import defaultdict
@@ -93,6 +94,11 @@ class ZincAnalysisParser(object):
         self.rebase(infile, outfile, rebase_mappings, java_home)
 
   def rebase(self, infile, outfile, rebase_mappings, java_home=None):
+    """Rebase from/to absolute paths with placeholders so analysis files can be cached and reused.
+
+    TODO with https://github.com/sbt/zinc/issues/218 for zinc to generate machine independent analysis
+    first rebase from absolute paths to placeholders will move into zinc.
+    """
     self._verify_version(infile)
     outfile.write(ZincAnalysis.FORMAT_VERSION_LINE)
 
@@ -113,6 +119,7 @@ class ZincAnalysisParser(object):
   def _rebase_section(self, cls, header, lines_iter, outfile, rebase_mappings, java_home=None):
     # Booleans describing the rebasing logic to apply, if any.
     rebase_pants_home_anywhere = header in cls.pants_home_anywhere
+    rebase_pants_home_anywhere_base64 = header in cls.pants_home_anywhere_base64
     rebase_pants_home_prefix = header in cls.pants_home_prefix_only
     filter_java_home_anywhere = java_home and header in cls.java_home_anywhere
     filter_java_home_prefix = java_home and header in cls.java_home_prefix_only
@@ -135,6 +142,16 @@ class ZincAnalysisParser(object):
         if rebase_pants_home_anywhere:
           for rebased_from, rebased_to in rebase_mappings:
             rebased_line = rebased_line.replace(rebased_from, rebased_to)
+        elif rebase_pants_home_anywhere_base64:
+          val_pos = rebased_line.find(' -> ')
+          if val_pos >= 0:
+            prefix, val = rebased_line[:val_pos+4], rebased_line[val_pos+4:-1]
+          else:
+            prefix, val = '', rebased_line.rstrip()
+          val = base64.b64decode(val)
+          for rebased_from, rebased_to in rebase_mappings:
+            val = val.replace(rebased_from, rebased_to)
+          rebased_line = '{}{}\n'.format(prefix, base64.b64encode(val))
         elif rebase_pants_home_prefix:
           for rebased_from, rebased_to in rebase_mappings:
             if line.startswith(rebased_from):
