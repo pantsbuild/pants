@@ -322,7 +322,7 @@ impl Select {
     } else {
       self.entries.iter()
         .map(|entry| {
-          let (task, edges) = context.core.rule_graph.edges_and_task_for_inner(entry);
+          let task = context.core.rule_graph.task_for_inner(entry);
           context.get(
             Task {
               subject: self.subject.clone(),

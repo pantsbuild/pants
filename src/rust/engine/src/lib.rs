@@ -59,8 +59,7 @@ use externs::{
   StoreBytesExtern,
   TypeIdBuffer,
   ValForExtern,
-  ValToStrExtern,
-  with_vec,
+  ValToStrExtern
 };
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
@@ -249,33 +248,22 @@ pub extern fn scheduler_create(
                 string: type_string,
                 bytes: type_bytes,
               };
-  let mut core = Core::new(
+  let core = Core::new(
+                   root_type_ids.clone(),
                    tasks,
                    types,
                    build_root,
                    ignore_patterns,
                    work_dir,
                  );
-  // TODO rm finish et al in favor of constructing the rule graph here
-  core.finish(root_type_ids.clone());
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       Scheduler::new(
-        core,
-        root_type_ids)))
-}
-
-#[no_mangle]
-pub extern fn scheduler_root_subject_types(
-  scheduler_ptr: *mut Scheduler,
-  subject_types_ptr: *mut TypeId,
-  subject_types_len: u64) {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      scheduler.set_root_subject_types(subject_types.clone())
-    })
-  })
+        core
+      )
+    )
+  )
 }
 
 #[no_mangle]

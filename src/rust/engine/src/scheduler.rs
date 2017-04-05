@@ -22,7 +22,6 @@ pub struct Scheduler {
   pub core: Arc<Core>,
   // Initial set of roots for the execution, in the order they were declared.
   roots: Vec<Root>,
-  expected_root_subject_types: Vec<TypeId>
 }
 
 impl Scheduler {
@@ -43,11 +42,10 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(core: Core, root_subject_types: Vec<TypeId>) -> Scheduler {
+  pub fn new(core: Core) -> Scheduler {
     Scheduler {
       core: Arc::new(core),
       roots: Vec::new(),
-      expected_root_subject_types: root_subject_types.clone()
     }
   }
 
@@ -153,16 +151,6 @@ impl Scheduler {
       .task_end()
   }
 
-  fn finish(&mut self) {
-    Arc::get_mut(&mut self.core)
-      .expect("The core may not be mutated after init. We're in finish")
-      .finish(self.expected_root_subject_types.clone());
-  }
-
-  pub fn set_root_subject_types(&mut self, subject_types: Vec<TypeId>) {
-    self.expected_root_subject_types = subject_types;
-    self.finish();
-  }
   /**
    * Starting from existing roots, execute a graph to completion.
    */

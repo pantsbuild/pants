@@ -188,8 +188,6 @@ void scheduler_pre_fork(Scheduler*);
 void scheduler_post_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
 
-void scheduler_root_subject_types(Scheduler*, TypeId*, uint64_t);
-
 uint64_t graph_len(Scheduler*);
 uint64_t graph_invalidate(Scheduler*, BufferBuffer);
 void graph_visualize(Scheduler*, char*);

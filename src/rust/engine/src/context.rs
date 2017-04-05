@@ -33,6 +33,7 @@ pub struct Core {
 
 impl Core {
   pub fn new(
+    root_subject_types: Vec<TypeId>,
     mut tasks: Tasks,
     types: Types,
     build_root: PathBuf,
@@ -56,11 +57,14 @@ impl Core {
       ),
       types.snapshots.clone(),
     );
+    let mut rule_graph = RuleGraphContainer::new();
+    rule_graph.setup(&tasks, root_subject_types);
+
     Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
-      rule_graph: RuleGraphContainer::new(),
+      rule_graph: rule_graph,
       snapshots: snapshots,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
@@ -102,10 +106,6 @@ impl Core {
 
   pub fn task_end(&mut self) {
     self.tasks.task_end();
-  }
-
-  pub fn finish(&mut self, root_types: Vec<TypeId>) {
-    self.rule_graph.setup(&self.tasks, root_types)
   }
 
 }
