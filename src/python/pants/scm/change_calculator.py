@@ -9,6 +9,7 @@ import logging
 import re
 from abc import abstractmethod
 
+from pants.base.specs import DescendantAddresses
 from pants.build_graph.source_mapper import SpecSourceMapper
 from pants.goal.workspace import ScmWorkspace
 from pants.util.meta import AbstractClass
@@ -55,7 +56,6 @@ class BuildGraphChangeCalculator(ChangeCalculator):
                diffspec=None,
                exclude_target_regexp=None):
     super(BuildGraphChangeCalculator, self).__init__(scm, workspace, changes_since, diffspec)
-    self._address_mapper = address_mapper
     self._build_graph = build_graph
     self._include_dependees = include_dependees
     self._fast = fast
@@ -82,8 +82,8 @@ class BuildGraphChangeCalculator(ChangeCalculator):
       return changed
 
     # Load the whole build graph since we need it for dependee finding in either remaining case.
-    for address in self._address_mapper.scan_addresses():
-      self._build_graph.inject_address_closure(address)
+    for _ in self._build_graph.inject_specs_closure([DescendantAddresses('')]):
+      pass
 
     if self._include_dependees == 'direct':
       return changed.union(*[self._build_graph.dependents_of(addr) for addr in changed])

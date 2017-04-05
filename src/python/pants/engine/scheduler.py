@@ -258,9 +258,6 @@ class WrappedNativeScheduler(object):
   def pre_fork(self):
     self._native.lib.scheduler_pre_fork(self._scheduler)
 
-  def post_fork(self):
-    self._native.lib.scheduler_post_fork(self._scheduler)
-
   def root_entries(self, execution_request):
     raw_roots = self._native.lib.execution_roots(self._scheduler)
     try:
@@ -444,9 +441,6 @@ class LocalScheduler(object):
 
   def pre_fork(self):
     self._scheduler.pre_fork()
-
-  def post_fork(self):
-    self._scheduler.post_fork()
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.

@@ -1,0 +1,41 @@
+<definitions xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+		xmlns:wsp="http://www.w3.org/ns/ws-policy"
+		xmlns:wsp1_2="http://schemas.xmlsoap.org/ws/2004/09/policy"
+		xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata"
+		xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+		xmlns:tns="http://example.com/"
+		xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+		xmlns="http://schemas.xmlsoap.org/wsdl/"
+		targetNamespace="http://example.com/"
+		name="HelloWorldServerImplService">
+	<types/>
+	<message name="sayHello">
+		<part name="arg0" type="xsd:string"/>
+	</message>
+	<message name="sayHelloResponse">
+		<part name="return" type="xsd:string"/>
+	</message>
+	<portType name="HelloWorldServer">
+		<operation name="sayHello">
+			<input wsam:Action="http://example.com/HelloWorldServer/sayHelloRequest" message="tns:sayHello"/>
+			<output wsam:Action="http://example.com/HelloWorldServer/sayHelloResponse" message="tns:sayHelloResponse"/>
+		</operation>
+	</portType>
+	<binding name="HelloWorldServerImplPortBinding" type="tns:HelloWorldServer">
+		<soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc"/>
+		<operation name="sayHello">
+			<soap:operation soapAction=""/>
+			<input>
+				<soap:body use="literal" namespace="http://example.com/"/>
+			</input>
+			<output>
+				<soap:body use="literal" namespace="http://example.com/"/>
+			</output>
+		</operation>
+	</binding>
+	<service name="HelloWorldServerImplService">
+		<port name="HelloWorldServerImplPort" binding="tns:HelloWorldServerImplPortBinding">
+			<soap:address location="http://127.0.0.1:9876/hw"/>
+		</port>
+	</service>
+</definitions>

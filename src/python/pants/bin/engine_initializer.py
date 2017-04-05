@@ -161,6 +161,6 @@ class EngineInitializer(object):
     # TODO: Do not use the cache yet, as it incurs a high overhead.
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native)
     engine = LocalSerialEngine(scheduler, use_cache=False)
-    change_calculator = EngineChangeCalculator(engine, scm) if scm else None
+    change_calculator = EngineChangeCalculator(scheduler, engine, symbol_table_cls, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

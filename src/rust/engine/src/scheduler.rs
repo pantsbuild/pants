@@ -145,12 +145,6 @@ impl Scheduler {
     );
   }
 
-  pub fn task_end(&mut self) {
-    Arc::get_mut(&mut self.core)
-      .expect("The core may not be mutated after init. We're in task_end")
-      .task_end()
-  }
-
   /**
    * Starting from existing roots, execute a graph to completion.
    */
@@ -166,7 +160,10 @@ impl Scheduler {
         self.root_nodes().into_iter()
           .map(|root| {
             self.core.graph.create(root.clone(), &self.core)
-              .then::<_, Result<(), ()>>(|_| Ok(()))
+              .then::<_, Result<(), ()>>(move |_| {
+                externs::log(LogLevel::Debug, &format!("Root {} completed.", root.format()));
+                Ok(())
+              })
           })
           .collect::<Vec<_>>()
       );
