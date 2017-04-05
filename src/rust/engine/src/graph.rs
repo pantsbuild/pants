@@ -121,7 +121,7 @@ impl Entry {
             future::err(Failure::Noop(Noop::Cycle)).boxed(),
         };
 
-      self.state = Some(future::Shared::new(state));
+      self.state = Some(state.shared());
       self.state(context_factory, entry_id)
     }
   }

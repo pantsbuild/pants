@@ -19,8 +19,8 @@ gcc = "0.3"
 blake2-rfc = "0.2.17"
 fnv = "1.0.5"
 # TODO: See https://github.com/alexcrichton/futures-rs/pull/442
-futures = { git = "https://github.com/carllerche/futures-rs", rev = "48eaba07c9d9d7072958522fa127091ae517d587" }
-futures-cpupool = { git = "https://github.com/carllerche/futures-rs", rev = "48eaba07c9d9d7072958522fa127091ae517d587" }
+futures = { git = "https://github.com/stuhood/futures-rs", rev = "8fb28bca5936df73180bc071cf748ad0598adb37" }
+futures-cpupool = { git = "https://github.com/stuhood/futures-rs", rev = "8fb28bca5936df73180bc071cf748ad0598adb37" }
 glob = "0.2.11"
 ignore = "0.1.8"
 lazy_static = "0.2.2"
