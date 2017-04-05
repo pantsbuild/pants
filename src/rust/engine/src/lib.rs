@@ -213,7 +213,9 @@ pub extern fn scheduler_create(
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
+  root_type_ids: TypeIdBuffer,
 ) -> *const Scheduler {
+  let root_type_ids = root_type_ids.to_vec();
   let build_root = PathBuf::from(build_root_buf.to_os_string());
   let work_dir = PathBuf::from(work_dir_buf.to_os_string());
   let ignore_patterns =
@@ -225,41 +227,43 @@ pub extern fn scheduler_create(
     with_tasks(tasks_ptr, |tasks| {
       tasks.clone()
     });
+  let types = Types {
+                construct_snapshot: construct_snapshot,
+                construct_snapshots: construct_snapshots,
+                construct_file_content: construct_file_content,
+                construct_files_content: construct_files_content,
+                construct_path_stat: construct_path_stat,
+                construct_dir: construct_dir,
+                construct_file: construct_file,
+                construct_link: construct_link,
+                address: type_address,
+                has_products: type_has_products,
+                has_variants: type_has_variants,
+                path_globs: type_path_globs,
+                snapshot: type_snapshot,
+                snapshots: type_snapshots,
+                files_content: type_files_content,
+                dir: type_dir,
+                file: type_file,
+                link: type_link,
+                string: type_string,
+                bytes: type_bytes,
+              };
+  let mut core = Core::new(
+                   tasks,
+                   types,
+                   build_root,
+                   ignore_patterns,
+                   work_dir,
+                 );
+  // TODO rm finish et al in favor of constructing the rule graph here
+  core.finish(root_type_ids.clone());
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       Scheduler::new(
-        Core::new(
-          tasks,
-          Types {
-            construct_snapshot: construct_snapshot,
-            construct_snapshots: construct_snapshots,
-            construct_file_content: construct_file_content,
-            construct_files_content: construct_files_content,
-            construct_path_stat: construct_path_stat,
-            construct_dir: construct_dir,
-            construct_file: construct_file,
-            construct_link: construct_link,
-            address: type_address,
-            has_products: type_has_products,
-            has_variants: type_has_variants,
-            path_globs: type_path_globs,
-            snapshot: type_snapshot,
-            snapshots: type_snapshots,
-            files_content: type_files_content,
-            dir: type_dir,
-            file: type_file,
-            link: type_link,
-            string: type_string,
-            bytes: type_bytes,
-          },
-          build_root,
-          ignore_patterns,
-          work_dir,
-        ),
-      )
-    )
-  )
+        core,
+        root_type_ids)))
 }
 
 #[no_mangle]
@@ -510,44 +514,38 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 #[no_mangle]
 pub extern fn validator_run(
   tasks_ptr: *mut Tasks,
-  subject_types_ptr: *mut TypeId,
-  subject_types_len: u64
+  subject_types: TypeIdBuffer
 ) -> Value {
   with_tasks(tasks_ptr, |tasks| {
-    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let graph_maker = GraphMaker::new(&tasks,
-                                        subject_types.clone());
-      let graph = graph_maker.full_graph();
+    let graph_maker = GraphMaker::new(&tasks,
+                                      subject_types.to_vec());
+    let graph = graph_maker.full_graph();
 
-      match graph.validate() {
-        Result::Ok(_) => {
-          externs::store_list(vec![], false)
-        },
-        Result::Err(msg) => {
-          externs::create_exception(&msg)
-        }
+    match graph.validate() {
+      Result::Ok(_) => {
+        externs::store_list(vec![], false)
+      },
+      Result::Err(msg) => {
+        externs::create_exception(&msg)
       }
-    })
+    }
   })
 }
 
 #[no_mangle]
 pub extern fn rule_graph_visualize(
   scheduler_ptr: *mut Scheduler,
-  subject_types_ptr: *mut TypeId,
-  subject_types_len: u64,
+  subject_types: TypeIdBuffer,
   path_ptr: *const raw::c_char
 ) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-      let path = PathBuf::from(path_str);
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = PathBuf::from(path_str);
 
-      let graph = graph_full(scheduler, subject_types);
-      write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
-        println!("Failed to visualize to {}: {:?}", path.display(), e);
-      });
-    })
+    let graph = graph_full(scheduler, subject_types.to_vec());
+    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
+      println!("Failed to visualize to {}: {:?}", path.display(), e);
+    });
   })
 }
 
@@ -570,8 +568,8 @@ pub extern fn rule_subgraph_visualize(
 }
 
 
-fn graph_full(scheduler: &mut Scheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types.clone());
+fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
 

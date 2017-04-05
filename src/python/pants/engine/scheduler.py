@@ -47,14 +47,15 @@ class WrappedNativeScheduler(object):
     self._native = native
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
+    self._root_subject_types = sorted(root_subject_types)
 
     # Create the ExternContext, and the native Scheduler.
     self._tasks = native.new_tasks()
     self._register_rules(rule_index)
-    self.root_subject_types = root_subject_types
 
     self._scheduler = native.new_scheduler(
         self._tasks,
+        self._root_subject_types,
         build_root,
         work_dir,
         ignore_patterns,
@@ -77,8 +78,9 @@ class WrappedNativeScheduler(object):
         constraint_for(File),
         constraint_for(Link),
       )
-    # TODO, rm this in favor of passing the root subjects to the constructor
-    self._register_root_subject_types(root_subject_types)
+
+  def _root_type_ids(self):
+    return self._to_ids_buf(sorted(self._root_subject_types))
 
   def graph_trace(self):
     with temporary_file_path() as path:
@@ -88,16 +90,11 @@ class WrappedNativeScheduler(object):
           yield line.rstrip()
 
   def assert_ruleset_valid(self):
-    root_type_ids = self._root_type_ids()
-
-    raw_value = self._native.lib.validator_run(self._tasks, root_type_ids, len(root_type_ids))
+    raw_value = self._native.lib.validator_run(self._tasks, self._root_type_ids())
     value = self._from_value(raw_value)
 
     if isinstance(value, Exception):
       raise ValueError(str(value))
-
-  def _root_type_ids(self):
-    return list(TypeId(self._to_id(t)) for t in sorted(self.root_subject_types))
 
   def _to_value(self, obj):
     return self._native.context.to_value(obj)
@@ -121,7 +118,7 @@ class WrappedNativeScheduler(object):
     return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
 
   def _to_ids_buf(self, types):
-    return self._native.context.type_ids_buf([TypeId(self._to_id(t)) for t in types])
+    return self._native.to_ids_buf(types)
 
   def _to_utf8_buf(self, string):
     return self._native.context.utf8_buf(string)
@@ -197,11 +194,9 @@ class WrappedNativeScheduler(object):
     self._native.lib.graph_visualize(self._scheduler, bytes(filename))
 
   def visualize_rule_graph_to_file(self, filename):
-    root_type_ids = self._root_type_ids()
     self._native.lib.rule_graph_visualize(
       self._scheduler,
-      root_type_ids,
-      len(root_type_ids),
+      self._root_type_ids(),
       bytes(filename))
 
   def rule_graph_visualization(self):
@@ -288,10 +283,6 @@ class WrappedNativeScheduler(object):
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
-
-  def _register_root_subject_types(self, root_subject_types):
-    type_ids = list(TypeId(self._to_id(t)) for t in sorted(root_subject_types))
-    self._native.lib.scheduler_root_subject_types(self._scheduler, type_ids, len(type_ids))
 
 
 class LocalScheduler(object):

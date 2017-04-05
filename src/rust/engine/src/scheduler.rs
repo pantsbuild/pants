@@ -43,11 +43,11 @@ impl Scheduler {
   /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(core: Core) -> Scheduler {
+  pub fn new(core: Core, root_subject_types: Vec<TypeId>) -> Scheduler {
     Scheduler {
       core: Arc::new(core),
       roots: Vec::new(),
-      expected_root_subject_types: Vec::new()
+      expected_root_subject_types: root_subject_types.clone()
     }
   }
 
