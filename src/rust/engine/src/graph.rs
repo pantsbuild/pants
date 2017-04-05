@@ -94,11 +94,11 @@ impl Entry {
     match res {
       Ok(nr) =>
         Ok(
-          nr.clone().try_into().unwrap_or_else(|_| {
+          (*nr).clone().try_into().unwrap_or_else(|_| {
             panic!("A Node implementation was ambiguous.")
           })
         ),
-      Err(failure) => Err(failure.clone())
+      Err(failure) => Err((*failure).clone())
     }
   }
 
