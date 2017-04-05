@@ -3,9 +3,7 @@
 
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use futures_cpupool::{self, CpuPool};
+use std::sync::Arc;
 
 use externs;
 use fs::{PosixFS, Snapshots};
