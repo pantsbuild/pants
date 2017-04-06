@@ -78,88 +78,110 @@ def create_isolated_git_repo():
   #          |--BUILD
   #          |--ClasspathDirectoriesSpec.scala
   with temporary_dir(root_dir=get_buildroot()) as worktree:
-    with safe_open(os.path.join(worktree, 'README'), 'w') as fp:
-      fp.write('Just a test tree.')
+    def create_file(path, content):
+      """Creates a file in the isolated git repo."""
+      write_path = os.path.join(worktree, path)
+      with safe_open(write_path, 'w') as f:
+        f.write(dedent(content))
+      return write_path
 
-    # Create an empty pants config file.
-    touch(os.path.join(worktree, 'pants.ini'))
+    def copy_into(path, to_path=None):
+      """Copies a file from the real git repo into the isolated git repo."""
+      write_path = os.path.join(worktree, to_path or path)
+      if os.path.isfile(path):
+        safe_mkdir(os.path.dirname(write_path))
+        shutil.copyfile(path, write_path)
+      else:
+        shutil.copytree(path, write_path)
+      return write_path
 
-    # Copy .gitignore to new repo.
-    shutil.copyfile('.gitignore', os.path.join(worktree, '.gitignore'))
+    create_file('README', 'N.B. This is just a test tree.')
+    create_file('pants.ini',
+      """
+      [GLOBAL]
+      pythonpath: [
+          "{0}/contrib/go/src/python",
+          "{0}/pants-plugins/src/python"
+        ]
+      backend_packages: +[
+          "internal_backend.utilities",
+          "pants.contrib.go"
+        ]
+      """.format(get_buildroot())
+    )
+    copy_into('.gitignore')
 
     with initialize_repo(worktree=worktree, gitdir=os.path.join(worktree, '.git')) as git:
-      # Resource File
-      resource_file = os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/README.md')
-      with safe_open(resource_file, 'w') as fp:
-        fp.write('Just resource.')
+      def add_to_git(commit_msg, *files):
+        git.add(*files)
+        git.commit(commit_msg)
 
-      resource_build_file = os.path.join(worktree, 'src/resources/org/pantsbuild/resourceonly/BUILD')
-      with safe_open(resource_build_file, 'w') as fp:
-        fp.write(dedent("""
+      add_to_git('resource file',
+        create_file('src/resources/org/pantsbuild/resourceonly/BUILD',
+        """
         resources(
           name='resource',
-          sources=['README.md'],
+          sources=['README.md']
         )
-        """))
+        """
+        ),
+        create_file('src/resources/org/pantsbuild/resourceonly/README.md', 'Just a resource.')
+      )
 
-      git.add(resource_file, resource_build_file)
-      git.commit('Check in a resource target.')
+      add_to_git('hello world java program with a dependency on a resource file',
+        create_file('src/java/org/pantsbuild/helloworld/BUILD',
+          """
+          jvm_binary(
+            dependencies=[
+              'src/resources/org/pantsbuild/resourceonly:resource',
+            ],
+            source='helloworld.java',
+            main='org.pantsbuild.helloworld.HelloWorld',
+          )
+          """
+        ),
+        create_file('src/java/org/pantsbuild/helloworld/helloworld.java',
+          """
+          package org.pantsbuild.helloworld;
 
-      # Java Program
-      src_file = os.path.join(worktree, 'src/java/org/pantsbuild/helloworld/helloworld.java')
-      with safe_open(src_file, 'w') as fp:
-        fp.write(dedent("""
-        package org.pantsbuild.helloworld;
-
-        class HelloWorld {
-          public static void main(String[] args) {
-            System.out.println("Hello, World!\n");
+          class HelloWorld {
+            public static void main(String[] args) {
+              System.out.println("Hello, World!\n");
+            }
           }
-        }
-        """))
-
-      src_build_file = os.path.join(worktree, 'src/java/org/pantsbuild/helloworld/BUILD')
-      with safe_open(src_build_file, 'w') as fp:
-        fp.write(dedent("""
-        jvm_binary(
-          dependencies=[
-            '{}',
-          ],
-          source='helloworld.java',
-          main='org.pantsbuild.helloworld.HelloWorld',
+          """
         )
-        """.format('src/resources/org/pantsbuild/resourceonly:resource')))
+      )
 
-      git.add(src_file, src_build_file)
-      git.commit('hello world java program with a dependency on a resource file.')
+      add_to_git('scala test target',
+        copy_into(
+          'testprojects/tests/scala/org/pantsbuild/testproject/cp-directories',
+          'tests/scala/org/pantsbuild/cp-directories'
+        )
+      )
 
-      # Scala Program
-      scala_src_dir = os.path.join(worktree, 'tests/scala/org/pantsbuild/cp-directories')
-      safe_mkdir(os.path.dirname(scala_src_dir))
-      shutil.copytree('testprojects/tests/scala/org/pantsbuild/testproject/cp-directories', scala_src_dir)
-      git.add(scala_src_dir)
-      git.commit('Check in a scala test target.')
+      add_to_git('python targets',
+        copy_into('testprojects/src/python/python_targets', 'src/python/python_targets')
+      )
 
-      # Python library and binary
-      python_src_dir = os.path.join(worktree, 'src/python/python_targets')
-      safe_mkdir(os.path.dirname(python_src_dir))
-      shutil.copytree('testprojects/src/python/python_targets', python_src_dir)
-      git.add(python_src_dir)
-      git.commit('Check in python targets.')
+      add_to_git('a python_library with resources=["filename"]',
+        copy_into('testprojects/src/python/sources', 'src/python/sources')
+      )
 
-      # A `python_library` with `resources=['file.name']`.
-      python_src_dir = os.path.join(worktree, 'src/python/sources')
-      safe_mkdir(os.path.dirname(python_src_dir))
-      shutil.copytree('testprojects/src/python/sources', python_src_dir)
-      git.add(python_src_dir)
-      git.commit('Check in a python library with resource dependency.')
+      add_to_git('a go target with default sources',
+        create_file('src/go/tester/BUILD', 'go_binary()'),
+        create_file('src/go/tester/main.go',
+          """
+          package main
+          import "fmt"
+          func main() {
+            fmt.Println("hello, world")
+          }
+          """
+        )
+      )
 
-      # Copy 3rdparty/BUILD.
-      _3rdparty_build = os.path.join(worktree, '3rdparty/BUILD')
-      safe_mkdir(os.path.dirname(_3rdparty_build))
-      shutil.copyfile('3rdparty/BUILD', _3rdparty_build)
-      git.add(_3rdparty_build)
-      git.commit('Check in 3rdparty/BUILD.')
+      add_to_git('3rdparty/BUILD', copy_into('3rdparty/BUILD'))
 
       with environment_as(PANTS_BUILDROOT_OVERRIDE=worktree):
         yield worktree
@@ -213,6 +235,12 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       none=['tests/scala/org/pantsbuild/cp-directories:cp-directories'],
       direct=['tests/scala/org/pantsbuild/cp-directories:cp-directories'],
       transitive=['tests/scala/org/pantsbuild/cp-directories:cp-directories']
+    ),
+    # A `go_binary` with default sources.
+    'src/go/tester/main.go': dict(
+      none=['src/go/tester:tester'],
+      direct=['src/go/tester:tester'],
+      transitive=['src/go/tester:tester']
     ),
     # An unclaimed source file.
     'src/python/python_targets/test_unclaimed_src.py': dict(
