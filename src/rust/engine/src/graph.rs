@@ -94,11 +94,11 @@ impl Entry {
     match res {
       Ok(nr) =>
         Ok(
-          nr.clone().try_into().unwrap_or_else(|_| {
+          (*nr).clone().try_into().unwrap_or_else(|_| {
             panic!("A Node implementation was ambiguous.")
           })
         ),
-      Err(failure) => Err(failure.clone())
+      Err(failure) => Err((*failure).clone())
     }
   }
 
@@ -110,22 +110,18 @@ impl Entry {
       state.clone()
     } else {
       let state =
-        match self.node.clone() {
-          EntryKey::Valid(n) => {
-            let pool_opt = context_factory.pool();
-            let pool = pool_opt.as_ref().expect("Uninitialized CpuPool!");
+        match &self.node {
+          &EntryKey::Valid(ref n) => {
+            // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
             let context = context_factory.create(entry_id);
-            pool
-              .spawn_fn(move || {
-                n.run(context)
-              })
-              .boxed()
+            let node = n.clone();
+            future::lazy(move || node.run(context)).boxed()
           },
-          EntryKey::Cyclic(_) =>
+          &EntryKey::Cyclic(_) =>
             future::err(Failure::Noop(Noop::Cycle)).boxed(),
         };
 
-      self.state = Some(future::Shared::new(state));
+      self.state = Some(state.shared());
       self.state(context_factory, entry_id)
     }
   }
