@@ -16,7 +16,7 @@ from textwrap import dedent
 from pants.base.deprecated import CodeRemovedError
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.config import Config
-from pants.option.custom_types import file_option, target_option
+from pants.option.custom_types import UnsetBool, file_option, target_option
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
                                  NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
@@ -76,6 +76,7 @@ class OptionsTest(unittest.TestCase):
     register_global('--store-true-def-false-flag', type=bool, default=False)
     register_global('--store-false-def-false-flag', type=bool, implicit_value=False, default=False)
     register_global('--store-false-def-true-flag', type=bool, implicit_value=False, default=True)
+    register_global('--def-unset-bool-flag', type=bool, default=UnsetBool)
 
     # Choices.
     register_global('--str-choices', choices=['foo', 'bar'])
@@ -281,11 +282,13 @@ class OptionsTest(unittest.TestCase):
     self.assertTrue(options.for_global_scope().store_true_def_true_flag)
     self.assertFalse(options.for_global_scope().store_false_def_false_flag)
     self.assertTrue(options.for_global_scope().store_false_def_true_flag)
+    self.assertIsNone(options.for_global_scope().def_unset_bool_flag)
 
   def test_boolean_set_option(self):
     options = self._parse('./pants --store-true-flag --store-false-flag '
                           ' --store-true-def-true-flag --store-true-def-false-flag '
-                          ' --store-false-def-true-flag --store-false-def-false-flag')
+                          ' --store-false-def-true-flag --store-false-def-false-flag '
+                          ' --def-unset-bool-flag')
 
     self.assertTrue(options.for_global_scope().store_true_flag)
     self.assertFalse(options.for_global_scope().store_false_flag)
@@ -293,17 +296,20 @@ class OptionsTest(unittest.TestCase):
     self.assertTrue(options.for_global_scope().store_true_def_true_flag)
     self.assertFalse(options.for_global_scope().store_false_def_false_flag)
     self.assertFalse(options.for_global_scope().store_false_def_true_flag)
+    self.assertTrue(options.for_global_scope().def_unset_bool_flag)
 
   def test_boolean_negate_option(self):
     options = self._parse('./pants --no-store-true-flag --no-store-false-flag '
                           ' --no-store-true-def-true-flag --no-store-true-def-false-flag '
-                          ' --no-store-false-def-true-flag --no-store-false-def-false-flag')
+                          ' --no-store-false-def-true-flag --no-store-false-def-false-flag '
+                          ' --no-def-unset-bool-flag')
     self.assertFalse(options.for_global_scope().store_true_flag)
     self.assertTrue(options.for_global_scope().store_false_flag)
     self.assertFalse(options.for_global_scope().store_true_def_false_flag)
     self.assertFalse(options.for_global_scope().store_true_def_true_flag)
     self.assertTrue(options.for_global_scope().store_false_def_false_flag)
     self.assertTrue(options.for_global_scope().store_false_def_true_flag)
+    self.assertFalse(options.for_global_scope().def_unset_bool_flag)
 
   def test_boolean_config_override_true(self):
     options = self._parse('./pants', config={'DEFAULT': {'store_true_flag': True,
@@ -312,6 +318,7 @@ class OptionsTest(unittest.TestCase):
                                                          'store_true_def_false_flag': True,
                                                          'store_false_def_true_flag': True,
                                                          'store_false_def_false_flag': True,
+                                                         'def_unset_bool_flag': True,
                                                          }})
     self.assertTrue(options.for_global_scope().store_true_flag)
     self.assertTrue(options.for_global_scope().store_false_flag)
@@ -319,6 +326,7 @@ class OptionsTest(unittest.TestCase):
     self.assertTrue(options.for_global_scope().store_true_def_true_flag)
     self.assertTrue(options.for_global_scope().store_false_def_false_flag)
     self.assertTrue(options.for_global_scope().store_false_def_true_flag)
+    self.assertTrue(options.for_global_scope().def_unset_bool_flag)
 
   def test_boolean_config_override_false(self):
     options = self._parse('./pants', config={'DEFAULT': {'store_true_flag': False,
@@ -327,6 +335,7 @@ class OptionsTest(unittest.TestCase):
                                                          'store_true_def_false_flag': False,
                                                          'store_false_def_true_flag': False,
                                                          'store_false_def_false_flag': False,
+                                                         'def_unset_bool_flag': False,
                                                          }})
     self.assertFalse(options.for_global_scope().store_true_flag)
     self.assertFalse(options.for_global_scope().store_false_flag)
@@ -334,6 +343,7 @@ class OptionsTest(unittest.TestCase):
     self.assertFalse(options.for_global_scope().store_true_def_true_flag)
     self.assertFalse(options.for_global_scope().store_false_def_false_flag)
     self.assertFalse(options.for_global_scope().store_false_def_true_flag)
+    self.assertFalse(options.for_global_scope().def_unset_bool_flag)
 
   def test_boolean_invalid_value(self):
     with self.assertRaises(Parser.BooleanConversionError):

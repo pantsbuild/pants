@@ -15,6 +15,13 @@ from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_text
 
 
+# A default value for a bool typed option that indicates it can act as a tri-state that defaults to
+# `None`; ie: the option is un-set.
+#
+# :API: public
+UnsetBool = object()
+
+
 def dict_option(s):
   """An option of type 'dict'.
 
