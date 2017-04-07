@@ -178,10 +178,11 @@ class JvmCompile(NailgunTaskBase):
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
 
-    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='warn',
+    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
              fingerprint=True,
              help='Controls whether unused deps are checked, and whether they cause warnings or '
-                  'errors.')
+                  'errors. This option uses zinc\'s analysis to determine which deps are unused, '
+                  'and can thus result in false negatives: thus it is disabled by default.')
 
     register('--suggest-missing-deps', type=bool,
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
