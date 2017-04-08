@@ -15,8 +15,9 @@ import six
 
 from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import (DictValueComponent, ListValueComponent, dict_option,
-                                       dir_option, file_option, list_option, target_option)
+from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
+                                       dict_option, dir_option, file_option, list_option,
+                                       target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
                                  NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
@@ -304,10 +305,15 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    # Boolean options always have an implicit boolean-typed default.  They can never be None.
-    # We make that default explicit here.
-    if kwargs.get('type') == bool and kwargs.get('default') is None:
-      kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
+    if kwargs.get('type') == bool:
+      default = kwargs.get('default')
+      if default is None:
+        # Unless a tri-state bool is explicitly opted into with the `UnsetBool` default value,
+        # boolean options always have an implicit boolean-typed default. We make that default
+        # explicit here.
+        kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
+      elif default is UnsetBool:
+        kwargs['default'] = None
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))

@@ -9,6 +9,7 @@ import os
 
 from pkg_resources import Requirement
 
+from pants.option.custom_types import UnsetBool
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -56,7 +57,7 @@ class PythonSetup(Subsystem):
              default=10 * 365 * 86400,  # 10 years.
              help='The time in seconds before we consider re-resolving an open-ended requirement, '
                   'e.g. "flask>=0.2" if a matching distribution is available on disk.')
-    register('--resolver-allow-prereleases', advanced=True, type=bool, default=False,
+    register('--resolver-allow-prereleases', advanced=True, type=bool, default=UnsetBool,
              fingerprint=True, help='Whether to include pre-releases when resolving requirements.')
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
