@@ -52,7 +52,7 @@ function calculate_current_hash() {
 
 function ensure_cffi_sources() {
   # N.B. Here we assume that higher level callers have already setup the pants' venv and $PANTS_SRCPATH.
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python2 "${CFFI_BOOTSTRAPPER}" "$@"
 }
 
 function ensure_build_prerequisites() {
