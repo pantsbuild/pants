@@ -63,7 +63,7 @@ function fingerprint_data() {
 }
 
 function ensure_file_exists() {
-  if [ ! -s $1 ]; then
+  if [ ! -s "${1}" ]; then
     die "ERROR: ${1} does not exist!"
   fi
 }
