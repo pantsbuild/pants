@@ -3,8 +3,8 @@
 
 python_library(
   dependencies=[
+    ':resources',
     '3rdparty/python:pex',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks:resources',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks2',
     'src/python/pants/base:exceptions',
@@ -12,4 +12,9 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/util:dirutil',
   ]
+)
+
+resources(
+  name='resources',
+  sources=globs('templates/python_eval/*.mustache'),
 )
