@@ -71,6 +71,8 @@ matrix:
         - SHARD="Test native engine build fix."
       script:
         - ./pants --version
+        - cat src/rust/engine/src/cffi/native_engine.sh
+        - ls -lL $(cut -dI -f2 < src/rust/engine/src/cffi/native_engine.sh | tr -d '"')
       after_success:
         - ./build-support/bin/native/generate-bintray-manifest.sh
 
