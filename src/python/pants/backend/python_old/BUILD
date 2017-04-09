@@ -6,8 +6,9 @@ python_library(
   sources = ['__init__.py', 'register.py'],
   dependencies = [
     'src/python/pants/backend/python:plugin',
-    'src/python/pants/backend/python/tasks:python',  # For isort.
+    'src/python/pants/backend/python/tasks:python',
     'src/python/pants/backend/python/tasks2',
+    'src/python/pants/base:deprecated',
     'src/python/pants/goal:task_registrar',
   ]
 )
