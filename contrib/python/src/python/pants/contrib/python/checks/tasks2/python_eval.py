@@ -41,7 +41,7 @@ class PythonEval(ResolveRequirementsTaskBase):
       self.failed = failed
 
   _EXEC_NAME = '__pants_executable__'
-  _EVAL_TEMPLATE_PATH = os.path.join('..', 'tasks', 'templates', 'python_eval', 'eval.py.mustache')
+  _EVAL_TEMPLATE_PATH = os.path.join('templates', 'python_eval', 'eval.py.mustache')
 
   @classmethod
   def prepare(cls, options, round_manager):
