@@ -62,6 +62,12 @@ function fingerprint_data() {
   openssl sha1 | cut -d' ' -f2
 }
 
+function ensure_file_exists() {
+  if [ ! -s $1 ]; then
+    die "ERROR: ${1} does not exist!"
+  fi
+}
+
 # Prevent bootstrapping failure due to unrecognized flag:
 # https://github.com/pantsbuild/pants/issues/78
 function set_archflags() {
