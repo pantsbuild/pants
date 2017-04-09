@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
 # Indirectly defines:
@@ -78,15 +80,9 @@ EOF
 }
 
 function emit_linux_files() {
-  native_engine_32="$(build_native_code i686-unknown-linux-gnu)"
-  native_engine_64="$(build_native_code x86_64-unknown-linux-gnu)"
   cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${native_engine_32}",
-      "uploadPattern": "build-support/bin/native-engine/linux/i386/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-    },
-    {
-      "includePattern": "${native_engine_64}",
+      "includePattern": "${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}",
       "uploadPattern": "build-support/bin/native-engine/linux/x86_64/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     }
 EOF
