@@ -23,7 +23,7 @@ from pants.engine.selectors import Select, SelectDependencies, SelectProjection,
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
-from pants_test.engine.test_mapper import TargetTable
+from pants_test.engine.util import TargetTable
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
@@ -498,9 +498,9 @@ class RuleGraphMakerTest(unittest.TestCase):
 
   def test_select_transitive_with_separate_types_for_subselectors(self):
     rules = [
-      (Exactly(A), (SelectTransitive(B, C, field_types=(D,)),), noop),
-      (B, (Select(D),), noop),
-      (C, (Select(SubA),), noop)
+      TaskRule(Exactly(A), [SelectTransitive(B, C, field_types=(D,))], noop),
+      TaskRule(B, [Select(D)], noop),
+      TaskRule(C, [Select(SubA)], noop)
     ]
 
     subgraph = self.create_subgraph(A, rules, SubA())
