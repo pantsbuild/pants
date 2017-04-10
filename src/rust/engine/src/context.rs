@@ -3,9 +3,7 @@
 
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use futures_cpupool::{self, CpuPool};
+use std::sync::Arc;
 
 use core::TypeId;
 use externs;
@@ -26,9 +24,6 @@ pub struct Core {
   pub types: Types,
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
-  // TODO: This is a second pool (relative to the VFS pool), upon which all work is
-  // submitted. See https://github.com/pantsbuild/pants/issues/4298
-  pool: RwLock<Option<CpuPool>>,
 }
 
 impl Core {
@@ -73,37 +68,11 @@ impl Core {
         .unwrap_or_else(|e| {
           panic!("Could not initialize VFS: {:?}", e);
         }),
-      pool: RwLock::new(None),
     }
-  }
-
-  pub fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
-    {
-      let pool = self.pool.read().unwrap();
-      if pool.is_some() {
-        return pool;
-      }
-    }
-    // If we get to here, the pool is None and needs re-initializing.
-    {
-      let mut pool = self.pool.write().unwrap();
-      if pool.is_none() {
-        *pool = Some(Core::create_pool());
-      }
-    }
-    self.pool.read().unwrap()
-  }
-
-  fn create_pool() -> CpuPool {
-    futures_cpupool::Builder::new()
-      .name_prefix("engine-")
-      .create()
   }
 
   pub fn pre_fork(&self) {
     self.vfs.pre_fork();
-    let mut pool = self.pool.write().unwrap();
-    *pool = None;
   }
 }
 
@@ -124,7 +93,6 @@ impl Context {
 
 pub trait ContextFactory {
   fn create(&self, entry_id: EntryId) -> Context;
-  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>>;
 }
 
 impl ContextFactory for Context {
@@ -137,9 +105,5 @@ impl ContextFactory for Context {
       entry_id: entry_id,
       core: self.core.clone(),
     }
-  }
-
-  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
-    self.core.pool()
   }
 }

@@ -4,6 +4,65 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.3.0.dev16 (4/08/2017)
+-----------------------
+A weekly unstable release.
+
+This release brings the new `pantsbuild.pants.contrib.jax_ws
+<https://github.com/pantsbuild/pants/tree/master/contrib/jax_ws>`_ plugin that can generate Java
+client stubs from WSDL sources. Thanks to Chris Heisterkamp for this!
+
+The release also pulls in a few fixes for python requirement resolution in the PEX library used by
+pants. In the past, the python-setup.resolver_allow_prereleases configuration option would not
+always be resepected; it now is. Additionally, a longstanding bug in transitive requirement
+resolution that would lead to erroneous 'Ambiguous resolvable' errors has now been fixed. Thanks to
+Todd Gardner and Nathan Butler for these fixes!
+
+New Features
+~~~~~~~~~~~~
+
+* Add JAX-WS plugin to generate client stub files from WSDL files (#4411)
+  `PR #4411 <https://github.com/pantsbuild/pants/pull/4411>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Disable unused deps by default (#4440)
+  `PR #4440 <https://github.com/pantsbuild/pants/pull/4440>`_
+
+* Bump pex version to 1.2.6 (#4442)
+  `PR #4442 <https://github.com/pantsbuild/pants/pull/4442>`_
+
+* Upgrade to pex 1.2.5. (#4434)
+  `PR #4434 <https://github.com/pantsbuild/pants/pull/4434>`_
+
+* Update 3rdparty jars: args4j to 2.33, jsr305 to 3.0.2, easymock to 3.4, burst-junit4 to 1.1.1, commons-io to 2.5, and mockito-core to 2.7.21 (#4421)
+  `PR #4421 <https://github.com/pantsbuild/pants/pull/4421>`_
+
+Bugfixes
+~~~~~~~~
+
+* Default --resolver-allow-prereleases to None. (#4445)
+  `PR #4445 <https://github.com/pantsbuild/pants/pull/4445>`_
+
+* Fully hydrate a BuildGraph for the purposes of ChangedCalculator. (#4424)
+  `PR #4424 <https://github.com/pantsbuild/pants/pull/4424>`_
+
+* Upgrade zinc to `1.0.0-X7` (python portion) (#4419)
+  `Issue #75 <https://github.com/sbt/util/issues/75>`_
+  `Issue #218 <https://github.com/sbt/zinc/issues/218>`_
+  `PR #4419 <https://github.com/pantsbuild/pants/pull/4419>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [engine] New shared impl (#4429)
+  `PR #4429 <https://github.com/pantsbuild/pants/pull/4429>`_
+  `PR #442) <https://github.com/alexcrichton/futures-rs/pull/442)>`_
+
+* Speed up changed task when backed by v2 engine. (#4422)
+  `PR #4422 <https://github.com/pantsbuild/pants/pull/4422>`_
+
 1.3.0.dev15 (4/03/2017)
 -----------------------
 A weekly unstable release, delayed by a week!

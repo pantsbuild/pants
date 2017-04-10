@@ -246,7 +246,7 @@ For python repos, you need to override the following settings in pants.ini:
         "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
       ]
 
-    indices: [
+    indexes: [
         "https://pypi.python.org/simple/"
       ]
 
