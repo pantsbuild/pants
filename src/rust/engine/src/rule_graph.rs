@@ -306,9 +306,6 @@ impl <'t> GraphMaker<'t> {
                                    rules_or_literals_for_selector);
               },
               &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
-              // TODO This is incorrect because SelectTransitive works differently than SelectDependencies.
-              // See line nodes.rs:710, select transitive depends on itself w/ a different subject
-              // // TODO TODO I think ^^ the above todo is incorrect. Need to think it through again.
               &Selector::SelectTransitive(SelectTransitive{ref product, ref dep_product, ref field_types, ..}) => {
                 let initial_selector = *dep_product;
                 let initial_rules_or_literals = rhs_for_select(&self.tasks,
@@ -835,7 +832,7 @@ impl RuleEdges {
     RuleEdges { dependencies: new_deps, selector_to_dependencies: new_selector_deps }
   }
 
-  pub fn entries_for(&self, selectors: &Vec<Selector>) -> Entries {
+  pub fn entries_for(&self, selectors: &[Selector]) -> Entries {
     self.selector_to_dependencies.get(selectors).map(|x|x.clone()).unwrap_or_else(|| Vec::new())
   }
 

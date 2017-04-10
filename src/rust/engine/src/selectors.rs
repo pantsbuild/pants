@@ -44,7 +44,6 @@ pub enum Selector {
   SelectProjection(SelectProjection),
 }
 
-// TODO master removed this
 impl Selector {
   pub fn select(product: TypeConstraint) -> Selector {
     Selector::Select(

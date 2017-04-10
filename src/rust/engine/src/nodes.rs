@@ -418,18 +418,18 @@ impl SelectDependencies {
   ) -> SelectDependencies {
     // filters entries by whether the subject type is the right subject type
     let dep_p_entries = edges.entries_for(
-      &vec![
-      Selector::SelectDependencies(selector.clone()),
-      Selector::select(selector.clone().dep_product)
+      &[
+        Selector::SelectDependencies(selector.clone()),
+        Selector::select(selector.clone().dep_product)
       ]);
     let dep_p_entries = dep_p_entries.into_iter()
       .filter(|e| e.matches_subject_type(subject.type_id().clone()))
       .collect::<Vec<_>>();
 
     let p_entries = edges.entries_for(
-      &vec![
-      Selector::SelectDependencies(selector.clone()),
-      Selector::select(selector.clone().product)
+      &[
+        Selector::SelectDependencies(selector.clone()),
+        Selector::select(selector.clone().product)
       ]);
 
     let p_entries = p_entries.into_iter()
@@ -547,18 +547,18 @@ impl SelectTransitive {
 
     // filters entries by whether the subject type is the right subject type
     let dep_p_entries = edges.entries_for(
-      &vec![
-      Selector::SelectTransitive(selector.clone()),
-      Selector::select(selector.clone().dep_product)
+      &[
+        Selector::SelectTransitive(selector.clone()),
+        Selector::select(selector.clone().dep_product)
       ]);
     let dep_p_entries = dep_p_entries.into_iter()
       .filter(|e| e.matches_subject_type(subject.type_id().clone()))
       .collect::<Vec<_>>();
 
     let p_entries = edges.entries_for(
-      &vec![
-      Selector::SelectTransitive(selector.clone()),
-      Selector::select(selector.clone().product)
+      &[
+        Selector::SelectTransitive(selector.clone()),
+        Selector::select(selector.clone().product)
       ]);
 
     let p_entries = p_entries.into_iter()
@@ -709,21 +709,21 @@ impl SelectProjection {
          variants: Variants,
          edges: &rule_graph::RuleEdges
   ) -> SelectProjection {
-
+    // TODO reduce the duplication here
     // filters entries by whether the subject type is the right subject type
     let dep_p_entries = edges.entries_for(
-      &vec![
-      Selector::SelectProjection(selector.clone()),
-      Selector::select(selector.clone().input_product)
+      &[
+        Selector::SelectProjection(selector.clone()),
+        Selector::select(selector.clone().input_product)
       ]);
     let dep_p_entries = dep_p_entries.into_iter()
       .filter(|e| e.matches_subject_type(subject.type_id().clone()))
       .collect::<Vec<_>>();
 
     let p_entries = edges.entries_for(
-      &vec![
-      Selector::SelectProjection(selector.clone()),
-      Selector::select(selector.clone().product)
+      &[
+        Selector::SelectProjection(selector.clone()),
+        Selector::select(selector.clone().product)
       ]);
 
     let p_entries = p_entries.into_iter()
