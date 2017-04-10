@@ -9,7 +9,7 @@ use core::TypeId;
 use externs;
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
-use rule_graph::RuleGraphContainer;
+use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
 
@@ -20,7 +20,7 @@ use types::Types;
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
-  pub rule_graph: RuleGraphContainer,
+  pub rule_graph: RuleGraph,
   pub types: Types,
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
@@ -52,8 +52,7 @@ impl Core {
       ),
       types.snapshots.clone(),
     );
-    let mut rule_graph = RuleGraphContainer::new();
-    rule_graph.setup(&tasks, root_subject_types);
+    let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
     Core {
       graph: Graph::new(),

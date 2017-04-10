@@ -258,7 +258,7 @@ pub extern fn scheduler_create(
           build_root,
           ignore_patterns,
           work_dir,
-        )
+        ),
       )
     )
   )

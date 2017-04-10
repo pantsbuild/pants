@@ -12,60 +12,6 @@ use externs;
 use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
 use tasks::{Task, Tasks};
 
-pub struct RuleGraphContainer {
-  rule_graph: Option<RuleGraph>
-}
-
-impl RuleGraphContainer {
-  pub fn new() -> RuleGraphContainer {
-    RuleGraphContainer { rule_graph: None }
-  }
-
-  pub fn setup(&mut self, tasks: &Tasks, root_subject_types: Vec<TypeId>) {
-    let maker = GraphMaker::new(tasks, root_subject_types);
-
-    let graph = Some(maker.full_graph());
-    self.rule_graph = graph;
-  }
-
-  pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> { // TODO return Result instead
-    if let Some(ref rule_graph) = self.rule_graph {
-      let root = RootEntry { subject_type: subject_type, clause: vec![selector] };
-      // could do something if None, since we might need to. Or could let caller deal
-      rule_graph.root_dependencies.get(&root).map(|e|e.clone())
-    } else {
-      // this means we need to do subgraph gen. Currently, this just fails,
-      // but we should have it generate a subgraph on the fly for use.
-      panic!("no root edge known here for {} with {}", type_str(subject_type.clone()), selector_str(&selector));
-    }
-  }
-
-  pub fn task_for_inner(&self, entry: &Entry) -> Task {
-    if let &Entry::InnerEntry(ref inner) = entry {
-      inner.rule.clone()
-    } else {
-      panic!("not an inner entry! {:?}", entry)
-    }
-  }
-
-  pub fn edges_for_inner(&self, entry: &Entry) -> Option<RuleEdges> {
-    if let &Entry::InnerEntry(ref inner) = entry {
-      self.edges_for_inner_entry(inner)
-    } else {
-      panic!("not an inner entry! {:?}", entry)
-    }
-  }
-
-  pub fn edges_for_inner_entry(&self, inner_entry: &InnerEntry) -> Option<RuleEdges> {
-    if let Some(ref rule_graph) = self.rule_graph {
-      // could also not clone here, but then I would need to do som other things
-      rule_graph.rule_dependency_edges.get(inner_entry).map(|e| e.clone())
-    } else {
-      panic!("no inner edge known here for {}", entry_str(&Entry::from(inner_entry.clone())));
-    }
-  }
-}
-
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry {
   SubjectIsProduct {
@@ -705,6 +651,37 @@ fn task_display(task: &Task) -> String {
 }
 
 impl RuleGraph {
+  pub fn new(tasks: &Tasks, root_subject_types: Vec<TypeId>) -> RuleGraph {
+    let maker = GraphMaker::new(tasks, root_subject_types);
+
+    maker.full_graph()
+  }
+
+  pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> { // TODO return Result instead
+    let root = RootEntry { subject_type: subject_type, clause: vec![selector] };
+    self.root_dependencies.get(&root).map(|e|e.clone())
+  }
+
+  pub fn task_for_inner(&self, entry: &Entry) -> Task {
+    if let &Entry::InnerEntry(ref inner) = entry {
+      inner.rule.clone()
+    } else {
+      panic!("not an inner entry! {:?}", entry)
+    }
+  }
+
+  pub fn edges_for_inner(&self, entry: &Entry) -> Option<RuleEdges> {
+    if let &Entry::InnerEntry(ref inner) = entry {
+      self.edges_for_inner_entry(inner)
+    } else {
+      panic!("not an inner entry! {:?}", entry)
+    }
+  }
+
+  pub fn edges_for_inner_entry(&self, inner_entry: &InnerEntry) -> Option<RuleEdges> {
+    self.rule_dependency_edges.get(inner_entry).map(|e| e.clone())
+  }
+
   pub fn validate(&self) -> Result<(), String> {
     if self.has_errors() {
       Result::Err(self.build_error_msg())
