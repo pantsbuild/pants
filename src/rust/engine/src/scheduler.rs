@@ -76,24 +76,31 @@ impl Scheduler {
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
-
-    // find the edges for the root in the rule graph
-    // then add a node that contains those edges to the roots
-    // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
-    // TODO up front.
     let edges = self.core.rule_graph.find_root_edges(
       subject.type_id().clone(),
       selectors::Selector::select(product)
     );
+    let edges = edges
+      .expect("Edges to have been found. TODO handle this. Right now, find_root_edges will panic. But we should have a better response.");
+    // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
+    // TODO up front.
+    // TODO Handle the case where the requested root is not in the list of roots that the graph was
+    //      created with.
+    //
+    //      Options
+    //        1. Toss the graph and make a subgraph specific graph, blowing up if that fails.
+    //           I can do this with minimal changes.
+    //        2. Update the graph & check result,
+
+
     self.roots.push(
       Root::Select(Select::new(product,
                                subject,
                                Default::default(),
-                               &edges.expect("Edges to have been found. TODO handle this. Right now, find_root_edges will panic. But we should have a better response."))
+                               &edges)
       )
     );
   }
-
 
   pub fn add_root_select_dependencies(
     &mut self,
@@ -103,14 +110,6 @@ impl Scheduler {
     field: Field,
     field_types: Vec<TypeId>
   ) {
-    // TODO Handle the case where the requested root is not in the list of roots that the graph was
-    //      created with.
-    //
-    //      Options
-    //        1. Toss the graph and make a subgraph specific graph, blowing up if that fails.
-    //           I can do this with minimal changes.
-    //        2. Update the graph & check result,
-
     let selector = selectors::SelectDependencies {
       product: product,
       dep_product: dep_product,
@@ -118,28 +117,18 @@ impl Scheduler {
       field_types: field_types,
     };
 
-    //let mut edges = self.core.rule_graph.find_root_edges(
     let edges = self.core.rule_graph.find_root_edges(
       subject.type_id().clone(),
       selectors::Selector::SelectDependencies(selector.clone()));
-/*
-    if edges.is_none() {
-      self.core.rule_graph.update_graph_with_subgraph_for(
-        subject.type_id().clone(),
-        selectors::Selector::SelectDependencies(selector.clone()));
-      );
-      edges = self.core.rule_graph.find_root_edges(
-      subject.type_id().clone(),
-      selectors::Selector::SelectDependencies(selector.clone()));
-    }
-    */
+    let edges = edges
+      .expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject));
     self.roots.push(
       Root::SelectDependencies(
         SelectDependencies::new(
           selector.clone(),
           subject,
           Default::default(),
-          &edges.expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject))
+          &edges
         )
       )
     );

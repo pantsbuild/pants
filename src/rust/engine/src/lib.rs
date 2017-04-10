@@ -226,41 +226,39 @@ pub extern fn scheduler_create(
     with_tasks(tasks_ptr, |tasks| {
       tasks.clone()
     });
-  let types = Types {
-                construct_snapshot: construct_snapshot,
-                construct_snapshots: construct_snapshots,
-                construct_file_content: construct_file_content,
-                construct_files_content: construct_files_content,
-                construct_path_stat: construct_path_stat,
-                construct_dir: construct_dir,
-                construct_file: construct_file,
-                construct_link: construct_link,
-                address: type_address,
-                has_products: type_has_products,
-                has_variants: type_has_variants,
-                path_globs: type_path_globs,
-                snapshot: type_snapshot,
-                snapshots: type_snapshots,
-                files_content: type_files_content,
-                dir: type_dir,
-                file: type_file,
-                link: type_link,
-                string: type_string,
-                bytes: type_bytes,
-              };
-  let core = Core::new(
-                   root_type_ids.clone(),
-                   tasks,
-                   types,
-                   build_root,
-                   ignore_patterns,
-                   work_dir,
-                 );
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(
     Box::new(
       Scheduler::new(
-        core
+        Core::new(
+          root_type_ids.clone(),
+          tasks,
+          Types {
+            construct_snapshot: construct_snapshot,
+            construct_snapshots: construct_snapshots,
+            construct_file_content: construct_file_content,
+            construct_files_content: construct_files_content,
+            construct_path_stat: construct_path_stat,
+            construct_dir: construct_dir,
+            construct_file: construct_file,
+            construct_link: construct_link,
+            address: type_address,
+            has_products: type_has_products,
+            has_variants: type_has_variants,
+            path_globs: type_path_globs,
+            snapshot: type_snapshot,
+            snapshots: type_snapshots,
+            files_content: type_files_content,
+            dir: type_dir,
+            file: type_file,
+            link: type_link,
+            string: type_string,
+            bytes: type_bytes,
+          },
+          build_root,
+          ignore_patterns,
+          work_dir,
+        )
       )
     )
   )

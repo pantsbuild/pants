@@ -16,9 +16,6 @@ pub struct RuleGraphContainer {
   rule_graph: Option<RuleGraph>
 }
 
-// TODO This is here partly because we can't construct the graph until Tasks is initialized, but
-// scheduler needs to have a handle on the graph before Tasks are initialized.
-// https://github.com/pantsbuild/pants/issues/4375
 impl RuleGraphContainer {
   pub fn new() -> RuleGraphContainer {
     RuleGraphContainer { rule_graph: None }
@@ -31,7 +28,7 @@ impl RuleGraphContainer {
     self.rule_graph = graph;
   }
 
-  pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> {
+  pub fn find_root_edges(&self, subject_type: TypeId, selector: Selector) -> Option<RuleEdges> { // TODO return Result instead
     if let Some(ref rule_graph) = self.rule_graph {
       let root = RootEntry { subject_type: subject_type, clause: vec![selector] };
       // could do something if None, since we might need to. Or could let caller deal
@@ -122,8 +119,8 @@ impl From<RootEntry> for Entry {
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry {
-  pub subject_type: TypeId,
-  pub rule: Task
+  subject_type: TypeId,
+  rule: Task
 }
 
 impl From<InnerEntry> for Entry {

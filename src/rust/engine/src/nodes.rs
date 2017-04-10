@@ -533,7 +533,6 @@ pub struct SelectTransitive {
   pub subject: Key,
   pub variants: Variants,
   pub selector: selectors::SelectTransitive,
-  //edges: rule_graph::RuleEdges
   dep_product_entries: rule_graph::Entries,
   product_entries: rule_graph::Entries
 }
@@ -1062,7 +1061,6 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
-  //edges: rule_graph::RuleEdges
   entry: rule_graph::Entry
 }
 
