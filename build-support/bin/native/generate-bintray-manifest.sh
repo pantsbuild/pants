@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -e
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
 # Indirectly defines:
@@ -21,7 +23,7 @@ source ${REPO_ROOT}/build-support/bin/native/bootstrap.sh
 
 readonly native_engine_version=$(get_native_engine_version)
 
-cat << EOF > ${REPO_ROOT}/native-engine.bintray.json
+cat << __EOF__ > ${REPO_ROOT}/native-engine.bintray.json
 {
   "package": {
     "subject": "pantsbuild",
@@ -51,12 +53,17 @@ cat << EOF > ${REPO_ROOT}/native-engine.bintray.json
   "publish": true,
 
   "files": [
-EOF
+__EOF__
 
 function emit_osx_files() {
+  local readonly cached_bin_path="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+  ensure_file_exists "${cached_bin_path}"
+
   # Rust targets OSX 10.7+ as noted here: https://doc.rust-lang.org/book/getting-started.html#tier-1
   for version in $(get_rust_osx_versions)
   do
+    local cached_link_path="${cached_bin_path}.10.${version}"
+
     if (( ${version} < ${OSX_MAX_VERSION} ))
     then
       local sep=","
@@ -65,31 +72,26 @@ function emit_osx_files() {
     fi
     # It appears to be the case that upload de-dupes on includePattern keys; so we make a unique
     # includePattern per uploadPattern via a symlink here per OSX version.
-    ln -fs \
-      ${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY} \
-      ${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}.10.${version}
-    cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
+    ln -fs "${cached_bin_path}" "${cached_link_path}"
+    cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}.10.${version}",
+      "includePattern": "${cached_link_path}",
       "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     }${sep}
-EOF
+__EOF__
   done
 }
 
 function emit_linux_files() {
-  native_engine_32="$(build_native_code i686-unknown-linux-gnu)"
-  native_engine_64="$(build_native_code x86_64-unknown-linux-gnu)"
-  cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
+  local readonly cached_bin_path="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+  ensure_file_exists "${cached_bin_path}"
+
+  cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
     {
-      "includePattern": "${native_engine_32}",
-      "uploadPattern": "build-support/bin/native-engine/linux/i386/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-    },
-    {
-      "includePattern": "${native_engine_64}",
+      "includePattern": "${cached_bin_path}",
       "uploadPattern": "build-support/bin/native-engine/linux/x86_64/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
     }
-EOF
+__EOF__
 }
 
 if [ "${OS_NAME}" == "mac" ]
@@ -99,7 +101,7 @@ else
   emit_linux_files
 fi
 
-cat << EOF >> ${REPO_ROOT}/native-engine.bintray.json
+cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
   ]
 }
-EOF
+__EOF__
