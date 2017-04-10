@@ -301,6 +301,9 @@ def create_graph_rules(address_mapper, symbol_table_cls):
   """
   symbol_table_constraint = symbol_table_cls.constraint()
   return [
+    TaskRule(BuildFilesCollection,
+             [SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))],
+             BuildFilesCollection),
     # A singleton to provide the AddressMapper.
     SingletonRule(AddressMapper, address_mapper),
     # Support for resolving Structs from Addresses.
