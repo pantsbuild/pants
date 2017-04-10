@@ -215,7 +215,10 @@ class NodeDistribution(object):
     :rtype: :class:`NodeDistribution.Command`
     """
     return self.Command(
-      bin_dir_path=os.path.join(self.yarnpkg_path, 'bin'), executable='yarnpkg', args=args or [])
+      bin_dir_path=(
+        os.path.join(self.path, 'bin') + os.path.pathsep +
+        os.path.join(self.yarnpkg_path, 'bin')
+      ), executable='yarnpkg', args=args or [])
 
   def _create_command(self, executable, args=None):
     return self.Command(os.path.join(self.path, 'bin'), executable, args or [])
