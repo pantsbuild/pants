@@ -29,9 +29,6 @@ class LegacyPythonCallbacksParser(Parser):
   macros and target factories.
   """
 
-  _objects = []
-  _lock = threading.Lock()
-
   @classmethod
   @memoized_method
   def _get_symbols(cls, symbol_table_cls):
@@ -73,7 +70,7 @@ class LegacyPythonCallbacksParser(Parser):
         if name and self._serializable:
           kwargs.setdefault('type_alias', self._type_alias)
           obj = self._object_type(**kwargs)
-          cls._objects.append(obj)
+          parse_context._object_namespace.add(obj)
           return obj
         else:
           return self._object_type(*args, **kwargs)
@@ -115,9 +112,13 @@ class LegacyPythonCallbacksParser(Parser):
     symbols, parse_context = cls._get_symbols(symbol_table_cls)
     python = filecontent
 
-    with cls._lock:
-      # Mutate the parse context for the new path.
-      parse_context._rel_path = os.path.dirname(filepath)
-      del cls._objects[:]
-      six.exec_(python, symbols)
-      return list(cls._objects)
+    # Mutate the parse context for the new path, and clear its (thread local) object_namespace
+    parse_context._rel_path = os.path.dirname(filepath)
+
+    # Then exec, copy the resulting objects, and clear the namespace.
+    six.exec_(python, symbols)
+    resulting_objects = list(parse_context._object_namespace.objects)
+    parse_context._object_namespace.clear()
+
+    # Return resulting objects.
+    return resulting_objects

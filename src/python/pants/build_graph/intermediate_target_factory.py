@@ -63,13 +63,13 @@ class IntermediateTargetFactoryBase(AbstractClass):
       index=hash_str,
     )
 
-    if (name, self._parse_context.rel_path) not in self._targets:
-      self._parse_context.create_object(
-        'target',
-        name=name,
-        dependencies=[address.spec],
-        **self.extra_target_arguments
-      )
-      self._targets.add((name, self._parse_context.rel_path))
+    #if (name, self._parse_context.rel_path) not in self._targets:
+    self._parse_context.create_object(
+      'target',
+      name=name,
+      dependencies=[address.spec],
+      **self.extra_target_arguments
+    )
+    self._targets.add((name, self._parse_context.rel_path))
 
     return ':{}'.format(name)

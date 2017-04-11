@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class BuildConfiguration(object):
   """Stores the types and helper functions exposed to BUILD files."""
 
-  ParseState = namedtuple('ParseState', ['registered_addressable_instances', 'parse_globals'])
+  ParseState = namedtuple('ParseState', ['parse_context', 'parse_globals'])
 
   def __init__(self):
     self._target_by_alias = {}
@@ -144,12 +144,11 @@ class BuildConfiguration(object):
     # asked to be a BuildFileTargetFactory when they are not (in SourceRoot registration context).
     # See: https://github.com/pantsbuild/pants/issues/2125
     type_aliases = self._exposed_object_by_alias.copy()
-
-    registered_addressable_instances = []
+    parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
 
     def create_call_proxy(tgt_type, tgt_alias=None):
       def registration_callback(address, addressable):
-        registered_addressable_instances.append((address, addressable))
+        parse_context._object_namespace.add(addressable, name=address.target_name)
       addressable_factory = self._get_addressable_factory(tgt_type, tgt_alias)
       return AddressableCallProxy(addressable_factory=addressable_factory,
                                   build_file=build_file,
@@ -175,12 +174,10 @@ class BuildConfiguration(object):
         proxy = create_call_proxy(target_type)
         type_aliases[target_type] = proxy
 
-    parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
-
     for alias, object_factory in self._exposed_context_aware_object_factory_by_alias.items():
       parse_globals[alias] = object_factory(parse_context)
 
     for alias, target_macro_factory in self._target_macro_factory_by_alias.items():
       parse_globals[alias] = target_macro_factory.target_macro(parse_context)
 
-    return self.ParseState(registered_addressable_instances, parse_globals)
+    return self.ParseState(parse_context, parse_globals)
