@@ -59,8 +59,7 @@ use externs::{
   StoreBytesExtern,
   TypeIdBuffer,
   ValForExtern,
-  ValToStrExtern,
-  with_vec,
+  ValToStrExtern
 };
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{RootResult, Scheduler, ExecutionStat};
@@ -213,7 +212,9 @@ pub extern fn scheduler_create(
   build_root_buf: Buffer,
   work_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
+  root_type_ids: TypeIdBuffer,
 ) -> *const Scheduler {
+  let root_type_ids = root_type_ids.to_vec();
   let build_root = PathBuf::from(build_root_buf.to_os_string());
   let work_dir = PathBuf::from(work_dir_buf.to_os_string());
   let ignore_patterns =
@@ -230,6 +231,7 @@ pub extern fn scheduler_create(
     Box::new(
       Scheduler::new(
         Core::new(
+          root_type_ids.clone(),
           tasks,
           Types {
             construct_snapshot: construct_snapshot,
@@ -491,44 +493,38 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 #[no_mangle]
 pub extern fn validator_run(
   tasks_ptr: *mut Tasks,
-  subject_types_ptr: *mut TypeId,
-  subject_types_len: u64
+  subject_types: TypeIdBuffer
 ) -> Value {
   with_tasks(tasks_ptr, |tasks| {
-    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let graph_maker = GraphMaker::new(&tasks,
-                                        subject_types.clone());
-      let graph = graph_maker.full_graph();
+    let graph_maker = GraphMaker::new(&tasks,
+                                      subject_types.to_vec());
+    let graph = graph_maker.full_graph();
 
-      match graph.validate() {
-        Result::Ok(_) => {
-          externs::store_list(vec![], false)
-        },
-        Result::Err(msg) => {
-          externs::create_exception(&msg)
-        }
+    match graph.validate() {
+      Result::Ok(_) => {
+        externs::store_list(vec![], false)
+      },
+      Result::Err(msg) => {
+        externs::create_exception(&msg)
       }
-    })
+    }
   })
 }
 
 #[no_mangle]
 pub extern fn rule_graph_visualize(
   scheduler_ptr: *mut Scheduler,
-  subject_types_ptr: *mut TypeId,
-  subject_types_len: u64,
+  subject_types: TypeIdBuffer,
   path_ptr: *const raw::c_char
 ) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    with_vec(subject_types_ptr, subject_types_len as usize, |subject_types| {
-      let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-      let path = PathBuf::from(path_str);
+    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+    let path = PathBuf::from(path_str);
 
-      let graph = graph_full(scheduler, subject_types);
-      write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
-        println!("Failed to visualize to {}: {:?}", path.display(), e);
-      });
-    })
+    let graph = graph_full(scheduler, subject_types.to_vec());
+    write_to_file(path.as_path(), &graph).unwrap_or_else(|e| {
+      println!("Failed to visualize to {}: {:?}", path.display(), e);
+    });
   })
 }
 
@@ -551,8 +547,8 @@ pub extern fn rule_subgraph_visualize(
 }
 
 
-fn graph_full(scheduler: &mut Scheduler, subject_types: &Vec<TypeId>) -> RuleGraph {
-  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types.clone());
+fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
+  let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
 }
 

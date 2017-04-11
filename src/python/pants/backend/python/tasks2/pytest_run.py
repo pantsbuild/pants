@@ -26,10 +26,10 @@ from pants.base.exceptions import TaskError, TestFailedTaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.java.junit.junit_xml_parser import parse_failed_targets, Test, TestRegistry
+from pants.java.junit.junit_xml_parser import Test, TestRegistry, parse_failed_targets
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_open, safe_mkdir_for
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser

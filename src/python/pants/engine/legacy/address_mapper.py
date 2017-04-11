@@ -12,9 +12,7 @@ from pants.base.build_file import BuildFile
 from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.build_files import BuildDirs, BuildFiles
-from pants.engine.fs import Dir
-from pants.engine.selectors import SelectDependencies
+from pants.engine.build_files import BuildFilesCollection
 from pants.util.dirutil import fast_relpath
 
 
@@ -33,9 +31,7 @@ class LegacyAddressMapper(AddressMapper):
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
-    subject = DescendantAddresses(base_path)
-    selector = SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))
-    request = self._scheduler.selection_request([(selector, subject)])
+    request = self._scheduler.execution_request([BuildFilesCollection], [(DescendantAddresses(base_path))])
 
     result = self._engine.execute(request)
     if result.error:
@@ -43,7 +39,7 @@ class LegacyAddressMapper(AddressMapper):
 
     build_files_set = set()
     for state in result.root_products.values():
-      for build_files in state.value:
+      for build_files in state.value.dependencies:
         build_files_set.update(f.path for f in build_files.files_content.dependencies)
 
     return build_files_set

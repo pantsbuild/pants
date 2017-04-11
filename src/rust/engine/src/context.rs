@@ -5,12 +5,13 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use core::TypeId;
 use externs;
 use fs::{PosixFS, Snapshots};
 use graph::{EntryId, Graph};
+use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
-
 
 /**
  * The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -19,6 +20,7 @@ use types::Types;
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
+  pub rule_graph: RuleGraph,
   pub types: Types,
   pub snapshots: Snapshots,
   pub vfs: PosixFS,
@@ -26,6 +28,7 @@ pub struct Core {
 
 impl Core {
   pub fn new(
+    root_subject_types: Vec<TypeId>,
     mut tasks: Tasks,
     types: Types,
     build_root: PathBuf,
@@ -49,10 +52,13 @@ impl Core {
       ),
       types.snapshots.clone(),
     );
+    let rule_graph = RuleGraph::new(&tasks, root_subject_types);
+
     Core {
       graph: Graph::new(),
       tasks: tasks,
       types: types,
+      rule_graph: rule_graph,
       snapshots: snapshots,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
