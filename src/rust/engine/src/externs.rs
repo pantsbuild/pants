@@ -346,6 +346,7 @@ impl ValueBuffer {
 
 // Points to an array of TypeIds.
 #[repr(C)]
+#[derive(Debug)]
 pub struct TypeIdBuffer {
   ids_ptr: *mut TypeId,
   ids_len: u64,

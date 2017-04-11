@@ -182,7 +182,8 @@ Scheduler* scheduler_create(Tasks*,
                             TypeId,
                             Buffer,
                             Buffer,
-                            BufferBuffer);
+                            BufferBuffer,
+                            TypeIdBuffer);
 void scheduler_pre_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
 
@@ -202,9 +203,9 @@ void execution_add_root_select_dependencies(Scheduler*,
 ExecutionStat execution_execute(Scheduler*);
 RawNodes* execution_roots(Scheduler*);
 
-Value validator_run(Tasks*, TypeId*, uint64_t);
+Value validator_run(Tasks*, TypeIdBuffer);
 
-void rule_graph_visualize(Scheduler*, TypeId*, uint64_t, char*);
+void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);
 void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 
 void nodes_destroy(RawNodes*);
@@ -675,11 +676,15 @@ class Native(object):
   def buffer(self, cdata):
     return self.ffi.buffer(cdata)
 
+  def to_ids_buf(self, types):
+    return self.context.type_ids_buf([TypeId(self.context.to_id(t)) for t in types])
+
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
   def new_scheduler(self,
                     tasks,
+                    root_subject_types,
                     build_root,
                     work_dir,
                     ignore_patterns,
@@ -735,5 +740,6 @@ class Native(object):
         self.context.utf8_buf(build_root),
         self.context.utf8_buf(work_dir),
         self.context.utf8_buf_buf(ignore_patterns),
+        self.to_ids_buf(root_subject_types),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
