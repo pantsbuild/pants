@@ -77,13 +77,14 @@ class CompileContext(object):
   """
 
   def __init__(self, target, analysis_file, portable_analysis_file, classes_dir, jar_file,
-               log_file, sources, strict_deps):
+               log_file, zinc_args_file, sources, strict_deps):
     self.target = target
     self.analysis_file = analysis_file
     self.portable_analysis_file = portable_analysis_file
     self.classes_dir = classes_dir
     self.jar_file = jar_file
     self.log_file = log_file
+    self.zinc_args_file = zinc_args_file
     self.sources = sources
     self.strict_deps = strict_deps
 
