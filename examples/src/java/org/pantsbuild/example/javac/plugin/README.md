@@ -88,6 +88,7 @@ java_library(
 
 In order to load a plugin, it has to be on javac's classpath. 
 This can be achieved in one of two ways:
+
 - Have targets that must be compiled with a plugin depend (directly or indirectly) 
 either on the `javac_plugin` target, or on a `jar_library` pointing to a published version
 of the plugin.
