@@ -77,8 +77,8 @@ These are specified like this:
 ```
 java_library(
   ...
-  javac_plugins: ['simple_javac_plugin'],
-  javac_plugin_args: {
+  javac_plugins=['simple_javac_plugin'],
+  javac_plugin_args={
       'simple_javac_plugin': ['arg1', 'arg2']
     }
 )

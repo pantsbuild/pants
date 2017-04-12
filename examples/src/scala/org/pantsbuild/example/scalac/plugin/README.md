@@ -76,8 +76,8 @@ These are specified like this:
 ```
 scala_library(
   ...
-  scalac_plugins: ['simple_scalac_plugin'],
-  scalac_plugin_args: {
+  scalac_plugins=['simple_scalac_plugin'],
+  scalac_plugin_args={
       'simple_scalac_plugin': ['arg1', 'arg2']
     }
 )
