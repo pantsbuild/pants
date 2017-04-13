@@ -113,6 +113,9 @@ class NodeDistribution(object):
     """
     node_package_path = self.unpack_package(
       supportdir=self._supportdir, version=self.version, filename='node.tar.gz')
+    # Todo: https://github.com/pantsbuild/pants/issues/4431
+    # This line depends on repacked node distribution.
+    # Should change it from 'node/bin' to 'dist/bin'
     node_bin_path = os.path.join(node_package_path, 'node', 'bin')
     self._installed_bin_paths.append(node_bin_path)
     return node_bin_path
@@ -144,7 +147,7 @@ class NodeDistribution(object):
       :returns: The full command line used to spawn this command as a list of strings.
       :rtype: list
       """
-      return [self.executable] + self.args
+      return [self.executable] + (self.args or [])
 
     def _prepare_env(self, kwargs):
       """Returns a modifed copy of kwargs['env'], and a copy of kwargs with 'env' removed.
@@ -196,7 +199,7 @@ class NodeDistribution(object):
     # `node` with no arguments is useful, it launches a REPL.
     node_bin_path = self.install_node()
     return self.Command(
-      executable=os.path.join(node_bin_path, 'node'), args=args or [],
+      executable=os.path.join(node_bin_path, 'node'), args=args,
       extra_paths=self.installed_bin_paths)
 
   def npm_command(self, args):
@@ -208,7 +211,7 @@ class NodeDistribution(object):
     """
     node_bin_path = self.install_node()
     return self.Command(
-      executable=os.path.join(node_bin_path, 'npm'), args=args or [],
+      executable=os.path.join(node_bin_path, 'npm'), args=args,
       extra_paths=self.installed_bin_paths)
 
   def yarnpkg_command(self, args):
@@ -221,5 +224,5 @@ class NodeDistribution(object):
     self.install_node()
     yarnpkg_bin_path = self.install_yarnpkg()
     return self.Command(
-      executable=os.path.join(yarnpkg_bin_path, 'yarnpkg'), args=args or [],
+      executable=os.path.join(yarnpkg_bin_path, 'yarnpkg'), args=args,
       extra_paths=self.installed_bin_paths)
