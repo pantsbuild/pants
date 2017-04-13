@@ -57,16 +57,31 @@ class NodeDistributionTest(unittest.TestCase):
     yarnpkg_versions = json.loads(yarnpkg_versions_command.check_output())
     self.assertEqual(yarnpkg_version, yarnpkg_versions['data']['yarn'])
 
-  def test_bin_dir_on_path(self):
-    node_cmd = self.distribution.node_command(args=['--eval', 'console.log(process.env["PATH"])'])
+  def test_node_command_path_injection(self):
+    node_bin_path = self.distribution.install_node()
+    node_path_cmd = self.distribution.node_command(
+      args=['--eval', 'console.log(process.env["PATH"])'])
 
     # Test the case in which we do not pass in env,
     # which should fall back to env=os.environ.copy()
-    output = node_cmd.check_output().strip()
-    self.assertEqual(node_cmd.bin_dir_path, output.split(os.pathsep)[0])
+    injected_paths = node_path_cmd.check_output().strip().split(os.pathsep)
+    self.assertEqual(node_bin_path, injected_paths[0])
 
-    output = node_cmd.check_output(env={'PATH': '/test/path'}).strip()
-    self.assertEqual(node_cmd.bin_dir_path + os.path.pathsep + '/test/path', output)
+  def test_node_command_path_injection_with_overrided_path(self):
+    node_bin_path = self.distribution.install_node()
+    node_path_cmd = self.distribution.node_command(
+      args=['--eval', 'console.log(process.env["PATH"])'])
+    injected_paths = node_path_cmd.check_output(
+      env={'PATH': '/test/path'}
+    ).strip().split(os.pathsep)
+    self.assertEqual(node_bin_path, injected_paths[0])
+    self.assertListEqual([node_bin_path, '/test/path'], injected_paths)
 
-    output = node_cmd.check_output(env={'PATH': ''}).strip()
-    self.assertEqual(node_cmd.bin_dir_path, output)
+  def test_node_command_path_injection_with_empty_path(self):
+    node_bin_path = self.distribution.install_node()
+    node_path_cmd = self.distribution.node_command(
+      args=['--eval', 'console.log(process.env["PATH"])'])
+    injected_paths = node_path_cmd.check_output(
+      env={'PATH': ''}
+    ).strip().split(os.pathsep)
+    self.assertListEqual([node_bin_path, ''], injected_paths)

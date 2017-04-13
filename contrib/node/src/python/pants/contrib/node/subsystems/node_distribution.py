@@ -200,7 +200,7 @@ class NodeDistribution(object):
     node_bin_path = self.install_node()
     return self.Command(
       executable=os.path.join(node_bin_path, 'node'), args=args,
-      extra_paths=self.installed_bin_paths)
+      extra_paths=[node_bin_path])
 
   def npm_command(self, args):
     """Creates a command that can run `npm`, passing the given args to it.
@@ -212,7 +212,7 @@ class NodeDistribution(object):
     node_bin_path = self.install_node()
     return self.Command(
       executable=os.path.join(node_bin_path, 'npm'), args=args,
-      extra_paths=self.installed_bin_paths)
+      extra_paths=[node_bin_path])
 
   def yarnpkg_command(self, args):
     """Creates a command that can run `yarnpkg`, passing the given args to it.
@@ -221,8 +221,8 @@ class NodeDistribution(object):
     :returns: An `yarnpkg` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
-    self.install_node()
+    node_bin_path = self.install_node()
     yarnpkg_bin_path = self.install_yarnpkg()
     return self.Command(
       executable=os.path.join(yarnpkg_bin_path, 'yarnpkg'), args=args,
-      extra_paths=self.installed_bin_paths)
+      extra_paths=[yarnpkg_bin_path, node_bin_path])
