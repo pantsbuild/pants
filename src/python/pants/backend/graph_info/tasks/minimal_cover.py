@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.task.console_task import ConsoleTask
 from pants.build_graph.target import Target
+from pants.task.console_task import ConsoleTask
 
 
 class MinimalCover(ConsoleTask):
