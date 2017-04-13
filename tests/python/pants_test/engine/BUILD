@@ -144,6 +144,7 @@ python_tests(
   sources=['test_mapper.py'],
   dependencies=[
     ':scheduler_test_base',
+    ':util',
     'src/python/pants/build_graph',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:storage',
@@ -169,7 +170,7 @@ python_tests(
   coverage=['pants.engine.rules'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':mapper',
+    ':util',
     ':scheduler_test_base',
     'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:build_files',

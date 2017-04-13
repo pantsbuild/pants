@@ -43,3 +43,14 @@ pub enum Selector {
   SelectTransitive(SelectTransitive),
   SelectProjection(SelectProjection),
 }
+
+impl Selector {
+  pub fn select(product: TypeConstraint) -> Selector {
+    Selector::Select(
+      Select {
+        product: product,
+        variant_key: None,
+      }
+    )
+  }
+}

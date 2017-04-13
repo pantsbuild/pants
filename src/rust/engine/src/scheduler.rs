@@ -12,6 +12,7 @@ use core::{Failure, Field, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
 use nodes::{NodeKey, Select, SelectDependencies};
+use rule_graph;
 use selectors;
 
 /**
@@ -75,8 +76,16 @@ impl Scheduler {
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
+    let edges = self.find_root_edges_or_update_rule_graph(
+      subject.type_id().clone(),
+      selectors::Selector::select(product)
+    );
     self.roots.push(
-      Root::Select(Select::new(product, subject, Default::default()))
+      Root::Select(Select::new(product,
+                               subject,
+                               Default::default(),
+                               &edges)
+      )
     );
   }
 
@@ -88,20 +97,43 @@ impl Scheduler {
     field: Field,
     field_types: Vec<TypeId>
   ) {
+    let selector = selectors::SelectDependencies {
+      product: product,
+      dep_product: dep_product,
+      field: field,
+      field_types: field_types,
+    };
+
+    let edges = self.find_root_edges_or_update_rule_graph(
+      subject.type_id().clone(),
+      selectors::Selector::SelectDependencies(selector.clone()));
     self.roots.push(
       Root::SelectDependencies(
         SelectDependencies::new(
-          selectors::SelectDependencies {
-            product: product,
-            dep_product: dep_product,
-            field: field,
-            field_types: field_types
-          },
+          selector.clone(),
           subject,
           Default::default(),
+          &edges
         )
       )
     );
+  }
+
+  fn find_root_edges_or_update_rule_graph(&self, subject_type: TypeId, selector: selectors::Selector) -> rule_graph::RuleEdges {
+    // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
+    // TODO up front.
+    // TODO Handle the case where the requested root is not in the list of roots that the graph was
+    //      created with.
+    //
+    //      Options
+    //        1. Toss the graph and make a subgraph specific graph, blowing up if that fails.
+    //           I can do this with minimal changes.
+    //        2. Update the graph & check result,
+
+    self.core.rule_graph.find_root_edges(
+      subject_type.clone(),
+      selector.clone()
+    ).expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject_type))
   }
 
   /**

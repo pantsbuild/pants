@@ -14,8 +14,8 @@ from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
 from pants.build_graph.address import Address
-from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Exactly,
-                                      TypeConstraintError)
+from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Collection,
+                                      Exactly, TypeConstraintError)
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
@@ -290,6 +290,9 @@ def _recursive_dirname(f):
   yield ''
 
 
+BuildFilesCollection = Collection.of(BuildFiles)
+
+
 def create_graph_rules(address_mapper, symbol_table_cls):
   """Creates tasks used to parse Structs from BUILD files.
 
@@ -298,6 +301,9 @@ def create_graph_rules(address_mapper, symbol_table_cls):
   """
   symbol_table_constraint = symbol_table_cls.constraint()
   return [
+    TaskRule(BuildFilesCollection,
+             [SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))],
+             BuildFilesCollection),
     # A singleton to provide the AddressMapper.
     SingletonRule(AddressMapper, address_mapper),
     # Support for resolving Structs from Addresses.
