@@ -88,8 +88,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
                   "profiles later.")
     register('--options', type=list, help='Pass these options to pytest.')
     register('--coverage',
-             help='Emit coverage information for specified paths/modules. Value has two forms: '
-                  '"module:list,of,modules" or "path:list,of,paths"')
+             help='Emit coverage information for specified packages or directories (absolute or'
+                  'relative to the build root).  The special value "auto" indicates that Pants '
+                  'should attempt to deduce which packages to emit coverage for.')
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to.'
              'If not specified, a default within dist is used.')
@@ -248,33 +249,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     return cp
 
   @contextmanager
-  def _cov_setup(self, targets, chroot, coverage_modules=None):
-    def compute_coverage_modules(tgt):
-      if tgt.coverage:
-        return tgt.coverage
-      else:
-        # This makes the assumption that tests/python/<target> will be testing src/python/<target>.
-        # Note in particular that this doesn't work for pants' own tests, as those are under
-        # the top level package 'pants_tests', rather than just 'pants'.
-        # TODO(John Sirois): consider failing fast if there is no explicit coverage scheme; but also
-        # consider supporting configuration of a global scheme whether that be parallel
-        # dirs/packages or some arbitrary function that can be registered that takes a test target
-        # and hands back the source packages or paths under test.
-        return set(os.path.dirname(source).replace(os.sep, '.')
-                   for source in tgt.sources_relative_to_source_root())
-
-    if coverage_modules is None:
-      coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
-
-    def is_python_lib(tgt):
-      return tgt.has_sources('.py') and not isinstance(tgt, PythonTests)
-
-    source_mappings = {}
-    for target in targets:
-      libs = (tgt for tgt in target.closure() if is_python_lib(tgt))
-      for lib in libs:
-        source_mappings[lib.target_base] = [chroot]
-
+  def _cov_setup(self, source_mappings, coverage_sources=None):
     cp = self._generate_coverage_config(source_mappings=source_mappings)
     # Note that it's important to put the tmpdir under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
@@ -286,7 +261,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       # Note that --cov-report= with no value turns off terminal reporting, which
       # we handle separately.
       args = ['--cov-report=', '--cov-config', coverage_rc]
-      for module in coverage_modules:
+      for module in coverage_sources:
         args.extend(['--cov', module])
       yield args, coverage_rc
 
@@ -297,22 +272,62 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       yield []
       return
 
-    def read_coverage_list(prefix):
-      return coverage[len(prefix):].split(',')
-
     pex_src_root = os.path.relpath(
       self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
-    coverage_modules = None
-    if coverage.startswith('modules:'):
-      coverage_modules = read_coverage_list('modules:')
-    elif coverage.startswith('paths:'):
-      coverage_modules = []
-      for path in read_coverage_list('paths:'):
-        coverage_modules.append(path)
 
-    with self._cov_setup(targets,
-                         pex_src_root,
-                         coverage_modules=coverage_modules) as (args, coverage_rc):
+    source_mappings = {}
+    for target in targets:
+      libs = (tgt for tgt in target.closure()
+              if tgt.has_sources('.py') and not isinstance(tgt, PythonTests))
+      for lib in libs:
+        source_mappings[lib.target_base] = [pex_src_root]
+
+    def ensure_trailing_sep(path):
+      return path if path.endswith(os.path.sep) else path + os.path.sep
+
+    if coverage == 'auto':
+      def compute_coverage_sources(tgt):
+        if tgt.coverage:
+          return tgt.coverage
+        else:
+          # This makes the assumption that tests/python/<tgt> will be testing src/python/<tgt>.
+          # Note in particular that this doesn't work for pants' own tests, as those are under
+          # the top level package 'pants_tests', rather than just 'pants'.
+          # TODO(John Sirois): consider failing fast if there is no explicit coverage scheme;
+          # but also  consider supporting configuration of a global scheme whether that be parallel
+          # dirs/packages or some arbitrary function that can be registered that takes a test target
+          # and hands back the source packages or paths under test.
+          return set(os.path.dirname(s).replace(os.sep, '.')
+                     for s in tgt.sources_relative_to_source_root())
+      coverage_sources = set(itertools.chain(*[compute_coverage_sources(t) for t in targets]))
+    else:
+      coverage_sources = []
+      for source in coverage.split(','):
+        if os.path.isdir(source):
+          # The source is a dir, so correct its prefix for the chroot.
+          # E.g. if source is /path/to/src/python/foo/bar or src/python/foo/bar then
+          # rel_source is src/python/foo/bar, and ...
+          rel_source = os.path.relpath(source, get_buildroot())
+          rel_source = ensure_trailing_sep(rel_source)
+          found_target_base = False
+          for target_base in source_mappings:
+            prefix = ensure_trailing_sep(target_base)
+            if rel_source.startswith(prefix):
+              # ... rel_source will match on prefix=src/python/ ...
+              suffix = rel_source[len(prefix):]
+              # ... suffix will equal foo/bar ...
+              coverage_sources.append(os.path.join(pex_src_root, suffix))
+              found_target_base = True
+              # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
+              break
+          if not found_target_base:
+            self.context.log.warn('Coverage path {} is not in any target. Skipping.'.format(source))
+        else:
+          # The source is to be interpreted as a package name.
+          coverage_sources.append(source)
+
+    with self._cov_setup(source_mappings,
+                         coverage_sources=coverage_sources) as (args, coverage_rc):
       try:
         yield args
       finally:

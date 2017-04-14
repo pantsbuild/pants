@@ -339,14 +339,11 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.assertTrue(os.path.isfile(data_file))
     coverage_data = coverage.coverage(data_file=data_file)
     coverage_data.load()
-    coverage_data.report()
     _, all_statements, not_run_statements, _ = coverage_data.analysis(path)
     return all_statements, not_run_statements
 
-  def test_coverage_simple_option(self):
-    # TODO(John Sirois): Consider eliminating support for "simple" coverage or at least formalizing
-    # the coverage option value that turns this on to "1" or "all" or "simple" = anything formal.
-    simple_coverage_kwargs = {'coverage': '1'}
+  def test_coverage_auto_option(self):
+    simple_coverage_kwargs = {'coverage': 'auto'}
 
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
@@ -382,9 +379,9 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_coverage_modules_dne_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    # modules: should trump .coverage
+    # Explicit modules should trump .coverage.
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
-                           coverage='modules:does_not_exist,nor_does_this')
+                           coverage='does_not_exist,nor_does_this')
     all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
@@ -392,25 +389,15 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
   def test_coverage_modules_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='modules:core')
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='core')
     all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
-  def test_coverage_paths_dne_option(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-
-    # paths: should trump .coverage
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
-                           coverage='paths:does_not_exist/,nor_does_this/')
-    all_statements, not_run_statements = self.load_coverage_data()
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([1, 2, 5, 6], not_run_statements)
-
   def test_coverage_paths_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='paths:lib/')
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='lib/')
     all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)

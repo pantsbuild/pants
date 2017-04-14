@@ -20,7 +20,6 @@ from six import StringIO
 from six.moves import configparser
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
@@ -69,10 +68,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   """
   :API: public
   """
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
 
   @classmethod
   def register_options(cls, register):
@@ -402,8 +397,15 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
-    testing_reqs = [PythonRequirement(s)
-                    for s in PyTest.global_instance().get_requirement_strings()]
+    # We hard-code the requirements here because they can't be upgraded without
+    # major changes to this code, and the PyTest subsystem now contains the versions
+    # for the new PytestRun task.  This one is about to be deprecated anyway.
+    testing_reqs = [PythonRequirement(s) for s in [
+      'pytest>=2.6,<2.7',
+      'pytest-timeout<1.0.0',
+      'pytest-cov>=1.8,<1.9',
+      'unittest2>=0.6.0,<=1.9.0',
+    ]]
 
     chroot = self.cached_chroot(interpreter=interpreter,
                                 pex_info=pex_info,
