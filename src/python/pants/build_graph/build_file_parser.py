@@ -10,6 +10,8 @@ import warnings
 
 import six
 
+from pants.build_graph.address import BuildFileAddress
+
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +153,7 @@ class BuildFileParser(object):
                            build_file=build_file,
                            name=name))
       if name in name_map:
-        raise self.AddressableConflictException( 
+        raise self.AddressableConflictException(
           "File {conflicting_file} defines address '{target_name}' more than once."
           .format(conflicting_file=build_file,
                   target_name=name))
@@ -159,9 +161,11 @@ class BuildFileParser(object):
 
     logger.debug("{build_file} produced the following Addressables:"
                  .format(build_file=build_file))
+    address_map = {}
     for name, addressable in name_map.items():
+      address_map[BuildFileAddress(build_file=build_file, target_name=name)] = addressable
       logger.debug("  * {name}: {addressable}"
                    .format(name=name,
                            addressable=addressable))
-    
+
     return address_map
