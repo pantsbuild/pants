@@ -6,7 +6,6 @@ python_library(
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    '3rdparty/python:coverage',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     '3rdparty/python:six',
