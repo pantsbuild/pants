@@ -146,7 +146,7 @@ class BuildFileParser(object):
                               .format(message=e, build_file=build_file))
 
     name_map = {}
-    for addressable in parse_state.parse_context.objects:
+    for addressable in parse_state.objects:
       name = addressable.addressed_name
       logger.debug('Adding {addressable} to the BuildFileParser address map for {build_file} with {name}'
                    .format(addressable=addressable,

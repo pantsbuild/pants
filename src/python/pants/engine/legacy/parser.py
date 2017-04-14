@@ -70,7 +70,7 @@ class LegacyPythonCallbacksParser(Parser):
         if name and self._serializable:
           kwargs.setdefault('type_alias', self._type_alias)
           obj = self._object_type(**kwargs)
-          parse_context._object_namespace.add(obj)
+          parse_context._storage.add(obj)
           return obj
         else:
           return self._object_type(*args, **kwargs)
@@ -112,13 +112,7 @@ class LegacyPythonCallbacksParser(Parser):
     symbols, parse_context = cls._get_symbols(symbol_table_cls)
     python = filecontent
 
-    # Mutate the parse context for the new path, and clear its (thread local) object_namespace
-    parse_context._rel_path = os.path.dirname(filepath)
-
-    # Then exec, copy the resulting objects, and clear the namespace.
+    # Mutate the parse context for the new path, then exec, and copy the resulting objects.
+    parse_context._storage.clear(os.path.dirname(filepath))
     six.exec_(python, symbols)
-    resulting_objects = list(parse_context._object_namespace.objects)
-    parse_context._object_namespace.clear()
-
-    # Return resulting objects.
-    return resulting_objects
+    return list(parse_context._storage.objects)

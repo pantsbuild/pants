@@ -25,7 +25,7 @@ class BuildConfiguration(object):
   class ParseState(namedtuple('ParseState', ['parse_context', 'parse_globals'])):
     @property
     def objects(self):
-      return self.parse_context._object_namespace.objects
+      return self.parse_context._storage.objects
 
   def __init__(self):
     self._target_by_alias = {}
@@ -151,7 +151,7 @@ class BuildConfiguration(object):
 
     def create_call_proxy(tgt_type, tgt_alias=None):
       def registration_callback(address, addressable):
-        parse_context._object_namespace.add(addressable, name=address.target_name)
+        parse_context._storage.add(addressable, name=address.target_name)
       addressable_factory = self._get_addressable_factory(tgt_type, tgt_alias)
       return AddressableCallProxy(addressable_factory=addressable_factory,
                                   build_file=build_file,

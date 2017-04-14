@@ -9,11 +9,12 @@ import functools
 import threading
 
 
-class ObjectNamespace(threading.local):
-  def __init__(self):
-    self.clear()
+class Storage(threading.local):
+  def __init__(self, rel_path):
+    self.clear(rel_path)
 
-  def clear(self):
+  def clear(self, rel_path):
+    self.rel_path = rel_path
     self.objects_by_name = dict()
     self.objects = []
 
@@ -48,9 +49,8 @@ class ParseContext(object):
       constructor for the alias.
     """
 
-    self._rel_path = rel_path
     self._type_aliases = type_aliases
-    self._object_namespace = ObjectNamespace()
+    self._storage = Storage(rel_path)
 
   def create_object(self, alias, *args, **kwargs):
     """Constructs the type with the given alias using the given args and kwargs.
@@ -90,7 +90,7 @@ class ParseContext(object):
                                     name=name,
                                     *args,
                                     **kwargs)
-    return self._object_namespace.add_if_not_exists(name, obj_creator)
+    return self._storage.add_if_not_exists(name, obj_creator)
 
   @property
   def rel_path(self):
@@ -100,4 +100,4 @@ class ParseContext(object):
 
     :rtype string
     """
-    return self._rel_path
+    return self._storage.rel_path
