@@ -85,7 +85,6 @@ class NodeDistribution(object):
     self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
     logger.debug('Node.js version: %s package manager from config: %s',
                  self._version, package_manager)
-    self._installed_bin_paths = []
 
   @property
   def version(self):
@@ -117,7 +116,6 @@ class NodeDistribution(object):
     # This line depends on repacked node distribution.
     # Should change it from 'node/bin' to 'dist/bin'
     node_bin_path = os.path.join(node_package_path, 'node', 'bin')
-    self._installed_bin_paths.append(node_bin_path)
     return node_bin_path
 
   @memoized_method
@@ -130,12 +128,7 @@ class NodeDistribution(object):
     yarnpkg_package_path = self.unpack_package(
       supportdir='bin/yarnpkg', version=self.yarnpkg_version, filename='yarnpkg.tar.gz')
     yarnpkg_bin_path = os.path.join(yarnpkg_package_path, 'dist', 'bin')
-    self._installed_bin_paths.append(yarnpkg_bin_path)
     return yarnpkg_bin_path
-
-  @property
-  def installed_bin_paths(self):
-    return self._installed_bin_paths
 
   class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
     """Describes a command to be run using a Node distribution."""
