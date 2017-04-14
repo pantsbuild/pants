@@ -11,7 +11,6 @@ from pants.task.console_task import ConsoleTask
 
 
 # TODO: Remove this entire file in 1.5.0dev0.
-
 class WhatChanged(ConsoleTask):
   """Emits the targets that have been modified since a given commit."""
 
