@@ -43,14 +43,14 @@ class BuildConfigurationTest(unittest.TestCase):
     with self._create_mock_build_file('fred') as build_file:
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(0, len(parse_state.objects))
       self.assertEqual(1, len(parse_state.parse_globals))
 
       target_call_proxy = parse_state.parse_globals['fred']
       target_call_proxy(name='jake')
 
-      self.assertEqual(1, len(parse_state.registered_addressable_instances))
-      name, target_proxy = parse_state.registered_addressable_instances.pop()
+      self.assertEqual(1, len(parse_state.objects))
+      target_proxy = parse_state.objects[0]
       self.assertEqual('jake', target_proxy.addressed_name)
       self.assertEqual(Fred, target_proxy.addressed_type)
 
@@ -85,14 +85,14 @@ class BuildConfigurationTest(unittest.TestCase):
     with self._create_mock_build_file('fred') as build_file:
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(0, len(parse_state.objects))
       self.assertEqual(1, len(parse_state.parse_globals))
 
       target_call_proxy = parse_state.parse_globals['fred']
       target_call_proxy(name='jake')
 
-      self.assertEqual(1, len(parse_state.registered_addressable_instances))
-      name, target_proxy = parse_state.registered_addressable_instances.pop()
+      self.assertEqual(1, len(parse_state.objects))
+      target_proxy = parse_state.objects[0]
       self.assertEqual('frog', target_proxy.addressed_name)
       self.assertEqual(Fred, target_proxy.addressed_type)
       self.assertEqual(['jake'], target_proxy.dependency_specs)
@@ -109,7 +109,7 @@ class BuildConfigurationTest(unittest.TestCase):
     with self._create_mock_build_file('jane') as build_file:
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(0, len(parse_state.objects))
       self.assertEqual(1, len(parse_state.parse_globals))
       self.assertEqual(42, parse_state.parse_globals['jane'])
 
@@ -169,7 +169,7 @@ class BuildConfigurationTest(unittest.TestCase):
       build_file = BuildFile(FileSystemProjectTree(root), 'george/BUILD')
       parse_state = self.build_configuration.initialize_parse_state(build_file)
 
-      self.assertEqual(0, len(parse_state.registered_addressable_instances))
+      self.assertEqual(0, len(parse_state.objects))
       self.assertEqual(1, len(parse_state.parse_globals))
       yield parse_state.parse_globals['george']
 
