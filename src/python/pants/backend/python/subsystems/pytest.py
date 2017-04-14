@@ -14,11 +14,9 @@ class PyTest(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PyTest, cls).register_options(register)
-    register('--requirements', advanced=True, default='pytest>=2.6,<2.7',
+    register('--requirements', advanced=True, default='pytest>=2.9,<2.10',
              help='Requirements string for the pytest library.')
-    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
-    #   https://github.com/pantsbuild/pants/issues/2566
-    register('--timeout-requirements', advanced=True, default='pytest-timeout<1.0.0',
+    register('--timeout-requirements', advanced=True, default='pytest-timeout>=1.0,<1.1',
              help='Requirements string for the pytest-timeout library.')
     register('--cov-requirements', advanced=True, default='pytest-cov>=1.8,<1.9',
              help='Requirements string for the pytest-cov library.')
