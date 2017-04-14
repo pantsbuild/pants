@@ -191,7 +191,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
     ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
-      --coverage=paths:pants/ \
+      --coverage=pants/ \
       --test-pytest-test-shard=${python_unit_shard} \
       --compile-python-eval-skip \
       tests/python::
