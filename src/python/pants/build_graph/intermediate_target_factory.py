@@ -24,14 +24,8 @@ def hash_target(address, suffix):
 class IntermediateTargetFactoryBase(AbstractClass):
   """Convenience factory which constructs an intermediate target with the appropriate attributes."""
 
-  _targets = set()
-
   class ExpectedAddressError(TargetDefinitionException):
     """Thrown if an object that is not an address is used as the dependency spec."""
-
-  @classmethod
-  def reset(cls):
-    cls._targets.clear()
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
@@ -63,13 +57,11 @@ class IntermediateTargetFactoryBase(AbstractClass):
       index=hash_str,
     )
 
-    #if (name, self._parse_context.rel_path) not in self._targets:
-    self._parse_context.create_object(
+    self._parse_context.create_object_if_not_exists(
       'target',
       name=name,
       dependencies=[address.spec],
       **self.extra_target_arguments
     )
-    self._targets.add((name, self._parse_context.rel_path))
 
     return ':{}'.format(name)
