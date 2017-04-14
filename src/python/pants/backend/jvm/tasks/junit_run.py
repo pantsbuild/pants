@@ -25,7 +25,7 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TargetDefinitionException, TaskError, ErrorWhileTesting
+from pants.base.exceptions import ErrorWhileTesting, TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes

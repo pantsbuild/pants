@@ -9,6 +9,7 @@ from pants.base.deprecated import deprecated
 from pants.scm.subsystems.changed import Changed
 from pants.task.console_task import ConsoleTask
 
+
 # TODO: Remove this entire file in 1.5.0dev0.
 
 class WhatChanged(ConsoleTask):
