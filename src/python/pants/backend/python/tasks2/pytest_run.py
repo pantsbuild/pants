@@ -22,7 +22,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError, ErrorWhileTesting
+from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
