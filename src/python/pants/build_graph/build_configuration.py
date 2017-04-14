@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 class BuildConfiguration(object):
   """Stores the types and helper functions exposed to BUILD files."""
 
-  ParseState = namedtuple('ParseState', ['parse_context', 'parse_globals'])
+  class ParseState(namedtuple('ParseState', ['parse_context', 'parse_globals'])):
+    @property
+    def objects(self):
+      return self.parse_context._object_namespace.objects
 
   def __init__(self):
     self._target_by_alias = {}
