@@ -22,14 +22,13 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
-from pants.java.junit.junit_xml_parser import Test, TestRegistry, parse_failed_targets
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
@@ -89,8 +88,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
                   "profiles later.")
     register('--options', type=list, help='Pass these options to pytest.')
     register('--coverage',
-             help='Emit coverage information for specified paths/modules. Value has two forms: '
-                  '"module:list,of,modules" or "path:list,of,paths"')
+             help='Emit coverage information for specified packages or directories (absolute or'
+                  'relative to the build root).  The special value "auto" indicates that Pants '
+                  'should attempt to deduce which packages to emit coverage for.')
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to.'
              'If not specified, a default within dist is used.')
@@ -134,7 +134,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def run_tests(self, targets, workunit):
     result = self._do_run_tests(targets, workunit)
     if not result.success:
-      raise TestFailedTaskError(failed_targets=result.failed_targets)
+      raise ErrorWhileTesting(failed_targets=result.failed_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
@@ -153,7 +153,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         yield []
         return
 
-      with temporary_dir() as tmp:
+      # Note that it's important to put the tmpdir under the workdir, because pytest
+      # uses all arguments that look like paths to compute its rootdir, and we want
+      # it to pick the buildroot.
+      with temporary_dir(root_dir=self.workdir) as tmp:
         path = os.path.join(tmp, 'conftest.py')
         with open(path, 'w') as fp:
           fp.write(dedent("""
@@ -246,61 +249,21 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     return cp
 
   @contextmanager
-  def _cov_setup(self, targets, chroot, coverage_modules=None):
-    def compute_coverage_modules(tgt):
-      if tgt.coverage:
-        return tgt.coverage
-      else:
-        # This makes the assumption that tests/python/<target> will be testing src/python/<target>.
-        # Note in particular that this doesn't work for pants' own tests, as those are under
-        # the top level package 'pants_tests', rather than just 'pants'.
-        # TODO(John Sirois): consider failing fast if there is no explicit coverage scheme; but also
-        # consider supporting configuration of a global scheme whether that be parallel
-        # dirs/packages or some arbitrary function that can be registered that takes a test target
-        # and hands back the source packages or paths under test.
-        return set(os.path.dirname(source).replace(os.sep, '.')
-                   for source in tgt.sources_relative_to_source_root())
-
-    if coverage_modules is None:
-      coverage_modules = set(itertools.chain(*[compute_coverage_modules(t) for t in targets]))
-
-    # Hack in turning off pytest_cov reporting to the console - we want control this ourselves.
-    # Take the approach of registering a plugin that replaces the pycov plugin's
-    # `pytest_terminal_summary` callback with a noop.
-    with temporary_dir() as plugin_root:
-      plugin_root = os.path.realpath(plugin_root)
-      with safe_open(os.path.join(plugin_root, 'pants_reporter.py'), 'w') as fp:
-        fp.write(dedent("""
-          def pytest_configure(__multicall__, config):
-            # This executes the rest of the pytest_configures ensuring the `pytest_cov` plugin is
-            # registered so we can grab it below.
-            __multicall__.execute()
-            pycov = config.pluginmanager.getplugin('_cov')
-            # Squelch console reporting
-            pycov.pytest_terminal_summary = lambda *args, **kwargs: None
-        """))
-
-      pythonpath = os.environ.get('PYTHONPATH')
-      existing_pythonpath = pythonpath.split(os.pathsep) if pythonpath else []
-      with environment_as(PYTHONPATH=os.pathsep.join(existing_pythonpath + [plugin_root])):
-        def is_python_lib(tgt):
-          return tgt.has_sources('.py') and not isinstance(tgt, PythonTests)
-
-        source_mappings = {}
-        for target in targets:
-          libs = (tgt for tgt in target.closure() if is_python_lib(tgt))
-          for lib in libs:
-            source_mappings[lib.target_base] = [chroot]
-
-        cp = self._generate_coverage_config(source_mappings=source_mappings)
-        with temporary_file() as fp:
-          cp.write(fp)
-          fp.close()
-          coverage_rc = fp.name
-          args = ['-p', 'pants_reporter', '-p', 'pytest_cov', '--cov-config', coverage_rc]
-          for module in coverage_modules:
-            args.extend(['--cov', module])
-          yield args, coverage_rc
+  def _cov_setup(self, source_mappings, coverage_sources=None):
+    cp = self._generate_coverage_config(source_mappings=source_mappings)
+    # Note that it's important to put the tmpdir under the workdir, because pytest
+    # uses all arguments that look like paths to compute its rootdir, and we want
+    # it to pick the buildroot.
+    with temporary_file(root_dir=self.workdir) as fp:
+      cp.write(fp)
+      fp.close()
+      coverage_rc = fp.name
+      # Note that --cov-report= with no value turns off terminal reporting, which
+      # we handle separately.
+      args = ['--cov-report=', '--cov-config', coverage_rc]
+      for module in coverage_sources:
+        args.extend(['--cov', module])
+      yield args, coverage_rc
 
   @contextmanager
   def _maybe_emit_coverage_data(self, targets, pex, workunit):
@@ -309,34 +272,62 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       yield []
       return
 
-    def read_coverage_list(prefix):
-      return coverage[len(prefix):].split(',')
+    pex_src_root = os.path.relpath(
+      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
 
-    coverage_modules = None
-    if coverage.startswith('modules:'):
-      # NB: pytest-cov maps these modules to the `[run] sources` config.  So for
-      # `modules:pants.base,pants.util` the config emitted has:
-      # [run]
-      # source =
-      #   pants.base
-      #   pants.util
-      #
-      # Now even though these are not paths, coverage sees the dots and switches to a module
-      # prefix-matching mode.  Unfortunately, neither wildcards nor top-level module prefixes
-      # like `pants.` serve to engage this module prefix-matching as one might hope.  It
-      # appears that `pants.` is treated as a path and `pants.*` is treated as a literal
-      # module prefix name.
-      coverage_modules = read_coverage_list('modules:')
-    elif coverage.startswith('paths:'):
-      coverage_modules = []
-      pex_src_root = os.path.relpath(
-        self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
-      for path in read_coverage_list('paths:'):
-        coverage_modules.append(os.path.join(pex_src_root, path))
+    source_mappings = {}
+    for target in targets:
+      libs = (tgt for tgt in target.closure()
+              if tgt.has_sources('.py') and not isinstance(tgt, PythonTests))
+      for lib in libs:
+        source_mappings[lib.target_base] = [pex_src_root]
 
-    with self._cov_setup(targets,
-                         pex.path(),
-                         coverage_modules=coverage_modules) as (args, coverage_rc):
+    def ensure_trailing_sep(path):
+      return path if path.endswith(os.path.sep) else path + os.path.sep
+
+    if coverage == 'auto':
+      def compute_coverage_sources(tgt):
+        if tgt.coverage:
+          return tgt.coverage
+        else:
+          # This makes the assumption that tests/python/<tgt> will be testing src/python/<tgt>.
+          # Note in particular that this doesn't work for pants' own tests, as those are under
+          # the top level package 'pants_tests', rather than just 'pants'.
+          # TODO(John Sirois): consider failing fast if there is no explicit coverage scheme;
+          # but also  consider supporting configuration of a global scheme whether that be parallel
+          # dirs/packages or some arbitrary function that can be registered that takes a test target
+          # and hands back the source packages or paths under test.
+          return set(os.path.dirname(s).replace(os.sep, '.')
+                     for s in tgt.sources_relative_to_source_root())
+      coverage_sources = set(itertools.chain(*[compute_coverage_sources(t) for t in targets]))
+    else:
+      coverage_sources = []
+      for source in coverage.split(','):
+        if os.path.isdir(source):
+          # The source is a dir, so correct its prefix for the chroot.
+          # E.g. if source is /path/to/src/python/foo/bar or src/python/foo/bar then
+          # rel_source is src/python/foo/bar, and ...
+          rel_source = os.path.relpath(source, get_buildroot())
+          rel_source = ensure_trailing_sep(rel_source)
+          found_target_base = False
+          for target_base in source_mappings:
+            prefix = ensure_trailing_sep(target_base)
+            if rel_source.startswith(prefix):
+              # ... rel_source will match on prefix=src/python/ ...
+              suffix = rel_source[len(prefix):]
+              # ... suffix will equal foo/bar ...
+              coverage_sources.append(os.path.join(pex_src_root, suffix))
+              found_target_base = True
+              # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
+              break
+          if not found_target_base:
+            self.context.log.warn('Coverage path {} is not in any target. Skipping.'.format(source))
+        else:
+          # The source is to be interpreted as a package name.
+          coverage_sources.append(source)
+
+    with self._cov_setup(source_mappings,
+                         coverage_sources=coverage_sources) as (args, coverage_rc):
       try:
         yield args
       finally:
@@ -401,9 +392,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
       rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True, env=env)
       return PythonTestResult.rc(rc)
-    except TestFailedTaskError:
+    except ErrorWhileTesting:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
-      # fail with a TestFailedTaskError. We can't just set PythonTestResult
+      # fail with a ErrorWhileTesting. We can't just set PythonTestResult
       # to a failure because the resultslog doesn't have all the failures
       # when tests are killed with a timeout. Therefore we need to re-raise
       # here.
@@ -414,43 +405,30 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       return PythonTestResult.exception()
 
   def _get_failed_targets_from_junitxml(self, junitxml, targets):
-    # Note that unlike in Java, we can't easily map targets to test classnames up-front.
-    # Instead we grab the classnames seen in practice and work backwards to the targets.
-
-    # First map the dotted paths of the modules to their respective targets.
     pex_src_root = os.path.relpath(
       self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
-    dotted_module_path_to_target = {}
-    for target in targets:
-      for src in target.sources_relative_to_source_root():
-        pex_src = os.path.join(pex_src_root, src)
-        dotted_path = os.path.splitext(pex_src)[0].replace(os.path.sep, '.')
-        dotted_module_path_to_target[dotted_path] = target
+    # First map sources back to their targets.
+    relsrc_to_target = {os.path.join(pex_src_root, src): target
+                        for target in targets for src in target.sources_relative_to_source_root()}
 
-    # Now grab the classnames from the xml file.
-    xml = XmlParser.from_file(junitxml)
-    classname_and_names = ((testcase.getAttribute('classname'), testcase.getAttribute('name'))
-                           for testcase in xml.parsed.getElementsByTagName('testcase'))
+    # Now find the sources that contained failing tests.
+    failed_targets = set()
 
-    # Now find which module each classname belongs to, and map it to its target.
-    test_target_pairs = []
-    for classname, name in classname_and_names:
-      # if the classname is empty, it means that there was an error in the module body,
-      # outside any class or method body.  In this case the module name in its entirety
-      # ends up in the 'name' attribute.
-      dotted_path = classname or name
-      while dotted_path and dotted_path not in dotted_module_path_to_target:
-        dotted_path = dotted_path.rpartition('.')[0]
-      if dotted_path:
-        target = dotted_module_path_to_target[dotted_path]
-        test_target_pairs.append((Test(classname), target))
+    try:
+      xml = XmlParser.from_file(junitxml)
+      failures = int(xml.get_attribute('testsuite', 'failures'))
+      errors = int(xml.get_attribute('testsuite', 'errors'))
+      if failures or errors:
+        for testcase in xml.parsed.getElementsByTagName('testcase'):
+          test_failed = testcase.getElementsByTagName('failure')
+          test_errored = testcase.getElementsByTagName('error')
+          if test_failed or test_errored:
+            # The 'file' attribute is a relsrc, because that's what we passed in to pytest.
+            failed_targets.add(relsrc_to_target.get(testcase.getAttribute('file')))
+    except (XmlParser.XmlError, ValueError) as e:
+      raise TaskError('Error parsing xml file at {}: {}'.format(junitxml, e))
 
-    # Now parse the junit xml the usual way.
-    def error_handler(e):
-      raise TaskError(e)
-    failed_targets_map = parse_failed_targets(TestRegistry(test_target_pairs),
-                                              junitxml, error_handler)
-    return failed_targets_map.keys()
+    return failed_targets
 
   def _do_run_tests(self, targets, workunit):
     if not targets:
@@ -459,7 +437,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     rel_sources = list(itertools.chain(*[t.sources_relative_to_source_root() for t in targets]))
     if not rel_sources:
       return PythonTestResult.rc(0)
-    source_root = self.context.products.get_data(GatherSources.PYTHON_SOURCES).path()
+    source_root = os.path.relpath(
+      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(),
+      get_buildroot()
+    )
     sources = [os.path.join(source_root, p) for p in rel_sources]
 
     with self._test_runner(targets, workunit) as (pex, test_args):
@@ -473,7 +454,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
-      args = ['--junitxml', junitxml_path, '--confcutdir', get_buildroot()]
+      args = ['--junitxml', junitxml_path, '--confcutdir', get_buildroot(),
+              '--continue-on-collection-errors']
       if self.get_options().fail_fast:
         args.extend(['-x'])
       if self._debug:

@@ -27,7 +27,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     start = time.time()
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--test-pytest-coverage=1',
+                                '--test-pytest-coverage=auto',
                                 '--test-pytest-options=-k exceeds_timeout',
                                 '--timeout-default=1',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout'])
@@ -49,7 +49,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     terminate_wait = 2
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
-                                '--test-pytest-coverage=1',
+                                '--test-pytest-coverage=auto',
                                 '--test-pytest-timeout-terminate-wait=%d' % terminate_wait,
                                 '--timeout-default=1',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
@@ -70,12 +70,12 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                   "killing...".format(terminate_wait), pants_run.stderr_data)
 
   def test_pytest_explicit_coverage(self):
-    with temporary_dir() as coverage_dir:
+    with temporary_dir(cleanup=False) as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
-                                  '--test-pytest-coverage=path:testprojects',
+                                  '--test-pytest-coverage=pants',
                                   '--test-pytest-coverage-output-dir={}'.format(coverage_dir),
-                                  'testprojects/tests/python/pants/constants_only:constants_only'])
+                                  'testprojects/tests/python/pants/constants_only'])
       self.assert_success(pants_run)
       self.assertTrue(os.path.exists(os.path.join(coverage_dir, 'coverage.xml')))
 
