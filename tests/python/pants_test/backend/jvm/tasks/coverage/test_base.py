@@ -42,7 +42,7 @@ class fake_log(object):
     return
 
 
-class TestCoverageEngine(Coverage):
+class CoverageEngineForTesting(Coverage):
   """
   :API: public
   """
@@ -52,7 +52,7 @@ class TestCoverageEngine(Coverage):
     self.copytree_calls = defaultdict(list)
     self.safe_makedir_calls = []
 
-    super(TestCoverageEngine, self).__init__(
+    super(CoverageEngineForTesting, self).__init__(
         settings,
         copy2=lambda frm, to: self.copy2_calls[frm].append(to),
         copytree=lambda frm, to: self.copytree_calls[frm].append(to),
@@ -141,7 +141,7 @@ class TestBase(BaseTest):
     options = attrdict(coverage=True, coverage_jvm_options=[])
 
     settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
-    coverage = TestCoverageEngine(settings)
+    coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
     self._add_for_target(classpath_products, self.jar_lib, '/jar/lib/classpath')
@@ -167,7 +167,7 @@ class TestBase(BaseTest):
     options = attrdict(coverage=True, coverage_jvm_options=[])
 
     settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
-    coverage = TestCoverageEngine(settings)
+    coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
     self._add_for_target(classpath_products, self.java_target, '/java/target/first.jar')
@@ -194,7 +194,7 @@ class TestBase(BaseTest):
     options = attrdict(coverage=True, coverage_jvm_options=[])
 
     settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
-    coverage = TestCoverageEngine(settings)
+    coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
     self._add_for_target(classpath_products, self.annotation_target, '/anno/target/dir')

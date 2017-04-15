@@ -31,7 +31,7 @@ from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.java.junit.junit_xml_parser import Test, TestRegistry, parse_failed_targets
+from pants.java.junit.junit_xml_parser import Test, RegistryOfTests, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util import desktop
@@ -324,10 +324,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     If `self._tests_to_run` is set, return a registry of explicitly specified tests instead.
 
     :returns: A registry of tests to run.
-    :rtype: :class:`pants.java.junit.junit_xml_parser.Test.TestRegistry`
+    :rtype: :class:`pants.java.junit.junit_xml_parser.Test.RegistryOfTests`
     """
 
-    test_registry = TestRegistry(tuple(self._calculate_tests_from_targets(targets)))
+    test_registry = RegistryOfTests(tuple(self._calculate_tests_from_targets(targets)))
 
     if targets and self._tests_to_run:
       # If there are some junit_test targets in the graph, find ones that match the requested
@@ -346,7 +346,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                         "specifier or bring in the proper target(s)."
                         .format("'\n  '".join(t.render_test_spec() for t in unknown_tests)))
 
-      return TestRegistry(possible_test_to_target)
+      return RegistryOfTests(possible_test_to_target)
     else:
       return test_registry
 

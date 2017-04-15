@@ -73,7 +73,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as coverage_dir:
       pants_run = self.run_pants(['clean-all',
                                   'test.pytest',
-                                  '--test-pytest-coverage=path:testprojects',
+                                  '--test-pytest-coverage=testprojects',
                                   '--test-pytest-coverage-output-dir={}'.format(coverage_dir),
                                   'testprojects/tests/python/pants/constants_only:constants_only'])
       self.assert_success(pants_run)
