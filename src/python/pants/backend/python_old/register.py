@@ -6,12 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.register import build_file_aliases as orig_build_file_aliases
-from pants.backend.python.tasks.pytest_run import PytestRun
-from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
-from pants.backend.python.tasks.python_isort import IsortPythonTask
-from pants.backend.python.tasks.python_repl import PythonRepl
-from pants.backend.python.tasks.python_run import PythonRun
-from pants.backend.python.tasks.setup_py import SetupPy
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.pytest_run import PytestRun as PytestRun2
 from pants.backend.python.tasks2.python_binary_create import \
@@ -21,6 +15,12 @@ from pants.backend.python.tasks2.python_run import PythonRun as PythonRun2
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.backend.python.tasks2.setup_py import SetupPy as SetupPy2
+from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks.python_isort import IsortPythonTask
+from pants.backend.python.tasks.python_repl import PythonRepl
+from pants.backend.python.tasks.python_run import PythonRun
+from pants.backend.python.tasks.setup_py import SetupPy
 from pants.base.deprecated import deprecated
 from pants.goal.task_registrar import TaskRegistrar as task
 

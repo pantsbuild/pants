@@ -129,8 +129,7 @@ class Target(AbstractTarget):
     """Raised when there are too many recursive calls to calculate the fingerprint."""
     pass
 
-
-  _MAX_RECURSION_DEPTH=300
+  _MAX_RECURSION_DEPTH=250
 
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses

@@ -9,8 +9,8 @@ from pants.base.deprecated import deprecated
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.task.changed_target_task import ChangedTargetTask
 
-# TODO: Remove this entire file in 1.5.0dev0.
 
+# TODO: Remove this entire file in 1.5.0dev0.
 class CompileChanged(ChangedTargetTask):
   """Find and compile changed targets."""
 
