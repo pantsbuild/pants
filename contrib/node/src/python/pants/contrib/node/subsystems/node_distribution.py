@@ -14,8 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_dir
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
@@ -78,9 +77,9 @@ class NodeDistribution(object):
     # 'X.Y.Z'.
     return version if version.startswith('v') else 'v' + version
 
-  def __init__(self, binary_util, relpath, version, package_manager, yarnpkg_version):
+  def __init__(self, binary_util, supportdir, version, package_manager, yarnpkg_version):
     self._binary_util = binary_util
-    self._relpath = relpath
+    self._supportdir = supportdir
     self._version = self._normalize_version(version)
     self.package_manager = self.validate_package_manager(package_manager=package_manager)
     self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
@@ -96,46 +95,42 @@ class NodeDistribution(object):
     """
     return self._version
 
-  def get_binary_path_from_tgz(self, supportdir, version, filename, inpackage_path):
+  def unpack_package(self, supportdir, version, filename):
     tarball_filepath = self._binary_util.select_binary(
       supportdir=supportdir, version=version, name=filename)
     logger.debug('Tarball for %s(%s): %s', supportdir, version, tarball_filepath)
     work_dir = os.path.dirname(tarball_filepath)
-    unpacked_dir = os.path.join(work_dir, 'unpacked')
-    if not os.path.exists(unpacked_dir):
-      with temporary_dir(root_dir=work_dir) as tmp_dist:
-        TGZ.extract(tarball_filepath, tmp_dist)
-        os.rename(tmp_dist, unpacked_dir)
-    binary_path = os.path.join(unpacked_dir, inpackage_path)
-    return binary_path
+    TGZ.extract(tarball_filepath, work_dir)
+    return work_dir
 
-  @memoized_property
-  def path(self):
-    """Returns the root path of this node distribution.
+  @memoized_method
+  def install_node(self):
+    """Install the Node distribution from pants support binaries.
 
-    :returns: The Node distribution root path.
+    :returns: The Node distribution bin path.
     :rtype: string
     """
-    node_path = self.get_binary_path_from_tgz(
-      supportdir=self._relpath, version=self.version, filename='node.tar.gz',
-      inpackage_path='node')
-    logger.debug('Node path: %s', node_path)
-    return node_path
+    node_package_path = self.unpack_package(
+      supportdir=self._supportdir, version=self.version, filename='node.tar.gz')
+    # Todo: https://github.com/pantsbuild/pants/issues/4431
+    # This line depends on repacked node distribution.
+    # Should change it from 'node/bin' to 'dist/bin'
+    node_bin_path = os.path.join(node_package_path, 'node', 'bin')
+    return node_bin_path
 
-  @memoized_property
-  def yarnpkg_path(self):
-    """Returns the root path of yarnpkg distribution.
+  @memoized_method
+  def install_yarnpkg(self):
+    """Install the Yarnpkg distribution from pants support binaries.
 
-    :returns: The yarnpkg root path.
+    :returns: The Yarnpkg distribution bin path.
     :rtype: string
     """
-    yarnpkg_path = self.get_binary_path_from_tgz(
-      supportdir='bin/yarnpkg', version=self.yarnpkg_version, filename='yarnpkg.tar.gz',
-      inpackage_path='dist')
-    logger.debug('Yarnpkg path: %s', yarnpkg_path)
-    return yarnpkg_path
+    yarnpkg_package_path = self.unpack_package(
+      supportdir='bin/yarnpkg', version=self.yarnpkg_version, filename='yarnpkg.tar.gz')
+    yarnpkg_bin_path = os.path.join(yarnpkg_package_path, 'dist', 'bin')
+    return yarnpkg_bin_path
 
-  class Command(namedtuple('Command', ['bin_dir_path', 'executable', 'args'])):
+  class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
     """Describes a command to be run using a Node distribution."""
 
     @property
@@ -145,7 +140,7 @@ class NodeDistribution(object):
       :returns: The full command line used to spawn this command as a list of strings.
       :rtype: list
       """
-      return [os.path.join(self.bin_dir_path, self.executable)] + self.args
+      return [self.executable] + (self.args or [])
 
     def _prepare_env(self, kwargs):
       """Returns a modifed copy of kwargs['env'], and a copy of kwargs with 'env' removed.
@@ -159,8 +154,7 @@ class NodeDistribution(object):
       """
       kwargs = kwargs.copy()
       env = kwargs.pop('env', os.environ).copy()
-      env['PATH'] = (self.bin_dir_path + os.path.pathsep + env['PATH']
-                     if env.get('PATH', '') else self.bin_dir_path)
+      env['PATH'] = os.path.pathsep.join(self.extra_paths + [env.get('PATH', '')])
       return env, kwargs
 
     def run(self, **kwargs):
@@ -196,7 +190,10 @@ class NodeDistribution(object):
     """
     # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
     # `node` with no arguments is useful, it launches a REPL.
-    return self._create_command('node', args)
+    node_bin_path = self.install_node()
+    return self.Command(
+      executable=os.path.join(node_bin_path, 'node'), args=args,
+      extra_paths=[node_bin_path])
 
   def npm_command(self, args):
     """Creates a command that can run `npm`, passing the given args to it.
@@ -205,7 +202,10 @@ class NodeDistribution(object):
     :returns: An `npm` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
-    return self._create_command('npm', args)
+    node_bin_path = self.install_node()
+    return self.Command(
+      executable=os.path.join(node_bin_path, 'npm'), args=args,
+      extra_paths=[node_bin_path])
 
   def yarnpkg_command(self, args):
     """Creates a command that can run `yarnpkg`, passing the given args to it.
@@ -214,8 +214,8 @@ class NodeDistribution(object):
     :returns: An `yarnpkg` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
+    node_bin_path = self.install_node()
+    yarnpkg_bin_path = self.install_yarnpkg()
     return self.Command(
-      bin_dir_path=os.path.join(self.yarnpkg_path, 'bin'), executable='yarnpkg', args=args or [])
-
-  def _create_command(self, executable, args=None):
-    return self.Command(os.path.join(self.path, 'bin'), executable, args or [])
+      executable=os.path.join(yarnpkg_bin_path, 'yarnpkg'), args=args,
+      extra_paths=[yarnpkg_bin_path, node_bin_path])
