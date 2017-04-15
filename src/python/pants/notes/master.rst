@@ -5,7 +5,7 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
-1.3.0.dev17 (4/14/2017)
+1.3.0.dev17 (4/15/2017)
 -----------------------
 A weekly unstable release, highlighted by setting the new python backend as the default.
 
