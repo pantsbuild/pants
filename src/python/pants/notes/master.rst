@@ -4,6 +4,45 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.3.0.dev17 (4/14/2017)
+-----------------------
+A weekly unstable release, highlighted by setting the new python backend as the default.
+
+API Changes
+~~~~~~~~~~~
+* Upgrade pants to current versions of pytest et al. (#4410)
+  `PR #4410 <https://github.com/pantsbuild/pants/pull/4410>`_
+
+* Make the new python backend the default. (#4441)
+  `PR #4441 <https://github.com/pantsbuild/pants/pull/4441>`_
+
+Bugfixes
+~~~~~~~~
+* Correctly inject Yarn into the Node path when it is in use (#4455)
+  `PR #4455 <https://github.com/pantsbuild/pants/pull/4455>`_
+
+* Fix resource loading issue in the python eval task. (#4452)
+  `PR #4452 <https://github.com/pantsbuild/pants/pull/4452>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* [engine] Use RuleGraph for task lookup instead of Tasks (#4371)
+  `PR #4371 <https://github.com/pantsbuild/pants/pull/4371>`_
+
+* Re-use pre-built Linux engine binaries for bintray upload. (#4454)
+  `PR #4454 <https://github.com/pantsbuild/pants/pull/4454>`_
+
+* Replace `indices` with `indexes` in docs (#4453)
+  `PR #4453 <https://github.com/pantsbuild/pants/pull/4453>`_
+
+* Add ParseContext singleton helper (#4466)
+  `PR #4466 <https://github.com/pantsbuild/pants/pull/4466>`_
+
+* Avoid re-walking for every target root in minimize (#4463)
+  `PR #4463 <https://github.com/pantsbuild/pants/pull/4463>`_
+
+
 1.3.0.dev16 (4/08/2017)
 -----------------------
 A weekly unstable release.
