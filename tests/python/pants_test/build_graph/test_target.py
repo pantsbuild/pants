@@ -16,11 +16,11 @@ from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
-class TestImplicitSourcesTarget(Target):
+class ImplicitSourcesTestingTarget(Target):
   default_sources_globs = '*.foo'
 
 
-class TestImplicitSourcesTargetMulti(Target):
+class ImplicitSourcesTestingTargetMulti(Target):
   default_sources_globs = ('*.foo', '*.bar')
   default_sources_exclude_globs = ('*.baz', '*.qux')
 
@@ -96,13 +96,13 @@ class TargetTest(BaseTest):
   def test_implicit_sources(self):
     options = {Target.Arguments.options_scope: {'implicit_sources': True}}
     init_subsystem(Target.Arguments, options)
-    target = self.make_target(':a', TestImplicitSourcesTarget)
+    target = self.make_target(':a', ImplicitSourcesTestingTarget)
     # Note explicit key_arg.
     sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar',
                                           key_arg='sources')
     self.assertEqual(sources.filespec, {'globs': ['src/foo/bar/*.foo']})
 
-    target = self.make_target(':b', TestImplicitSourcesTargetMulti)
+    target = self.make_target(':b', ImplicitSourcesTestingTargetMulti)
     # Note no explicit key_arg, which should behave just like key_arg='sources'.
     sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
     self.assertEqual(sources.filespec, {
@@ -118,7 +118,7 @@ class TargetTest(BaseTest):
   def test_implicit_sources_disabled(self):
     options = {Target.Arguments.options_scope: {'implicit_sources': False}}
     init_subsystem(Target.Arguments, options)
-    target = self.make_target(':a', TestImplicitSourcesTarget)
+    target = self.make_target(':a', ImplicitSourcesTestingTarget)
     sources = target.create_sources_field(sources=None, sources_rel_path='src/foo/bar')
     self.assertEqual(sources.filespec, {'globs': []})
 
