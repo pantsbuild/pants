@@ -14,6 +14,9 @@ API Changes
 * Upgrade pants to current versions of pytest et al. (#4410)
   `PR #4410 <https://github.com/pantsbuild/pants/pull/4410>`_
 
+* Add ParseContext singleton helper (#4466)
+  `PR #4466 <https://github.com/pantsbuild/pants/pull/4466>`_
+
 * Make the new python backend the default. (#4441)
   `PR #4441 <https://github.com/pantsbuild/pants/pull/4441>`_
 
@@ -21,9 +24,6 @@ Bugfixes
 ~~~~~~~~
 * Correctly inject Yarn into the Node path when it is in use (#4455)
   `PR #4455 <https://github.com/pantsbuild/pants/pull/4455>`_
-
-* Add ParseContext singleton helper (#4466)
-  `PR #4466 <https://github.com/pantsbuild/pants/pull/4466>`_
 
 * Fix resource loading issue in the python eval task. (#4452)
   `PR #4452 <https://github.com/pantsbuild/pants/pull/4452>`_
