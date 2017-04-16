@@ -36,7 +36,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
     register('--compiler-plugin-deps', advanced=True, type=list, member_type=target_option,
              removal_version='1.5.0.dev0',
-             removal_hint='Use --compile-zinc-javac-plugin-deps instead.',
+             removal_hint='See http://www.pantsbuild.org/javac_plugins.html#depending-on-plugins.',
              fingerprint=True)
 
   @classmethod
