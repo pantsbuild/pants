@@ -106,6 +106,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Mike Lindsey
 + Misho Krastev
 + Moses Nakamura
++ Nadav Samet
 + Neil Sanchala
 + Nicholas Santos
 + Nick Howard
