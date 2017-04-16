@@ -21,10 +21,12 @@ from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class PythonTestBuilderTestBase(PythonTaskTestBase):
+class PytestTestBase(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return PytestRun
+
+  _CONFTEST_CONTENT = '# I am an existing root-level conftest file.'
 
   def run_tests(self, targets, **options):
     """Run the tests in the specified targets, with the specified PytestRun task options.
@@ -34,6 +36,7 @@ class PythonTestBuilderTestBase(PythonTaskTestBase):
     """
     context = self._prepare_test_run(targets, **options)
     self._do_run_tests(context)
+    return context
 
   def run_failing_tests(self, targets, failed_targets, **options):
     context = self._prepare_test_run(targets, **options)
@@ -68,14 +71,14 @@ class PythonTestBuilderTestBase(PythonTaskTestBase):
       pytest_run_task.execute()
 
 
-class PythonTestBuilderTestEmpty(PythonTestBuilderTestBase):
+class PytestTestEmpty(PytestTestBase):
   def test_empty(self):
     self.run_tests(targets=[])
 
 
-class PythonTestBuilderTest(PythonTestBuilderTestBase):
+class PytestTest(PytestTestBase):
   def setUp(self):
-    super(PythonTestBuilderTest, self).setUp()
+    super(PytestTest, self).setUp()
     self.create_file(
         'lib/core.py',
         dedent("""
@@ -152,6 +155,10 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
       """
         )
     )
+    self.create_file(
+      'tests/conftest.py', self._CONFTEST_CONTENT
+    )
+
     self.add_to_build_file(
         'tests',
         dedent("""
@@ -260,6 +267,17 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
               'core'
             ]
           )
+
+          python_tests(
+            name='green-with-conftest',
+            sources=[
+              'conftest.py',
+              'test_core_green.py',
+            ],
+            dependencies=[
+              'lib:core',
+            ]
+          )
         """))
     self.green = self.target('tests:green')
 
@@ -272,6 +290,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     self.all = self.target('tests:all')
     self.all_with_coverage = self.target('tests:all-with-coverage')
+    self.green_with_conftest = self.target('tests:green-with-conftest')
 
   def test_error(self):
     """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
@@ -427,3 +446,13 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], test_shard='1/a')
+
+  def test_conftest_preservation(self):
+    # Ensure that our monkeying around with conftest.py in the chroot leaves
+    # it in its original state after the test run.
+    context = self.run_tests(targets=[self.green_with_conftest])
+    chroot = context.products.get_data(GatherSources.PYTHON_SOURCES).path()
+    with open(os.path.join(chroot, 'conftest.py')) as fp:
+      conftest_content = fp.read()
+    self.assertEqual(self._CONFTEST_CONTENT, conftest_content)
+
