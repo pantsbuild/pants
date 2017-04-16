@@ -22,6 +22,9 @@ Bugfixes
 * Correctly inject Yarn into the Node path when it is in use (#4455)
   `PR #4455 <https://github.com/pantsbuild/pants/pull/4455>`_
 
+* Add ParseContext singleton helper (#4466)
+  `PR #4466 <https://github.com/pantsbuild/pants/pull/4466>`_
+
 * Fix resource loading issue in the python eval task. (#4452)
   `PR #4452 <https://github.com/pantsbuild/pants/pull/4452>`_
 
@@ -35,9 +38,6 @@ Refactoring, Improvements, and Tooling
 
 * Replace `indices` with `indexes` in docs (#4453)
   `PR #4453 <https://github.com/pantsbuild/pants/pull/4453>`_
-
-* Add ParseContext singleton helper (#4466)
-  `PR #4466 <https://github.com/pantsbuild/pants/pull/4466>`_
 
 * Avoid re-walking for every target root in minimize (#4463)
   `PR #4463 <https://github.com/pantsbuild/pants/pull/4463>`_
