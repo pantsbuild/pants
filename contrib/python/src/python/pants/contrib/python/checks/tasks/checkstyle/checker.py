@@ -52,6 +52,9 @@ class PythonCheckStyleTask(Task):
   def subsystem_dependencies(cls):
     return super(Task, cls).subsystem_dependencies() + cls._subsystems
 
+  deprecated_options_scope = 'compile.pythonstyle'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
+
   @classmethod
   def register_options(cls, register):
     super(PythonCheckStyleTask, cls).register_options(register)

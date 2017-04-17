@@ -52,6 +52,9 @@ class PythonEval(ResolveRequirementsTaskBase):
   def _is_evalable(target):
     return isinstance(target, (PythonLibrary, PythonBinary))
 
+  deprecated_options_scope = 'compile.python-eval'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
+
   @classmethod
   def register_options(cls, register):
     super(PythonEval, cls).register_options(register)

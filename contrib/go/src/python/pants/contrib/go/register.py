@@ -46,6 +46,6 @@ def register_goals():
   task(name='go', action=GoCompile).install('compile')
   task(name='go', action=GoBinaryCreate).install('binary')
   task(name='go', action=GoRun).install('run')
-  task(name='go-checkstyle', action=GoCheckstyle).install('compile')
+  task(name='go', action=GoCheckstyle).install('lint')
   task(name='go', action=GoTest).install('test')
   task(name='go', action=GoFmt).install('fmt')

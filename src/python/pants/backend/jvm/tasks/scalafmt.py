@@ -112,6 +112,8 @@ class ScalaFmtCheckFormat(ScalaFmt):
 
   :API: public
   """
+  deprecated_options_scope = 'compile.scalafmt'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   def get_command_args(self, files):
     # If no config file is specified use default scalafmt config.
