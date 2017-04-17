@@ -372,35 +372,53 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     # We must create our conftest.py in the root of the source chroot, so that its hooks
     # run while loading the test files in that chroot.  We take care not to stomp on an
     # existing conftest.py from the source code.  We temporarily append to it instead.
+
+    # Note the following invariants:
+    #
+    #   1: If there was an existing conftest.py then:
+    #      A. If conftest_orig exists, it contains that conftest.py's content.
+    #      B. If conftest_orig does not exist, then conftest contains that conftest.py's content.
+    #      This invariant says nothing about the case of no existing conftest.py.
+    #   2:
+    #      A. If there was an existing conftest.py, its content is in conftest.
+    #      B. If there was no existing conftest.py, then conftest does not exist.
+    #
+    # These invariants ensure that we can restore the source chroot to its original state
+    # during post-test cleanup, and that even if that cleanup fails for some reason, the
+    # next test run will be able to restore the correct state.
     conftest = os.path.join(
       self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), 'conftest.py')
     conftest_orig = None
-    # If there's an existing conftest.py, overwrite it to ensure it contains exactly
-    # any original user content, plus our temporary additions.
+
+    # Note that on the first test run since the source chroot was created both invariants hold
+    # here: 1 holds because haven't ever created conftest_orig, and 2 holds trivially.
+    # See below for why both invariants hold here on subsequent runs that complete normally.
+    # Note that even if invariant 2 is violated here (say because the previous run crashed before
+    # executing the cleanup that restores it) it will be restored in this run's cleanup.
     if os.path.exists(conftest):
-      # First, ensure that we've saved the original conftest.py.
       conftest_orig = '{}.orig'.format(conftest)
       if not os.path.exists(conftest_orig):
-        # We only copy if the orig file isn't present, to ensure that the conftest.py we're
-        # copying is indeed the original one from the source tree, and not one that we
-        # created in an earlier run and somehow survived cleanup.
+        # Note that this preserves both invariants.
         shutil.copy(conftest, conftest_orig)
-      # Here we know that conftest_orig contains the original content, regardless of
-      # the state of conftest.
+
       with open(conftest_orig) as fp:
         orig_conftest_content = fp.read()
       conftest_content = orig_conftest_content + conftest_content
 
-    with open(conftest, 'w') as fp:
-      fp.write(conftest_content)
-    yield
-    # Restore the original state: if there was an original conftest.py, restore
-    # its content and remove the conftest_orig file, otherwise delete conftest.py.
-    if conftest_orig:
-      if os.path.exists(conftest_orig):
+    try:
+      # Temporarily violate invariant 2!
+      with open(conftest, 'w') as fp:
+        fp.write(conftest_content)
+      yield
+    finally:
+      # Restore invariant 2, which is possible because invariant 1 still holds.
+      if conftest_orig:  # There was an existing conftest.py.
+        # Preserves invariant 1, and restores invariant 2.
         shutil.move(conftest_orig, conftest)
-    else:
-      os.unlink(conftest)
+      else:  # There was no existing conftest.py.
+        # Restores invariant 2.  Does not affect invariant 1.
+        os.unlink(conftest)
+    # Here both invariants hold, so they will hold on entry on a subsequent run too.
 
   @contextmanager
   def _test_runner(self, targets, sources_map, workunit):
