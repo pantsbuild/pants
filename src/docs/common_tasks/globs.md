@@ -28,7 +28,7 @@ You can also exclude files from a particular directory:
 
     ::python
     scala_library(name='scala',
-      sources=rglobs('*.scala') - rglobs('dir_to_exclude/*.scala')
+      sources=rglobs('*.scala', exclude=[rglobs('dir_to_exclude/*.scala')]),
     )
 
 ## See Also
