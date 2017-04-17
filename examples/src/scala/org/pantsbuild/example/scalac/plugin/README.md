@@ -33,7 +33,7 @@ plus two extra:
   the target name.
   
 Building a plugin target will, in addition to compiling the code, generate
-the appropriate metadata into `scalac-plugin.xm`, so
+the appropriate metadata into `scalac-plugin.xml`, so
 that scalac can load the plugin by name at runtime.
 
 A plugin may be published for later consumption in any repo. It can also
@@ -92,9 +92,9 @@ This can be achieved in one of two ways:
 either on the `scalac_plugin` target, or on a `jar_library` pointing to a published version
 of the plugin.
 - Have a `scalac-plugin-dep` target in `BUILD.tools`:
- 
+
 ```
-jar_library(name='scala-plugin-dep',
+jar_library(name='scalac-plugin-dep',
             jars = [jar(org='com.foo', name='foo_plugin', rev='1.2.3')],
 ```
 
