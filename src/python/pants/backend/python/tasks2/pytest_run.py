@@ -448,9 +448,13 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def _get_failed_targets_from_junitxml(self, junitxml, targets):
     pex_src_root = os.path.relpath(
       self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
-    # First map sources back to their targets.
-    relsrc_to_target = {os.path.join(pex_src_root, src): target
-                        for target in targets for src in target.sources_relative_to_source_root()}
+    # First map chrooted sources back to their targets.
+    relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
+                        for src in target.sources_relative_to_source_root()}
+    # Also map the source tree-rooted sources, because in some cases (e.g., a failure to even
+    # eval the test file during test collection), that's the path pytest will use in the junit xml.
+    relsrc_to_target.update({src: target for target in targets
+                             for src in target.sources_relative_to_buildroot()})
 
     # Now find the sources that contained failing tests.
     failed_targets = set()
