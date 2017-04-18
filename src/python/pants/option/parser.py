@@ -15,6 +15,7 @@ import six
 
 from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
+from pants.option.config import Config
 from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
                                        dict_option, dir_option, file_option, list_option,
                                        target_option)
@@ -451,7 +452,8 @@ class Parser(object):
     # Get value from config files, and capture details about its derivation.
     config_details = None
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
-    config_val_str = expand(self._config.get(config_section, dest, default=None))
+    config_default_val_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
+    config_val_str = expand(self._config.get(config_section, dest, default=None, use_default_section=False))
     config_source_file = self._config.get_source_for_option(config_section, dest)
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
@@ -505,14 +507,15 @@ class Parser(object):
     # is idempotent, so this is OK.
 
     values_to_rank = [to_value_type(x) for x in
-                      [flag_val, env_val_str, config_val_str, kwargs.get('default'), None]]
+                      [flag_val, env_val_str, config_default_val_str,
+                       config_val_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
     # Record info about the derivation of each of the values.
     for ranked_val in ranked_vals:
-      if ranked_val.rank == RankedValue.CONFIG:
+      if ranked_val.rank in (RankedValue.CONFIG, RankedValue.CONFIG_DEFAULT):
         details = config_details
       elif ranked_val.rank == RankedValue.ENVIRONMENT:
         details = env_details

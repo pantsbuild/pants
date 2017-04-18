@@ -24,7 +24,7 @@ class Config(AbstractClass):
   Supports recursive variable substitution using standard python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
   """
-  _DEFAULT_SECTION = configparser.DEFAULTSECT
+  DEFAULT_SECTION = configparser.DEFAULTSECT
 
   class ConfigError(Exception):
     pass
@@ -86,20 +86,21 @@ class Config(AbstractClass):
 
     return configparser.SafeConfigParser(all_seed_values)
 
-  def get(self, section, option, type_=six.string_types, default=None):
+  def get(self, section, option, type_=six.string_types, default=None, use_default_section=True):
     """Retrieves option from the specified section (or 'DEFAULT') and attempts to parse it as type.
 
     If the specified section does not exist or is missing a definition for the option, the value is
     looked up in the DEFAULT section.  If there is still no definition found, the default value
     supplied is returned.
     """
-    return self._getinstance(section, option, type_, default)
+    return self._getinstance(section, option, type_, default,
+                             use_default_section=use_default_section)
 
-  def _getinstance(self, section, option, type_, default=None):
+  def _getinstance(self, section, option, type_, default=None, use_default_section=True):
     if not self.has_option(section, option):
       return default
 
-    raw_value = self.get_value(section, option)
+    raw_value = self.get_value(section, option, use_default_section=use_default_section)
     # We jump through some hoops here to deal with the fact that `six.string_types` is a tuple of
     # types.
     if (type_ == six.string_types or
@@ -191,15 +192,18 @@ class _SingleFileConfig(Config):
   def has_section(self, section):
     return self.configparser.has_section(section)
 
-  def has_option(self, section, option):
+  def has_option(self, section, option, use_default_section=True):
     return (self.configparser.has_option(section, option) or
-            self.configparser.has_option(self._DEFAULT_SECTION, option))
+            (use_default_section and
+             self.configparser.has_option(self.DEFAULT_SECTION, option)))
 
-  def get_value(self, section, option):
+  def get_value(self, section, option, use_default_section=True):
     if self.configparser.has_option(section, option):
       return self.configparser.get(section, option)
+    elif use_default_section:
+      return self.configparser.get(self.DEFAULT_SECTION, option)
     else:
-      return self.configparser.get(self._DEFAULT_SECTION, option)
+      return None
 
   def get_source_for_option(self, section, option):
     if self.has_option(section, option):
@@ -242,10 +246,10 @@ class _ChainedConfig(Config):
         return True
     return False
 
-  def get_value(self, section, option):
+  def get_value(self, section, option, use_default_section=True):
     for cfg in self._configs:
       try:
-        return cfg.get_value(section, option)
+        return cfg.get_value(section, option, use_default_section=use_default_section)
       except (configparser.NoSectionError, configparser.NoOptionError):
         pass
     if not self.has_section(section):
