@@ -32,6 +32,7 @@ scala_build_info = {
 scala_style_jar = JarDependency('org.scalastyle', 'scalastyle_2.11', '0.8.0')
 
 
+# TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A scala platform.
 

@@ -11,7 +11,6 @@ from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
-from pants.java.jar.jar_dependency import JarDependency
 
 from pants.contrib.kythe.tasks.indexable_java_targets import IndexableJavaTargets
 
@@ -47,8 +46,6 @@ class ExtractJava(JvmToolTaskMixin):
     super(ExtractJava, cls).register_options(register)
     cls.register_jvm_tool(register,
                           'kythe-extractor',
-                          classpath=[JarDependency('kythe', 'extractors/javac_extractor',
-                                                   'v0.0.26-snowchain3')],
                           custom_rules=[
                             # These need to remain unshaded so that Kythe can interact with the
                             # javac embedded in its jar.
@@ -102,7 +99,6 @@ class ExtractJava(JvmToolTaskMixin):
         if arg == '-d':
           output_dir = javac_args[-1]
       elif arg.startswith('-C'):
-        # No need to have the Kythe extractor run our plugin.
         javac_args.append(arg[2:])
       elif arg.endswith('.java'):
         javac_args.append(arg)

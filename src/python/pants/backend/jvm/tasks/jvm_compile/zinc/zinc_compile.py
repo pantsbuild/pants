@@ -159,6 +159,7 @@ class BaseZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
+    # TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
     register('--name-hashing', advanced=True, type=bool, fingerprint=True,
              removal_hint='Name hashing is required for operation in zinc 1.0.0-X: this '
                           'option no longer has any effect.',

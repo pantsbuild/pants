@@ -11,9 +11,6 @@ from pants.backend.jvm.subsystems.jvm import JVM
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.java.jar.jar_dependency import JarDependency
-from pants.util.dirutil import safe_mkdir
-
 from pants.contrib.kythe.tasks.indexable_java_targets import IndexableJavaTargets
 
 
@@ -47,13 +44,7 @@ class IndexJava(NailgunTask):
              help='Re-index all targets, even if they are valid.')
     cls.register_jvm_tool(register,
                           'kythe-indexer',
-                          classpath=[JarDependency('kythe', 'indexers/java_indexer',
-                                                   'v0.0.26-snowchain3')],
                           main=cls._KYTHE_INDEXER_MAIN)
-
-  @property
-  def cache_target_dirs(self):
-    return True
 
   def execute(self):
     def entries_file(_vt):
@@ -71,7 +62,8 @@ class IndexJava(NailgunTask):
       for vt in vts_to_index:
         self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
         kindex_file = kindex_files.get(vt.target)
-        safe_mkdir(vt.results_dir)
+        if not kindex_file:
+          raise TaskError('No .kindex file found for {}'.format(vt.target.address.spec))
         args = [kindex_file, '--out', entries_file(vt)]
         result = self.runjava(classpath=cp, main=self._KYTHE_INDEXER_MAIN,
                               jvm_options=jvm_options,

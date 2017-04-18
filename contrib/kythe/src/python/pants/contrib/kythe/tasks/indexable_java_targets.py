@@ -7,18 +7,24 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.build_graph.target_scopes import Scopes
-from pants.util.memo import memoized_method
 
 
 class IndexableJavaTargets(object):
   """Determines which java targets Kythe should act on."""
 
   @classmethod
-  @memoized_method
   def get(cls, context):
-    """Return the indexable targets in the given context."""
-    # TODO: Should we index COMPILE scoped deps? E.g., annotations?
-    return context.targets(
-      lambda t: isinstance(t, JvmTarget) and t.has_sources('.java'),
-      exclude_scopes=Scopes.COMPILE
-    )
+    """Return the indexable targets in the given context.
+
+    Computes them lazily from the given context.  They are then fixed for the duration
+    of the run, even if this method is called again with a different context.
+    """
+    if not cls._targets:
+      # TODO: Should we index COMPILE scoped deps? E.g., annotations?
+      cls._targets = context.targets(
+        lambda t: isinstance(t, JvmTarget) and t.has_sources('.java'),
+        exclude_scopes=Scopes.COMPILE
+      )
+    return cls._targets
+
+  _targets = None
