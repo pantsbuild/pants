@@ -64,3 +64,17 @@ class ScalacPluginIntegrationTest(BaseCompileIT):
 
   def test_local(self):
     self._do_test(['args', 'from', 'target', 'local'], None, 'local')
+
+  def test_plugin_uses_other_plugin(self):
+    # Test that a plugin can use another plugin:  While compiling simple_scalac_plugin
+    # we will use other_simple_scalac_plugin (because it's globally specified).
+    # This is a regression test for https://github.com/pantsbuild/pants/issues/4475.
+    config = {
+      'compile.zinc': {
+        'scalac_plugins': ['other_simple_scalac_plugin'],
+        'scalac_plugin_args': {
+          'other_simple_scalac_plugin': ['foo']
+        }
+      }
+    }
+    self._do_test(['args', 'from', 'target', 'local'], config, 'local')

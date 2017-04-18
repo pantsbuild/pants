@@ -6,6 +6,15 @@ scalac_plugin(
   plugin='simple_scalac_plugin',
   classname='org.pantsbuild.example.scalac.plugin.SimpleScalacPlugin',
   sources=['SimpleScalacPlugin.scala'],
+  dependencies=[':other_simple_scalac_plugin'],
+  scope='compile',
+)
+
+scalac_plugin(
+  name='other_simple_scalac_plugin',
+  plugin='other_simple_scalac_plugin',
+  classname='org.pantsbuild.example.scalac.plugin.OtherSimpleScalacPlugin',
+  sources=['OtherSimpleScalacPlugin.scala'],
   scope='compile',
 )
 
