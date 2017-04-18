@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
-from pants.contrib.go.tasks.go_fmt import GoFmt
 from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -18,6 +17,7 @@ from pants.contrib.go.tasks.go_buildgen import GoBuildgen
 from pants.contrib.go.tasks.go_checkstyle import GoCheckstyle
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
+from pants.contrib.go.tasks.go_fmt import GoFmt
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo
 from pants.contrib.go.tasks.go_run import GoRun
 from pants.contrib.go.tasks.go_test import GoTest

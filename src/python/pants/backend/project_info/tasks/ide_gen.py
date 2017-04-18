@@ -345,8 +345,8 @@ class IdeGen(IvyTaskMixin, NailgunTask):
 
     self._prepare_project()
 
-    if self.context.options.is_known_scope('compile.checkstyle'):
-      checkstyle_classpath = self.tool_classpath('checkstyle', scope='compile.checkstyle')
+    if self.context.options.is_known_scope('lint.checkstyle'):
+      checkstyle_classpath = self.tool_classpath('checkstyle', scope='lint.checkstyle')
     else:  # Checkstyle not enabled.
       checkstyle_classpath = []
 
