@@ -6,8 +6,8 @@ tooling easier.
 
 ## Installation
 
-Go support is provided by a plugin distributed to [pypi]
-(https://pypi.python.org/pypi/pantsbuild.pants.contrib.go).
+Go support is provided by a plugin distributed to 
+[pypi](https://pypi.python.org/pypi/pantsbuild.pants.contrib.go).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
 add the Go plugin in your `pants.ini`, like so:
 ```ini
@@ -43,7 +43,7 @@ Pants requires:
 
 You likely comply with 1 already, the Go standards push almost all projects in this direction, but 2
 and 3 may be new concepts if you haven't used Pants or a tool like it before. You may want to read
-up on [BUILD files](/src/docs/build_files.md) and the [3rdparty pattern](/src/docs/3rdparty.md)
+up on [[BUILD files|pants('src/docs:build_files')]] and the [[3rdparty pattern|pants('src/docs:3rdparty')]]
 before continuing.
 
 ## Codebase setup
@@ -272,9 +272,9 @@ default.
 
 ## Testing
 
-You can run your Go tests with `./pants test [go targets]`. Any [standard Go tests]
-(https://golang.org/pkg/testing/) found amongst the targets will be compiled and run with output
-sent to the console.
+You can run your Go tests with `./pants test [go targets]`. Any 
+[standard Go tests](https://golang.org/pkg/testing/) found amongst the targets will be compiled and 
+run with output sent to the console.
 
 ## Working with other Go ecosystem tools
 
