@@ -338,12 +338,17 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
     # Search for scalac plugins on the entire classpath, which will allow use of
     # in-repo plugins for scalac (which works naturally for javac).
-    # Note that at this point the classpath will already have the
-    # extra_compile_time_classpath_elements() appended to it, so those will also get
-    # searched here.  Note that in scala 2.11 and up, the plugin's classpath element
-    # can be a dir, but for 2.10 it must be a jar.  So in-repo plugins will only work
-    # with 2.10 if --use-classpath-jars is true.
-    zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, classpath))
+    # Note that:
+    # - At this point the classpath will already have the extra_compile_time_classpath_elements()
+    #   appended to it, so those will also get searched here.
+    # - In scala 2.11 and up, the plugin's classpath element can be a dir, but for 2.10 it must be
+    #   a jar.  So in-repo plugins will only work with 2.10 if --use-classpath-jars is true.
+    # - We exclude our own classes_output_dir, because if we're a plugin ourselves, then our
+    #   classes_output_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
+    #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
+    #   triggering the plugin search mechanism, which does the memoizing).
+    scalac_plugin_search_classpath = set(classpath) - {classes_output_dir}
+    zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
                         ','.join('{}:{}'.format(*kv) for kv in upstream_analysis.items())])
