@@ -33,16 +33,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'python_run_integration',
-  sources = ['test_python_run_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'python_binary_integration',
   sources = ['test_python_binary_integration.py'],
   dependencies = [
