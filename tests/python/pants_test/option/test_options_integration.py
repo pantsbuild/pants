@@ -76,11 +76,12 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
   @ensure_engine
   def test_options_only_overridden(self):
-    pants_run = self.run_pants(['options', '--no-colors', '--only-overridden'])
+    pants_run = self.run_pants(['options', '--scope=options', '--no-colors', '--only-overridden'])
     self.assert_success(pants_run)
     self.assertIn('options.only_overridden = True', pants_run.stdout_data)
     self.assertIn('options.colors = False', pants_run.stdout_data)
-    self.assertNotIn('options.scope =', pants_run.stdout_data)
+    self.assertIn('options.scope = options', pants_run.stdout_data)
+    self.assertNotIn('options.name =', pants_run.stdout_data)
     self.assertNotIn('from HARDCODED', pants_run.stdout_data)
     self.assertNotIn('from NONE', pants_run.stdout_data)
 
@@ -117,6 +118,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       self.assertIn('options.only_overridden = True', pants_run.stdout_data)
       self.assertIn('(from CONFIG in {})'.format(config_path), pants_run.stdout_data)
+      self.assertIn("options.scope = options", pants_run.stdout_data)
 
   @ensure_engine
   def test_options_deprecation_from_config(self):
