@@ -3,7 +3,6 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/backend/jvm/subsystems:jvm',
     'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
