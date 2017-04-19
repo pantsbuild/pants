@@ -42,11 +42,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
            We setup the maven central resolver to require successful pom downloads here. -->
       <ibiblio name="maven-central" m2compatible="true" descriptor="required"/>
 
-      <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
-      <url name="benjyw/binhost">
-        <artifact pattern="https://github.com/benjyw/binhost/raw/master/[organisation]/${kythe.artifact}" />
-      </url>
-
       <!-- NB: Although url resolvers (like <ibiblio/>) can be pointed at local file:// system
            URLs, this leads to issues resolving any <dependency/> with a custom artifact that
            defines a file:// url itself.  We stick to <filesystem/> resolvers here for the
@@ -69,6 +64,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
         <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
       </filesystem>
+
+      <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
+      <url name="benjyw/binhost">
+        <artifact pattern="https://github.com/benjyw/binhost/raw/master/[organisation]/${kythe.artifact}" />
+      </url>
     </chain>
   </resolvers>
 </ivysettings>
