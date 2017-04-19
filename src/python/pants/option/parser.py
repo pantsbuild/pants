@@ -508,8 +508,8 @@ class Parser(object):
     # is idempotent, so this is OK.
 
     values_to_rank = [to_value_type(x) for x in
-                      [flag_val, env_val_str, config_default_val_str,
-                       config_val_str, kwargs.get('default'), None]]
+                      [flag_val, env_val_str, config_val_str,
+                       config_default_val_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
