@@ -969,11 +969,7 @@ class OptionsTest(unittest.TestCase):
                           })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
-
-    # TODO(John Sirois): This should pick up 99 from the the recursive global '--a' flag defined in
-    # middle scope 'compile', but instead it picks up `a`'s value from the config DEFAULT section.
-    # Fix this test as part of https://github.com/pantsbuild/pants/issues/1803.
-    self.assertEquals(100, options.for_scope('compile.java').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
 
     options = self._parse('./pants',
                           env={
