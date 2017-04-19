@@ -58,10 +58,3 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='isort', action=IsortPythonTask).install('fmt')
-
-  # Integration tests of the new pipeline still use the `*2` aliases.
-  task(name='py', action=PythonRun).install('run2')
-  task(name='pytest', action=PytestRun).install('test2')
-  task(name='py', action=PythonRepl).install('repl2')
-  task(name='py', action=PythonBinaryCreate).install('binary2')
-  task(name='setup-py2', action=SetupPy).install()
