@@ -41,7 +41,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
   def _echo_version(self, version):
     with temporary_dir() as distdir:
       config = {
-        'DEFAULT': {
+        'GLOBAL': {
           'pants_distdir': distdir
         }
       }

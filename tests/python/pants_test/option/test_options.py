@@ -969,11 +969,7 @@ class OptionsTest(unittest.TestCase):
                           })
     self.assertEquals(100, options.for_global_scope().a)
     self.assertEquals(99, options.for_scope('compile').a)
-
-    # TODO(John Sirois): This should pick up 99 from the the recursive global '--a' flag defined in
-    # middle scope 'compile', but instead it picks up `a`'s value from the config DEFAULT section.
-    # Fix this test as part of https://github.com/pantsbuild/pants/issues/1803.
-    self.assertEquals(100, options.for_scope('compile.java').a)
+    self.assertEquals(99, options.for_scope('compile.java').a)
 
     options = self._parse('./pants',
                           env={
@@ -1256,3 +1252,35 @@ class OptionsTest(unittest.TestCase):
 
     # Check values.
     self.assertEquals('uu', vals2.qux)
+
+  def test_scope_deprecation_defaults(self):
+    # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
+    class DummyOptionable1(Optionable):
+      options_scope = 'new-scope1'
+      options_scope_category = ScopeInfo.SUBSYSTEM
+      deprecated_options_scope = 'deprecated-scope'
+      deprecated_options_scope_removal_version = '9999.9.9.dev0'
+
+    options = Options.create(env={},
+                             config=self._create_config({
+                               'DEFAULT': {
+                                 'foo': 'aa'
+                               },
+                               DummyOptionable1.options_scope: {
+                                 'foo': 'xx'
+                               },
+                             }),
+                             known_scope_infos=[
+                               DummyOptionable1.get_scope_info(),
+                             ],
+                             args=shlex.split('./pants'),
+                             option_tracker=OptionTracker())
+
+    options.register(DummyOptionable1.options_scope, '--foo')
+
+    with self.warnings_catcher() as w:
+      vals1 = options.for_scope(DummyOptionable1.options_scope)
+
+    # Check that we got no warnings and that the actual scope took precedence.
+    self.assertEquals(0, len(w))
+    self.assertEquals('xx', vals1.foo)
