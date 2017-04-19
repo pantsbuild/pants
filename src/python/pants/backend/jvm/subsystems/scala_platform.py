@@ -23,7 +23,7 @@ major_version_info = namedtuple('major_version_info', ['full_version'])
 # runtime library (when compiling plugins, which require the compiler library as a dependency).
 scala_build_info = {
   '2.10': major_version_info(full_version='2.10.6'),
-  '2.11': major_version_info(full_version='2.11.9'),
+  '2.11': major_version_info(full_version='2.11.11'),
   '2.12': major_version_info(full_version='2.12.2'),
 }
 
