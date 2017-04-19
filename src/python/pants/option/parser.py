@@ -453,8 +453,9 @@ class Parser(object):
     config_details = None
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
     config_default_val_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
-    config_val_str = expand(self._config.get(config_section, dest, default=None, use_default_section=False))
-    config_source_file = self._config.get_source_for_option(config_section, dest)
+    config_val_str = expand(self._config.get(config_section, dest, default=None))
+    config_source_file = (self._config.get_source_for_option(config_section, dest) or
+        self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
       config_details = 'in {}'.format(config_source_file)
