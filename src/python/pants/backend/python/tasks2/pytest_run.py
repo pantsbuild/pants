@@ -73,11 +73,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
     register('--fast', type=bool, default=True,
-             removal_version='1.5.0.dev0',
-             removal_hint='Unused. In the new pipeline tests are always run in "fast" mode.',
-             help='Run all tests in a single chroot. If turned off, each test target will '
-                  'create a new chroot, which will be much slower, but more correct, as the '
-                  'isolation verifies that all dependencies are correctly declared.')
+             help='Run all tests in a single pytest invocation. If turned off, each test target '
+                  'will run in its own pytest invocation, which will be slower, but isolates '
+                  'tests from process-wide state created by test in other targets.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
@@ -121,11 +119,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     test_targets = self._get_test_targets()
     if test_targets:
       self.context.release_lock()
-      with self.context.new_workunit(name='run',
-                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
-        result = self._do_run_tests(test_targets, workunit)
-        if not result.success:
-          raise ErrorWhileTesting(failed_targets=result.failed_targets)
+      self._run_tests(test_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
@@ -216,7 +210,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       yield args, coverage_rc
 
   @contextmanager
-  def _maybe_emit_coverage_data(self, targets, pex, workunit):
+  def _maybe_emit_coverage_data(self, targets, pex):
     coverage = self.get_options().coverage
     if coverage is None:
       yield []
@@ -284,8 +278,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         env = {
           'PEX_MODULE': 'coverage.cmdline:main'
         }
-        def pex_run(args):
-          return self._pex_run(pex, workunit, args=args, env=env)
+        def pex_run(arguments):
+          return self._pex_run(pex, workunit_name='coverage', args=arguments, env=env)
 
         # On failures or timeouts, the .coverage file won't be written.
         if not os.path.exists('.coverage'):
@@ -295,8 +289,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
           # This swaps the /tmp pex chroot source paths for the local original source paths
           # the pex was generated from and which the user understands.
           shutil.move('.coverage', '.coverage.raw')
-          pex_run(args=['combine', '--rcfile', coverage_rc])
-          pex_run(args=['report', '-i', '--rcfile', coverage_rc])
+          pex_run(['combine', '--rcfile', coverage_rc])
+          pex_run(['report', '-i', '--rcfile', coverage_rc])
           if self.get_options().coverage_output_dir:
             target_dir = self.get_options().coverage_output_dir
           else:
@@ -304,9 +298,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
             pants_distdir = self.context.options.for_global_scope().pants_distdir
             target_dir = os.path.join(pants_distdir, 'coverage', relpath)
           safe_mkdir(target_dir)
-          pex_run(args=['html', '-i', '--rcfile', coverage_rc, '-d', target_dir])
+          pex_run(['html', '-i', '--rcfile', coverage_rc, '-d', target_dir])
           coverage_xml = os.path.join(target_dir, 'coverage.xml')
-          pex_run(args=['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml])
+          pex_run(['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml])
 
   def _get_shard_conftest_content(self):
     shard_spec = self.get_options().test_shard
@@ -426,16 +420,16 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     # Here both invariants hold, so they will hold on entry on a subsequent run too.
 
   @contextmanager
-  def _test_runner(self, targets, sources_map, workunit):
+  def _test_runner(self, targets, sources_map):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
     pex = self.create_pex(pex_info)
 
     with self._conftest(sources_map):
-      with self._maybe_emit_coverage_data(targets, pex, workunit) as coverage_args:
+      with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
         yield pex, [] + coverage_args
 
-  def _do_run_tests_with_args(self, pex, workunit, args):
+  def _do_run_tests_with_args(self, pex, args):
     try:
       # The pytest runner we use accepts a --pdb argument that will launch an interactive pdb
       # session on any test failure.  In order to support use of this pass-through flag we must
@@ -454,8 +448,11 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       profile = self.get_options().profile
       if profile:
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
-      rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True, env=env)
-      return PythonTestResult.rc(rc)
+
+      with self.context.new_workunit(name='run',
+                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
+        rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
+        return PythonTestResult.rc(rc)
     except ErrorWhileTesting:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
       # fail with a ErrorWhileTesting. We can't just set PythonTestResult
@@ -498,7 +495,25 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
     return failed_targets
 
-  def _do_run_tests(self, targets, workunit):
+  def _run_tests(self, targets):
+    if self.get_options().fast:
+      result = self._do_run_tests(targets)
+      if not result.success:
+        raise ErrorWhileTesting(failed_targets=result.failed_targets)
+    else:
+      results = {}
+      for target in targets:
+        rv = self._do_run_tests([target])
+        results[target] = rv
+        if not rv.success and self.get_options().fail_fast:
+          break
+      for target in sorted(results):
+        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
+      failed_targets = [target for target, _rv in results.items() if not _rv.success]
+      if failed_targets:
+        raise ErrorWhileTesting(failed_targets=failed_targets)
+
+  def _do_run_tests(self, targets):
     if not targets:
       return PythonTestResult.rc(0)
 
@@ -513,7 +528,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     if not sources_map:
       return PythonTestResult.rc(0)
 
-    with self._test_runner(targets, sources_map, workunit) as (pex, test_args):
+    with self._test_runner(targets, sources_map) as (pex, test_args):
       # Validate that the user didn't provide any passthru args that conflict
       # with those we must set ourselves.
       for arg in self.get_passthru_args():
@@ -537,7 +552,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       args.extend(test_args)
       args.extend(sources_map.keys())
 
-      result = self._do_run_tests_with_args(pex, workunit, args)
+      result = self._do_run_tests_with_args(pex, args)
       external_junit_xml_dir = self.get_options().junit_xml_dir
       if external_junit_xml_dir:
         safe_mkdir(external_junit_xml_dir)
@@ -545,9 +560,11 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
       return result.with_failed_targets(failed_targets)
 
-  def _pex_run(self, pex, workunit, args, env):
-    process = self._spawn(pex, workunit, args, setsid=False, env=env)
-    return process.wait()
+  def _pex_run(self, pex, workunit_name, args, env):
+    with self.context.new_workunit(name=workunit_name,
+                                   labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
+      process = self._spawn(pex, workunit, args, setsid=False, env=env)
+      return process.wait()
 
   def _spawn(self, pex, workunit, args, setsid=False, env=None):
     env = env or {}
