@@ -31,7 +31,7 @@ class OptionValueContainer(object):
     """Returns the keys for any values that were set explicitly (via flag, config, or env var)."""
     ret = []
     for k, v in self._value_map.items():
-      if v.rank > RankedValue.HARDCODED:
+      if v.rank > RankedValue.CONFIG_DEFAULT:
         ret.append(k)
     return ret
 
