@@ -12,7 +12,7 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
 
   def test_run_repl(self):
     # Run a repl on a library target. Avoid some known-to-choke-on interpreters.
-    command = ['repl2',
+    command = ['repl',
                'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
                '--python-setup-interpreter-constraints=CPython>=2.6,<3',
                '--python-setup-interpreter-constraints=CPython>=3.3',

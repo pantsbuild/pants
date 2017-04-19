@@ -65,15 +65,6 @@ python_tests(
 )
 
 python_tests(
-  name='python_repl_integration',
-  sources=['test_python_repl_integration.py'],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name='python_isort_task',
   sources=['test_python_isort.py'],
   dependencies=[
