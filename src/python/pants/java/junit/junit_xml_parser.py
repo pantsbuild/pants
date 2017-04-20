@@ -156,7 +156,11 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
             test = Test(classname=testcase.getAttribute('classname'),
                         methodname=testcase.getAttribute('name'))
             target = test_registry.get_owning_target(test)
-            failed_targets[target].add(test)
+            # There are some cases where we'll fail to find an owning target; in which case its
+            # better to have partial failure results, than none at all due to an internal error.
+            # See: https://github.com/pantsbuild/pants/pull/4055
+            if target:
+              failed_targets[target].add(test)
     except (XmlParser.XmlError, ValueError) as e:
       error_handler(ParseError(path, e))
 
