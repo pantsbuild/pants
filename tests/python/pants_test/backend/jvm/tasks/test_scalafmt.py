@@ -16,14 +16,14 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     target = '{}/badscalastyle'.format(TEST_DIR)
     # test should fail because of style error.
     failing_test = self.run_pants(['compile', target],
-      {'compile.scalafmt':{'skip':'False'}})
+      {'lint.scalafmt':{'skip':'False'}})
     self.assert_failure(failing_test)
 
   def test_scalafmt_fail(self):
     target = '{}/badscalastyle'.format(TEST_DIR)
     # test should fail because of style error.
     failing_test = self.run_pants(['compile', target],
-      {'compile.scalafmt':{'skip':'False',
+      {'lint.scalafmt':{'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'}})
     self.assert_failure(failing_test)
 
@@ -31,7 +31,7 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     target = '{}/badscalastyle'.format(TEST_DIR)
     # test should pass because of scalafmt disabled.
     failing_test = self.run_pants(['compile', target],
-      {'compile.scalafmt': {'skip':'True'}})
+      {'lint.scalafmt': {'skip':'True'}})
     self.assert_success(failing_test)
 
   def test_scalafmt_format_default_config(self):
@@ -55,7 +55,7 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     self.assert_success(fmt_result)
 
     # verify that the compile check not passes.
-    test_fmt = self.run_pants(['compile', target], {'compile.scalafmt':options})
+    test_fmt = self.run_pants(['compile', target], {'lint.scalafmt':options})
     self.assert_success(test_fmt)
 
     # restore the file to its original state.
@@ -67,6 +67,6 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     target = '{}/badscalastyle:as_resources'.format(TEST_DIR)
     # test should succeed because the target is not in `target-types`.
     run = self.run_pants(['compile', target],
-      {'compile.scalafmt':{'skip':'False',
+      {'lint.scalafmt':{'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'}})
     self.assert_success(run)
