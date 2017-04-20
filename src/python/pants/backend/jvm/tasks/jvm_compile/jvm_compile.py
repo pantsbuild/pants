@@ -734,10 +734,9 @@ class JvmCompile(NailgunTaskBase):
 
     # Register classfile product dependencies (if requested).
     if product_deps_by_src is not None:
-      if __name__ == '__main__':
-        for compile_context in compile_contexts:
-          product_deps_by_src[compile_context.target] = \
-              self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
+      for compile_context in compile_contexts:
+        product_deps_by_src[compile_context.target] = \
+            self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
 
     # Register the zinc args used to compile the target (if requested).
     if zinc_args is not None:
