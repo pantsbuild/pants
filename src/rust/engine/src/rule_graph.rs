@@ -147,7 +147,7 @@ impl Entry {
 ///
 /// A key for the Selects used from a rule. Rules are only picked up by Select selectors. These keys uniquely identify the
 /// selects used by a particular entry in the rule graph so that they can be mapped to the dependencies they correspond
-// to.
+/// to.
 ///
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum SelectKey {
