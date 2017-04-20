@@ -75,7 +75,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     register('--fast', type=bool, default=True,
              help='Run all tests in a single pytest invocation. If turned off, each test target '
                   'will run in its own pytest invocation, which will be slower, but isolates '
-                  'tests from process-wide state created by test in other targets.')
+                  'tests from process-wide state created by tests in other targets.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
