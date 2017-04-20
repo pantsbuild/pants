@@ -78,7 +78,7 @@ impl Scheduler {
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::select(product)
+      selectors::Selector::Select(selectors::Select::without_variant(product))
     );
     self.roots.push(
       Root::Select(Select::new(product,

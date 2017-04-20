@@ -143,15 +143,21 @@ impl Entry {
   }
 }
 
+
+///
+/// A key for the Selects used from a rule. Rules are only picked up by Select selectors. These keys uniquely identify the
+/// selects used by a particular entry in the rule graph so that they can be mapped to the dependencies they correspond
+// to.
+///
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub enum SelectorPath {
+pub enum SelectKey {
   // A bare select with no projection.
   JustSelect(Select),
   // The initial select of a multi-select operator, eg SelectDependencies.
   NestedSelect(Selector, Select),
-  // The projected select of a multi-select operator when there can only be one projected type.
+  // The projected select of a multi-select operator when there can be only be one projected type.
   ProjectedNestedSelect(Selector, TypeId, Select),
-  // The projected select of a multi-select operator when there can multiple projected types.
+  // The projected select of a multi-select operator when there can be multiple projected types.
   ProjectedMultipleNestedSelect(Selector, Vec<TypeId>, Select),
   // No selector. Used for tasks with no dependencies.
   Nothing
@@ -316,7 +322,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   SelectorPath::JustSelect(select.clone()),
+                                   SelectKey::JustSelect(select.clone()),
                                    rules_or_literals_for_selector);
               },
               &Selector::SelectDependencies(SelectDependencies{ref product, ref dep_product, ref field_types, ..}) |
@@ -330,7 +336,7 @@ impl <'t> GraphMaker<'t> {
                                      &entry,
                                      entry.subject_type(),
                                      format!("no matches for {} when resolving {}",
-                                             selector_str(&Selector::select(initial_selector)),
+                                             selector_str(&Selector::Select(Select::without_variant(initial_selector))),
                                              selector_str(selector)));
                   was_unfulfillable = true;
                   continue;
@@ -348,7 +354,7 @@ impl <'t> GraphMaker<'t> {
                                            &entry,
                                            t.clone(),
                                            format!("no matches for {} when resolving {}",
-                                                   selector_str(&Selector::select(*product)),
+                                                   selector_str(&Selector::Select(Select::without_variant(*product))),
                                                    selector_str(selector))
                         );
                     }
@@ -360,7 +366,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   SelectorPath::NestedSelect(
+                                   SelectKey::NestedSelect(
                                      selector.clone(),
                                      Select::without_variant(*dep_product)),
                                    initial_rules_or_literals);
@@ -370,7 +376,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   SelectorPath::ProjectedMultipleNestedSelect(
+                                   SelectKey::ProjectedMultipleNestedSelect(
                                      selector.clone(),
                                      field_types.clone(),
                                      Select::without_variant(*product)),
@@ -386,7 +392,7 @@ impl <'t> GraphMaker<'t> {
                                      &entry,
                                      entry.subject_type(),
                                      format!("no matches for {} when resolving {}",
-                                             selector_str(&Selector::select(initial_selector)),
+                                             selector_str(&Selector::Select(Select::without_variant(initial_selector))),
                                              selector_str(selector)));
                   was_unfulfillable = true;
                   continue
@@ -400,7 +406,7 @@ impl <'t> GraphMaker<'t> {
                                      &entry,
                                      select.projected_subject,
                                      format!("no matches for {} when resolving {}",
-                                             selector_str(&Selector::select(select.product)),
+                                             selector_str(&Selector::Select(Select::without_variant(select.product))),
                                              selector_str(selector)));
                   was_unfulfillable = true;
                   continue
@@ -411,7 +417,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   SelectorPath::NestedSelect(
+                                   SelectKey::NestedSelect(
                                      selector.clone(),
                                      Select::without_variant(initial_selector)),
                                    initial_rules_or_literals);
@@ -420,7 +426,7 @@ impl <'t> GraphMaker<'t> {
                                    &mut unfulfillable_rules,
                                    &mut root_rule_dependency_edges,
                                    &entry,
-                                   SelectorPath::ProjectedNestedSelect(
+                                   SelectKey::ProjectedNestedSelect(
                                      selector.clone(),
                                      select.projected_subject,
                                      Select::without_variant(select.product)),
@@ -439,7 +445,7 @@ impl <'t> GraphMaker<'t> {
                            &mut unfulfillable_rules,
                            &mut root_rule_dependency_edges,
                            &entry,
-                           SelectorPath::Nothing,
+                           SelectKey::Nothing,
                            vec![]);
       }
     }
@@ -461,7 +467,7 @@ impl <'t> GraphMaker<'t> {
     // Deforestation. Leaping from tree to tree.
 
     let mut removal_traversal: VecDeque<_> = rule_graph.unfulfillable_rules.keys()
-      .map(|r| r.clone())
+      .cloned()
       .collect();
     // could experiment with doing this for each rule added and deduping the traversal list
     while let Some(unfulfillable_entry) = removal_traversal.pop_front() {
@@ -791,7 +797,7 @@ impl RuleGraph {
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges {
   dependencies: Entries,
-  selector_to_dependencies: HashMap<SelectorPath, Entries>
+  dependencies_by_select_key: HashMap<SelectKey, Entries>
 }
 
 
@@ -800,23 +806,23 @@ impl RuleEdges {
   pub fn new() -> RuleEdges {
     RuleEdges {
       dependencies: vec![],
-      selector_to_dependencies: HashMap::new()
+      dependencies_by_select_key: HashMap::new()
     }
   }
 
-  pub fn entries_for(&self, selector_path: &SelectorPath) -> Entries {
-    self.selector_to_dependencies.get(selector_path).map(|x|x.clone()).unwrap_or_else(|| Vec::new())
+  pub fn entries_for(&self, select_key: &SelectKey) -> Entries {
+    self.dependencies_by_select_key.get(select_key).cloned().unwrap_or_else(|| Vec::new())
   }
 
   pub fn is_empty(&self) -> bool {
     self.dependencies.is_empty()
   }
 
-  fn add_edges_via(&mut self, selector_path: SelectorPath, new_dependencies: &Entries) {
-    if SelectorPath::Nothing == selector_path && !new_dependencies.is_empty() {
+  fn add_edges_via(&mut self, select_key: SelectKey, new_dependencies: &Entries) {
+    if SelectKey::Nothing == select_key && !new_dependencies.is_empty() {
       panic!("Cannot specify a None selector with non-empty dependencies!")
     }
-    let mut deps_for_selector = self.selector_to_dependencies.entry(selector_path).or_insert(vec![]);
+    let mut deps_for_selector = self.dependencies_by_select_key.entry(select_key).or_insert(vec![]);
     for d in new_dependencies {
       if !deps_for_selector.contains(d) {
         deps_for_selector.push(d.clone());
@@ -827,15 +833,15 @@ impl RuleEdges {
     }
   }
 
-  fn has_edges_for(&self, selector_path: &SelectorPath) -> bool {
-    self.selector_to_dependencies.contains_key(selector_path)
+  fn has_edges_for(&self, select_key: &SelectKey) -> bool {
+    self.dependencies_by_select_key.contains_key(select_key)
   }
 
   fn makes_unfulfillable(&self, dep_to_eliminate: &Entry) -> bool {
     // Returns true if removing dep_to_eliminate makes this set of edges unfulfillable.
     if self.dependencies.len() == 1 && &self.dependencies[0] == dep_to_eliminate {
       true
-    } else if self.selector_to_dependencies.values().any(|deps| deps.len() == 1 && &deps[0] == dep_to_eliminate) {
+    } else if self.dependencies_by_select_key.values().any(|deps| deps.len() == 1 && &deps[0] == dep_to_eliminate) {
       true
     } else {
       false
@@ -844,7 +850,7 @@ impl RuleEdges {
 
   fn remove_rule(&mut self, dep: &Entry) {
     self.dependencies.retain(|d| d != dep);
-    for (_, deps) in self.selector_to_dependencies.iter_mut() {
+    for (_, deps) in self.dependencies_by_select_key.iter_mut() {
       deps.retain(|d| d != dep);
     }
   }
@@ -859,7 +865,7 @@ fn update_edges_based_on_unfulfillable_entry<K>(edge_container: &mut HashMap<K, 
         K: Eq + Hash + Clone + fmt::Debug
 {
   let keys: Vec<_> = edge_container.keys()
-    .map(|c| c.clone())
+    .cloned()
     .collect();
 
   for current_entry in keys {
@@ -913,7 +919,7 @@ fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
                       unfulfillable_rules: &mut UnfulfillableRuleMap,
                       root_rule_dependency_edges: &mut RootRuleDependencyEdges,
                       entry: &Entry,
-                      selector_path: SelectorPath,
+                      select_key: SelectKey,
                       dep_rules: Entries) {
   {
     let rule_deps: &RuleDependencyEdges = rule_dependency_edges;
@@ -924,22 +930,22 @@ fn add_rules_to_graph(rules_to_traverse: &mut VecDeque<Entry>,
         &Entry::Root(ref r) => !root_rule_dependency_edges.contains_key(&r),
         _ => true
       })
-      .map(|g| g.clone());
+      .cloned();
     rules_to_traverse.extend(unseen_dep_rules);
   }
   match entry {
     &Entry::Root(ref root_entry) => {
       let mut edges = root_rule_dependency_edges.entry(root_entry.clone()).or_insert(RuleEdges::new());
-      edges.add_edges_via(selector_path, &dep_rules);
+      edges.add_edges_via(select_key, &dep_rules);
     },
     &Entry::InnerEntry(ref inner_entry) => {
       let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(RuleEdges::new());
-      if edges.has_edges_for(&selector_path) {
+      if edges.has_edges_for(&select_key) {
         // This is an error that should only happen if there's a bug in the algorithm, but it
         // might make sense to expose it in a more friendly way.
-        panic!("Rule {:?} already has dependencies set for selector {:?}", entry, selector_path)
+        panic!("Rule {:?} already has dependencies set for selector {:?}", entry, select_key)
       }
-      edges.add_edges_via(selector_path, &dep_rules);
+      edges.add_edges_via(select_key, &dep_rules);
     },
     _ => {
       // these should have already been filtered out before this was called.

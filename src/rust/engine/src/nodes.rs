@@ -131,12 +131,12 @@ impl Select {
              variants: Variants,
              edges: &rule_graph::RuleEdges) -> Select {
     let selector = selectors::Select::without_variant(product);
-    let selector_path = rule_graph::SelectorPath::JustSelect(selector.clone());
+    let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
     Select {
       selector: selector,
       subject: subject,
       variants: variants,
-      entries: edges.entries_for(&selector_path)
+      entries: edges.entries_for(&select_key)
     }
   }
 
@@ -146,12 +146,12 @@ impl Select {
     variants: Variants,
     edges: &rule_graph::RuleEdges
   ) -> Select {
-    let selector_path = rule_graph::SelectorPath::JustSelect(selector.clone());
+    let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
     Select {
       selector: selector,
       subject: subject,
       variants: variants,
-      entries: edges.entries_for(&selector_path)
+      entries: edges.entries_for(&select_key)
         .into_iter()
         .filter(|e| e.matches_subject_type(subject.type_id().clone()))
         .collect()
@@ -416,13 +416,13 @@ impl SelectDependencies {
   ) -> SelectDependencies {
     // filters entries by whether the subject type is the right subject type
     let dep_p_entries = edges.entries_for(
-      &rule_graph::SelectorPath::NestedSelect(
+      &rule_graph::SelectKey::NestedSelect(
         Selector::SelectDependencies(selector.clone()),
         selectors::Select::without_variant(selector.clone().dep_product)
       )
     );
     let p_entries = edges.entries_for(
-      &rule_graph::SelectorPath::ProjectedMultipleNestedSelect(
+      &rule_graph::SelectKey::ProjectedMultipleNestedSelect(
         Selector::SelectDependencies(selector.clone()),
         selector.field_types.clone(),
         selectors::Select::without_variant(selector.product.clone())
@@ -445,10 +445,11 @@ impl SelectDependencies {
     let dep_subject_key = externs::key_for(dep_subject);
     context.get(
       Select {
-        selector: selectors::Select { product: self.selector.product, variant_key: None },
+        selector: selectors::Select::without_variant(self.selector.product),
         subject: dep_subject_key,
         variants: self.variants.clone(),
-        // NB: Filtering by the concrete subject type, since we know it.
+        // NB: We're filtering out all of the entries for field types other than
+        //    dep_subject's since none of them will match.
         entries: self.product_entries.clone().into_iter()
                                              .filter(|e| e.matches_subject_type(dep_subject_key.type_id().clone()))
                                              .collect()
@@ -536,13 +537,13 @@ impl SelectTransitive {
     edges: &rule_graph::RuleEdges
   ) -> SelectTransitive {
     let dep_p_entries = edges.entries_for(
-      &rule_graph::SelectorPath::NestedSelect(
+      &rule_graph::SelectKey::NestedSelect(
         Selector::SelectTransitive(selector.clone()),
         selectors::Select::without_variant(selector.clone().dep_product)
       )
     );
     let p_entries = edges.entries_for(
-      &rule_graph::SelectorPath::ProjectedMultipleNestedSelect(
+      &rule_graph::SelectKey::ProjectedMultipleNestedSelect(
         Selector::SelectTransitive(selector.clone()),
         selector.field_types.clone(),
         selectors::Select::without_variant(selector.clone().product)
@@ -568,10 +569,11 @@ impl SelectTransitive {
     context
       .get(
         Select {
-          selector: selectors::Select { product: self.selector.product, variant_key: None },
+          selector: selectors::Select::without_variant(self.selector.product),
           subject: subject_key,
           variants: self.variants.clone(),
-          // NB: Filtering by the matching subject type, since we now have a concrete one.
+          // NB: We're filtering out all of the entries for field types other than
+          //     subject_key's since none of them will match.
           entries: self.product_entries.clone().into_iter()
                                                .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
                                                .collect()
@@ -694,13 +696,13 @@ impl SelectProjection {
          edges: &rule_graph::RuleEdges
   ) -> SelectProjection {
     let dep_p_entries = edges.entries_for(
-      &rule_graph::SelectorPath::NestedSelect(
+      &rule_graph::SelectKey::NestedSelect(
         Selector::SelectProjection(selector.clone()),
         selectors::Select::without_variant(selector.clone().input_product)
       )
     );
     let p_entries = edges.entries_for(
-      &rule_graph::SelectorPath::ProjectedNestedSelect(
+      &rule_graph::SelectKey::ProjectedNestedSelect(
         Selector::SelectProjection(selector.clone()),
         selector.projected_subject.clone(),
         selectors::Select::without_variant(selector.clone().product)
@@ -746,7 +748,8 @@ impl Node for SelectProjection {
                   selector: selectors::Select::without_variant(self.selector.product),
                   subject: externs::key_for(&projected_subject),
                   variants: self.variants.clone(),
-                  // NB: We don't need to filter by subject here, because there is only one projected type.
+                  // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by subject here,
+                   //    because there is only one projected type.
                   entries: self.projected_entries.clone()
                 }
               )
