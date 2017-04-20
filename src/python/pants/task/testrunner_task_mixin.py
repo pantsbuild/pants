@@ -213,6 +213,6 @@ class TestRunnerTaskMixin(object):
   def _execute(self, all_targets):
     """Actually goes ahead and runs the tests for the targets.
 
-    :param targets: list of the targets whose tests are to be run
+    :param all_targets: list of the targets whose tests are to be run
     """
     raise NotImplementedError

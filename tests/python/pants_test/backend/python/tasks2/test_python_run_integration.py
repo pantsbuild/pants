@@ -22,12 +22,12 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as interpreters_cache:
       pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
       pants_run_27 = self.run_pants(
-        command=['run2', '{}:echo_interpreter_version_2.7'.format(self.testproject)],
+        command=['run', '{}:echo_interpreter_version_2.7'.format(self.testproject)],
         config=pants_ini_config
       )
       self.assert_success(pants_run_27)
       pants_run_26 = self.run_pants(
-        command=['run2', '{}:echo_interpreter_version_2.6'.format(self.testproject),
+        command=['run', '{}:echo_interpreter_version_2.6'.format(self.testproject),
                  '--python-setup-interpreter-constraints=CPython>=2.6,<3',
                  '--python-setup-interpreter-constraints=CPython>=3.3'],
         config=pants_ini_config
@@ -35,7 +35,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run_26)
 
   def test_die(self):
-    command = ['run2',
+    command = ['run',
                '{}:die'.format(self.testproject),
                '--python-setup-interpreter-constraints=CPython>=2.6,<3',
                '--python-setup-interpreter-constraints=CPython>=3.3',
@@ -59,7 +59,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     binary_target = '{}:{}'.format(self.testproject, binary_name)
     # Build a pex.
     # Avoid some known-to-choke-on interpreters.
-    command = ['run2',
+    command = ['run',
                binary_target,
                '--python-setup-interpreter-constraints=CPython>=2.6,<3',
                '--python-setup-interpreter-constraints=CPython>=3.3',

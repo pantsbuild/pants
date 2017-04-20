@@ -9,6 +9,12 @@ pub struct Select {
   pub variant_key: Option<String>,
 }
 
+impl Select {
+  pub fn without_variant(product: TypeConstraint) -> Select {
+    Select { product: product, variant_key: None }
+  }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
   pub product: TypeConstraint,
@@ -42,15 +48,4 @@ pub enum Selector {
   SelectDependencies(SelectDependencies),
   SelectTransitive(SelectTransitive),
   SelectProjection(SelectProjection),
-}
-
-impl Selector {
-  pub fn select(product: TypeConstraint) -> Selector {
-    Selector::Select(
-      Select {
-        product: product,
-        variant_key: None,
-      }
-    )
-  }
 }
