@@ -13,7 +13,6 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.pytest_run import PytestRun
 from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
@@ -22,6 +21,7 @@ from pants.backend.python.tasks2.python_run import PythonRun
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.backend.python.tasks2.setup_py import SetupPy
+from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
@@ -58,10 +58,3 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='isort', action=IsortPythonTask).install('fmt')
-
-  # Integration tests of the new pipeline still use the `*2` aliases.
-  task(name='py', action=PythonRun).install('run2')
-  task(name='pytest', action=PytestRun).install('test2')
-  task(name='py', action=PythonRepl).install('repl2')
-  task(name='py', action=PythonBinaryCreate).install('binary2')
-  task(name='setup-py2', action=SetupPy).install()

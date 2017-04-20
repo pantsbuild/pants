@@ -33,7 +33,7 @@ plus two extra:
   the target name.
   
 Building a plugin target will, in addition to compiling the code, generate
-the appropriate metadata into `scalac-plugin.xm`, so
+the appropriate metadata into `scalac-plugin.xml`, so
 that scalac can load the plugin by name at runtime.
 
 A plugin may be published for later consumption in any repo. It can also
@@ -76,8 +76,8 @@ These are specified like this:
 ```
 scala_library(
   ...
-  scalac_plugins: ['simple_scalac_plugin'],
-  scalac_plugin_args: {
+  scalac_plugins=['simple_scalac_plugin'],
+  scalac_plugin_args={
       'simple_scalac_plugin': ['arg1', 'arg2']
     }
 )
@@ -87,13 +87,14 @@ scala_library(
 
 In order to load a plugin, it has to be on scalac's classpath. 
 This can be achieved in one of two ways:
+
 - Have targets that must be compiled with a plugin depend (directly or indirectly) 
 either on the `scalac_plugin` target, or on a `jar_library` pointing to a published version
 of the plugin.
 - Have a `scalac-plugin-dep` target in `BUILD.tools`:
- 
+
 ```
-jar_library(name='scala-plugin-dep',
+jar_library(name='scalac-plugin-dep',
             jars = [jar(org='com.foo', name='foo_plugin', rev='1.2.3')],
 ```
 

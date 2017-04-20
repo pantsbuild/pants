@@ -71,9 +71,9 @@ that.""",
     self._check_defaults(self.config.get, '')
     self._check_defaults(self.config.get, '42')
 
-  def test_default_section_fallback(self):
-    self.assertEquals('foo', self.config.get('defined_section', 'name'))
-    self.assertEquals('foo', self.config.get('not_a_defined_section', 'name'))
+  def test_default_section(self):
+    self.assertEquals('foo', self.config.get(Config.DEFAULT_SECTION, 'name'))
+    self.assertEquals('foo', self.config.get(Config.DEFAULT_SECTION, 'name'))
 
   def test_sections(self):
     self.assertEquals(['a', 'b', 'defined_section'], self.config.sections())

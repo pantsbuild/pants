@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import threading
 
 import six
 
@@ -28,9 +27,6 @@ class LegacyPythonCallbacksParser(Parser):
   This parser attempts to be compatible with existing legacy BUILD files and concepts including
   macros and target factories.
   """
-
-  _objects = []
-  _lock = threading.Lock()
 
   @classmethod
   @memoized_method
@@ -73,7 +69,7 @@ class LegacyPythonCallbacksParser(Parser):
         if name and self._serializable:
           kwargs.setdefault('type_alias', self._type_alias)
           obj = self._object_type(**kwargs)
-          cls._objects.append(obj)
+          parse_context._storage.add(obj)
           return obj
         else:
           return self._object_type(*args, **kwargs)
@@ -115,9 +111,7 @@ class LegacyPythonCallbacksParser(Parser):
     symbols, parse_context = cls._get_symbols(symbol_table_cls)
     python = filecontent
 
-    with cls._lock:
-      # Mutate the parse context for the new path.
-      parse_context._rel_path = os.path.dirname(filepath)
-      del cls._objects[:]
-      six.exec_(python, symbols)
-      return list(cls._objects)
+    # Mutate the parse context for the new path, then exec, and copy the resulting objects.
+    parse_context._storage.clear(os.path.dirname(filepath))
+    six.exec_(python, symbols)
+    return list(parse_context._storage.objects)

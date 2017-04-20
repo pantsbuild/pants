@@ -18,7 +18,7 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
 
     sdist_path = 'dist/pantsbuild.pants.distance-thrift-python-0.0.1.tar.gz'
 
-    command = ['setup-py2',
+    command = ['setup-py',
                'examples/src/thrift/org/pantsbuild/example/distance:distance-python']
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)

@@ -41,7 +41,6 @@ python_tests(
   name='pytest_run',
   sources=['test_pytest_run.py'],
   dependencies=[
-    '3rdparty/python:coverage',
     '3rdparty/python:pex',
     '3rdparty/python:mock',
     ':python_task_test_base',
@@ -63,15 +62,6 @@ python_tests(
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
   ]
-)
-
-python_tests(
-  name='python_repl_integration',
-  sources=['test_python_repl_integration.py'],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
 )
 
 python_tests(

@@ -43,7 +43,7 @@ class Test(datatype('Test', ['classname', 'methodname'])):
       return '{}#{}'.format(self.classname, self.methodname)
 
 
-class TestRegistry(object):
+class RegistryOfTests(object):
   """A registry of tests and the targets that own them."""
 
   def __init__(self, mapping_or_seq):
@@ -133,7 +133,7 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
   Targets with no failed tests are omitted from the returned mapping.
 
   :param test_registry: A registry of tests that were run.
-  :type test_registry: :class:`TestRegistry`
+  :type test_registry: :class:`RegistryOfTests`
   :param string junit_xml_path: A path to a file or directory containing test junit xml reports
                                 to analyze.
   :param error_handler: An error handler that will be called with any junit xml parsing errors.

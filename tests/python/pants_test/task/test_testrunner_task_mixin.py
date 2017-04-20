@@ -9,7 +9,7 @@ import collections
 
 from mock import patch
 
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.process_handler import ProcessHandler
@@ -131,7 +131,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
 
     self.set_options(timeouts=True, timeout_maximum=1, timeout_default=10)
     task = self.create_task(self.context())
-    with self.assertRaises(TestFailedTaskError):
+    with self.assertRaises(ErrorWhileTesting):
       task.execute()
 
 
@@ -186,7 +186,7 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
     with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
       mock_timeout().__exit__.side_effect = TimeoutReached(1)
 
-      with self.assertRaises(TestFailedTaskError):
+      with self.assertRaises(ErrorWhileTesting):
         task.execute()
 
       # Ensures that Timeout is instantiated with a 1 second timeout.
@@ -279,7 +279,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
       mock_timer.side_effect = set_handler
 
 
-      with self.assertRaises(TestFailedTaskError):
+      with self.assertRaises(ErrorWhileTesting):
         task.execute()
 
       # Ensure that all the calls we want to kill the process gracefully are made.
@@ -301,7 +301,7 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
       mock_timer.side_effect = set_handler
 
 
-      with self.assertRaises(TestFailedTaskError):
+      with self.assertRaises(ErrorWhileTesting):
         task.execute()
 
       # Ensure that we only call terminate, and not kill.
@@ -355,13 +355,13 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
       task = self.create_task(self.context())
 
       task.current_targets = [targetA]
-      with self.assertRaises(TestFailedTaskError) as cm:
+      with self.assertRaises(ErrorWhileTesting) as cm:
         task.execute()
       self.assertEqual(len(cm.exception.failed_targets), 1)
       self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetA')
 
       task.current_targets = [targetB]
-      with self.assertRaises(TestFailedTaskError) as cm:
+      with self.assertRaises(ErrorWhileTesting) as cm:
         task.execute()
       self.assertEqual(len(cm.exception.failed_targets), 1)
       self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetB')

@@ -19,11 +19,11 @@ from pants.engine.fs import PathGlobs, create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.scheduler import WrappedNativeScheduler
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
-from pants_test.engine.test_mapper import TargetTable
+from pants_test.engine.util import TargetTable
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
@@ -329,8 +329,8 @@ class RuleGraphMakerTest(unittest.TestCase):
       else:
         pass
 
-    self.assertEquals(31, len(all_rules))
-    self.assertEquals(56, len(root_rule_lines)) # 2 lines per entry
+    self.assertEquals(36, len(all_rules))
+    self.assertEquals(66, len(root_rule_lines)) # 2 lines per entry
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [
@@ -493,6 +493,28 @@ class RuleGraphMakerTest(unittest.TestCase):
                          "Select(A) for SubA" -> {"(A, (,), noop) of SubA"}
                        // internal entries
                          "(A, (,), noop) of SubA" -> {}
+                     }""").strip(),
+      subgraph)
+
+  def test_select_transitive_with_separate_types_for_subselectors(self):
+    rules = [
+      TaskRule(Exactly(A), [SelectTransitive(B, C, field_types=(D,))], noop),
+      TaskRule(B, [Select(D)], noop),
+      TaskRule(C, [Select(SubA)], noop)
+    ]
+
+    subgraph = self.create_subgraph(A, rules, SubA())
+
+    self.assert_equal_with_printing(dedent("""
+                     digraph {
+                       // root subject types: SubA
+                       // root entries
+                         "Select(A) for SubA" [color=blue]
+                         "Select(A) for SubA" -> {"(A, (SelectTransitive(B, C, field_types=(D,)),), noop) of SubA"}
+                       // internal entries
+                         "(A, (SelectTransitive(B, C, field_types=(D,)),), noop) of SubA" -> {"(C, (Select(SubA),), noop) of SubA" "(B, (Select(D),), noop) of D"}
+                         "(B, (Select(D),), noop) of D" -> {"SubjectIsProduct(D)"}
+                         "(C, (Select(SubA),), noop) of SubA" -> {"SubjectIsProduct(SubA)"}
                      }""").strip(),
       subgraph)
 
