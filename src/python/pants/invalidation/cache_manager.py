@@ -264,8 +264,10 @@ class InvalidationCacheManager(object):
     self._artifact_write_callback = artifact_write_callback
     self.invalidation_report = invalidation_report
 
-    # Create the task-versioned prefix of the results dir, and a stable symlink to it (useful when debugging).
-    self._results_dir_prefix = os.path.join(results_dir_root, sha1(self._task_version).hexdigest()[:12])
+    # Create the task-versioned prefix of the results dir, and a stable symlink to it
+    # (useful when debugging).
+    self._results_dir_prefix = os.path.join(results_dir_root,
+                                            sha1(self._task_version).hexdigest()[:12])
     safe_mkdir(self._results_dir_prefix)
     stable_prefix = os.path.join(results_dir_root, self._STABLE_DIR_NAME)
     safe_delete(stable_prefix)

@@ -35,3 +35,16 @@ jar_library(name = 'scrooge-linter',
               '3rdparty:thrift-0.6.1',
             ])
 
+
+# Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
+# (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
+# for more info.
+jar_library(
+  name='kythe-extractor',
+  jars = [jar(org='kythe', name='extractors/javac_extractor', rev='v0.0.26-snowchain3')]
+)
+
+jar_library(
+  name='kythe-indexer',
+  jars = [jar(org='kythe', name='indexers/java_indexer', rev='v0.0.26-snowchain3')]
+)
