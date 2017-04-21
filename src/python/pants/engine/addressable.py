@@ -472,7 +472,9 @@ def _extract_variants(address, variants_str):
 
 
 def parse_variants(address):
-  target_name, _, variants_str = address.target_name.partition('@')
+  target_name, at_sign, variants_str = address.target_name.partition('@')
+  if not at_sign:
+    return address, None
   variants = _extract_variants(address, variants_str) if variants_str else None
   if isinstance(address, BuildFileAddress):
     normalized_address = BuildFileAddress(rel_path=address.rel_path, target_name=target_name)
