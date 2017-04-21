@@ -5,6 +5,83 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0.dev18 (4/21/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Create a lint goal and put checkstyle tasks in it. (#4481)
+  `PR #4481 <https://github.com/pantsbuild/pants/pull/4481>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix some incorrectly formatted dev release semvers. (#4501)
+  `PR #4501 <https://github.com/pantsbuild/pants/pull/4501>`_
+
+* Make go targets work with v2 changed. (#4500)
+  `PR #4500 <https://github.com/pantsbuild/pants/pull/4500>`_
+
+* Fix pytest fixture registration bug. (#4497)
+  `PR #4497 <https://github.com/pantsbuild/pants/pull/4497>`_
+
+* Don't trigger deprecated scope warnings for options from the DEFAULT section (#4487)
+  `PR #4487 <https://github.com/pantsbuild/pants/pull/4487>`_
+
+* Ensure that incomplete scalac plugin state doesn't get memoized. (#4480)
+  `PR #4480 <https://github.com/pantsbuild/pants/pull/4480>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [engine] Skip re-creating copy of address if no variants (#4032)
+  `PR #4032 <https://github.com/pantsbuild/pants/pull/4032>`_
+
+* Default `Fetcher.ProgressListener` to stderr. (#4499)
+  `PR #4499 <https://github.com/pantsbuild/pants/pull/4499>`_
+
+* A contrib plugin to run the Kythe indexer on Java source. (#4457)
+  `PR #4457 <https://github.com/pantsbuild/pants/pull/4457>`_
+
+* Keep failed target mapping free from `None` key. (#4493)
+  `PR #4493 <https://github.com/pantsbuild/pants/pull/4493>`_
+
+* Bring back --no-fast mode in pytest run. (#4491)
+  `PR #4491 <https://github.com/pantsbuild/pants/pull/4491>`_
+
+* [engine] Use enum for RuleEdges keys, add factory for Selects w/o variants (#4461)
+  `PR #4461 <https://github.com/pantsbuild/pants/pull/4461>`_
+
+* Bump scala platform versions to 2.11.11 and 2.12.2 (#4488)
+  `PR #4488 <https://github.com/pantsbuild/pants/pull/4488>`_
+
+* Get rid of the '2' registrations of the new python tasks. (#4486)
+  `PR #4486 <https://github.com/pantsbuild/pants/pull/4486>`_
+
+* Make pytest report sources paths relative to the buildroot. (#4472)
+  `PR #4472 <https://github.com/pantsbuild/pants/pull/4472>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* [docs] fix broken link to certifi (#3508)
+  `PR #3508 <https://github.com/pantsbuild/pants/pull/3508>`_
+
+* [docs] Fix links in Go README (#3719)
+  `PR #3719 <https://github.com/pantsbuild/pants/pull/3719>`_
+
+* Update globs.md (#4476)
+  `PR #4476 <https://github.com/pantsbuild/pants/pull/4476>`_
+
+* Fix some compiler plugin documentation nits. (#4462)
+  `PR #4462 <https://github.com/pantsbuild/pants/pull/4462>`_
+
+* Convert readthedocs link for their .org -> .io migration for hosted projects (#3542)
+  `PR #3542 <https://github.com/pantsbuild/pants/pull/3542>`_
+
+
 1.3.0.dev17 (4/15/2017)
 -----------------------
 A weekly unstable release, highlighted by setting the new python backend as the default.
