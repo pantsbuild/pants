@@ -29,7 +29,7 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       target_list = pants_run.stdout_data.strip().split('\n')
       for target in target_list:
-        pants_run = self.run_pants(['compile', '--compile-scalafmt-skip', target])
+        pants_run = self.run_pants(['compile', '--lint-scalafmt-skip', target])
         self.assert_success(pants_run)
 
   def modify_exports_and_compile(self, target, modify_file):
@@ -38,12 +38,12 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
       target_dir, target_name = target.rsplit(':', 1)
       shutil.copytree(target_dir, src_dir)
       with self.temporary_workdir() as workdir:
-        cmd = ['compile', '--compile-scalafmt-skip', '{}:{}'.format(src_dir, target_name)]
+        cmd = ['compile', '--lint-scalafmt-skip', '{}:{}'.format(src_dir, target_name)]
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
 
         with open(os.path.join(src_dir, modify_file), 'ab') as fh:
-          fh.write('\n')
+          fh.write(b'\n')
 
         pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
         self.assert_success(pants_run)
@@ -57,7 +57,7 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
       self.modify_exports_and_compile(target, 'B.{}'.format(lang))
 
   def test_non_exports(self):
-    pants_run = self.run_pants(['compile', '--compile-scalafmt-skip',
+    pants_run = self.run_pants(['compile', '--lint-scalafmt-skip',
                                 'testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C'])
     self.assert_failure(pants_run)
     self.assertIn('FAILURE: Compilation failure: Failed jobs: '

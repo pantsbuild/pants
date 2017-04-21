@@ -12,7 +12,7 @@ class ScalastyleIntegrationTest(PantsRunIntegrationTest):
 
   def test_scalastyle_without_quiet(self):
     scalastyle_args = [
-      'compile.scalastyle',
+      'lint.scalastyle',
       '--config=examples/src/scala/org/pantsbuild/example/styleissue/style.xml',
       'examples/src/scala/org/pantsbuild/example/styleissue',
       ]
@@ -21,7 +21,7 @@ class ScalastyleIntegrationTest(PantsRunIntegrationTest):
 
   def test_scalastyle_with_quiet(self):
     scalastyle_args = [
-      'compile.scalastyle',
+      'lint.scalastyle',
       '--config=examples/src/scala/org/pantsbuild/example/styleissue/style.xml',
       '--quiet',
       'examples/src/scala/org/pantsbuild/example/styleissue',

@@ -21,8 +21,11 @@ from pants.task.task import Task
 class IsortPythonTask(Task):
   """Autoformats Python source files with isort.
 
-  isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort, then uploaded to
+  isort binary is built at contrib/python/src/python/pants/contrib/python/isort,
+  then uploaded to
   https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
+
+  TODO: Explain why we don't invoke isort directly.
 
   Behavior:
   ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
@@ -47,7 +50,8 @@ class IsortPythonTask(Task):
     super(IsortPythonTask, cls).register_options(register)
     register('--skip', type=bool, default=False,
              help='If true, skip isort task.')
-    register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
+    register('--version', advanced=True, fingerprint=True, default='4.2.5',
+             help='Version of isort.')
 
   def execute(self, test_output_file=None):
 
@@ -60,12 +64,14 @@ class IsortPythonTask(Task):
       logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
       return
 
-    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
+    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort',
+                                                             self.options.version, 'isort.pex')
     cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 
     try:
-      subprocess.check_call(cmd, cwd=get_buildroot(), stderr=test_output_file, stdout=test_output_file)
+      subprocess.check_call(cmd, cwd=get_buildroot(),
+                            stderr=test_output_file, stdout=test_output_file)
     except subprocess.CalledProcessError as e:
       raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), e.returncode))
 
@@ -82,7 +88,8 @@ class IsortPythonTask(Task):
 
   @staticmethod
   def is_non_synthetic_python_target(target):
-    return not target.is_synthetic and isinstance(target, (PythonLibrary, PythonBinary, PythonTests))
+    return (not target.is_synthetic
+            and isinstance(target, (PythonLibrary, PythonBinary, PythonTests)))
 
   @classmethod
   def supports_passthru_args(cls):
