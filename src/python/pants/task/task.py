@@ -381,7 +381,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
                                     phase='pre-check')
 
-    # Cache has been checked to create the full list of invalid VTs. Only copy previous_results for this subset of VTs.
+    # Cache has been checked to create the full list of invalid VTs.
+    # Only copy previous_results for this subset of VTs.
     for vts in invalidation_check.invalid_vts:
       if self.incremental:
         vts.copy_previous_results(self.workdir)
@@ -391,7 +392,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if invalidation_report:
       for vts in invalidation_check.all_vts:
-        invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid, phase='post-check')
+        invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
+                                    phase='post-check')
 
     for vt in invalidation_check.invalid_vts:
       vt.update()

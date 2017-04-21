@@ -281,7 +281,7 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, zinc_file_manager,
+              log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
@@ -295,6 +295,7 @@ class JvmCompile(NailgunTaskBase):
     :param upstream_analysis:
     :param analysis_file: Where to write the compile analysis.
     :param log_file: Where to write logs.
+    :param zinc_args_file: Where to write the args zinc was invoked with.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
@@ -421,6 +422,7 @@ class JvmCompile(NailgunTaskBase):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
+    zinc_args_file = os.path.join(target_workdir, 'zinc_args')
     strict_deps = self.strict_deps_enabled(target)
     return CompileContext(target,
                           analysis_file,
@@ -428,6 +430,7 @@ class JvmCompile(NailgunTaskBase):
                           classes_dir,
                           jar_file,
                           log_file,
+                          zinc_args_file,
                           self._compute_sources_for_target(target),
                           strict_deps)
 
@@ -548,8 +551,8 @@ class JvmCompile(NailgunTaskBase):
         f.write(text.encode('utf-8'))
 
   def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings, zinc_file_manager,
-                   counter):
+                   log_file, zinc_args_file, progress_message, settings, fatal_warnings,
+                   zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -589,7 +592,7 @@ class JvmCompile(NailgunTaskBase):
 
         try:
           self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                       log_file, settings, fatal_warnings, zinc_file_manager,
+                       log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
                        self._get_plugin_map('javac', target),
                        self._get_plugin_map('scalac', target))
         except TaskError:
@@ -676,6 +679,9 @@ class JvmCompile(NailgunTaskBase):
         or self._unused_deps_check_enabled:
       self.context.products.safe_create_data('product_deps_by_src', dict)
 
+    if self.context.products.is_required_data('zinc_args'):
+      self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
+
   def compute_classes_by_source(self, compile_contexts):
     """Compute a map of (context->(src->classes)) for the given compile_contexts.
 
@@ -714,6 +720,7 @@ class JvmCompile(NailgunTaskBase):
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
+    zinc_args = self.context.products.get_data('zinc_args')
 
     # Register a mapping between sources and classfiles (if requested).
     if classes_by_source is not None:
@@ -730,6 +737,13 @@ class JvmCompile(NailgunTaskBase):
       for compile_context in compile_contexts:
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
+
+    # Register the zinc args used to compile the target (if requested).
+    if zinc_args is not None:
+      for compile_context in compile_contexts:
+        with open(compile_context.zinc_args_file, 'r') as fp:
+          args = fp.read().split()
+        zinc_args[compile_context.target] = args
 
   def _check_unused_deps(self, compile_context):
     """Uses `product_deps_by_src` to check unused deps and warn or error."""
@@ -884,6 +898,7 @@ class JvmCompile(NailgunTaskBase):
                           cp_entries,
                           ctx.classes_dir,
                           log_file,
+                          ctx.zinc_args_file,
                           progress_message,
                           tgt.platform,
                           fatal_warnings,

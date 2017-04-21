@@ -123,7 +123,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 3)]
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 5)]
 
   @classmethod
   def compiler_plugin_types(cls):
@@ -159,6 +159,7 @@ class BaseZincCompile(JvmCompile):
   @classmethod
   def register_options(cls, register):
     super(BaseZincCompile, cls).register_options(register)
+    # TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
     register('--name-hashing', advanced=True, type=bool, fingerprint=True,
              removal_hint='Name hashing is required for operation in zinc 1.0.0-X: this '
                           'option no longer has any effect.',
@@ -312,7 +313,7 @@ class BaseZincCompile(JvmCompile):
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, zinc_file_manager,
+              log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
               javac_plugin_map, scalac_plugin_map):
     self._verify_zinc_classpath(classpath)
     self._verify_zinc_classpath(upstream_analysis.keys())
@@ -382,6 +383,11 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(sources)
 
     self.log_zinc_file(analysis_file)
+    with open(zinc_args_file, 'w') as fp:
+      for arg in zinc_args:
+        fp.write(arg)
+        fp.write(b'\n')
+
     if self.runjava(classpath=self.zinc_classpath(),
                     main=self._ZINC_MAIN,
                     jvm_options=jvm_options,
@@ -527,7 +533,7 @@ class ZincCompile(BaseZincCompile):
 
   @classmethod
   def product_types(cls):
-    return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src']
+    return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src', 'zinc_args']
 
   def extra_compile_time_classpath_elements(self):
     """Classpath entries containing plugins."""

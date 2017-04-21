@@ -12,6 +12,7 @@ from pants.option.custom_types import target_option
 from pants.subsystem.subsystem import Subsystem
 
 
+# TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
 class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A subsystem to encapsulate compile-time settings and features for the Java language.
 
