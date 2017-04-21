@@ -1,6 +1,7 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
++ Adam Chainz
 + Alan Paulin
 + Alexander Johnson
 + Alyssa Pohahau
@@ -32,6 +33,7 @@ Created by running `build-support/bin/contributors.sh`.
 + Derek Young
 + Divij Rajkumar
 + Dominic Hamon
++ Drew Rothstein
 + Dumitru Daniliuc
 + Ebube Chuba
 + Emily Caveness
