@@ -147,7 +147,7 @@ class Fetcher(object):
   class ProgressListener(Listener):
     """A Listener that logs progress to a stream."""
 
-    def __init__(self, width=None, chunk_size_bytes=None, stream=sys.stderr):
+    def __init__(self, width=None, chunk_size_bytes=None, stream=None):
       """Creates a ProgressListener that logs progress for known size items with a progress bar of
       the given width in characters and otherwise logs a progress indicator every chunk_size.
 
@@ -160,7 +160,7 @@ class Fetcher(object):
       if not isinstance(self._width, six.integer_types):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
-      self._stream = stream
+      self._stream = stream or sys.stderr
       self._start = time.time()
 
     def status(self, code, content_length=None):
