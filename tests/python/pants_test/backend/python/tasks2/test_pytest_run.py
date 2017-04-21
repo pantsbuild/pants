@@ -446,13 +446,3 @@ class PytestTest(PytestTestBase):
 
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], test_shard='1/a')
-
-  def test_conftest_preservation(self):
-    # Ensure that our monkeying around with conftest.py in the chroot leaves
-    # it in its original state after the test run.
-    context = self.run_tests(targets=[self.green_with_conftest])
-    chroot = context.products.get_data(GatherSources.PYTHON_SOURCES).path()
-    with open(os.path.join(chroot, 'conftest.py')) as fp:
-      conftest_content = fp.read()
-    self.assertEqual(self._CONFTEST_CONTENT, conftest_content)
-
