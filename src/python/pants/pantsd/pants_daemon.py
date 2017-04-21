@@ -192,4 +192,7 @@ class PantsDaemon(ProcessManager):
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemonize()."""
+    for service in self._services:
+      service.post_fork()
+
     self._run()

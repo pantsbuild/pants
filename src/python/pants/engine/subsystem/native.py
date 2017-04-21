@@ -209,6 +209,8 @@ void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);
 void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 
 void nodes_destroy(RawNodes*);
+
+void set_panic_handler();
 '''
 
 CFFI_EXTERNS = '''

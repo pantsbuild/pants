@@ -33,6 +33,7 @@ use std::fs::File;
 use std::io;
 use std::mem;
 use std::os::raw;
+use std::panic;
 use std::path::{Path, PathBuf};
 
 
@@ -544,6 +545,19 @@ pub extern fn rule_subgraph_visualize(
       println!("Failed to visualize to {}: {:?}", path.display(), e);
     });
   })
+}
+
+#[no_mangle]
+pub extern fn set_panic_handler() {
+  panic::set_hook(Box::new(|panic_info| {
+    let panic_str = format!("panic occured: {:?}", panic_info.payload().downcast_ref::<&str>().unwrap());
+    externs::log(externs::LogLevel::Critical, &panic_str);
+
+    if let Some(location) = panic_info.location() {
+      let panic_location_str = format!("{}, {}", location.file(), location.line());
+      externs::log(externs::LogLevel::Critical, &panic_location_str);
+    }
+  }));
 }
 
 
