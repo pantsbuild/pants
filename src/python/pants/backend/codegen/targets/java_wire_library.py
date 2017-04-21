@@ -9,6 +9,6 @@ from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.wire.java instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.wire.java instead')
 
 JavaWireLibrary = JavaWireLibrary

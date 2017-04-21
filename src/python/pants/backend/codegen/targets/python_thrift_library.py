@@ -9,6 +9,6 @@ from pants.backend.codegen.thrift.python.python_thrift_library import PythonThri
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.thrift.python instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.thrift.python instead')
 
 PythonThriftLibrary = PythonThriftLibrary

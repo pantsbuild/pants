@@ -78,13 +78,13 @@ are suffixed with `rcN`. For instance: "the `1.1.x` `stable` branch",
 
 ### `dev` naming
 `dev` releases occur between `stable` branches, and are differentiated by a `devN` suffix. The pattern
-to follow is `N.N.0devN`, where `N.N` are the _next_ `major`/`minor` branch that will be created
-and N is the next sequential number starting from `0`. For instance: "the `1.1.0dev0` `dev` release".
+to follow is `N.N.0.devN`, where `N.N` are the _next_ `major`/`minor` branch that will be created
+and N is the next sequential number starting from `0`. For instance: "the `1.1.0.dev0` `dev` release".
 
 ## Examples
 
 * Leading up to the release of `2.0.0` the release manager would create a `stable` branch with
-the literal name "`2.0.x`". They would cut release candidates named `2.0.0rc0` (and so on), and
+the literal name "`2.0.x`". They would cut release candidates named `2.0.0.rc0` (and so on), and
 afterwards, they'd finalize the `2.0.0` release in that `2.0.x` branch by tagging the
 commit with the release version: `v2.0.0`.
 
@@ -93,7 +93,7 @@ branch, they would cherry-pick the commit to the `1.1.x` branch, run a series of
 (ie, `1.1.1rc0`, etc), and finally tag the validated commit with a new patch version (ie `v1.1.1`).
 
 * If `dev` releases were required after having created the `1.0.x` branch, but before having created
-the `1.1.x` branch, then they would start with `1.1.0dev0`, and continue weekly to `1.1.0devN`
+the `1.1.x` branch, then they would start with `1.1.0.dev0`, and continue weekly to `1.1.0.devN`
 until the `1.1.x` branch had been created.
 
 ## `stable` Release Candidates

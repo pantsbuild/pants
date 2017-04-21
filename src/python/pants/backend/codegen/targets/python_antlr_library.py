@@ -9,6 +9,6 @@ from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrL
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.antlr.python instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.antlr.python instead')
 
 PythonAntlrLibrary = PythonAntlrLibrary
