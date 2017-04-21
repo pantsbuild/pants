@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.contrib.kythe.tasks.extract_java import ExtractJava
-from pants.contrib.kythe.tasks.index_java import IndexJava
 from pants.goal.task_registrar import TaskRegistrar as task
 
+from pants.contrib.kythe.tasks.extract_java import ExtractJava
+from pants.contrib.kythe.tasks.index_java import IndexJava
 
 
 def register_goals():
