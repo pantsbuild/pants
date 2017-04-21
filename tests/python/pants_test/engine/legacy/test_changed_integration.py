@@ -131,12 +131,12 @@ def create_isolated_git_repo():
 
       add_to_git('resource file',
         create_file('src/resources/org/pantsbuild/resourceonly/BUILD',
-        """
-        resources(
-          name='resource',
-          sources=['README.md']
-        )
-        """
+          """
+          resources(
+            name='resource',
+            sources=['README.md']
+          )
+          """
         ),
         create_file('src/resources/org/pantsbuild/resourceonly/README.md', 'Just a resource.')
       )
