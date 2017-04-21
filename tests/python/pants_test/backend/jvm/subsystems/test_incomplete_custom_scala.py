@@ -30,7 +30,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   def pants_run(self, options=None):
     if options is None:
       options = []
-    full_options = options + ['clean-all', 'compile', self.target_path]
+    full_options = options + ['clean-all', 'compile', 'lint', self.target_path]
     return self.run_pants(full_options)
 
   def run_repl(self, target, program, options=None):

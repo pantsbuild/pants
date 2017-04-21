@@ -11,5 +11,5 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-  task(name='checkstyle', action=Checkstyle).install('compile')
-  task(name='scalastyle', action=Scalastyle).install('compile')
+  task(name='checkstyle', action=Checkstyle).install('lint')
+  task(name='scalastyle', action=Scalastyle).install('lint')

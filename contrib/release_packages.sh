@@ -93,10 +93,10 @@ PKG_PYTHON_CHECKS=(
 function pkg_python_checks_install_test() {
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
-    --explain compile | grep "python-eval" &> /dev/null && \
+    --explain lint | grep "python-eval" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
-    --explain compile | grep "pythonstyle" &> /dev/null
+    --explain lint | grep "pythonstyle" &> /dev/null
 }
 
 PKG_FINDBUGS=(
