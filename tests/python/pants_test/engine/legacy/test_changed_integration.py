@@ -116,6 +116,19 @@ def create_isolated_git_repo():
         git.add(*files)
         git.commit(commit_msg)
 
+      add_to_git('a go target with default sources',
+        create_file('src/go/tester/BUILD', 'go_binary()'),
+        create_file('src/go/tester/main.go',
+          """
+          package main
+          import "fmt"
+          func main() {
+            fmt.Println("hello, world")
+          }
+          """
+        )
+      )
+
       add_to_git('resource file',
         create_file('src/resources/org/pantsbuild/resourceonly/BUILD',
         """
@@ -166,19 +179,6 @@ def create_isolated_git_repo():
 
       add_to_git('a python_library with resources=["filename"]',
         copy_into('testprojects/src/python/sources', 'src/python/sources')
-      )
-
-      add_to_git('a go target with default sources',
-        create_file('src/go/tester/BUILD', 'go_binary()'),
-        create_file('src/go/tester/main.go',
-          """
-          package main
-          import "fmt"
-          func main() {
-            fmt.Println("hello, world")
-          }
-          """
-        )
       )
 
       add_to_git('3rdparty/BUILD', copy_into('3rdparty/BUILD'))
