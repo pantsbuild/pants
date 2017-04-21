@@ -9,6 +9,6 @@ from pants.base.deprecated import deprecated_module
 from pants.java.jar.exclude import Exclude
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.jvm.exclude instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.jvm.exclude instead')
 
 Exclude = Exclude

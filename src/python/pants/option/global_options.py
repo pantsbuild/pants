@@ -127,7 +127,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # This facilitates use of the v2 engine, sans daemon.
-    # TODO: Add removal_version='1.5.0dev0' before 1.4 lands.
+    # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
     register('--enable-v2-engine', advanced=True, type=bool, default=True,
              help='Enables use of the v2 engine.')
 

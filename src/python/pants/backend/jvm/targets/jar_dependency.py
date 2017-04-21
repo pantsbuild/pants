@@ -9,6 +9,6 @@ from pants.base.deprecated import deprecated_module
 from pants.java.jar.jar_dependency import JarDependency
 
 
-deprecated_module('1.5.0dev0', 'Use pants.java.jar instead')
+deprecated_module('1.5.0.dev0', 'Use pants.java.jar instead')
 
 JarDependency = JarDependency
