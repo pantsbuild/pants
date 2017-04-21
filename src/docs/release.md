@@ -70,7 +70,7 @@ script fail:
         EOF
         
   - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
-    If you have another name for it, you should `git rename othername origin` before running
+    If you have another name for it, you should `git remote rename othername origin` before running
     the release script, and rename it back afterwards.
 
 Prepare Release

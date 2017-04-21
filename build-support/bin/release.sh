@@ -308,7 +308,7 @@ EOF
 function tag_release() {
   release_version="$(local_version)" && \
   tag_name="release_${release_version}" && \
-  git tag \
+  git tag -f \
     --local-user=$(get_pgp_keyid) \
     -m "pantsbuild.pants release ${release_version}" \
     ${tag_name} && \
