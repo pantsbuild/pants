@@ -22,6 +22,12 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout'])
     self.assert_success(pants_run)
 
+  def test_pytest_run_conftest_succeeds(self):
+    pants_run = self.run_pants(['clean-all',
+                                'test.pytest',
+                                'testprojects/tests/python/pants/conf_test'])
+    self.assert_success(pants_run)
+
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_fails(self):
     start = time.time()
