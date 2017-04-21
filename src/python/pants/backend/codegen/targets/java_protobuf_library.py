@@ -9,6 +9,6 @@ from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtob
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.protobuf.java instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.protobuf.java instead')
 
 JavaProtobufLibrary = JavaProtobufLibrary

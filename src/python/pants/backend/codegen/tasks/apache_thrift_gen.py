@@ -9,6 +9,6 @@ from pants.backend.codegen.thrift.java.apache_thrift_java_gen import ApacheThrif
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.thrift.java instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.thrift.java instead')
 
 ApacheThriftGen = ApacheThriftJavaGen
