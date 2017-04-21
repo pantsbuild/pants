@@ -94,11 +94,13 @@ class FetcherTest(unittest.TestCase):
         self.fetcher.fetch(no_perms, self.listener)
 
   @contextmanager
-  def expect_get(self, url, chunk_size_bytes, timeout_secs, listener=True):
-    chunks = ['0123456789', 'a']
+  def expect_get(self, url, chunk_size_bytes, timeout_secs, chunks=None, listener=True):
+    chunks = chunks or ['0123456789', 'a']
+    size = sum(len(c) for c in chunks)
+
     self.requests.get.return_value = self.response
     self.response.status_code = 200
-    self.response.headers = {'content-length': '11'}
+    self.response.headers = {'content-length': str(size)}
     self.response.iter_content.return_value = chunks
 
     yield chunks, [self.ok_call(chunks)] if listener else []
@@ -283,6 +285,29 @@ class FetcherTest(unittest.TestCase):
       self.assertEqual(path, fd.name)
       with open(path) as fp:
         self.assertEqual(downloaded, fp.read())
+
+  @mock.patch('time.time')
+  def test_progress_listener(self, timer):
+    timer.side_effect = [0, 1.137]
+
+    stream = StringIO()
+    progress_listener = Fetcher.ProgressListener(width=5, chunk_size_bytes=1, stream=stream)
+
+    with self.expect_get('http://baz',
+                         chunk_size_bytes=1,
+                         timeout_secs=37,
+                         chunks=[[1]] * 1024) as (chunks, expected_listener_calls):
+
+      self.fetcher.fetch('http://baz',
+                         progress_listener.wrap(self.listener),
+                         chunk_size_bytes=1,
+                         timeout_secs=37)
+
+    self.assert_listener_calls(expected_listener_calls, chunks)
+
+    # We just test the last progress line which should indicate a 100% complete download.
+    # We control progress bar width (5 dots), size (1KB) and total time downloading (fake 1.137s).
+    self.assertEqual('100% ..... 1 KB 1.137s\n', stream.getvalue().split('\r')[-1])
 
 
 class FetcherRedirectTest(unittest.TestCase):
