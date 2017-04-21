@@ -15,14 +15,14 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
   def test_scalafmt_fail_default_config(self):
     target = '{}/badscalastyle'.format(TEST_DIR)
     # test should fail because of style error.
-    failing_test = self.run_pants(['compile', target],
+    failing_test = self.run_pants(['lint', target],
       {'lint.scalafmt':{'skip':'False'}})
     self.assert_failure(failing_test)
 
   def test_scalafmt_fail(self):
     target = '{}/badscalastyle'.format(TEST_DIR)
     # test should fail because of style error.
-    failing_test = self.run_pants(['compile', target],
+    failing_test = self.run_pants(['lint', target],
       {'lint.scalafmt':{'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'}})
     self.assert_failure(failing_test)
@@ -30,7 +30,7 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
   def test_scalafmt_disabled(self):
     target = '{}/badscalastyle'.format(TEST_DIR)
     # test should pass because of scalafmt disabled.
-    failing_test = self.run_pants(['compile', target],
+    failing_test = self.run_pants(['lint', target],
       {'lint.scalafmt': {'skip':'True'}})
     self.assert_success(failing_test)
 
@@ -54,8 +54,8 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     fmt_result = self.run_pants(['fmt', target], {'fmt.scalafmt':options})
     self.assert_success(fmt_result)
 
-    # verify that the compile check not passes.
-    test_fmt = self.run_pants(['compile', target], {'lint.scalafmt':options})
+    # verify that the compile check passes.
+    test_fmt = self.run_pants(['lint', target], {'lint.scalafmt':options})
     self.assert_success(test_fmt)
 
     # restore the file to its original state.
@@ -66,7 +66,7 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
   def test_scalafmt_ignore_resources(self):
     target = '{}/badscalastyle:as_resources'.format(TEST_DIR)
     # test should succeed because the target is not in `target-types`.
-    run = self.run_pants(['compile', target],
+    run = self.run_pants(['lint', target],
       {'lint.scalafmt':{'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'}})
     self.assert_success(run)
