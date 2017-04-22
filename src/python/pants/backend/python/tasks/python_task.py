@@ -16,6 +16,7 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
+from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.base import hash_utils
 from pants.binaries.thrift_binary import ThriftBinary
