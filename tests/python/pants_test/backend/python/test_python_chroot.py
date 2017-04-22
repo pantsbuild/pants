@@ -83,21 +83,20 @@ class PythonChrootTest(BaseTest):
         python_chroot.delete()
 
   def test_shebang_modified(self):
-      self.create_file(relpath='src/python/test/main.py', contents=dedent("""
-      def main():
-        print('Hello World!')
-      """))
+    self.create_file(relpath='src/python/test/main.py', contents=dedent("""
+    def main():
+      print('Hello World!')
+    """))
 
-      binary = self.make_target(spec='src/python/test',
-                                target_type=PythonBinary,
-                                source='main.py',
-                                shebang='/usr/bin/env python2'
-                                )
+    binary = self.make_target(spec='src/python/test',
+                              target_type=PythonBinary,
+                              source='main.py',
+                              shebang='/usr/bin/env python2'
+                             )
 
-      with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
-          pex_builder.freeze()
-
-          self.assertEqual(python_chroot._targets[0].shebang, '/usr/bin/env python2')
+    with self.dumped_chroot([binary]) as (pex_builder, python_chroot):
+        pex_builder.freeze()
+        self.assertEqual(python_chroot._targets[0].shebang, '/usr/bin/env python2')
 
   def test_shebang(self):
       self.create_file(relpath='src/python/test/main.py', contents=dedent("""
