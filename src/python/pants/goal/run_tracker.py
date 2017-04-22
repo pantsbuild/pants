@@ -304,7 +304,12 @@ class RunTracker(Subsystem):
     # Upload to remote stats db.
     stats_url = self.get_options().stats_upload_url
     if stats_url:
-      self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+      pid = os.fork()
+      if pid == 0:
+        try:
+          self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+        finally:
+          os._exit(0)
 
     # Write stats to local json file.
     stats_json_file_name = self.get_options().stats_local_json_file

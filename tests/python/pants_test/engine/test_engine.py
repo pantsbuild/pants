@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 
 from pants.build_graph.address import Address
 from pants.engine.engine import LocalSerialEngine
@@ -32,13 +32,13 @@ class EngineTest(unittest.TestCase):
 
   def assert_engine(self, engine):
     result = engine.execute(self.request(['compile'], self.java))
+    self.scheduler.visualize_graph_to_file('blah/run.0.dot')
     self.assertEqual([Return(Classpath(creator='javac'))], result.root_products.values())
     self.assertIsNone(result.error)
 
   @contextmanager
   def serial_engine(self):
-    with closing(LocalSerialEngine(self.scheduler)) as e:
-      yield e
+    yield LocalSerialEngine(self.scheduler)
 
   def test_serial_engine_simple(self):
     with self.serial_engine() as engine:

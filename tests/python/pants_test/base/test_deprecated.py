@@ -10,13 +10,14 @@ import warnings
 from contextlib import contextmanager
 
 from pants.base.deprecated import (BadDecoratorNestingError, BadRemovalVersionError,
-                                   CodeRemovedError, MissingRemovalVersionError, deprecated,
-                                   deprecated_conditional, deprecated_module, warn_or_error)
+                                   CodeRemovedError, MissingRemovalVersionError,
+                                   NonDevRemovalVersionError, deprecated, deprecated_conditional,
+                                   deprecated_module, warn_or_error)
 from pants.version import VERSION
 
 
 class DeprecatedTest(unittest.TestCase):
-  FUTURE_VERSION = '9999.9.9'
+  FUTURE_VERSION = '9999.9.9.dev0'
 
   @contextmanager
   def _test_deprecation(self, deprecation_expected=True):
@@ -101,6 +102,18 @@ class DeprecatedTest(unittest.TestCase):
       self.assertEqual(expected_return, deprecated_function())
       self.assertIn(hint_message, str(extract_deprecation_warning()))
 
+  def test_deprecation_subject(self):
+    subject = '`./pants blah`'
+    expected_return = 'deprecated_function'
+
+    @deprecated(self.FUTURE_VERSION, subject=subject)
+    def deprecated_function():
+      return expected_return
+
+    with self._test_deprecation() as extract_deprecation_warning:
+      self.assertEqual(expected_return, deprecated_function())
+      self.assertIn(subject, str(extract_deprecation_warning()))
+
   def test_removal_version_required(self):
     with self.assertRaises(MissingRemovalVersionError):
       @deprecated(None)
@@ -132,6 +145,12 @@ class DeprecatedTest(unittest.TestCase):
       def test_func1a():
         pass
 
+  def test_removal_version_non_dev(self):
+    with self.assertRaises(NonDevRemovalVersionError):
+      @deprecated('1.0.0')
+      def test_func1a():
+        pass
+
   def test_removal_version_same(self):
     with self.assertRaises(CodeRemovedError):
       warn_or_error(VERSION, 'dummy description')
@@ -144,9 +163,9 @@ class DeprecatedTest(unittest.TestCase):
 
   def test_removal_version_lower(self):
     with self.assertRaises(CodeRemovedError):
-      warn_or_error('0.0.27', 'dummy description')
+      warn_or_error('0.0.27.dev0', 'dummy description')
 
-    @deprecated('0.0.27')
+    @deprecated('0.0.27.dev0')
     def test_func():
       pass
     with self.assertRaises(CodeRemovedError):

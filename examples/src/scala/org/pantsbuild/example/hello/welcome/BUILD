@@ -6,8 +6,6 @@
 scala_library(
   dependencies=[
     'examples/src/java/org/pantsbuild/example/hello/greet:greet',
-  ],
-  resources = [
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
   provides = scala_artifact(org='org.pantsbuild.example.hello',

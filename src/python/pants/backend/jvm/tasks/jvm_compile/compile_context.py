@@ -13,6 +13,51 @@ from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 
 
+def _resolve_strict_dependencies(target):
+  for declared in target.dependencies:
+    if type(declared) in (AliasTarget, Target):
+      # Is an alias. Recurse to expand.
+      for r in _resolve_strict_dependencies(declared):
+        yield r
+    else:
+      yield declared
+
+    for export in _resolve_exports(declared):
+      yield export
+
+
+def _resolve_exports(target):
+  for export in getattr(target, 'exports', []):
+    if type(export) in (AliasTarget, Target):
+      # If exported target is an alias, expand its dependencies.
+      for dep in _resolve_strict_dependencies(export):
+        yield dep
+    else:
+      for exp in _resolve_exports(export):
+        yield exp
+      yield export
+
+
+def strict_dependencies(target, dep_context):
+  """Compute the 'strict' compile target dependencies for this target.
+
+  Results the declared dependencies of a target after alias expansion, with the addition
+  of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
+  """
+  for declared in _resolve_strict_dependencies(target):
+    if isinstance(declared, dep_context.compiler_plugin_types):
+      for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
+        yield r
+    else:
+      yield declared
+
+
+def all_dependencies(target, dep_context):
+  """All transitive dependencies of the context's target."""
+  for dep in target.closure(bfs=True, **dep_context.target_closure_kwargs):
+    yield dep
+
+
 class DependencyContext(object):
   def __init__(self, compiler_plugin_types, target_closure_kwargs):
     """
@@ -32,13 +77,14 @@ class CompileContext(object):
   """
 
   def __init__(self, target, analysis_file, portable_analysis_file, classes_dir, jar_file,
-               log_file, sources, strict_deps):
+               log_file, zinc_args_file, sources, strict_deps):
     self.target = target
     self.analysis_file = analysis_file
     self.portable_analysis_file = portable_analysis_file
     self.classes_dir = classes_dir
     self.jar_file = jar_file
     self.log_file = log_file
+    self.zinc_args_file = zinc_args_file
     self.sources = sources
     self.strict_deps = strict_deps
 
@@ -50,36 +96,9 @@ class CompileContext(object):
   def dependencies(self, dep_context):
     """Yields the compile time dependencies of this target, in the given DependencyContext."""
     if self.strict_deps:
-      return self.strict_dependencies(dep_context)
+      return strict_dependencies(self.target, dep_context)
     else:
-      return self.all_dependencies(dep_context)
-
-  def _resolve_aliases(self, t):
-    for declared in t.dependencies:
-      if type(declared) in (AliasTarget, Target):
-        # Is an alias. Recurse to expand.
-        for r in self._resolve_aliases(declared):
-          yield r
-      else:
-        yield declared
-
-  def strict_dependencies(self, dep_context):
-    """Compute the 'strict' compile target dependencies for this target.
-
-    Results the declared dependencies of a target after alias expansion, with the addition
-    of compiler plugins and their transitive deps, since compiletime is actually runtime for them.
-    """
-    for declared in self._resolve_aliases(self.target):
-      if isinstance(declared, dep_context.compiler_plugin_types):
-        for r in declared.closure(bfs=True, **dep_context.target_closure_kwargs):
-          yield r
-      else:
-        yield declared
-
-  def all_dependencies(self, dep_context):
-    """All transitive dependencies of the context's target."""
-    for dep in self.target.closure(bfs=True, **dep_context.target_closure_kwargs):
-      yield dep
+      return all_dependencies(self.target, dep_context)
 
   @property
   def _id(self):

@@ -10,20 +10,22 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.bin.options_initializer import OptionsInitializer
-from pants.engine.build_files import create_graph_tasks
+from pants.engine.build_files import create_graph_rules
 from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import create_fs_tasks
+from pants.engine.fs import create_fs_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (JvmAppAdaptor, PythonTargetAdaptor, RemoteSourcesAdaptor,
+from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
+                                         JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
+                                         PythonTestsAdaptor, RemoteSourcesAdaptor, ScalaLibraryAdaptor,
                                          TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.engine.subsystem.native import Native
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
 
@@ -50,10 +52,20 @@ class LegacySymbolTable(SymbolTable):
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
+    for alias in ['java_library', 'java_agent', 'javac_plugin']:
+      aliases[alias] = JavaLibraryAdaptor
+    for alias in ['scala_library', 'scalac_plugin']:
+      aliases[alias] = ScalaLibraryAdaptor
+    for alias in ['python_library', 'pants_plugin']:
+      aliases[alias] = PythonLibraryAdaptor
+    for alias in ['go_library', 'go_binary']:
+      aliases[alias] = GoTargetAdaptor
+
+    aliases['junit_tests'] = JunitTestsAdaptor
     aliases['jvm_app'] = JvmAppAdaptor
+    aliases['python_tests'] = PythonTestsAdaptor
+    aliases['python_binary'] = PythonTargetAdaptor
     aliases['remote_sources'] = RemoteSourcesAdaptor
-    for alias in ('python_library', 'python_tests', 'python_binary'):
-      aliases[alias] = PythonTargetAdaptor
 
     return aliases
 
@@ -81,7 +93,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph(self.scheduler, self.engine, self.symbol_table_cls)
+    graph = LegacyBuildGraph.create(self.scheduler, self.engine, self.symbol_table_cls)
     logger.debug('build_graph is: %s', graph)
     with self.scheduler.locked():
       # Ensure the entire generator is unrolled.
@@ -99,15 +111,18 @@ class EngineInitializer(object):
 
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
+                         workdir,
                          build_root=None,
                          native=None,
                          symbol_table_cls=None,
                          build_ignore_patterns=None,
-                         exclude_target_regexps=None):
+                         exclude_target_regexps=None,
+                         subproject_roots=None):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
+    :param str workdir: The pants workdir.
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
     :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
@@ -115,6 +130,8 @@ class EngineInitializer(object):
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
+    :param list subproject_roots: Paths that correspond with embedded build roots
+                                  under the current build root.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
@@ -129,7 +146,8 @@ class EngineInitializer(object):
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=LegacyPythonCallbacksParser,
                                    build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps)
+                                   exclude_target_regexps=exclude_target_regexps,
+                                   subproject_roots=subproject_roots)
 
     # Load the native backend.
     native = native or Native.Factory.global_instance().create()
@@ -138,13 +156,13 @@ class EngineInitializer(object):
     # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
       create_legacy_graph_tasks(symbol_table_cls) +
-      create_fs_tasks() +
-      create_graph_tasks(address_mapper, symbol_table_cls)
+      create_fs_rules() +
+      create_graph_rules(address_mapper, symbol_table_cls)
     )
 
     # TODO: Do not use the cache yet, as it incurs a high overhead.
-    scheduler = LocalScheduler(dict(), tasks, project_tree, native)
+    scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native)
     engine = LocalSerialEngine(scheduler, use_cache=False)
-    change_calculator = EngineChangeCalculator(engine, scm) if scm else None
+    change_calculator = EngineChangeCalculator(scheduler, engine, symbol_table_cls, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)

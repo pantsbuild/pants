@@ -631,6 +631,16 @@ analysis, disabling summary mode (by passing the `--no-summary` flag) will outpu
 for each dependency edge. This mode does no aggregation, so using it effectively usually means
 doing analytics or graph analysis with an external tool.
 
+Compiler Plugins
+----------------
+
+Pants has robust support for both developing and using compiler plugins for
+javac and scalac.  For more details:
+
+- [[javac plugins with Pants|pants('examples/src/java/org/pantsbuild/example/javac/plugin:readme')]].
+- [[scalac plugins with Pants|pants('examples/src/scala/org/pantsbuild/example/scalac/plugin:readme')]].
+
+
 Further Reading
 ---------------
 

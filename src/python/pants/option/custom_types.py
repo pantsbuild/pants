@@ -15,6 +15,20 @@ from pants.util.memo import memoized_method
 from pants.util.strutil import ensure_text
 
 
+class UnsetBool(object):
+  """A type that can be used as the default value for a bool typed option to indicate un-set.
+
+  In other words, `bool`-typed options with a `default=UnsetBool` that are not explicitly set will
+  have the value `None`, enabling a tri-state.
+
+  :API: public
+  """
+
+  def __init__(self):
+    raise NotImplementedError('UnsetBool cannot be instantiated. It should only be used as a '
+                              'sentinel type.')
+
+
 def dict_option(s):
   """An option of type 'dict'.
 

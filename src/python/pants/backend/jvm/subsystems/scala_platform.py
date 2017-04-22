@@ -9,9 +9,9 @@ from collections import namedtuple
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -23,8 +23,8 @@ major_version_info = namedtuple('major_version_info', ['full_version'])
 # runtime library (when compiling plugins, which require the compiler library as a dependency).
 scala_build_info = {
   '2.10': major_version_info(full_version='2.10.6'),
-  '2.11': major_version_info(full_version='2.11.8'),
-  '2.12': major_version_info(full_version='2.12.0'),
+  '2.11': major_version_info(full_version='2.11.11'),
+  '2.12': major_version_info(full_version='2.12.2'),
 }
 
 
@@ -32,6 +32,7 @@ scala_build_info = {
 scala_style_jar = JarDependency('org.scalastyle', 'scalastyle_2.11', '0.8.0')
 
 
+# TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A scala platform.
 

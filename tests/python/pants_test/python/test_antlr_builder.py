@@ -9,10 +9,9 @@ import unittest
 
 import antlr3
 import antlr3.tree
-
-from pants.backend.python.test.Eval import Eval
-from pants.backend.python.test.ExprLexer import ExprLexer
-from pants.backend.python.test.ExprParser import ExprParser
+from pants_antlr.test.eval.Eval import Eval
+from pants_antlr.test.eval.ExprLexer import ExprLexer
+from pants_antlr.test.eval.ExprParser import ExprParser
 
 
 class AntlrBuilderTest(unittest.TestCase):

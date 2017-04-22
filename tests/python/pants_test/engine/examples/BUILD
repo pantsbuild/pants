@@ -62,6 +62,7 @@ python_library(
     'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:desktop',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
@@ -80,4 +81,26 @@ python_binary(
   dependencies=[
     ':visualizer'
   ]
+)
+
+resources(
+  name='fs_test',
+  # Note that this test data dir is bundled into a tarfile, to preserve symlink structure
+  # when copied into a chroot.
+  sources=rglobs('fs_test/*')
+)
+
+resources(
+  name='graph_test',
+  sources=rglobs('graph_test/*')
+)
+
+resources(
+  name='mapper_test',
+  sources=rglobs('mapper_test/*')
+)
+
+resources(
+  name='scheduler_inputs',
+  sources=rglobs('scheduler_inputs/*')
 )

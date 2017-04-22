@@ -1,106 +1,25 @@
-python_tests(
-  name='go_binary_create',
-  sources=['test_go_binary_create.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
-    'contrib/go/src/python/pants/contrib/go/tasks:go_binary_create',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='go_buildgen',
-  sources=['test_go_buildgen.py'],
+  sources = globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems',
-    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
-    'contrib/go/src/python/pants/contrib/go/targets:go_library',
-    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
-    'contrib/go/src/python/pants/contrib/go/tasks:go_buildgen',
     'contrib/go/src/python/pants/contrib/go:plugin',
+    'contrib/go/src/python/pants/contrib/go/subsystems',
+    'contrib/go/src/python/pants/contrib/go/targets',
+    'contrib/go/src/python/pants/contrib/go/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='go_workspace_task',
-  sources=['test_go_workspace_task.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_library',
-    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
-    'contrib/go/src/python/pants/contrib/go/tasks:go_workspace_task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
-python_tests(
-  name='go_compile',
-  sources=['test_go_compile.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_library',
-    'contrib/go/src/python/pants/contrib/go/tasks:go_compile',
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
 
 python_tests(
-  name='go_fetch',
-  sources=['test_go_fetch.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems',
-    'contrib/go/src/python/pants/contrib/go/targets:go_remote_library',
-    'contrib/go/src/python/pants/contrib/go/tasks:go_fetch',
-    'src/python/pants/build_graph',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='go_go',
-  sources=['test_go_go.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/targets:go_binary',
-    'contrib/go/src/python/pants/contrib/go/tasks:go_go',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
-  name='go_compile_integration',
-  sources=['test_go_compile_integration.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/subsystems',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test/testutils:file_test_util',
-    'tests/python/pants_test:int-test',
-  ],
-  tags={'integration'},
-)
-
-python_tests(
-  name='go_test_integration',
-  sources=['test_go_test_integration.py'],
-  dependencies=[
-    'src/python/pants/util:dirutil',
-    'tests/python/pants_test:int-test',
-  ],
-  tags={'integration'},
-)
-
-python_tests(
-  name='go_thrift_gen_integration',
-  sources=['test_go_thrift_gen_integration.py'],
+  name = 'integration',
+  sources = globs('*_integration.py'),
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'src/python/pants/base:build_environment',
@@ -111,32 +30,5 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags={'integration'},
-  timeout=120,
-)
-
-python_tests(
-  name='go_run_integration',
-  sources=['test_go_run_integration.py'],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-  ],
-  tags={'integration'},
-)
-
-python_tests(
-  name='go_fetch_integration',
-  sources=['test_go_fetch_integration.py'],
-  dependencies=[
-    'tests/python/pants_test:int-test',
-  ],
-  tags={'integration'},
-)
-
-python_tests(
-  name='go_task',
-  sources=['test_go_task.py'],
-  dependencies=[
-    'contrib/go/src/python/pants/contrib/go/tasks:go_task',
-    'tests/python/pants_test/tasks:task_test_base',
-  ],
+  timeout=180,
 )

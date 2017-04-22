@@ -18,16 +18,16 @@ from collections import OrderedDict, defaultdict, namedtuple
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
 from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
+from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.java.util import execute_runner
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
 from pants.util.fileutil import atomic_copy
@@ -296,8 +296,9 @@ class FrozenResolution(object):
 
     # Assuming target is a jar library.
     for j in target.jar_dependencies:
-      if j.url:
-        self.coordinate_to_attributes[j.coordinate] = {'url': j.url}
+      url = j.get_url(relative=True)
+      if url:
+        self.coordinate_to_attributes[j.coordinate] = {'url': url, 'base_path': j.base_path}
       else:
         self.coordinate_to_attributes[j.coordinate] = {}
 
@@ -353,6 +354,7 @@ class FrozenResolution(object):
                                   .format(spec))
         resolution.add_resolution_coords(t, [m2_for(c) for c in coord_strs])
       result[conf] = resolution
+
     return result
 
   @classmethod
@@ -364,6 +366,7 @@ class FrozenResolution(object):
         ['coord_to_attrs', OrderedDict([str(c), attrs]
                                        for c, attrs in resolution.coordinate_to_attributes.items())]
       ])
+
     with safe_concurrent_creation(filename) as tmp_filename:
       with open(tmp_filename, 'wb') as f:
         json.dump(res, f)
@@ -656,7 +659,7 @@ class IvyInfo(object):
     :param memo: See `traverse_dependency_graph`.
     :returns: All the artifacts for all of the jars for the provided coordinates,
               including transitive dependencies.
-    :rtype: list of :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
+    :rtype: list of :class:`pants.java.jar.ResolvedJar`
     """
     def to_resolved_jar(jar_ref, jar_path):
       return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
@@ -670,7 +673,7 @@ class IvyInfo(object):
       return OrderedSet([dep])
     for jar in coordinates:
       classifier = jar.classifier if self._conf == 'default' else self._conf
-      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier)
+      jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
       for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
         for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
           resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
@@ -1156,7 +1159,7 @@ class IvyUtils(object):
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
-      url = jar.url
+      url = jar.get_url()
       if url:
         any_have_url = True
       classifier = jar.classifier
@@ -1202,7 +1205,7 @@ class IvyUtils(object):
     artifacts = OrderedDict()
     for jar in jars:
       ext = jar.ext
-      url = jar.url
+      url = jar.get_url()
       if url:
         any_have_url = True
       classifier = jar.classifier

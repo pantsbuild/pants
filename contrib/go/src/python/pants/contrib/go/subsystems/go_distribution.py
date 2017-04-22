@@ -32,7 +32,7 @@ class GoDistribution(object):
       register('--supportdir', advanced=True, default='bin/go',
                help='Find the go distributions under this dir.  Used as part of the path to lookup '
                     'the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', advanced=True, default='1.7.1',
+      register('--version', advanced=True, default='1.8', fingerprint=True,
                help='Go distribution version.  Used as part of the path to lookup the distribution '
                     'with --binary-util-baseurls and --pants-bootstrapdir')
 
@@ -74,15 +74,23 @@ class GoDistribution(object):
         os.rename(tmp_dist, outdir)
     return os.path.join(outdir, 'go')
 
+  def go_env(self, gopath=None):
+    """Return an env dict that represents a proper Go environment mapping for this distribution."""
+    # Forcibly nullify the GOPATH if the command does not need one - this can prevent bad user
+    # GOPATHs from erroring out commands; see: https://github.com/pantsbuild/pants/issues/2321.
+    # NB: As of go 1.8, when GOPATH is unset (set to ''), it defaults to ~/go (assuming HOME is
+    # set - and we can't unset that since it might legitimately be used by the subcommand); so we
+    # set the GOPATH here to a valid value that nonetheless will fail to work if GOPATH is
+    # actually used by the subcommand.
+    no_gopath = os.devnull
+    return OrderedDict(GOROOT=self.goroot, GOPATH=gopath or no_gopath)
+
   class GoCommand(namedtuple('GoCommand', ['cmdline', 'env'])):
     """Encapsulates a go command that can be executed."""
 
     @classmethod
-    def _create(cls, goroot, cmd, gopath=None, args=None):
-      # Forcibly nullify the GOPATH if the command does not need one - this can prevent bad user
-      # GOPATHs from erroring out commands; see: https://github.com/pantsbuild/pants/issues/2321.
-      env = OrderedDict(GOROOT=goroot, GOPATH=gopath or '')
-      return cls([os.path.join(goroot, 'bin', 'go'), cmd] + (args or []), env=env)
+    def _create(cls, goroot, cmd, go_env, args=None):
+      return cls([os.path.join(goroot, 'bin', 'go'), cmd] + (args or []), env=go_env)
 
     def spawn(self, env=None, **kwargs):
       """
@@ -124,7 +132,7 @@ class GoDistribution(object):
     :returns: A go command that can be executed later.
     :rtype: :class:`GoDistribution.GoCommand`
     """
-    return self.GoCommand._create(self.goroot, cmd, gopath=gopath, args=args)
+    return self.GoCommand._create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
 
   def execute_go_cmd(self, cmd, gopath=None, args=None, env=None,
                      workunit_factory=None, workunit_name=None, workunit_labels=None, **kwargs):
@@ -145,7 +153,7 @@ class GoDistribution(object):
     :returns: A tuple of the exit code and the go command that was run.
     :rtype: (int, :class:`GoDistribution.GoCommand`)
     """
-    go_cmd = self.GoCommand._create(self.goroot, cmd, gopath=gopath, args=args)
+    go_cmd = self.GoCommand._create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
     if workunit_factory is None:
       return go_cmd.spawn(**kwargs).wait()
     else:

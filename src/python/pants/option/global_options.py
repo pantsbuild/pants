@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import sys
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
@@ -45,7 +46,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', type=bool, default=True, recursive=True,
+    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True,
              help='Set whether log messages are displayed in color.')
 
     # Pants code uses this only to verify that we are of the requested version. However
@@ -64,7 +65,14 @@ class GlobalOptionsRegistrar(Optionable):
              default=['pants.backend.graph_info',
                       'pants.backend.python',
                       'pants.backend.jvm',
-                      'pants.backend.codegen',
+                      'pants.backend.codegen.antlr.java',
+                      'pants.backend.codegen.antlr.python',
+                      'pants.backend.codegen.jaxb',
+                      'pants.backend.codegen.protobuf.java',
+                      'pants.backend.codegen.ragel.java',
+                      'pants.backend.codegen.thrift.java',
+                      'pants.backend.codegen.thrift.python',
+                      'pants.backend.codegen.wire.java',
                       'pants.backend.project_info'],
              help='Load backends from these packages that are already on the path. '
                   'Add contrib and custom backends to this list.')
@@ -119,9 +127,10 @@ class GlobalOptionsRegistrar(Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
-    # This facilitates use of the v2 engine for BuildGraph construction, sans daemon.
-    register('--enable-v2-engine', advanced=True, type=bool, default=False,
-             help='Enables use of the v2 engine. (Beta)')
+    # This facilitates use of the v2 engine, sans daemon.
+    # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
+    register('--enable-v2-engine', advanced=True, type=bool, default=True,
+             help='Enables use of the v2 engine.')
 
   @classmethod
   def register_options(cls, register):
@@ -147,6 +156,8 @@ class GlobalOptionsRegistrar(Optionable):
              help='Kill nailguns before exiting')
     register('-i', '--interpreter', advanced=True, default=[], type=list,
              metavar='<requirement>',
+             removal_version='1.5.0.dev0',
+             removal_hint='Use --interpreter-constraints in scope python-setup instead.',
              help="Constrain what Python interpreters to use.  Uses Requirement format from "
                   "pkg_resources, e.g. 'CPython>=2.6,<3' or 'PyPy'. By default, no constraints "
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
@@ -159,7 +170,7 @@ class GlobalOptionsRegistrar(Optionable):
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
-             removal_version='1.3.0', removal_hint='Use --build-ignore instead.',
+             removal_version='1.3.0.dev0', removal_hint='Use --build-ignore instead.',
              mutually_exclusive_group='build_ignore', help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
@@ -186,8 +197,12 @@ class GlobalOptionsRegistrar(Optionable):
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
     register('--build-file-rev', advanced=True,
+             removal_hint='Lightly used feature, scheduled for removal.', removal_version='1.5.0.dev0',
              help='Read BUILD files from this scm rev instead of from the working tree.  This is '
              'useful for implementing pants-aware sparse checkouts.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')
+    register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
+             help='Paths that correspond with build roots for any subproject that this '
+                  'project depends on.')

@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from multiprocessing import cpu_count
+import multiprocessing
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
@@ -40,6 +40,8 @@ class ThriftLinter(NailgunTask):
                   'this value if it is set.')
     register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              help='Additional options passed to the linter.')
+    register('--worker-count', default=multiprocessing.cpu_count(), advanced=True, type=int,
+             help='Maximum number of workers to use for linter parallelization.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 
   @classmethod
@@ -80,6 +82,8 @@ class ThriftLinter(NailgunTask):
       config_args.append('--ignore-errors')
 
     include_paths , paths = calculate_compile_sources([target], self._is_thrift)
+    if target.include_paths:
+      include_paths |= set(target.include_paths)
     for p in include_paths:
       config_args.extend(['--include-path', p])
 
@@ -92,7 +96,8 @@ class ThriftLinter(NailgunTask):
                               main='com.twitter.scrooge.linter.Main',
                               args=args,
                               jvm_options=self.get_options().jvm_options,
-                              workunit_labels=[WorkUnitLabel.COMPILER])  # to let stdout/err through.
+                              # to let stdout/err through, but don't print tool's label.
+                              workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
 
     if returncode != 0:
       raise ThriftLintError(
@@ -110,7 +115,7 @@ class ThriftLinter(NailgunTask):
       with self.context.new_workunit('parallel-thrift-linter') as workunit:
         worker_pool = WorkerPool(workunit.parent,
                                  self.context.run_tracker,
-                                 cpu_count())
+                                 self.get_options().worker_count)
 
         scrooge_linter_classpath = self.tool_classpath('scrooge-linter')
         results = []

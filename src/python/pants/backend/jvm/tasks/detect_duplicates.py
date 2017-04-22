@@ -9,13 +9,10 @@ import os
 import re
 from collections import defaultdict
 
-from pex.compatibility import to_bytes
-
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.manifest import Manifest
-from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_property
 
 
@@ -123,14 +120,8 @@ class DuplicateDetector(JvmBinaryTask):
     artifacts_by_file_name = defaultdict(set)
     for external_dep, coordinate in self.list_external_jar_dependencies(binary_target):
       self.context.log.debug('  scanning {} from {}'.format(coordinate, external_dep))
-      with open_zip(external_dep) as dep_zip:
-        for qualified_file_name in dep_zip.namelist():
-          # Zip entry names can come in any encoding and in practice we find some jars that have
-          # utf-8 encoded entry names, some not.  As a result we cannot simply decode in all cases
-          # and need to do this to_bytes(...).decode('utf-8') dance to stay safe across all entry
-          # name flavors and under all supported pythons.
-          decoded_file_name = to_bytes(qualified_file_name).decode('utf-8')
-          artifacts_by_file_name[decoded_file_name].add(coordinate.artifact_filename)
+      for qualified_file_name in ClasspathUtil.classpath_entries_contents([external_dep]):
+        artifacts_by_file_name[qualified_file_name].add(coordinate.artifact_filename)
     return artifacts_by_file_name
 
   def _is_excluded(self, path):

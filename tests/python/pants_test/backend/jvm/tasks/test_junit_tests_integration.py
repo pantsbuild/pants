@@ -27,8 +27,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           'test',
           'examples/tests/java/org/pantsbuild/example/hello/greet',
           'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-          '--interpreter=CPython>=2.6,<3',
-          '--interpreter=CPython>=3.3'],
+          '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+          '--python-setup-interpreter-constraints=CPython>=3.3'],
           workdir)
       self.assert_success(pants_run)
       self._assert_junit_output(workdir)
@@ -78,8 +78,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
-        '--interpreter=CPython>=2.6,<3',
-        '--interpreter=CPython>=3.3',
+        '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+        '--python-setup-interpreter-constraints=CPython>=3.3',
         '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
@@ -87,8 +87,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
-        '--interpreter=CPython>=2.6,<3',
-        '--interpreter=CPython>=3.3',
+        '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+        '--python-setup-interpreter-constraints=CPython>=3.3',
         '--jvm-test-junit-options=-Dcwd.test.enabled=true',
         '--test-junit-cwd=testprojects/src/java/org/pantsbuild/testproject/cwdexample/subdir'])
     self.assert_success(pants_run)
@@ -97,8 +97,8 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants([
         'test',
         'testprojects/tests/java/org/pantsbuild/testproject/cwdexample',
-        '--interpreter=CPython>=2.6,<3',
-        '--interpreter=CPython>=3.3',
+        '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+        '--python-setup-interpreter-constraints=CPython>=3.3',
         '--jvm-test-junit-options=-Dcwd.test.enabled=true'])
     self.assert_failure(pants_run)
 
@@ -122,6 +122,13 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         'test',
         'testprojects/tests/java/org/pantsbuild/testproject/annotation'])
     self.assert_success(pants_run)
+
+  def test_junit_test_256_failures(self):
+    pants_run = self.run_pants([
+      'test',
+      'testprojects/tests/java/org/pantsbuild/testproject/fail256'])
+    self.assert_failure(pants_run)
+    self.assertIn('Failures: 256', pants_run.stdout_data)
 
   def test_junit_test_duplicate_resources(self):
     pants_run = self.run_pants([

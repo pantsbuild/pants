@@ -5,7 +5,8 @@
 node_module(
   sources=globs('package.json', 'checkarg', 'src/*.js', 'test/*.js'),
   dependencies=[
-    'contrib/node/examples/3rdparty/node/babel',
+    'contrib/node/examples/3rdparty/node/babel-core',
+    'contrib/node/examples/3rdparty/node/babel-cli',
     'contrib/node/examples/3rdparty/node/mocha',
   ]
 )

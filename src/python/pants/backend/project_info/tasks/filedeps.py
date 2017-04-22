@@ -27,6 +27,9 @@ class FileDeps(ConsoleTask):
     register('--globs', type=bool,
              help='Instead of outputting filenames, output globs (ignoring excludes)')
 
+  def _full_path(self, path):
+    return os.path.join(get_buildroot(), path)
+
   def console_output(self, targets):
     concrete_targets = set()
     for target in targets:
@@ -40,21 +43,20 @@ class FileDeps(ConsoleTask):
       if isinstance(concrete_target, ScalaLibrary):
         concrete_targets.update(concrete_target.java_sources)
 
-    buildroot = get_buildroot()
     files = set()
     output_globs = self.get_options().globs
 
     # Filter out any synthetic targets, which will not have a build_file attr.
     concrete_targets = set([target for target in concrete_targets if not target.is_synthetic])
     for target in concrete_targets:
-      files.add(target.address.build_file.full_path)
+      files.add(self._full_path(target.address.rel_path))
       if output_globs or target.has_sources():
         if output_globs:
           globs_obj = target.globs_relative_to_buildroot()
           if globs_obj:
-            files.update(os.path.join(buildroot, src) for src in globs_obj['globs'])
+            files.update(self._full_path(src) for src in globs_obj['globs'])
         else:
-          files.update(os.path.join(buildroot, src) for src in target.sources_relative_to_buildroot())
+          files.update(self._full_path(src) for src in target.sources_relative_to_buildroot())
       # TODO(John Sirois): BundlePayload should expose its sources in a way uniform to
       # SourcesPayload to allow this special-casing to go away.
       if isinstance(target, JvmApp) and not output_globs:

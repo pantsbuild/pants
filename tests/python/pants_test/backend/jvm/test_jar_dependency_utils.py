@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 
 
 class JarDependencyUtilsTest(unittest.TestCase):

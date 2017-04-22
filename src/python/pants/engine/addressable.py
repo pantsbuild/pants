@@ -13,7 +13,7 @@ from functools import update_wrapper
 
 import six
 
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.objects import Resolvable, Serializable
 from pants.util.memo import memoized
 from pants.util.meta import AbstractClass
@@ -43,6 +43,13 @@ class Collection(object):
 
 
 Addresses = Collection.of(Address)
+
+
+class BuildFileAddresses(Collection.of(BuildFileAddress)):
+  @property
+  def addresses(self):
+    """Converts the BuildFileAddress objects in this collection to Address objects."""
+    return [bfa.to_address() for bfa in self.dependencies]
 
 
 class TypeConstraint(AbstractClass):
@@ -136,6 +143,12 @@ class Exactly(TypeConstraint):
 
   def satisfied_by_type(self, obj_type):
     return obj_type in self._types
+
+  def graph_str(self):
+    if len(self.types) == 1:
+      return self.types[0].__name__
+    else:
+      return repr(self)
 
 
 class SubclassesOf(TypeConstraint):
@@ -459,7 +472,12 @@ def _extract_variants(address, variants_str):
 
 
 def parse_variants(address):
-  target_name, _, variants_str = address.target_name.partition('@')
+  target_name, at_sign, variants_str = address.target_name.partition('@')
+  if not at_sign:
+    return address, None
   variants = _extract_variants(address, variants_str) if variants_str else None
-  normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
+  if isinstance(address, BuildFileAddress):
+    normalized_address = BuildFileAddress(rel_path=address.rel_path, target_name=target_name)
+  else:
+    normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
   return normalized_address, variants

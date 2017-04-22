@@ -11,7 +11,7 @@ import unittest
 from pants.build_graph.address import Address
 from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                       addressable_list)
-from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_tasks
+from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_rules
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
@@ -92,20 +92,20 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     super(GraphTestBase, self).setUp()
 
-  def create(self, build_pattern=None, parser_cls=None):
+  def create(self, build_patterns=None, parser_cls=None):
     symbol_table_cls = TestTable
 
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   build_pattern=build_pattern,
+                                   build_patterns=build_patterns,
                                    parser_cls=parser_cls)
 
-    tasks = create_graph_tasks(address_mapper, symbol_table_cls)
+    tasks = create_graph_rules(address_mapper, symbol_table_cls)
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples'))
     scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
     return scheduler
 
   def create_json(self):
-    return self.create(build_pattern='*.BUILD.json', parser_cls=JsonParser)
+    return self.create(build_patterns=('*.BUILD.json',), parser_cls=JsonParser)
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
@@ -169,12 +169,12 @@ class InlinedGraphTest(GraphTestBase):
     self.do_test_codegen_simple(scheduler)
 
   def test_python(self):
-    scheduler = self.create(build_pattern='*.BUILD.python',
+    scheduler = self.create(build_patterns=('*.BUILD.python',),
                             parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic(self):
-    scheduler = self.create(build_pattern='*.BUILD',
+    scheduler = self.create(build_patterns=('*.BUILD',),
                             parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(scheduler)
 
@@ -205,7 +205,7 @@ class InlinedGraphTest(GraphTestBase):
   def do_test_cycle(self, address_str):
     scheduler = self.create_json()
     parsed_address = Address.parse(address_str)
-    self.do_test_trace_message(scheduler, parsed_address, 'cycle')
+    self.do_test_trace_message(scheduler, parsed_address, 'Dep graph contained a cycle.')
 
   def assert_throws_are_leaves(self, error_msg, throw_name):
     def indent_of(s):
@@ -297,7 +297,7 @@ class LazyResolvingGraphTest(GraphTestBase):
                                 version='0.9.2',
                                 strict=True,
                                 lang='java',
-                                dependencies=[address(thrift2_address)]
+                                dependencies=[thrift2_address]
                               ),
                             ])
 
@@ -330,11 +330,11 @@ class LazyResolvingGraphTest(GraphTestBase):
     self.do_test_codegen_simple(scheduler)
 
   def test_python_lazy(self):
-    scheduler = self.create(build_pattern='*.BUILD.python',
+    scheduler = self.create(build_patterns=('*.BUILD.python',),
                             parser_cls=PythonAssignmentsParser)
     self.do_test_codegen_simple(scheduler)
 
   def test_python_classic_lazy(self):
-    scheduler = self.create(build_pattern='*.BUILD',
+    scheduler = self.create(build_patterns=('*.BUILD',),
                             parser_cls=PythonCallbacksParser)
     self.do_test_codegen_simple(scheduler)

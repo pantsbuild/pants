@@ -5,15 +5,14 @@ python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':native_engine_version',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:storage',
     'src/python/pants/subsystem:subsystem',
   ],
-  resource_targets=[
-    ':native_engine_version'
-  ]
 )
 
 resources(

@@ -6,6 +6,7 @@ python_library(
     '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:payload_field',
     'src/python/pants/base:project_tree',
     'src/python/pants/option',
     'src/python/pants/subsystem',

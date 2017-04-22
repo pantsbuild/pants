@@ -70,8 +70,7 @@ class AddressMapper(AbstractClass):
           single_address, type(single_address), SingleAddress))
 
     try:
-      self.scan_specs([single_address])
-      return True
+      return bool(self.scan_specs([single_address]))
     except AddressLookupError:
       return False
 

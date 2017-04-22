@@ -15,7 +15,6 @@ from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -31,6 +30,7 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
@@ -404,6 +404,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       result['targets']['src/python/z:z']['globs']
     )
 
+  # TODO: Delete this test in 1.5.0.dev0, once we remove support for resources=.
   def test_synthetic_target(self):
     # Create a BUILD file then add itself as resources
     self.add_to_build_file('src/python/alpha/BUILD', """

@@ -15,9 +15,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':java_thrift_library_fingerprint_strategy',
     ':thrift_util',
-    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
-    'src/python/pants/backend/codegen/targets:java',
-    'src/python/pants/backend/codegen/tasks:all',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
@@ -53,7 +51,7 @@ python_library(
   name='java_thrift_library_fingerprint_strategy',
   sources=['java_thrift_library_fingerprint_strategy.py'],
   dependencies=[
-    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/base:fingerprint_strategy',
   ],
 )

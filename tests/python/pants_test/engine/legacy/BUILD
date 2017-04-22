@@ -80,12 +80,24 @@ python_tests(
 )
 
 python_tests(
+  name = 'filedeps_integration',
+  sources = ['test_filedeps_integration.py'],
+  dependencies = [
+    'src/python/pants/base:project_tree',
+    'tests/python/pants_test:int-test'
+  ],
+  tags = {'integration'},
+  timeout = 180,
+)
+
+python_tests(
   name = 'graph',
   sources = ['test_graph.py'],
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
+    'src/python/pants/init',
     'tests/python/pants_test/engine:util',
   ]
 )
@@ -98,6 +110,15 @@ python_tests(
   ],
   tags = {'integration'},
   timeout = 180,
+)
+
+python_tests(
+  name = 'list_owners_integration',
+  sources = ['test_list_owners_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test'
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

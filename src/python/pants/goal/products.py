@@ -421,7 +421,8 @@ class Products(object):
     :API: public
 
     If the product isn't found, returns None, unless init_func is set, in which case the product's
-    value is set to the return value of init_func(), and returned."""
+    value is set to the return value of init_func(), and returned.
+    """
     if typename not in self.data_products:
       if not init_func:
         return None

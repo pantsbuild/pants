@@ -9,6 +9,7 @@ import hashlib
 import logging
 from abc import abstractmethod
 
+from pants.base.deprecated import deprecated
 from pants.util.meta import AbstractClass
 
 
@@ -44,6 +45,12 @@ class FingerprintStrategy(AbstractClass):
     else:
       return None
 
+  def direct(self, target):
+    return False
+
+  def dependencies(self, target):
+    return target.dependencies
+
   @abstractmethod
   def __hash__(self):
     """Subclasses must implement a hash so computed fingerprints can be safely memoized."""
@@ -72,6 +79,10 @@ class TaskIdentityFingerprintStrategy(FingerprintStrategy):
   :API: public
   """
 
+  @deprecated('1.5.0.dev0',
+              'The information that was previously included in the fingerprint by '
+              'TaskIdentityFingerprintStrategy is now included by default in all Tasks. '
+              'If you were extending this class, extend FingerprintStrategy directly instead.')
   def __init__(self, task):
     self._task = task
 

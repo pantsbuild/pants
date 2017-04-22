@@ -68,7 +68,7 @@ class JvmPlatformIntegrationMixin(object):
       with self.temporary_workdir() as workdir:
         pants_run = self.run_pants_with_workdir(
           ['binary'] + self.get_pants_compile_args()
-          + ['compile.checkstyle', '--skip', spec]
+          + ['lint.checkstyle', '--skip', spec]
           + more_args,
           workdir, config)
         self.assert_success(pants_run)

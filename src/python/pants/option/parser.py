@@ -15,8 +15,10 @@ import six
 
 from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import (DictValueComponent, ListValueComponent, dict_option,
-                                       dir_option, file_option, list_option, target_option)
+from pants.option.config import Config
+from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
+                                       dict_option, dir_option, file_option, list_option,
+                                       target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
                                  NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
@@ -304,10 +306,15 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    # Boolean options always have an implicit boolean-typed default.  They can never be None.
-    # We make that default explicit here.
-    if kwargs.get('type') == bool and kwargs.get('default') is None:
-      kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
+    if kwargs.get('type') == bool:
+      default = kwargs.get('default')
+      if default is None:
+        # Unless a tri-state bool is explicitly opted into with the `UnsetBool` default value,
+        # boolean options always have an implicit boolean-typed default. We make that default
+        # explicit here.
+        kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
+      elif default is UnsetBool:
+        kwargs['default'] = None
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
@@ -445,8 +452,10 @@ class Parser(object):
     # Get value from config files, and capture details about its derivation.
     config_details = None
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
+    config_default_val_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
     config_val_str = expand(self._config.get(config_section, dest, default=None))
-    config_source_file = self._config.get_source_for_option(config_section, dest)
+    config_source_file = (self._config.get_source_for_option(config_section, dest) or
+        self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
       config_details = 'in {}'.format(config_source_file)
@@ -499,14 +508,15 @@ class Parser(object):
     # is idempotent, so this is OK.
 
     values_to_rank = [to_value_type(x) for x in
-                      [flag_val, env_val_str, config_val_str, kwargs.get('default'), None]]
+                      [flag_val, env_val_str, config_val_str,
+                       config_default_val_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
     # Record info about the derivation of each of the values.
     for ranked_val in ranked_vals:
-      if ranked_val.rank == RankedValue.CONFIG:
+      if ranked_val.rank in (RankedValue.CONFIG, RankedValue.CONFIG_DEFAULT):
         details = config_details
       elif ranked_val.rank == RankedValue.ENVIRONMENT:
         details = env_details

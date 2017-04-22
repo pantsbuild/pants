@@ -161,14 +161,14 @@ To get your pull request reviewed, you should:
   who should review your change. Running `git log -- $filename` on one or more of the files that
   you changed is a good way to find potential reviewers!
 
-Finally, when the review is ready for attention, add the `reviewable` label: this is the
-signal to committers and contributors that the review is ready for attention. You can see
-a list of all actively `reviewable` reviews [here](https://github.com/pantsbuild/pants/labels/reviewable).
+You can see a list of all actively `reviewable` reviews [here](
+https://github.com/pantsbuild/pants/pulls?utf8=%E2%9C%93&q=is%3Apr%20is%3Aopen%20status%3Asuccess).
 
 #### Iterating
 
 If reviewers post any feedback
-([for more information on providing feedback see](https://help.github.com/articles/reviewing-proposed-changes-in-a-pull-request/)),
+([for more information on providing feedback see](
+https://help.github.com/articles/reviewing-proposed-changes-in-a-pull-request/)),
 there might be a few iterations before finally getting a Ship It. As reviewers enter
 feedback, the github page updates; it should also send
 you mail as long as you are `Subscribed` to notifications for the pull request.

@@ -289,7 +289,7 @@ public class JarBuilder implements Closeable {
       this.source = source;
     }
 
-    public String name() {
+    @Override public String name() {
       return source.getPath();
     }
   }
@@ -1081,6 +1081,7 @@ public class JarBuilder implements Closeable {
     return FluentIterable.from(getAdditions().asMap().entrySet()).transformAndConcat(mergeEntries);
   }
 
+  @SuppressWarnings("UnnecessaryDefaultInEnumSwitch")
   private Optional<ReadableEntry> processEntries(
       Predicate<CharSequence> skipPath,
       DuplicateHandler duplicateHandler,

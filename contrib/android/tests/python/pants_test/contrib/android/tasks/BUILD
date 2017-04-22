@@ -119,7 +119,7 @@ python_tests(
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',
-    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/java/jar',
     'src/python/pants/fs:fs',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

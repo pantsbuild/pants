@@ -14,16 +14,22 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class FilemapIntegrationTest(PantsRunIntegrationTest):
   PATH_PREFIX = 'testprojects/tests/python/pants/file_sets/'
   TEST_EXCLUDE_FILES = {
-    'a.py', 'aa.py', 'aaa.py', 'ab.py', 'aabb.py', 'dir1/a.py', 'dir1/aa.py', 'dir1/aaa.py',
+    'a.py', 'aa.py', 'aaa.py', 'ab.py', 'aabb.py', 'test_a.py',
+    'dir1/a.py', 'dir1/aa.py', 'dir1/aaa.py',
     'dir1/ab.py', 'dir1/aabb.py', 'dir1/dirdir1/a.py', 'dir1/dirdir1/aa.py', 'dir1/dirdir1/ab.py'
   }
 
   def setUp(self):
     super(FilemapIntegrationTest, self).setUp()
+
     project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ['BUILD', '.*'])
     scan_set = set()
+
+    def should_ignore(file):
+      return file.endswith('.pyc')
+
     for root, dirs, files in project_tree.walk(''):
-      scan_set.update({os.path.join(root, f) for f in files})
+      scan_set.update({os.path.join(root, f) for f in files if not should_ignore(f)})
 
     self.assertEquals(scan_set, self.TEST_EXCLUDE_FILES)
 
@@ -48,9 +54,6 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
                           success=True,
                           enable_v2_engine=True)
     self.assertIn('testprojects/src/python/sources/sources.py', run.stdout_data)
-    # FIXME: The synthetic target that is created to expose the `resources=globs` arg does not show
-    # up in filemap, because it is synthetic. see https://github.com/pantsbuild/pants/issues/3563
-    #self.assertIn('testprojects/src/python/sources/sources.txt', run.stdout_data)
 
   def test_exclude_invalid_string(self):
     build_path = os.path.join(self.PATH_PREFIX, 'BUILD.invalid')
@@ -100,3 +103,11 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(self.TEST_EXCLUDE_FILES -
                       {'a.py', 'aaa.py', 'dir1/a.py', 'dir1/dirdir1/a.py'},
                       test_out)
+
+  def test_implicit_sources(self):
+    test_out = self._extract_exclude_output('implicit_sources')
+    self.assertEquals({'a.py', 'aa.py', 'aaa.py', 'aabb.py', 'ab.py'},
+                      test_out)
+
+    test_out = self._extract_exclude_output('test_with_implicit_sources')
+    self.assertEquals({'test_a.py'}, test_out)

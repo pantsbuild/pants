@@ -4,6 +4,42 @@
 This document describes releases leading up to the ``1.2.x`` ``stable`` series.
 
 
+1.2.1 (01/20/2017)
+------------------
+
+Promotion of the 1.2.1rc0 release to a stable release, with no changes.
+
+1.2.1rc0 (12/19/2016)
+---------------------
+
+The first release candidate for stable 1.2.1: includes a backlog of recent fixes, particularly
+for initialization issues with Task results_dirs. Additionally, includes native support for
+running Scalatest tests via JUnit using Pants' junit_tests target type.
+
+Bugfixes
+~~~~~~~~
+
+* Ensure that invalid vts have results_dir cleaned before passing to ta… (#4139)
+  `PR #4139 <https://github.com/pantsbuild/pants/pull/4139>`_
+
+* Surface --dereference-symlinks flag to task caching level
+  `RB #4338 <https://rbcommons.com/s/twitter/r/4338>`_
+
+* Correction on [resolve.node]
+  `RB #4364 <https://rbcommons.com/s/twitter/r/4364>`_
+
+* Remove safe_mkdir on results_dir in [resolve.node]
+  `RB #4362 <https://rbcommons.com/s/twitter/r/4362>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Bump junit-runner to 1.0.16
+  `RB #4381 <https://rbcommons.com/s/twitter/r/4381>`_
+
+* Patch to make scala tests work
+  `RB #4361 <https://rbcommons.com/s/twitter/r/4361>`_
+
 1.2.0 (10/31/2016)
 ------------------
 

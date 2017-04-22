@@ -5,7 +5,7 @@ If you work in an large engineering environment with a codebase shared
 between many teams, you have a lot of code!  Over time, your codebase
 will consist of many interrelated projects and libraries.
 
-The choice of how your organize your code has many implications.  If
+The choice of how you organize your code has many implications.  If
 you have a large number of small, independently-versioned code
 repositories, each project will have a small, manageable codebase but
 what about all the code it depends on?

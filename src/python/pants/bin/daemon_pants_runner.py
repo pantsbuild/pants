@@ -15,10 +15,10 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.bin.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
+from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.pantsd.util import clean_global_runtime_state
 from pants.util.contextutil import HardSystemExit, stdio_as
 
 
@@ -129,6 +129,11 @@ class DaemonPantsRunner(ProcessManager):
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     self.daemonize(write_pid=False)
+
+  def pre_fork(self):
+    """Pre-fork callback executed via ProcessManager.daemonize()."""
+    if self._graph_helper:
+      self._graph_helper.scheduler.pre_fork()
 
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""

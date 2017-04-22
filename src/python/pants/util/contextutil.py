@@ -22,6 +22,10 @@ from pants.util.dirutil import safe_delete
 from pants.util.tarutil import TarFile
 
 
+class InvalidZipPath(ValueError):
+  """Indicates a bad zip file path."""
+
+
 @contextmanager
 def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
@@ -165,16 +169,27 @@ def pushd(directory):
 
 @contextmanager
 def open_zip(path_or_file, *args, **kwargs):
-  """
-    A with-context for zip files.  Passes through positional and kwargs to zipfile.ZipFile.
+  """A with-context for zip files.
 
-    :API: public
+  Passes through *args and **kwargs to zipfile.ZipFile.
+
+  :API: public
+
+  :param path_or_file: Full path to zip file.
+  :param args: Any extra args accepted by `zipfile.ZipFile`.
+  :param kwargs: Any extra keyword args accepted by `zipfile.ZipFile`.
+  :raises: `InvalidZipPath` if path_or_file is invalid.
+  :raises: `zipfile.BadZipfile` if zipfile.ZipFile cannot open a zip at path_or_file.
+  :returns: `class 'contextlib.GeneratorContextManager`.
   """
+  if not path_or_file:
+    raise InvalidZipPath('Invalid zip location: {}'.format(path_or_file))
+  allowZip64 = kwargs.pop('allowZip64', True)
   try:
-    allowZip64 = kwargs.pop('allowZip64', True)
     zf = zipfile.ZipFile(path_or_file, *args, allowZip64=allowZip64, **kwargs)
   except zipfile.BadZipfile as bze:
-    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(path_or_file, bze))
+    # Use the realpath in order to follow symlinks back to the problem source file.
+    raise zipfile.BadZipfile("Bad Zipfile {0}: {1}".format(os.path.realpath(path_or_file), bze))
   try:
     yield zf
   finally:

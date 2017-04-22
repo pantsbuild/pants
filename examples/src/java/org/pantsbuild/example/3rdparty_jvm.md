@@ -66,29 +66,10 @@ published jar.
       provides = artifact(org='org.archie',
                           name='api',
                           repo=myrepo,)
-	)
+    )
 
 Controlling JAR Dependency Versions
 -----------------------------------
-
-**If you notice a small number of wrong-version things,** then in a JVM
-target, you can depend on a `jar` that specifies a version and sets
-`force=True` to *force* using that version:
-
-    :::python
-    scala_library(
-      name = "loadtest",
-      dependencies = [
-        '3rdparty/bijection:bijection-scrooge',
-        # our 3rdparty/BUILD still has 6.1.4 as the default version, but
-        # finagle-[core|thrift] version 6.1.4 is superceded (evicted) by
-        # version 6.4.1
-        # Force inclusion of version 6.1.4, until we're bumped to finagle 6.4.1+
-        jar(org='com.twitter', name='iago', rev='0.6.3', force=True),
-        jar(org='com.twitter', name='finagle-core', rev='6.1.4', force=True),
-        jar(org='com.twitter', name='finagle-thrift', rev='6.1.4', force=True),
-      ],
-      sources = ["LoadTestRecordProcessor.scala"])
 
 **If you notice that one "foreign" dependency pulls in mostly wrong
 things,** tell Pants not to pull in its dependencies. In your
@@ -98,13 +79,14 @@ carefully add hand-picked versions:
     :::python
     jar_library(name="retro-naming-factory",
       jars=[
-	jar(org='retro', name='retro-factory', rev='5.0.18', intransitive=True),
+	      jar(org='retro', name='retro-factory', rev='5.0.18', intransitive=True),
       ],
       dependencies=[
         # Don't use retro's expected (old, incompatible) common-logging
         # version, yipe; use the same version we use everywhere else:
-    '3rdparty/jvm/common-logging',
-      ])
+        '3rdparty/jvm/common-logging',
+      ]
+    )
 
 **If you notice a small number of transitive dependencies to exclude**
 Rather than mark the `jar` intransitive, you can `exclude` some

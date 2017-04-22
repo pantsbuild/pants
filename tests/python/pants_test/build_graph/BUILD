@@ -37,6 +37,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'subproject_integration',
+  sources = ['test_subproject_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+
+python_tests(
   name = 'build_file_aliases',
   sources = ['test_build_file_aliases.py'],
   dependencies = [
@@ -57,6 +67,8 @@ python_tests(
 python_tests(
   sources = ['test_build_graph.py'],
   dependencies = [
+    'src/python/pants/java/jar',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test'
   ],
@@ -108,8 +120,7 @@ python_tests(
   sources = ['test_target.py'],
   dependencies = [
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:payload',
-    'src/python/pants/base:payload_field',
+    'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',

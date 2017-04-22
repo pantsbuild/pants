@@ -400,10 +400,13 @@ class IdeaIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
   def test_all_targets(self):
     self._idea_test([
       'src::', 'tests::', 'examples::', 'testprojects::',
+      '--gen-protoc-import-from-root',
       # IdeaGen resolves source jars by default, which causes a collision with these targets because
       # they explicitly include jersey.jersey's source jar.
       '--exclude-target-regexp=testprojects/3rdparty/managed:jersey.jersey.sources',
       '--exclude-target-regexp=testprojects/3rdparty/managed:example-dependee',
+      # This target fails by design.
+      '--exclude-target-regexp=testprojects/src/antlr/python/test:antlr_failure',
       '--jvm-platform-default-platform=java7'
     ])
 

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from textwrap import dedent
 
-from pants.option.custom_types import ListValueComponent, dict_option, list_option
+from pants.option.custom_types import ListValueComponent, UnsetBool, dict_option, list_option
 from pants.option.errors import ParseError
 from pants.util.strutil import ensure_binary
 
@@ -31,6 +31,11 @@ class CustomTypesTest(unittest.TestCase):
 
   def _do_split(self, expr, expected):
     self.assertEqual(expected, ListValueComponent._split_modifier_expr(expr))
+
+  def test_unset_bool(self):
+    # UnsetBool should only be use-able as a singleton value via its type.
+    with self.assertRaises(NotImplementedError):
+      UnsetBool()
 
   def test_dict(self):
     self._do_test({}, '{}')

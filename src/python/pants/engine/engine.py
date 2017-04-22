@@ -120,11 +120,6 @@ class Engine(AbstractClass):
       for computed_product in maybe_list(return_value, expected_type=product):
         yield computed_product
 
-  def close(self):
-    """Shutdown this engine instance, releasing resources it was using."""
-    self._storage.close()
-    self._cache.close()
-
   def cache_stats(self):
     """Returns cache stats for the engine."""
     return self._cache.get_stats()
@@ -159,20 +154,5 @@ class Engine(AbstractClass):
 class LocalSerialEngine(Engine):
   """An engine that runs tasks locally and serially in-process."""
 
-  def _run(self, runnable):
-    return runnable.func(*runnable.args)
-
   def reduce(self, execution_request):
-    generator = self._scheduler.schedule(execution_request)
-    for runnable_batch in generator:
-      completed = []
-      for entry, runnable in runnable_batch:
-        key, result = self._maybe_cache_get(entry, runnable)
-        if result is None:
-          try:
-            result = Return(self._run(runnable))
-            self._maybe_cache_put(key, result)
-          except Exception as e:
-            result = Throw(e)
-        completed.append((entry, result))
-      generator.send(completed)
+    self._scheduler.schedule(execution_request)

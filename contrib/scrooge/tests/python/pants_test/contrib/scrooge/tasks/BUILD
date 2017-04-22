@@ -6,7 +6,7 @@ python_tests(
   sources=['test_java_thrift_library_fingerprint_strategy.py'],
   dependencies=[
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:java_thrift_library_fingerprint_strategy',
-    'src/python/pants/backend/codegen/subsystems:thrift_defaults',
+    'src/python/pants/backend/codegen/thrift/java',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -17,7 +17,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:mock',
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:scrooge_gen',
-    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
@@ -26,6 +26,15 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ],
+)
+
+python_tests(
+  name='scrooge_gen_integration',
+  sources=['test_scrooge_gen_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags={'integration'},
 )
 
 python_tests(
@@ -44,7 +53,7 @@ python_tests(
     '3rdparty/python:mock',
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_linter',
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
-    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/build_graph',
     'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test/testutils:mock_logger',

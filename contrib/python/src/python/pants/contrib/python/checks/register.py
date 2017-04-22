@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
+from pants.contrib.python.checks.tasks2.python_eval import PythonEval
 from pants.contrib.python.checks.tasks.checkstyle.checker import PythonCheckStyleTask
-from pants.contrib.python.checks.tasks.python_eval import PythonEval
 
 
 def register_goals():
-  task(name='python-eval', action=PythonEval).install('compile')
-  task(name='pythonstyle', action=PythonCheckStyleTask).install('compile')
+  task(name='python-eval', action=PythonEval).install('lint')
+  task(name='pythonstyle', action=PythonCheckStyleTask).install('lint')

@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import hashlib
 import os
 from collections import defaultdict
 from multiprocessing import cpu_count
@@ -17,39 +18,49 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
+from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
+  CLASS_NOT_FOUND_ERROR_PATTERNS
+from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
+                                                                 strict_dependencies)
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
+from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
+                                                                           MissingDependencyFinder)
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.backend.jvm.tasks.nailgun_task import NailgunTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.worker_pool import WorkerPool
-from pants.base.workunit import WorkUnitLabel
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
-from pants.util.dirutil import fast_relpath, safe_delete, safe_mkdir, safe_rmtree, safe_walk
+from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
+                                safe_walk)
 from pants.util.fileutil import create_size_estimators
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 
 
-class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStrategy):
+class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
   """Task fingerprint strategy that also includes the resolved coordinates of dependent jars."""
 
-  def __init__(self, task, classpath_products):
-    super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__init__(task)
+  def __init__(self, classpath_products, dep_context):
+    super(ResolvedJarAwareFingerprintStrategy, self).__init__()
     self._classpath_products = classpath_products
+    self._dep_context = dep_context
 
   def compute_fingerprint(self, target):
     if isinstance(target, Resources):
       # Just do nothing, this kind of dependency shouldn't affect result's hash.
       return None
 
-    hasher = self._build_hasher(target)
+    hasher = hashlib.sha1()
+    hasher.update(target.payload.fingerprint())
     if isinstance(target, JarLibrary):
       # NB: Collects only the jars for the current jar_library, and hashes them to ensure that both
       # the resolved coordinates, and the requested coordinates are used. This ensures that if a
@@ -62,12 +73,21 @@ class ResolvedJarAwareTaskIdentityFingerprintStrategy(TaskIdentityFingerprintStr
         hasher.update(str(entry.coordinate))
     return hasher.hexdigest()
 
+  def direct(self, target):
+    if isinstance(target, JvmTarget):
+      return JvmCompile.strict_deps_enabled(target)
+    return False
+
+  def dependencies(self, target):
+    if self.direct(target):
+      return strict_dependencies(target, self._dep_context)
+    return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
+
   def __hash__(self):
-    return hash((type(self), self._task.fingerprint))
+    return hash(type(self))
 
   def __eq__(self, other):
-    return (isinstance(other, ResolvedJarAwareTaskIdentityFingerprintStrategy) and
-            super(ResolvedJarAwareTaskIdentityFingerprintStrategy, self).__eq__(other))
+    return type(self) == type(other)
 
 
 class JvmCompile(NailgunTaskBase):
@@ -158,10 +178,20 @@ class JvmCompile(NailgunTaskBase):
              help='Capture classpath to per-target newline-delimited text files. These files will '
                   'be packaged into any jar artifacts that are created from the jvm targets.')
 
-    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='warn',
+    register('--unused-deps', choices=['ignore', 'warn', 'fatal'], default='ignore',
              fingerprint=True,
              help='Controls whether unused deps are checked, and whether they cause warnings or '
-                  'errors.')
+                  'errors. This option uses zinc\'s analysis to determine which deps are unused, '
+                  'and can thus result in false negatives: thus it is disabled by default.')
+
+    register('--suggest-missing-deps', type=bool,
+             help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
+                  'deps for compilation failures that are due to class not found.')
+
+    register('--class-not-found-error-patterns', advanced=True, type=list,
+             default=CLASS_NOT_FOUND_ERROR_PATTERNS,
+             help='List of regular expression patterns that extract class not found '
+                  'compile errors.')
 
     register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
              help='Use jar files on the compile_classpath. Note: Using this option degrades '
@@ -251,7 +281,8 @@ class JvmCompile(NailgunTaskBase):
     raise NotImplementedError()
 
   def compile(self, args, classpath, sources, classes_output_dir, upstream_analysis, analysis_file,
-              log_file, settings, fatal_warnings, zinc_file_manager, javac_plugins_to_exclude):
+              log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+              javac_plugin_map, scalac_plugin_map):
     """Invoke the compiler.
 
     Must raise TaskError on compile failure.
@@ -264,13 +295,13 @@ class JvmCompile(NailgunTaskBase):
     :param upstream_analysis:
     :param analysis_file: Where to write the compile analysis.
     :param log_file: Where to write logs.
+    :param zinc_args_file: Where to write the args zinc was invoked with.
     :param JvmPlatformSettings settings: platform settings determining the -source, -target, etc for
       javac to use.
     :param fatal_warnings: whether to convert compilation warnings to errors.
     :param zinc_file_manager: whether to use zinc provided file manager.
-    :param javac_plugins_to_exclude: A list of names of javac plugins that mustn't be used in
-                                     this compilation, even if requested (typically because
-                                     this compilation is building those same plugins).
+    :param javac_plugin_map: Map of names of javac plugins to use to their arguments.
+    :param scalac_plugin_map: Map of names of scalac plugins to use to their arguments.
     """
     raise NotImplementedError()
 
@@ -347,12 +378,43 @@ class JvmCompile(NailgunTaskBase):
                                  self.context.products.get_data('runtime_classpath'),
                                  self.context.products.get_data('product_deps_by_src'))
 
+  @memoized_property
+  def _missing_deps_finder(self):
+    return MissingDependencyFinder(self._dep_analyzer, CompileErrorExtractor(
+      self.get_options().class_not_found_error_patterns))
+
   @property
   def _analysis_parser(self):
     return self._analysis_tools.parser
 
+  @staticmethod
+  def _compute_language_property(target, selector):
+    """Computes a language property setting for the given target sources.
+
+    :param target The target whose language property will be calculated.
+    :param selector A function that takes a target or platform and returns the boolean value of the
+                    property for that target or platform, or None if that target or platform does
+                    not directly define the property.
+
+    If the target does not override the language property, returns true iff the property
+    is true for any of the matched languages for the target.
+    """
+    if selector(target) is not None:
+      return selector(target)
+
+    prop = False
+    if target.has_sources('.java'):
+      prop |= selector(Java.global_instance())
+    if target.has_sources('.scala'):
+      prop |= selector(ScalaPlatform.global_instance())
+    return prop
+
   def _fingerprint_strategy(self, classpath_products):
-    return ResolvedJarAwareTaskIdentityFingerprintStrategy(self, classpath_products)
+    return ResolvedJarAwareFingerprintStrategy(classpath_products, self._dep_context)
+
+  @staticmethod
+  def strict_deps_enabled(target):
+    return JvmCompile._compute_language_property(target, lambda x: x.strict_deps)
 
   def _compile_context(self, target, target_workdir):
     analysis_file = JvmCompile._analysis_for_target(target_workdir, target)
@@ -360,13 +422,15 @@ class JvmCompile(NailgunTaskBase):
     classes_dir = os.path.join(target_workdir, 'classes')
     jar_file = os.path.join(target_workdir, 'z.jar')
     log_file = os.path.join(target_workdir, 'debug.log')
-    strict_deps = self._compute_language_property(target, lambda x: x.strict_deps)
+    zinc_args_file = os.path.join(target_workdir, 'zinc_args')
+    strict_deps = self.strict_deps_enabled(target)
     return CompileContext(target,
                           analysis_file,
                           portable_analysis_file,
                           classes_dir,
                           jar_file,
                           log_file,
+                          zinc_args_file,
                           self._compute_sources_for_target(target),
                           strict_deps)
 
@@ -380,8 +444,7 @@ class JvmCompile(NailgunTaskBase):
       return
 
     # Clone the compile_classpath to the runtime_classpath.
-    compile_classpath = self.context.products.get_data('compile_classpath')
-    classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    classpath_product = self.create_runtime_classpath()
 
     def classpath_for_context(context):
       if self.get_options().use_classpath_jars:
@@ -424,6 +487,16 @@ class JvmCompile(NailgunTaskBase):
             classpath_product.remove_for_target(cc.target, [(conf, cc.classes_dir)])
             classpath_product.add_for_target(cc.target, [(conf, cc.jar_file)])
 
+  def create_runtime_classpath(self):
+    compile_classpath = self.context.products.get_data('compile_classpath')
+    classpath_product = self.context.products.get_data('runtime_classpath')
+    if not classpath_product:
+      classpath_product = self.context.products.get_data('runtime_classpath', compile_classpath.copy)
+    else:
+      classpath_product.update(compile_classpath)
+
+    return classpath_product
+
   def do_compile(self,
                  invalidation_check,
                  compile_contexts,
@@ -434,7 +507,7 @@ class JvmCompile(NailgunTaskBase):
     assert invalid_targets, "compile_chunk should only be invoked if there are invalid targets."
 
     # This ensures the workunit for the worker pool is set before attempting to compile.
-    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self._name)) \
+    with self.context.new_workunit('isolation-{}-pool-bootstrap'.format(self.name())) \
             as workunit:
       # This uses workunit.parent as the WorkerPool's parent so that child workunits
       # of different pools will show up in order in the html output. This way the current running
@@ -477,9 +550,9 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, progress_message, settings, fatal_warnings, zinc_file_manager,
-                   counter):
+  def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
+                   log_file, zinc_args_file, progress_message, settings, fatal_warnings,
+                   zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
@@ -509,7 +582,7 @@ class JvmCompile(NailgunTaskBase):
         ' (',
         progress_message,
         ').')
-      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]):
+      with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
         # The compiler may delete classfiles, then later exit on a compilation error. Then if the
         # change triggering the error is reverted, we won't rebuild to restore the missing
         # classfiles. So we force-invalidate here, to be on the safe side.
@@ -517,11 +590,76 @@ class JvmCompile(NailgunTaskBase):
         if self.get_options().capture_classpath:
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
-        # If compiling a plugin, don't try to use it on itself.
-        javac_plugins_to_exclude = (t.plugin for t in vts.targets if isinstance(t, JavacPlugin))
-        self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                     log_file, settings, fatal_warnings, zinc_file_manager,
-                     javac_plugins_to_exclude)
+        try:
+          self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
+                       log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+                       self._get_plugin_map('javac', target),
+                       self._get_plugin_map('scalac', target))
+        except TaskError:
+          if self.get_options().suggest_missing_deps:
+            logs = self._find_failed_compile_logs(compile_workunit)
+            if logs:
+              self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
+          raise
+
+  def _get_plugin_map(self, compiler, target):
+    """Returns a map of plugin to args, for the given compiler.
+
+    Only plugins that must actually be activated will be present as keys in the map.
+    Plugins with no arguments will have an empty list as a value.
+
+    Active plugins and their args will be gathered from (in order of precedence):
+    - The <compiler>_plugins and <compiler>_plugin_args fields of the target, if it has them.
+    - The <compiler>_plugins and <compiler>_plugin_args options of this task, if it has them.
+    - The <compiler>_plugins and <compiler>_plugin_args fields of this task, if it has them.
+
+    Note that in-repo plugins will not be returned, even if requested, when building
+    themselves.  Use published versions of those plugins for that.
+
+    See:
+    - examples/src/java/org/pantsbuild/example/javac/plugin/README.md.
+    - examples/src/scala/org/pantsbuild/example/scalac/plugin/README.md
+
+    :param compiler: one of 'javac', 'scalac'.
+    :param target: The target whose plugins we compute.
+    """
+    # Note that we get() options and getattr() target fields and task methods,
+    # so we're robust when those don't exist (or are None).
+    plugins_key = '{}_plugins'.format(compiler)
+    requested_plugins = (
+      tuple(getattr(self, plugins_key, []) or []) +
+      tuple(self.get_options().get(plugins_key, []) or []) +
+      tuple((getattr(target, plugins_key, []) or []))
+    )
+    # Allow multiple flags and also comma-separated values in a single flag.
+    requested_plugins = set([p for val in requested_plugins for p in val.split(',')])
+
+    plugin_args_key = '{}_plugin_args'.format(compiler)
+    available_plugin_args = {}
+    available_plugin_args.update(getattr(self, plugin_args_key, {}) or {})
+    available_plugin_args.update(self.get_options().get(plugin_args_key, {}) or {})
+    available_plugin_args.update(getattr(target, plugin_args_key, {}) or {})
+
+    # From all available args, pluck just the ones for the selected plugins.
+    plugin_map = {}
+    for plugin in requested_plugins:
+      # Don't attempt to use a plugin while building that plugin.
+      # This avoids a bootstrapping problem.  Note that you can still
+      # use published plugins on themselves, just not in-repo plugins.
+      if target not in self._plugin_targets(compiler).get(plugin, {}):
+        plugin_map[plugin] = available_plugin_args.get(plugin, [])
+    return plugin_map
+
+  def _find_failed_compile_logs(self, compile_workunit):
+    """One of the compile child workunits actually calls compiler, this is to locate its stdout."""
+    logs = []
+    for workunit in compile_workunit.children:
+      for output_name, outpath in workunit.output_paths().items():
+        # Workunit that runs compiler is id-ed by the task name.
+        if (workunit.name == self.name() and output_name in ('stdout', 'stderr')
+            and workunit.outcome() == WorkUnit.FAILURE):
+          logs.append(outpath)
+    return logs
 
   def check_artifact_cache(self, vts):
     """Localizes the fetched analysis for targets we found in the cache."""
@@ -540,6 +678,9 @@ class JvmCompile(NailgunTaskBase):
     if self.context.products.is_required_data('product_deps_by_src') \
         or self._unused_deps_check_enabled:
       self.context.products.safe_create_data('product_deps_by_src', dict)
+
+    if self.context.products.is_required_data('zinc_args'):
+      self.context.products.safe_create_data('zinc_args', lambda: defaultdict(list))
 
   def compute_classes_by_source(self, compile_contexts):
     """Compute a map of (context->(src->classes)) for the given compile_contexts.
@@ -576,14 +717,10 @@ class JvmCompile(NailgunTaskBase):
       classes_by_src[None] = list(unclaimed_classes)
     return classes_by_src_by_context
 
-  def classname_for_classfile(self, compile_context, class_file_name):
-    assert class_file_name.startswith(compile_context.classes_dir)
-    rel_classfile_path = class_file_name[len(compile_context.classes_dir) + 1:]
-    return ClasspathUtil.classname_for_rel_classfile(rel_classfile_path)
-
   def _register_vts(self, compile_contexts):
     classes_by_source = self.context.products.get_data('classes_by_source')
     product_deps_by_src = self.context.products.get_data('product_deps_by_src')
+    zinc_args = self.context.products.get_data('zinc_args')
 
     # Register a mapping between sources and classfiles (if requested).
     if classes_by_source is not None:
@@ -600,6 +737,13 @@ class JvmCompile(NailgunTaskBase):
       for compile_context in compile_contexts:
         product_deps_by_src[compile_context.target] = \
             self._analysis_parser.parse_deps_from_path(compile_context.analysis_file)
+
+    # Register the zinc args used to compile the target (if requested).
+    if zinc_args is not None:
+      for compile_context in compile_contexts:
+        with open(compile_context.zinc_args_file, 'r') as fp:
+          args = fp.read().split()
+        zinc_args[compile_context.target] = args
 
   def _check_unused_deps(self, compile_context):
     """Uses `product_deps_by_src` to check unused deps and warn or error."""
@@ -630,6 +774,31 @@ class JvmCompile(NailgunTaskBase):
       else:
         self.context.log.warn('Target {} had {}\n'.format(
           compile_context.target.address.spec, unused_msg))
+
+  def _find_missing_deps(self, compile_failure_log, target):
+    with self.context.new_workunit('missing-deps-suggest', labels=[WorkUnitLabel.COMPILER]):
+      missing_dep_suggestions, no_suggestions = self._missing_deps_finder.find(
+        compile_failure_log, target)
+
+      if missing_dep_suggestions:
+        self.context.log.info('Found the following deps from target\'s transitive '
+                              'dependencies that provide the missing classes:')
+        suggested_deps = set()
+        for classname, candidates in missing_dep_suggestions.items():
+          suggested_deps.add(list(candidates)[0])
+          self.context.log.info('  {}: {}'.format(classname, ', '.join(candidates)))
+        suggestion_msg = (
+          '\nIf the above information is correct, '
+          'please add the following to the dependencies of ({}):\n  {}\n'
+            .format(target.address.spec, '\n  '.join(sorted(list(suggested_deps))))
+        )
+        self.context.log.info(suggestion_msg)
+
+      if no_suggestions:
+        self.context.log.debug('Unable to find any deps from target\'s transitive '
+                               'dependencies that provide the following missing classes:')
+        no_suggestion_msg = '\n   '.join(sorted(list(no_suggestions)))
+        self.context.log.debug('  {}'.format(no_suggestion_msg))
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
@@ -722,12 +891,14 @@ class JvmCompile(NailgunTaskBase):
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
+                          ctx.target,
                           ctx.sources,
                           ctx.analysis_file,
                           upstream_analysis,
                           cp_entries,
                           ctx.classes_dir,
                           log_file,
+                          ctx.zinc_args_file,
                           progress_message,
                           tgt.platform,
                           fatal_warnings,
@@ -831,27 +1002,6 @@ class JvmCompile(NailgunTaskBase):
       sources.extend(resolve_target_sources(target.java_sources))
     return sources
 
-  def _compute_language_property(self, target, selector):
-    """Computes the a language property setting for the given target sources.
-
-    :param target The target whose language property will be calculated.
-    :param selector A function that takes a target or platform and returns the boolean value of the
-                    property for that target or platform, or None if that target or platform does
-                    not directly define the property.
-
-    If the target does not override the language property, returns true iff the property
-    is true for any of the matched languages for the target.
-    """
-    if selector(target) is not None:
-      return selector(target)
-
-    prop = False
-    if target.has_sources('.java'):
-      prop |= selector(Java.global_instance())
-    if target.has_sources('.scala'):
-      prop |= selector(ScalaPlatform.global_instance())
-    return prop
-
   def _compute_extra_classpath(self, extra_compile_time_classpath_elements):
     """Compute any extra compile-time-only classpath elements.
 
@@ -863,3 +1013,15 @@ class JvmCompile(NailgunTaskBase):
           yield (conf, jar)
 
     return list(extra_compile_classpath_iter())
+
+  @memoized_method
+  def _plugin_targets(self, compiler):
+    """Returns a map from plugin name to the targets that build that plugin."""
+    if compiler == 'javac':
+      plugin_cls = JavacPlugin
+    elif compiler == 'scalac':
+      plugin_cls = ScalacPlugin
+    else:
+      raise TaskError('Unknown JVM compiler: {}'.format(compiler))
+    plugin_tgts = self.context.targets(predicate=lambda t: isinstance(t, plugin_cls))
+    return {t.plugin: t.closure() for t in plugin_tgts}

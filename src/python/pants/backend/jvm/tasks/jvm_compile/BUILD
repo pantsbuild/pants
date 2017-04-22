@@ -50,6 +50,8 @@ python_library(
   sources = ['jvm_classpath_publisher.py'],
   dependencies = [
     ':jvm_compile',
+    'src/python/pants/backend/jvm/tasks:classpath_products',
+    'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',
@@ -61,9 +63,11 @@ python_library(
   dependencies = [
     ':compile_context',
     ':execution_graph',
+    ':missing_dependency_finder',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
+    'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/backend/jvm/tasks:jvm_dependency_analyzer',
@@ -99,12 +103,13 @@ python_library(
   name = 'zinc',
   sources = globs('zinc/*.py'),
   dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    '3rdparty/python:six',
     ':analysis',
     ':analysis_parser',
     ':analysis_tools',
     ':jvm_compile',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/subsystems:scala_platform',
     'src/python/pants/backend/jvm/subsystems:shader',
@@ -129,5 +134,17 @@ python_binary(
     ':anonymizer',
     ':zinc',
     'src/python/pants/util:dirutil',
+  ],
+)
+
+python_library(
+  name = 'missing_dependency_finder',
+  sources = [
+    'class_not_found_error_patterns.py',
+    'missing_dependency_finder.py'
+  ],
+  dependencies = [
+    '3rdparty/python:ansicolors',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
   ],
 )

@@ -101,7 +101,7 @@ class DepmapTest(BaseDepmapTest):
       java_library(
         name='a_java',
         sources=[],
-        resources=['resources/a:a_resources']
+        dependencies=['resources/a:a_resources']
       )
     """))
     self.add_to_build_file('src/java/a', dedent("""

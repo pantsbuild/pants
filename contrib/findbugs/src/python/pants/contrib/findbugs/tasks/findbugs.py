@@ -9,13 +9,13 @@ import os
 import re
 
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
@@ -57,7 +57,7 @@ class FindBugs(NailgunTask):
     register('--include-filter-file', type=file_option, fingerprint=True,
              help='Include only bugs matching given filter')
     register('--exclude-patterns', type=list, default=[], fingerprint=True,
-             help='Adds patterns for targets to be excluded from analysis.')
+             help='Patterns for targets to be excluded from analysis.')
 
     cls.register_jvm_tool(register,
                           'findbugs',
@@ -68,8 +68,7 @@ class FindBugs(NailgunTask):
                           ],
                           main=cls._FINDBUGS_MAIN,
                           custom_rules=[
-                            Shader.exclude_package('edu.umd.cs.findbugs',
-                                                   recursive=True),
+                            Shader.exclude_package('edu.umd.cs.findbugs', recursive=True),
                           ])
 
   @classmethod
@@ -83,7 +82,7 @@ class FindBugs(NailgunTask):
 
   @memoized_property
   def _exclude_patterns(self):
-    return "(" + ")|(".join(self.get_options().exclude_patterns) + ")"
+    return [re.compile(x) for x in set(self.get_options().exclude_patterns or [])]
 
   def _is_findbugs_target(self, target):
     if not isinstance(target, (JavaLibrary, JUnitTests)):
@@ -92,25 +91,25 @@ class FindBugs(NailgunTask):
     if target.is_synthetic:
       self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
       return False
-    if self.get_options().exclude_patterns and re.match(self._exclude_patterns, target.address.spec):
-      self.context.log.debug('Skipping [{}] because it matches exclude pattern'.format(target.address.spec))
-      return False
+    for pattern in self._exclude_patterns:
+      if pattern.search(target.address.spec):
+        self.context.log.debug(
+          "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+        return False
     return True
 
   def execute(self):
     if self.get_options().skip:
       return
 
-    invalidate_deps=True
     if self.get_options().transitive:
       targets = self.context.targets(self._is_findbugs_target)
     else:
       targets = filter(self._is_findbugs_target, self.context.target_roots)
-      invalidate_deps=False
 
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
     target_count = 0
-    with self.invalidated(targets, invalidate_dependents=invalidate_deps) as invalidation_check:
+    with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
       total_targets = len(invalidation_check.invalid_vts)
       for vt in invalidation_check.invalid_vts:
         target_count += 1
@@ -185,7 +184,7 @@ class FindBugs(NailgunTask):
                           jvm_options=self.get_options().jvm_options,
                           args=args,
                           workunit_name='findbugs',
-                          workunit_labels=[WorkUnitLabel.PREP])
+                          workunit_labels=[WorkUnitLabel.LINT])
     if result != 0:
       raise TaskError('java {main} ... exited non-zero ({result})'.format(
           main=self._FINDBUGS_MAIN, result=result))

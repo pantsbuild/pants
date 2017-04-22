@@ -13,7 +13,6 @@ from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
-from pants.bin.target_roots import TargetRoots
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
@@ -23,8 +22,9 @@ from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
+from pants.init.pants_daemon_launcher import PantsDaemonLauncher
+from pants.init.target_roots import TargetRoots
 from pants.java.nailgun_executor import NailgunProcessGroup
-from pants.pantsd.subsystem.pants_daemon_launcher import PantsDaemonLauncher
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
@@ -75,13 +75,15 @@ class GoalRunnerFactory(object):
       self._exiter(result)
 
   def _init_graph(self, use_engine, pants_ignore_patterns, build_ignore_patterns,
-                  exclude_target_regexps, target_specs, graph_helper=None):
+                  exclude_target_regexps, target_specs, workdir, graph_helper=None,
+                  subproject_build_roots=None):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
     :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
     :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
                                        applied during BUILD file searching.
+    :param str workdir: The pants workdir.
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param list target_specs: The original target specs.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
@@ -91,10 +93,14 @@ class GoalRunnerFactory(object):
     # N.B. Use of the daemon implies use of the v2 engine.
     if graph_helper or use_engine:
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-      graph_helper = graph_helper or EngineInitializer.setup_legacy_graph(
-        pants_ignore_patterns,
-        build_ignore_patterns=build_ignore_patterns,
-        exclude_target_regexps=exclude_target_regexps)
+      graph_helper = (
+        graph_helper
+        or EngineInitializer.setup_legacy_graph(pants_ignore_patterns,
+                                                workdir,
+                                                build_ignore_patterns=build_ignore_patterns,
+                                                exclude_target_regexps=exclude_target_regexps,
+                                                subproject_roots=subproject_build_roots)
+      )
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
                                         change_calculator=graph_helper.change_calculator)
@@ -105,7 +111,8 @@ class GoalRunnerFactory(object):
       address_mapper = BuildFileAddressMapper(self._build_file_parser,
                                               get_project_tree(self._global_options),
                                               build_ignore_patterns,
-                                              exclude_target_regexps)
+                                              exclude_target_regexps,
+                                              subproject_build_roots)
       return MutableBuildGraph(address_mapper), address_mapper, spec_roots
 
   def _determine_goals(self, requested_goals):
@@ -138,15 +145,14 @@ class GoalRunnerFactory(object):
 
     return list(generate_targets(specs))
 
-  def _maybe_launch_pantsd(self):
+  def _maybe_launch_pantsd(self, pantsd_launcher):
     """Launches pantsd if configured to do so."""
     if self._global_options.enable_pantsd:
       # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
       with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
-        pantsd_launcher = PantsDaemonLauncher.Factory.global_instance().create(EngineInitializer)
         pantsd_launcher.maybe_launch()
 
-  def _setup_context(self):
+  def _setup_context(self, pantsd_launcher):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._build_graph, self._address_mapper, spec_roots = self._init_graph(
         self._global_options.enable_v2_engine,
@@ -154,7 +160,9 @@ class GoalRunnerFactory(object):
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
         self._options.target_specs,
-        self._daemon_graph_helper
+        self._global_options.pants_workdir,
+        self._daemon_graph_helper,
+        self._global_options.subproject_roots,
       )
       goals, is_quiet = self._determine_goals(self._requested_goals)
       target_roots = self._specs_to_targets(spec_roots)
@@ -174,14 +182,15 @@ class GoalRunnerFactory(object):
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
                         address_mapper=self._address_mapper,
-                        invalidation_report=invalidation_report)
+                        invalidation_report=invalidation_report,
+                        pantsd_launcher=pantsd_launcher)
       return goals, context
 
   def setup(self):
-    self._maybe_launch_pantsd()
+    pantsd_launcher = PantsDaemonLauncher.Factory.global_instance().create(EngineInitializer)
+    self._maybe_launch_pantsd(pantsd_launcher)
     self._handle_help(self._help_request)
-
-    goals, context = self._setup_context()
+    goals, context = self._setup_context(pantsd_launcher)
     return GoalRunner(context=context,
                       goals=goals,
                       run_tracker=self._run_tracker,

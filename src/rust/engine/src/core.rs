@@ -1,9 +1,14 @@
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use fnv::FnvHasher;
-use libc;
 
 use std::collections::HashMap;
-use std::hash;
-use std::ptr;
+use std::{fmt, hash};
+use std::ops::Drop;
+
+use externs;
+use handles::{Handle, enqueue_drop_handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -42,11 +47,17 @@ impl Variants {
 
 pub type Id = u64;
 
+// The name of a field.
+pub type Field = String;
+
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);
+
+// On the python side, the 0th type id is used as an anonymous id
+pub const ANY_TYPE: TypeId = TypeId(0);
 
 // A type constraint, which a TypeId may or may-not satisfy.
 #[repr(C)]
@@ -58,16 +69,13 @@ pub struct TypeConstraint(pub Id);
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Function(pub Id);
 
-// The name of a field.
+/**
+ * Wraps a type id for use as a key in HashMaps and sets.
+ */
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Field(pub Key);
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug)]
 pub struct Key {
   id: Id,
-  value: Value,
   type_id: TypeId,
 }
 
@@ -86,12 +94,12 @@ impl hash::Hash for Key {
 }
 
 impl Key {
-  pub fn id(&self) -> Id {
-    self.id
+  pub fn new_with_anon_type_id(id: Id) -> Key {
+    Key { id: id, type_id: ANY_TYPE }
   }
 
-  pub fn value(&self) -> &Value {
-    &self.value
+  pub fn id(&self) -> Id {
+    self.id
   }
 
   pub fn type_id(&self) -> &TypeId {
@@ -102,25 +110,73 @@ impl Key {
 /**
  * Represents a handle to a python object, explicitly without equality or hashing. Whenever
  * the equality/identity of a Value matters, a Key should be computed for it and used instead.
+ *
+ * Value implements Clone by calling out to a python extern `clone_val` which clones the
+ * underlying CFFI handle.
  */
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct Value {
-  handle: *const libc::c_void,
-  type_id: TypeId,
-}
+pub struct Value(Handle);
 
-impl Value {
-  pub fn type_id(&self) -> &TypeId {
-    &self.type_id
+// By default, Values would not be marked Send because of the raw pointer they hold.
+// Because the handle is opaque and can't be cloned, we can safely implement Send.
+unsafe impl Send for Value {}
+unsafe impl Sync for Value {}
+
+impl Drop for Value {
+  fn drop(&mut self) {
+    enqueue_drop_handle(self.0);
   }
 }
 
-impl Default for Value {
-  fn default() -> Self {
-    Value {
-      handle: ptr::null() as *const libc::c_void,
-      type_id: TypeId(0),
-    }
+impl Value {
+  /**
+   * An escape hatch to allow for cloning a Value without cloning its handle. You should generally
+   * not do this unless you are certain the input Value has been mem::forgotten (otherwise it
+   * will be `Drop`ed twice).
+   */
+  pub unsafe fn clone_without_handle(&self) -> Value {
+    Value(self.0)
+  }
+}
+
+/**
+ * Implemented by calling back to python to clone the underlying Handle.
+ */
+impl Clone for Value {
+  fn clone(&self) -> Value {
+    externs::clone_val(self)
+  }
+}
+
+impl fmt::Debug for Value {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", externs::val_to_str(&self))
+  }
+}
+
+#[derive(Debug, Clone)]
+pub enum Failure {
+  Noop(Noop),
+  Throw(Value),
+}
+
+// NB: enum members are listed in ascending priority order based on how likely they are
+// to be useful to users.
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Noop {
+  NoTask,
+  NoVariant,
+  Cycle,
+}
+
+impl fmt::Debug for Noop {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    f.write_str(
+      match self {
+        &Noop::Cycle => "Dep graph contained a cycle.",
+        &Noop::NoTask => "No task was available to compute the value.",
+        &Noop::NoVariant => "A matching variant key was not configured in variants.",
+      }
+    )
   }
 }

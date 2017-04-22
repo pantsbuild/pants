@@ -10,11 +10,10 @@ import os
 import xml.dom.minidom as DOM
 from textwrap import dedent
 
-import coverage
 from mock import patch
 
 from pants.backend.python.tasks.pytest_run import PytestRun
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting
 from pants.util.contextutil import pushd
 from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
@@ -38,7 +37,7 @@ class PythonTestBuilderTestBase(PythonTaskTestBase):
       pytest_run_task.execute()
 
   def run_failing_tests(self, targets, failed_targets, **options):
-    with self.assertRaises(TestFailedTaskError) as cm:
+    with self.assertRaises(ErrorWhileTesting) as cm:
       self.run_tests(targets=targets, **options)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
@@ -249,7 +248,7 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.all_with_coverage = self.target('tests:all-with-coverage')
 
   def test_error(self):
-    """Test that a test that errors rather than fails shows up in TestFailedTaskError."""
+    """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
 
     self.run_failing_tests(targets=[self.red, self.green, self.error],
                            failed_targets=[self.red, self.error])
@@ -334,95 +333,6 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.assertEqual(0, len(children_by_test_name['test_one'].childNodes))
     self.assertEqual(1, len(children_by_test_name['test_two'].childNodes))
     self.assertEqual('failure', children_by_test_name['test_two'].firstChild.nodeName)
-
-  def coverage_data_file(self):
-    return os.path.join(self.build_root, '.coverage')
-
-  def load_coverage_data(self, path):
-    data_file = self.coverage_data_file()
-    self.assertTrue(os.path.isfile(data_file))
-    coverage_data = coverage.coverage(data_file=data_file)
-    coverage_data.load()
-    _, all_statements, not_run_statements, _ = coverage_data.analysis(path)
-    return all_statements, not_run_statements
-
-  def test_coverage_simple_option(self):
-    # TODO(John Sirois): Consider eliminating support for "simple" coverage or at least formalizing
-    # the coverage option value that turns this on to "1" or "all" or "simple" = anything formal.
-    simple_coverage_kwargs = {'coverage': '1'}
-
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    covered_file = os.path.join(self.build_root, 'lib', 'core.py')
-
-    self.run_tests(targets=[self.green], **simple_coverage_kwargs)
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([6], not_run_statements)
-
-    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], **simple_coverage_kwargs)
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([2], not_run_statements)
-
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
-                           **simple_coverage_kwargs)
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
-
-    # The all target has no coverage attribute and the code under test does not follow the
-    # auto-discover pattern so we should get no coverage.
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], **simple_coverage_kwargs)
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([1, 2, 5, 6], not_run_statements)
-
-    self.run_failing_tests(targets=[self.all_with_coverage],
-                           failed_targets=[self.all_with_coverage],
-                           **simple_coverage_kwargs)
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
-
-  def test_coverage_modules_dne_option(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    covered_file = os.path.join(self.build_root, 'lib', 'core.py')
-
-    # modules: should trump .coverage
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
-                           coverage='modules:does_not_exist,nor_does_this')
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([1, 2, 5, 6], not_run_statements)
-
-  def test_coverage_modules_option(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    covered_file = os.path.join(self.build_root, 'lib', 'core.py')
-
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='modules:core')
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
-
-  def test_coverage_paths_dne_option(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    covered_file = os.path.join(self.build_root, 'lib', 'core.py')
-
-    # paths: should trump .coverage
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
-                           coverage='paths:does_not_exist/,nor_does_this/')
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([1, 2, 5, 6], not_run_statements)
-
-  def test_coverage_paths_option(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    covered_file = os.path.join(self.build_root, 'lib', 'core.py')
-
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='paths:core.py')
-    all_statements, not_run_statements = self.load_coverage_data(covered_file)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
 
   def test_sharding(self):
     self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red],

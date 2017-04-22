@@ -11,7 +11,7 @@ import unittest
 from pants.java.junit.junit_xml_parser import Test as JUnitTest
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.
-from pants.java.junit.junit_xml_parser import ParseError, TestRegistry, parse_failed_targets
+from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests, parse_failed_targets
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.xml_parser import XmlParser
@@ -42,14 +42,14 @@ class TestTest(unittest.TestCase):
 
 class TestTestRegistry(unittest.TestCase):
   def test_empty(self):
-    self.assertTrue(TestRegistry({}).empty)
-    self.assertTrue(TestRegistry(()).empty)
-    self.assertTrue(TestRegistry([]).empty)
+    self.assertTrue(RegistryOfTests({}).empty)
+    self.assertTrue(RegistryOfTests(()).empty)
+    self.assertTrue(RegistryOfTests([]).empty)
 
   def test_get_owning_target(self):
-    registry = TestRegistry(((JUnitTest('class1'), 'Bob'),
-                             (JUnitTest('class2'), 'Jane'),
-                             (JUnitTest('class3', 'method1'), 'Heidi')))
+    registry = RegistryOfTests(((JUnitTest('class1'), 'Bob'),
+                                (JUnitTest('class2'), 'Jane'),
+                                (JUnitTest('class3', 'method1'), 'Heidi')))
 
     self.assertEqual('Bob', registry.get_owning_target(JUnitTest('class1')))
     self.assertEqual('Bob', registry.get_owning_target(JUnitTest('class1', 'method1')))
@@ -68,10 +68,10 @@ class TestTestRegistry(unittest.TestCase):
     self.assertEqual(sorted_values(expected), sorted_values(actual))
 
   def test_index_nominal(self):
-    registry = TestRegistry({JUnitTest('class1'): (1, 'a'),
-                             JUnitTest('class2'): (2, 'b'),
-                             JUnitTest('class3', 'method1'): (1, 'a'),
-                             JUnitTest('class3', 'method2'): (4, 'b')})
+    registry = RegistryOfTests({JUnitTest('class1'): (1, 'a'),
+                                JUnitTest('class2'): (2, 'b'),
+                                JUnitTest('class3', 'method1'): (1, 'a'),
+                                JUnitTest('class3', 'method2'): (4, 'b')})
 
     actual_index = registry.index(lambda t: t[0], lambda t: t[1])
     expected_index = {(1, 'a'): (JUnitTest('class1'), JUnitTest('class3', 'method1')),
@@ -80,11 +80,11 @@ class TestTestRegistry(unittest.TestCase):
     self._assert_index(expected_index, actual_index)
 
   def test_index_empty(self):
-    self._assert_index({}, TestRegistry({}).index())
+    self._assert_index({}, RegistryOfTests({}).index())
 
   def test_index_no_indexers(self):
-    registry = TestRegistry({JUnitTest('class1'): (1, 'a'),
-                             JUnitTest('class2'): (2, 'b')})
+    registry = RegistryOfTests({JUnitTest('class1'): (1, 'a'),
+                                JUnitTest('class2'): (2, 'b')})
 
     self._assert_index({(): (JUnitTest('class1'), JUnitTest('class2'))}, registry.index())
 
@@ -106,16 +106,16 @@ class TestParseFailedTargets(unittest.TestCase):
       return self._errors
 
   def test_parse_failed_targets_no_files(self):
-    registry = TestRegistry({})
+    registry = RegistryOfTests({})
     with temporary_dir() as junit_xml_dir:
       failed_targets = parse_failed_targets(registry, junit_xml_dir, self._raise_handler)
 
       self.assertEqual({}, failed_targets)
 
   def test_parse_failed_targets_nominal(self):
-    registry = TestRegistry({JUnitTest('org.pantsbuild.Failure'): 'Bob',
-                             JUnitTest('org.pantsbuild.Error'): 'Jane',
-                             JUnitTest('org.pantsbuild.AnotherError'): 'Bob'})
+    registry = RegistryOfTests({JUnitTest('org.pantsbuild.Failure'): 'Bob',
+                                JUnitTest('org.pantsbuild.Error'): 'Jane',
+                                JUnitTest('org.pantsbuild.AnotherError'): 'Bob'})
 
     with temporary_dir() as junit_xml_dir:
       with open(os.path.join(junit_xml_dir, 'TEST-a.xml'), 'w') as fp:
@@ -150,7 +150,7 @@ class TestParseFailedTargets(unittest.TestCase):
                        failed_targets)
 
   def test_parse_failed_targets_error_raise(self):
-    registry = TestRegistry({})
+    registry = RegistryOfTests({})
     with temporary_dir() as junit_xml_dir:
       junit_xml_file = os.path.join(junit_xml_dir, 'TEST-bad.xml')
       with open(junit_xml_file, 'w') as fp:
@@ -161,7 +161,7 @@ class TestParseFailedTargets(unittest.TestCase):
       self.assertIsInstance(exc.exception.cause, XmlParser.XmlError)
 
   def test_parse_failed_targets_error_continue(self):
-    registry = TestRegistry({})
+    registry = RegistryOfTests({})
     with temporary_dir() as junit_xml_dir:
       bad_file1 = os.path.join(junit_xml_dir, 'TEST-bad1.xml')
       with open(bad_file1, 'w') as fp:
@@ -183,4 +183,4 @@ class TestParseFailedTargets(unittest.TestCase):
       self.assertEqual(2, len(collect_handler.errors))
       self.assertEqual({bad_file1, bad_file2}, {e.junit_xml_path for e in collect_handler.errors})
 
-      self.assertEqual({None: {JUnitTest('org.pantsbuild.Error', 'testError')}}, failed_targets)
+      self.assertEqual({}, failed_targets)

@@ -8,12 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, JarsField, PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 
 
 class JarLibrary(Target):
@@ -75,6 +75,16 @@ class JarLibrary(Target):
     :API: public
     """
     return self.payload.excludes
+
+  @property
+  def exports(self):
+    """
+    :API: public
+    """
+
+    # It is currently aliased to dependencies. For future work see
+    # https://github.com/pantsbuild/pants/issues/4398
+    return self.dependencies
 
   @staticmethod
   def to_jar_dependencies(relative_to, jar_library_specs, build_graph):

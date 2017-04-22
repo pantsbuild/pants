@@ -46,6 +46,8 @@ public abstract class ConsoleRunnerTestBase {
       this.useExperimentalRunner = useExperimentalRunner;
       this.defaultConcurrency = defaultConcurrency;
     }
+
+    @Override
     public String toString() {
       StringBuilder sb = new StringBuilder();
       if (useExperimentalRunner) {

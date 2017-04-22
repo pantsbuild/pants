@@ -40,10 +40,10 @@ class GoTestIntegrationTest(PantsRunIntegrationTest):
       with safe_open(os.path.join(lib_unstyle_dir, 'BUILD'), 'w') as fp:
         fp.write('go_library()')
 
-      args = ['compile', lib_unstyle_dir]
+      args = ['compile', 'lint', lib_unstyle_dir]
       pants_run = self.run_pants(args)
       self.assert_failure(pants_run)
 
-      args = ['compile.gofmt', '--skip', lib_unstyle_dir]
+      args = ['compile', 'lint', '--lint-go-skip', lib_unstyle_dir]
       pants_run = self.run_pants(args)
       self.assert_success(pants_run)

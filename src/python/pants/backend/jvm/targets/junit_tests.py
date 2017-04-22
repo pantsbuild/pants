@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
@@ -112,7 +113,11 @@ class JUnitTests(DeprecatedJavaTestsAlias):
   def traversable_dependency_specs(self):
     for spec in super(JUnitTests, self).traversable_dependency_specs:
       yield spec
-    yield JUnit.global_instance().library_spec(self._build_graph)
+    junit_addr = JUnit.global_instance().library_address()
+    if not self._build_graph.contains_address(junit_addr):
+      self._build_graph.inject_synthetic_target(junit_addr, JarLibrary, jars=[JUnit.LIBRARY_JAR],
+                                                scope='forced')
+    yield junit_addr.spec
 
   @property
   def test_platform(self):

@@ -12,17 +12,20 @@ import subprocess
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
+from pants.task.task import Task
 
 
-class IsortPythonTask(PythonTask):
+class IsortPythonTask(Task):
   """Autoformats Python source files with isort.
 
-  isort binary is built at contrib/python/src/python/pants/contrib/python/isort:isort, then uploaded to
+  isort binary is built at contrib/python/src/python/pants/contrib/python/isort,
+  then uploaded to
   https://github.com/pantsbuild/binaries/tree/gh-pages/build-support/scripts
+
+  TODO: Explain why we don't invoke isort directly.
 
   Behavior:
   ./pants fmt.isort <targets> -- <args, e.g. "--recursive ."> will sort the files only related
@@ -34,6 +37,10 @@ class IsortPythonTask(PythonTask):
 
   _PYTHON_SOURCE_EXTENSION = '.py'
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(IsortPythonTask, cls).subsystem_dependencies() + (BinaryUtil.Factory.scoped(cls), )
+
   def __init__(self, *args, **kwargs):
     super(IsortPythonTask, self).__init__(*args, **kwargs)
     self.options = self.get_options()
@@ -43,7 +50,8 @@ class IsortPythonTask(PythonTask):
     super(IsortPythonTask, cls).register_options(register)
     register('--skip', type=bool, default=False,
              help='If true, skip isort task.')
-    register('--version', advanced=True, fingerprint=True, default='4.2.5', help='Version of isort.')
+    register('--version', advanced=True, fingerprint=True, default='4.2.5',
+             help='Version of isort.')
 
   def execute(self, test_output_file=None):
 
@@ -56,12 +64,14 @@ class IsortPythonTask(PythonTask):
       logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
       return
 
-    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort', self.options.version, 'isort.pex')
+    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort',
+                                                             self.options.version, 'isort.pex')
     cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 
     try:
-      subprocess.check_call(cmd, cwd=get_buildroot(), stderr=test_output_file, stdout=test_output_file)
+      subprocess.check_call(cmd, cwd=get_buildroot(),
+                            stderr=test_output_file, stdout=test_output_file)
     except subprocess.CalledProcessError as e:
       raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), e.returncode))
 
@@ -78,7 +88,8 @@ class IsortPythonTask(PythonTask):
 
   @staticmethod
   def is_non_synthetic_python_target(target):
-    return not target.is_synthetic and isinstance(target, (PythonLibrary, PythonBinary, PythonTests))
+    return (not target.is_synthetic
+            and isinstance(target, (PythonLibrary, PythonBinary, PythonTests)))
 
   @classmethod
   def supports_passthru_args(cls):

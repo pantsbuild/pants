@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.meta import AbstractClass
 
 
@@ -31,7 +31,7 @@ class Jarable(AbstractClass):
     return None
 
   def get_artifact_info(self):
-    """Returns a tuple composed of a :class:`pants.backend.jvm.targets.jar_dependency.JarDependency`
+    """Returns a tuple composed of a :class:`pants.java.jar.JarDependency`
     describing the jar for this target and a bool indicating if this target is exportable.
     """
     exported = bool(self.provides)

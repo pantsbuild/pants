@@ -45,6 +45,10 @@ class SchedulerService(PantsService):
     """Surfaces the change calculator."""
     return self._graph_helper.change_calculator
 
+  def pre_fork(self):
+    """Pre-fork controls."""
+    self._scheduler.pre_fork()
+
   def setup(self):
     """Service setup."""
     # Register filesystem event handlers on an FSEventService instance.
@@ -98,8 +102,3 @@ class SchedulerService(PantsService):
     """Main service entrypoint."""
     while not self.is_killed:
       self._process_event_queue()
-
-  def terminate(self):
-    """An extension of PantsService.terminate() that tears down the engine."""
-    self._engine.close()
-    super(SchedulerService, self).terminate()

@@ -17,6 +17,7 @@ python_library(
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/subsystems',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',

@@ -14,9 +14,10 @@ from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.targets.go_thrift_library import GoThriftLibrary
 from pants.contrib.go.tasks.go_binary_create import GoBinaryCreate
 from pants.contrib.go.tasks.go_buildgen import GoBuildgen
-from pants.contrib.go.tasks.go_checkstyle import GoFmt
+from pants.contrib.go.tasks.go_checkstyle import GoCheckstyle
 from pants.contrib.go.tasks.go_compile import GoCompile
 from pants.contrib.go.tasks.go_fetch import GoFetch
+from pants.contrib.go.tasks.go_fmt import GoFmt
 from pants.contrib.go.tasks.go_go import GoEnv, GoGo
 from pants.contrib.go.tasks.go_run import GoRun
 from pants.contrib.go.tasks.go_test import GoTest
@@ -45,5 +46,6 @@ def register_goals():
   task(name='go', action=GoCompile).install('compile')
   task(name='go', action=GoBinaryCreate).install('binary')
   task(name='go', action=GoRun).install('run')
-  task(name='gofmt', action=GoFmt).install('compile')
+  task(name='go', action=GoCheckstyle).install('lint')
   task(name='go', action=GoTest).install('test')
+  task(name='go', action=GoFmt).install('fmt')

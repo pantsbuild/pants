@@ -13,7 +13,8 @@ from hashlib import sha1
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.util.dirutil import relative_symlink, safe_mkdir
+from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_rmtree
+from pants.util.memo import memoized_method
 
 
 class VersionedTargetSet(object):
@@ -24,6 +25,9 @@ class VersionedTargetSet(object):
   When checking the artifact cache, this can also be used to represent a list of targets that are
   built together into a single artifact.
   """
+
+  class IllegalResultsDir(Exception):
+    """Indicate a problem interacting with a versioned target results directory."""
 
   @staticmethod
   def from_versioned_targets(versioned_targets):
@@ -83,7 +87,7 @@ class VersionedTargetSet(object):
 
   @property
   def has_previous_results_dir(self):
-    return self._previous_results_dir is not None
+    return self._previous_results_dir is not None and os.path.isdir(self._previous_results_dir)
 
   @property
   def results_dir(self):
@@ -113,17 +117,38 @@ class VersionedTargetSet(object):
     TODO: Exposing old results is a bit of an abstraction leak, because ill-behaved Tasks could
     mutate them.
     """
-    if self._previous_results_dir is None:
+    if not self.has_previous_results_dir:
       raise ValueError('There is no previous_results_dir for: {}'.format(self))
     return self._previous_results_dir
 
+  def ensure_legal(self):
+    """Return True as long as the state does not break any internal contracts."""
+    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
+    if self._results_dir:
+      errors = ''
+      if not os.path.islink(self._results_dir):
+        errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self._results_dir)
+      if not os.path.isdir(self._current_results_dir):
+        errors += '\nThe current_results_dir directory was not found\n\t* {}'.format(self._current_results_dir)
+      if errors:
+        raise self.IllegalResultsDir(
+          '\nThe results_dirs state should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
+        )
+    return True
+
   def live_dirs(self):
     """Yields directories that must exist for this VersionedTarget to function."""
+    # The only caller of this function is the workdir cleaning pipeline. It is not clear that the previous_results_dir
+    # should be returned for that purpose. And, by the time this is called, the contents have already been copied.
     if self.has_results_dir:
       yield self.results_dir
       yield self.current_results_dir
       if self.has_previous_results_dir:
         yield self.previous_results_dir
+
+  @memoized_method
+  def _target_to_vt(self):
+    return {vt.target: vt for vt in self.versioned_targets}
 
   def __repr__(self):
     return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
@@ -136,8 +161,6 @@ class VersionedTarget(VersionedTargetSet):
 
   :API: public
   """
-
-  _STABLE_DIR_NAME = 'current'
 
   def __init__(self, cache_manager, target, cache_key):
     """
@@ -152,58 +175,35 @@ class VersionedTarget(VersionedTargetSet):
     super(VersionedTarget, self).__init__(cache_manager, [self])
     self.id = target.id
 
-  def _results_dir_path(self, root_dir, key, stable):
-    """Return a results directory path for the given key.
+  def create_results_dir(self):
+    """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
+    self._current_results_dir = self._cache_manager.results_dir_path(self.cache_key, stable=False)
+    self._results_dir = self._cache_manager.results_dir_path(self.cache_key, stable=True)
 
-    :param key: A CacheKey to generate an id for.
-    :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
-      generate a path unique to the key.
+    if not self.valid:
+      # Clean the workspace for invalid vts.
+      safe_mkdir(self._current_results_dir, clean=True)
+      relative_symlink(self._current_results_dir, self._results_dir)
+    self.ensure_legal()
+
+  def copy_previous_results(self, root_dir):
+    """Use the latest valid results_dir as the starting contents of the current results_dir.
+
+    Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
     """
-    task_version = self._cache_manager.task_version
-    # TODO: Shorten cache_key hashes in general?
-    return os.path.join(
-        root_dir,
-        sha1(task_version).hexdigest()[:12],
-        key.id,
-        self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
-    )
-
-  def create_results_dir(self, root_dir, allow_incremental):
-    """Ensures that a results_dir exists under the given root_dir for this versioned target.
-
-    If incremental=True, attempts to clone the results_dir for the previous version of this target
-    to the new results dir. Otherwise, simply ensures that the results dir exists.
-    """
-    # Generate unique and stable directory paths for this cache key.
-    current_dir = self._results_dir_path(root_dir, self.cache_key, stable=False)
-    self._current_results_dir = current_dir
-    stable_dir = self._results_dir_path(root_dir, self.cache_key, stable=True)
-    self._results_dir = stable_dir
-    if self.valid:
-      # If the target is valid, both directories can be assumed to exist.
-      return
-
-    # Clone from the previous results_dir if incremental, or initialize.
-    previous_dir = self._use_previous_dir(allow_incremental, root_dir, current_dir)
-    if previous_dir is not None:
+    # TODO(mateo): An immediate followup removes the root_dir param, it is identical to the task.workdir.
+    # TODO(mateo): This should probably be managed by the task, which manages the rest of the incremental support.
+    if not self.previous_cache_key:
+      return None
+    previous_path = self._cache_manager.results_dir_path(self.previous_cache_key, stable=False)
+    if os.path.isdir(previous_path):
       self.is_incremental = True
-      self._previous_results_dir = previous_dir
-      shutil.copytree(previous_dir, current_dir)
-    else:
-      safe_mkdir(current_dir)
-
-    # Finally, create the stable symlink.
-    relative_symlink(current_dir, stable_dir)
-
-  def _use_previous_dir(self, allow_incremental, root_dir, current_dir):
-    if not allow_incremental or not self.previous_cache_key:
-      # Not incremental.
-      return None
-    previous_dir = self._results_dir_path(root_dir, self.previous_cache_key, stable=False)
-    if not os.path.isdir(previous_dir) or os.path.isdir(current_dir):
-      # Could be useful, but no previous results are present.
-      return None
-    return previous_dir
+      safe_rmtree(self._current_results_dir)
+      shutil.copytree(previous_path, self._current_results_dir)
+    safe_mkdir(self._current_results_dir)
+    relative_symlink(self._current_results_dir, self.results_dir)
+    # Set the self._previous last, so that it is only True after the copy completed.
+    self._previous_results_dir = previous_path
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
@@ -240,7 +240,10 @@ class InvalidationCacheManager(object):
   class CacheValidationError(Exception):
     """Indicates a problem accessing the cache."""
 
+  _STABLE_DIR_NAME = 'current'
+
   def __init__(self,
+               results_dir_root,
                cache_key_generator,
                build_invalidator_dir,
                invalidate_dependents,
@@ -261,14 +264,25 @@ class InvalidationCacheManager(object):
     self._artifact_write_callback = artifact_write_callback
     self.invalidation_report = invalidation_report
 
+    # Create the task-versioned prefix of the results dir, and a stable symlink to it
+    # (useful when debugging).
+    self._results_dir_prefix = os.path.join(results_dir_root,
+                                            sha1(self._task_version).hexdigest()[:12])
+    safe_mkdir(self._results_dir_prefix)
+    stable_prefix = os.path.join(results_dir_root, self._STABLE_DIR_NAME)
+    safe_delete(stable_prefix)
+    relative_symlink(self._results_dir_prefix, stable_prefix)
+
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
     for vt in vts.versioned_targets:
+      vt.ensure_legal()
       if not vt.valid:
         self._invalidator.update(vt.cache_key)
         vt.valid = True
         self._artifact_write_callback(vt)
     if not vts.valid:
+      vts.ensure_legal()
       self._invalidator.update(vts.cache_key)
       vts.valid = True
       self._artifact_write_callback(vts)
@@ -301,9 +315,19 @@ class InvalidationCacheManager(object):
   def task_name(self):
     return self._task_name
 
-  @property
-  def task_version(self):
-    return self._task_version
+  def results_dir_path(self, key, stable):
+    """Return a results directory path for the given key.
+
+    :param key: A CacheKey to generate an id for.
+    :param stable: True to use a stable subdirectory, false to use a portion of the cache key to
+      generate a path unique to the key.
+    """
+    # TODO: Shorten cache_key hashes in general?
+    return os.path.join(
+      self._results_dir_prefix,
+      key.id,
+      self._STABLE_DIR_NAME if stable else sha1(key.hash).hexdigest()[:12]
+    )
 
   def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.

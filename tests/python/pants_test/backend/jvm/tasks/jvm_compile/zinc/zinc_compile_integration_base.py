@@ -45,9 +45,10 @@ class BaseZincCompileIntegrationTest(object):
     """With no initial analysis, a failed compilation shouldn't leave anything behind."""
     analysis_file = 'testprojects.src.scala.' \
         'org.pantsbuild.testproject.compilation_failure.compilation_failure.analysis'
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testprojects/compilation_failure',
-                              expected_files=[analysis_file],
-                              expect_failure=True) as found:
+    with self.do_test_compile(
+        'testprojects/src/scala/org/pantsbuild/testprojects/compilation_failure',
+        expected_files=[analysis_file],
+        expect_failure=True) as found:
       self.assertEqual(0, len(found[analysis_file]))
 
   def test_scala_with_java_sources_compile(self):
@@ -64,12 +65,13 @@ class BaseZincCompileIntegrationTest(object):
               'org/pantsbuild/testproject/javasources/JavaSource.class'))
 
   def test_scalac_plugin_compile(self):
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
-                              expected_files=['HelloScalac.class', 'scalac-plugin.xml']) as found:
+    with self.do_test_compile(
+        'examples/src/scala/org/pantsbuild/example/scalac/plugin:other_simple_scalac_plugin',
+        expected_files=['OtherSimpleScalacPlugin.class', 'scalac-plugin.xml']) as found:
 
       self.assertTrue(
-          self.get_only(found, 'HelloScalac.class').endswith(
-              'org/pantsbuild/testproject/scalac/plugin/HelloScalac.class'))
+          self.get_only(found, 'OtherSimpleScalacPlugin.class').endswith(
+              'org/pantsbuild/example/scalac/plugin/OtherSimpleScalacPlugin.class'))
 
       # Ensure that the plugin registration file is written to the root of the classpath.
       path = self.get_only(found, 'scalac-plugin.xml')
@@ -80,14 +82,15 @@ class BaseZincCompileIntegrationTest(object):
       # And that it is well formed.
       root = ET.parse(path).getroot()
       self.assertEqual('plugin', root.tag)
-      self.assertEqual('hello_scalac', root.find('name').text)
-      self.assertEqual('org.pantsbuild.testproject.scalac.plugin.HelloScalac',
+      self.assertEqual('other_simple_scalac_plugin', root.find('name').text)
+      self.assertEqual('org.pantsbuild.example.scalac.plugin.OtherSimpleScalacPlugin',
                        root.find('classname').text)
 
   def test_scalac_debug_symbol(self):
-    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/scalac/plugin',
-                         expected_files=['HelloScalac.class', 'scalac-plugin.xml'],
-                         extra_args=['--compile-zinc-debug-symbols']):
+    with self.do_test_compile(
+        'examples/src/scala/org/pantsbuild/example/scalac/plugin:simple_scalac_plugin',
+        expected_files=['SimpleScalacPlugin.class', 'scalac-plugin.xml'],
+        extra_args=['--compile-zinc-debug-symbols']):
       pass
 
   def test_zinc_unsupported_option(self):
@@ -109,9 +112,11 @@ class BaseZincCompileIntegrationTest(object):
 
   def test_analysis_portability(self):
     target = 'testprojects/src/scala/org/pantsbuild/testproject/javasources'
-    analysis_file_name = 'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
+    analysis_file_name = \
+      'testprojects.src.scala.org.pantsbuild.testproject.javasources.javasources.analysis.portable'
 
-    # do_new_project_compile_and_return_analysis executes pants with different build root/work directory each time.
+    # do_new_project_compile_and_return_analysis executes pants with
+    # different build root/work directory each time.
     def do_new_project_compilation_and_return_analysis():
       with self.do_test_compile(target, iterations=1, expected_files=[analysis_file_name],
                                 workdir_outside_of_buildroot=True) as found:
@@ -124,7 +129,8 @@ class BaseZincCompileIntegrationTest(object):
     analysis2 = do_new_project_compilation_and_return_analysis()
 
     def extract_content(analysis):
-      # TODO(stuhood): Comparing content before stamps only, because there is different line in internal apis section.
+      # TODO(stuhood): Comparing content before stamps only, because there is
+      # a different line in internal apis section.
       # return re.sub(re.compile('lastModified\(\d+\)'), "lastModified()", analysis).split('\n')
       return analysis.partition("stamps")[0].split("\n")
 
@@ -141,7 +147,8 @@ class BaseZincCompileIntegrationTest(object):
           pants_run = self.run_test_compile(
               workdir,
               cachedir,
-              'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(target),
+              'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:{}'.format(
+                target),
               extra_args=[arg] + extra_args)
 
           if expect_success:

@@ -5,15 +5,15 @@ output mode:
 output directories:
 1 items
 file:/src/pants/.pants.d/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/ -> file:/src/pants/.pants.d/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/
-classpath options:
+classpath hash:
 7 items
-0 -> file:/src/pants/.pants.d/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/
-1 -> file:/src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar
-2 -> file:/src/pants/.pants.d/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.exe.exe/current/classes/
-3 -> file:/src/pants/.pants.d/compile/zinc/66ac1c9326be/examples.src.scala.org.pantsbuild.example.hello.welcome.welcome/current/classes/
-4 -> file:/src/pants/.pants.d/compile/zinc/66ac1c9326be/examples.src.java.org.pantsbuild.example.hello.greet.greet/current/classes/
-5 -> file:/src/pants/.pants.d/resources/prepare/252d64521cf9/examples.src.resources.org.pantsbuild.example.hello.hello/current/
-6 -> file:/src/pants/.pants.d/ivy/jars/org.scala-lang/scala-library/jars/scala-library-2.10.6.jar
+0 -> AIQvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL2NvbXBpbGUvemluYy82NmFjMWM5MzI2YmUvZXhhbXBsZXMuc3JjLnNjYWxhLm9yZy5wYW50c2J1aWxkLmV4YW1wbGUuaGVsbG8uZXhlLmV4ZS9jdXJyZW50L2NsYXNzZXMAAAAB
+1 -> AGYvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL2l2eS9qYXJzL29yZy5zY2FsYS1sYW5nL3NjYWxhLWxpYnJhcnkvamFycy9zY2FsYS1saWJyYXJ5LTIuMTEuOC5qYXKQfS/G
+2 -> AIQvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL2NvbXBpbGUvemluYy82NmFjMWM5MzI2YmUvZXhhbXBsZXMuc3JjLnNjYWxhLm9yZy5wYW50c2J1aWxkLmV4YW1wbGUuaGVsbG8uZXhlLmV4ZS9jdXJyZW50L2NsYXNzZXMAAAAB
+3 -> AIwvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL2NvbXBpbGUvemluYy82NmFjMWM5MzI2YmUvZXhhbXBsZXMuc3JjLnNjYWxhLm9yZy5wYW50c2J1aWxkLmV4YW1wbGUuaGVsbG8ud2VsY29tZS53ZWxjb21lL2N1cnJlbnQvY2xhc3NlcwAAAAE=
+4 -> AIcvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL2NvbXBpbGUvemluYy82NmFjMWM5MzI2YmUvZXhhbXBsZXMuc3JjLmphdmEub3JnLnBhbnRzYnVpbGQuZXhhbXBsZS5oZWxsby5ncmVldC5ncmVldC9jdXJyZW50L2NsYXNzZXMAAAAB
+5 -> AIMvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL3Jlc291cmNlcy9wcmVwYXJlLzI1MmQ2NDUyMWNmOS9leGFtcGxlcy5zcmMucmVzb3VyY2VzLm9yZy5wYW50c2J1aWxkLmV4YW1wbGUuaGVsbG8uaGVsbG8vY3VycmVudAAAAAE=
+6 -> AGYvVXNlcnMvcGVpeXUvZ2l0aHViL3BhbnRzLy5wYW50cy5kL2l2eS9qYXJzL29yZy5zY2FsYS1sYW5nL3NjYWxhLWxpYnJhcnkvamFycy9zY2FsYS1saWJyYXJ5LTIuMTEuOC5qYXKQfS/G
 compile options:
 6 items
 0 -> -encoding

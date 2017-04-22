@@ -154,7 +154,7 @@ class Jar(object):
 
     If called multiple times, new entry will be appended to the existing classpath.
 
-    :param list classpath: a list of paths
+    :param iterable classpath: a list of paths
     """
     self._classpath = self._classpath + maybe_list(classpath)
 

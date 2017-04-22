@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.project_info.tasks.dependencies import Dependencies
@@ -13,6 +12,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -182,7 +182,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
       'dependencies:python_inner',
       'dependencies:python_leaf',
       'dependencies:python_inner_with_external',
-      'antlr-python-runtime==3.1.3',
+      'antlr_python_runtime==3.1.3',
       targets=[self.target('dependencies:python_root')]
     )
 
@@ -198,7 +198,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
 
   def test_external_dependencies(self):
     self.assert_console_output_ordered(
-      'antlr-python-runtime==3.1.3',
+      'antlr_python_runtime==3.1.3',
       targets=[self.target('dependencies:python_root')],
       options={'external_only': True}
     )
@@ -213,7 +213,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
 
   def test_intransitive_external_dependencies(self):
     self.assert_console_output_ordered(
-      'antlr-python-runtime==3.1.3',
+      'antlr_python_runtime==3.1.3',
       targets=[self.target('dependencies:python_root')],
       options={'transitive': False, 'external_only': True}
     )

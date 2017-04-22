@@ -54,7 +54,6 @@ class PythonInterpreterCache(object):
     safe_mkdir(self._cache_dir)
     self._interpreters = set()
     self._logger = logger or (lambda msg: True)
-    self._default_filters = (python_setup.interpreter_requirement or b'',)
 
   @property
   def interpreters(self):
@@ -77,7 +76,7 @@ class PythonInterpreterCache(object):
       # Create a helpful error message.
       unique_compatibilities = set(tuple(t.compatibility) for t in tgts_with_compatibilities)
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
-      tgts_with_compatibilities_strs = [str(t) for t in tgts_with_compatibilities]
+      tgts_with_compatibilities_strs = [t.address.spec for t in tgts_with_compatibilities]
       raise TaskError('Unable to detect a suitable interpreter for compatibilities: {} '
                       '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
                                                          ', '.join(tgts_with_compatibilities_strs)))
@@ -145,7 +144,10 @@ class PythonInterpreterCache(object):
       cache, using the Requirement-style format, e.g. ``'CPython>=3', or just ['>=2.7','<3']``
       for requirements agnostic to interpreter class.
     """
-    filters = self._default_filters if not any(filters) else filters
+    # We filter the interpreter cache itself (and not just the interpreters we pull from it)
+    # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
+    # an escape hatch.
+    filters = self._python_setup.interpreter_constraints if not any(filters) else filters
     setup_paths = paths or os.getenv('PATH').split(os.pathsep)
     self._setup_cached(filters)
     def unsatisfied_filters():

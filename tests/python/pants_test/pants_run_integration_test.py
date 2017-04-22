@@ -13,6 +13,7 @@ import unittest
 from collections import namedtuple
 from contextlib import contextmanager
 from operator import eq, ne
+from threading import Lock
 
 from colors import strip_color
 
@@ -58,6 +59,7 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
+# TODO: Remove this in 1.5.0dev0, when `--enable-v2-engine` is removed.
 def ensure_engine(f):
   """A decorator for running an integration test with and without the v2 engine enabled via
   temporary environment variables."""
@@ -88,6 +90,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     return [
         # Used in the wrapper script to locate a rust install.
         'HOME',
+        'PANTS_PROFILE',
       ]
 
   @classmethod
@@ -141,6 +144,19 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
       yield clone_dir
 
+  # Incremented each time we spawn a pants subprocess.
+  # Appended to PANTS_PROFILE in the called pants process, so that each subprocess
+  # writes to its own profile file, instead of all stomping on the parent process's profile.
+  _profile_disambiguator = 0
+  _profile_disambiguator_lock = Lock()
+
+  @classmethod
+  def _get_profile_disambiguator(cls):
+    with cls._profile_disambiguator_lock:
+      ret = cls._profile_disambiguator
+      cls._profile_disambiguator += 1
+      return ret
+
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              build_root=None, **kwargs):
 
@@ -173,13 +189,19 @@ class PantsRunIntegrationTest(unittest.TestCase):
       args.append('--config-override=' + ini_file_name)
 
     pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
-    pants_command = [pants_script] + args + command
+
+    # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
+    if kwargs.get('shell') is True:
+      assert not isinstance(command, list), 'must pass command as a string when using shell=True'
+      pants_command = ' '.join([pants_script, ' '.join(args), command])
+    else:
+      pants_command = [pants_script] + args + command
 
     # Only whitelisted entries will be included in the environment if hermetic=True.
     if self.hermetic():
       env = dict()
       for h in self.hermetic_env_whitelist():
-        env[h] = os.getenv(h)
+        env[h] = os.getenv(h) or ''
       hermetic_env = os.getenv('HERMETIC_ENV')
       if hermetic_env:
         for h in hermetic_env.strip(',').split(','):
@@ -188,6 +210,15 @@ class PantsRunIntegrationTest(unittest.TestCase):
       env = os.environ.copy()
     if extra_env:
       env.update(extra_env)
+
+    # Don't overwrite the profile of this process in the called process.
+    # Instead, write the profile into a sibling file.
+    if env.get('PANTS_PROFILE'):
+      prof = '{}.{}'.format(env['PANTS_PROFILE'], self._get_profile_disambiguator())
+      env['PANTS_PROFILE'] = prof
+      # Make a note the subprocess command, so the user can correctly interpret the profile files.
+      with open('{}.cmd'.format(prof), 'w') as fp:
+        fp.write(b' '.join(pants_command))
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)

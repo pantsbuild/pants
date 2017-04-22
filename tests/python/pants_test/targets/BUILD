@@ -62,6 +62,7 @@ python_tests(
   sources = ['test_scala_library.py'],
   dependencies = [
     ':base',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',

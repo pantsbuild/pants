@@ -12,6 +12,7 @@ from pants.option.custom_types import target_option
 from pants.subsystem.subsystem import Subsystem
 
 
+# TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
 class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A subsystem to encapsulate compile-time settings and features for the Java language.
 
@@ -35,9 +36,9 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
                                'embedded in the Java distribution we run on.')
 
     register('--compiler-plugin-deps', advanced=True, type=list, member_type=target_option,
-             fingerprint=True,
-             help='Requested javac plugins will be found in these targets, as well as in any '
-                  'dependencies of the targets being compiled.')
+             removal_version='1.5.0.dev0',
+             removal_hint='See http://www.pantsbuild.org/javac_plugins.html#depending-on-plugins.',
+             fingerprint=True)
 
   @classmethod
   def global_javac_spec(cls, buildgraph):

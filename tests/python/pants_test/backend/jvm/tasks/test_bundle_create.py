@@ -7,15 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
-from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.classpath_util import MissingClasspathEntryError
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts, MissingClasspathEntryError
 from pants.build_graph.resources import Resources
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_file_dump, safe_mkdir, safe_mkdtemp
 from pants_test.backend.jvm.tasks.jvm_binary_task_test_base import JvmBinaryTaskTestBase
@@ -83,8 +82,7 @@ class TestBundleCreate(JvmBinaryTaskTestBase):
 
     self.binary_target = self.make_target(spec='//foo:foo-binary',
                                           target_type=JvmBinary,
-                                          dependencies=[self.java_lib_target, self.jar_lib],
-                                          resources=[self.resources_target.address.spec])
+                                          dependencies=[self.java_lib_target, self.jar_lib, self.resources_target])
 
     self.dist_root = os.path.join(self.build_root, 'dist')
 

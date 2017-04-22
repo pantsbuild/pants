@@ -1,77 +1,92 @@
-use std::collections::{HashSet, VecDeque};
+// Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::io;
 use std::path::Path;
+use std::sync::Arc;
 
-use core::{FNV, Field, Key, TypeConstraint};
-use graph::{EntryId, Graph};
-use nodes::{Complete, Node, Runnable, State};
-use selectors::{Selector, SelectDependencies};
-use tasks::Tasks;
+use futures::future::{self, Future};
+
+use context::{Context, ContextFactory, Core};
+use core::{Failure, Field, Key, TypeConstraint, TypeId, Value};
+use externs::{self, LogLevel};
+use graph::EntryId;
+use nodes::{NodeKey, Select, SelectDependencies};
+use rule_graph;
+use selectors;
 
 /**
  * Represents the state of an execution of (a subgraph of) a Graph.
  */
 pub struct Scheduler {
-  pub graph: Graph,
-  pub tasks: Tasks,
+  pub core: Arc<Core>,
   // Initial set of roots for the execution, in the order they were declared.
-  roots: Vec<Node>,
-  // Candidates for execution.
-  candidates: VecDeque<EntryId>,
-  // Outstanding ids. This will always contain at least as many entries as the `ready` set. If
-  // it contains more ids than the `ready` set, it is because entries that were previously
-  // declared to be ready are still outstanding.
-  outstanding: HashSet<EntryId, FNV>,
-  runnable: HashSet<EntryId, FNV>,
+  roots: Vec<Root>,
 }
 
 impl Scheduler {
   /**
+   * Roots are limited to either `SelectDependencies` and `Select`, which are known to
+   * produce Values. But this method exists to satisfy Graph APIs which only need instances
+   * of the NodeKey enum.
+   */
+  fn root_nodes(&self) -> Vec<NodeKey> {
+    self.roots.iter()
+      .map(|r| match r {
+        &Root::Select(ref s) => s.clone().into(),
+        &Root::SelectDependencies(ref s) => s.clone().into(),
+      })
+      .collect()
+  }
+
+  /**
    * Creates a Scheduler with an initially empty set of roots.
    */
-  pub fn new(graph: Graph, tasks: Tasks) -> Scheduler {
+  pub fn new(core: Core) -> Scheduler {
     Scheduler {
-      graph: graph,
-      tasks: tasks,
+      core: Arc::new(core),
       roots: Vec::new(),
-      candidates: VecDeque::new(),
-      outstanding: HashSet::default(),
-      runnable: HashSet::default(),
     }
   }
 
   pub fn visualize(&self, path: &Path) -> io::Result<()> {
-    self.graph.visualize(&self.roots, path, &self.tasks.externs)
+    self.core.graph.visualize(&self.root_nodes(), path)
   }
 
   pub fn trace(&self, path: &Path) -> io::Result<()> {
-    for root in &self.roots {
-      let result = self.graph.trace(&root, path, &self.tasks.externs);
-      if result.is_err() {
-        return result;
-      }
+    for root in self.root_nodes() {
+      self.core.graph.trace(&root, path)?;
     }
     Ok(())
   }
 
   pub fn reset(&mut self) {
     self.roots.clear();
-    self.candidates.clear();
-    self.outstanding.clear();
   }
 
-  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<&Complete>)> {
+  pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<RootResult>)> {
     self.roots.iter()
-      .map(|root| {
-        let state = self.graph.entry(root).and_then(|e| e.state());
-        (root.subject(), root.product(), state)
+      .map(|root| match root {
+        &Root::Select(ref s) =>
+          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
+        &Root::SelectDependencies(ref s) =>
+          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
       })
       .collect()
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
-    self.add_root(Node::create(Selector::select(product), subject, Default::default()));
+    let edges = self.find_root_edges_or_update_rule_graph(
+      subject.type_id().clone(),
+      selectors::Selector::Select(selectors::Select::without_variant(product))
+    );
+    self.roots.push(
+      Root::Select(Select::new(product,
+                               subject,
+                               Default::default(),
+                               &edges)
+      )
+    );
   }
 
   pub fn add_root_select_dependencies(
@@ -80,98 +95,99 @@ impl Scheduler {
     product: TypeConstraint,
     dep_product: TypeConstraint,
     field: Field,
-    transitive: bool,
+    field_types: Vec<TypeId>
   ) {
-    self.add_root(
-      Node::create(
-        Selector::SelectDependencies(
-          SelectDependencies { product: product, dep_product: dep_product, field: field, transitive: transitive }),
-        subject,
-        Default::default(),
+    let selector = selectors::SelectDependencies {
+      product: product,
+      dep_product: dep_product,
+      field: field,
+      field_types: field_types,
+    };
+
+    let edges = self.find_root_edges_or_update_rule_graph(
+      subject.type_id().clone(),
+      selectors::Selector::SelectDependencies(selector.clone()));
+    self.roots.push(
+      Root::SelectDependencies(
+        SelectDependencies::new(
+          selector.clone(),
+          subject,
+          Default::default(),
+          &edges
+        )
       )
     );
   }
 
-  fn add_root(&mut self, node: Node) {
-    self.roots.push(node.clone());
-    self.candidates.push_back(self.graph.ensure_entry(node));
+  fn find_root_edges_or_update_rule_graph(&self, subject_type: TypeId, selector: selectors::Selector) -> rule_graph::RuleEdges {
+    // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
+    // TODO up front.
+    // TODO Handle the case where the requested root is not in the list of roots that the graph was
+    //      created with.
+    //
+    //      Options
+    //        1. Toss the graph and make a subgraph specific graph, blowing up if that fails.
+    //           I can do this with minimal changes.
+    //        2. Update the graph & check result,
+
+    self.core.rule_graph.find_root_edges(
+      subject_type.clone(),
+      selector.clone()
+    ).expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject_type))
   }
 
   /**
-   * Attempt to run a step with the currently available dependencies of the given Node. If
-   * a step runs, the new State of the Node will be returned.
+   * Starting from existing roots, execute a graph to completion.
    */
-  fn attempt_step(&self, id: EntryId) -> Option<State<Node>> {
-    if !self.graph.is_ready_entry(id) {
-      return None;
-    }
+  pub fn execute(&mut self) -> ExecutionStat {
+    // TODO: Restore counts.
+    let runnable_count = 0;
+    let scheduling_iterations = 0;
 
-    // Run a step.
-    let entry = self.graph.entry_for_id(id);
-    Some(entry.node().step(entry, &self.graph, &self.tasks))
+    // Bootstrap tasks for the roots, and then wait for all of them.
+    externs::log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
+    let roots_res =
+      future::join_all(
+        self.root_nodes().into_iter()
+          .map(|root| {
+            self.core.graph.create(root.clone(), &self.core)
+              .then::<_, Result<(), ()>>(move |_| {
+                externs::log(LogLevel::Debug, &format!("Root {} completed.", root.format()));
+                Ok(())
+              })
+          })
+          .collect::<Vec<_>>()
+      );
+
+    // Wait for all roots to complete. Failure here should be impossible, because each
+    // individual Future in the join was mapped into success regardless of its result.
+    roots_res.wait().expect("Execution failed.");
+
+    ExecutionStat {
+      runnable_count: runnable_count,
+      scheduling_iterations: scheduling_iterations,
+    }
   }
+}
 
-  /**
-   * Continues execution after the given runnables have completed execution.
-   *
-   * Returns an ordered batch of `Staged<EntryId>` for which every `StagedArg::Promise` is
-   * satisfiable by an entry earlier in the list. This "mini graph" can be executed linearly, or in
-   * parallel as long as those promise dependencies are observed.
-   */
-  pub fn next(&mut self, completed: Vec<(EntryId, Complete)>) -> Vec<(EntryId, Runnable)> {
-    let mut ready = Vec::new();
+/**
+ * Root requests are limited to Selectors that produce (python) Values.
+ */
+enum Root {
+  Select(Select),
+  SelectDependencies(SelectDependencies),
+}
 
-    // Mark any completed entries as such.
-    for (id, state) in completed {
-      self.outstanding.remove(&id);
-      self.candidates.extend(self.graph.entry_for_id(id).dependents());
-      self.graph.complete(id, state);
-    }
+pub type RootResult = Result<Value, Failure>;
 
-    // For each changed node, determine whether its dependents or itself are a candidate.
-    while let Some(entry_id) = self.candidates.pop_front() {
-      if self.outstanding.contains(&entry_id) {
-        // Already running.
-        continue;
-      }
-
-      // Attempt to run a step for the Node.
-      match self.attempt_step(entry_id) {
-        Some(State::Runnable(s)) => {
-          // The node is ready to run!
-          ready.push((entry_id, s));
-          self.outstanding.insert(entry_id);
-        },
-        Some(State::Complete(s)) => {
-          // Node completed statically; mark any dependents of the Node as candidates.
-          self.graph.complete(entry_id, s);
-          self.candidates.extend(self.graph.entry_for_id(entry_id).dependents());
-        },
-        Some(State::Waiting(w)) => {
-          // Add the new dependencies.
-          self.graph.add_dependencies(entry_id, w);
-          let ref graph = self.graph;
-          let mut incomplete_deps =
-            self.graph.entry_for_id(entry_id).dependencies().iter()
-              .map(|&d| graph.entry_for_id(d))
-              .filter(|e| !e.is_complete())
-              .map(|e| e.id())
-              .peekable();
-          if incomplete_deps.peek().is_some() {
-            // Mark incomplete deps as candidates for steps.
-            self.candidates.extend(incomplete_deps);
-          } else {
-            // All newly declared deps are already completed: still a candidate.
-            self.candidates.push_front(entry_id);
-          }
-        },
-        None =>
-          // Not ready to step.
-          continue,
-      }
-    }
-
-    self.runnable.clear();
-    ready
+impl ContextFactory for Arc<Core> {
+  fn create(&self, entry_id: EntryId) -> Context {
+    Context::new(entry_id, self.clone())
   }
+}
+
+#[repr(C)]
+pub struct ExecutionStat {
+  runnable_count: u64,
+  scheduling_iterations: u64,
 }
