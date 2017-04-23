@@ -312,7 +312,7 @@ function tag_release() {
     --local-user=$(get_pgp_keyid) \
     -m "pantsbuild.pants release ${release_version}" \
     ${tag_name} && \
-  git push git@github.com:pantsbuild/pants.git ${tag_name}
+  git push -f git@github.com:pantsbuild/pants.git ${tag_name}
 }
 
 function publish_docs_if_master() {
