@@ -289,6 +289,8 @@ class BuildFileAddress(Address):
   def build_file(self):
     """The build file that contains the object this address points to.
 
+    :API: public
+
     :rtype: :class:`pants.base.build_file.BuildFile`
     """
     return self._build_file
