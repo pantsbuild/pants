@@ -91,7 +91,8 @@ class LegacyBuildGraph(BuildGraph):
     for node, state in roots.items():
       if type(state) is not Return:
         # NB: ResolveError means that a target was not found, which is a common user facing error.
-        #     So, we propagate that error's message.
+        # TODO Come up with a better error reporting mechanism so that we don't need this as a special case.
+        #      Possibly as part of https://github.com/pantsbuild/pants/issues/4446
         if isinstance(state.exc, ResolveError):
           raise AddressLookupError(str(state.exc))
         else:
