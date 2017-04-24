@@ -109,9 +109,10 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
 
 
 def _raise_did_you_mean(address_family, name):
-  possibilities = '\n  '.join(str(a) for a in address_family.addressables)
-  raise ResolveError('A Struct was not found in namespace {} for name "{}". '
-                     'Did you mean one of?:\n  {}'.format(address_family.namespace, name, possibilities))
+  possibilities = '\n  '.join(':{}'.format(a.target_name) for a in address_family.addressables)
+  raise ResolveError('"{}" was not found in namespace "{}". '
+                     'Did you mean one of:\n  {}'
+                     .format(name, address_family.namespace, possibilities))
 
 
 @rule(UnhydratedStruct,
@@ -237,11 +238,16 @@ def addresses_from_address_families(address_families, spec):
   if type(spec) in (DescendantAddresses, SiblingAddresses, AscendantAddresses):
     addresses = tuple(a for af in address_families for a in af.addressables.keys())
   elif type(spec) is SingleAddress:
+    # TODO Could assert len(address_families) == 1, as it should always be true in this case.
     addresses = tuple(a
                       for af in address_families
                       for a in af.addressables.keys() if a.target_name == spec.name)
+    if not addresses:
+      if len(address_families) == 1:
+        _raise_did_you_mean(address_families[0], spec.name)
   else:
     raise ValueError('Unrecognized Spec type: {}'.format(spec))
+
   return BuildFileAddresses(addresses)
 
 

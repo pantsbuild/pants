@@ -13,6 +13,7 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.build_files import BuildFilesCollection
+from pants.engine.nodes import Throw
 from pants.util.dirutil import fast_relpath
 
 
@@ -75,7 +76,10 @@ class LegacyAddressMapper(AddressMapper):
 
     addresses = set()
     for (spec, _), state in root_entries.items():
-      if missing_is_fatal and not state.value.dependencies:
+      if isinstance(state, Throw) and missing_is_fatal:
+        raise self.BuildFileScanError(
+          'Spec `{}` does not match any targets.\n{}'.format(spec.to_spec_string(), str(state.exc)))
+      elif missing_is_fatal and not state.value.dependencies:
         raise self.BuildFileScanError(
           'Spec `{}` does not match any targets.'.format(spec.to_spec_string()))
       addresses.update(state.value.dependencies)
