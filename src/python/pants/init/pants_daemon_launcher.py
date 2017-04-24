@@ -37,10 +37,11 @@ class PantsDaemonLauncher(object):
       register('--log-dir', advanced=True, default=None,
                help='The directory to log pantsd output to.')
       register('--fs-event-detection', advanced=True, type=bool,
-               help='Whether or not to use filesystem event detection. Experimental.')
+               removal_version='1.5.0.dev0',
+               removal_hint='This option is now implied by `--enable-pantsd`.',
+               help='Whether or not to use filesystem event detection.')
       register('--fs-event-workers', advanced=True, type=int, default=4,
-               help='The number of workers to use for the filesystem event service executor pool.'
-                    ' Experimental.')
+               help='The number of workers to use for the filesystem event service executor pool.')
 
     @classmethod
     def subsystem_dependencies(cls):
@@ -61,7 +62,6 @@ class PantsDaemonLauncher(object):
                                  log_level=options.level.upper(),
                                  pailgun_host=options.pailgun_host,
                                  pailgun_port=options.pailgun_port,
-                                 fs_event_enabled=options.fs_event_detection,
                                  fs_event_workers=options.fs_event_workers,
                                  pants_ignore_patterns=options.pants_ignore,
                                  build_ignore_patterns=options.build_ignore,
@@ -76,7 +76,6 @@ class PantsDaemonLauncher(object):
                log_level,
                pailgun_host,
                pailgun_port,
-               fs_event_enabled,
                fs_event_workers,
                pants_ignore_patterns,
                build_ignore_patterns,
@@ -90,8 +89,6 @@ class PantsDaemonLauncher(object):
     :param str log_level: The log level for pantsd logs (derived from the pants log level).
     :param str pailgun_host: The bind address for the Pailgun server.
     :param int pailgun_port: The bind port for the Pailgun server.
-    :param bool fs_event_enabled: Whether or not to enable fs event detection (Watchman) for graph
-                                  invalidation.
     :param int fs_event_workers: The number of workers to use for processing the fs event queue.
     :param list pants_ignore_patterns: A list of path ignore patterns for filesystem operations.
     :param list build_ignore_patterns: A list of path ignore patterns for BUILD file parsing.
@@ -106,7 +103,6 @@ class PantsDaemonLauncher(object):
     self._log_level = log_level
     self._pailgun_host = pailgun_host
     self._pailgun_port = pailgun_port
-    self._fs_event_enabled = fs_event_enabled
     self._fs_event_workers = fs_event_workers
     self._pants_ignore_patterns = pants_ignore_patterns
     self._build_ignore_patterns = build_ignore_patterns
@@ -139,18 +135,17 @@ class PantsDaemonLauncher(object):
 
     services = []
     scheduler_service = None
-    if self._fs_event_enabled:
-      fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
+    fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
 
-      legacy_graph_helper = self._engine_initializer.setup_legacy_graph(
-        self._pants_ignore_patterns,
-        self._pants_workdir,
-        build_ignore_patterns=self._build_ignore_patterns,
-        exclude_target_regexps=self._exclude_target_regexp,
-        subproject_roots=self._subproject_roots,
-      )
-      scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
-      services.extend((fs_event_service, scheduler_service))
+    legacy_graph_helper = self._engine_initializer.setup_legacy_graph(
+      self._pants_ignore_patterns,
+      self._pants_workdir,
+      build_ignore_patterns=self._build_ignore_patterns,
+      exclude_target_regexps=self._exclude_target_regexp,
+      subproject_roots=self._subproject_roots,
+    )
+    scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
+    services.extend((fs_event_service, scheduler_service))
 
     pailgun_service = PailgunService(bind_addr=(self._pailgun_host, self._pailgun_port),
                                      exiter_class=DaemonExiter,
@@ -167,7 +162,7 @@ class PantsDaemonLauncher(object):
 
   def _launch_pantsd(self):
     # Launch Watchman (if so configured).
-    watchman = self.watchman_launcher.maybe_launch() if self._fs_event_enabled else None
+    watchman = self.watchman_launcher.maybe_launch()
 
     # Initialize pantsd services.
     services, port_map = self._setup_services(watchman)
@@ -192,5 +187,4 @@ class PantsDaemonLauncher(object):
 
   def terminate(self):
     self.pantsd.terminate()
-    if self._fs_event_enabled:
-      self.watchman_launcher.terminate()
+    self.watchman_launcher.terminate()
