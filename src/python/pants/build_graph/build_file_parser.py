@@ -82,7 +82,7 @@ class BuildFileParser(object):
               "Both {conflicting_file} and {addressable_file} define the same address: "
               "'{target_name}'"
               .format(conflicting_file=sibling_build_file,
-                      addressable_file=address.build_file,
+                      addressable_file=address.rel_path,
                       target_name=address.target_name))
       family_address_map_by_build_file[bf] = bf_address_map
     return family_address_map_by_build_file

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
-from pants.base.deprecated import deprecated_conditional
+from pants.base.deprecated import deprecated, deprecated_conditional
 from pants.util.dirutil import longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -283,10 +283,11 @@ class BuildFileAddress(Address):
     return Address(spec_path=self.spec_path, target_name=self.target_name)
 
   @property
+  @deprecated('1.5.0.dev0',
+              hint_message='Use `BuildFileAddress.rel_path` to access the relative path to the '
+                           'BUILD file for a target.')
   def build_file(self):
     """The build file that contains the object this address points to.
-
-    :API: public
 
     :rtype: :class:`pants.base.build_file.BuildFile`
     """
