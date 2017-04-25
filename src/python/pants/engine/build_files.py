@@ -235,6 +235,9 @@ def _hydrate(item_type, spec_path, **kwargs):
        Select(_SPECS_CONSTRAINT)])
 def addresses_from_address_families(address_families, spec):
   """Given a list of AddressFamilies and a Spec, return matching Addresses."""
+  if not address_families:
+    raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
+
   if type(spec) in (DescendantAddresses, SiblingAddresses, AscendantAddresses):
     addresses = tuple(a for af in address_families for a in af.addressables.keys())
   elif type(spec) is SingleAddress:
