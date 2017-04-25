@@ -23,10 +23,10 @@ from pants_test.base_test import BaseTest
 class BuildFileAddressMapperTest(BaseTest):
 
   def test_resolve(self):
-    build_file = self.add_to_build_file('BUILD', 'target(name="foo")')
+    self.add_to_build_file('BUILD', 'target(name="foo")')
     address, addressable = self.address_mapper.resolve(Address.parse('//:foo'))
     self.assertIsInstance(address, BuildFileAddress)
-    self.assertEqual(build_file, address.build_file)
+    self.assertEqual('BUILD', address.rel_path)
     self.assertEqual('foo', address.target_name)
     self.assertEqual(address.target_name, addressable.addressed_name)
     self.assertEqual(addressable.addressed_type, Target)
