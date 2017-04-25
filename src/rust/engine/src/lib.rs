@@ -550,13 +550,20 @@ pub extern fn rule_subgraph_visualize(
 #[no_mangle]
 pub extern fn set_panic_handler() {
   panic::set_hook(Box::new(|panic_info| {
-    let panic_str = format!("panic occured: {:?}", panic_info.payload().downcast_ref::<&str>().unwrap());
-    externs::log(externs::LogLevel::Critical, &panic_str);
+    let mut panic_str = format!("panic at '{}', ",
+                                panic_info.payload().downcast_ref::<&str>().unwrap());
 
     if let Some(location) = panic_info.location() {
-      let panic_location_str = format!("{}, {}", location.file(), location.line());
-      externs::log(externs::LogLevel::Critical, &panic_location_str);
+      let panic_location_str = format!("{}:{}", location.file(), location.line());
+      panic_str.push_str(&panic_location_str);
     }
+
+    externs::log(externs::LogLevel::Critical, &panic_str);
+
+    let mut panic_file_bug_str = "Oops! You should not see this. ".to_string();
+    panic_file_bug_str.push_str("Please file a bug at https://github.com/pantsbuild/pants/issues.");
+
+    externs::log(externs::LogLevel::Critical, &panic_file_bug_str);
   }));
 }
 
