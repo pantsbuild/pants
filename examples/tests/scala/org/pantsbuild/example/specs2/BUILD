@@ -3,9 +3,6 @@
 
 junit_tests(
   dependencies=[
-    'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
-    '3rdparty:junit',
-    '3rdparty:scalatest',
     '3rdparty/jvm/org/specs2:specs2-core',
   ],
 )
