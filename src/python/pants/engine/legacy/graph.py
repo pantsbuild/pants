@@ -20,6 +20,7 @@ from pants.build_graph.remote_sources import RemoteSources
 from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
+from pants.engine.mapper import ResolveError
 from pants.engine.nodes import Return
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
@@ -89,9 +90,15 @@ class LegacyBuildGraph(BuildGraph):
     # Index the ProductGraph.
     for node, state in roots.items():
       if type(state) is not Return:
-        trace = '\n'.join(self._scheduler.trace())
-        raise AddressLookupError(
-            'Build graph construction failed for {}:\n{}'.format(node, trace))
+        # NB: ResolveError means that a target was not found, which is a common user facing error.
+        # TODO Come up with a better error reporting mechanism so that we don't need this as a special case.
+        #      Possibly as part of https://github.com/pantsbuild/pants/issues/4446
+        if isinstance(state.exc, ResolveError):
+          raise AddressLookupError(str(state.exc))
+        else:
+          trace = '\n'.join(self._scheduler.trace())
+          raise AddressLookupError(
+              'Build graph construction failed for {}:\n{}'.format(node, trace))
       if type(state.value) is not HydratedTargets:
         raise TypeError('Expected roots to hold {}; got: {}'.format(
           HydratedTargets, type(state.value)))

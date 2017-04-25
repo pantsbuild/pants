@@ -14,6 +14,7 @@ import mock
 
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.target_roots import TargetRoots
@@ -43,7 +44,7 @@ class TaggingSymbolTable(LegacySymbolTable):
       )
 
 
-class GraphInvalidationTest(unittest.TestCase):
+class GraphTestBase(unittest.TestCase):
 
   _native = init_native()
 
@@ -64,6 +65,22 @@ class GraphInvalidationTest(unittest.TestCase):
       graph = graph_helper.create_build_graph(target_roots)[0]
       addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
       yield graph, addresses, graph_helper.scheduler
+
+
+class GraphTargetScanFailureTests(GraphTestBase):
+
+  def test_with_missing_target_in_existing_build_file(self):
+    with self.assertRaises(AddressLookupError) as cm:
+      with self.open_scheduler(['3rdparty/python:rutabaga']) as (_, _, scheduler):
+        self.fail('Expected an exception.')
+
+    self.assertIn('"rutabaga" was not found in namespace "3rdparty/python". Did you mean one of:\n'
+                  '  :psutil\n'
+                  '  :isort',
+                  str(cm.exception))
+
+
+class GraphInvalidationTest(GraphTestBase):
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):

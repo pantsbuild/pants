@@ -161,8 +161,8 @@ class BuildFileParserTargetTest(BaseTest):
     address_map = self.build_file_parser.address_map_from_build_files(
       BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), "."))
     addresses = address_map.keys()
-    self.assertEqual({bar_build_file, base_build_file, foo_build_file},
-                     set([address.build_file for address in addresses]))
+    self.assertEqual({bar_build_file.relpath, base_build_file.relpath, foo_build_file.relpath},
+                     set([address.rel_path for address in addresses]))
     self.assertEqual({'//:base', '//:foo', '//:bat'},
                      set([address.spec for address in addresses]))
 
