@@ -89,20 +89,8 @@ class LegacyBuildGraph(BuildGraph):
 
     # Index the ProductGraph.
     for node, state in roots.items():
-      if type(state) is not Return:
-        # NB: ResolveError means that a target was not found, which is a common user facing error.
-        # TODO Come up with a better error reporting mechanism so that we don't need this as a special case.
-        #      Possibly as part of https://github.com/pantsbuild/pants/issues/4446
-        if isinstance(state.exc, ResolveError):
-          raise AddressLookupError(str(state.exc))
-        else:
-          trace = '\n'.join(self._scheduler.trace())
-          raise AddressLookupError(
-              'Build graph construction failed for {}:\n{}'.format(node, trace))
-      if type(state.value) is not HydratedTargets:
-        raise TypeError('Expected roots to hold {}; got: {}'.format(
-          HydratedTargets, type(state.value)))
-
+      self._assert_type_is_return(node, state)
+      self._assert_correct_value_type(state, HydratedTargets)
       # We have a successful HydratedTargets value (for a particular input Spec).
       for hydrated_target in state.value.dependencies:
         target_adaptor = hydrated_target.adaptor
@@ -239,13 +227,16 @@ class LegacyBuildGraph(BuildGraph):
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
-    root_entries = self._scheduler.root_entries(request)
+    root_entries = result.root_products
     address_entries = {k: v for k, v in root_entries.items() if k[1].product is BuildFileAddresses}
     target_entries = {k: v for k, v in root_entries.items() if k[1].product is HydratedTargets}
     self._index(target_entries)
 
     yielded_addresses = set()
     for (subject, _), state in address_entries.items():
+      self._assert_type_is_return(subject, state)
+      self._assert_correct_value_type(state, BuildFileAddresses)
+
       if not state.value.dependencies:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(subject))
@@ -253,6 +244,25 @@ class LegacyBuildGraph(BuildGraph):
         if address not in yielded_addresses:
           yielded_addresses.add(address)
           yield address
+
+  def _assert_type_is_return(self, node, state):
+    if type(state) is Return:
+      return
+
+    # NB: ResolveError means that a target was not found, which is a common user facing error.
+    # TODO Come up with a better error reporting mechanism so that we don't need this as a special case.
+    #      Possibly as part of https://github.com/pantsbuild/pants/issues/4446
+    if isinstance(state.exc, ResolveError):
+      raise AddressLookupError(str(state.exc))
+    else:
+      trace = '\n'.join(self._scheduler.trace())
+      raise AddressLookupError(
+        'Build graph construction failed for {}:\n{}'.format(node, trace))
+
+  def _assert_correct_value_type(self, state, expected_type):
+    if type(state.value) is not expected_type:
+      raise TypeError('Expected roots to hold {}; got: {}'.format(
+        expected_type, type(state.value)))
 
 
 class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
