@@ -14,7 +14,9 @@ from pants.base.specs import SiblingAddresses, SingleAddress
 from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_mapper import AddressMapper
+from pants.engine.engine import Engine
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
+from pants.engine.nodes import Throw
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir
 from pants_test.engine.util import init_native
@@ -182,3 +184,20 @@ class LegacyAddressMapperTest(unittest.TestCase):
       mapper = self.create_address_mapper(build_root)
       addresses = mapper.scan_addresses(os.path.join(build_root, 'foo'))
       self.assertEqual(addresses, set())
+
+  def test_other_throw_is_fail(self):
+    # scan_addresses() should raise an error if the scheduler returns an error it can't ignore.
+    class ThrowReturningScheduler(object):
+      def execution_request(self, *args):
+        pass
+
+    class ThrowResultingEngine(object):
+      def execute(self, *args):
+        return Engine.Result(None, {('some-thing', None): Throw(Exception('just an exception'))})
+
+    with temporary_dir() as build_root:
+      mapper = LegacyAddressMapper(ThrowReturningScheduler(), ThrowResultingEngine(), build_root)
+
+      with self.assertRaises(LegacyAddressMapper.BuildFileScanError) as cm:
+        mapper.scan_addresses(os.path.join(build_root, 'foo'))
+      self.assertIn('just an exception', str(cm.exception))
