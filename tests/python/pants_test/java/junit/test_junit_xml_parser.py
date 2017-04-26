@@ -183,4 +183,4 @@ class TestParseFailedTargets(unittest.TestCase):
       self.assertEqual(2, len(collect_handler.errors))
       self.assertEqual({bad_file1, bad_file2}, {e.junit_xml_path for e in collect_handler.errors})
 
-      self.assertEqual({}, failed_targets)
+      self.assertEqual({None: {JUnitTest('org.pantsbuild.Error', 'testError')}}, failed_targets)
