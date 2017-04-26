@@ -101,6 +101,10 @@ class GoalRunnerFactory(object):
                                                 exclude_target_regexps=exclude_target_regexps,
                                                 subproject_roots=subproject_build_roots)
       )
+
+      # Set panic handler on native library.
+      graph_helper.scheduler.set_panic_handler()
+
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
                                         change_calculator=graph_helper.change_calculator)
