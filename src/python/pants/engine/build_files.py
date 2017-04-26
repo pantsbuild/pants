@@ -234,7 +234,12 @@ def _hydrate(item_type, spec_path, **kwargs):
       [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
        Select(_SPECS_CONSTRAINT)])
 def addresses_from_address_families(address_families, spec):
-  """Given a list of AddressFamilies and a Spec, return matching Addresses."""
+  """Given a list of AddressFamilies and a Spec, return matching Addresses.
+
+  Raises a ResolveError if:
+     - there were no matching AddressFamilies, or
+     - the Spec matches no addresses for SingleAddresses.
+  """
   if not address_families:
     raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
 
