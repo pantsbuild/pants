@@ -261,6 +261,9 @@ class WrappedNativeScheduler(object):
   def set_panic_handler(self):
     self._native.lib.set_panic_handler()
 
+  def trigger_panic(self):
+    self._native.lib.trigger_panic()
+
   def root_entries(self, execution_request):
     raw_roots = self._native.lib.execution_roots(self._scheduler)
     try:
@@ -447,6 +450,9 @@ class LocalScheduler(object):
 
   def set_panic_handler(self):
     self._scheduler.set_panic_handler()
+
+  def trigger_panic(self):
+    self._scheduler.trigger_panic()
 
   def schedule(self, execution_request):
     """Yields batches of Steps until the roots specified by the request have been completed.

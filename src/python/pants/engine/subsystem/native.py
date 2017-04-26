@@ -211,6 +211,7 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 void nodes_destroy(RawNodes*);
 
 void set_panic_handler();
+void trigger_panic();
 '''
 
 CFFI_EXTERNS = '''

@@ -567,6 +567,11 @@ pub extern fn set_panic_handler() {
   }));
 }
 
+#[no_mangle]
+pub extern fn trigger_panic() {
+  panic!("This is a manually triggered panic for testing purpose.");
+}
+
 
 fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
