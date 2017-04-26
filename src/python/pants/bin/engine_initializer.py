@@ -17,8 +17,8 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (JavaLibraryAdaptor, JunitTestsAdaptor, JvmAppAdaptor,
-                                         PythonLibraryAdaptor, PythonTargetAdaptor,
+from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
+                                         JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
                                          PythonTestsAdaptor, RemoteSourcesAdaptor,
                                          ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
@@ -58,6 +58,8 @@ class LegacySymbolTable(SymbolTable):
       aliases[alias] = ScalaLibraryAdaptor
     for alias in ['python_library', 'pants_plugin']:
       aliases[alias] = PythonLibraryAdaptor
+    for alias in ['go_library', 'go_binary']:
+      aliases[alias] = GoTargetAdaptor
 
     aliases['junit_tests'] = JunitTestsAdaptor
     aliases['jvm_app'] = JvmAppAdaptor

@@ -24,7 +24,7 @@ class Config(AbstractClass):
   Supports recursive variable substitution using standard python format strings. E.g.,
   %(var_name)s will be replaced with the value of var_name.
   """
-  _DEFAULT_SECTION = configparser.DEFAULTSECT
+  DEFAULT_SECTION = configparser.DEFAULTSECT
 
   class ConfigError(Exception):
     pass
@@ -192,14 +192,10 @@ class _SingleFileConfig(Config):
     return self.configparser.has_section(section)
 
   def has_option(self, section, option):
-    return (self.configparser.has_option(section, option) or
-            self.configparser.has_option(self._DEFAULT_SECTION, option))
+    return self.configparser.has_option(section, option)
 
   def get_value(self, section, option):
-    if self.configparser.has_option(section, option):
-      return self.configparser.get(section, option)
-    else:
-      return self.configparser.get(self._DEFAULT_SECTION, option)
+    return self.configparser.get(section, option)
 
   def get_source_for_option(self, section, option):
     if self.has_option(section, option):

@@ -14,6 +14,7 @@ import mock
 
 from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
 from pants.build_graph.address import Address
+from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.target_roots import TargetRoots
@@ -43,7 +44,7 @@ class TaggingSymbolTable(LegacySymbolTable):
       )
 
 
-class GraphInvalidationTest(unittest.TestCase):
+class GraphTestBase(unittest.TestCase):
 
   _native = init_native()
 
@@ -53,17 +54,65 @@ class GraphInvalidationTest(unittest.TestCase):
     return options
 
   @contextmanager
-  def open_scheduler(self, specs, symbol_table_cls=None):
+  def graph_helper(self, symbol_table_cls=None):
     with temporary_dir() as work_dir:
       path_ignore_patterns = ['.*']
-      target_roots = TargetRoots.create(options=self._make_setup_args(specs))
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                           work_dir,
                                                           symbol_table_cls=symbol_table_cls,
                                                           native=self._native)
-      graph = graph_helper.create_build_graph(target_roots)[0]
+      yield graph_helper
+
+  @contextmanager
+  def open_scheduler(self, specs, symbol_table_cls=None):
+    with self.graph_helper(symbol_table_cls) as graph_helper:
+      graph, target_roots = self.create_graph_from_specs(graph_helper, specs)
       addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
       yield graph, addresses, graph_helper.scheduler
+
+  def create_graph_from_specs(self, graph_helper, specs):
+    target_roots = self.create_target_roots(specs)
+    graph = graph_helper.create_build_graph(target_roots)[0]
+    return graph, target_roots
+
+  def create_target_roots(self, specs):
+    return TargetRoots.create(options=self._make_setup_args(specs))
+
+
+class GraphTargetScanFailureTests(GraphTestBase):
+
+  def test_with_missing_target_in_existing_build_file(self):
+    with self.assertRaises(AddressLookupError) as cm:
+      with self.graph_helper() as graph_helper:
+        self.create_graph_from_specs(graph_helper, ['3rdparty/python:rutabaga'])
+        self.fail('Expected an exception.')
+
+    self.assertIn('"rutabaga" was not found in namespace "3rdparty/python". Did you mean one of:\n'
+                  '  :psutil\n'
+                  '  :isort',
+                  str(cm.exception))
+
+  def test_with_missing_directory_fails(self):
+    with self.assertRaises(AddressLookupError) as cm:
+      with self.graph_helper() as graph_helper:
+        self.create_graph_from_specs(graph_helper, ['no-such-path:'])
+        self.fail('Expected an exception.')
+
+    self.assertIn('Path "no-such-path" contains no BUILD files',
+                  str(cm.exception))
+
+  def test_with_existing_directory_with_no_build_files_fails(self):
+    with self.assertRaises(AddressLookupError) as cm:
+      with self.graph_helper() as graph_helper:
+        self.create_graph_from_specs(graph_helper, ['build-support/bin::'])
+        self.fail('Expected an exception.')
+
+    self.assertIn('Path "build-support/bin" contains no BUILD files',
+                  str(cm.exception))
+
+
+
+class GraphInvalidationTest(GraphTestBase):
 
   def test_invalidate_fsnode(self):
     with self.open_scheduler(['3rdparty/python::']) as (_, _, scheduler):

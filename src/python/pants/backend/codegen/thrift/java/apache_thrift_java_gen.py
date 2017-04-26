@@ -21,7 +21,7 @@ from pants.binaries.thrift_binary import ThriftBinary
 class ApacheThriftJavaGen(ApacheThriftGenBase):
   """Generate Java source files from thrift IDL files."""
   deprecated_options_scope = 'gen.thrift'  # New scope is gen.thrift-java.
-  deprecated_options_scope_removal_version = '1.5.0dev0'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   gentarget_type = JavaThriftLibrary
   thrift_generator = 'java'

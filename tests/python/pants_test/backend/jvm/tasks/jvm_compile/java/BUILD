@@ -72,8 +72,9 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
     'tests/python/pants_test/java/distribution',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/tasks:task_test_base',
   ],
 )
 

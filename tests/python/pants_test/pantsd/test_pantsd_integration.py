@@ -81,10 +81,9 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         print(line)
 
   def test_pantsd_run_with_watchman(self):
-    config = {'pantsd': {'fs_event_detection': True},
-              # The absolute paths in CI can exceed the UNIX socket path limitation
-              # (>104-108 characters), so we override that here with a shorter path.
-              'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
+    # The absolute paths in CI can exceed the UNIX socket path limitation
+    # (>104-108 characters), so we override that here with a shorter path.
+    config = {'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
 
     with self.pantsd_test_context(config) as (workdir, pantsd_config, checker):
       print('log: {}/pantsd/pantsd.log'.format(workdir))

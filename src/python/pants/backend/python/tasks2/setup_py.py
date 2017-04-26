@@ -15,6 +15,7 @@ from collections import OrderedDict, defaultdict
 
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
+from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
@@ -314,6 +315,7 @@ class SetupPy(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
+    round_manager.require_data(PythonInterpreter)
 
   @classmethod
   def register_options(cls, register):
@@ -593,12 +595,13 @@ class SetupPy(Task):
       create(target)
 
     executed = {}  # Collected and returned for tests, processed target -> sdist|setup_dir.
+    interpreter = self.context.products.get_data(PythonInterpreter)
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:
         if not self._run:
           self.context.log.info('Running packager against {}'.format(setup_dir))
-          setup_runner = Packager(setup_dir)
+          setup_runner = Packager(setup_dir, interpreter=interpreter)
           tgz_name = os.path.basename(setup_runner.sdist())
           sdist_path = os.path.join(dist_dir, tgz_name)
           self.context.log.info('Writing {}'.format(sdist_path))
@@ -607,7 +610,7 @@ class SetupPy(Task):
           executed[target] = sdist_path
         else:
           self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
-          setup_runner = SetupPyRunner(setup_dir, self._run)
+          setup_runner = SetupPyRunner(setup_dir, self._run, interpreter=interpreter)
           setup_runner.run()
           executed[target] = setup_dir
     return executed

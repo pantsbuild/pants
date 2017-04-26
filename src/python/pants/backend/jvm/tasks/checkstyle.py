@@ -30,6 +30,9 @@ class Checkstyle(NailgunTask):
 
   _CHECKSTYLE_BOOTSTRAP_KEY = "checkstyle"
 
+  deprecated_options_scope = 'compile.checkstyle'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
+
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)

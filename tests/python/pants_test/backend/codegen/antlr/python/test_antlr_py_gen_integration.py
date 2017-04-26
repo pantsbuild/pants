@@ -11,9 +11,9 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class AntlrPyGenIntegrationTest(PantsRunIntegrationTest):
 
   def test_antlr_py_gen_integration(self):
-    result = self.run_pants(['run2',
+    result = self.run_pants(['run',
                              'testprojects/src/python/antlr:eval-bin',
-                             '--run2-py-args="123 * 321"'])
+                             '--run-py-args="123 * 321"'])
     self.assertEqual(0, result.returncode)
     self.assertIn('39483', result.stdout_data)
 

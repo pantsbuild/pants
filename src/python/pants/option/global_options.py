@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import sys
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
@@ -45,7 +46,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Squelches most console output.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', type=bool, default=True, recursive=True,
+    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True,
              help='Set whether log messages are displayed in color.')
 
     # Pants code uses this only to verify that we are of the requested version. However
@@ -127,7 +128,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # This facilitates use of the v2 engine, sans daemon.
-    # TODO: Add removal_version='1.5.0dev0' before 1.4 lands.
+    # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
     register('--enable-v2-engine', advanced=True, type=bool, default=True,
              help='Enables use of the v2 engine.')
 

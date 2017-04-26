@@ -12,5 +12,5 @@ from pants.contrib.python.checks.tasks.checkstyle.checker import PythonCheckStyl
 
 
 def register_goals():
-  task(name='python-eval', action=PythonEval).install('compile')
-  task(name='pythonstyle', action=PythonCheckStyleTask).install('compile')
+  task(name='python-eval', action=PythonEval).install('lint')
+  task(name='pythonstyle', action=PythonCheckStyleTask).install('lint')

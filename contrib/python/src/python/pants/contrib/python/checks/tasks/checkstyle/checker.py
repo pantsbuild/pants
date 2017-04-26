@@ -11,11 +11,13 @@ from collections import namedtuple
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.option.custom_types import file_option
+from pants.task.task import Task
+
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 from pants.contrib.python.checks.tasks.checkstyle.register_plugins import register_plugins
-from pants.option.custom_types import file_option
-from pants.task.task import Task
+
 
 _NOQA_LINE_SEARCH = re.compile(r'# noqa\b').search
 _NOQA_FILE_SEARCH = re.compile(r'# (flake8|checkstyle): noqa$').search
@@ -51,6 +53,9 @@ class PythonCheckStyleTask(Task):
   @classmethod
   def subsystem_dependencies(cls):
     return super(Task, cls).subsystem_dependencies() + cls._subsystems
+
+  deprecated_options_scope = 'compile.pythonstyle'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   @classmethod
   def register_options(cls, register):

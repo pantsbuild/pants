@@ -45,10 +45,6 @@ class ZincAnalysisElement(object):
   # To rebase pants home we must string-replace anywhere in the line.
   pants_home_anywhere = ()
 
-  # Sections that can reference paths under the pants home anywhere on a line, paths are encoded in base64.
-  # To rebase pants home we must first decode, string-replace anywhere in the line and then encode again.
-  pants_home_anywhere_base64 = ()
-
   # Sections that can reference paths under the pants home, but only at the beginning of a line.
   # To rebase pants home we can just check the prefix.
   pants_home_prefix_only = ()

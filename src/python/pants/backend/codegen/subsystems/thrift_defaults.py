@@ -9,6 +9,6 @@ from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.base.deprecated import deprecated_module
 
 
-deprecated_module('1.5.0dev0', 'Use pants.backend.codegen.thrift.java.thrift_defaults instead')
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.thrift.java.thrift_defaults instead')
 
 ThriftDefaults = ThriftDefaults

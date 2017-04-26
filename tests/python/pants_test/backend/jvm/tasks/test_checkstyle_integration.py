@@ -53,10 +53,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           self._create_config_file(config_file, config)
           args = [
             'clean-all',
-            'compile.checkstyle',
+            'lint',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            '--compile-checkstyle-configuration={}'.format(config_file)
+            '--lint-checkstyle-configuration={}'.format(config_file)
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -77,10 +77,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           config_file = os.path.join(tmp, config_name)
           self._create_config_file(config_file, config)
           args = [
-            'compile.checkstyle',
+            'lint',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            '--compile-checkstyle-configuration={}'.format(config_file)
+            '--lint-checkstyle-configuration={}'.format(config_file)
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -142,10 +142,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         previous_names.add(config_file)
         self._create_config_file(config_file, config)
         args = [
-          'compile.checkstyle',
+          'lint',
           cache_args,
           'examples/src/java/org/pantsbuild/example/hello/simple',
-          '--compile-checkstyle-configuration={}'.format(config_file),
+          '--lint-checkstyle-configuration={}'.format(config_file),
         ]
         pants_run = self.run_pants_with_workdir(args, workdir)
         self.assert_success(pants_run)
@@ -173,10 +173,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'checkstyle.suppression.files': suppression_file,
           }
           args = [
-            'compile.checkstyle',
+            'lint',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            "--compile-checkstyle-properties={}".format(json.dumps(properties)),
+            "--lint-checkstyle-properties={}".format(json.dumps(properties)),
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -216,10 +216,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'checkstyle.suppression.files': suppression_file,
           }
           args = [
-            'compile.checkstyle',
+            'lint',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            "--compile-checkstyle-properties={}".format(json.dumps(properties)),
+            "--lint-checkstyle-properties={}".format(json.dumps(properties)),
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -235,10 +235,10 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'my.value': value,
           }
           args = [
-            'compile.checkstyle',
+            'lint',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
-            "--compile-checkstyle-properties={}".format(json.dumps(properties)),
+            "--lint-checkstyle-properties={}".format(json.dumps(properties)),
           ]
           pants_run = self.run_pants_with_workdir(args, workdir)
           self.assert_success(pants_run)
@@ -249,7 +249,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
       # Ensure that only the second use of the default checkstyle will not invalidate anything.
       for checkstyle_jar in (None, 'testprojects/3rdparty/checkstyle', None):
         args = [
-            'compile.checkstyle',
+            'lint.checkstyle',
             cache_args,
             '--checkstyle={}'.format(checkstyle_jar) if checkstyle_jar else '',
             'examples/src/java/org/pantsbuild/example/hello/simple'

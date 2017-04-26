@@ -104,7 +104,6 @@ class SourcesField(datatype('SourcesField', ['address', 'arg', 'filespecs', 'pat
 
 
 class JavaLibraryAdaptor(TargetAdaptor):
-
   @property
   def default_sources_globs(self):
     return ('*.java',)
@@ -115,7 +114,6 @@ class JavaLibraryAdaptor(TargetAdaptor):
 
 
 class ScalaLibraryAdaptor(TargetAdaptor):
-
   @property
   def default_sources_globs(self):
     return ('*.scala',)
@@ -126,7 +124,6 @@ class ScalaLibraryAdaptor(TargetAdaptor):
 
 
 class JunitTestsAdaptor(TargetAdaptor):
-
   java_test_globs = ('*Test.java',)
   scala_test_globs = ('*Test.scala', '*Spec.scala')
 
@@ -227,7 +224,6 @@ class PythonTargetAdaptor(TargetAdaptor):
 
 
 class PythonLibraryAdaptor(PythonTargetAdaptor):
-
   @property
   def default_sources_globs(self):
     return ('*.py',)
@@ -238,12 +234,18 @@ class PythonLibraryAdaptor(PythonTargetAdaptor):
 
 
 class PythonTestsAdaptor(PythonTargetAdaptor):
-
   python_test_globs = ('test_*.py', '*_test.py')
 
   @property
   def default_sources_globs(self):
     return self.python_test_globs
+
+
+class GoTargetAdaptor(TargetAdaptor):
+  @property
+  def default_sources_globs(self):
+    # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
+    return ('*',)
 
 
 class BaseGlobs(Locatable, AbstractClass):
