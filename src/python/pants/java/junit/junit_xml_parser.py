@@ -130,7 +130,8 @@ class ParseError(Exception):
 def parse_failed_targets(test_registry, junit_xml_path, error_handler):
   """Parses junit xml reports and maps targets to the set of individual tests that failed.
 
-  Targets with no failed tests are omitted from the returned mapping.
+  Targets with no failed tests are omitted from the returned mapping and failed tests with no
+  identifiable owning target are keyed under `None`.
 
   :param test_registry: A registry of tests that were run.
   :type test_registry: :class:`RegistryOfTests`
@@ -138,7 +139,8 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
                                 to analyze.
   :param error_handler: An error handler that will be called with any junit xml parsing errors.
   :type error_handler: callable that accepts a single :class:`ParseError` argument.
-  :returns: A mapping from targets to the set of individual tests that failed.
+  :returns: A mapping from targets to the set of individual tests that failed. Any failed tests
+            that belong to no identifiable target will be mapped to `None`.
   :rtype: dict from :class:`pants.build_graph.target.Target` to a set of :class:`Test`
   """
   failed_targets = defaultdict(set)
@@ -156,11 +158,7 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
             test = Test(classname=testcase.getAttribute('classname'),
                         methodname=testcase.getAttribute('name'))
             target = test_registry.get_owning_target(test)
-            # There are some cases where we'll fail to find an owning target; in which case its
-            # better to have partial failure results, than none at all due to an internal error.
-            # See: https://github.com/pantsbuild/pants/pull/4055
-            if target:
-              failed_targets[target].add(test)
+            failed_targets[target].add(test)
     except (XmlParser.XmlError, ValueError) as e:
       error_handler(ParseError(path, e))
 

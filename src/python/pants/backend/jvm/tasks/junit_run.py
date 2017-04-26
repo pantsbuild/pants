@@ -434,12 +434,19 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                .format(path=parse_error.junit_xml_path, cause=parse_error.cause))
 
       target_to_failed_test = parse_failed_targets(test_registry, output_dir, error_handler)
-      failed_targets = sorted(target_to_failed_test, key=lambda t: t.address.spec)
+
+      def sort_owning_target(t):
+        return t.address.spec if t else None
+
+      failed_targets = sorted(target_to_failed_test, key=sort_owning_target)
       error_message_lines = []
       if self._failure_summary:
+        def render_owning_target(t):
+          return t.address.spec if t else '<Unknown Target>'
+
         for target in failed_targets:
-          error_message_lines.append('\n{indent}{address}'.format(indent=' ' * 4,
-                                                                  address=target.address.spec))
+          error_message_lines.append('\n{indent}{owner}'.format(indent=' ' * 4,
+                                                                owner=render_owning_target(target)))
           for test in sorted(target_to_failed_test[target]):
             error_message_lines.append('{indent}{classname}#{methodname}'
                                        .format(indent=' ' * 8,
