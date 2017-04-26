@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
@@ -24,6 +26,26 @@ class PythonTarget(Target):
 
   :API: public
   """
+
+  @classmethod
+  def _suffix_for_synthetic_spec(cls, spec):
+    """Given a spec, append the synthetic resources suffix to it for a consistent mapping."""
+    return spec + '_synthetic_resources'
+
+  @classmethod
+  def create(cls, parse_context, **kwargs):
+    resources = kwargs.get('resources', None) or []
+    if resources:
+      resources_kwargs = dict(
+        name=''.join((kwargs.get('name', 'unknown'), '_synthetic_resources_target')),
+        sources=resources,
+        build_graph=kwargs['build_graph'],
+        type_alias=Resources.alias()
+      )
+      resource_target = parse_context.create_object(Resources, **resources_kwargs)
+      kwargs['dependencies'] = kwargs['dependencies'] + [resource_target.address.spec]
+
+    parse_context.create_object(cls, type_alias=cls.alias(), **kwargs)
 
   def __init__(self,
                address=None,
@@ -70,6 +92,7 @@ class PythonTarget(Target):
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'resources': self.create_sources_field(resources, address.spec_path, key_arg='resources'),
+      'resource_targets': PrimitiveField(resource_targets),
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
@@ -100,15 +123,15 @@ class PythonTarget(Target):
         address = Address.parse(spec, relative_to=self.address.spec_path)
         yield address.spec
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(PythonTarget, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(PythonTarget, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    if self._resource_target_specs:
-      for spec in self._resource_target_specs:
-        yield spec
-    if self._synthetic_resources_target:
-      yield self._synthetic_resources_target.address.spec
+
+    target_representation = kwargs or payload.as_dict()
+    specs = target_representation.get('resource_targets', None) or []
+    for spec in specs:
+      yield spec
 
   @property
   def provides(self):
@@ -133,28 +156,10 @@ class PythonTarget(Target):
     #   - Regular dependencies on Resources targets.
     #   - Resources targets specified via resource_targets=.
     #   - The synthetic Resources target created from the resources= fileset.
-    # Because these are all in the traversable_dependency_specs.
+    # Because these are all in the dependency specs.
     return [dep for dep in self.dependencies if isinstance(dep, Resources)]
 
   def walk(self, work, predicate=None):
     super(PythonTarget, self).walk(work, predicate)
     for binary in self.provided_binaries.values():
       binary.walk(work, predicate)
-
-  @memoized_property
-  def _synthetic_resources_target(self):
-    if not self.payload.resources.source_paths:
-      return None
-
-    # Create an address for the synthetic target.
-    spec = self.address.spec + '_synthetic_resources'
-    resource_address = Address.parse(spec=spec)
-    # For safety, ensure an address that's not used already, even though that's highly unlikely.
-    while self._build_graph.contains_address(resource_address):
-      spec += '_'
-      resource_address = Address.parse(spec=spec)
-
-    self._build_graph.inject_synthetic_target(resource_address, Resources,
-                                              sources=self.payload.resources.source_paths,
-                                              derived_from=self)
-    return self._build_graph.get_target(resource_address)

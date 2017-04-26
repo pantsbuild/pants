@@ -109,4 +109,4 @@ class JavaProtobufLibraryTest(BaseTest):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertEqual([':import_jars'], list(target.traversable_dependency_specs))
+    self.assertEqual([':import_jars'], list(target.compute_dependency_specs(payload=target.payload)))

@@ -34,14 +34,14 @@ class JavaProtobufLibrary(ImportJarsMixin, JvmTarget):
     })
     super(JavaProtobufLibrary, self).__init__(payload=payload, **kwargs)
     if buildflags is not None:
-      logger.warn(" Target definition at {address} sets attribute 'buildflags' which is "
+      logger.warn("Target definition at {address} sets attribute 'buildflags' which is "
                   "ignored and will be removed in a future release"
                   .format(address=self.address.spec))
 
-  @property
-  def imported_jar_library_specs(self):
-    """List of JarLibrary specs to import.
+  @classmethod
+  def imported_jar_library_spec_fields(cls):
+    """Fields to extract JarLibrary specs from.
 
     Required to implement the ImportJarsMixin.
     """
-    return self.payload.import_specs
+    yield ('imports', 'import_specs')

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import logging
 
 from twitter.common.collections import OrderedSet
@@ -17,6 +18,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.remote_sources import RemoteSources
+from pants.build_graph.target import Target
 from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
@@ -98,7 +100,9 @@ class LegacyBuildGraph(BuildGraph):
         address = target_adaptor.address
         all_addresses.add(address)
         if address not in self._target_by_address:
-          new_targets.append(self._index_target(target_adaptor))
+          new_target = self._index_target(target_adaptor)
+          new_target.apply_injectables(self)
+          new_targets.append(new_target)
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -112,8 +116,14 @@ class LegacyBuildGraph(BuildGraph):
           deps_to_inject.add((target.address, address))
 
     for target in new_targets:
-      for spec in target.traversable_dependency_specs:
+      traversables = [target.compute_dependency_specs(payload=target.payload)]
+      # Only poke `traversable_dependency_specs` if a concrete implementation is defined
+      # in order to avoid spurious deprecation warnings.
+      if type(target).traversable_dependency_specs is not Target.traversable_dependency_specs:
+        traversables.append(target.traversable_dependency_specs)
+      for spec in itertools.chain(*traversables):
         inject(target, spec, is_dependency=True)
+
       for spec in target.traversable_specs:
         inject(target, spec, is_dependency=False)
 

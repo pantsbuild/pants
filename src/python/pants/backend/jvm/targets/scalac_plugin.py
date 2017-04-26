@@ -28,8 +28,10 @@ class ScalacPlugin(ScalaLibrary):
     self.classname = classname
     self.add_labels('scalac_plugin')
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(ScalacPlugin, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(ScalacPlugin, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    yield ScalaPlatform.compiler_library_target_spec(self._build_graph)
+
+    for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scalac'):
+      yield spec

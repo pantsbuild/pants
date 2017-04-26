@@ -34,10 +34,6 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
     super(ScalaJSPlatform, cls).prepare(options, round_manager)
     round_manager.require_data('scala_js_binaries')
 
-  @property
-  def runtime(self):
-    return self.get_options().runtime
-
   def resolve_target(self, node_task, target, results_dir, node_paths):
     # Copy any binaries to the results directory.
     main = ''
@@ -58,3 +54,9 @@ class ScalaJSPlatform(Subsystem, NodeResolverBase):
     }
     with open(os.path.join(results_dir, 'package.json'), 'wb') as fp:
       json.dump(package, fp, indent=2)
+
+  @property
+  def injectables_spec_mapping(self):
+    return {
+      'runtime': self.get_options().runtime,
+    }

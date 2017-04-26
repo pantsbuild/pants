@@ -47,11 +47,13 @@ class ScalaLibrary(ExportableJvmLibrary):
     super(ScalaLibrary, self).__init__(**kwargs)
     self.add_labels('scala')
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(ScalaLibrary, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(ScalaLibrary, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    yield ScalaPlatform.runtime_library_target_spec(self._build_graph)
+
+    for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scala-library'):
+      yield spec
 
   @property
   def traversable_specs(self):
