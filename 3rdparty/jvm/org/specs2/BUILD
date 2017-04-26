@@ -5,5 +5,6 @@ jar_library(
   name='specs2-core',
   jars=[
     jar(org='org.specs2', name='specs2-core_2.11', rev='3.8.9'),
+    jar(org='org.specs2', name='specs2-junit_2.11', rev='3.8.9'),
   ],
 )
