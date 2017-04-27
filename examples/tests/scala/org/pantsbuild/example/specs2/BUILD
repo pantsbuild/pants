@@ -3,7 +3,7 @@
 
 junit_tests(
   dependencies=[
-    '3rdparty/jvm/org/specs2:specs2-core',
+    '3rdparty/jvm/org/specs2',
     '3rdparty:junit',
     '3rdparty:scalatest',
   ],

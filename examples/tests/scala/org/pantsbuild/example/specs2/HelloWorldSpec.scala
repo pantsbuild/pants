@@ -1,12 +1,8 @@
 package org.pantsbuild.example.specs2
 
-import org.junit.runner.RunWith
-import org.specs2.mutable.Specification
-//import org.specs2.runner.JUnitRunner
-import org.scalatest.junit.JUnitRunner
+import org.specs2.mutable.SpecificationWithJUnit
 
-@RunWith(classOf[JUnitRunner])
-object HelloWorldSpec extends Specification {
+class HelloWorldSpec extends SpecificationWithJUnit {
 
   "add three numbers" in {
     1 + 1 + 1 mustEqual 3
