@@ -4,6 +4,5 @@
 junit_tests(
   dependencies=[
     '3rdparty/jvm/org/specs2:specs2-junit_2.11',
-    '3rdparty:junit',
   ],
 )
