@@ -96,7 +96,6 @@ class GraphTargetScanFailureTests(GraphTestBase):
     with self.assertRaises(AddressLookupError) as cm:
       with self.graph_helper() as graph_helper:
         self.create_graph_from_specs(graph_helper, ['no-such-path:'])
-        self.fail('Expected an exception.')
 
     self.assertIn('Path "no-such-path" contains no BUILD files',
                   str(cm.exception))
@@ -105,11 +104,19 @@ class GraphTargetScanFailureTests(GraphTestBase):
     with self.assertRaises(AddressLookupError) as cm:
       with self.graph_helper() as graph_helper:
         self.create_graph_from_specs(graph_helper, ['build-support/bin::'])
-        self.fail('Expected an exception.')
 
     self.assertIn('Path "build-support/bin" contains no BUILD files',
                   str(cm.exception))
 
+  def test_inject_bad_dir(self):
+    with self.assertRaises(AddressLookupError) as cm:
+      with self.graph_helper() as graph_helper:
+        graph, target_roots = self.create_graph_from_specs(graph_helper, ['3rdparty/python:'])
+
+        graph.inject_address_closure(Address('build-support/bin','wat'))
+
+    self.assertIn('Path "build-support/bin" contains no BUILD files',
+                  str(cm.exception))
 
 
 class GraphInvalidationTest(GraphTestBase):
