@@ -22,7 +22,7 @@ class CppBinaryCreate(CppTask):
 
   @classmethod
   def product_types(cls):
-    return ['exe']
+    return ['exe', 'deployable_archives']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -39,11 +39,13 @@ class CppBinaryCreate(CppTask):
       targets = self.context.targets(self.is_binary)
       with self.invalidated(targets, invalidate_dependents=True) as invalidation_check:
         binary_mapping = self.context.products.get('exe')
+        deployable_archives_mapping = self.context.products.get('deployable_archives')
         for vt in invalidation_check.all_vts:
           binary_path = os.path.join(vt.results_dir, vt.target.name)
           if not vt.valid:
             self._create_binary(vt.target, binary_path)
           binary_mapping.add(vt.target, vt.results_dir).append(binary_path)
+          deployable_archives_mapping.add(vt.target,  os.path.dirname(binary_path)).append(os.path.basename(binary_path))
 
   def _create_binary(self, target, binary_path):
     objects = []

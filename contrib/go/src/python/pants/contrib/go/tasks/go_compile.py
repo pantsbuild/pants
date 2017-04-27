@@ -30,7 +30,7 @@ class GoCompile(GoWorkspaceTask):
 
   @classmethod
   def product_types(cls):
-    return ['exec_binary']
+    return ['exec_binary', 'deployable_archives']
 
   def execute(self):
     self.context.products.safe_create_data('exec_binary', lambda: {})
@@ -39,6 +39,8 @@ class GoCompile(GoWorkspaceTask):
                           topological_order=True) as invalidation_check:
       # Maps each local/remote library target to its compiled binary.
       lib_binary_map = {}
+      go_exec_binary = self.context.products.get_data('exec_binary')
+      go_deployable_archive = self.context.products.get('deployable_archives')
       for vt in invalidation_check.all_vts:
         gopath = self.get_gopath(vt.target)
         if not isinstance(vt.target, GoTarget):
@@ -49,7 +51,8 @@ class GoCompile(GoWorkspaceTask):
           self._go_install(vt.target, gopath)
         if self.is_binary(vt.target):
           binary_path = os.path.join(gopath, 'bin', os.path.basename(vt.target.address.spec_path))
-          self.context.products.get_data('exec_binary')[vt.target] = binary_path
+          go_exec_binary[vt.target] = binary_path
+          go_deployable_archive.add(vt.target, os.path.dirname(binary_path)).append(os.path.basename(binary_path))
         else:
           lib_binary_map[vt.target] = os.path.join(gopath, 'pkg', self.goos_goarch,
                                                    vt.target.import_path + '.a')
