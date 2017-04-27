@@ -193,9 +193,12 @@ class JvmCompile(NailgunTaskBase):
              help='List of regular expression patterns that extract class not found '
                   'compile errors.')
 
-    register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
-             help='Use jar files on the compile_classpath. Note: Using this option degrades '
-                  'incremental compile between targets.')
+    register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True, default=True,
+             removal_hint='Since zinc 1.0.0-X was incorporated using classpath jars is faster '
+                          'for all usecases, including incremental compile. It is now enabled '
+                          'by default.',
+             removal_version='1.5.0.dev0',
+             help='Use jar files on the compile_classpath.')
 
   @classmethod
   def prepare(cls, options, round_manager):
