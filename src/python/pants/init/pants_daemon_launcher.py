@@ -9,6 +9,7 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.engine.subsystem.native import Native
 from pants.init.target_roots import TargetRoots
 from pants.init.util import clean_global_runtime_state
 from pants.pantsd.pants_daemon import PantsDaemon
@@ -46,7 +47,7 @@ class PantsDaemonLauncher(object):
     @classmethod
     def subsystem_dependencies(cls):
       return super(PantsDaemonLauncher.Factory,
-                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory, Subprocess.Factory)
+                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory, Subprocess.Factory, Native.Factory)
 
     def create(self, engine_initializer=None):
       """
@@ -108,6 +109,7 @@ class PantsDaemonLauncher(object):
     self._build_ignore_patterns = build_ignore_patterns
     self._exclude_target_regexp = exclude_target_regexp
     self._subproject_roots = subproject_roots
+    self._native = Native.Factory.global_instance().create()
     # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
 
     lock_location = os.path.join(self._build_root, '.pantsd.startup')
@@ -117,7 +119,7 @@ class PantsDaemonLauncher(object):
   @testable_memoized_property
   def pantsd(self):
     return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._log_dir,
-                       reset_func=clean_global_runtime_state)
+                       reset_func=clean_global_runtime_state, native=self._native)
 
   @testable_memoized_property
   def watchman_launcher(self):
@@ -134,12 +136,13 @@ class PantsDaemonLauncher(object):
     from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 
     services = []
-    scheduler_service = None
+
     fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
 
     legacy_graph_helper = self._engine_initializer.setup_legacy_graph(
       self._pants_ignore_patterns,
       self._pants_workdir,
+      native=self._native,
       build_ignore_patterns=self._build_ignore_patterns,
       exclude_target_regexps=self._exclude_target_regexp,
       subproject_roots=self._subproject_roots,

@@ -560,18 +560,10 @@ pub extern fn set_panic_handler() {
 
     externs::log(externs::LogLevel::Critical, &panic_str);
 
-    let mut panic_file_bug_str = "Oops! You should not see this. ".to_string();
-    panic_file_bug_str.push_str("Please file a bug at https://github.com/pantsbuild/pants/issues.");
-
+    let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
     externs::log(externs::LogLevel::Critical, &panic_file_bug_str);
   }));
 }
-
-#[no_mangle]
-pub extern fn trigger_panic() {
-  panic!("This is a manually triggered panic for testing purpose.");
-}
-
 
 fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);

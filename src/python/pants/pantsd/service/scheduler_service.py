@@ -49,10 +49,6 @@ class SchedulerService(PantsService):
     """Pre-fork controls."""
     self._scheduler.pre_fork()
 
-  def post_fork(self):
-    """Post-fork controls."""
-    self._scheduler.set_panic_handler()
-
   def setup(self):
     """Service setup."""
     # Register filesystem event handlers on an FSEventService instance.

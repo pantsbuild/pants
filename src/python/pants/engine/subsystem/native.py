@@ -211,7 +211,6 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 void nodes_destroy(RawNodes*);
 
 void set_panic_handler();
-void trigger_panic();
 '''
 
 CFFI_EXTERNS = '''
@@ -746,3 +745,6 @@ class Native(object):
         self.to_ids_buf(root_subject_types),
       )
     return self.gc(scheduler, self.lib.scheduler_destroy)
+
+  def set_panic_handler(self):
+    self.lib.set_panic_handler()

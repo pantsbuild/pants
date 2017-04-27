@@ -49,7 +49,7 @@ class PantsDaemon(ProcessManager):
   class RuntimeFailure(Exception): pass
 
   def __init__(self, build_root, work_dir, log_level, log_dir=None, services=None,
-               metadata_base_dir=None, reset_func=None):
+               metadata_base_dir=None, reset_func=None, native=None):
     """
     :param string build_root: The pants build root.
     :param string work_dir: The pants work directory.
@@ -68,6 +68,7 @@ class PantsDaemon(ProcessManager):
     self._log_dir = log_dir or os.path.join(work_dir, self.name)
     self._services = services or ()
     self._reset_func = reset_func
+    self._native = native
     self._socket_map = {}
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
@@ -195,7 +196,7 @@ class PantsDaemon(ProcessManager):
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemonize()."""
-    for service in self._services:
-      service.post_fork()
+    if self._native:
+      self._native.set_panic_handler()
 
     self._run()
