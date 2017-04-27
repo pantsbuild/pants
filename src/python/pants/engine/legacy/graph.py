@@ -246,6 +246,8 @@ class LegacyBuildGraph(BuildGraph):
           yield address
 
   def _assert_type_is_return(self, node, state):
+    # TODO Verifying the type is return should be handled in a more central way.
+    #      It's related to the clean up tracked via https://github.com/pantsbuild/pants/issues/4229
     if type(state) is Return:
       return
 
@@ -260,6 +262,8 @@ class LegacyBuildGraph(BuildGraph):
         'Build graph construction failed for {}:\n{}'.format(node, trace))
 
   def _assert_correct_value_type(self, state, expected_type):
+    # TODO This is a pretty general assertion, and it should live closer to where the result is generated.
+    #      It's related to the clean up tracked via https://github.com/pantsbuild/pants/issues/4229
     if type(state.value) is not expected_type:
       raise TypeError('Expected roots to hold {}; got: {}'.format(
         expected_type, type(state.value)))
