@@ -74,6 +74,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + John Townsend
 + Jon Boulle
 + Jonathan Coveney
++ Jonathan D. Simms
 + Jonathan Sokolowski
 + Joshua Cohen
 + Joshua Humphries
@@ -128,6 +129,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Senthil Kumaran
 + Sergey Serebryakov
 + Simeon Franklin
++ Stefan Sauer
 + Stu Hood
 + Tansy Arron-Walker
 + Ted Dziuba
