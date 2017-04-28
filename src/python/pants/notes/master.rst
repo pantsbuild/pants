@@ -5,6 +5,65 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.3.0.dev19 (4/28/2017)
+-----------------------
+A weekly unstable release.
+
+API Changes
+~~~~~~~~~~~
+
+* Add support for 'deployable_archives' for go and cpp rules. (#4518)
+  `PR #4518 <https://github.com/pantsbuild/pants/pull/4518>`_
+
+* Deprecate `BuildFileAddress.build_file` (#4511)
+  `PR #4511 <https://github.com/pantsbuild/pants/pull/4511>`_
+
+* Make usage of pantsd imply usage of watchman. (#4512)
+  `PR #4512 <https://github.com/pantsbuild/pants/pull/4512>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix the kythe bootclasspath. (#4527)
+  `PR #4527 <https://github.com/pantsbuild/pants/pull/4527>`_
+
+* Revert the zinc `1.0.0-X7` upgrade (#4510)
+  `PR #4510 <https://github.com/pantsbuild/pants/pull/4510>`_
+
+* Invoke setup-py using an interpreter that matches the target. (#4482)
+  `PR #4482 <https://github.com/pantsbuild/pants/pull/4482>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Ensure rust panics surface in output or daemon logs (#4522)
+  `PR #4522 <https://github.com/pantsbuild/pants/pull/4522>`_
+
+* Make the release script more idempotent. (#4504)
+  `PR #4504 <https://github.com/pantsbuild/pants/pull/4504>`_
+
+* [engine] pass on ResolveErrors during address injection (#4523)
+  `PR #4523 <https://github.com/pantsbuild/pants/pull/4523>`_
+
+* [engine] Improve error messages for missing/empty dirs (#4517)
+  `PR #4517 <https://github.com/pantsbuild/pants/pull/4517>`_
+
+* Render failed junit tests with no target owner. (#4521)
+  `PR #4521 <https://github.com/pantsbuild/pants/pull/4521>`_
+
+* [engine] Better error messages for missing targets (#4509)
+  `PR #4509 <https://github.com/pantsbuild/pants/pull/4509>`_
+
+* Options should only default to --color=True when sys.stdout isatty (#4503)
+  `PR #4503 <https://github.com/pantsbuild/pants/pull/4503>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Add a scala specs2 example (#4516)
+  `PR #4516 <https://github.com/pantsbuild/pants/pull/4516>`_
+
+
 1.3.0.dev18 (4/21/2017)
 -----------------------
 A weekly unstable release.
