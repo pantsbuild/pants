@@ -118,8 +118,8 @@ class PantsDaemonLauncher(object):
 
   @testable_memoized_property
   def pantsd(self):
-    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._log_dir,
-                       reset_func=clean_global_runtime_state, native=self._native)
+    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._native, self._log_dir,
+                       reset_func=clean_global_runtime_state)
 
   @testable_memoized_property
   def watchman_launcher(self):

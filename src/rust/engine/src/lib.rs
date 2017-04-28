@@ -550,11 +550,11 @@ pub extern fn rule_subgraph_visualize(
 #[no_mangle]
 pub extern fn set_panic_handler() {
   panic::set_hook(Box::new(|panic_info| {
-    let mut panic_str = format!("panic at '{}', ",
+    let mut panic_str = format!("panic at '{}'",
                                 panic_info.payload().downcast_ref::<&str>().unwrap());
 
     if let Some(location) = panic_info.location() {
-      let panic_location_str = format!("{}:{}", location.file(), location.line());
+      let panic_location_str = format!(", {}:{}", location.file(), location.line());
       panic_str.push_str(&panic_location_str);
     }
 
