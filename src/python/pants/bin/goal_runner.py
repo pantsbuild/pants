@@ -93,14 +93,17 @@ class GoalRunnerFactory(object):
     # N.B. Use of the daemon implies use of the v2 engine.
     if graph_helper or use_engine:
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-      graph_helper = (
-        graph_helper
-        or EngineInitializer.setup_legacy_graph(pants_ignore_patterns,
-                                                workdir,
-                                                build_ignore_patterns=build_ignore_patterns,
-                                                exclude_target_regexps=exclude_target_regexps,
-                                                subproject_roots=subproject_build_roots)
-      )
+      if not graph_helper:
+        native = Native.Factory.global_instance().create()
+        native.set_panic_handler()
+        graph_helper = EngineInitializer.setup_legacy_graph(
+          pants_ignore_patterns,
+          workdir,
+          native=native,
+          build_ignore_patterns=build_ignore_patterns,
+          exclude_target_regexps=exclude_target_regexps,
+          subproject_roots=subproject_build_roots)
+
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
                                         change_calculator=graph_helper.change_calculator)
