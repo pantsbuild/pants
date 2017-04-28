@@ -27,7 +27,7 @@ from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
-from pants.util.contextutil import temporary_file, temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split

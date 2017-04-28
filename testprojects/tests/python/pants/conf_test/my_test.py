@@ -1,5 +1,6 @@
-import conftest
 import unittest
+
+import conftest
 
 
 class MyTest(unittest.TestCase):

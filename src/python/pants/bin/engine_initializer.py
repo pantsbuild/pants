@@ -19,8 +19,8 @@ from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
                                          JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
-                                         PythonTestsAdaptor, RemoteSourcesAdaptor, ScalaLibraryAdaptor,
-                                         TargetAdaptor)
+                                         PythonTestsAdaptor, RemoteSourcesAdaptor,
+                                         ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler

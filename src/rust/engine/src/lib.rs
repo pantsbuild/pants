@@ -33,6 +33,7 @@ use std::fs::File;
 use std::io;
 use std::mem;
 use std::os::raw;
+use std::panic;
 use std::path::{Path, PathBuf};
 
 
@@ -546,6 +547,23 @@ pub extern fn rule_subgraph_visualize(
   })
 }
 
+#[no_mangle]
+pub extern fn set_panic_handler() {
+  panic::set_hook(Box::new(|panic_info| {
+    let mut panic_str = format!("panic at '{}'",
+                                panic_info.payload().downcast_ref::<&str>().unwrap());
+
+    if let Some(location) = panic_info.location() {
+      let panic_location_str = format!(", {}:{}", location.file(), location.line());
+      panic_str.push_str(&panic_location_str);
+    }
+
+    externs::log(externs::LogLevel::Critical, &panic_str);
+
+    let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
+    externs::log(externs::LogLevel::Critical, &panic_file_bug_str);
+  }));
+}
 
 fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
