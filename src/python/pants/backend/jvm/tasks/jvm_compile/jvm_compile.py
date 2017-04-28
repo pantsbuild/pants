@@ -553,23 +553,21 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
-                   log_file, zinc_args_file, progress_message, settings, fatal_warnings,
+  def _compile_vts(self, vts, ctx, upstream_analysis, classpath,
+                   log_file, progress_message, settings, fatal_warnings,
                    zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
-    sources - sources for this target set
-    analysis_file - the analysis file to manipulate
+    ctx - CompileContext for the target
     classpath - a list of classpath entries
-    outdir - the output dir to send classes to
 
     May be invoked concurrently on independent target sets.
 
     Postcondition: The individual targets in vts are up-to-date, as if each were
                    compiled individually.
     """
-    if not sources:
+    if not ctx.sources:
       self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
@@ -579,7 +577,7 @@ class JvmCompile(NailgunTaskBase):
       self.context.log.info(
         counter_str,
         'Compiling ',
-        items_to_report_element(sources, '{} source'.format(self.name())),
+        items_to_report_element(ctx.sources, '{} source'.format(self.name())),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
@@ -591,18 +589,18 @@ class JvmCompile(NailgunTaskBase):
         # classfiles. So we force-invalidate here, to be on the safe side.
         vts.force_invalidate()
         if self.get_options().capture_classpath:
-          self._record_compile_classpath(classpath, vts.targets, outdir)
+          self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
 
         try:
-          self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
-                       log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
-                       self._get_plugin_map('javac', target),
-                       self._get_plugin_map('scalac', target))
+          self.compile(self._args, classpath, ctx, upstream_analysis,
+                       log_file, settings, fatal_warnings, zinc_file_manager,
+                       self._get_plugin_map('javac', ctx.target),
+                       self._get_plugin_map('scalac', ctx.target))
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
             if logs:
-              self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
+              self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), ctx.target)
           raise
 
   def _get_plugin_map(self, compiler, target):
@@ -894,14 +892,10 @@ class JvmCompile(NailgunTaskBase):
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
         self._compile_vts(vts,
-                          ctx.target,
-                          ctx.sources,
-                          ctx.analysis_file,
+                          ctx,
                           upstream_analysis,
                           cp_entries,
-                          ctx.classes_dir,
                           log_file,
-                          ctx.zinc_args_file,
                           progress_message,
                           tgt.platform,
                           fatal_warnings,
