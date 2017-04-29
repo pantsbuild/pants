@@ -21,6 +21,9 @@ API Changes
 * Make usage of pantsd imply usage of watchman. (#4512)
   `PR #4512 <https://github.com/pantsbuild/pants/pull/4512>`_
 
+* Enable --compile-zinc-use-classpath-jars by default (#4525)
+  `PR #4525 <https://github.com/pantsbuild/pants/pull/4525>`_
+
 Bugfixes
 ~~~~~~~~
 
