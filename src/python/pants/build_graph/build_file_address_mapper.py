@@ -208,7 +208,7 @@ class BuildFileAddressMapper(AddressMapper):
 
   @staticmethod
   def is_declaring_file(address, file_path):
-    return address.build_file.relpath == file_path
+    return address.rel_path == file_path
 
   def _scan_spec(self, spec, fail_fast):
     """Scans the given address spec."""
@@ -260,7 +260,7 @@ class BuildFileAddressMapper(AddressMapper):
         len(set(address.rel_path for address in addresses)) == 1):
       specs = [':{}'.format(address.target_name) for address in addresses]
     else:
-      specs = [':{} (from {})'.format(address.target_name, os.path.basename(address.build_file.relpath))
+      specs = [':{} (from {})'.format(address.target_name, os.path.basename(address.rel_path))
                for address in addresses]
 
     # Might be neat to sort by edit distance or something, but for now alphabetical is fine.
