@@ -84,7 +84,6 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.jvm',\
         'pants.backend.project_info',\
         'pants.backend.python',\
-        'internal_backend.optional',\
         'internal_backend.repositories',\
         'internal_backend.sitegen',\
         'internal_backend.utilities',\
