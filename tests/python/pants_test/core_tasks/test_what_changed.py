@@ -111,6 +111,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         ]
       )
     """))
+    self.create_file('root/src/py/a/b/c', contents='', mode='w')
+    self.create_file('root/src/py/a/d', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/1', dedent("""
       python_library(
@@ -118,6 +120,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['2']
       )
     """))
+    self.create_file('root/src/py/1/2', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/dependency_tree/a', dedent("""
       python_library(
@@ -125,6 +128,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a.py'],
       )
     """))
+    self.create_file('root/src/py/dependency_tree/a/a.py', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/dependency_tree/b', dedent("""
       python_library(
@@ -133,6 +137,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         dependencies=['root/src/py/dependency_tree/a']
       )
     """))
+    self.create_file('root/src/py/dependency_tree/b/b.py', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/dependency_tree/c', dedent("""
       python_library(
@@ -141,6 +146,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         dependencies=['root/src/py/dependency_tree/b']
       )
     """))
+    self.create_file('root/src/py/dependency_tree/c/c.py', contents='', mode='w')
 
     self.add_to_build_file('root/src/thrift', dedent("""
       java_thrift_library(
@@ -153,6 +159,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a.thrift']
       )
     """))
+    self.create_file('root/src/thrift/a.thrift', contents='', mode='w')
 
     self.add_to_build_file('root/src/resources/a', dedent("""
       resources(
@@ -160,6 +167,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a.resources']
       )
     """))
+    self.create_file('root/src/resources/a/a.resources', contents='', mode='w')
 
     self.add_to_build_file('root/src/java/a', dedent("""
       java_library(
@@ -167,6 +175,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=rglobs("*.java"),
       )
     """))
+    self.create_file('root/src/java/a/foo.java', contents='', mode='w')
+    self.create_file('root/src/java/a/b/foo.java', contents='', mode='w')
 
     self.add_to_build_file('root/src/java/b', dedent("""
           java_library(
@@ -174,6 +184,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
             sources=globs("*.java"),
           )
         """))
+    self.create_file('root/src/java/b/foo.java', contents='', mode='w')
+    self.create_file('root/src/java/b/b/foo.java', contents='', mode='w')
 
     self.add_to_build_file('root/3rdparty/BUILD.twitter', dedent("""
       jar_library(
@@ -201,6 +213,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a/build/scripts.java'],
       )
     """))
+    self.create_file('root/scripts/a/build/scripts.java', contents='', mode='w')
 
     self.add_to_build_file('BUILD.config', dedent("""
       resources(
@@ -208,6 +221,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources = globs('pants.ini*')
       )
     """))
+    self.create_file('pants.ini', contents='', mode='w')
+    self.create_file('pants.ini.backup', contents='', mode='w')
 
 
 class WhatChangedTest(WhatChangedTestBasic):
@@ -300,7 +315,6 @@ class WhatChangedTest(WhatChangedTestBasic):
 
   def test_diffspec_removed_files(self):
     file_in_target = 'root/src/java/a/b/c/Foo.java'
-    self.create_file(relpath=file_in_target, contents='', mode='a')
     self.assert_console_output(
       'root/src/java/a:a_java',
       options={'diffspec': '42'},
@@ -376,32 +390,20 @@ class WhatChangedTest(WhatChangedTestBasic):
     )
 
   def test_rglobs_in_sources(self):
-    file_in_target_a = 'root/src/java/a/foo.java'
-    file_in_target_b = 'root/src/java/a/b/foo.java'
-
-    self.create_file(file_in_target_a, contents='', mode='w')
-    self.create_file(file_in_target_b, contents='', mode='w')
-
     self.assert_console_output(
       'root/src/java/a:a_java',
-      workspace=self.workspace(files=[file_in_target_a])
+      workspace=self.workspace(files=['root/src/java/a/foo.java'])
     )
 
     self.assert_console_output(
       'root/src/java/a:a_java',
-      workspace=self.workspace(files=[file_in_target_b])
+      workspace=self.workspace(files=['root/src/java/a/b/foo.java'])
     )
 
   def test_globs_in_sources(self):
-    file_in_target_a = 'root/src/java/b/foo.java'
-    file_in_target_b = 'root/src/java/b/b/foo.java'
-
-    self.create_file(file_in_target_a, contents='', mode='w')
-    self.create_file(file_in_target_b, contents='', mode='w')
-
     self.assert_console_output(
       'root/src/java/b:b_java',
-      workspace=self.workspace(files=[file_in_target_a])
+      workspace=self.workspace(files=['root/src/java/b/foo.java'])
     )
 
     self.assert_console_output(
@@ -439,11 +441,9 @@ class WhatChangedTest(WhatChangedTestBasic):
     )
 
   def test_root_config(self):
-    file_in_target = 'pants.ini'
-    self.create_file(relpath=file_in_target, contents='', mode='w')
     self.assert_console_output(
       '//:pants-config',
-      workspace=self.workspace(files=[file_in_target])
+      workspace=self.workspace(files=['pants.ini'])
     )
 
   def test_exclude_sources(self):

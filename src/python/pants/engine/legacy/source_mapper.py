@@ -68,9 +68,8 @@ class EngineSourceMapper(SourceMapper):
 
     # Handle `sources`-declaring targets.
     target_sources = target_kwargs.get('sources', [])
-    if target_sources:
-      if self._match_source(source, target_sources):
-        return True
+    if target_sources and self._match_source(source, target_sources):
+      return True
 
     # Handle `resources`-declaring targets.
     # TODO: Remember to get rid of this in 1.5.0.dev0, when the deprecation of `resources` is complete.
@@ -96,9 +95,8 @@ class EngineSourceMapper(SourceMapper):
         for hydrated_targets in self._engine.product_request(HydratedTargets, resource_dep_subjects):
           for hydrated_target in hydrated_targets.dependencies:
             resource_sources = hydrated_target.adaptor.kwargs().get('sources')
-            if resource_sources:
-              if self._match_source(source, resource_sources):
-                return True
+            if resource_sources and self._match_source(source, resource_sources):
+              return True
       else:
         raise AssertionError('Could not process target_resources with type {}'.format(type(target_resources)))
 
