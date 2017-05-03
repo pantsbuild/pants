@@ -314,7 +314,9 @@ class WhatChangedTest(WhatChangedTestBasic):
     )
 
   def test_diffspec_removed_files(self):
+    # This file was not created in setup stage.
     file_in_target = 'root/src/java/a/b/c/Foo.java'
+
     self.assert_console_output(
       'root/src/java/a:a_java',
       options={'diffspec': '42'},
