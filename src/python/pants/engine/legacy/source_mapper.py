@@ -50,13 +50,10 @@ class EngineSourceMapper(SourceMapper):
     return list(self.iter_target_addresses_for_sources([source]))
 
   def _match_source(self, source, fileset):
-    if os.path.exists(source):
-      return fileset.matches(source)
-    else:
-      return matches_filespec(source, fileset.filespec)
+    return fileset.matches(source) or matches_filespec(source, fileset.filespec)
 
-  def _own_source(self, source, legacy_target):
-    """Given a `HydratedTarget` instance, yield all files owned by the target."""
+  def _owns_source(self, source, legacy_target):
+    """Given a `HydratedTarget` instance, check if it owns the given source file."""
     target_kwargs = legacy_target.adaptor.kwargs()
 
     # Handle targets like `python_binary` which have a singular `source='main.py'` declaration.
@@ -116,5 +113,5 @@ class EngineSourceMapper(SourceMapper):
         if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
           yield legacy_address
         else:
-          if any(self._own_source(source, hydrated_target) for source in sources_set):
+          if any(self._owns_source(source, hydrated_target) for source in sources_set):
             yield legacy_address

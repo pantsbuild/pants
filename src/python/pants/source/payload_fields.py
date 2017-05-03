@@ -35,11 +35,7 @@ class SourcesField(PayloadField):
     return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
   def matches(self, path):
-    if os.path.exists(path):
-      return self.sources.matches(path)
-
-    # Deleted file
-    return matches_filespec(path, self.filespec)
+    return self.sources.matches(path) or matches_filespec(path, self.filespec)
 
   @property
   def filespec(self):
