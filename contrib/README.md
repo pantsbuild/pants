@@ -48,7 +48,6 @@ Contrib plugins should generally follow 3 basic setup steps:
      ]
 
    backend_packages: [
-       "internal_backend.optional",
        "internal_backend.repositories",
        "internal_backend.sitegen",
        "internal_backend.utilities",
