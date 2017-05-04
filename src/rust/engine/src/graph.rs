@@ -141,7 +141,7 @@ impl Entry {
     let state =
       match self.peek::<N>() {
         Some(Ok(ref nr)) => format!("{:?}", nr),
-        Some(Err(Failure::Throw(ref v))) => externs::val_to_str(v),
+        Some(Err(Failure::Throw(ref v, _))) => externs::val_to_str(v),
         Some(Err(ref x)) => format!("{:?}", x),
         None => "<None>".to_string(),
       };
@@ -322,7 +322,7 @@ impl InnerGraph {
       |entry: &Entry| {
         match entry.peek::<NodeKey>() {
           None | Some(Err(Failure::Noop(_))) => "white".to_string(),
-          Some(Err(Failure::Throw(_))) => "4".to_string(),
+          Some(Err(Failure::Throw(..))) => "4".to_string(),
           Some(Ok(_)) => {
             let viz_colors_len = viz_colors.len();
             viz_colors.entry(entry.node.content().product_str()).or_insert_with(|| {
@@ -374,7 +374,7 @@ impl InnerGraph {
     let is_bottom = |eid: EntryId| -> bool {
       match self.entry_for_id(eid).peek::<NodeKey>() {
         None | Some(Err(Failure::Noop(..))) => true,
-        Some(Err(Failure::Throw(_))) => false,
+        Some(Err(Failure::Throw(..))) => false,
         Some(Ok(_)) => true,
       }
     };
@@ -399,7 +399,14 @@ impl InnerGraph {
         let state_str = match entry.peek::<NodeKey>() {
           None => "<None>".to_string(),
           Some(Ok(ref x)) => format!("{:?}", x),
-          Some(Err(Failure::Throw(ref x))) => format!("Throw({})", externs::val_to_str(x)),
+          Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+            "Throw({})\n{}",
+            externs::val_to_str(x),
+            traceback.split("\n")
+                     .map(|l| format!("{}    {}", indent, l))
+                     .collect::<Vec<_>>()
+                     .join("\n")
+          ),
           Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
         };
         format!("{}\n{}  {}", output, indent, state_str)

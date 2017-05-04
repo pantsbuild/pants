@@ -49,11 +49,11 @@ class LegacyBuildGraph(BuildGraph):
     """Raised when command line spec is not a valid directory"""
 
   @classmethod
-  def create(cls, scheduler, engine, symbol_table_cls):
+  def create(cls, scheduler, engine, symbol_table_cls, include_trace_on_error=True):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, engine, cls._get_target_types(symbol_table_cls))
+    return cls(scheduler, engine, cls._get_target_types(symbol_table_cls), include_trace_on_error=include_trace_on_error)
 
-  def __init__(self, scheduler, engine, target_types):
+  def __init__(self, scheduler, engine, target_types, include_trace_on_error=True):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
     :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
@@ -61,6 +61,7 @@ class LegacyBuildGraph(BuildGraph):
     :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
+    self._include_trace_on_error = include_trace_on_error
     self._scheduler = scheduler
     self._engine = engine
     self._target_types = target_types
@@ -257,9 +258,17 @@ class LegacyBuildGraph(BuildGraph):
     if isinstance(state.exc, ResolveError):
       raise AddressLookupError(str(state.exc))
     else:
-      trace = '\n'.join(self._scheduler.trace())
-      raise AddressLookupError(
-        'Build graph construction failed for {}:\n{}'.format(node, trace))
+      if self._include_trace_on_error:
+        trace = '\n'.join(self._scheduler.trace())
+        raise AddressLookupError(
+          'Build graph construction failed for {}:\n{}'.format(node, trace))
+      else:
+        raise AddressLookupError(
+          'Build graph construction failed for {}: {} {}'
+            .format(node,
+                    type(state.exc).__name__,
+                    str(state.exc))
+        )
 
   def _assert_correct_value_type(self, state, expected_type):
     # TODO This is a pretty general assertion, and it should live closer to where the result is generated.

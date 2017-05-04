@@ -158,7 +158,10 @@ pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<
       )
     });
   if result.is_throw {
-    Err(Failure::Throw(result.value))
+    let traceback = result.traceback.to_string().unwrap_or_else(|e| {
+                      format!("<failed to decode unicode for {:?}: {}>", result.traceback, e)
+                    });
+    Err(Failure::Throw(result.value, traceback))
   } else {
     Ok(result.value)
   }
@@ -323,6 +326,7 @@ pub enum LogLevel {
 pub struct RunnableComplete {
   value: Value,
   is_throw: bool,
+  traceback: Buffer
 }
 
 // Points to an array containing a series of values allocated by Python.
@@ -369,6 +373,7 @@ pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64) -> ValueBuffer;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Buffer {
   bytes_ptr: *mut u8,
   bytes_len: u64,

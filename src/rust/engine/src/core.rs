@@ -157,7 +157,7 @@ impl fmt::Debug for Value {
 #[derive(Debug, Clone)]
 pub enum Failure {
   Noop(Noop),
-  Throw(Value),
+  Throw(Value, String),
 }
 
 // NB: enum members are listed in ascending priority order based on how likely they are
