@@ -16,10 +16,10 @@ pub struct Task {
   pub cacheable: bool,
 }
 
-/**
- * Registry of Tasks able to produce each type, and Singletons, which are the only
- * provider of a type.
- */
+///
+/// Registry of Tasks able to produce each type, and Singletons, which are the only
+/// provider of a type.
+///
 #[derive(Clone)]
 pub struct Tasks {
   // Singleton Values to be returned for a given TypeConstraint.
@@ -30,17 +30,17 @@ pub struct Tasks {
   preparing: Option<Task>,
 }
 
-/**
- * Defines a stateful lifecycle for defining tasks via the C api. Call in order:
- *   1. task_begin() - once per task
- *   2. add_*() - zero or more times per task to add input clauses
- *   3. task_end() - once per task
- *
- * Also has a one-shot method for adding a singleton (which has no Selectors):
- *   1. singleton_add()
- *
- * (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
- */
+///
+/// Defines a stateful lifecycle for defining tasks via the C api. Call in order:
+///   1. task_begin() - once per task
+///   2. add_*() - zero or more times per task to add input clauses
+///   3. task_end() - once per task
+///
+/// Also has a one-shot method for adding a singleton (which has no Selectors):
+///   1. singleton_add()
+///
+/// (This protocol was original defined in a Builder, but that complicated the C lifecycle.)
+///
 impl Tasks {
   pub fn new() -> Tasks {
     Tasks {
@@ -89,9 +89,9 @@ impl Tasks {
     self.singletons.insert(product, (externs::key_for(&value), value));
   }
 
-  /**
-   * The following methods define the Task registration lifecycle.
-   */
+  ///
+  /// The following methods define the Task registration lifecycle.
+  ///
   pub fn task_begin(&mut self, func: Function, product: TypeConstraint) {
     assert!(
       self.preparing.is_none(),

@@ -31,9 +31,9 @@ impl Fingerprint {
   }
 }
 
-/**
- * A Write instance that fingerprints all data that passes through it.
- */
+///
+/// A Write instance that fingerprints all data that passes through it.
+///
 pub struct WriterHasher<W: Write> {
   hasher: Blake2b,
   inner: W,
@@ -47,9 +47,9 @@ impl<W: Write> WriterHasher<W> {
     }
   }
 
-  /**
-   * Returns the result of fingerprinting this stream, and Drops the stream.
-   */
+  ///
+  /// Returns the result of fingerprinting this stream, and Drops the stream.
+  ///
   pub fn finish(self) -> Fingerprint {
     Fingerprint::from_bytes_unsafe(&self.hasher.finalize().as_bytes())
   }

@@ -15,9 +15,9 @@ use nodes::{NodeKey, Select, SelectDependencies};
 use rule_graph;
 use selectors;
 
-/**
- * Represents the state of an execution of (a subgraph of) a Graph.
- */
+///
+/// Represents the state of an execution of (a subgraph of) a Graph.
+///
 pub struct Scheduler {
   pub core: Arc<Core>,
   // Initial set of roots for the execution, in the order they were declared.
@@ -25,11 +25,11 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
-  /**
-   * Roots are limited to either `SelectDependencies` and `Select`, which are known to
-   * produce Values. But this method exists to satisfy Graph APIs which only need instances
-   * of the NodeKey enum.
-   */
+  ///
+  /// Roots are limited to either `SelectDependencies` and `Select`, which are known to
+  /// produce Values. But this method exists to satisfy Graph APIs which only need instances
+  /// of the NodeKey enum.
+  ///
   fn root_nodes(&self) -> Vec<NodeKey> {
     self.roots.iter()
       .map(|r| match r {
@@ -39,9 +39,9 @@ impl Scheduler {
       .collect()
   }
 
-  /**
-   * Creates a Scheduler with an initially empty set of roots.
-   */
+  ///
+  /// Creates a Scheduler with an initially empty set of roots.
+  ///
   pub fn new(core: Core) -> Scheduler {
     Scheduler {
       core: Arc::new(core),
@@ -136,9 +136,9 @@ impl Scheduler {
     ).expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject_type))
   }
 
-  /**
-   * Starting from existing roots, execute a graph to completion.
-   */
+  ///
+  /// Starting from existing roots, execute a graph to completion.
+  ///
   pub fn execute(&mut self) -> ExecutionStat {
     // TODO: Restore counts.
     let runnable_count = 0;
@@ -170,9 +170,9 @@ impl Scheduler {
   }
 }
 
-/**
- * Root requests are limited to Selectors that produce (python) Values.
- */
+///
+/// Root requests are limited to Selectors that produce (python) Values.
+///
 enum Root {
   Select(Select),
   SelectDependencies(SelectDependencies),
