@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 import unittest
 from textwrap import dedent
 
@@ -15,15 +14,13 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import RuleIndex, TaskRule
-from pants.engine.scheduler import WrappedNativeScheduler
+from pants.engine.rules import TaskRule
 from pants.engine.selectors import Select, SelectVariant
-from pants.engine.subsystem.native import Native
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
                                                  Jar, ThriftSources, setup_json_scheduler)
-from pants_test.engine.util import assert_equal_with_printing, init_native
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.engine.util import (assert_equal_with_printing, create_native_scheduler,
+                                    init_native, remove_locations_from_traceback)
 
 
 walk = "TODO: Should port tests that attempt to inspect graph internals to the native code."
@@ -255,25 +252,19 @@ def nested_raise(x):
 class SchedulerTraceTest(unittest.TestCase):
   assert_equal_with_printing = assert_equal_with_printing
 
-  def create_native_scheduler(self, root_subject_types, rules):
-    rule_index = RuleIndex.create(rules)
-    native = init_native()
-    scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index, root_subject_types)
-    return scheduler
-
   def test_trace_includes_rule_exception_traceback(self):
     rules = [
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = self.create_native_scheduler({B}, rules)
+    scheduler = create_native_scheduler({B}, rules)
     subject = B()
     scheduler.add_root_selection(subject, Select(A))
     scheduler.run_and_return_stat()
 
     trace = '\n'.join(scheduler.graph_trace())
     # NB removing location info to make trace repeatable
-    trace = self._remove_locations_from_traceback(trace)
+    trace = remove_locations_from_traceback(trace)
 
     assert_equal_with_printing(self, dedent('''
                      Computing Select(<pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A)
@@ -288,10 +279,3 @@ class SchedulerTraceTest(unittest.TestCase):
                                raise Exception('An exception for {}'.format(type(x).__name__))
                            Exception: An exception for B''').lstrip() + '\n\n', # Traces include two empty lines after.
                                trace)
-
-  def _remove_locations_from_traceback(self, trace):
-    location_pattern = re.compile('"/.*", line \d+')
-    address_pattern = re.compile('0x[0-9a-f]+')
-    new_trace = location_pattern.sub('LOCATION-INFO', trace)
-    new_trace = address_pattern.sub('0xEEEEEEEEE', new_trace)
-    return new_trace

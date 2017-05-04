@@ -112,18 +112,18 @@ class Engine(AbstractClass):
 
     # Throw handling.
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
-    throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
-    if throw_roots:
-      # TODO test these cases
-
+    throw_root_states = tuple(state for root, state in result_items if type(state) is Throw)
+    if throw_root_states:
       if self._include_trace_on_error:
         cumulative_trace = '\n'.join(self._scheduler.trace())
         raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 
-      if len(throw_roots) == 1:
-        raise throw_roots[0].exc
+      if len(throw_root_states) == 1:
+        raise throw_root_states[0].exc
       else:
-        raise ExecutionError('Multiple exceptions encountered:\n  {}'.format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc)) for t in throw_roots)))
+        raise ExecutionError('Multiple exceptions encountered:\n  {}'
+                             .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
+                                                 for t in throw_root_states)))
 
     # Return handling.
     returns = tuple(state.value for _, state in result_items if type(state) is Return)
