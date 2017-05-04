@@ -135,11 +135,11 @@ impl PathGlob {
     Ok(path_globs)
   }
 
-  /**
-   * Given a filespec String relative to a canonical Dir and path, split it into path components
-   * while eliminating consecutive '**'s (to avoid repetitive traversing), and parse it to a
-   * series of PathGlob objects.
-   */
+  ///
+  /// Given a filespec String relative to a canonical Dir and path, split it into path components
+  /// while eliminating consecutive '**'s (to avoid repetitive traversing), and parse it to a
+  /// series of PathGlob objects.
+  ///
   fn parse(canonical_dir: Dir, symbolic_path: PathBuf, filespec: &str) -> Result<Vec<PathGlob>, String> {
     let mut parts = Vec::new();
     let mut prev_was_doublestar = false;
@@ -171,9 +171,9 @@ impl PathGlob {
     PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
   }
 
-  /**
-   * Given a filespec as Patterns, create a series of PathGlob objects.
-   */
+  ///
+  /// Given a filespec as Patterns, create a series of PathGlob objects.
+  ///
   fn parse_globs(
     canonical_dir: Dir,
     symbolic_path: PathBuf,
@@ -415,23 +415,23 @@ impl PosixFS {
   }
 }
 
-/**
- * A context for filesystem operations parameterized on an error type 'E'.
- */
+///
+/// A context for filesystem operations parameterized on an error type 'E'.
+///
 pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
   fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
   fn mk_error(msg: &str) -> E;
 
-  /**
-   * Canonicalize the Link for the given Path to an underlying File or Dir. May result
-   * in None if the PathStat represents a broken Link.
-   *
-   * Skips ignored paths both before and after expansion.
-   *
-   * TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand_multi).
-   */
+  ///
+  /// Canonicalize the Link for the given Path to an underlying File or Dir. May result
+  /// in None if the PathStat represents a broken Link.
+  ///
+  /// Skips ignored paths both before and after expansion.
+  ///
+  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand_multi).
+  ///
   fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
     let context = self.clone();
@@ -523,12 +523,12 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       .boxed()
   }
 
-  /**
-   * Recursively expands PathGlobs into PathStats while applying excludes.
-   *
-   * TODO: Eventually, it would be nice to be able to apply excludes as we go, to
-   * avoid walking into directories that aren't relevant.
-   */
+  ///
+  /// Recursively expands PathGlobs into PathStats while applying excludes.
+  ///
+  /// TODO: Eventually, it would be nice to be able to apply excludes as we go, to
+  /// avoid walking into directories that aren't relevant.
+  ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
     self.expand_multi(path_globs.include).join(self.expand_multi(path_globs.exclude))
       .map(|(include, exclude)| {
@@ -539,9 +539,9 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       .boxed()
   }
 
-  /**
-   * Recursively expands PathGlobs into PathStats.
-   */
+  ///
+  /// Recursively expands PathGlobs into PathStats.
+  ///
   fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
     if path_globs.is_empty() {
       return future::ok(vec![]).boxed();
@@ -595,10 +595,10 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
     .boxed()
   }
 
-  /**
-   * Apply a PathGlob, returning PathStats and additional PathGlobs that are needed for the
-   * expansion.
-   */
+  ///
+  /// Apply a PathGlob, returning PathStats and additional PathGlobs that are needed for the
+  /// expansion.
+  ///
   fn expand_single(&self, path_glob: PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
     match path_glob {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
@@ -682,9 +682,9 @@ fn safe_create_tmpdir_in(base_dir: &Path, prefix: &str) -> Result<TempDir, Strin
   )
 }
 
-/**
- * A facade for the snapshot directory, which lives under the pants workdir.
- */
+///
+/// A facade for the snapshot directory, which lives under the pants workdir.
+///
 pub struct Snapshots {
   snapshots_dir: PathBuf,
   snapshots_generator: Mutex<(TempDir, usize)>,
@@ -723,11 +723,11 @@ impl Snapshots {
     )
   }
 
-  /**
-   * A non-canonical (does not expand symlinks) in-memory form of normalize. Used to collapse
-   * parent and cur components, which are legal in symbolic paths in PathStats, but not in
-   * Tar files.
-   */
+  ///
+  /// A non-canonical (does not expand symlinks) in-memory form of normalize. Used to collapse
+  /// parent and cur components, which are legal in symbolic paths in PathStats, but not in
+  /// Tar files.
+  ///
   fn normalize(path: &Path) -> Result<PathBuf, String> {
     let mut res = PathBuf::new();
     for component in path.components() {
@@ -751,10 +751,10 @@ impl Snapshots {
     Ok(res)
   }
 
-  /**
-   * Create a tar file on the given Write instance containing the given paths, or
-   * return an error string.
-   */
+  ///
+  /// Create a tar file on the given Write instance containing the given paths, or
+  /// return an error string.
+  ///
   fn tar_create<W: io::Write>(
     dest: W,
     paths: &Vec<PathStat>,
@@ -789,10 +789,10 @@ impl Snapshots {
     )
   }
 
-  /**
-   * Create a tar file at the given dest Path containing the given paths, while
-   * fingerprinting the written stream.
-   */
+  ///
+  /// Create a tar file at the given dest Path containing the given paths, while
+  /// fingerprinting the written stream.
+  ///
   fn tar_create_fingerprinted(
     dest: &Path,
     paths: &Vec<PathStat>,
@@ -816,10 +816,10 @@ impl Snapshots {
     )
   }
 
-  /**
-   * Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
-   * the case of Snapshots because the destination path is unique to its content.
-   */
+  ///
+  /// Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
+  /// the case of Snapshots because the destination path is unique to its content.
+  ///
   fn finalize(temp_path: &Path, dest_path: &Path) -> Result<(), String> {
     if dest_path.is_file() {
       // The Snapshot has already been created.
@@ -845,9 +845,9 @@ impl Snapshots {
     path.join(&hex[0..2]).join(&hex[2..4]).join(format!("{}.tar", hex))
   }
 
-  /**
-   * Creates a Snapshot for the given paths under the given VFS.
-   */
+  ///
+  /// Creates a Snapshot for the given paths under the given VFS.
+  ///
   pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
     let dest_dir = self.snapshot_path().to_owned();
     let build_root = fs.build_root.clone();

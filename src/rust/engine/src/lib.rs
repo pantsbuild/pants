@@ -181,12 +181,12 @@ pub extern fn externs_set(
   );
 }
 
-/**
- * Given a set of Tasks and type information, creates a Scheduler.
- *
- * The given Tasks struct will be cloned, so no additional mutation of the reference will
- * affect the created Scheduler.
- */
+///
+/// Given a set of Tasks and type information, creates a Scheduler.
+///
+/// The given Tasks struct will be cloned, so no additional mutation of the reference will
+/// affect the created Scheduler.
+///
 #[no_mangle]
 pub extern fn scheduler_create(
   tasks_ptr: *mut Tasks,

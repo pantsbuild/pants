@@ -167,10 +167,10 @@ pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<
   }
 }
 
-/**
- * NB: Panics on failure. Only recommended for use with built-in functions, such as
- * those configured in types::Types.
- */
+///
+/// NB: Panics on failure. Only recommended for use with built-in functions, such as
+/// those configured in types::Types.
+///
 pub fn invoke_unsafe(func: &Function, args: &Vec<Value>) -> Value {
   invoke_runnable(&val_for_id(func.0), args, false)
     .unwrap_or_else(|e| {
@@ -186,10 +186,10 @@ lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
 }
 
-/**
- * Set the static Externs for this process. All other methods of this module will fail
- * until this has been called.
- */
+///
+/// Set the static Externs for this process. All other methods of this module will fail
+/// until this has been called.
+///
 pub fn set_externs(externs: Externs) {
   let mut externs_ref = EXTERNS.write().unwrap();
   *externs_ref = Some(externs);

@@ -73,8 +73,9 @@ python_library(
   dependencies=[
     ':address_mapper',
     ':graph',
-    'src/python/pants/base:build_file',
     'src/python/pants/base:specs',
+    'src/python/pants/build_graph',
+    'src/python/pants/source',
   ]
 )
 
