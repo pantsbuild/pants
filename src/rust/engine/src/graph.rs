@@ -44,11 +44,11 @@ impl EntryStateGetter for EntryStateField {
   }
 }
 
-/**
- * Because there are guaranteed to be more edges than nodes in Graphs, we mark cyclic
- * dependencies via a wrapper around the NodeKey (rather than adding a byte to every
- * valid edge).
- */
+///
+/// Because there are guaranteed to be more edges than nodes in Graphs, we mark cyclic
+/// dependencies via a wrapper around the NodeKey (rather than adding a byte to every
+/// valid edge).
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum EntryKey {
   Valid(NodeKey),
@@ -64,9 +64,9 @@ impl EntryKey {
   }
 }
 
-/**
- * An Entry and its adjacencies.
- */
+///
+/// An Entry and its adjacencies.
+///
 pub struct Entry {
   // TODO: This is a clone of the Node, which is also kept in the `nodes` map. It would be
   // nice to avoid keeping two copies of each Node, but tracking references between the two
@@ -76,11 +76,11 @@ pub struct Entry {
 }
 
 impl Entry {
-  /**
-   * Creates an Entry, wrapping its execution in `future::lazy` to defer execution until a
-   * a caller actually pulls on it. This indirection exists in order to allow Nodes to start
-   * outside of the Graph lock.
-   */
+  ///
+  /// Creates an Entry, wrapping its execution in `future::lazy` to defer execution until a
+  /// a caller actually pulls on it. This indirection exists in order to allow Nodes to start
+  /// outside of the Graph lock.
+  ///
   fn new(node: EntryKey) -> Entry {
     Entry {
       node: node,
@@ -102,9 +102,9 @@ impl Entry {
     }
   }
 
-  /**
-   * Returns a reference to the Node's Future, starting it if need be.
-   */
+  ///
+  /// Returns a reference to the Node's Future, starting it if need be.
+  ///
   fn state(&mut self, context_factory: &ContextFactory, entry_id: EntryId) -> EntryStateField {
     if let Some(ref state) = self.state {
       state.clone()
@@ -126,9 +126,9 @@ impl Entry {
     }
   }
 
-  /**
-   * If the Future for this Node has already completed, returns a clone of its result.
-   */
+  ///
+  /// If the Future for this Node has already completed, returns a clone of its result.
+  ///
   fn peek<N: Node>(&self) -> Option<Result<N::Output, Failure>> {
     self.state
       .as_ref()
@@ -196,11 +196,11 @@ impl InnerGraph {
     id
   }
 
-  /**
-   * Detect whether adding an edge from src to dst would create a cycle.
-   *
-   * Returns true if a cycle would be created by adding an edge from src->dst.
-   */
+  ///
+  /// Detect whether adding an edge from src to dst would create a cycle.
+  ///
+  /// Returns true if a cycle would be created by adding an edge from src->dst.
+  ///
   fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
     // Search either forward from the dst, or backward from the src.
     let (root, needle, dependents) = {
@@ -219,9 +219,9 @@ impl InnerGraph {
     self.walk(roots, dependents).any(|eid| eid == needle)
   }
 
-  /**
-   * Begins a topological Walk from the given roots.
-   */
+  ///
+  /// Begins a topological Walk from the given roots.
+  ///
   fn walk(&self, roots: VecDeque<EntryId>, dependents: bool) -> Walk {
     Walk {
       graph: self,
@@ -231,10 +231,10 @@ impl InnerGraph {
     }
   }
 
-  /**
-   * Begins a topological walk from the given roots. Provides both the current entry as well as the
-   * depth from the root.
-   */
+  ///
+  /// Begins a topological walk from the given roots. Provides both the current entry as well as the
+  /// depth from the root.
+  ///
   fn leveled_walk<P>(&self, roots: Vec<EntryId>, predicate: P, dependents: bool) -> LeveledWalk<P>
     where P: Fn(EntryId, Level) -> bool {
     let rrr = roots.into_iter().map(|r| (r, 0)).collect::<VecDeque<_>>();
@@ -247,9 +247,9 @@ impl InnerGraph {
     }
   }
 
-  /**
-   * Finds all Nodes with the given subjects, and invalidates their transitive dependents.
-   */
+  ///
+  /// Finds all Nodes with the given subjects, and invalidates their transitive dependents.
+  ///
   fn invalidate(&mut self, paths: HashSet<PathBuf>) -> usize {
     // Collect all entries that will be deleted.
     let ids: HashSet<EntryId, FNV> = {
@@ -422,9 +422,9 @@ impl InnerGraph {
   }
 }
 
-/**
- * A DAG (enforced on mutation) of Entries.
- */
+///
+/// A DAG (enforced on mutation) of Entries.
+///
 pub struct Graph {
   inner: Mutex<InnerGraph>,
 }
@@ -446,19 +446,19 @@ impl Graph {
     inner.nodes.len()
   }
 
-  /**
-   * If the given Node has completed, returns a clone of its state.
-   */
+  ///
+  /// If the given Node has completed, returns a clone of its state.
+  ///
   pub fn peek<N: Node>(&self, node: N) -> Option<Result<N::Output, Failure>> {
     let node = node.into();
     let inner = self.inner.lock().unwrap();
     inner.entry(&EntryKey::Valid(node)).and_then(|e| e.peek::<N>())
   }
 
-  /**
-   * In the context of the given src Node, declare a dependency on the given dst Node and
-   * begin its execution if it has not already started.
-   */
+  ///
+  /// In the context of the given src Node, declare a dependency on the given dst Node and
+  /// begin its execution if it has not already started.
+  ///
   pub fn get<N: Node>(&self, src_id: EntryId, context: &ContextFactory, dst_node: N) -> NodeFuture<N::Output> {
     let dst_node = dst_node.into();
 
@@ -488,9 +488,9 @@ impl Graph {
     dst_state.get::<N>()
   }
 
-  /**
-   * Create the given Node if it does not already exist.
-   */
+  ///
+  /// Create the given Node if it does not already exist.
+  ///
   pub fn create<N: Node>(&self, node: N, context: &ContextFactory) -> NodeFuture<N::Output> {
     // Initialize the state while under the lock...
     let state = {
@@ -518,10 +518,10 @@ impl Graph {
   }
 }
 
-/**
- * Represents the state of a particular topological walk through a Graph. Implements Iterator and
- * has the same lifetime as the Graph itself.
- */
+///
+/// Represents the state of a particular topological walk through a Graph. Implements Iterator and
+/// has the same lifetime as the Graph itself.
+///
 struct Walk<'a> {
   graph: &'a InnerGraph,
   direction: Direction,
@@ -549,10 +549,10 @@ impl<'a> Iterator for Walk<'a> {
 
 type Level = u32;
 
-/**
- * Represents the state of a particular topological walk through a Graph. Implements Iterator and
- * has the same lifetime as the Graph itself.
- */
+///
+/// Represents the state of a particular topological walk through a Graph. Implements Iterator and
+/// has the same lifetime as the Graph itself.
+///
 struct LeveledWalk<'a, P: Fn(EntryId, Level)->bool> {
   graph: &'a InnerGraph,
   direction: Direction,

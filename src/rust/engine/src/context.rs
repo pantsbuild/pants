@@ -13,10 +13,10 @@ use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
 
-/**
- * The core context shared (via Arc) between the Scheduler and the Context objects of
- * all running Nodes.
- */
+///
+/// The core context shared (via Arc) between the Scheduler and the Context objects of
+/// all running Nodes.
+///
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
@@ -95,10 +95,10 @@ pub trait ContextFactory {
 }
 
 impl ContextFactory for Context {
-  /**
-   * Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
-   * is a shallow clone.
-   */
+  ///
+  /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
+  /// is a shallow clone.
+  ///
   fn create(&self, entry_id: EntryId) -> Context {
     Context {
       entry_id: entry_id,
