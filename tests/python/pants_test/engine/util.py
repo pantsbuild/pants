@@ -36,3 +36,22 @@ class TargetTable(SymbolTable):
   @classmethod
   def table(cls):
     return {'struct': Struct, 'target': Target}
+
+
+def assert_equal_with_printing(test_case, expected, actual):
+  """Asserts equality, but also prints the values so they can be compared on failure.
+
+  Usage:
+
+     class FooTest(unittest.TestCase):
+       assert_equal_with_printing = assert_equal_with_printing
+
+       def test_foo(self):
+         self.assert_equal_with_printing("a", "b")
+  """
+  str_actual = str(actual)
+  print('Expected:')
+  print(expected)
+  print('Actual:')
+  print(str_actual)
+  test_case.assertEqual(expected, str_actual)

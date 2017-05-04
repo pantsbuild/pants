@@ -11,6 +11,7 @@ import os
 import sys
 import sysconfig
 import threading
+import traceback
 
 import cffi
 import pkg_resources
@@ -83,6 +84,7 @@ typedef struct {
 typedef struct {
   Value  value;
   _Bool  is_throw;
+  Buffer traceback;
 } RunnableComplete;
 
 typedef void ExternContext;
@@ -407,11 +409,13 @@ def _initialize_externs(ffi):
     try:
       val = runnable(*args)
       is_throw = False
+      traceback_str = ''
     except Exception as e:
       val = e
       is_throw = True
+      traceback_str = traceback.format_exc()
 
-    return RunnableComplete(c.to_value(val), is_throw)
+    return RunnableComplete(c.to_value(val), is_throw, c.utf8_buf(traceback_str))
 
 
 class Value(datatype('Value', ['handle'])):
@@ -434,7 +438,7 @@ class TypeId(datatype('TypeId', ['id_'])):
   """Corresponds to the native object of the same name."""
 
 
-class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw'])):
+class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw', 'traceback'])):
   """Corresponds to the native object of the same name."""
 
 

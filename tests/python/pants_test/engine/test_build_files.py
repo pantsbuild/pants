@@ -222,10 +222,8 @@ class InlinedGraphTest(GraphTestBase):
       # Make sure lines with Throw have more or equal indentation than its neighbors.
       current_line = lines[idx]
       line_above = lines[max(0, idx - 1)]
-      line_below = lines[min(len(lines) - 1, idx + 1)]
 
       assert_equal_or_more_indentation(current_line, line_above)
-      assert_equal_or_more_indentation(current_line, line_below)
 
   def test_cycle_self(self):
     self.do_test_cycle('graph_test:self_cycle')

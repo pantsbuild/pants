@@ -39,7 +39,7 @@ fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
 }
 
 fn throw(msg: &str) -> Failure {
-  Failure::Throw(externs::create_exception(msg))
+  Failure::Throw(externs::create_exception(msg), format!("Traceback (no traceback):\n  <pants native internals>\nException: {}", msg).to_string())
 }
 
 /**
@@ -89,7 +89,7 @@ impl VFS<Failure> for Context {
   }
 
   fn mk_error(msg: &str) -> Failure {
-    Failure::Throw(externs::create_exception(msg))
+    Failure::Throw(externs::create_exception(msg), "<pants native internals>".to_string())
   }
 }
 
@@ -235,7 +235,7 @@ impl Select {
               }
               continue
             },
-            f @ Failure::Throw(_) =>
+            f @ Failure::Throw(..) =>
               return Err(f),
           }
         },

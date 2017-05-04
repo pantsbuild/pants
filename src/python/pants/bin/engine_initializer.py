@@ -85,7 +85,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     if result.error:
       raise result.error
 
-  def create_build_graph(self, target_roots, build_root=None):
+  def create_build_graph(self, target_roots, build_root=None, include_trace_on_error=True):
     """Construct and return a `BuildGraph` given a set of input specs.
 
     :param TargetRoots target_roots: The targets root of the request.
@@ -93,7 +93,8 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'engine', 
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(self.scheduler, self.engine, self.symbol_table_cls)
+    graph = LegacyBuildGraph.create(self.scheduler, self.engine, self.symbol_table_cls,
+                                    include_trace_on_error=include_trace_on_error)
     logger.debug('build_graph is: %s', graph)
     with self.scheduler.locked():
       # Ensure the entire generator is unrolled.
@@ -117,7 +118,8 @@ class EngineInitializer(object):
                          symbol_table_cls=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None,
-                         subproject_roots=None):
+                         subproject_roots=None,
+                         include_trace_on_error=True):
     """Construct and return the components necessary for LegacyBuildGraph construction.
 
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
@@ -132,6 +134,7 @@ class EngineInitializer(object):
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
+    :param bool include_trace_on_error: If True, when an error occurs, the error message will include the graph trace.
     :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
     """
 
@@ -162,7 +165,7 @@ class EngineInitializer(object):
 
     # TODO: Do not use the cache yet, as it incurs a high overhead.
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native)
-    engine = LocalSerialEngine(scheduler, use_cache=False)
+    engine = LocalSerialEngine(scheduler, use_cache=False, include_trace_on_error=include_trace_on_error)
     change_calculator = EngineChangeCalculator(scheduler, engine, symbol_table_cls, scm) if scm else None
 
     return LegacyGraphHelper(scheduler, engine, symbol_table_cls, change_calculator)
