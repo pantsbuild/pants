@@ -16,7 +16,7 @@ use types::Types;
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
 /// all running Nodes.
-//
+///
 pub struct Core {
   pub graph: Graph,
   pub tasks: Tasks,
