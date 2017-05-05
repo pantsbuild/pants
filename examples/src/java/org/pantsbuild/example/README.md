@@ -513,7 +513,7 @@ Target Scopes
 
 ### Overview
 
-Pants supports marking targets with a `scope` value which the JVM backend will use to filter
+Pants supports marking targets with one or more `scope` values which the JVM backend will use to filter
 dependency subgraphs at compiletime and runtime. Scopes are also used for unused dependency
 detection: only `default` scoped targets are eligible to be considered as "unused" deps.
 
@@ -538,6 +538,9 @@ Pants' built in scopes are:
 * `runtime`: Indicates that a target is only used at runtime, and should not be presented to the
   compiler. Targets which are only used via JVM reflection are good examples of runtime-only
   dependencies.
+* `test`: Indicates that a target is used when running tests. This scope is typically used in
+  addition to another scope (e.g.: `scope='compile test'`). Targets which are are provided by an
+  external execution environment are good examples of compile+test dependencies.
 * `forced` _(available from pants 1.1.0)_: The `forced` scope is equivalent to the `default` scope, but additionally indicates
   that a target is not eligible to be considered an "unused" dependency. It is sometimes necessary
   to mark a target `forced` due to false positives in the static analysis used for unused
@@ -553,6 +556,15 @@ that target:
     java_library(name='lib',
       ..,
       scope='runtime',
+    )
+
+Multiple scopes can be specified. The equivalent of Maven's `provided` scope can be expressed by
+specifying both compile and test scopes.
+
+    :::python
+    java_library(name='lib',
+      ..,
+      scope='compile test',
     )
 
 If the scope of a target is not matched for a particular context, the entire subgraph represented
