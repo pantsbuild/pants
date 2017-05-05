@@ -19,6 +19,7 @@ page(
   source='from_maven.md',
   links=[
     ':3rdparty_jvm',
+    ':readme',
   ],
 )
 
