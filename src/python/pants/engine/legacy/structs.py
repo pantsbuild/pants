@@ -10,11 +10,11 @@ from abc import abstractproperty
 
 from six import string_types
 
+from pants.base.deprecated import deprecated_conditional
+from pants.build_graph.target import Target
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
-from pants.base.deprecated import deprecated_conditional
-from pants.build_graph.target import Target
 from pants.engine.struct import Struct, StructWithDeps
 from pants.source import wrapped_globs
 from pants.util.contextutil import exception_logging
