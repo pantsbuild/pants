@@ -288,7 +288,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                                   '--no-colors',
                                   'options'])
       self.assert_success(pants_run)
-      self.assertIn("pants_ignore = ['.*', '/dist/', 'some/random/dir'] (from CONFIG)",
+      self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG)",
                     pants_run.stdout_data)
 
   @ensure_engine
@@ -305,5 +305,5 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                                   '--no-colors',
                                   'options'])
       self.assert_success(pants_run)
-      self.assertIn("pants_ignore = ['.*', '/some/other/dist/dir/', 'some/random/dir'] (from CONFIG)",
+      self.assertIn("pants_ignore = ['.*/', '/some/other/dist/dir/', 'some/random/dir'] (from CONFIG)",
                     pants_run.stdout_data)
