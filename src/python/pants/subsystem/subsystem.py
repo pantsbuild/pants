@@ -211,6 +211,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
     This function will be called just before `Target` injection time. Any objects injected here
     should have a static spec path that will need to be emitted, pre-injection, by the
     `injectables_specs` classmethod for the purpose of dependency association for e.g. `changed`.
+
+    :API: public
     """
 
   @property
@@ -218,11 +220,16 @@ class Subsystem(SubsystemClientMixin, Optionable):
     """A mapping of {key: spec} that is used for locating injectable specs.
 
     This should be overridden by subclasses who wish to define an injectables mapping.
+
+    :API: public
     """
     return {}
 
   def injectables_specs_for_key(self, key):
-    """Given a key, yield all relevant injectable spec addresses."""
+    """Given a key, yield all relevant injectable spec addresses.
+
+    :API: public
+    """
     mapping = self.injectables_spec_mapping
     if key not in mapping:
       raise self.NoMappingForKey(key)
@@ -234,7 +241,10 @@ class Subsystem(SubsystemClientMixin, Optionable):
     return [Address.parse(s).spec for s in specs]
 
   def injectables_spec_for_key(self, key):
-    """Given a key, yield a singular spec representing that key."""
+    """Given a key, yield a singular spec representing that key.
+
+    :API: public
+    """
     specs = self.injectables_specs_for_key(key)
     specs_len = len(specs)
     if specs_len == 0:

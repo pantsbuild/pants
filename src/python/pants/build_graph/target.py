@@ -649,6 +649,8 @@ class Target(AbstractTarget):
       https://github.com/pantsbuild/pants/issues/3560
       https://github.com/pantsbuild/pants/issues/3561
 
+    :API: public
+
     :param dict kwargs: The pre-Target.__init__() kwargs dict.
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: Spec strings representing dependencies of this target.
