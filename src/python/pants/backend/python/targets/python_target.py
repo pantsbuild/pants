@@ -41,11 +41,11 @@ class PythonTarget(Target):
       resources_kwargs = dict(
         name=''.join((kwargs.get('name', 'unknown'), '_synthetic_resources_target')),
         sources=resources,
-        build_graph=kwargs['build_graph'],
         type_alias=Resources.alias()
       )
       resource_target = parse_context.create_object(Resources, **resources_kwargs)
-      kwargs['dependencies'] = kwargs['dependencies'] + [resource_target.address.spec]
+      resource_target_relative_spec = ':{}'.format(resource_target.addressed_name)
+      kwargs['dependencies'] = kwargs.get('dependencies', []) + [resource_target_relative_spec]
 
     parse_context.create_object(cls, type_alias=cls.alias(), **kwargs)
 
