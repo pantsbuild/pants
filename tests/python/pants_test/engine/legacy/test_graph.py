@@ -156,20 +156,6 @@ class GraphInvalidationTest(GraphTestBase):
       self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd'],
                         sources)
 
-  def test_implicit_sources(self):
-    expected_sources = {
-      'testprojects/tests/python/pants/file_sets:implicit_sources':
-        ['a.py', 'aa.py', 'aaa.py', 'aabb.py', 'ab.py'],
-      'testprojects/tests/python/pants/file_sets:test_with_implicit_sources':
-        ['test_a.py']
-    }
-
-    for spec, exp_sources in expected_sources.items():
-      with self.open_scheduler([spec]) as (graph, _, _):
-        target = graph.get_target(Address.parse(spec))
-        sources = sorted([os.path.basename(s) for s in target.sources_relative_to_buildroot()])
-        self.assertEquals(exp_sources, sources)
-
   def test_target_macro_override(self):
     """Tests that we can "wrap" an existing target type with additional functionality.
 
