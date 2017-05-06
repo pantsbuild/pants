@@ -35,6 +35,8 @@ class PythonTarget(Target):
   @classmethod
   def create(cls, parse_context, **kwargs):
     resources = kwargs.get('resources', None) or []
+    deprecated_conditional(lambda: bool(resources), '1.5.0.dev0',
+                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
     if resources:
       resources_kwargs = dict(
         name=''.join((kwargs.get('name', 'unknown'), '_synthetic_resources_target')),
