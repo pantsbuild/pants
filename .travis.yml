@@ -16,6 +16,8 @@ env:
     - secure: qid/ot1XIWOpNaN+RhgdJq8IEajcpHI5EFvy2ywkYHJO2hKYawyX2M4gFd0Vq8+xmeGB4MUmpPW8D8gijLi5JB+0aZ3+5JHs5r9NWkK7HVMpVnok3CywknzXBgeo+UoEQv9ugYvRr1Sm9Dj9IezAhM0tw1uS95Ap+JLbnWFB830=
 
 before_cache:
+  # Ensure permissions to do the below removals, which happen with or without caching enabled.
+  - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
   # Kill all python bytecode in our cached venvs.  Some files appear to
   # get bytecode compiled in non-yet-understood circumstances leading to
   # a full cache re-pack due to new bytecode files.
@@ -56,11 +58,39 @@ matrix:
     - os: osx
       language: generic
       env:
-        - SHARD="OSX"
+        - SHARD="OSX Bintray Builder"
       script:
-        - ./pants --version
-      after_success:
         - ./build-support/bin/native/generate-bintray-manifest.sh
+
+    - os: linux
+      dist: trusty
+      sudo: required
+      # Docker runs will write files as root, so avoid caching for this shard.
+      cache: false
+      services:
+        - docker
+      language: python
+      python: "2.7.13"
+      env:
+        - SHARD="Linux Bintray Builder"
+        # Use the standard python manylinux image for ideal binary compatibility.
+        - DOCKER_IMAGE="quay.io/pypa/manylinux1_x86_64"
+      before_install:
+        # Remove any Ubuntu binary cruft before building.
+        - git clean -fdx
+        - rm -rf ~/.cache/pants
+        - docker pull $DOCKER_IMAGE
+      script:
+        # Map virtual mount paths 1:1 to simulate running in-place in travis.
+        - docker run --rm -t
+          -v "${TRAVIS_BUILD_DIR}:${TRAVIS_BUILD_DIR}"
+          -v "${HOME}:${HOME}"
+          -e "HOME=${HOME}"
+          "${DOCKER_IMAGE}"
+          sh -c "
+            export PATH=/opt/python/cp27-cp27mu/bin:/opt/rh/devtoolset-2/root/usr/bin:${PATH} ;
+            cd $TRAVIS_BUILD_DIR && ./build-support/bin/native/generate-bintray-manifest.sh
+          "
 
     - os: linux
       dist: trusty
@@ -89,8 +119,6 @@ matrix:
         - SHARD="Various pants self checks"
       script:
         - ./build-support/bin/ci.sh -x -cjlpn 'Various pants self checks'
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -119,8 +147,6 @@ matrix:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrcn -u 0/2 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -149,8 +175,6 @@ matrix:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrcn -u 1/2 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -179,8 +203,6 @@ matrix:
         - SHARD="Python contrib tests"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrcjlp "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -209,8 +231,6 @@ matrix:
         - SHARD="Python integration tests for pants - shard 1"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 0/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -239,8 +259,6 @@ matrix:
         - SHARD="Python integration tests for pants - shard 2"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 1/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -269,8 +287,6 @@ matrix:
         - SHARD="Python integration tests for pants - shard 3"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 2/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -299,8 +315,6 @@ matrix:
         - SHARD="Python integration tests for pants - shard 4"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 3/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -329,8 +343,6 @@ matrix:
         - SHARD="Python integration tests for pants - shard 5"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 4/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -359,8 +371,6 @@ matrix:
         - SHARD="Python integration tests for pants - shard 6"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 5/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
     - os: linux
       dist: trusty
@@ -389,20 +399,17 @@ matrix:
         - SHARD="Python integration tests for pants - shard 7"
       script:
         - ./build-support/bin/ci.sh -x -fkmsrjlpn -i 6/7 "${SHARD}"
-      after_success:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/bintray/
   provider: bintray
-
   # NB: This is generated in after_success in each shard above.
   file: ./native-engine.bintray.json
-
   user: ${BINTRAY_USER}
   key: ${BINTRAY_KEY}
   dry-run: false
   on:
+    condition: -f ./native-engine.bintray.json
     # NB: Deploys are always tagged as part of the deploy process encoded in
     # `build-support/bin/release.sh`, so this ensures we release an appropriate native engine binary
     # for all releases. Unfortunately, CI only runs after the release tag hits origin and so there
