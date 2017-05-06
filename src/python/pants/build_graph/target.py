@@ -655,8 +655,8 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: Spec strings representing dependencies of this target.
     """
-    assert not all((kwargs is None, payload is None)), 'must provide either kwargs or payload'
-    assert not all((kwargs is not None, payload is not None)), 'may not provide both kwargs and payload'
+    assert kwargs is None or payload is None, 'must provide either kwargs or payload'
+    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
     assert not (kwargs and not isinstance(kwargs, dict)), (
       'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
     )

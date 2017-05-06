@@ -42,8 +42,8 @@ class ImportJarsMixin(Target):
     :returns: list of JarLibrary specs to be imported.
     :rtype: list of JarLibrary
     """
-    assert not all((kwargs is None, payload is None)), 'must provide either kwargs or payload'
-    assert not all((kwargs is not None, payload is not None)), 'may not provide both kwargs and payload'
+    assert kwargs is None or payload is None, 'must provide either kwargs or payload'
+    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
 
     field_pos = 0 if kwargs is not None else 1
     target_representation = kwargs or payload.as_dict()
