@@ -43,7 +43,7 @@ class TargetAdaptor(StructWithDeps):
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
     if sources is None and self.default_sources_globs is not None:
-      if Target.Arguments.global_instance().get_options().implicit_sources:
+      if self.default_sources:
         return Globs(*self.default_sources_globs,
                      spec_path=self.address.spec_path,
                      exclude=self.default_sources_exclude_globs or [])
@@ -66,6 +66,11 @@ class TargetAdaptor(StructWithDeps):
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path)
       return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
+
+  @property
+  def default_sources(self):
+    """True if this adaptor should use default sources if they are defined."""
+    return Target.Arguments.global_instance().get_options().implicit_sources
 
   @property
   def default_sources_globs(self):
@@ -250,6 +255,12 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
 
 
 class GoTargetAdaptor(TargetAdaptor):
+
+  @property
+  def default_sources(self):
+    # Go has always used implicit_sources: override to ignore the option.
+    return True
+
   @property
   def default_sources_globs(self):
     # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
