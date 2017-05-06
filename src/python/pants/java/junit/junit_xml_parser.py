@@ -170,3 +170,57 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
     parse_junit_xml_file(junit_xml_path)
 
   return dict(failed_targets)
+
+
+def parse_test_info(junit_xml_path, error_handler):
+  """
+  Parses the junit file for info needed about each test
+  info needed:
+    - result code
+    - run time duration
+    - name
+  :param string junit_xml_path:
+  :param error_handler:
+  :return: dict of tests
+  """
+  tests_in_path = {}
+
+  def parse_junit_xml_file(path):
+    # TODO: create enum for these variables
+    SUCCESS = 0
+    SKIPPED = 5000
+    FAILURE = 10000
+    ERROR = 15000
+
+    try:
+      xml = XmlParser.from_file(path)
+      for testcase in xml.parsed.getElementsByTagName('testcase'):
+        test_info = {'time': float(testcase.getAttribute('time'))}
+        test_info.update({'classname': testcase.getAttribute('classname')})
+
+        test_error = testcase.getElementsByTagName('error')
+        test_fail = testcase.getElementsByTagName('failure')
+        test_skip = testcase.getElementsByTagName('skipped')
+
+        if test_fail:
+          test_info.update({'result_code': FAILURE})
+        elif test_error:
+          test_info.update({'result_code': ERROR})
+        elif test_skip:
+          test_info.update({'result_code': SKIPPED})
+        else:
+          test_info.update({'result_code': SUCCESS})
+
+        tests_in_path.update({testcase.getAttribute('name'): test_info})
+
+    except (XmlParser.XmlError, ValueError) as e:
+      error_handler(ParseError(path, e))
+
+  if os.path.isdir(junit_xml_path):
+    for name in os.listdir(junit_xml_path):
+      if _JUNIT_XML_MATCHER.match(name):
+        parse_junit_xml_file(os.path.join(junit_xml_path, name))
+  else:
+    parse_junit_xml_file(junit_xml_path)
+
+  return tests_in_path

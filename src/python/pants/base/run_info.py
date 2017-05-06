@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
 import getpass
 import os
 import re
@@ -66,7 +67,10 @@ class RunInfo(object):
       if k in self._info:
         raise ValueError('info key "{}" already exists with value {}. '
                          'Cannot add it again with value {}.'.format(k, self._info[k], v))
-      self._info[k] = v
+      if k == 'target_data':
+        self._info[k] = ast.literal_eval(v)
+      else:
+        self._info[k] = v
 
     try:
       with open(self._info_file, 'a') as outfile:

@@ -31,7 +31,8 @@ from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_failed_targets
+from pants.java.junit.junit_xml_parser import (RegistryOfTests, Test, parse_failed_targets,
+                                               parse_test_info)
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util import desktop
@@ -351,6 +352,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       return test_registry
 
   def _run_tests(self, test_registry, output_dir, coverage=None):
+
+    def parse_error_handler(parse_error):
+      # Just log and move on since the result is only used to characterize failures, and raising
+      # an error here would just distract from the underlying test failures.
+      self.context.log.error('Error parsing test result file {path}: {cause}'
+        .format(path=parse_error.junit_xml_path, cause=parse_error.cause))
+
     if coverage:
       extra_jvm_options = coverage.extra_jvm_options
       classpath_prepend = coverage.classpath_prepend
@@ -423,17 +431,18 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               create_synthetic_jar=self.synthetic_classpath,
             ))
 
+          tests_info = parse_test_info(output_dir, parse_error_handler)
+          for test_name, test_info in tests_info.items():
+            test_item = Test(test_info['classname'], test_name)
+            test_target = test_registry.get_owning_target(test_item)
+            self.context.run_tracker.report_test_info(self.options_scope, test_target,
+                                                      test_name, test_info)
+
           if result != 0 and self._fail_fast:
             break
 
     if result != 0:
-      def error_handler(parse_error):
-        # Just log and move on since the result is only used to characterize failures, and raising
-        # an error here would just distract from the underlying test failures.
-        self.context.log.error('Error parsing test result file {path}: {cause}'
-                               .format(path=parse_error.junit_xml_path, cause=parse_error.cause))
-
-      target_to_failed_test = parse_failed_targets(test_registry, output_dir, error_handler)
+      target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
 
       def sort_owning_target(t):
         return t.address.spec if t else None

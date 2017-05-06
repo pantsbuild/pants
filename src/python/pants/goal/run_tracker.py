@@ -144,6 +144,8 @@ class RunTracker(Subsystem):
 
     self._aborted = False
 
+    self._target_data = {}
+
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
 
@@ -353,6 +355,9 @@ class RunTracker(Subsystem):
       # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
       self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
+    if self._target_data:
+      self.run_info.add_info('target_data', self._target_data)
+
     self.report.close()
     self.store_stats()
 
@@ -390,3 +395,31 @@ class RunTracker(Subsystem):
     N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
     """
     SubprocPool.shutdown(self._aborted)
+
+  def report_target_info(self, scope, target, key, val):
+    """
+    Add target information to run_info under target_data
+    :param string scope: The running scope
+    :param string target: The target that we want to store info for
+    :param string or list of items to make into a key key: The key for the info being stored
+                (This could be test data and it's value could be a dict)
+    :param dict or string val: The value of the info being stored
+    """
+    # Stringify list of keys to make one key
+    if not isinstance(key, basestring):
+      new_key = [str(key_item) for key_item in key]
+      key = '#'.join(new_key)
+
+    if target in self._target_data:
+      if scope in self._target_data[target]:
+        self._target_data[target][scope].update({key: val})
+      else:
+        self._target_data[target].update({scope: {key: val}})
+    else:
+      self._target_data.update({target: {scope: {key: val}}})
+
+  def report_test_info(self, scope, target, key, test_info):
+    target_addr = str(getattr(target, 'address').to_address())
+    target_type = getattr(target, '_type_alias')
+    self.report_target_info('GLOBAL', target_addr, ['target_type'], target_type)
+    self.report_target_info(scope, target_addr, key, test_info)
