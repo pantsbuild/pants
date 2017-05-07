@@ -30,22 +30,27 @@ class PythonTarget(Target):
   @classmethod
   def _suffix_for_synthetic_spec(cls, spec):
     """Given a spec, append the synthetic resources suffix to it for a consistent mapping."""
-    return spec + '_synthetic_resources'
+    return '{}_synthetic_resources'.format(spec)
 
   @classmethod
   def create(cls, parse_context, **kwargs):
     resources = kwargs.get('resources', None) or []
-    deprecated_conditional(lambda: bool(resources), '1.5.0.dev0',
-                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
     if resources:
+      deprecated_conditional(
+        lambda: True,
+        '1.5.0.dev0',
+        'The `resources=` Python target argument', 'Depend on resources targets instead.'
+      )
       resources_kwargs = dict(
-        name=''.join((kwargs.get('name', 'unknown'), '_synthetic_resources_target')),
+        name=cls._suffix_for_synthetic_spec(kwargs.get('name', 'unknown')),
         sources=resources,
+        build_graph=kwargs.get('build_graph'),
         type_alias=Resources.alias()
       )
       resource_target = parse_context.create_object(Resources, **resources_kwargs)
-      resource_target_relative_spec = ':{}'.format(resource_target.addressed_name)
-      kwargs['dependencies'] = kwargs.get('dependencies', []) + [resource_target_relative_spec]
+      resource_target_spec = '//{}:{}'.format(parse_context.rel_path,
+                                              resource_target.addressed_name)
+      kwargs['dependencies'] = kwargs.get('dependencies', []) + [resource_target_spec]
 
     parse_context.create_object(cls, type_alias=cls.alias(), **kwargs)
 
