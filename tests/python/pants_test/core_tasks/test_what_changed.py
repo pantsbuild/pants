@@ -245,6 +245,7 @@ class WhatChangedTest(WhatChangedTestBasic):
     self.assert_console_output(
       'root/src/py/a:alpha',
       'root/src/py/a:beta',
+      'root/src/py/a:alpha_synthetic_resources',
       workspace=self.workspace(files=['root/src/py/a/BUILD'])
     )
 
