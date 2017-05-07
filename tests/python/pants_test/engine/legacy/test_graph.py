@@ -20,6 +20,7 @@ from pants.build_graph.target import Target
 from pants.init.target_roots import TargetRoots
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.util import init_native
+from pants.subsystem.subsystem import Subsystem
 
 
 # Macro that adds the specified tag.
@@ -71,6 +72,7 @@ class GraphTestBase(unittest.TestCase):
       yield graph, addresses, graph_helper.scheduler
 
   def create_graph_from_specs(self, graph_helper, specs):
+    Subsystem.reset()
     target_roots = self.create_target_roots(specs)
     graph = graph_helper.create_build_graph(target_roots)[0]
     return graph, target_roots
