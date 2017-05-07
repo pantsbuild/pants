@@ -44,7 +44,6 @@ class PythonTarget(Target):
       resources_kwargs = dict(
         name=cls._suffix_for_synthetic_spec(kwargs.get('name', 'unknown')),
         sources=resources,
-        build_graph=kwargs.get('build_graph'),
         type_alias=Resources.alias()
       )
       resource_target = parse_context.create_object(Resources, **resources_kwargs)
@@ -121,14 +120,16 @@ class PythonTarget(Target):
       except ValueError as e:
         raise TargetDefinitionException(self, str(e))
 
-  @property
-  def traversable_specs(self):
-    for spec in super(PythonTarget, self).traversable_specs:
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    for spec in super(PythonTarget, cls).compute_injectable_specs(kwargs, payload):
       yield spec
-    if self._provides:
-      for spec in self._provides._binaries.values():
-        address = Address.parse(spec, relative_to=self.address.spec_path)
-        yield address.spec
+
+    target_representation = kwargs or payload.as_dict()
+    provides = target_representation.get('provides', None) or []
+    if provides:
+      for spec in provides._binaries.values():
+        yield spec
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):

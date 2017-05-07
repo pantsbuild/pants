@@ -98,7 +98,13 @@ class MutableBuildGraph(BuildGraph):
           self.inject_dependency(dependent=target.address, dependency=traversable_address)
           target.mark_transitive_invalidation_hash_dirty()
 
-      for traversable_spec in target.traversable_specs:
+      traversables = [target.compute_injectable_specs(payload=target.payload)]
+      # Only poke `traversable_specs` if a concrete implementation is defined
+      # in order to avoid spurious deprecation warnings.
+      if type(target).traversable_specs is not Target.traversable_specs:
+        traversables.append(target.traversable_specs)
+
+      for traversable_spec in itertools.chain(*traversables):
         traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
         self.maybe_inject_address_closure(traversable_address)
         target.mark_transitive_invalidation_hash_dirty()

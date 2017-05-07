@@ -136,7 +136,7 @@ class Target(AbstractTarget):
   class RecursiveDepthError(AddressLookupError):
     """Raised when there are too many recursive calls to calculate the fingerprint."""
 
-  _MAX_RECURSION_DEPTH=250
+  _MAX_RECURSION_DEPTH = 250
 
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses
@@ -617,6 +617,7 @@ class Target(AbstractTarget):
     return self._build_graph.get_concrete_derived_from(self.address)
 
   @property
+  @deprecated('1.5.0.dev0', 'Use `Target.compute_injectable_specs()` instead.')
   def traversable_specs(self):
     """
     :API: public
@@ -638,6 +639,33 @@ class Target(AbstractTarget):
     """
     return []
 
+  @staticmethod
+  def _validate_target_representation_args(kwargs, payload):
+    assert kwargs is None or payload is None, 'must provide either kwargs or payload'
+    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
+    assert not (kwargs and not isinstance(kwargs, dict)), (
+      'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
+    )
+    assert not (payload and not isinstance(payload, Payload)), (
+      'expected a `Payload` object for payload, instead found a {}'.format(type(payload))
+    )
+
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the specs
+    to inject as non-dependencies in the same vein as the prior `traversable_specs`.
+
+    :API: public
+
+    :param dict kwargs: The pre-Target.__init__() kwargs dict.
+    :param Payload payload: The post-Target.__init__() Payload object.
+    :yields: Spec strings representing dependencies of this target.
+    """
+    cls._validate_target_representation_args(kwargs, payload)
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    return
+    yield
+
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
     """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the
@@ -655,14 +683,7 @@ class Target(AbstractTarget):
     :param Payload payload: The post-Target.__init__() Payload object.
     :yields: Spec strings representing dependencies of this target.
     """
-    assert kwargs is None or payload is None, 'must provide either kwargs or payload'
-    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
-    assert not (kwargs and not isinstance(kwargs, dict)), (
-      'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
-    )
-    assert not (payload and not isinstance(payload, Payload)), (
-      'expected a `Payload` object for payload, instead found a {}'.format(type(payload))
-    )
+    cls._validate_target_representation_args(kwargs, payload)
     # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
     return
     yield

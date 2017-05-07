@@ -124,7 +124,10 @@ class LegacyBuildGraph(BuildGraph):
       for spec in itertools.chain(*traversables):
         inject(target, spec, is_dependency=True)
 
-      for spec in target.traversable_specs:
+      traversables = [target.compute_injectable_specs(payload=target.payload)]
+      if type(target).traversable_specs is not Target.traversable_specs:
+        traversables.append(target.traversable_specs)
+      for spec in itertools.chain(*traversables):
         inject(target, spec, is_dependency=False)
 
     # Inject all addresses, then declare injected dependencies.
