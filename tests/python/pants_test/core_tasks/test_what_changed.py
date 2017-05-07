@@ -255,7 +255,6 @@ class WhatChangedTest(WhatChangedTestBasic):
       """))
       self.assert_console_output(workspace=self.workspace(files=['root/src/py/a/BUILD']))
 
-  @unittest.skip('XXX')
   def test_resource_changed(self):
     self.assert_console_output(
       'root/src/py/a:alpha',

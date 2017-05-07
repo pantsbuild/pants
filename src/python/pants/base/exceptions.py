@@ -23,6 +23,12 @@ class TaskError(Exception):
     self._failed_targets = kwargs.pop('failed_targets', [])
     super(TaskError, self).__init__(*args, **kwargs)
 
+  def __str__(self):
+    return (
+      '{}(exit_code={}, failed_targets={})'
+      .format(type(self).__name__, self.exit_code, self.failed_targets)
+    )
+
   @property
   def exit_code(self):
     return self._exit_code

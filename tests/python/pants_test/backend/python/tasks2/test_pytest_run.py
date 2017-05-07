@@ -422,9 +422,9 @@ class PytestTest(PytestTestBase):
     self.assertEqual([], not_run_statements)
 
   def test_sharding(self):
-    self.run_tests(targets=[self.red, self.green], test_shard='0/2')
+    self.run_tests(targets=[self.red, self.green], test_shard='1/2')
     self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red],
-                           test_shard='1/2')
+                           test_shard='0/2')
 
   def test_sharding_single(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red], test_shard='0/1')
