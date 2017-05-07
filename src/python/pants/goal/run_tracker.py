@@ -402,7 +402,6 @@ class RunTracker(Subsystem):
     :param string scope: The running scope
     :param string target: The target that we want to store info for
     :param string or list of items to make into a key key: The key for the info being stored
-                (This could be test data and it's value could be a dict)
     :param dict or string val: The value of the info being stored
     """
     # Stringify list of keys to make one key
@@ -419,7 +418,14 @@ class RunTracker(Subsystem):
       self._target_data.update({target: {scope: {key: val}}})
 
   def report_test_info(self, scope, target, key, test_info):
+    """
+    Add test information to target information
+    :param string scope: The running scope
+    :param Target target: The target that we want to store the test info under
+    :param list of strings or string key: The key for the info being stored
+    :param dict test_info: The info being stored
+    """
     target_addr = str(getattr(target, 'address').to_address())
     target_type = getattr(target, '_type_alias')
-    self.report_target_info('GLOBAL', target_addr, ['target_type'], target_type)
+    self.report_target_info('GLOBAL', target_addr, 'target_type', target_type)
     self.report_target_info(scope, target_addr, key, test_info)

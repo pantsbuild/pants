@@ -473,7 +473,6 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def _get_test_info_from_junitxml(self, junitxml):
     tests_in_path = []
 
-    #  TODO: create enum
     SUCCESS = 0
     FAILURE = 10000
     ERROR = 15000

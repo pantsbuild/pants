@@ -186,7 +186,6 @@ def parse_test_info(junit_xml_path, error_handler):
   tests_in_path = {}
 
   def parse_junit_xml_file(path):
-    # TODO: create enum for these variables
     SUCCESS = 0
     SKIPPED = 5000
     FAILURE = 10000
