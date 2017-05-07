@@ -412,7 +412,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       """.strip())
 
     result = self.execute_export_json('src/python/alpha')
-    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources_target'])
+    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources'])
     # But not the origin target
     self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
 
