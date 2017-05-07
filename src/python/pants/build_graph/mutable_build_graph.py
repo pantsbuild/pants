@@ -76,7 +76,7 @@ class MutableBuildGraph(BuildGraph):
 
       if not self.contains_address(target_address):
         target = self._target_addressable_to_target(target_address, target_addressable)
-        target.apply_injectables(self)
+        self.apply_injectables([target])
         self.inject_target(target, dependencies=dep_addresses)
       else:
         for dep_address in dep_addresses:

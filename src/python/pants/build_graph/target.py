@@ -667,13 +667,6 @@ class Target(AbstractTarget):
     return
     yield
 
-  @classmethod
-  def apply_injectables(cls, build_graph):
-    """Given a BuildGraph, apply all of this targets subsystems injectables."""
-    for subsystem in cls.subsystems():
-      if subsystem.is_initialized():
-        subsystem.global_instance().injectables(build_graph)
-
   @property
   def dependencies(self):
     """

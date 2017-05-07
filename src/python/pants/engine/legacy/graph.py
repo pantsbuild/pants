@@ -100,9 +100,7 @@ class LegacyBuildGraph(BuildGraph):
         address = target_adaptor.address
         all_addresses.add(address)
         if address not in self._target_by_address:
-          new_target = self._index_target(target_adaptor)
-          new_target.apply_injectables(self)
-          new_targets.append(new_target)
+          new_targets.append(self._index_target(target_adaptor))
 
     # Once the declared dependencies of all targets are indexed, inject their
     # additional "traversable_(dependency_)?specs".
@@ -114,6 +112,8 @@ class LegacyBuildGraph(BuildGraph):
         addresses_to_inject.add(address)
         if is_dependency:
           deps_to_inject.add((target.address, address))
+
+    self.apply_injectables(new_targets)
 
     for target in new_targets:
       traversables = [target.compute_dependency_specs(payload=target.payload)]

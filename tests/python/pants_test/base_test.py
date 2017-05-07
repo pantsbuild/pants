@@ -168,7 +168,7 @@ class BaseTest(unittest.TestCase):
                          **kwargs)
     dependencies = dependencies or []
 
-    target.apply_injectables(self.build_graph)
+    self.build_graph.apply_injectables([target])
     self.build_graph.inject_target(target,
                                    dependencies=[dep.address for dep in dependencies],
                                    derived_from=derived_from,
