@@ -17,7 +17,7 @@ from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
@@ -35,7 +35,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       # TODO: Use dummy target types here, instead of depending on other backends.
       targets={
         'java_library': JavaLibrary,
-        'python_library': PythonLibrary,
+        'python_library': TargetMacro.Factory.wrap(PythonLibrary.create, PythonLibrary),
         'jar_library': JarLibrary,
         'unpacked_jars': UnpackedJars,
         'resources': Resources,
@@ -258,6 +258,10 @@ class WhatChangedTest(WhatChangedTestBasic):
   def test_resource_changed(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
+      # Currently, `ParseContext` created objects cannot be synthetic - so these surface as
+      # concrete targets. This should be fine for now, since the `resources=` field is
+      # deprecated anyway - so this usage pattern is quickly going away.
+      'root/src/py/a:alpha_synthetic_resources',
       workspace=self.workspace(files=['root/src/py/a/test.resources'])
     )
 
