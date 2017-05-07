@@ -183,8 +183,7 @@ class BaseTest(unittest.TestCase):
       traversables.append(target.traversable_dependency_specs)
 
     for dependency_spec in itertools.chain(*traversables):
-      dependency_address = Address.parse(dependency_spec,
-                                                     relative_to=address.spec_path)
+      dependency_address = Address.parse(dependency_spec, relative_to=address.spec_path)
       dependency_target = self.build_graph.get_target(dependency_address)
       if not dependency_target:
         raise ValueError('Tests must make targets for dependency specs ahead of them '
