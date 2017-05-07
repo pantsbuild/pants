@@ -75,7 +75,6 @@ class JavaProtobufLibraryTest(BaseTest):
     with self.assertRaises(JarLibrary.WrongTargetTypeError):
       target.imported_jars
 
-  @unittest.skip('XXX')
   def test_wrong_import_type2(self):
     self.add_to_build_file('BUILD', dedent('''
       java_protobuf_library(name='foo',
@@ -85,10 +84,8 @@ class JavaProtobufLibraryTest(BaseTest):
         ],
       )
       '''))
-    target = self.target('//:foo')
-    self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JarLibrary.ExpectedAddressError):
-      target.imported_jars
+      target = self.target('//:foo')
 
   def test_traversable_specs(self):
     self.add_to_build_file('BUILD', dedent('''

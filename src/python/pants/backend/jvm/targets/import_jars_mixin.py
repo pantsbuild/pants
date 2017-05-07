@@ -53,8 +53,12 @@ class ImportJarsMixin(Target):
         for item in target_representation.get(fields_tuple[field_pos], ()):
           # For better error handling, this simply skips over non-strings, but we catch them
           # with a WrongTargetType in JarLibrary.to_jar_dependencies.
-          if item and isinstance(item, six.string_types):
-            yield item
+          if not isinstance(item, six.string_types):
+            raise JarLibrary.ExpectedAddressError(
+              'expected imports to contain string addresses, got {found_class} instead.'
+              .format(found_class=type(item).__name__)
+            )
+          yield item
 
     return list(gen_specs())
 
