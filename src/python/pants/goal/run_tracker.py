@@ -425,7 +425,7 @@ class RunTracker(Subsystem):
     :param list of strings or string key: The key for the info being stored
     :param dict test_info: The info being stored
     """
-    target_addr = str(getattr(target, 'address').to_address())
-    target_type = getattr(target, '_type_alias')
+    target_addr = str(target.address.to_address())
+    target_type = target.type_alias
     self.report_target_info('GLOBAL', target_addr, 'target_type', target_type)
     self.report_target_info(scope, target_addr, key, test_info)
