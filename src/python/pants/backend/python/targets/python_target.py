@@ -18,6 +18,7 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.build_graph.target_addressable import TargetAddressable
 from pants.util.memo import memoized_property
 
 
@@ -46,9 +47,12 @@ class PythonTarget(Target):
         sources=resources,
         type_alias=Resources.alias()
       )
-      resource_target = parse_context.create_object(Resources, **resources_kwargs)
-      resource_target_spec = '//{}:{}'.format(parse_context.rel_path,
-                                              resource_target.addressed_name)
+      resource_target = parse_context.create_object(Resources.alias(), **resources_kwargs)
+      if isinstance(resource_target, TargetAddressable):
+        name = resource_target.addressed_name
+      else:
+        name = resource_target.name
+      resource_target_spec = '//{}:{}'.format(parse_context.rel_path, name)
       kwargs['dependencies'] = kwargs.get('dependencies', []) + [resource_target_spec]
 
     parse_context.create_object(cls, type_alias=cls.alias(), **kwargs)
