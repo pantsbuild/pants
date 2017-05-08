@@ -50,10 +50,10 @@ class UnpackedJars(ImportJarsMixin, Target):
       raise self.ExpectedLibrariesError('Expected non-empty libraries attribute for {spec}'
                                         .format(spec=self.address.spec))
 
-  @property
-  def imported_jar_library_specs(self):
-    """List of JarLibrary specs to import.
+  @classmethod
+  def imported_jar_library_spec_fields(cls):
+    """Fields to extract JarLibrary specs from.
 
     Required to implement the ImportJarsMixin.
     """
-    return self.payload.library_specs
+    yield ('libraries', 'library_specs')

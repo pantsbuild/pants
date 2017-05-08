@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 
 from pants.backend.jvm.artifact import Artifact
 from pants.backend.jvm.repository import Repository
@@ -60,6 +61,7 @@ class PythonTargetTest(BaseTest):
       self.assertEqual(expected_resource_contents, fp.read())
     return resources_tgt
 
+  @unittest.skip('TODO: Figure out a better way to test macros.')
   def test_resources(self):
     self.create_file('test/data.txt', contents='42')
     lib = self.make_target(spec='test:lib', target_type=PythonLibrary, sources=[],

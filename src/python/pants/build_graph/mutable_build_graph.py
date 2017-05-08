@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import logging
 import traceback
 
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.target import Target
 
 
 logger = logging.getLogger(__name__)
@@ -74,6 +76,7 @@ class MutableBuildGraph(BuildGraph):
 
       if not self.contains_address(target_address):
         target = self._target_addressable_to_target(target_address, target_addressable)
+        self.apply_injectables([target])
         self.inject_target(target, dependencies=dep_addresses)
       else:
         for dep_address in dep_addresses:
@@ -81,7 +84,13 @@ class MutableBuildGraph(BuildGraph):
             self.inject_dependency(target_address, dep_address)
         target = self.get_target(target_address)
 
-      for traversable_spec in target.traversable_dependency_specs:
+      traversables = [target.compute_dependency_specs(payload=target.payload)]
+      # Only poke `traversable_dependency_specs` if a concrete implementation is defined
+      # in order to avoid spurious deprecation warnings.
+      if type(target).traversable_dependency_specs is not Target.traversable_dependency_specs:
+        traversables.append(target.traversable_dependency_specs)
+
+      for traversable_spec in itertools.chain(*traversables):
         traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
         self.maybe_inject_address_closure(traversable_address)
 
@@ -89,7 +98,13 @@ class MutableBuildGraph(BuildGraph):
           self.inject_dependency(dependent=target.address, dependency=traversable_address)
           target.mark_transitive_invalidation_hash_dirty()
 
-      for traversable_spec in target.traversable_specs:
+      traversables = [target.compute_injectable_specs(payload=target.payload)]
+      # Only poke `traversable_specs` if a concrete implementation is defined
+      # in order to avoid spurious deprecation warnings.
+      if type(target).traversable_specs is not Target.traversable_specs:
+        traversables.append(target.traversable_specs)
+
+      for traversable_spec in itertools.chain(*traversables):
         traversable_address = Address.parse(traversable_spec, relative_to=target_address.spec_path)
         self.maybe_inject_address_closure(traversable_address)
         target.mark_transitive_invalidation_hash_dirty()

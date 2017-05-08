@@ -149,7 +149,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       if suffix:
         return '{0}_{1}'.format(name, suffix)
       else:
-        raise RuntimeError('Suffix version must be specified if using a custom scala version.'
+        raise RuntimeError('Suffix version must be specified if using a custom scala version. '
                            'Suffix version is used for bootstrapping jars.  If a custom '
                            'scala version is not specified, then the version specified in '
                            '--scala-platform-suffix-version is used.  For example for Scala '
@@ -165,38 +165,33 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the repl tool key."""
     return self._key_for_tool_version('scala-repl', self.version)
 
-  @classmethod
-  def compiler_library_target_spec(cls, buildgraph):
-    """Returns a target spec for the scala compiler library.
-
-    Synthesizes one into the buildgraph if necessary.
-
-    :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
-    :return a target spec:
-    """
-    return cls.global_instance()._library_target_spec(buildgraph, 'scalac',
-                                                      cls._create_compiler_jardep)
-
-  @classmethod
-  def runtime_library_target_spec(cls, buildgraph):
-    """Returns a target spec for the scala runtime library.
-
-    Synthesizes one into the buildgraph if necessary.
-
-    :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
-    :return a target spec:
-    """
-    return cls.global_instance()._library_target_spec(buildgraph, 'scala-library',
-                                                      cls._create_runtime_jardep)
-
-  def _library_target_spec(self, buildgraph, key, create_jardep_func):
+  def injectables(self, build_graph):
     if self.version == 'custom':
-      return '//:{}'.format(key)
-    else:
-      synthetic_address = Address.parse('//:{}-synthetic'.format(key))
-      if not buildgraph.contains_address(synthetic_address):
+      return
+
+    specs_to_create = [
+      ('scalac', self._create_compiler_jardep),
+      ('scala-library', self._create_runtime_jardep)
+    ]
+
+    for spec_key, create_jardep_func in specs_to_create:
+      spec = self.injectables_spec_for_key(spec_key)
+      target_address = Address.parse(spec)
+      if not build_graph.contains_address(target_address):
         jars = [create_jardep_func(self.version)]
-        buildgraph.inject_synthetic_target(synthetic_address, JarLibrary, jars=jars, scope='forced')
-      elif not buildgraph.get_target(synthetic_address).is_synthetic:
-        raise buildgraph.ManualSyntheticTargetError(synthetic_address)
-      return buildgraph.get_target(synthetic_address).address.spec
+        build_graph.inject_synthetic_target(target_address,
+                                           JarLibrary,
+                                           jars=jars,
+                                           scope='forced')
+      elif not build_graph.get_target(target_address).is_synthetic:
+        raise build_graph.ManualSyntheticTargetError(target_address)
+
+  @property
+  def injectables_spec_mapping(self):
+    maybe_suffix = '' if self.version == 'custom' else '-synthetic'
+    return {
+      # Target spec for the scala compiler library.
+      'scalac': ['//:scalac{}'.format(maybe_suffix)],
+      # Target spec for the scala runtime library.
+      'scala-library': ['//:scala-library{}'.format(maybe_suffix)]
+    }

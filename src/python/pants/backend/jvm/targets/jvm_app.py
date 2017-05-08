@@ -262,12 +262,15 @@ class JvmApp(Target):
       globs += super_globs['globs']
     return {'globs': globs}
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(JvmApp, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(JvmApp, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    if self.payload.binary:
-      yield self.payload.binary
+
+    target_representation = kwargs or payload.as_dict()
+    binary = target_representation.get('binary')
+    if binary:
+      yield binary
 
   @property
   def basename(self):

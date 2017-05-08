@@ -50,14 +50,6 @@ class GoLocalSource(GoTarget):
 
     parse_context.create_object(cls, type_alias=cls.alias(), name=name, **kwargs)
 
-  @classmethod
-  def alias(cls):
-    """Subclasses should return their desired BUILD file alias.
-
-    :rtype: string
-    """
-    raise NotImplementedError()
-
   def __init__(self, address=None, payload=None, sources=None, **kwargs):
     if not sources:
       # We grab all files in the current directory except BUILD files for 2 reasons:

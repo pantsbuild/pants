@@ -57,7 +57,7 @@ class TargetTest(BaseTest):
   def test_empty_traversable_properties(self):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
-    self.assertSequenceEqual([], list(target.traversable_dependency_specs))
+    self.assertSequenceEqual([], list(target.compute_dependency_specs(payload=target.payload)))
 
   def test_illegal_kwargs(self):
     init_subsystem(Target.Arguments)

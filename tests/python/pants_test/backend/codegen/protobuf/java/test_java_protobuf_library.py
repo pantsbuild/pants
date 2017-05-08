@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import unittest
 from textwrap import dedent
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
@@ -83,10 +84,8 @@ class JavaProtobufLibraryTest(BaseTest):
         ],
       )
       '''))
-    target = self.target('//:foo')
-    self.assertIsInstance(target, JavaProtobufLibrary)
     with self.assertRaises(JarLibrary.ExpectedAddressError):
-      target.imported_jars
+      target = self.target('//:foo')
 
   def test_traversable_specs(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -109,4 +108,4 @@ class JavaProtobufLibraryTest(BaseTest):
     '''))
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
-    self.assertEqual([':import_jars'], list(target.traversable_dependency_specs))
+    self.assertEqual([':import_jars'], list(target.compute_dependency_specs(payload=target.payload)))

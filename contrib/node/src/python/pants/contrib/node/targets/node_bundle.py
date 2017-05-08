@@ -38,12 +38,15 @@ class NodeBundle(NodePackage):
     })
     super(NodeBundle, self).__init__(address=address, payload=payload, **kwargs)
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(NodeBundle, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(NodeBundle, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    if self.payload.node_module:
-      yield self.payload.node_module
+
+    target_representation = kwargs or payload.as_dict()
+    spec = target_representation.get('node_module')
+    if spec:
+      yield spec
 
   @property
   def node_module(self):

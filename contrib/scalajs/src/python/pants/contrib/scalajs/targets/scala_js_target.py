@@ -17,7 +17,7 @@ class ScalaJSTarget(object):
 
   @classmethod
   def subsystems(cls):
-    return super(ScalaJSTarget, cls).subsystems() + (JvmPlatform, ScalaJSPlatform,)
+    return super(ScalaJSTarget, cls).subsystems() + (JvmPlatform, ScalaJSPlatform)
 
   def __init__(self, address=None, payload=None, **kwargs):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
@@ -27,11 +27,11 @@ class ScalaJSTarget(object):
     })
     super(ScalaJSTarget, self).__init__(address=address, payload=payload, **kwargs)
 
-  @property
-  def traversable_dependency_specs(self):
-    for library_spec in ScalaJSPlatform.global_instance().runtime:
-      yield library_spec
-    for spec in super(ScalaJSTarget, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(ScalaJSTarget, cls).compute_dependency_specs(kwargs, payload):
+      yield spec
+    for spec in ScalaJSPlatform.global_instance().injectables_specs_for_key('runtime'):
       yield spec
 
   @property
