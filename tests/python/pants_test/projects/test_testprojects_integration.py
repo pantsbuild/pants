@@ -51,6 +51,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/missingjardepswhitelist:missingjardepswhitelist',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_failure',
       'testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:fatal',
+      'testprojects/src/thrift/org/pantsbuild/thrift_exports:C-without-exports',
       'testprojects/src/thrift/org/pantsbuild/thrift_linter:',
       'testprojects/src/java/org/pantsbuild/testproject/provided:c',
       'testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target',

@@ -8,7 +8,7 @@ java_thrift_library(
 )
 
 java_thrift_library(
-  name='B1',
+  name='B-with-exports',
   sources=[
     'B.thrift',
   ],
@@ -23,7 +23,7 @@ java_thrift_library(
 )
 
 java_thrift_library(
-  name='B2',
+  name='B-without-exports',
   sources=[
     'B.thrift',
   ],
@@ -35,12 +35,12 @@ java_thrift_library(
 )
 
 java_thrift_library(
-  name='C1',
+  name='C-with-exports',
   sources=[
     'C.thrift',
   ],
   dependencies=[
-    ':B1',
+    ':B-with-exports',
   ],
   language='scala',
   compiler='scrooge',
@@ -48,12 +48,12 @@ java_thrift_library(
 )
 
 java_thrift_library(
-  name='C2',
+  name='C-without-exports',
   sources=[
     'C.thrift',
   ],
   dependencies=[
-    ':B2',
+    ':B-without-exports',
   ],
   language='scala',
   compiler='scrooge',

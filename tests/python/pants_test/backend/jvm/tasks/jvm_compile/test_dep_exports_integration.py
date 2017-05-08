@@ -68,10 +68,10 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
 class DepExportsThriftTargets(PantsRunIntegrationTest):
 
   def test_exports_for_thrift_targets(self):
-    pants_run = self.run_pants(['compile', 'testprojects/src/thrift/org/pantsbuild/thrift_exports:C1'])
+    pants_run = self.run_pants(['compile', 'testprojects/src/thrift/org/pantsbuild/thrift_exports:C-with-exports'])
     self.assert_success(pants_run)
 
-    pants_run = self.run_pants(['compile', 'testprojects/src/thrift/org/pantsbuild/thrift_exports:C2'])
+    pants_run = self.run_pants(['compile', 'testprojects/src/thrift/org/pantsbuild/thrift_exports:C-without-exports'])
     self.assert_failure(pants_run)
     self.assertIn('Symbol \'type org.pantsbuild.thrift_exports.thriftscala.FooA\' is missing from the classpath',
                   pants_run.stdout_data)
