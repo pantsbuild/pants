@@ -1,0 +1,36 @@
+java_thrift_library(
+  name='A',
+  sources=[
+    'A.thrift',
+  ],
+  language='scala',
+  compiler='scrooge',
+)
+
+java_thrift_library(
+  name='B',
+  sources=[
+    'B.thrift',
+  ],
+  dependencies=[
+    ':A',
+  ],
+  exports=[
+    ':A',
+  ],
+  language='scala',
+  compiler='scrooge',
+)
+
+java_thrift_library(
+  name='C',
+  sources=[
+    'C.thrift',
+  ],
+  dependencies=[
+    ':B',
+  ],
+  language='scala',
+  compiler='scrooge',
+  strict_deps=True,
+)

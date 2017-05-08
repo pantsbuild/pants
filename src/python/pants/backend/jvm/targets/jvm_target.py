@@ -139,23 +139,33 @@ class JvmTarget(Target, Jarable):
 
   @property
   def exports(self):
+    return self.payload.exports
+
+  @property
+  def exports_targets(self):
     """A list of exported targets, which will be accessible to dependents.
 
     :return: See constructor.
     :rtype: list
     """
-    exports = []
+    exports_targets = []
     for spec in self.payload.exports:
       addr = Address.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(addr)
+      if target.is_thrift:
+        for dep in self.dependencies:
+          if dep != target and dep.is_synthetic and dep.derived_from == target:
+            target = dep
+            break
+
       if target not in self.dependencies:
         # This means the exported target was not injected before "self",
         # thus it's not a valid export.
         raise TargetDefinitionException(self,
           'Invalid exports: "{}" is not a dependency of {}'.format(spec, self))
-      exports.append(target)
+      exports_targets.append(target)
 
-    return exports
+    return exports_targets
 
   @property
   def fatal_warnings(self):
@@ -281,3 +291,7 @@ class JvmTarget(Target, Jarable):
   @property
   def services(self):
     return self._services
+
+  @property
+  def is_thrift(self):
+    return False

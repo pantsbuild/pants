@@ -27,7 +27,7 @@ def _resolve_strict_dependencies(target):
 
 
 def _resolve_exports(target):
-  for export in getattr(target, 'exports', []):
+  for export in getattr(target, 'exports_targets', []):
     if type(export) in (AliasTarget, Target):
       # If exported target is an alias, expand its dependencies.
       for dep in _resolve_strict_dependencies(export):
