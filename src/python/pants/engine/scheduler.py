@@ -90,7 +90,7 @@ class WrappedNativeScheduler(object):
           yield line.rstrip()
 
   def assert_ruleset_valid(self):
-    raw_value = self._native.lib.validator_run(self._tasks, self._root_type_ids())
+    raw_value = self._native.lib.validator_run(self._scheduler)
     value = self._from_value(raw_value)
 
     if isinstance(value, Exception):
@@ -264,7 +264,7 @@ class WrappedNativeScheduler(object):
       roots = {}
       for root, raw_root in zip(execution_request.roots,
                                 self._native.unpack(raw_roots.nodes_ptr,
-                                                               raw_roots.nodes_len)):
+                                                    raw_roots.nodes_len)):
         if raw_root.state_tag is 0:
           state = None
         elif raw_root.state_tag is 1:
