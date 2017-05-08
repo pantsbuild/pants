@@ -8,7 +8,7 @@ java_thrift_library(
 )
 
 java_thrift_library(
-  name='B',
+  name='B1',
   sources=[
     'B.thrift',
   ],
@@ -23,12 +23,37 @@ java_thrift_library(
 )
 
 java_thrift_library(
-  name='C',
+  name='B2',
+  sources=[
+    'B.thrift',
+  ],
+  dependencies=[
+    ':A',
+  ],
+  language='scala',
+  compiler='scrooge',
+)
+
+java_thrift_library(
+  name='C1',
   sources=[
     'C.thrift',
   ],
   dependencies=[
-    ':B',
+    ':B1',
+  ],
+  language='scala',
+  compiler='scrooge',
+  strict_deps=True,
+)
+
+java_thrift_library(
+  name='C2',
+  sources=[
+    'C.thrift',
+  ],
+  dependencies=[
+    ':B2',
   ],
   language='scala',
   compiler='scrooge',
