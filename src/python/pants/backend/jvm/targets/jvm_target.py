@@ -102,11 +102,11 @@ class JvmTarget(Target, Jarable):
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
-
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
       'excludes': excludes,
+      'resources': PrimitiveField(self.assert_list(resources, key_arg='resources')),
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
       'exports': SetOfPrimitivesField(exports),
@@ -117,10 +117,8 @@ class JvmTarget(Target, Jarable):
       'scalac_plugins': SetOfPrimitivesField(scalac_plugins),
       'scalac_plugin_args': PrimitiveField(scalac_plugin_args),
     })
-    self._resource_specs = self.assert_list(resources, key_arg='resources')
 
-    super(JvmTarget, self).__init__(address=address, payload=payload,
-                                    **kwargs)
+    super(JvmTarget, self).__init__(address=address, payload=payload, **kwargs)
 
     # Service info is only used when generating resources, it should not affect, for example, a
     # compile fingerprint or javadoc fingerprint.  As such, its not a payload field.
@@ -251,26 +249,25 @@ class JvmTarget(Target, Jarable):
   def has_resources(self):
     return len(self.resources) > 0
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(JvmTarget, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(JvmTarget, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    for resource_spec in self._resource_specs:
-      yield resource_spec
-    # Add deps on anything we might need to find plugins.
-    # Note that this will also add deps from scala targets to javac plugins, but there's
-    # no real harm in that, and the alternative is to check for .java sources, which would
-    # eagerly evaluate all the globs, which would be a performance drag for goals that
-    # otherwise wouldn't do that (like `list`).
-    for spec in Java.global_plugin_dependency_specs():
-      # Ensure that if this target is the plugin, we don't create a dep on ourself.
-      # Note that we can't do build graph dep checking here, so we will create a dep on our own
-      # deps, thus creating a cycle. Therefore an in-repo plugin that has JvmTarget deps
-      # can only be applied globally via the Java subsystem if you publish it first and then
-      # reference it as a JarLibrary (it can still be applied directly from the repo on targets
-      # that explicitly depend on it though). This is an unfortunate gotcha that will be addressed
-      # in the new engine.
-      if spec != self.address.spec:
+
+    target_representation = kwargs or payload.as_dict()
+    resources = target_representation.get('resources')
+    if resources:
+      for spec in resources:
+        yield spec
+
+    # TODO: https://github.com/pantsbuild/pants/issues/3409
+    if Java.is_initialized():
+      # Add deps on anything we might need to find plugins.
+      # Note that this will also add deps from scala targets to javac plugins, but there's
+      # no real harm in that, and the alternative is to check for .java sources, which would
+      # eagerly evaluate all the globs, which would be a performance drag for goals that
+      # otherwise wouldn't do that (like `list`).
+      for spec in Java.global_instance().injectables_specs_for_key('plugin'):
         yield spec
 
   @property

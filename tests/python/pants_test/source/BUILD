@@ -2,6 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
+  name = 'filespec',
+  sources = ['test_filespec.py'],
+  dependencies = [
+    'src/python/pants/source',
+  ]
+)
+
+python_tests(
   name = 'payload_fields',
   sources = ['test_payload_fields.py'],
   dependencies = [

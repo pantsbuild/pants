@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from hashlib import sha1
 
+from pants.base.payload_field import PayloadField
+
 
 class PayloadFieldAlreadyDefinedError(Exception): pass
 
@@ -31,6 +33,10 @@ class Payload(object):
   @property
   def fields(self):
     return self._fields.items()
+
+  def as_dict(self):
+    """Return the Payload object as a dict."""
+    return {k: self.get_field_value(k) for k in self._fields}
 
   def freeze(self):
     """Permanently make this Payload instance immutable.

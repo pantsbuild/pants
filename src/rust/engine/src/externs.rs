@@ -158,16 +158,19 @@ pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<
       )
     });
   if result.is_throw {
-    Err(Failure::Throw(result.value))
+    let traceback = result.traceback.to_string().unwrap_or_else(|e| {
+                      format!("<failed to decode unicode for {:?}: {}>", result.traceback, e)
+                    });
+    Err(Failure::Throw(result.value, traceback))
   } else {
     Ok(result.value)
   }
 }
 
-/**
- * NB: Panics on failure. Only recommended for use with built-in functions, such as
- * those configured in types::Types.
- */
+///
+/// NB: Panics on failure. Only recommended for use with built-in functions, such as
+/// those configured in types::Types.
+///
 pub fn invoke_unsafe(func: &Function, args: &Vec<Value>) -> Value {
   invoke_runnable(&val_for_id(func.0), args, false)
     .unwrap_or_else(|e| {
@@ -183,10 +186,10 @@ lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
 }
 
-/**
- * Set the static Externs for this process. All other methods of this module will fail
- * until this has been called.
- */
+///
+/// Set the static Externs for this process. All other methods of this module will fail
+/// until this has been called.
+///
 pub fn set_externs(externs: Externs) {
   let mut externs_ref = EXTERNS.write().unwrap();
   *externs_ref = Some(externs);
@@ -323,6 +326,7 @@ pub enum LogLevel {
 pub struct RunnableComplete {
   value: Value,
   is_throw: bool,
+  traceback: Buffer
 }
 
 // Points to an array containing a series of values allocated by Python.
@@ -369,6 +373,7 @@ pub type ProjectMultiExtern =
   extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64) -> ValueBuffer;
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Buffer {
   bytes_ptr: *mut u8,
   bytes_len: u64,

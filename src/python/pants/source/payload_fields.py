@@ -5,9 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from hashlib import sha1
 
 from pants.base.payload_field import PayloadField
+from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.util.memo import memoized_property
@@ -33,7 +35,7 @@ class SourcesField(PayloadField):
     return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
   def matches(self, path):
-    return self.sources.matches(path)
+    return self.sources.matches(path) or matches_filespec(path, self.filespec)
 
   @property
   def filespec(self):

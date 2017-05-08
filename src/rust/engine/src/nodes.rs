@@ -39,13 +39,13 @@ fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
 }
 
 fn throw(msg: &str) -> Failure {
-  Failure::Throw(externs::create_exception(msg))
+  Failure::Throw(externs::create_exception(msg), format!("Traceback (no traceback):\n  <pants native internals>\nException: {}", msg).to_string())
 }
 
-/**
- * A helper to indicate that the value represented by the Failure was required, and thus
- * fatal if not present.
- */
+///
+/// A helper to indicate that the value represented by the Failure was required, and thus
+/// fatal if not present.
+///
 fn was_required(failure: Failure) -> Failure {
   match failure {
     Failure::Noop(noop) =>
@@ -59,9 +59,9 @@ trait GetNode {
 }
 
 impl GetNode for Context {
-  /**
-   * Get the future value for the given Node implementation.
-   */
+  ///
+  /// Get the future value for the given Node implementation.
+  ///
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
     if N::is_inline() {
       node.run(self.clone())
@@ -89,19 +89,19 @@ impl VFS<Failure> for Context {
   }
 
   fn mk_error(msg: &str) -> Failure {
-    Failure::Throw(externs::create_exception(msg))
+    Failure::Throw(externs::create_exception(msg), "<pants native internals>".to_string())
   }
 }
 
-/**
- * Defines executing a cacheable/memoizable step for the given context.
- *
- * The Output type of a Node is bounded to values that can be stored and retrieved from
- * the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
- * stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
- * combination of bounds at usage sites should mean that a failure to unwrap the result is
- * exceedingly rare.
- */
+///
+/// Defines executing a cacheable/memoizable step for the given context.
+///
+/// The Output type of a Node is bounded to values that can be stored and retrieved from
+/// the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
+/// stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
+/// combination of bounds at usage sites should mean that a failure to unwrap the result is
+/// exceedingly rare.
+///
 pub trait Node: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
@@ -109,14 +109,14 @@ pub trait Node: Into<NodeKey> {
   fn is_inline() -> bool;
 }
 
-/**
- * A Node that selects a product for a subject.
- *
- * A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
- * 'variants' field represents variant configuration that is propagated to dependencies. When
- * a task needs to consume a product as configured by the variants map, it can pass variant_key,
- * which matches a 'variant' value to restrict the names of values selected by a SelectNode.
- */
+///
+/// A Node that selects a product for a subject.
+///
+/// A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
+/// 'variants' field represents variant configuration that is propagated to dependencies. When
+/// a task needs to consume a product as configured by the variants map, it can pass variant_key,
+/// which matches a 'variant' value to restrict the names of values selected by a SelectNode.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
   pub subject: Key,
@@ -179,11 +179,11 @@ impl Select {
     }
   }
 
-  /**
-   * Looks for has-a or is-a relationships between the given value and the requested product.
-   *
-   * Returns the resulting product value, or None if no match was made.
-   */
+  ///
+  /// Looks for has-a or is-a relationships between the given value and the requested product.
+  ///
+  /// Returns the resulting product value, or None if no match was made.
+  ///
   fn select_literal(
     &self,
     context: &Context,
@@ -208,9 +208,9 @@ impl Select {
     None
   }
 
-  /**
-   * Given the results of configured Task nodes, select a single successful value, or fail.
-   */
+  ///
+  /// Given the results of configured Task nodes, select a single successful value, or fail.
+  ///
   fn choose_task_result(
     &self,
     context: Context,
@@ -235,7 +235,7 @@ impl Select {
               }
               continue
             },
-            f @ Failure::Throw(_) =>
+            f @ Failure::Throw(..) =>
               return Err(f),
           }
         },
@@ -259,9 +259,9 @@ impl Select {
     }
   }
 
-  /**
-   * Gets a Snapshot for the current subject.
-   */
+  ///
+  /// Gets a Snapshot for the current subject.
+  ///
   fn get_snapshot(&self, context: &Context) -> NodeFuture<fs::Snapshot> {
     // TODO: Hacky... should have an intermediate Node to Select PathGlobs for the subject
     // before executing, and then treat this as an intrinsic. Otherwise, Snapshots for
@@ -283,10 +283,10 @@ impl Select {
     )
   }
 
-  /**
-   * Return Futures for each Task/Node that might be able to compute the given product for the
-   * given subject and variants.
-   */
+  ///
+  /// Return Futures for each Task/Node that might be able to compute the given product for the
+  /// given subject and variants.
+  ///
   fn gen_nodes(&self, context: &Context) -> Vec<NodeFuture<Value>> {
     // TODO: These `product==` hooks are hacky.
     if self.product() == &context.core.types.snapshot {
@@ -389,15 +389,15 @@ impl From<Select> for NodeKey {
   }
 }
 
-/**
- * A Node that selects the given Product for each of the items in `field` on `dep_product`.
- *
- * Begins by selecting the `dep_product` for the subject, and then selects a product for each
- * member of a collection named `field` on the dep_product.
- *
- * The value produced by this Node guarantees that the order of the provided values matches the
- * order of declaration in the list `field` of the `dep_product`.
- */
+///
+/// A Node that selects the given Product for each of the items in `field` on `dep_product`.
+///
+/// Begins by selecting the `dep_product` for the subject, and then selects a product for each
+/// member of a collection named `field` on the dep_product.
+///
+/// The value produced by this Node guarantees that the order of the provided values matches the
+/// order of declaration in the list `field` of the `dep_product`.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectDependencies {
   pub subject: Key,
@@ -513,13 +513,13 @@ impl From<SelectDependencies> for NodeKey {
   }
 }
 
-/**
- * A node that selects for the dep_product type, then recursively selects for the product type of
- * the result. Both the product and the dep_product must have the same "field" and the types of
- * products in that field must match the field type.
- *
- * A node that recursively selects the dependencies of requested type and merge them.
- */
+///
+/// A node that selects for the dep_product type, then recursively selects for the product type of
+/// the result. Both the product and the dep_product must have the same "field" and the types of
+/// products in that field must match the field type.
+///
+/// A node that recursively selects the dependencies of requested type and merge them.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SelectTransitive {
   pub subject: Key,
@@ -559,11 +559,11 @@ impl SelectTransitive {
     }
   }
 
-  /**
-   * Process single subject.
-   *
-   * Return tuple of (processed subject_key, product output, dependencies to be processed in future iterations).
-   */
+  ///
+  /// Process single subject.
+  ///
+  /// Return tuple of (processed subject_key, product output, dependencies to be processed in future iterations).
+  ///
   fn expand_transitive(&self, context: &Context, subject_key: Key) -> NodeFuture<(Key, Value, Vec<Value>)> {
     let field_name = self.selector.field.to_owned();
     context
@@ -587,9 +587,9 @@ impl SelectTransitive {
   }
 }
 
-/**
- * Track states when processing `SelectTransitive` iteratively.
- */
+///
+/// Track states when processing `SelectTransitive` iteratively.
+///
 #[derive(Debug)]
 struct TransitiveExpansion {
   // Subjects to be processed.
@@ -780,9 +780,9 @@ impl From<SelectProjection> for NodeKey {
   }
 }
 
-/**
- * A Node that represents reading the destination of a symlink (non-recursively).
- */
+///
+/// A Node that represents reading the destination of a symlink (non-recursively).
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct ReadLink(Link);
 
@@ -812,14 +812,14 @@ impl From<ReadLink> for NodeKey {
   }
 }
 
-/**
- * A Node that represents consuming the stat for some path.
- *
- * NB: Because the `Scandir` operation gets the stats for a parent directory in a single syscall,
- * this operation results in no data, and is simply a placeholder for `Snapshot` Nodes to use to
- * declare a dependency on the existence/content of a particular path. This makes them more error
- * prone, unfortunately.
- */
+///
+/// A Node that represents consuming the stat for some path.
+///
+/// NB: Because the `Scandir` operation gets the stats for a parent directory in a single syscall,
+/// this operation results in no data, and is simply a placeholder for `Snapshot` Nodes to use to
+/// declare a dependency on the existence/content of a particular path. This makes them more error
+/// prone, unfortunately.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Stat(PathBuf);
 
@@ -841,10 +841,10 @@ impl From<Stat> for NodeKey {
   }
 }
 
-/**
- * A Node that represents executing a directory listing that returns a Stat per directory
- * entry (generally in one syscall). No symlinks are expanded.
- */
+///
+/// A Node that represents executing a directory listing that returns a Stat per directory
+/// entry (generally in one syscall). No symlinks are expanded.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
@@ -877,12 +877,12 @@ impl From<Scandir> for NodeKey {
   }
 }
 
-/**
- * A Node that captures an fs::Snapshot for the given subject.
- *
- * Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
- * PathStats matched by the PathGlobs.
- */
+///
+/// A Node that captures an fs::Snapshot for the given subject.
+///
+/// Begins by selecting PathGlobs for the subject, and then computes a Snapshot for the
+/// PathStats matched by the PathGlobs.
+///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Snapshot {
   subject: Key,
@@ -1043,9 +1043,9 @@ pub struct Task {
 }
 
 impl Task {
-  /**
-   * TODO: Can/should inline execution of all of these.
-   */
+  ///
+  /// TODO: Can/should inline execution of all of these.
+  ///
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
     let ref edges = context.core.rule_graph.edges_for_inner(&self.entry).expect("edges for task exist.");
     match selector {
@@ -1181,9 +1181,9 @@ impl NodeKey {
     }
   }
 
-  /**
-   * If this NodeKey represents an FS operation, returns its Path.
-   */
+  ///
+  /// If this NodeKey represents an FS operation, returns its Path.
+  ///
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
       &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),

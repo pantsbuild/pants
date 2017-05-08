@@ -115,11 +115,13 @@ class Page(Target):
     """The first (and only) source listed by this Page."""
     return list(self.payload.sources.source_paths)[0]
 
-  @property
-  def traversable_specs(self):
-    for spec in super(Page, self).traversable_specs:
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    for spec in super(Page, cls).compute_injectable_specs(kwargs, payload):
       yield spec
-    for spec in self.payload.links:
+
+    target_representation = kwargs or payload.as_dict()
+    for spec in target_representation.get('links', []):
       yield spec
 
   @property

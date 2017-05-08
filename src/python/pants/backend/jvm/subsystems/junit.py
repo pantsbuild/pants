@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
@@ -49,14 +50,19 @@ class JUnit(JvmToolMixin, Subsystem):
                                                    recursive=True),
                           ])
 
-  @memoized_method
-  def library_address(self):
-    """Returns an address for the junit library.
+  def injectables(self, build_graph):
+    junit_addr = Address.parse(self.injectables_spec_for_key('library'))
+    if not build_graph.contains_address(junit_addr):
+      build_graph.inject_synthetic_target(junit_addr,
+                                          JarLibrary,
+                                          jars=[JUnit.LIBRARY_JAR],
+                                          scope='forced')
 
-    :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
-    :rtype: `Address`
-    """
-    return Address.parse(self.get_options().junit_library)
+  @property
+  def injectables_spec_mapping(self):
+    return {
+      'library': [self.get_options().junit_library]
+    }
 
   def runner_classpath(self, context):
     """Returns an iterable of classpath elements for the runner.

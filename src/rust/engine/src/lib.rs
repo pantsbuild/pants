@@ -92,8 +92,8 @@ impl RawNode {
           (RawStateTag::Empty as u8, externs::create_exception("No value")),
         Some(Ok(v)) =>
           (RawStateTag::Return as u8, v),
-        Some(Err(Failure::Throw(msg))) =>
-          (RawStateTag::Throw as u8, msg),
+        Some(Err(Failure::Throw(exc, _))) =>
+          (RawStateTag::Throw as u8, exc),
         Some(Err(Failure::Noop(noop))) =>
           (RawStateTag::Noop as u8, externs::create_exception(&format!("{:?}", noop))),
       };
@@ -181,12 +181,12 @@ pub extern fn externs_set(
   );
 }
 
-/**
- * Given a set of Tasks and type information, creates a Scheduler.
- *
- * The given Tasks struct will be cloned, so no additional mutation of the reference will
- * affect the created Scheduler.
- */
+///
+/// Given a set of Tasks and type information, creates a Scheduler.
+///
+/// The given Tasks struct will be cloned, so no additional mutation of the reference will
+/// affect the created Scheduler.
+///
 #[no_mangle]
 pub extern fn scheduler_create(
   tasks_ptr: *mut Tasks,

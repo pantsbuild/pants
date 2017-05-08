@@ -28,6 +28,10 @@ class PythonBinary(PythonTarget):
   :API: public
   """
 
+  @classmethod
+  def alias(cls):
+    return 'python_binary'
+
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
   def __init__(self,

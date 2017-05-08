@@ -18,6 +18,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.target_roots import TargetRoots
+from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.util import init_native
 
@@ -71,6 +72,7 @@ class GraphTestBase(unittest.TestCase):
       yield graph, addresses, graph_helper.scheduler
 
   def create_graph_from_specs(self, graph_helper, specs):
+    Subsystem.reset()
     target_roots = self.create_target_roots(specs)
     graph = graph_helper.create_build_graph(target_roots)[0]
     return graph, target_roots
@@ -155,20 +157,6 @@ class GraphInvalidationTest(GraphTestBase):
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
       self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd'],
                         sources)
-
-  def test_implicit_sources(self):
-    expected_sources = {
-      'testprojects/tests/python/pants/file_sets:implicit_sources':
-        ['a.py', 'aa.py', 'aaa.py', 'aabb.py', 'ab.py'],
-      'testprojects/tests/python/pants/file_sets:test_with_implicit_sources':
-        ['test_a.py']
-    }
-
-    for spec, exp_sources in expected_sources.items():
-      with self.open_scheduler([spec]) as (graph, _, _):
-        target = graph.get_target(Address.parse(spec))
-        sources = sorted([os.path.basename(s) for s in target.sources_relative_to_buildroot()])
-        self.assertEquals(exp_sources, sources)
 
   def test_target_macro_override(self):
     """Tests that we can "wrap" an existing target type with additional functionality.

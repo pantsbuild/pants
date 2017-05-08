@@ -23,18 +23,8 @@ from pants.engine.selectors import Select, SelectDependencies, SelectProjection,
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
-from pants_test.engine.util import TargetTable
+from pants_test.engine.util import TargetTable, assert_equal_with_printing, init_native
 from pants_test.subsystem.subsystem_util import init_subsystem
-
-
-def assert_equal_with_printing(test_case, expected, actual):
-
-  str_actual = str(actual)
-  print('Expected:')
-  print(expected)
-  print('Actual:')
-  print(str_actual)
-  test_case.assertEqual(expected, str_actual)
 
 
 class AGoal(Goal):
@@ -95,9 +85,8 @@ class RulesetValidatorTest(unittest.TestCase):
     return self.create_native_scheduler(root_subject_types, rules)
 
   def create_native_scheduler(self, root_subject_types, rules):
-    init_subsystem(Native.Factory)
     rule_index = RuleIndex.create(rules)
-    native = Native.Factory.global_instance().create()
+    native = init_native()
     scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index, root_subject_types)
     return scheduler
 

@@ -9,6 +9,8 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 
 
@@ -31,7 +33,7 @@ class ScalaLibrary(ExportableJvmLibrary):
   def subsystems(cls):
     return super(ScalaLibrary, cls).subsystems() + (ScalaPlatform, )
 
-  def __init__(self, java_sources=None, **kwargs):
+  def __init__(self, java_sources=None, payload=None, **kwargs):
     """
     :param java_sources: Java libraries this library has a *circular*
       dependency on.
@@ -43,22 +45,30 @@ class ScalaLibrary(ExportableJvmLibrary):
     :param resources: An optional list of paths (DEPRECATED) or ``resources``
       targets containing resources that belong on this library's classpath.
     """
-    self._java_sources_specs = self.assert_list(java_sources, key_arg='java_sources')
-    super(ScalaLibrary, self).__init__(**kwargs)
+    payload = payload or Payload()
+    payload.add_fields({
+      'java_sources': PrimitiveField(self.assert_list(java_sources, key_arg='java_sources')),
+    })
+    super(ScalaLibrary, self).__init__(payload=payload, **kwargs)
     self.add_labels('scala')
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(ScalaLibrary, self).traversable_dependency_specs:
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    for spec in super(ScalaLibrary, cls).compute_injectable_specs(kwargs, payload):
       yield spec
-    yield ScalaPlatform.runtime_library_target_spec(self._build_graph)
 
-  @property
-  def traversable_specs(self):
-    for spec in super(ScalaLibrary, self).traversable_specs:
-      yield spec
-    for java_source_spec in self._java_sources_specs:
+    target_representation = kwargs or payload.as_dict()
+    java_sources_specs = target_representation.get('java_sources', None) or []
+    for java_source_spec in java_sources_specs:
       yield java_source_spec
+
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(ScalaLibrary, cls).compute_dependency_specs(kwargs, payload):
+      yield spec
+
+    for spec in ScalaPlatform.global_instance().injectables_specs_for_key('scala-library'):
+      yield spec
 
   def get_jar_dependencies(self):
     for jar in super(ScalaLibrary, self).get_jar_dependencies():
@@ -69,7 +79,7 @@ class ScalaLibrary(ExportableJvmLibrary):
 
   @property
   def java_sources(self):
-    for spec in self._java_sources_specs:
+    for spec in self.payload.java_sources:
       address = Address.parse(spec, relative_to=self.address.spec_path)
       target = self._build_graph.get_target(address)
       if target is None:

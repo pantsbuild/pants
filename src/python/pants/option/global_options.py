@@ -169,15 +169,15 @@ class GlobalOptionsRegistrar(Optionable):
     # e.g. '/dist/'
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))
     register('--ignore-patterns', advanced=True, type=list, fromfile=True,
-             default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
+             default=['.*/', rel_distdir, 'bower_components/', 'node_modules/', '*.egg-info/'],
              removal_version='1.3.0.dev0', removal_hint='Use --build-ignore instead.',
              mutually_exclusive_group='build_ignore', help='See help for --build-ignore.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
-             default=['.*', rel_distdir, 'bower_components', 'node_modules', '*.egg-info'],
+             default=['.*/', rel_distdir, 'bower_components/', 'node_modules/', '*.egg-info/'],
              help='Paths to ignore when identifying BUILD files. '
                   'This does not affect any other filesystem operations. '
                   'Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).')
-    register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*', rel_distdir],
+    register('--pants-ignore', advanced=True, type=list, fromfile=True, default=['.*/', rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '

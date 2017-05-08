@@ -14,7 +14,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_open, touch
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
 from pants_test.base_test import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 from pants_test.testutils.git_util import initialize_repo
@@ -408,6 +408,25 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
 
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), '')
+
+  @ensure_engine
+  def test_changed_with_deleted_file(self):
+    deleted_file = 'src/python/sources/sources.py'
+
+    with create_isolated_git_repo() as worktree:
+      safe_delete(os.path.join(worktree, deleted_file))
+      pants_run = self.run_pants(['changed'])
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
+
+  def test_list_changed(self):
+    deleted_file = 'src/python/sources/sources.py'
+
+    with create_isolated_git_repo() as worktree:
+      safe_delete(os.path.join(worktree, deleted_file))
+      pants_run = self.run_pants(['--enable-v2-engine', '--changed-parent=HEAD', 'list'])
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
 
   # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):

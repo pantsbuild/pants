@@ -41,13 +41,13 @@ class AndroidLibrary(ImportJarsMixin, AndroidTarget):
 
     super(AndroidLibrary, self).__init__(payload=payload, **kwargs)
 
-  @property
-  def imported_jar_library_specs(self):
-    """List of JarLibrary specs to import.
+  @classmethod
+  def imported_jar_library_spec_fields(cls):
+    """Yields fields to extract JarLibrary specs from.
 
     Required to implement the ImportJarsMixin.
     """
-    return self.payload.library_specs
+    yield ('libraries', 'library_specs')
 
   @memoized_property
   def manifest(self):

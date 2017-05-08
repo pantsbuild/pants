@@ -54,7 +54,7 @@ class Engine(AbstractClass):
       """
       return cls(error=error, root_products=None)
 
-  def __init__(self, scheduler, storage=None, cache=None, use_cache=True):
+  def __init__(self, scheduler, storage=None, cache=None, use_cache=True, include_trace_on_error=True):
     """
     :param scheduler: The local scheduler for creating execution graphs.
     :type scheduler: :class:`pants.engine.scheduler.LocalScheduler`
@@ -66,7 +66,10 @@ class Engine(AbstractClass):
     :param use_cache: True to enable usage of the cache. The cache incurs a large amount of
       overhead for small tasks, and needs TODO: further improvement.
     :type use_cache: bool
+    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
+    :type include_trace_on_error: bool
     """
+    self._include_trace_on_error = include_trace_on_error
     self._scheduler = scheduler
     self._storage = storage or Storage.create()
     self._cache = cache or Cache.create(storage)
@@ -98,7 +101,7 @@ class Engine(AbstractClass):
     result = self.execute(request)
     if result.error:
       raise result.error
-    result_items = self._scheduler.root_entries(request).items()
+    result_items = result.root_products.items()
 
     # State validation.
     unknown_state_types = tuple(
@@ -109,10 +112,18 @@ class Engine(AbstractClass):
 
     # Throw handling.
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
-    throw_roots = tuple(root for root, state in result_items if type(state) is Throw)
-    if throw_roots:
-      cumulative_trace = '\n'.join(self._scheduler.trace())
-      raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
+    throw_root_states = tuple(state for root, state in result_items if type(state) is Throw)
+    if throw_root_states:
+      if self._include_trace_on_error:
+        cumulative_trace = '\n'.join(self._scheduler.trace())
+        raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
+
+      if len(throw_root_states) == 1:
+        raise throw_root_states[0].exc
+      else:
+        raise ExecutionError('Multiple exceptions encountered:\n  {}'
+                             .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
+                                                 for t in throw_root_states)))
 
     # Return handling.
     returns = tuple(state.value for _, state in result_items if type(state) is Return)

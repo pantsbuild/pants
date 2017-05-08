@@ -20,6 +20,10 @@ class Resources(Target):
   :API: public
   """
 
+  @classmethod
+  def alias(cls):
+    return 'resources'
+
   def __init__(self, address=None, payload=None, sources=None, **kwargs):
     """
     :API: public
