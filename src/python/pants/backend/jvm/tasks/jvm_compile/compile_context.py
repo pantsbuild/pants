@@ -21,7 +21,7 @@ class SyntheticTargetNotFound(Exception):
 
 
 def _get_synthetic_target(target, thrift_dep):
-  """Fina a thrift target's corresponding synthetic target."""
+  """Find a thrift target's corresponding synthetic target."""
   for dep in target.dependencies:
     if dep != thrift_dep and dep.is_synthetic and dep.derived_from == thrift_dep:
       return dep
