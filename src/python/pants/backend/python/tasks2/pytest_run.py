@@ -365,7 +365,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         real_nodeid = item.nodeid
         real_path = real_nodeid.split('::', 1)[0]
         fixed_path = _SOURCES_MAP.get(real_path, real_path)
-        fixed_nodeid = fixed_path + real_path[len(real_path):]
+        fixed_nodeid = fixed_path + real_nodeid[len(real_path):]
         try:
           item._nodeid = fixed_nodeid
           yield

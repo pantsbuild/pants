@@ -13,6 +13,8 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.resources_task import ResourcesTask
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.util.dirutil import safe_mkdir
 
 
@@ -27,6 +29,10 @@ class PrepareResources(ResourcesTask):
     super(PrepareResources, self).__init__(*args, **kwargs)
     self._buildroot = get_buildroot()
 
+  @classmethod
+  def implementation_version(cls):
+    return super(PrepareResources, cls).implementation_version() + [('PrepareResources', 2)]
+
   def find_all_relevant_resources_targets(self):
     # NB: Ordering isn't relevant here, because it is applied during the dep walk to
     # consume from the runtime_classpath.
@@ -35,9 +41,9 @@ class PrepareResources(ResourcesTask):
     jvm_targets = self.context.targets(predicate=is_jvm_target)
 
     all_resources_tgts = OrderedSet()
-    for target in jvm_targets:
-      if target.has_resources:
-        all_resources_tgts.update(target.resources)
+    for target in Target.closure_for_targets(jvm_targets, bfs=True):
+      if isinstance(target, Resources):
+        all_resources_tgts.add(target)
     return all_resources_tgts
 
   def prepare_resources(self, target, chroot):
