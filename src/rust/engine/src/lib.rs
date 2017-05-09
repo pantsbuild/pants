@@ -492,16 +492,9 @@ pub extern fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
 }
 
 #[no_mangle]
-pub extern fn validator_run(
-  tasks_ptr: *mut Tasks,
-  subject_types: TypeIdBuffer
-) -> Value {
-  with_tasks(tasks_ptr, |tasks| {
-    let graph_maker = GraphMaker::new(&tasks,
-                                      subject_types.to_vec());
-    let graph = graph_maker.full_graph();
-
-    match graph.validate() {
+pub extern fn validator_run(scheduler_ptr: *mut Scheduler) -> Value {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    match scheduler.core.rule_graph.validate() {
       Result::Ok(_) => {
         externs::store_list(vec![], false)
       },
