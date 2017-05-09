@@ -205,7 +205,7 @@ void execution_add_root_select_dependencies(Scheduler*,
 ExecutionStat execution_execute(Scheduler*);
 RawNodes* execution_roots(Scheduler*);
 
-Value validator_run(Tasks*, TypeIdBuffer);
+Value validator_run(Scheduler*);
 
 void rule_graph_visualize(Scheduler*, TypeIdBuffer, char*);
 void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
