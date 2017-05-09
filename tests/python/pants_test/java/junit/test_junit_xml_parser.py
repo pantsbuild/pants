@@ -11,8 +11,7 @@ import unittest
 from pants.java.junit.junit_xml_parser import Test as JUnitTest
 # NB: The Test -> JUnitTest import re-name above is needed to work around conflicts with pytest test
 # collection and a conflicting Test type in scope during that process.
-from pants.java.junit.junit_xml_parser import (ParseError, RegistryOfTests, parse_failed_targets,
-                                               parse_test_info)
+from pants.java.junit.junit_xml_parser import ParseError, RegistryOfTests, parse_failed_targets
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.xml_parser import XmlParser
