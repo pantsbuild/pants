@@ -37,7 +37,9 @@ class NodeRun(NodeTask):
         args = ['run-script', self.get_options().script_name, '--'] + self.get_passthru_args()
 
         with pushd(node_path):
-          result, npm_run = self.execute_npm(args, workunit_labels=[WorkUnitLabel.RUN])
+          result, npm_run = self.execute_npm(args,
+                                             workunit_name=target.address.reference(),
+                                             workunit_labels=[WorkUnitLabel.RUN])
           if result != 0:
             raise TaskError('npm run script failed:\n'
                             '\t{} failed with exit code {}'.format(npm_run, result))
@@ -45,7 +47,9 @@ class NodeRun(NodeTask):
         args = ['run', self.get_options().script_name, '--'] + self.get_passthru_args()
         with pushd(node_path):
           returncode, yarnpkg_run_command = self.execute_yarnpkg(
-            args=args, workunit_labels=[WorkUnitLabel.RUN])
+            args=args,
+            workunit_name=target.address.reference(),
+            workunit_labels=[WorkUnitLabel.RUN])
           if returncode != 0:
             raise TaskError('yarnpkg run script failed:\n'
                             '\t{} failed with exit code {}'.format(yarnpkg_run_command, returncode))

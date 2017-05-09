@@ -74,7 +74,9 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
 
         with pushd(node_path):
           self._currently_executing_test_targets = [target]
-          result, npm_test_command = self.execute_npm(args, workunit_labels=[WorkUnitLabel.TEST])
+          result, npm_test_command = self.execute_npm(args,
+                                                      workunit_name=target.address.reference(),
+                                                      workunit_labels=[WorkUnitLabel.TEST])
           if result != 0:
             raise TaskError('npm test script failed:\n'
                             '\t{} failed with exit code {}'.format(npm_test_command, result))
@@ -83,7 +85,9 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
         with pushd(node_path):
           self._currently_executing_test_targets = [target]
           result, npm_test_command = self.execute_yarnpkg(
-            args=args, workunit_labels=[WorkUnitLabel.TEST])
+            args=args,
+            workunit_name=target.address.reference(),
+            workunit_labels=[WorkUnitLabel.TEST])
           if result != 0:
             raise TaskError('npm test script failed:\n'
                             '\t{} failed with exit code {}'.format(npm_test_command, result))

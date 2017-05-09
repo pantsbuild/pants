@@ -61,7 +61,7 @@ class NodeTask(Task):
     ) if package_manager else self.node_distribution.package_manager
     return package_manager
 
-  def execute_node(self, args, workunit_name=None, workunit_labels=None):
+  def execute_node(self, args, workunit_name, workunit_labels=None):
     """Executes node passing the given args.
 
     :param list args: The command line args to pass to `node`.
@@ -76,7 +76,7 @@ class NodeTask(Task):
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 
-  def execute_npm(self, args, workunit_name=None, workunit_labels=None):
+  def execute_npm(self, args, workunit_name, workunit_labels=None):
     """Executes npm passing the given args.
 
     :param list args: The command line args to pass to `npm`.
@@ -92,7 +92,7 @@ class NodeTask(Task):
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 
-  def execute_yarnpkg(self, args, workunit_name=None, workunit_labels=None):
+  def execute_yarnpkg(self, args, workunit_name, workunit_labels=None):
     """Executes npm passing the given args.
 
     :param list args: The command line args to pass to `yarnpkg`.
@@ -108,7 +108,7 @@ class NodeTask(Task):
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 
-  def _execute_command(self, command, workunit_name=None, workunit_labels=None):
+  def _execute_command(self, command, workunit_name, workunit_labels=None):
     """Executes a node or npm command via self._run_node_distribution_command.
 
     :param NodeDistribution.Command command: The command to run.
