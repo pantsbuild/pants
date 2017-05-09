@@ -5,11 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import re
 from abc import abstractmethod
 from threading import Timer
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.util.timeout import Timeout, TimeoutReached
+from pants.util.xml_parser import XmlParser
 
 
 class TestRunnerTaskMixin(object):
@@ -62,6 +65,106 @@ class TestRunnerTaskMixin(object):
 
       all_targets = self._get_targets()
       self._execute(all_targets)
+
+  def report_test_info(self, scope, target, key, test_info):
+    """
+    Add test information to target information
+    :param string scope: The running scope
+    :param Target target: The target that we want to store the test info under
+    :param list of strings or string key: The key for the info being stored
+    :param dict test_info: The info being stored
+    """
+    if target and scope:
+      address = str(target.address.to_address())
+      target_type = target.type_alias
+      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info(scope, address, key, test_info)
+
+  @staticmethod
+  def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
+    """
+    Parses the junit file for info needed about each test
+    Will include:
+      - test result code
+      - test run time duration
+      - test name
+    :param string xml_path: path of the xml file to be parsed
+    :param function error_handler: error handler function
+    :param list of string additional_testcase_attributes: list of additional testcase attributes to
+           be included in test info.
+    :return: dict of tests
+    """
+    tests_in_path = {}
+    testcase_attributes = additional_testcase_attributes or []
+
+    SUCCESS = 'success'
+    SKIPPED = 'skipped'
+    FAILURE = 'failure'
+    ERROR = 'error'
+
+    _XML_MATCHER = re.compile(r'^TEST-.+\.xml$')
+
+    class ParseError(Exception):
+      """Indicates an error parsing a xml report file."""
+
+      def __init__(self, xml_path, cause):
+        super(ParseError, self).__init__('Error parsing test result file {}: {}'
+          .format(xml_path, cause))
+        self._xml_path = xml_path
+        self._cause = cause
+
+      @property
+      def xml_path(self):
+        """Return the path of the file the parse error was encountered in.
+
+        :return: The path of the file the parse error was encountered in.
+        :rtype: string
+        """
+        return self._xml_path
+
+      @property
+      def cause(self):
+        """Return the cause of the parse error.
+
+        :return: The cause of the parse error.
+        :rtype: :class:`BaseException`
+        """
+        return self._cause
+
+    def parse_xml_file(path):
+      try:
+        xml = XmlParser.from_file(path)
+        for testcase in xml.parsed.getElementsByTagName('testcase'):
+          test_info = {'time': float(testcase.getAttribute('time'))}
+          for attribute in testcase_attributes:
+            test_info[attribute] = testcase.getAttribute(attribute)
+
+          test_error = testcase.getElementsByTagName('error')
+          test_fail = testcase.getElementsByTagName('failure')
+          test_skip = testcase.getElementsByTagName('skipped')
+
+          if test_fail:
+            test_info.update({'result_code': FAILURE})
+          elif test_error:
+            test_info.update({'result_code': ERROR})
+          elif test_skip:
+            test_info.update({'result_code': SKIPPED})
+          else:
+            test_info.update({'result_code': SUCCESS})
+
+          tests_in_path.update({testcase.getAttribute('name'): test_info})
+
+      except (XmlParser.XmlError, ValueError) as e:
+        error_handler(ParseError(path, e))
+
+    if os.path.isdir(xml_path):
+      for name in os.listdir(xml_path):
+        if _XML_MATCHER.match(name):
+          parse_xml_file(os.path.join(xml_path, name))
+    else:
+      parse_xml_file(xml_path)
+
+    return tests_in_path
 
   def _get_test_targets_for_spawn(self):
     """Invoked by _spawn_and_wait to know targets being executed. Defaults to _get_test_targets().

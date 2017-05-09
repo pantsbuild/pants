@@ -431,12 +431,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               create_synthetic_jar=self.synthetic_classpath,
             ))
 
-          tests_info = parse_test_info(output_dir, parse_error_handler)
+          tests_info = self.parse_test_info(output_dir, parse_error_handler, ['classname'])
           for test_name, test_info in tests_info.items():
             test_item = Test(test_info['classname'], test_name)
             test_target = test_registry.get_owning_target(test_item)
-            self.context.run_tracker.report_test_info(self.options_scope, test_target,
-                                                      test_name, test_info)
+            self.report_test_info(self.options_scope, test_target, [test_name], test_info)
 
           if result != 0 and self._fail_fast:
             break

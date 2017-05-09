@@ -401,32 +401,23 @@ class RunTracker(Subsystem):
     Add target information to run_info under target_data
     :param string scope: The running scope
     :param string target: The target that we want to store info for
-    :param string or list of items to make into a key key: The key for the info being stored
+    :param list of keys key: The key for the info being stored
     :param dict or string val: The value of the info being stored
     """
-    # Stringify list of keys to make one key
-    if not isinstance(key, basestring):
-      new_key = [str(key_item) for key_item in key]
-      key = '#'.join(new_key)
-
-    if target in self._target_data:
-      if scope in self._target_data[target]:
-        self._target_data[target][scope].update({key: val})
+    def insert_key_value(keys, val_item, index):
+      if index > 0:
+        new_val = {keys[index]: val_item}
+        insert_key_value(keys, new_val, index - 1)
       else:
-        self._target_data[target].update({scope: {key: val}})
-    else:
-      self._target_data.update({target: {scope: {key: val}}})
+        return {keys[index]: val_item}
 
-  def report_test_info(self, scope, target, key, test_info):
-    """
-    Add test information to target information
-    :param string scope: The running scope
-    :param Target target: The target that we want to store the test info under
-    :param list of strings or string key: The key for the info being stored
-    :param dict test_info: The info being stored
-    """
-    if target and scope:
-      target_addr = str(target.address.to_address())
-      target_type = target.type_alias
-      self.report_target_info('GLOBAL', target_addr, 'target_type', target_type)
-      self.report_target_info(scope, target_addr, key, test_info)
+    val_to_store = insert_key_value(key, val, len(key) - 1)
+    target_data = self._target_data.get(target, None)
+    if target_data is None:
+      self._target_data.update({target: {scope: val_to_store}})
+    else:
+      scope_data = self._target_data[target].get(scope, None)
+      if scope_data is None:
+        self._target_data[target].update({scope: val_to_store})
+      else:
+        self._target_data[target][scope].update(val_to_store)

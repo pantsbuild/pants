@@ -365,7 +365,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         real_nodeid = item.nodeid
         real_path = real_nodeid.split('::', 1)[0]
         fixed_path = _SOURCES_MAP.get(real_path, real_path)
-        fixed_nodeid = fixed_path + real_path[len(real_path):]
+        fixed_nodeid = fixed_path + real_nodeid[len(real_path):]
         try:
           item._nodeid = fixed_nodeid
           yield
@@ -470,36 +470,6 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
     return failed_targets
 
-  def _get_test_info_from_junitxml(self, junitxml):
-    tests_in_path = []
-
-    SUCCESS = 0
-    FAILURE = 10000
-    ERROR = 15000
-    try:
-      xml = XmlParser.from_file(junitxml)
-      for testcase in xml.parsed.getElementsByTagName('testcase'):
-        test_info = {'time': float(testcase.getAttribute('time'))}
-        test_info.update({'file': testcase.getAttribute('file')})
-        test_info.update({'name': testcase.getAttribute('name')})
-
-        test_error = testcase.getElementsByTagName('error')
-        test_fail = testcase.getElementsByTagName('failure')
-
-        if test_fail:
-          test_info.update({'result_code': FAILURE})
-        elif test_error:
-          test_info.update({'result_code': ERROR})
-        else:
-          test_info.update({'result_code': SUCCESS})
-
-        tests_in_path.append(test_info)
-
-    except (XmlParser.XmlError, ValueError) as e:
-      raise TaskError('Error parsing xml file at {}: {}'.format(junitxml, e))
-
-    return tests_in_path
-
   def _get_target_from_test(self, test_info, targets):
     relsrc_to_target = self._map_relsrc_to_targets(targets)
     file_info = test_info['file']
@@ -569,11 +539,14 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         shutil.copy(junitxml_path, external_junit_xml_dir)
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
 
-      all_tests_info = self._get_test_info_from_junitxml(junitxml_path)
-      for test_info in all_tests_info:
+      def parse_error_handler(parse_error):
+        raise TaskError('Error parsing xml file at {}: {}'
+          .format(parse_error.xml_path, parse_error.cause))
+
+      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler, ['file', 'name'])
+      for test_name, test_info in all_tests_info.items():
         test_target = self._get_target_from_test(test_info, targets)
-        self.context.run_tracker.report_test_info(self.options_scope, test_target,
-                                                  [test_info['name'], test_info['time']], test_info)
+        self.report_test_info(self.options_scope, test_target, [test_name], test_info)
 
       return result.with_failed_targets(failed_targets)
 
