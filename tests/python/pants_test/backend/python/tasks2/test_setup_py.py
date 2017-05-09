@@ -85,16 +85,17 @@ class TestSetupPy(PythonTaskTestBase):
     self.set_options(recursive=recursive)
     context = self.context(target_roots=[target])
     setup_py = self.create_task(context)
-    yield setup_py.execute()
+    setup_py.execute()
+    yield context.products.get_data(SetupPy.PRODUCT_TYPE)
 
   def test_execution_reduced_dependencies_1(self):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
     target_map = self.create_dependencies(dep_map)
     with self.run_execute(target_map['foo'], recursive=False) as created:
-      self.assertEqual([target_map['foo']], created.by_target.keys())
+      self.assertEqual([target_map['foo']], created.keys())
     with self.run_execute(target_map['foo'], recursive=True) as created:
       self.assertEqual({target_map['baz'], target_map['bar'], target_map['foo']},
-                       set(created.by_target.keys()))
+                       set(created.keys()))
 
   def test_reduced_dependencies_2(self):
     # foo --> baz
@@ -157,10 +158,10 @@ class TestSetupPy(PythonTaskTestBase):
     self.assertEqual(entry_points, {'foo_binary': 'foo.bin:foo'})
 
     with self.run_execute(foo, recursive=False) as created:
-      self.assertEqual([foo], created.by_target.keys())
+      self.assertEqual([foo], created.keys())
 
     with self.run_execute(foo, recursive=True) as created:
-      self.assertEqual([foo], created.by_target.keys())
+      self.assertEqual([foo], created.keys())
 
   def test_binary_target_injected_into_reduced_dependencies_with_provider(self):
     bar_bin_dep = self.create_python_library(
@@ -203,10 +204,10 @@ class TestSetupPy(PythonTaskTestBase):
     self.assertEqual(entry_points, {'bar_binary': 'bar.bin:bar'})
 
     with self.run_execute(bar, recursive=False) as created:
-      self.assertEqual([bar], created.by_target.keys())
+      self.assertEqual([bar], created.keys())
 
     with self.run_execute(bar, recursive=True) as created:
-      self.assertEqual({bar_bin_dep, bar}, set(created.by_target.keys()))
+      self.assertEqual({bar_bin_dep, bar}, set(created.keys()))
 
   def test_pants_contrib_case(self):
     def create_requirement_lib(name):
@@ -388,8 +389,8 @@ class TestSetupPy(PythonTaskTestBase):
     conway = self.target('src/python/monster:conway')
 
     with self.run_execute(conway) as created:
-      self.assertEqual([conway], created.by_target.keys())
-      sdist = os.path.join(created[conway].items()[0][0], created[conway].items()[0][1][0])
+      self.assertEqual([conway], created.keys())
+      sdist = created[conway]
 
       with self.extracted_sdist(sdist=sdist,
                                 expected_prefix='monstrous.moonshine-0.0.0',
@@ -431,13 +432,13 @@ class TestSetupPy(PythonTaskTestBase):
     conway = self.target('src/python/monster:conway')
 
     with self.run_execute(conway) as created:
-      self.assertEqual([conway], created.by_target.keys())
+      self.assertEqual([conway], created.keys())
 
       # Now that we've created the sdist tarball, delete the symlink destination to ensure the
       # unpacked sdist can't get away with unpacking a symlink that happens to have local
       # resolution.
       os.unlink(res)
-      sdist = os.path.join(created[conway].items()[0][0], created[conway].items()[0][1][0])
+      sdist = created[conway]
 
       with self.extracted_sdist(sdist=sdist,
                                 expected_prefix='monstrous.moonshine-0.0.0',
@@ -502,7 +503,7 @@ class TestSetupPy(PythonTaskTestBase):
       ]
     )
     with self.run_execute(pants) as created:
-      self.assertEqual([pants], created.by_target.keys())
+      self.assertEqual([pants], created.keys())
 
 
 def test_detect_namespace_packages():
