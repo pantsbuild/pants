@@ -278,6 +278,8 @@ class SetupPy(Task):
 
   SOURCE_ROOT = b'src'
 
+  PYTHON_DISTS_PRODUCT = 'python_dists'
+
   @staticmethod
   def is_requirements(target):
     return isinstance(target, PythonRequirementLibrary)
@@ -293,6 +295,10 @@ class SetupPy(Task):
   @classmethod
   def has_provides(cls, target):
     return cls.is_python_target(target) and target.provides
+
+  @classmethod
+  def product_types(cls):
+    return [cls.PYTHON_DISTS_PRODUCT]
 
   class DependencyCalculator(ExportedTargetDependencyCalculator):
     """Calculates reduced dependencies for exported python targets."""
@@ -594,8 +600,8 @@ class SetupPy(Task):
     for target in targets:
       create(target)
 
-    executed = {}  # Collected and returned for tests, processed target -> sdist|setup_dir.
     interpreter = self.context.products.get_data(PythonInterpreter)
+    python_dists = self.context.products.get_data(self.PYTHON_DISTS_PRODUCT, lambda: {})
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:
@@ -607,10 +613,9 @@ class SetupPy(Task):
           self.context.log.info('Writing {}'.format(sdist_path))
           shutil.move(setup_runner.sdist(), sdist_path)
           safe_rmtree(setup_dir)
-          executed[target] = sdist_path
+          python_dists[target] = sdist_path
         else:
           self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
           setup_runner = SetupPyRunner(setup_dir, self._run, interpreter=interpreter)
           setup_runner.run()
-          executed[target] = setup_dir
-    return executed
+          python_dists[target] = setup_dir
