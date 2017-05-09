@@ -85,7 +85,8 @@ class TestSetupPy(PythonTaskTestBase):
     self.set_options(recursive=recursive)
     context = self.context(target_roots=[target])
     setup_py = self.create_task(context)
-    yield setup_py.execute()
+    setup_py.execute()
+    yield context.products.get_data(SetupPy.PYTHON_DISTS_PRODUCT)
 
   def test_execution_reduced_dependencies_1(self):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])
@@ -389,8 +390,9 @@ class TestSetupPy(PythonTaskTestBase):
 
     with self.run_execute(conway) as created:
       self.assertEqual([conway], created.keys())
+      sdist = created[conway]
 
-      with self.extracted_sdist(sdist=created[conway],
+      with self.extracted_sdist(sdist=sdist,
                                 expected_prefix='monstrous.moonshine-0.0.0',
                                 collect_suffixes=('.py', '.res')) as (py_files, path):
         self.assertEqual({path('setup.py'),
@@ -436,8 +438,9 @@ class TestSetupPy(PythonTaskTestBase):
       # unpacked sdist can't get away with unpacking a symlink that happens to have local
       # resolution.
       os.unlink(res)
+      sdist = created[conway]
 
-      with self.extracted_sdist(sdist=created[conway],
+      with self.extracted_sdist(sdist=sdist,
                                 expected_prefix='monstrous.moonshine-0.0.0',
                                 collect_suffixes=('.py', '.res')) as (py_files, path):
         res_link_path = path('src/monster/group.res')
