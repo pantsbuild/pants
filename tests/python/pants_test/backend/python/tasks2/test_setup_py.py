@@ -86,7 +86,7 @@ class TestSetupPy(PythonTaskTestBase):
     context = self.context(target_roots=[target])
     setup_py = self.create_task(context)
     setup_py.execute()
-    yield context.products.get_data(SetupPy.PRODUCT_TYPE)
+    yield context.products.get_data(SetupPy.PYTHON_DISTS_PRODUCT)
 
   def test_execution_reduced_dependencies_1(self):
     dep_map = OrderedDict(foo=['bar'], bar=['baz'], baz=[])

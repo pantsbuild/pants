@@ -278,7 +278,7 @@ class SetupPy(Task):
 
   SOURCE_ROOT = b'src'
 
-  PRODUCT_TYPE = 'python_dists'
+  PYTHON_DISTS_PRODUCT = 'python_dists'
 
   @staticmethod
   def is_requirements(target):
@@ -298,7 +298,7 @@ class SetupPy(Task):
 
   @classmethod
   def product_types(cls):
-    return [cls.PRODUCT_TYPE]
+    return [cls.PYTHON_DISTS_PRODUCT]
 
   class DependencyCalculator(ExportedTargetDependencyCalculator):
     """Calculates reduced dependencies for exported python targets."""
@@ -601,7 +601,7 @@ class SetupPy(Task):
       create(target)
 
     interpreter = self.context.products.get_data(PythonInterpreter)
-    python_dists = self.context.products.get_data(self.PRODUCT_TYPE, lambda: {})
+    python_dists = self.context.products.get_data(self.PYTHON_DISTS_PRODUCT, lambda: {})
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:
