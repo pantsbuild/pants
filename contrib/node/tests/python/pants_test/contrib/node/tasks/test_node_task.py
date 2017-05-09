@@ -93,7 +93,7 @@ class NodeTaskTest(TaskTestBase):
           fs.writeFile("{proof}", "Hello World!", function(err) {{}});
           """).format(proof=proof))
       self.assertFalse(os.path.exists(proof))
-      returncode, command = task.execute_node([script])
+      returncode, command = task.execute_node([script], workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
@@ -115,7 +115,7 @@ class NodeTaskTest(TaskTestBase):
       with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, _ = task.execute_npm(['run-script', 'proof'])
+        returncode, _ = task.execute_npm(['run-script', 'proof'], workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
@@ -137,7 +137,7 @@ class NodeTaskTest(TaskTestBase):
       with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, _ = task.execute_yarnpkg(['run', 'proof'])
+        returncode, _ = task.execute_yarnpkg(['run', 'proof'], workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
