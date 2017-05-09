@@ -83,7 +83,3 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def include_paths(self):
     return self._include_paths
-
-  @property
-  def is_thrift(self):
-    return True

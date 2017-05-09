@@ -12,10 +12,8 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.deprecated import deprecated_conditional
-from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
-from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
@@ -140,32 +138,6 @@ class JvmTarget(Target, Jarable):
     return self.payload.exports
 
   @property
-  def exports_targets(self):
-    """A list of exported targets, which will be accessible to dependents.
-
-    :return: See constructor.
-    :rtype: list
-    """
-    exports_targets = []
-    for spec in self.payload.exports:
-      addr = Address.parse(spec, relative_to=self.address.spec_path)
-      target = self._build_graph.get_target(addr)
-      if target.is_thrift:
-        for dep in self.dependencies:
-          if dep != target and dep.is_synthetic and dep.derived_from == target:
-            target = dep
-            break
-
-      if target not in self.dependencies:
-        # This means the exported target was not injected before "self",
-        # thus it's not a valid export.
-        raise TargetDefinitionException(self,
-          'Invalid exports: "{}" is not a dependency of {}'.format(spec, self))
-      exports_targets.append(target)
-
-    return exports_targets
-
-  @property
   def fatal_warnings(self):
     """If set, overrides the platform's default fatal_warnings setting.
 
@@ -288,7 +260,3 @@ class JvmTarget(Target, Jarable):
   @property
   def services(self):
     return self._services
-
-  @property
-  def is_thrift(self):
-    return False
