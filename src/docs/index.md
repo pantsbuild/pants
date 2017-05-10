@@ -5,7 +5,6 @@ Pants: A fast, scalable build system
 <img class="index-report-server-page-img" src="images/report-server-page.png" alt="Pants Report Page"
      width="391px" height="246px" />
 
-### We are excited to announce *<a href="1.0.html"><i>Pants 1.0</a>!*
 <br/>
 Pants is a build system designed for codebases that:
 
