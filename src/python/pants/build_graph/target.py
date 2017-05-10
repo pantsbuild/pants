@@ -72,6 +72,13 @@ class AbstractTarget(object):
     # TODO(John Sirois): fixup predicate dipping down into details here.
     return self.has_label('exportable') and self.provides
 
+  # DEPRECATED  to be removed after 0.0.29
+  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
+  @property
+  def is_thrift(self):
+    """Returns True if the target has thrift IDL sources."""
+    return False
+
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property

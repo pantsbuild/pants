@@ -83,3 +83,8 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def include_paths(self):
     return self._include_paths
+
+  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
+  @property
+  def is_thrift(self):
+    return True
