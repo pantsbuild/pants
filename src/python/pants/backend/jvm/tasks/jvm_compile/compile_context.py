@@ -46,9 +46,6 @@ def _resolve_exports(target):
     if not isinstance(export, Target):
       addr = Address.parse(export, relative_to=target.address.spec_path)
       export = target._build_graph.get_target(addr)
-      if export is None:
-        continue
-
       if export not in target.dependencies:
         # A target can only export its dependencies.
         raise TargetDefinitionException(target, 'Invalid exports: "{}" is not a dependency of {}'.format(export, target))
