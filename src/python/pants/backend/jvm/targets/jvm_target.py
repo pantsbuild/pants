@@ -12,10 +12,8 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.base.deprecated import deprecated_conditional
-from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
-from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
@@ -137,23 +135,7 @@ class JvmTarget(Target, Jarable):
 
   @property
   def exports(self):
-    """A list of exported targets, which will be accessible to dependents.
-
-    :return: See constructor.
-    :rtype: list
-    """
-    exports = []
-    for spec in self.payload.exports:
-      addr = Address.parse(spec, relative_to=self.address.spec_path)
-      target = self._build_graph.get_target(addr)
-      if target not in self.dependencies:
-        # This means the exported target was not injected before "self",
-        # thus it's not a valid export.
-        raise TargetDefinitionException(self,
-          'Invalid exports: "{}" is not a dependency of {}'.format(spec, self))
-      exports.append(target)
-
-    return exports
+    return self.payload.exports
 
   @property
   def fatal_warnings(self):

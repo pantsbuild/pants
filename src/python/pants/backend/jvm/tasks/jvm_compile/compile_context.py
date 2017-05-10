@@ -8,9 +8,24 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import zipfile
 from contextlib import contextmanager
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.base.exceptions import TargetDefinitionException
+from pants.build_graph.address import Address
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
+
+
+class SyntheticTargetNotFound(Exception):
+  pass
+
+
+def _get_synthetic_target(target, thrift_dep):
+  """Find a thrift target's corresponding synthetic target."""
+  for dep in target.dependencies:
+    if dep != thrift_dep and dep.is_synthetic and dep.derived_from == thrift_dep:
+      return dep
+  return None
 
 
 def _resolve_strict_dependencies(target):
@@ -28,14 +43,28 @@ def _resolve_strict_dependencies(target):
 
 def _resolve_exports(target):
   for export in getattr(target, 'exports', []):
+    if not isinstance(export, Target):
+      addr = Address.parse(export, relative_to=target.address.spec_path)
+      export = target._build_graph.get_target(addr)
+      if export not in target.dependencies:
+        # A target can only export its dependencies.
+        raise TargetDefinitionException(target, 'Invalid exports: "{}" is not a dependency of {}'.format(export, target))
+
     if type(export) in (AliasTarget, Target):
       # If exported target is an alias, expand its dependencies.
       for dep in _resolve_strict_dependencies(export):
         yield dep
     else:
+      if isinstance(export, JavaThriftLibrary):
+        synthetic_target = _get_synthetic_target(target, export)
+        if synthetic_target is None:
+          raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(export))
+        yield synthetic_target
+      else:
+        yield export
+
       for exp in _resolve_exports(export):
         yield exp
-      yield export
 
 
 def strict_dependencies(target, dep_context):
