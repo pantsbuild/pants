@@ -67,12 +67,12 @@ class TestRunnerTaskMixin(object):
       self._execute(all_targets)
 
   def report_test_info(self, scope, target, test_name, test_info):
-    """Add test information to target information
+    """Add test information to target information.
 
-    :param string scope: The running scope
-    :param Target target: The target that we want to store the test info under
-    :param string test_name: The key (test name) for the info being stored
-    :param dict test_info: The info being stored
+    :param string scope: The scope for which we are reporting information.
+    :param Target target: The target that we want to store the test information under.
+    :param string test_name: The key (test name) for the information being stored.
+    :param dict test_info: The information being stored.
     """
     if target and scope:
       address = target.address.spec
@@ -82,17 +82,17 @@ class TestRunnerTaskMixin(object):
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
-    """Parses the junit file for info needed about each test
+    """Parses the junit file for information needed about each test.
 
     Will include:
-      - test result code
+      - test result
       - test run time duration
       - test name
-    :param string xml_path: path of the xml file to be parsed
-    :param function error_handler: error handler function
-    :param list of string additional_testcase_attributes: list of additional testcase attributes to
-           be included in test info.
-    :return: dict of tests
+    :param string xml_path: The path of the xml file to be parsed.
+    :param function error_handler: The error handler function.
+    :param list of string additional_testcase_attributes: A list of additional attributes belonging
+           to each testcase that should be included in test information.
+    :return: A dictionary of test information.
     """
     tests_in_path = {}
     testcase_attributes = additional_testcase_attributes or []

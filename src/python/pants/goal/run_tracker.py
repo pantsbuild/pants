@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
 import json
 import multiprocessing
 import os
@@ -144,6 +145,18 @@ class RunTracker(Subsystem):
 
     self._aborted = False
 
+    # Data will be organized first by target and then scope.
+    # Eg:
+    # {
+    #   'target/address:name': {
+    #     'running_scope': {
+    #       'run_duration': 356.09
+    #     },
+    #     'GLOBAL': {
+    #       'target_type': 'pants.test'
+    #     }
+    #   }
+    # }
     self._target_data = {}
 
   def register_thread(self, parent_workunit):
@@ -287,8 +300,13 @@ class RunTracker(Subsystem):
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
+    run_information = self.run_info.get_as_dict()
+    target_data = run_information.get('target_data', None)
+    if target_data:
+      run_information['target_data'] = ast.literal_eval(target_data)
+
     stats = {
-      'run_info': self.run_info.get_as_dict(),
+      'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
@@ -396,26 +414,34 @@ class RunTracker(Subsystem):
     """
     SubprocPool.shutdown(self._aborted)
 
-  def report_target_info(self, scope, target, key, val):
+  def report_target_info(self, scope, target, keys, val):
     """Add target information to run_info under target_data.
 
-    Will Recursively construct a nested dict with the keys provided
+    Will Recursively construct a nested dict with the keys provided.
 
-    :param string scope: The running scope
-    :param string target: The target that we want to store info for
-    :param list of string key: The key for the info being stored
-    :param dict or string val: The value of the info being stored
+    :param string scope: The scope for which we are reporting the information.
+    :param string target: The target for which we want to store information.
+    :param list of string keys: The keys that will be recursively
+           nested and pointing to the information being stored.
+    :param dict or string val: The value of the information being stored.
 
     :API: public
     """
-    def insert_key_value(keys, val_item, index):
-      if index > 0:
-        new_val = {keys[index]: val_item}
-        insert_key_value(keys, new_val, index - 1)
-      else:
-        return {keys[index]: val_item}
+    def create_dict_with_nested_keys_and_val(all_keys, val_item, index):
+      """ Recursively constructs a nested dictionary with the keys pointing to the value.
 
-    val_to_store = insert_key_value(key, val, len(key) - 1)
+      :param list of string all_keys: The keys that will be recursively nested.
+      :param dict or string val_item: The value of the information being stored.
+      :param int index: The index into the list of keys.
+      :return: dict of nested keys leading to the value.
+      """
+      if index > 0:
+        new_val = {all_keys[index]: val_item}
+        create_dict_with_nested_keys_and_val(all_keys, new_val, index - 1)
+      else:
+        return {all_keys[index]: val_item}
+
+    val_to_store = create_dict_with_nested_keys_and_val(keys, val, len(keys) - 1)
     target_data = self._target_data.get(target, None)
     if target_data is None:
       self._target_data.update({target: {scope: val_to_store}})

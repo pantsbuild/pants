@@ -540,6 +540,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
 
       def parse_error_handler(parse_error):
+        # Simple error handler to pass to xml parsing function
         raise TaskError('Error parsing xml file at {}: {}'
           .format(parse_error.xml_path, parse_error.cause))
 
