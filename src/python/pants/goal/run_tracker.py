@@ -403,7 +403,7 @@ class RunTracker(Subsystem):
 
     :param string scope: The running scope
     :param string target: The target that we want to store info for
-    :param list of keys key: The key for the info being stored
+    :param list of string key: The key for the info being stored
     :param dict or string val: The value of the info being stored
 
     :API: public

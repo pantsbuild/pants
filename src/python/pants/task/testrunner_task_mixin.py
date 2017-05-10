@@ -71,7 +71,7 @@ class TestRunnerTaskMixin(object):
 
     :param string scope: The running scope
     :param Target target: The target that we want to store the test info under
-    :param string test_name: The key for the info being stored
+    :param string test_name: The key (test name) for the info being stored
     :param dict test_info: The info being stored
     """
     if target and scope:

@@ -356,7 +356,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       # Just log and move on since the result is only used to characterize failures, and raising
       # an error here would just distract from the underlying test failures.
       self.context.log.error('Error parsing test result file {path}: {cause}'
-        .format(path=parse_error.junit_xml_path, cause=parse_error.cause))
+        .format(path=parse_error.xml_path, cause=parse_error.cause))
 
     if coverage:
       extra_jvm_options = coverage.extra_jvm_options
