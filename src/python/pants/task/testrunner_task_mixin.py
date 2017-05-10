@@ -66,24 +66,24 @@ class TestRunnerTaskMixin(object):
       all_targets = self._get_targets()
       self._execute(all_targets)
 
-  def report_test_info(self, scope, target, key, test_info):
-    """
-    Add test information to target information
+  def report_test_info(self, scope, target, test_name, test_info):
+    """Add test information to target information
+
     :param string scope: The running scope
     :param Target target: The target that we want to store the test info under
-    :param list of strings or string key: The key for the info being stored
+    :param string test_name: The key for the info being stored
     :param dict test_info: The info being stored
     """
     if target and scope:
-      address = str(target.address.to_address())
+      address = target.address.spec
       target_type = target.type_alias
       self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
-      self.context.run_tracker.report_target_info(scope, address, key, test_info)
+      self.context.run_tracker.report_target_info(scope, address, [test_name], test_info)
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
-    """
-    Parses the junit file for info needed about each test
+    """Parses the junit file for info needed about each test
+
     Will include:
       - test result code
       - test run time duration
@@ -110,26 +110,8 @@ class TestRunnerTaskMixin(object):
       def __init__(self, xml_path, cause):
         super(ParseError, self).__init__('Error parsing test result file {}: {}'
           .format(xml_path, cause))
-        self._xml_path = xml_path
-        self._cause = cause
-
-      @property
-      def xml_path(self):
-        """Return the path of the file the parse error was encountered in.
-
-        :return: The path of the file the parse error was encountered in.
-        :rtype: string
-        """
-        return self._xml_path
-
-      @property
-      def cause(self):
-        """Return the cause of the parse error.
-
-        :return: The cause of the parse error.
-        :rtype: :class:`BaseException`
-        """
-        return self._cause
+        self.xml_path = xml_path
+        self.cause = cause
 
     def parse_xml_file(path):
       try:

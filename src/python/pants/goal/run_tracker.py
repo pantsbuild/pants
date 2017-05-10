@@ -397,12 +397,16 @@ class RunTracker(Subsystem):
     SubprocPool.shutdown(self._aborted)
 
   def report_target_info(self, scope, target, key, val):
-    """
-    Add target information to run_info under target_data
+    """Add target information to run_info under target_data.
+
+    Will Recursively construct a nested dict with the keys provided
+
     :param string scope: The running scope
     :param string target: The target that we want to store info for
     :param list of keys key: The key for the info being stored
     :param dict or string val: The value of the info being stored
+
+    :API: public
     """
     def insert_key_value(keys, val_item, index):
       if index > 0:
@@ -418,6 +422,5 @@ class RunTracker(Subsystem):
     else:
       scope_data = self._target_data[target].get(scope, None)
       if scope_data is None:
-        self._target_data[target].update({scope: val_to_store})
-      else:
-        self._target_data[target][scope].update(val_to_store)
+        self._target_data[target] = scope_data = {}
+      scope_data.update(val_to_store)
