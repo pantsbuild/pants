@@ -448,5 +448,5 @@ class RunTracker(Subsystem):
     else:
       scope_data = self._target_data[target].get(scope, None)
       if scope_data is None:
-        self._target_data[target] = scope_data = {}
+        self._target_data[target][scope] = scope_data = {}
       scope_data.update(val_to_store)
