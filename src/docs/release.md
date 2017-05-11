@@ -119,8 +119,9 @@ the release manager may also need to do a release from a stable branch.*
 * ###Preparation for the release from the stable branch
   See [Release Strategy](http://www.pantsbuild.org/release_strategy.html) for more details about
   whether a release is needed from a stable branch.
-    1. Cherry pick changes that have been identified in the [backport proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
-       directly to the stable branch.
+    1. Cherry pick [changes labelled needs-rc-cherrypick](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-rc-cherrypick)
+       directly to the stable branch.  Note that these pull requests must have been merged into master, and
+       therefore will be closed.
     2. In master, update `src/python/pants/notes/*.rst` to reflect all patches that were
        cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
        For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
@@ -128,6 +129,7 @@ the release manager may also need to do a release from a stable branch.*
     4. Cherry pick the merged notes changes from master to the release branch.
     5. In your release branch: edit and commit the version number in `src/python/pants/version.py`.
     6. Execute the release as described later on this page.
+    7. Remove the `needs-rc-cherrypick` label from the changes cherry-picked into the new release.
 
 Dry Run (Optional)
 ------------------

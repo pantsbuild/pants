@@ -29,9 +29,9 @@ justified, it will be either a `major` or `minor` branch (described below).
     * If a new `stable` branch is _not_ created (because of insufficient time/change to justify the
 stable vetting process), the release manager must cut a `dev` release from master instead.
 2. In addition to any `dev` release or newly-created `stable` branches, the release manager should
-determine whether any existing `stable` branches need new release candidates by inspecting the
-[Pants Backport Proposals](https://docs.google.com/spreadsheets/d/12rsaVVhmSXrMVlZV6PUu5uzsKNNcceP9Lpf7rpju_IE/edit#gid=0)
-sheet. If there are requests "sufficient" to justify `patch` releases for existing `stable` branches, the
+determine whether any existing `stable` branches need new release candidates by looking for 
+[changes labelled needs-rc-cherrypick](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-rc-cherrypick).
+If there are requests "sufficient" to justify `patch` releases for existing `stable` branches, the
 release manager should cut release candidates for those branches.
 
 In other words, for a given week: _one of either_ a `dev` or `rc` release will be created from
