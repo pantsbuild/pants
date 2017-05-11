@@ -82,8 +82,7 @@ def parse_address_family(address_mapper, path, build_files):
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
                                          address_mapper.symbol_table_cls,
-                                         address_mapper.parser_cls,
-                                         address_mapper.exclude_patterns))
+                                         address_mapper.parser_cls))
   return AddressFamily.create(path.path, address_maps)
 
 
@@ -231,9 +230,10 @@ def _hydrate(item_type, spec_path, **kwargs):
 
 
 @rule(BuildFileAddresses,
-      [SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
+      [Select(AddressMapper),
+       SelectDependencies(AddressFamily, BuildDirs, field_types=(Dir,)),
        Select(_SPECS_CONSTRAINT)])
-def addresses_from_address_families(address_families, spec):
+def addresses_from_address_families(address_mapper, address_families, spec):
   """Given a list of AddressFamilies and a Spec, return matching Addresses.
 
   Raises a ResolveError if:
@@ -243,13 +243,23 @@ def addresses_from_address_families(address_families, spec):
   if not address_families:
     raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
 
+  def exclude_address(address):
+    if address_mapper.exclude_patterns:
+      address_str = address.spec
+      return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
+    return False
+
   if type(spec) in (DescendantAddresses, SiblingAddresses, AscendantAddresses):
-    addresses = tuple(a for af in address_families for a in af.addressables.keys())
+    addresses = tuple(a
+                      for af in address_families
+                      for a in af.addressables.keys()
+                      if not exclude_address(a))
   elif type(spec) is SingleAddress:
     # TODO Could assert len(address_families) == 1, as it should always be true in this case.
     addresses = tuple(a
                       for af in address_families
-                      for a in af.addressables.keys() if a.target_name == spec.name)
+                      for a in af.addressables.keys()
+                      if a.target_name == spec.name and not exclude_address(a))
     if not addresses:
       if len(address_families) == 1:
         _raise_did_you_mean(address_families[0], spec.name)
