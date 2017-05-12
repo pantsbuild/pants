@@ -54,3 +54,14 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run)
         self.assertTrue(os.path.isfile(
           '{}/{}.rel_path-bundle/b/file1.txt'.format(temp_distdir, self.TARGET_PATH.replace('/', '.'))))
+
+  @ensure_engine
+  def test_bundle_resource_ordering(self):
+    """Ensures that `resources=` ordering is respected."""
+    pants_run = self.run_pants(
+      ['-q',
+       'run',
+       'testprojects/src/java/org/pantsbuild/testproject/bundle:bundle-resource-ordering']
+    )
+    self.assert_success(pants_run)
+    self.assertEquals(pants_run.stdout_data, 'Hello world from Foo\n\n')

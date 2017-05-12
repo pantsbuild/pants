@@ -39,16 +39,8 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
   :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
   """
 
-  @staticmethod
-  def exclude_target(target_address, exclude_patterns):
-    if exclude_patterns:
-      for pattern in exclude_patterns:
-        if pattern.search(target_address) is not None:
-          return True
-    return False
-
   @classmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls, exclude_patterns=None):
+  def parse(cls, filepath, filecontent, symbol_table_cls, parser_cls):
     """Parses a source for addressable Serializable objects.
 
     No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -61,7 +53,6 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
     :type symbol_table_cls: A :class:`pants.engine.parser.SymbolTable`.
     :param parser_cls: The parser cls to use.
     :type parser_cls: A :class:`pants.engine.parser.Parser`.
-    :param list exclude_patterns: A list of compiled regular expression objects.
     """
     try:
       objects = parser_cls.parse(filepath, filecontent, symbol_table_cls)
@@ -80,10 +71,7 @@ class AddressMap(datatype('AddressMap', ['path', 'objects_by_name'])):
       if name in objects_by_name:
         raise DuplicateNameError('An object already exists at {!r} with name {!r}: {!r}.  Cannot '
                                  'map {!r}'.format(filepath, name, objects_by_name[name], obj))
-
-      target_address = '{}:{}'.format(os.path.dirname(filepath), name)
-      if not AddressMap.exclude_target(target_address, exclude_patterns):
-        objects_by_name[name] = obj
+      objects_by_name[name] = obj
     return cls(filepath, OrderedDict(sorted(objects_by_name.items())))
 
 
