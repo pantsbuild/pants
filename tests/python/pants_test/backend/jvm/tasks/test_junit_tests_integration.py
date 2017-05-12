@@ -210,3 +210,21 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
         self.assertNotIn('org.pantsbuild.tmp.tests.AllTests#test2Success', output)
         self.assertNotIn('org.pantsbuild.tmp.tests.AllTestsBase', output)
         self.assertNotIn('org.pantsbuild.tmp.tests.AllTests$InnerClassSuccessTest', output)
+
+  def test_junit_test_throwing_runner(self):
+    with self.temporary_workdir() as workdir:
+      with self.source_clone('testprojects/src/java/org/pantsbuild/testproject/junit/customrunner') as custom_runner:
+        pants_run = self.run_pants_with_workdir([
+          'test',
+          '--test-junit-failure-summary',
+          '--no-test-junit-fail-fast',
+          custom_runner,
+        ], workdir)
+        group = [
+          'testprojects/src/java/org/pantsbuild/testproject/junit/customrunner:customrunner',
+          'org.pantsbuild.testprojects.junit.customrunner.TestsWithThrowingRunner'
+        ]
+        output = '\n'.join(line.strip() for line in pants_run.stdout_data.split('\n'))
+        self.assertIn('\n'.join(group), output,
+                      '{group}\n not found in\n\n{output}.'.format(group='\n'.join(group),
+                                                                   output=output))
