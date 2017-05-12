@@ -157,7 +157,7 @@ class RunTracker(Subsystem):
     #     }
     #   }
     # }
-    self._target_data = {}
+    self._target_to_data = {}
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -305,6 +305,7 @@ class RunTracker(Subsystem):
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
 
+    print(run_information)
     stats = {
       'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
@@ -373,8 +374,8 @@ class RunTracker(Subsystem):
       # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
       self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
-    if self._target_data:
-      self.run_info.add_info('target_data', self._target_data)
+    if self._target_to_data:
+      self.run_info.add_info('target_data', self._target_to_data)
 
     self.report.close()
     self.store_stats()
@@ -414,38 +415,23 @@ class RunTracker(Subsystem):
     """
     SubprocPool.shutdown(self._aborted)
 
-  def report_target_info(self, scope, target, keys, val):
+  def report_target_info(self, scope, target, key, val):
     """Add target information to run_info under target_data.
 
     Will Recursively construct a nested dict with the keys provided.
 
     :param string scope: The scope for which we are reporting the information.
     :param string target: The target for which we want to store information.
-    :param list of string keys: The keys that will be recursively
-           nested and pointing to the information being stored.
+    :param string key: The key that will point to the information being stored.
     :param dict or string val: The value of the information being stored.
 
     :API: public
     """
-    def create_dict_with_nested_keys_and_val(value, index):
-      """ Recursively constructs a nested dictionary with the keys pointing to the value.
-
-      :param dict or string value: The value of the information being stored.
-      :param int index: The index into the list of keys.
-      :return: dict of nested keys leading to the value.
-      """
-      if index > 0:
-        new_val = {keys[index]: value}
-        create_dict_with_nested_keys_and_val(new_val, index - 1)
-      else:
-        return {keys[index]: value}
-
-    val_to_store = create_dict_with_nested_keys_and_val(val, len(keys) - 1)
-    target_data = self._target_data.get(target, None)
+    target_data = self._target_to_data.get(target)
     if target_data is None:
-      self._target_data.update({target: {scope: val_to_store}})
+      self._target_to_data.update({target: {scope: {key: val}}})
     else:
-      scope_data = self._target_data[target].get(scope, None)
+      scope_data = target_data.get(scope)
       if scope_data is None:
-        self._target_data[target][scope] = scope_data = {}
-      scope_data.update(val_to_store)
+        self._target_to_data[target][scope] = scope_data = {}
+      scope_data.update({key: val})

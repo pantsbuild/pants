@@ -77,8 +77,8 @@ class TestRunnerTaskMixin(object):
     if target and scope:
       address = target.address.spec
       target_type = target.type_alias
-      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
-      self.context.run_tracker.report_target_info(scope, address, [test_name], test_info)
+      self.context.run_tracker.report_target_info('GLOBAL', address, 'target_type', target_type)
+      self.context.run_tracker.report_target_info(scope, address, test_name, test_info)
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
