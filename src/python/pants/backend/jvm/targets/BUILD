@@ -58,7 +58,6 @@ python_library(
     'annotation_processor.py',
     'java_agent.py',
     'java_library.py',
-    'java_tests.py',
     'javac_plugin.py',
   ],
   dependencies = [
