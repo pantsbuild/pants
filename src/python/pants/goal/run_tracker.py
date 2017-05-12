@@ -305,7 +305,6 @@ class RunTracker(Subsystem):
     if target_data:
       run_information['target_data'] = ast.literal_eval(target_data)
 
-    print(run_information)
     stats = {
       'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
