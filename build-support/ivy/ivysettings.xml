@@ -23,15 +23,15 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
        -->
   <properties environment="env"/>
-  <property name="ANDROID_HOME"
-            value="/please-export-your-ANDROID_HOME"
-            unlessset="env.ANDROID_HOME"/>
-  <property name="ANDROID_HOME"
+  <property name="android.home"
             value="${env.ANDROID_HOME}"
+            override="false"
             ifset="env.ANDROID_HOME"/>
-
-  <property name="android.repo.dir" value="${ANDROID_HOME}/extras/android/m2repository"/>
-  <property name="google.repo.dir" value="${ANDROID_HOME}/extras/google/m2repository"/>
+  <property name="android.home"
+            value="/please-export-your-ANDROID_HOME"
+            override="false"/>
+  <property name="android.repo.dir" value="${android.home}/extras/android/m2repository"/>
+  <property name="google.repo.dir" value="${android.home}/extras/google/m2repository"/>
 
   <resolvers>
 
