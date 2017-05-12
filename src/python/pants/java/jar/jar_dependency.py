@@ -39,7 +39,7 @@ class JarDependencyParseContextWrapper(object):
     """
     :param parse_context: The BUILD file parse context.
     """
-    self._rel_path = parse_context.rel_path
+    self._parse_context = parse_context
 
   def __call__(self, org, name, rev=None, force=False, ext=None, url=None, apidocs=None,
               classifier=None, mutable=None, intransitive=False, excludes=None):
@@ -66,7 +66,7 @@ class JarDependencyParseContextWrapper(object):
     :type excludes: list of :class:`pants.backend.jvm.targets.exclude.Exclude`
     """
     return JarDependency(org, name, rev, force, ext, url, apidocs, classifier, mutable, intransitive,
-                         excludes, self._rel_path)
+                         excludes, self._parse_context.rel_path)
 
 
 class JarDependency(datatype('JarDependency', [
