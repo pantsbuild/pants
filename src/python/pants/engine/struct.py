@@ -259,8 +259,9 @@ class Struct(Serializable, SerializableFactory, Validatable):
     return object.__getattribute__(self, item)
 
   def _key(self):
-    if self.address:
-      return self.address
+    address = self._kwargs.get('address', None)
+    if address:
+      return address
     else:
       def hashable(value):
         if isinstance(value, dict):
