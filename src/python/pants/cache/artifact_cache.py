@@ -156,12 +156,7 @@ def call_use_cached_files(tup):
 
   try:
     cache, key, results_dir = tup
-    res = cache.use_cached_files(key, results_dir)
-    if res:
-      sys.stderr.write('.')
-    else:
-      sys.stderr.write(' ')
-    return res
+    return cache.use_cached_files(key, results_dir)
   except NonfatalArtifactCacheError as e:
     logger.warn('Error calling use_cached_files in artifact cache: {0}'.format(e))
     return False
