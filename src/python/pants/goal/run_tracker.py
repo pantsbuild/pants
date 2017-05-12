@@ -427,21 +427,20 @@ class RunTracker(Subsystem):
 
     :API: public
     """
-    def create_dict_with_nested_keys_and_val(all_keys, val_item, index):
+    def create_dict_with_nested_keys_and_val(value, index):
       """ Recursively constructs a nested dictionary with the keys pointing to the value.
 
-      :param list of string all_keys: The keys that will be recursively nested.
-      :param dict or string val_item: The value of the information being stored.
+      :param dict or string value: The value of the information being stored.
       :param int index: The index into the list of keys.
       :return: dict of nested keys leading to the value.
       """
       if index > 0:
-        new_val = {all_keys[index]: val_item}
-        create_dict_with_nested_keys_and_val(all_keys, new_val, index - 1)
+        new_val = {keys[index]: value}
+        create_dict_with_nested_keys_and_val(new_val, index - 1)
       else:
-        return {all_keys[index]: val_item}
+        return {keys[index]: value}
 
-    val_to_store = create_dict_with_nested_keys_and_val(keys, val, len(keys) - 1)
+    val_to_store = create_dict_with_nested_keys_and_val(val, len(keys) - 1)
     target_data = self._target_data.get(target, None)
     if target_data is None:
       self._target_data.update({target: {scope: val_to_store}})

@@ -267,10 +267,10 @@ Pants allows more fine grained cache management, although it then becomes the re
 
 Recording Target Specific Data
 ------------------------------
-If you would like to track target information like the targets being run, their
-run times, or some other target-specific piece of data, `run_tracker` has this
-ability by calling the `report_target_info` method. The data reported will be
-stored in the `run_info` JSON blob along with timestamp, run id, etc.
+If you would like to track target information such as the targets being run,
+their run times, or some other target-specific piece of data, `run_tracker`
+provides this ability via the `report_target_info` method. The data reported
+will be stored in the `run_info` JSON blob along with timestamp, run id, etc.
 
 There are various reasons you might want to collect target information. The
 information could be used for things like tracking developer behavior (for

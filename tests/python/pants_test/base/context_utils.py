@@ -55,7 +55,7 @@ class TestContext(Context):
 
     artifact_cache_stats = DummyArtifactCacheStats()
 
-    def report_target_info(self, scope, target, key, val): pass
+    def report_target_info(self, scope, target, keys, val): pass
 
 
   @contextmanager
