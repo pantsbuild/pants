@@ -54,3 +54,11 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
   def test_deployable_archive_products(self):
     self.test_task.execute()
     self._check_products('bin')
+
+  def test_handles_multiple_binary_targets(self):
+    cbin = self.create_python_binary('src/python/cbin', 'cbin', 'lib.lib:main',
+                                     dependencies=['//src/python/lib'])
+    self.task_context = self.context(target_roots=[self.binary, cbin])
+    self.task_context.run_tracker.run_info = RunInfo(self.run_info_dir)
+    self.create_task(self.task_context).execute()
+    self._check_products('bin')
