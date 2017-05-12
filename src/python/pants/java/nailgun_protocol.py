@@ -192,7 +192,7 @@ class NailgunProtocol(object):
     if not return_bytes:
       payload = payload.decode('utf-8')
 
-    return chunk_type, payload
+    return chunk_type, payload.decode('utf-8')
 
   @classmethod
   def iter_chunks(cls, sock, return_bytes=False):
