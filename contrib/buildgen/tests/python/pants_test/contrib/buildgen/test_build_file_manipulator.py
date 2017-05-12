@@ -272,6 +272,9 @@ class BuildFileManipulatorTest(BaseTest):
     build_file_str = '\n'.join(multi_targ_bfm.build_file_lines())
     self.assertEqual(build_file_str, expected_build_string)
 
+
+
+
   def test_target_insertion_top(self):
     expected_build_string = dedent(
       """\
