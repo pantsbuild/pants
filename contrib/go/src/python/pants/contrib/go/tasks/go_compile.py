@@ -6,10 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
+from pants.util.strutil import safe_shlex_split
 
 from pants.contrib.go.targets.go_target import GoTarget
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
@@ -58,7 +60,8 @@ class GoCompile(GoWorkspaceTask):
                                                    vt.target.import_path + '.a')
 
   def _go_install(self, target, gopath):
-    args = self.get_options().build_flags.split() + [target.import_path]
+    build_flags = re.sub(r'^"|"$', '', self.get_options().build_flags)
+    args = safe_shlex_split(build_flags) + [target.import_path]
     result, go_cmd = self.go_dist.execute_go_cmd(
       'install', gopath=gopath, args=args,
       workunit_factory=self.context.new_workunit,

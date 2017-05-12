@@ -42,3 +42,8 @@ class GoCompileIntegrationTest(PantsRunIntegrationTest):
     args = ['compile', 'contrib/go/examples/src/go/server']
     pants_run = self.run_pants(args)
     self.assert_success(pants_run)
+
+  def test_go_compile_fully_static(self):
+    args = ['compile', 'contrib/go/examples/src/go/server', '--compile-go-build-flags="--ldflags \'-extldflags \"-static\"\'"']
+    pants_run = self.run_pants(args)
+    self.assert_success(pants_run)
