@@ -66,6 +66,6 @@ class SetupTest(unittest.TestCase):
       with open(log_file) as fp:
         loglines = fp.read().splitlines()
         self.assertEqual(2, len(loglines))
-        glog_format = r'\d{4} \d{2}:\d{2}:\d{2}.\d{6} \d+ \w+\.py:\d+] '
+        glog_format = r'\d{4} \d{2}:\d{2}:\d{2}.\d+ \d+ \w+\.py:\d+] '
         self.assertRegexpMatches(loglines[0], r'^W{}warn$'.format(glog_format))
         self.assertRegexpMatches(loglines[1], r'^I{}info$'.format(glog_format))
