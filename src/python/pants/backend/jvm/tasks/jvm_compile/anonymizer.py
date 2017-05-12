@@ -55,8 +55,7 @@ class TokenTranslator(object):
   # Utility method for anonymizing base64-encoded binary data in analysis files.
   @staticmethod
   def _random_base64_string():
-    n = random.randint(20, 200)
-    return base64.b64encode(os.urandom(n))
+    return base64.b64encode(os.urandom(20))
 
   # Break on delimiters (digits, space, forward slash, dash, underscore, dollar, period) and on
   # upper-case letters.
