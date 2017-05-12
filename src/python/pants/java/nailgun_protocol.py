@@ -159,7 +159,7 @@ class NailgunProtocol(object):
     return buf
 
   @classmethod
-  def read_chunk(cls, sock, return_bytes=False):
+  def read_chunk(cls, sock):
     """Read a single chunk from the connected client.
 
      A "chunk" is a variable-length block of data beginning with a 5-byte chunk header and followed
@@ -189,16 +189,15 @@ class NailgunProtocol(object):
     # we've drained the payload from the socket to avoid subsequent reads of a stale payload.
     if chunk_type not in ChunkType.VALID_TYPES:
       raise cls.ProtocolError('invalid chunk type: {}'.format(chunk_type))
-    if not return_bytes:
-      payload = payload.decode('utf-8')
 
+    # TODO: Decode this payload if a caller requires it. Currently, this payload is in bytes.
     return chunk_type, payload
 
   @classmethod
-  def iter_chunks(cls, sock, return_bytes=False):
+  def iter_chunks(cls, sock):
     """Generates chunks from a connected socket until an Exit chunk is sent."""
     while 1:
-      chunk_type, payload = cls.read_chunk(sock, return_bytes)
+      chunk_type, payload = cls.read_chunk(sock)
       yield chunk_type, payload
       if chunk_type == ChunkType.EXIT:
         break

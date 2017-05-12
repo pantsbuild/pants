@@ -55,7 +55,7 @@ class NailgunClientSession(NailgunProtocol):
   def _process_session(self):
     """Process the outputs of the nailgun session."""
     try:
-      for chunk_type, payload in self.iter_chunks(self._sock, return_bytes=True):
+      for chunk_type, payload in self.iter_chunks(self._sock):
         if chunk_type == ChunkType.STDOUT:
           self._write_flush(self._stdout, payload)
         elif chunk_type == ChunkType.STDERR:

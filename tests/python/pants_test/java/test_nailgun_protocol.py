@@ -178,7 +178,7 @@ class TestNailgunProtocol(unittest.TestCase):
 
   def test_send_unicode_chunk(self):
     NailgunProtocol.send_stdout(self.server_sock, self.TEST_UNICODE_PAYLOAD)
-    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock, return_bytes=True)
+    chunk_type, payload = NailgunProtocol.read_chunk(self.client_sock)
     self.assertEqual(
       (chunk_type, payload),
       (ChunkType.STDOUT, self.TEST_UNICODE_PAYLOAD)
