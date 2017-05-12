@@ -706,6 +706,7 @@ class Target(AbstractTarget):
 
     :return: targets that depend on this target
     :rtype: list of Target
+    dummy change
     """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependents_of(self.address)]
