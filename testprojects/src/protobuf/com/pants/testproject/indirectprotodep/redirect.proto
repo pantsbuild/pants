@@ -1,0 +1,5 @@
+package com.pants.testproject.indirectprotodep;
+
+message Foo {
+  optional string value = 1;
+}
