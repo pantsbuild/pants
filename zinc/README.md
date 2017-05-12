@@ -26,11 +26,11 @@ To build a jar use:
 To consume a jar, add a zinc target in BUILD.tools. To force pants to re-resolve
 and re-shade the artifact, use a new `rev` whenever the artifact has changed.
 
-    jar_library(name = 'zinc',
-                jars = [
-                  jar(org = 'org.pantsbuild', name = 'zinc', rev = ???,
-                      url = 'file:///Users/user/pants/dist/zinc.jar'),
-                ])
+jar_library(name = 'zinc',
+            jars = [
+              jar(org = 'org.pantsbuild', name = 'zinc', rev = ???,
+                  url = 'file:///Users/user/pants/dist/zinc.jar'),
+            ])
 
 
 Options
