@@ -210,6 +210,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       env = os.environ.copy()
     if extra_env:
       env.update(extra_env)
+    env['PANTS_ENABLE_V2_ENGINE'] = 'true'
 
     # Don't overwrite the profile of this process in the called process.
     # Instead, write the profile into a sibling file.
