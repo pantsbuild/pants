@@ -7,11 +7,30 @@ not undergo the vetting associated with ``stable`` releases.
 1.4.0.dev0 (5/12/2017)
 ----------------------
 
-* Update release docs to use a label instead of a spreadsheet for backports. (#4574)
-  `PR #4574 <https://github.com/pantsbuild/pants/pull/4574>`_
-
+API Changes
+~~~~~~~~~~~
 * Support "exports" for thrift targets (#4564)
   `PR #4564 <https://github.com/pantsbuild/pants/pull/4564>`_
+
+* [engine] Deprecate and replace `traversable_dependency_specs`. (#4542)
+  `PR #4542 <https://github.com/pantsbuild/pants/pull/4542>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix a pytest path mangling bug. (#4565)
+  `PR #4565 <https://github.com/pantsbuild/pants/pull/4565>`_
+* Make "changed" tasks work with deleted files (#4546)
+  `PR #4546 <https://github.com/pantsbuild/pants/pull/4546>`_
+
+* Fix two usages of Address.build_file that avoided detection during the deprecation. (#4538)
+  `PR #4538 <https://github.com/pantsbuild/pants/pull/4538>`_
+
+* Fix tag builds after the more-complete `isort` edit. (#4532)
+  `PR #4532 <https://github.com/pantsbuild/pants/pull/4532>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Make setup_py tasks provide 'python_dists' product. (#4498)
   `PR #4498 <https://github.com/pantsbuild/pants/pull/4498>`_
@@ -25,15 +44,6 @@ not undergo the vetting associated with ``stable`` releases.
 * [engine] Don't recreate a graph just for validation (#4566)
   `PR #4566 <https://github.com/pantsbuild/pants/pull/4566>`_
 
-* Fix a pytest path mangling bug. (#4565)
-  `PR #4565 <https://github.com/pantsbuild/pants/pull/4565>`_
-
-* Prepare the 1.3.0rc0 release. (#4562)
-  `PR #4562 <https://github.com/pantsbuild/pants/pull/4562>`_
-
-* [engine] Deprecate and replace `traversable_dependency_specs`. (#4542)
-  `PR #4542 <https://github.com/pantsbuild/pants/pull/4542>`_
-
 * Warn when implicit_sources would be used, but is disabled (#4559)
   `PR #4559 <https://github.com/pantsbuild/pants/pull/4559>`_
 
@@ -43,31 +53,29 @@ not undergo the vetting associated with ``stable`` releases.
 * Dockerize native engine builds. (#4554)
   `PR #4554 <https://github.com/pantsbuild/pants/pull/4554>`_
 
-* Update target scope docs (#4553)
-  `PR #4553 <https://github.com/pantsbuild/pants/pull/4553>`_
-
 * [engine] Support tracebacks in engine traces; only show them w/ flag (#4549)
   `PR #4549 <https://github.com/pantsbuild/pants/pull/4549>`_
+* Move scalastyle and java checkstyle into the `lint` goal (#4540)
+  `PR #4540 <https://github.com/pantsbuild/pants/pull/4540>`_
+
+* Enable --compile-zinc-use-classpath-jars by default (#4525)
+  `PR #4525 <https://github.com/pantsbuild/pants/pull/4525>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Update release docs to use a label instead of a spreadsheet for backports. (#4574)
+  `PR #4574 <https://github.com/pantsbuild/pants/pull/4574>`_
+
+* Prepare the 1.3.0rc0 release. (#4562)
+  `PR #4562 <https://github.com/pantsbuild/pants/pull/4562>`_
+
+* Update target scope docs (#4553)
+  `PR #4553 <https://github.com/pantsbuild/pants/pull/4553>`_
 
 * [engine] use rust doc comments instead of javadoc style comments (#4550)
   `PR #4550 <https://github.com/pantsbuild/pants/pull/4550>`_
 
-* Make "changed" tasks work with deleted files (#4546)
-  `PR #4546 <https://github.com/pantsbuild/pants/pull/4546>`_
-
-* Move scalastyle and java checkstyle into the `lint` goal (#4540)
-  `PR #4540 <https://github.com/pantsbuild/pants/pull/4540>`_
-
-* Fix two usages of Address.build_file that avoided detection during the deprecation. (#4538)
-  `PR #4538 <https://github.com/pantsbuild/pants/pull/4538>`_
-
-* Fix tag builds after the more-complete `isort` edit. (#4532)
-  `PR #4532 <https://github.com/pantsbuild/pants/pull/4532>`_
-
-* Squeeze in one last change.
-
-* Enable --compile-zinc-use-classpath-jars by default (#4525)
-  `PR #4525 <https://github.com/pantsbuild/pants/pull/4525>`_
 
 1.3.0rc0 (05/08/2017)
 ---------------------
