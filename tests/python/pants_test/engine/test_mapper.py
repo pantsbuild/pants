@@ -54,9 +54,9 @@ class AddressMapTest(unittest.TestCase):
   _symbol_table_cls = ThingTable
 
   @contextmanager
-  def parse_address_map(self, json, exclude_patterns=None):
+  def parse_address_map(self, json):
     path = '/dev/null'
-    address_map = AddressMap.parse(path, json, self._symbol_table_cls, self._parser_cls, exclude_patterns)
+    address_map = AddressMap.parse(path, json, self._symbol_table_cls, self._parser_cls)
     self.assertEqual(path, address_map.path)
     yield address_map
 
@@ -92,77 +92,6 @@ class AddressMapTest(unittest.TestCase):
       with self.parse_address_map('{"type_alias": "thing", "name": "one"}'
                                   '{"type_alias": "thing", "name": "one"}'):
         self.fail()
-
-  def test_exclude_target_regexps_plain_string(self):
-    with self.parse_address_map(dedent("""
-      {
-        "type_alias": "thing",
-        "name": "one",
-        "age": 42
-      }
-      {
-        "type_alias": "thing",
-        "name": "two",
-        "age": 37
-      }
-      """), [re.compile('two')]) as address_map:
-      self.assertEqual({'one': Thing(name='one', age=42)}, address_map.objects_by_name)
-
-  def test_exclude_target_regexps_exclude_all(self):
-    with self.parse_address_map(dedent("""
-      {
-        "type_alias": "thing",
-        "name": "one",
-        "age": 42
-      }
-      {
-        "type_alias": "thing",
-        "name": "two",
-        "age": 37
-      }
-      """), [re.compile('o')]) as address_map:
-      self.assertEqual(dict(), address_map.objects_by_name)
-
-  def test_exclude_target_regexps_re_expression(self):
-    with self.parse_address_map(dedent("""
-      {
-        "type_alias": "thing",
-        "name": "one",
-        "age": 42
-      }
-      {
-        "type_alias": "thing",
-        "name": "one_two",
-        "age": 37
-      }
-      {
-        "type_alias": "thing",
-        "name": "one_two_three",
-        "age": 32
-      }
-      """), [re.compile('o.*_two$')]) as address_map:
-      self.assertEqual({'one': Thing(name='one', age=42), 'one_two_three': Thing(name='one_two_three', age=32)},
-                       address_map.objects_by_name)
-
-  def test_exclude_target_regexps_multiple_re(self):
-    with self.parse_address_map(dedent("""
-      {
-        "type_alias": "thing",
-        "name": "one",
-        "age": 42
-      }
-      {
-        "type_alias": "thing",
-        "name": "one_two",
-        "age": 37
-      }
-      {
-        "type_alias": "thing",
-        "name": "one_two_three",
-        "age": 32
-      }
-      """), [re.compile('_.*_'), re.compile('e$')]) as address_map:
-      self.assertEqual({'one_two': Thing(name='one_two', age=37)}, address_map.objects_by_name)
 
 
 class AddressFamilyTest(unittest.TestCase):
@@ -305,10 +234,3 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                       self.addr('a/d/e:e'): Target(name='e', type_alias='target'),
                       self.addr('a/d/e:e-prime'): Struct(name='e-prime', type_alias='struct')},
                      self.resolve_multi(DescendantAddresses('a/d')))
-
-  # Excludes are not implemented: expects excludes=['a/b', 'a/d/e'].
-  @unittest.expectedFailure
-  def test_walk_descendants_path_excludes(self):
-    self.assertEqual({self.addr('//:root'): Struct(name='root'),
-                      self.addr('a/d:d'): Target(name='d')},
-                     self.resolve_multi(DescendantAddresses('')))
