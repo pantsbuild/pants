@@ -250,16 +250,8 @@ class CacheFactory(object):
       - A list or tuple of two specs, local, then remote, each as described above
     """
     compression = self._options.compression_level
-    if compression not in range(10):
-      raise ValueError('compression_level must be an integer 0-9: {}'.format(compression))
-
-    deprecated_conditional(
-        lambda: compression == 0,
-        '1.4.0.dev0',
-        'compression==0',
-        'The artifact cache depends on gzip compression for checksumming: a compression level '
-        '==0 disables compression, and can prevent detection of corrupted artifacts.'
-    )
+    if compression not in range(1, 10):
+      raise ValueError('compression_level must be an integer 1-9: {}'.format(compression))
 
     artifact_root = self._options.pants_workdir
 
