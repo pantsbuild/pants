@@ -53,6 +53,10 @@ class ThriftLinter(NailgunTask):
   def cache_target_dirs(self):
     return True
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   @staticmethod
   def _to_bool(value):
     # Converts boolean and string values to boolean.
