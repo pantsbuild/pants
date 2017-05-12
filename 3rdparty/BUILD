@@ -127,6 +127,13 @@ target(name='thrift-0.6.1',
          ':slf4j-api',
        ])
 
+jar_library(
+  name='autovalue',
+  jars=[
+    jar(org='com.google.auto.value', name='auto-value', rev='1.0'),
+  ],
+)
+
 
 ###############
 # Test support
