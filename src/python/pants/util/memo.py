@@ -15,6 +15,11 @@ from contextlib import contextmanager
 _kwargs_separator = (object(),)
 
 
+# Used as a sentinel that disambiguates tuples passed in *args from coincidentally matching tuples
+# formed from kwargs item pairs.
+_kwargs_separator = (object(),)
+
+
 def equal_args(*args, **kwargs):
   """A memoized key factory that compares the equality (`==`) of a stable sort of the parameters."""
   key = args
