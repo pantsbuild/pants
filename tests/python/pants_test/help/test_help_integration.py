@@ -47,7 +47,7 @@ class TestHelpIntegration(PantsRunIntegrationTest):
     self.assertIn('cache.test.junit advanced options:', pants_run.stdout_data)
     # Spot check to see that full args for all options are printed
     self.assertIn('--binary-dup-max-dups', pants_run.stdout_data)
-    self.assertIn('--cache-test-junit-exclude-target-regexp', pants_run.stdout_data)
+    self.assertIn('--cache-test-junit-read', pants_run.stdout_data)
     # Spot check to see that subsystem options are printing
     self.assertIn('--jvm-options', pants_run.stdout_data)
     # Spot check to see that advanced subsystem options are printing
