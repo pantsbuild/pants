@@ -418,8 +418,6 @@ class RunTracker(Subsystem):
   def report_target_info(self, scope, target, key, val):
     """Add target information to run_info under target_data.
 
-    Will Recursively construct a nested dict with the keys provided.
-
     :param string scope: The scope for which we are reporting the information.
     :param string target: The target for which we want to store information.
     :param string key: The key that will point to the information being stored.
