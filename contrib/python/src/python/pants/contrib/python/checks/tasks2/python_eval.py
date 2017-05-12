@@ -175,7 +175,7 @@ class PythonEval(ResolveRequirementsTaskBase):
 
       with self.context.new_workunit(name='eval',
                                      labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,
-                                             WorkUnitLabel.TOOL],
+                                             WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL],
                                      cmd=' '.join(exec_pex.cmdline())) as workunit:
         returncode = pex.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
         workunit.set_outcome(WorkUnit.SUCCESS if returncode == 0 else WorkUnit.FAILURE)
