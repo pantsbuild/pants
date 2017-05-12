@@ -19,4 +19,11 @@ jvm_binary(name='ten-thousand',
 jvm_binary(name='there-was-a-duck',
   main='org.pantsbuild.testproject.phrases.ThereWasADuck',
   source='ThereWasADuck.java',
+  dependencies=[
+    ':with-her-trusty-companion',
+  ]
+)
+
+java_library(name='with-her-trusty-companion',
+  sources=['TrustyCompanion.java'],
 )

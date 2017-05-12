@@ -163,8 +163,7 @@ class GlobalOptionsRegistrar(Optionable):
                   "are used.  Multiple constraints may be added.  They will be ORed together.")
     register('--exclude-target-regexp', advanced=True, type=list, default=[],
              metavar='<regexp>',
-             help='Exclude targets that match these regexes.',
-             recursive=True)  # TODO: Does this need to be recursive? What does that even mean?
+             help='Exclude target roots that match these regexes.')
     # Relative pants_distdir to buildroot. Requires --pants-distdir to be bootstrapped above first.
     # e.g. '/dist/'
     rel_distdir = '/{}/'.format(os.path.relpath(register.bootstrap.pants_distdir, get_buildroot()))

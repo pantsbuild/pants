@@ -40,13 +40,15 @@ class Bundles(object):
   ten_thousand = Bundle('ten-thousand',
       "And now you must face my army of ten thousand BUILD files.")
   there_was_a_duck = Bundle('there-was-a-duck',
-      "And also, there was a duck.")
+      "And also, there was a duck, with her trusty companion.")
+
+  trusty_companion = 'with-her-trusty-companion'
 
   all_bundles = [lesser_of_two, once_upon_a_time, ten_thousand, there_was_a_duck]
 
 
-class BundleIntegrationTest(PantsRunIntegrationTest):
-  """Tests the functionality of the --spec-exclude flag in pants."""
+class ExcludeTargetRegexpIntegrationTest(PantsRunIntegrationTest):
+  """Tests the functionality of the --exclude-target-regexp flag."""
 
   def _bundle_path(self, bundle):
     return os.path.join(get_buildroot(), 'dist',
@@ -135,12 +137,11 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     )
 
   @ensure_engine
-  def test_bundle_resource_ordering(self):
-    """Ensures that `resources=` ordering is respected."""
-    pants_run = self.run_pants(
-      ['-q',
-       'run',
-       'testprojects/src/java/org/pantsbuild/testproject/bundle:bundle-resource-ordering']
+  def test_only_exclude_roots(self):
+    # You cannot exclude the trusty companion (ie dependency) of an included root.
+    self._test_bundle_existences([
+          '{}:{}'.format(Bundles.phrase_path, Bundles.there_was_a_duck.spec),
+          '--exclude-target-regexp={}:{}'.format(Bundles.phrase_path, Bundles.trusty_companion),
+        ],
+        set([Bundles.there_was_a_duck]),
     )
-    self.assert_success(pants_run)
-    self.assertEquals(pants_run.stdout_data, 'Hello world from Foo\n\n')

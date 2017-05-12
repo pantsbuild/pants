@@ -5,6 +5,6 @@ package org.pantsbuild.testproject.phrases;
  */
 public class ThereWasADuck {
   public static void main(String[] args) {
-    System.out.println("And also, there was a duck.");
+    System.out.println("And also, there was a duck, with her " + TrustyCompanion.VALUE +  ".");
   }
 }
