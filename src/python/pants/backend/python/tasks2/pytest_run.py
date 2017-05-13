@@ -435,16 +435,21 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       self.context.log.info(traceback.format_exc())
       return PythonTestResult.exception()
 
-  def _get_failed_targets_from_junitxml(self, junitxml, targets):
+  def _map_relsrc_to_targets(self, targets):
     pex_src_root = os.path.relpath(
       self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
     # First map chrooted sources back to their targets.
     relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
-                        for src in target.sources_relative_to_source_root()}
+      for src in target.sources_relative_to_source_root()}
     # Also map the source tree-rooted sources, because in some cases (e.g., a failure to even
     # eval the test file during test collection), that's the path pytest will use in the junit xml.
     relsrc_to_target.update({src: target for target in targets
-                             for src in target.sources_relative_to_buildroot()})
+      for src in target.sources_relative_to_buildroot()})
+
+    return relsrc_to_target
+
+  def _get_failed_targets_from_junitxml(self, junitxml, targets):
+    relsrc_to_target = self._map_relsrc_to_targets(targets)
 
     # Now find the sources that contained failing tests.
     failed_targets = set()
@@ -464,6 +469,11 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       raise TaskError('Error parsing xml file at {}: {}'.format(junitxml, e))
 
     return failed_targets
+
+  def _get_target_from_test(self, test_info, targets):
+    relsrc_to_target = self._map_relsrc_to_targets(targets)
+    file_info = test_info['file']
+    return relsrc_to_target.get(file_info)
 
   def _run_tests(self, targets):
     if self.get_options().fast:
@@ -528,6 +538,17 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         safe_mkdir(external_junit_xml_dir)
         shutil.copy(junitxml_path, external_junit_xml_dir)
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
+
+      def parse_error_handler(parse_error):
+        # Simple error handler to pass to xml parsing function.
+        raise TaskError('Error parsing xml file at {}: {}'
+          .format(parse_error.xml_path, parse_error.cause))
+
+      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler, ['file', 'name'])
+      for test_name, test_info in all_tests_info.items():
+        test_target = self._get_target_from_test(test_info, targets)
+        self.report_test_info(self.options_scope, test_target, test_name, test_info)
+
       return result.with_failed_targets(failed_targets)
 
   def _pex_run(self, pex, workunit_name, args, env):

@@ -265,3 +265,15 @@ Pants allows more fine grained cache management, although it then becomes the re
           if self.artifact_cache_writes_enabled():
             self.update_artifact_cache((vt, [output_location]))
 
+Recording Target Specific Data
+------------------------------
+If you would like to track target information such as the targets being run,
+their run times, or some other target-specific piece of data, `run_tracker`
+provides this ability via the `report_target_info` method. The data reported
+will be stored in the `run_info` JSON blob along with timestamp, run id, etc.
+
+There are various reasons you might want to collect target information. The
+information could be used for things like tracking developer behavior (for
+example, inferring what code developers are constantly changing by observing
+which targets are run most often) or target heath (for example, a historical
+look at targets and their flakiness).

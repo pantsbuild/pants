@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
 import json
 import multiprocessing
 import os
@@ -143,6 +144,20 @@ class RunTracker(Subsystem):
     SubprocPool.foreground()
 
     self._aborted = False
+
+    # Data will be organized first by target and then scope.
+    # Eg:
+    # {
+    #   'target/address:name': {
+    #     'running_scope': {
+    #       'run_duration': 356.09
+    #     },
+    #     'GLOBAL': {
+    #       'target_type': 'pants.test'
+    #     }
+    #   }
+    # }
+    self._target_to_data = {}
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -285,8 +300,13 @@ class RunTracker(Subsystem):
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
+    run_information = self.run_info.get_as_dict()
+    target_data = run_information.get('target_data', None)
+    if target_data:
+      run_information['target_data'] = ast.literal_eval(target_data)
+
     stats = {
-      'run_info': self.run_info.get_as_dict(),
+      'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
@@ -353,6 +373,9 @@ class RunTracker(Subsystem):
       # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
       self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
+    if self._target_to_data:
+      self.run_info.add_info('target_data', self._target_to_data)
+
     self.report.close()
     self.store_stats()
 
@@ -390,3 +413,22 @@ class RunTracker(Subsystem):
     N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
     """
     SubprocPool.shutdown(self._aborted)
+
+  def report_target_info(self, scope, target, key, val):
+    """Add target information to run_info under target_data.
+
+    :param string scope: The scope for which we are reporting the information.
+    :param string target: The target for which we want to store information.
+    :param string key: The key that will point to the information being stored.
+    :param dict or string val: The value of the information being stored.
+
+    :API: public
+    """
+    target_data = self._target_to_data.get(target)
+    if target_data is None:
+      self._target_to_data.update({target: {scope: {key: val}}})
+    else:
+      scope_data = target_data.get(scope)
+      if scope_data is None:
+        self._target_to_data[target][scope] = scope_data = {}
+      scope_data.update({key: val})
