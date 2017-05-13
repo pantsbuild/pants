@@ -20,6 +20,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'jar_dependency_integration',
+  sources = ['test_jar_dependency_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name='jar_library',
   sources=['test_jar_library.py'],
   dependencies=[
