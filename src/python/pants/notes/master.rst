@@ -29,6 +29,12 @@ Bugfixes
 * Fix tag builds after the more-complete `isort` edit. (#4532)
   `PR #4532 <https://github.com/pantsbuild/pants/pull/4532>`_
 
+* Fix built-in macros for the mutable ParseContext (#4583)
+  `PR #4583 <https://github.com/pantsbuild/pants/pull/4583>`_
+
+* Exclude only roots for exclude-target-regexp in v2 (#4578)
+  `PR #4578 <https://github.com/pantsbuild/pants/pull/4578>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
