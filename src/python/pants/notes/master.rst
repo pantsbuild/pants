@@ -1,6 +1,6 @@
 Master Pre-Releases
 ===================
-F
+
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
