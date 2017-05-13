@@ -26,13 +26,13 @@ from pants.util.netrc import Netrc
 
 class BuildFilePath(object):
   def __init__(self, parse_context):
-    self.rel_path = parse_context.rel_path
+    self._parse_context = parse_context
 
   def __call__(self):
     """
     :returns: The absolute path of this BUILD file.
     """
-    return os.path.join(get_buildroot(), self.rel_path)
+    return os.path.join(get_buildroot(), self._parse_context.rel_path)
 
 
 def build_file_aliases():

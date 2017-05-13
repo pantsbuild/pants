@@ -152,10 +152,10 @@ class FilesetRelPathWrapper(AbstractClass):
     """
     :param parse_context: The BUILD file parse context.
     """
-    self._rel_path = parse_context.rel_path
+    self._parse_context = parse_context
 
   def __call__(self, *patterns, **kwargs):
-    return self.create_fileset_with_spec(self._rel_path, *patterns, **kwargs)
+    return self.create_fileset_with_spec(self._parse_context.rel_path, *patterns, **kwargs)
 
   @classmethod
   def create_fileset_with_spec(cls, rel_path, *patterns, **kwargs):
