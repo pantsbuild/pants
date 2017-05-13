@@ -16,6 +16,9 @@ API Changes
 * Make setup_py tasks provide 'python_dists' product. (#4498)
   `PR #4498 <https://github.com/pantsbuild/pants/pull/4498>`_
 
+* Include API that will store target info in run_tracker (#4561)
+  `PR #4561 <https://github.com/pantsbuild/pants/pull/4561>`_
+
 Bugfixes
 ~~~~~~~~
 
