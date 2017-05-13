@@ -6,14 +6,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
+import os
+from unittest import TestCase
 
 from mock import patch
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler
 from pants.util.timeout import TimeoutReached
+from pants.util.xml_parser import XmlParser
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -365,3 +370,156 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
         task.execute()
       self.assertEqual(len(cm.exception.failed_targets), 1)
       self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetB')
+
+
+class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
+  @staticmethod
+  def _raise_handler(e):
+    raise e
+
+  class CollectHandler(object):
+    def __init__(self):
+      self._errors = []
+
+    def __call__(self, e):
+      self._errors.append(e)
+
+    @property
+    def errors(self):
+      return self._errors
+
+  def test_parse_test_info_no_files(self):
+    with temporary_dir() as xml_dir:
+      test_info = self.parse_test_info(xml_dir, self._raise_handler)
+
+      self.assertEqual({}, test_info)
+
+  def test_parse_test_info_all_testcases(self):
+    with temporary_dir() as xml_dir:
+      with open(os.path.join(xml_dir, 'TEST-a.xml'), 'w') as fp:
+        fp.write("""
+        <testsuite failures="1" errors="1">
+          <testcase classname="org.pantsbuild.Green" name="testOK" time="1.290"/>
+          <testcase classname="org.pantsbuild.Failure" name="testFailure" time="0.27">
+            <failure/>
+          </testcase>
+          <testcase classname="org.pantsbuild.Error" name="testError" time="0.932">
+            <error/>
+          </testcase>
+          <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1">
+            <skipped/>
+          </testcase>
+        </testsuite>
+        """)
+
+      tests_info = self.parse_test_info(xml_dir, self._raise_handler)
+      self.assertEqual(
+        {
+          'testOK': {
+            'result_code': 'success',
+            'time': 1.290
+          },
+          'testFailure': {
+            'result_code': 'failure',
+            'time': 0.27
+          },
+          'testError': {
+            'result_code': 'error',
+            'time': 0.932
+          },
+          'testSkipped': {
+            'result_code': 'skipped',
+            'time': 0.1
+          }
+        }, tests_info)
+
+  def test_parse_test_info_invalid_file_name(self):
+    with temporary_dir() as xml_dir:
+      with open(os.path.join(xml_dir, 'random.xml'), 'w') as fp:
+        fp.write('<invalid></xml>')
+
+      tests_info = self.parse_test_info(xml_dir, self._raise_handler)
+      self.assertEqual({}, tests_info)
+
+  def test_parse_test_info_invalid_dir(self):
+    with temporary_dir() as xml_dir:
+      with safe_open(os.path.join(xml_dir, 'subdir', 'TEST-c.xml'), 'w') as fp:
+        fp.write('<invalid></xml>')
+
+      tests_info = self.parse_test_info(xml_dir, self._raise_handler)
+      self.assertEqual({}, tests_info)
+
+  def test_parse_test_info_error_raise(self):
+    with temporary_dir() as xml_dir:
+      xml_file = os.path.join(xml_dir, 'TEST-bad.xml')
+      with open(xml_file, 'w') as fp:
+        fp.write('<invalid></xml>')
+      with self.assertRaises(Exception) as exc:
+        self.parse_test_info(xml_dir, self._raise_handler)
+      self.assertEqual(xml_file, exc.exception.xml_path)
+      self.assertIsInstance(exc.exception.cause, XmlParser.XmlError)
+
+  def test_parse_test_info_error_continue(self):
+    with temporary_dir() as xml_dir:
+      bad_file1 = os.path.join(xml_dir, 'TEST-bad1.xml')
+      with open(bad_file1, 'w') as fp:
+        fp.write("""
+        <testsuite failures="0" errors="1">
+          <testcase classname="org.pantsbuild.Error" name="testError" time="zero">
+            <error/>
+          </testcase>
+        </testsuite>
+        """)
+      with open(os.path.join(xml_dir, 'TEST-good.xml'), 'w') as fp:
+        fp.write("""
+        <testsuite failures="0" errors="1">
+          <testcase classname="org.pantsbuild.Error" name="testError" time="1.2">
+            <error/>
+          </testcase>
+        </testsuite>
+        """)
+      bad_file2 = os.path.join(xml_dir, 'TEST-bad2.xml')
+      with open(bad_file2, 'w') as fp:
+        fp.write('<invalid></xml>')
+
+      collect_handler = self.CollectHandler()
+      tests_info = self.parse_test_info(xml_dir, collect_handler)
+      self.assertEqual(2, len(collect_handler.errors))
+      self.assertEqual({bad_file1, bad_file2}, {e.xml_path for e in collect_handler.errors})
+
+      self.assertEqual(
+        {'testError':
+          {
+            'result_code': 'error',
+            'time': 1.2
+          }
+        }, tests_info)
+
+  def test_parse_test_info_extra_attributes(self):
+    with temporary_dir() as xml_dir:
+      with open(os.path.join(xml_dir, 'TEST-a.xml'), 'w') as fp:
+        fp.write("""
+        <testsuite errors="1">
+          <testcase classname="org.pantsbuild.Green" name="testOK" time="1.290" file="file.py"/>
+          <testcase classname="org.pantsbuild.Error" name="testError" time="0.27" file="file.py">
+            <error/>
+          </testcase>
+        </testsuite>
+        """)
+
+      tests_info = self.parse_test_info(xml_dir, self._raise_handler, ['file', 'classname'])
+      self.assertEqual(
+        {
+          'testOK': {
+            'file': 'file.py',
+            'classname': 'org.pantsbuild.Green',
+            'result_code': 'success',
+            'time': 1.290
+          },
+          'testError': {
+            'file': 'file.py',
+            'classname': 'org.pantsbuild.Error',
+            'result_code': 'error',
+            'time': 0.27
+          }
+        }, tests_info)
