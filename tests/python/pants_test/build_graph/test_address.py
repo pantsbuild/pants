@@ -93,8 +93,8 @@ class ParseSpecTest(unittest.TestCase):
     self.do_test_bad_spec_path('//a/BUILD.suffix:b')
 
   def test_banned_chars_in_target_name(self):
-    # move to do_test_bad_spec_path after deprecation
-    self.assertEquals('c@d', Address(*parse_spec('a/b:c@d')).target_name)
+    with self.assertRaises(InvalidTargetName):
+      Address(*parse_spec('a/b:c@d'))
 
   def do_test_bad_spec_path(self, spec):
     with self.assertRaises(InvalidSpecPath):

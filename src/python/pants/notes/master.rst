@@ -4,6 +4,52 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev0 (5/12/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Support "exports" for thrift targets (#4564)
+  `PR #4564 <https://github.com/pantsbuild/pants/pull/4564>`_
+
+* Make setup_py tasks provide 'python_dists' product. (#4498)
+  `PR #4498 <https://github.com/pantsbuild/pants/pull/4498>`_
+
+* Include API that will store target info in run_tracker (#4561)
+  `PR #4561 <https://github.com/pantsbuild/pants/pull/4561>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix built-in macros for the mutable ParseContext (#4583)
+  `PR #4583 <https://github.com/pantsbuild/pants/pull/4583>`_
+
+* Exclude only roots for exclude-target-regexp in v2 (#4578)
+  `PR #4578 <https://github.com/pantsbuild/pants/pull/4578>`_
+  `PR #451) <https://github.com/twitter/commons/pull/451)>`_
+
+* Fix a pytest path mangling bug. (#4565)
+  `PR #4565 <https://github.com/pantsbuild/pants/pull/4565>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Specify a workunit for node.js test and run. (#4572)
+  `PR #4572 <https://github.com/pantsbuild/pants/pull/4572>`_
+
+* Include transitive Resources targets in PrepareResources. (#4569)
+  `PR #4569 <https://github.com/pantsbuild/pants/pull/4569>`_
+
+* [engine] Don't recreate a graph just for validation (#4566)
+  `PR #4566 <https://github.com/pantsbuild/pants/pull/4566>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Update release docs to use a label instead of a spreadsheet for backports. (#4574)
+  `PR #4574 <https://github.com/pantsbuild/pants/pull/4574>`_
+
 
 1.3.0rc0 (05/08/2017)
 ---------------------
