@@ -3,6 +3,48 @@
 
 This document describes releases leading up to the ``1.3.x`` ``stable`` series.
 
+1.3.0rc1 (05/12/2017)
+---------------------
+
+The second release candidate for 1.3.0! Thanks to excellent reports from a bunch of folks,
+a few issues have been shaken out of the new codepaths introduced by the v2 engine.
+
+It's possible that this will be the final release candidate for 1.3.0: please help give it
+a thorough testing to help discover any more issues!
+
+API Changes
+~~~~~~~~~~~
+
+* Support "exports" for thrift targets (#4564)
+  `PR #4564 <https://github.com/pantsbuild/pants/pull/4564>`_
+
+* Make setup_py tasks provide 'python_dists' product. (#4498)
+  `PR #4498 <https://github.com/pantsbuild/pants/pull/4498>`_
+
+* Include transitive Resources targets in PrepareResources. (#4569)
+  `PR #4569 <https://github.com/pantsbuild/pants/pull/4569>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix built-in macros for the mutable ParseContext (#4583)
+  `PR #4583 <https://github.com/pantsbuild/pants/pull/4583>`_
+
+* Exclude only roots for exclude-target-regexp in v2 (#4578)
+  `PR #4578 <https://github.com/pantsbuild/pants/pull/4578>`_
+
+* Fix a pytest path mangling bug. (#4565)
+  `PR #4565 <https://github.com/pantsbuild/pants/pull/4565>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Specify a workunit for node.js test and run. (#4572)
+  `PR #4572 <https://github.com/pantsbuild/pants/pull/4572>`_
+
+* [engine] Don't recreate a graph just for validation (#4566)
+  `PR #4566 <https://github.com/pantsbuild/pants/pull/4566>`_
+
 
 1.3.0rc0 (05/08/2017)
 ---------------------
