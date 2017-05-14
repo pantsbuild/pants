@@ -16,6 +16,7 @@ from pants.cache.cache_setup import (CacheFactory, CacheSetup, CacheSpec, CacheS
 from pants.cache.local_artifact_cache import LocalArtifactCache
 from pants.cache.resolver import Resolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+from pants.cache.s3_artifact_cache import S3ArtifactCache
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
@@ -164,6 +165,9 @@ class TestCacheSetup(BaseTest):
       check(RESTfulArtifactCache, [cachedir, 'http://localhost/bar'])
       check(RESTfulArtifactCache, [cachedir, 'http://localhost/bar'], resolver=self.resolver)
 
+      check(S3ArtifactCache, ['s3://some-bucket/bar'])
+      check(S3ArtifactCache, [cachedir, 's3://some-bucket/bar'])
+
       with self.assertRaises(CacheSpecFormatError):
         mk_cache(['foo'])
 
@@ -178,6 +182,12 @@ class TestCacheSetup(BaseTest):
 
       with self.assertRaises(TooManyCacheSpecsError):
         mk_cache([tmpdir, self.REMOTE_URI_1, self.REMOTE_URI_2])
+
+      with self.assertRaises(InvalidCacheSpecError):
+        mk_cache(['s3://some-bucket/bar|http://localhost/bar'])
+
+      with self.assertRaises(InvalidCacheSpecError):
+        mk_cache(['s3://some-bucket/bar|s3://some-other-bucket/foo'])
 
   def test_read_cache_available(self):
     self.assertEquals(None, self.cache_factory.read_cache_available())

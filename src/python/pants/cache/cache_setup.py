@@ -19,6 +19,7 @@ from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifa
 from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
+from pants.cache.s3_artifact_cache import S3ArtifactCache
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -84,6 +85,12 @@ class CacheSetup(Subsystem):
              help='number of times pinger tries a cache')
     register('--write-permissions', advanced=True, type=str, default=None,
              help='Permissions to use when writing artifacts to a local cache, in octal.')
+    register('--s3-credential-file', advanced=True, type=str,
+             default=os.path.expanduser('~/.pants/.s3credentials'),
+             help='File containing s3 credentials to use for s3 cache, in java properties format.')
+    register('--s3-profile', advanced=True, type=str,
+             default=None,
+             help='Boto profile to use for accessing the S3 cache.')
 
   @classmethod
   def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
@@ -218,9 +225,14 @@ class CacheFactory(object):
     return string_spec.startswith('/') or string_spec.startswith('~')
 
   @staticmethod
-  def is_remote(string_spec):
+  def _is_s3(string_spec):
+    return string_spec.startswith('s3://')
+
+  @classmethod
+  def is_remote(cls, string_spec):
     # both artifact cache and resolver use REST, add new protocols here once they are supported
-    return string_spec.startswith('http://') or string_spec.startswith('https://')
+    return (string_spec.startswith('http://') or string_spec.startswith('https://') or
+            cls._is_s3(string_spec))
 
   def _baseurl(self, url):
     parsed_url = urlparse.urlparse(url)
@@ -265,13 +277,25 @@ class CacheFactory(object):
                                 dereference=self._options.dereference_symlinks)
 
     def create_remote_cache(remote_spec, local_cache):
-      urls = self.get_available_urls(remote_spec.split('|'))
+      urls = remote_spec.split('|')
+      if len(urls) == 0:
+        return
 
-      if len(urls) > 0:
-        best_url_selector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
-                                             for url in urls])
-        local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
-        return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
+      local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
+      if any(map(self._is_s3, urls)):
+        if len(urls) != 1:
+          raise InvalidCacheSpecError('S3 Cache only supports a single entry, got: {0}'.format(
+            remote_spec))
+        return S3ArtifactCache(
+          self._options.s3_credential_file,
+          self._options.s3_profile, artifact_root, urls[0], local_cache)
+
+      available_urls = self.get_available_urls(urls)
+      if len(available_urls) == 0:
+        return
+      best_url_selector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
+                                           for url in available_urls])
+      return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
 
     local_cache = create_local_cache(spec.local) if spec.local else None
     remote_cache = create_remote_cache(spec.remote, local_cache) if spec.remote else None

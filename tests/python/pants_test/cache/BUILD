@@ -101,6 +101,19 @@ python_tests(
 )
 
 python_tests(
+  name = 's3_artifact_cache',
+  sources = ['test_s3_artifact_cache.py'],
+  dependencies = [
+    '3rdparty/python:boto3',
+    '3rdparty/python:moto',
+    'src/python/pants/cache',
+    'src/python/pants/invalidation',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+  ]
+)
+
+python_tests(
   name = 'cache_cleanup_integration',
   sources = ['test_cache_cleanup_integration.py'],
   dependencies = [
