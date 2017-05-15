@@ -414,21 +414,69 @@ class RunTracker(Subsystem):
     """
     SubprocPool.shutdown(self._aborted)
 
-  def report_target_info(self, scope, target, key, val):
+  @staticmethod
+  def create_dict_with_nested_keys_and_val(all_keys, value, index):
+    """ Recursively constructs a nested dictionary with the keys pointing to the value.
+
+    :param list of string all_keys: A list of keys to be nested as a dictionary.
+    :param dict or string value: The value of the information being stored.
+    :param int index: The index of the last element of the list of keys.
+    :return: dict of nested keys leading to the value.
+    """
+    if index > 0:
+      new_val = {all_keys[index]: value}
+      return RunTracker.create_dict_with_nested_keys_and_val(all_keys, new_val, index - 1)
+    elif index == 0:
+      return {all_keys[index]: value}
+
+
+  @staticmethod
+  def merge_list_of_keys_into_dict(data, keys, value, index):
+    """ Recursively merge list of keys that points to the given value into data.
+
+    :param dict data: Dictionary to be updated.
+    :param list of string keys: The keys that point to where the value should be stored.
+           Will recursively find the correct place to store in the nested dicts.
+    :param primitive value: The value of the information being stored.
+    :param int index: The index into the list of keys (starting form the beginning). This should
+           always be 0 when being called outside of this function.
+    """
+    if len(keys) == 0:
+      raise ValueError('Keys must contain at least one key')
+    if len(keys) < 2 or not data:
+      new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(keys, value, len(keys) - 1)
+      data.update(new_data_to_add)
+      return
+    else:
+      this_keys_contents = data.get(keys[index])
+      if this_keys_contents:
+        if isinstance(this_keys_contents, dict):
+          new_keys = keys[index+1:]
+          RunTracker.merge_list_of_keys_into_dict(this_keys_contents, new_keys, value, 0)
+        else:
+          new_keys = keys[index+1:]
+          new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(new_keys, value, len(new_keys) - 1)
+          data[keys[index]] = new_data_to_add
+          return
+      else:
+        new_keys = keys[index:]
+        new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(new_keys, value, len(new_keys) - 1)
+        data.update(new_data_to_add)
+        return
+
+  def report_target_info(self, scope, target, keys, val):
     """Add target information to run_info under target_data.
+
+    Will Recursively construct a nested dict with the keys provided.
 
     :param string scope: The scope for which we are reporting the information.
     :param string target: The target for which we want to store information.
-    :param string key: The key that will point to the information being stored.
-    :param dict or string val: The value of the information being stored.
+    :param list of string keys: The keys that will be recursively
+           nested and pointing to the information being stored.
+    :param primitive val: The value of the information being stored.
 
     :API: public
     """
-    target_data = self._target_to_data.get(target)
-    if target_data is None:
-      self._target_to_data.update({target: {scope: {key: val}}})
-    else:
-      scope_data = target_data.get(scope)
-      if scope_data is None:
-        self._target_to_data[target][scope] = scope_data = {}
-      scope_data.update({key: val})
+    new_key_list = [target, scope]
+    new_key_list += keys
+    RunTracker.merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
