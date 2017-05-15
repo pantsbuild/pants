@@ -66,19 +66,19 @@ class TestRunnerTaskMixin(object):
       all_targets = self._get_targets()
       self._execute(all_targets)
 
-  def report_test_info(self, scope, target, test_name, test_info):
+  def report_test_info(self, scope, target, keys, test_info):
     """Add test information to target information.
 
     :param string scope: The scope for which we are reporting information.
     :param Target target: The target that we want to store the test information under.
-    :param string test_name: The key (test name) for the information being stored.
-    :param dict test_info: The information being stored.
+    :param list of string keys: The keys that will point to the information being stored.
+    :param primitive test_info: The information being stored.
     """
     if target and scope:
       address = target.address.spec
       target_type = target.type_alias
-      self.context.run_tracker.report_target_info('GLOBAL', address, 'target_type', target_type)
-      self.context.run_tracker.report_target_info(scope, address, test_name, test_info)
+      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info(scope, address, keys, test_info)
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
