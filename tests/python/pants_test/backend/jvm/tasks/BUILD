@@ -708,8 +708,10 @@ python_tests(
   sources = ['test_export_classpath_integration.py'],
   dependencies = [
     'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout = 300
 )
 
 python_tests(
