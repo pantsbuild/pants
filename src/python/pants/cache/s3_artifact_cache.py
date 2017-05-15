@@ -151,14 +151,17 @@ class S3ArtifactCache(ArtifactCache):
       return False
 
     # Delegate storage and extraction to local cache
-    try:
+    body = get_result['Body']
+    try:      
       return self._localcache.store_and_use_artifact(
-        cache_key, iter_content(get_result['Body']), results_dir)
+        cache_key, iter_content(body), results_dir)
     except Exception as e:
       result = _log_and_classify_error(e, 'GET', cache_key)
       if result == _UNKNOWN:
         return UnreadableArtifact(cache_key, e)
       return False
+    finally:
+      body.close()
 
   def delete(self, cache_key):
     logger.debug("Delete {0}".format(cache_key))

@@ -60,7 +60,7 @@ class CacheSetup(Subsystem):
                   'instead of skipping them.')
     register('--resolver', advanced=True, choices=['none', 'rest'], default='none',
              help='Select which resolver strategy to use for discovering URIs that access '
-                  'artifact caches. none: use URIs from static config options, i.e. '
+                  'http(s) artifact caches. none: use URIs from static config options, i.e. '
                   '--read-from, --write-to. rest: look up URIs by querying a RESTful '
                   'URL, which is a remote address from --read-from, --write-to.')
     register('--read-from', advanced=True, type=list, default=default_cache,
