@@ -433,39 +433,49 @@ class RunTracker(Subsystem):
   def merge_list_of_keys_into_dict(data, keys, value, index=0):
     """Recursively merge list of keys that points to the given value into data.
 
-    Will not overwrite data that is already associated with a given key list.
+    Will override a primitive value with another primitive value, but will not
+    override a primitive with a dictionary.
 
     :param dict data: Dictionary to be updated.
     :param list of string keys: The keys that point to where the value should be stored.
            Will recursively find the correct place to store in the nested dicts.
     :param primitive value: The value of the information being stored.
-    :param int index: The index into the list of keys (starting form the beginning).
+    :param int index: The index into the list of keys (starting from the beginning).
     """
-    if len(keys) == 0:
-      raise ValueError('Keys must contain at least one key')
+    if len(keys) == 0 or index >= len(keys):
+      raise ValueError('Keys must contain at least one key and index must be'
+                       'an integer less than the length of the keys.')
     if len(keys) < 2 or not data:
       new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(keys, value, len(keys) - 1)
       data.update(new_data_to_add)
-      return
 
     this_keys_contents = data.get(keys[index])
     if this_keys_contents:
       if isinstance(this_keys_contents, dict):
         RunTracker.merge_list_of_keys_into_dict(this_keys_contents, keys, value, index + 1)
+      elif index < len(keys) - 1:
+        raise ValueError('Keys must point to a dictionary.')
+      else:
+        data[keys[index]] = value
     else:
       new_keys = keys[index:]
       new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(new_keys, value,
         len(new_keys) - 1)
       data.update(new_data_to_add)
-      return
 
   def report_target_info(self, scope, target, keys, val):
     """Add target information to run_info under target_data.
 
     Will Recursively construct a nested dict with the keys provided.
 
-    Once a value associated with a given key has been written, it
-    cannot be overwritten with a new value.
+    Primitive values can be overwritten with other primitive values,
+    but a primitive value cannot be overwritten with a dictionary.
+
+    For example:
+    Where the dictionary being updated is {'a': {'b': 16}}, reporting the value
+    15 with the key list ['a', 'b'] will result in {'a': {'b':15}};
+    but reporting the value 20 with the key list ['a', 'b', 'c'] will throw
+    an error.
 
     :param string scope: The scope for which we are reporting the information.
     :param string target: The target for which we want to store information.

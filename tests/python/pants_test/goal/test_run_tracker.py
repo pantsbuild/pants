@@ -151,3 +151,14 @@ class RunTrackerTest(BaseTest):
       'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y', 'z': 'Z-E-D'}}},
       'a': 'new O-N-E', 'c': {'d': {'e': {'f': 'F-O-U-R', 'g': {'h': 'H-E-L-L-O', 'i': 'E-Y-E'}}}}
     })
+
+    keys = ['one', 'two', 'a']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'L-A-L-A', index)
+    self.assertEquals(data, {
+      'one': {'two': {'a': 'L-A-L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y', 'z': 'Z-E-D'}}},
+      'a': 'new O-N-E', 'c': {'d': {'e': {'f': 'F-O-U-R', 'g': {'h': 'H-E-L-L-O', 'i': 'E-Y-E'}}}}
+    })
+
+    keys = ['one', 'two', 'a', 'b', 'c']
+    with self.assertRaises(ValueError):
+      RunTracker.merge_list_of_keys_into_dict(data, keys, 'new A', index)
