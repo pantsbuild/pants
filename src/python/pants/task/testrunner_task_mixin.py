@@ -77,9 +77,7 @@ class TestRunnerTaskMixin(object):
     if target and scope:
       address = target.address.spec
       target_type = target.type_alias
-      if not self.context.run_tracker.check_key_existence_in_scope_level_target_data('GLOBAL',
-        address, 'target_type'):
-        self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
       self.context.run_tracker.report_target_info(scope, address, keys, test_info)
 
   @staticmethod

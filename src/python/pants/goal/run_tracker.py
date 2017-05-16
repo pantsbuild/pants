@@ -433,12 +433,13 @@ class RunTracker(Subsystem):
   def merge_list_of_keys_into_dict(data, keys, value, index=0):
     """Recursively merge list of keys that points to the given value into data.
 
+    Will not overwrite data that is already associated with a given key list.
+
     :param dict data: Dictionary to be updated.
     :param list of string keys: The keys that point to where the value should be stored.
            Will recursively find the correct place to store in the nested dicts.
     :param primitive value: The value of the information being stored.
-    :param int index: The index into the list of keys (starting form the beginning). This should
-           always be 0 when being called outside of this function.
+    :param int index: The index into the list of keys (starting form the beginning).
     """
     if len(keys) == 0:
       raise ValueError('Keys must contain at least one key')
@@ -451,8 +452,6 @@ class RunTracker(Subsystem):
     if this_keys_contents:
       if isinstance(this_keys_contents, dict):
         RunTracker.merge_list_of_keys_into_dict(this_keys_contents, keys, value, index + 1)
-      else:
-        raise ValueError('Keys must point to a dictionary')
     else:
       new_keys = keys[index:]
       new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(new_keys, value,
@@ -460,30 +459,13 @@ class RunTracker(Subsystem):
       data.update(new_data_to_add)
       return
 
-  def check_key_existence_in_scope_level_target_data(self, scope, target, key):
-    """Check that the key exists within the target and scope.
-
-    For example:
-      This returns true:
-        {'target': {'scope': {key: value}}}
-      This returns false:
-        {'target': {'scope': {}}}
-
-    :param scope: The scope in which we want to check key existence in target_to_data.
-    :param target: The target for which we want to check key existence in target_to_data.
-    :param key: The key we want to look up under the target and scope in target_to_data.
-    :return: bool (true if exists, false if not)
-    """
-    if self._target_to_data.get(target):
-      if self._target_to_data[target].get(scope):
-        if self._target_to_data[target][scope].get(key):
-          return True
-    return False
-
   def report_target_info(self, scope, target, keys, val):
     """Add target information to run_info under target_data.
 
     Will Recursively construct a nested dict with the keys provided.
+
+    Once a value associated with a given key has been written, it
+    cannot be overwritten with a new value.
 
     :param string scope: The scope for which we are reporting the information.
     :param string target: The target for which we want to store information.
