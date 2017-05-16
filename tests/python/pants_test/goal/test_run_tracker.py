@@ -98,56 +98,60 @@ class RunTrackerTest(BaseTest):
     with self.assertRaises(ValueError):
       RunTracker.merge_list_of_keys_into_dict(data, keys, 'something', index)
 
-    keys += ['one']
+    keys = ['a']
     RunTracker.merge_list_of_keys_into_dict(data, keys, 'O-N-E', index)
-    self.assertEquals(data, {'one': 'O-N-E'})
-
-    keys += ['two']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'T-W-O', index)
-    self.assertEquals(data, {'one': {'two': 'T-W-O'}})
-
-    keys += ['three']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'T-H-R-E-E', index)
-    self.assertEquals(data, {'one': {'two': {'three': 'T-H-R-E-E'}}})
-
-    keys = ['one', 'two', 'a']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'A-E', index)
-    self.assertEquals(data, {'one': {'two': {'a': 'A-E', 'three': 'T-H-R-E-E'}}})
-
-    keys = ['one', 'two', 'a', 'b']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'B-E', index)
-    self.assertEquals(data, {'one': {'two': {'a': {'b': 'B-E'}, 'three': 'T-H-R-E-E'}}})
+    self.assertEquals(data, {'a': 'O-N-E'})
 
     keys = ['one', 'two', 'three']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'new T-H-R-E-E', index)
-    self.assertEquals(data, {'one': {'two': {'a': {'b': 'B-E'}, 'three': 'new T-H-R-E-E'}}})
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'T-H-R-E-E', index)
+    self.assertEquals(data, {'one': {'two': {'three': 'T-H-R-E-E'}}, 'a': 'O-N-E'})
 
-    keys = ['one', 'two', 'hi', 'hey', 'hola']
+    keys = ['one', 'two', 'a']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'L-A', index)
+    self.assertEquals(data, {'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E'}}, 'a': 'O-N-E'})
+
+    keys = ['c', 'd', 'e', 'f']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'F-O-U-R', index)
+    self.assertEquals(data, {
+      'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E'}}, 'a': 'O-N-E',
+      'c': {'d': {'e': {'f': 'F-O-U-R'}}}
+    })
+
+    keys = ['one', 'two', 'x', 'y']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'W-H-Y', index)
+    self.assertEquals(data, {
+      'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y'}}}, 'a': 'O-N-E',
+      'c': {'d': {'e': {'f': 'F-O-U-R'}}}
+    })
+
+    keys = ['c', 'd', 'e', 'g', 'h']
     RunTracker.merge_list_of_keys_into_dict(data, keys, 'H-E-L-L-O', index)
     self.assertEquals(data, {
-      'one': {
-        'two': {'hi': {'hey': {'hola': 'H-E-L-L-O'}}, 'a': {'b': 'B-E'}, 'three': 'new T-H-R-E-E'}
-      }
+      'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y'}}}, 'a': 'O-N-E',
+      'c': {'d': {'e': {'f': 'F-O-U-R', 'g': {'h': 'H-E-L-L-O'}}}}
     })
 
-    keys = ['one', 'two', 'hi', 'hey', 'yeah']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'Y-E-A-H', index)
+    keys = ['one', 'two', 'x', 'z']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'Z-E-D', index)
     self.assertEquals(data, {
-      'one': {
-        'two': {
-          'hi': {'hey': {'hola': 'H-E-L-L-O', 'yeah': 'Y-E-A-H'}}, 'a': {'b': 'B-E'},
-          'three': 'new T-H-R-E-E'
-        }
-      }
+      'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y', 'z': 'Z-E-D'}}},
+      'a': 'O-N-E', 'c': {'d': {'e': {'f': 'F-O-U-R', 'g': {'h': 'H-E-L-L-O'}}}}
     })
 
-    keys = ['one', 'two', 'a', 'c']
-    RunTracker.merge_list_of_keys_into_dict(data, keys, 'S-E-E', index)
+    keys = ['c', 'd', 'e', 'g', 'i']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'E-Y-E', index)
     self.assertEquals(data, {
-      'one': {
-        'two': {
-          'hi': {'hey': {'hola': 'H-E-L-L-O', 'yeah': 'Y-E-A-H'}}, 'a': {'b': 'B-E', 'c': 'S-E-E'},
-          'three': 'new T-H-R-E-E'
-        }
-      }
+      'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y', 'z': 'Z-E-D'}}},
+      'a': 'O-N-E', 'c': {'d': {'e': {'f': 'F-O-U-R', 'g': {'h': 'H-E-L-L-O', 'i': 'E-Y-E'}}}}
     })
+
+    keys = ['a']
+    RunTracker.merge_list_of_keys_into_dict(data, keys, 'new O-N-E', index)
+    self.assertEquals(data, {
+      'one': {'two': {'a': 'L-A', 'three': 'T-H-R-E-E', 'x': {'y': 'W-H-Y', 'z': 'Z-E-D'}}},
+      'a': 'new O-N-E', 'c': {'d': {'e': {'f': 'F-O-U-R', 'g': {'h': 'H-E-L-L-O', 'i': 'E-Y-E'}}}}
+    })
+
+    keys = ['one', 'two', 'three']
+    with self.assertRaises(ValueError):
+      RunTracker.merge_list_of_keys_into_dict(data, keys, 'new T-H-R-E-E', index)
