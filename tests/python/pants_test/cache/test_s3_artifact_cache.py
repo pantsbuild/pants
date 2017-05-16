@@ -82,7 +82,7 @@ def tmp_and_local_s3_cache_instance(
 
 @pytest.fixture()
 def cache_key():
-  return CacheKey('some_test_key', '0dfa0d08e47406038dda4ca5019c05c7977cb28c')
+  return CacheKey('some_test_key', '1dfa0d08e47406038dda4ca5019c05c7977cb28c')
 
 
 @pytest.yield_fixture()
