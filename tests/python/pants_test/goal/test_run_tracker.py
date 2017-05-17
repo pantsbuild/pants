@@ -98,6 +98,13 @@ class RunTrackerTest(BaseTest):
     with self.assertRaises(ValueError):
       RunTracker.merge_list_of_keys_into_dict(data, keys, 'something', index)
 
+    with self.assertRaises(ValueError):
+      RunTracker.merge_list_of_keys_into_dict(data, keys, 'something', -1)
+
+    keys = ['key']
+    with self.assertRaises(ValueError):
+      RunTracker.merge_list_of_keys_into_dict(data, keys, 'something', 1)
+
     keys = ['a']
     RunTracker.merge_list_of_keys_into_dict(data, keys, 'O-N-E', index)
     self.assertEquals(data, {'a': 'O-N-E'})
