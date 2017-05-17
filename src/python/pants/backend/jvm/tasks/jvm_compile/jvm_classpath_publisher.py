@@ -33,7 +33,7 @@ class RuntimeClasspathPublisher(Task):
   def execute(self):
     basedir = os.path.join(self.get_options().pants_distdir, self._output_folder)
     runtime_classpath = self.context.products.get_data('runtime_classpath')
-    targets = self.context.target_roots
+    targets = self.context.targets()
     if self.get_options().manifest_jar_only:
       classpath = ClasspathUtil.classpath(targets, runtime_classpath)
       # Safely create e.g. dist/export-classpath/manifest.jar
