@@ -40,6 +40,7 @@ class ExportClasspathIntegrationTest(PantsRunIntegrationTest):
 
     with open_zip(manifest_jar_path) as synthetic_jar:
       self.assertListEqual([Manifest.PATH], synthetic_jar.namelist())
-      oneline_classpath = synthetic_jar.read(Manifest.PATH).replace('\n', '')
-      self.assertNotIn('sbt', oneline_classpath)
+      oneline_classpath = synthetic_jar.read(Manifest.PATH).replace('\n', '').replace(' ', '')
+      self.assertNotIn('sbt-interface', oneline_classpath)
       self.assertIn('foo', oneline_classpath)
+      self.assertIn('baz', oneline_classpath)
