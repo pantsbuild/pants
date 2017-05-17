@@ -442,9 +442,9 @@ class RunTracker(Subsystem):
     :param primitive value: The value of the information being stored.
     :param int index: The index into the list of keys (starting from the beginning).
     """
-    if len(keys) == 0 or index >= len(keys):
+    if len(keys) == 0 or index < 0 or index >= len(keys):
       raise ValueError('Keys must contain at least one key and index must be'
-                       'an integer less than the length of the keys.')
+                       'an integer greater than 0 and less than the number of keys.')
     if len(keys) < 2 or not data:
       new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(keys, value, len(keys) - 1)
       data.update(new_data_to_add)
