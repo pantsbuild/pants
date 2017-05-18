@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -40,7 +41,7 @@ class PythonRun(PythonExecutionTaskBase):
         for arg in self.get_options().args:
           args.extend(safe_shlex_split(arg))
         args += self.get_passthru_args()
-        po = pex.run(blocking=False, args=args)
+        po = pex.run(blocking=False, args=args) #, env=os.environ
         try:
           result = po.wait()
           if result != 0:
