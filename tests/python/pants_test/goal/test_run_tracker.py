@@ -61,10 +61,8 @@ class RunTrackerTest(BaseTest):
   def test_create_dict_with_nested_keys_and_val(self):
     keys = []
 
-    self.assertEquals(
-      RunTracker._create_dict_with_nested_keys_and_val(keys, 'something'),
-      None
-    )
+    with self.assertRaises(ValueError):
+      RunTracker._create_dict_with_nested_keys_and_val(keys, 'something')
 
     keys += ['one']
     self.assertEquals(

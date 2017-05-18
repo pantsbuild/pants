@@ -71,7 +71,7 @@ class TestRunnerTaskMixin(object):
 
     Given the dict of test information
     {'time': 0.124, 'result_code': 'success', 'classname': 'some.test.class'}
-    iterate through each item and report the single item with report_test_info.
+    iterate through each item and report the single item with _report_test_info.
 
     :param string scope: The scope for which we are reporting the information.
     :param Target target: The target that we want to store the test information under.
@@ -80,9 +80,9 @@ class TestRunnerTaskMixin(object):
     """
     for test_info_key, test_info_val in test_info.items():
       key_list = [test_name, test_info_key]
-      self.report_test_info(scope, target, key_list, test_info_val)
+      self._report_test_info(scope, target, key_list, test_info_val)
 
-  def report_test_info(self, scope, target, keys, test_info):
+  def _report_test_info(self, scope, target, keys, test_info):
     """Add test information to target information.
 
     :param string scope: The scope for which we are reporting information.

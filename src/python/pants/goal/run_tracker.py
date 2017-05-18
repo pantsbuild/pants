@@ -429,14 +429,16 @@ class RunTracker(Subsystem):
     :param primitive value: The value of the information being stored.
     :return: dict of nested keys leading to the value.
     """
-    current_index = len(keys) - 1
 
     if len(keys) > 1:
-      new_val = {keys[current_index]: value}
-      new_keys = keys[:current_index]
+      new_keys = keys[:-1]
+      new_val = {keys[-1]: value}
       return cls._create_dict_with_nested_keys_and_val(new_keys, new_val)
     elif len(keys) == 1:
-      return {keys[current_index]: value}
+      return {keys[0]: value}
+    else:
+      raise ValueError('Keys must contain at least one key.')
+
 
   @classmethod
   def _merge_list_of_keys_into_dict(cls, data, keys, value, index=0):
