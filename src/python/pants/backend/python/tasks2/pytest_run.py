@@ -547,9 +547,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler, ['file', 'name'])
       for test_name, test_info in all_tests_info.items():
         test_target = self._get_target_from_test(test_info, targets)
-        for test_info_key, test_info_val in test_info.items():
-          key_list = [test_name, test_info_key]
-          self.report_test_info(self.options_scope, test_target, key_list, test_info_val)
+        self.report_all_info_for_single_test(self.options_scope, test_target, test_name, test_info)
 
       return result.with_failed_targets(failed_targets)
 

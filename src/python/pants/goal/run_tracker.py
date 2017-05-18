@@ -414,27 +414,44 @@ class RunTracker(Subsystem):
     """
     SubprocPool.shutdown(self._aborted)
 
-  @staticmethod
-  def create_dict_with_nested_keys_and_val(all_keys, value, index):
+  @classmethod
+  def _create_dict_with_nested_keys_and_val(cls, keys, value):
     """Recursively constructs a nested dictionary with the keys pointing to the value.
 
-    :param list of string all_keys: A list of keys to be nested as a dictionary.
-    :param dict or string value: The value of the information being stored.
-    :param int index: The index of the last element of the list of keys.
+    For example:
+    Given the list of keys ['a', 'b', 'c', 'd'] and a primitive
+    value 'hello world', the method will produce the nested dictionary
+    {'a': {'b': {'c': {'d': 'hello world'}}}}. The number of keys in the list
+    defines the depth of the nested dict. If the list of keys is ['a'] and
+    the value is 'hello world', then the result would be {'a': 'hello world'}.
+
+    :param list of string keys: A list of keys to be nested as a dictionary.
+    :param primitive value: The value of the information being stored.
     :return: dict of nested keys leading to the value.
     """
-    if index > 0:
-      new_val = {all_keys[index]: value}
-      return RunTracker.create_dict_with_nested_keys_and_val(all_keys, new_val, index - 1)
-    elif index == 0:
-      return {all_keys[index]: value}
+    current_index = len(keys) - 1
 
-  @staticmethod
-  def merge_list_of_keys_into_dict(data, keys, value, index=0):
+    if len(keys) > 1:
+      new_val = {keys[current_index]: value}
+      new_keys = keys[:current_index]
+      return cls._create_dict_with_nested_keys_and_val(new_keys, new_val)
+    elif len(keys) == 1:
+      return {keys[current_index]: value}
+
+  @classmethod
+  def _merge_list_of_keys_into_dict(cls, data, keys, value, index=0):
     """Recursively merge list of keys that points to the given value into data.
 
     Will override a primitive value with another primitive value, but will not
     override a primitive with a dictionary.
+
+    For example:
+    Given the dictionary {'a': {'b': {'c': 1}}, {'x': {'y': 100}}}, the keys
+    ['a', 'b', 'd'] and the value 2, the updated dictionary would be
+    {'a': {'b': {'c': 1, 'd': 2}}, {'x': {'y': 100}}}. Given this newly updated
+    dictionary, the keys ['a', 'x', 'y', 'z'] and the value 200, the method would raise
+    an error because we would be trying to override the primitive value 100 with the
+    dict {'z': 200}.
 
     :param dict data: Dictionary to be updated.
     :param list of string keys: The keys that point to where the value should be stored.
@@ -446,21 +463,20 @@ class RunTracker(Subsystem):
       raise ValueError('Keys must contain at least one key and index must be'
                        'an integer greater than 0 and less than the number of keys.')
     if len(keys) < 2 or not data:
-      new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(keys, value, len(keys) - 1)
+      new_data_to_add = cls._create_dict_with_nested_keys_and_val(keys, value)
       data.update(new_data_to_add)
 
     this_keys_contents = data.get(keys[index])
     if this_keys_contents:
       if isinstance(this_keys_contents, dict):
-        RunTracker.merge_list_of_keys_into_dict(this_keys_contents, keys, value, index + 1)
+        cls._merge_list_of_keys_into_dict(this_keys_contents, keys, value, index + 1)
       elif index < len(keys) - 1:
         raise ValueError('Keys must point to a dictionary.')
       else:
         data[keys[index]] = value
     else:
       new_keys = keys[index:]
-      new_data_to_add = RunTracker.create_dict_with_nested_keys_and_val(new_keys, value,
-        len(new_keys) - 1)
+      new_data_to_add = cls._create_dict_with_nested_keys_and_val(new_keys, value)
       data.update(new_data_to_add)
 
   def report_target_info(self, scope, target, keys, val):
@@ -487,4 +503,4 @@ class RunTracker(Subsystem):
     """
     new_key_list = [target, scope]
     new_key_list += keys
-    RunTracker.merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
+    self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
