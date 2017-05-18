@@ -46,7 +46,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
   def test_get_env_var(self):
     var_key = 'SOME_MAGICAL_VAR'
     var_val = 'a value'
-    command = ['run',
+    command = ['-q',
+               'run',
                'testprojects/src/python/print_env',
                '--',
                var_key]

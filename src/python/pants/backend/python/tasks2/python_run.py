@@ -41,7 +41,7 @@ class PythonRun(PythonExecutionTaskBase):
         for arg in self.get_options().args:
           args.extend(safe_shlex_split(arg))
         args += self.get_passthru_args()
-        po = pex.run(blocking=False, args=args) #, env=os.environ
+        po = pex.run(blocking=False, args=args, env=os.environ.copy())
         try:
           result = po.wait()
           if result != 0:
