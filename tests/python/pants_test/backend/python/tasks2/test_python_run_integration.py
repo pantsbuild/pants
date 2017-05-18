@@ -43,6 +43,18 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     assert pants_run.returncode == 57
 
+  def test_get_env_var(self):
+    var_key = 'SOME_MAGICAL_VAR'
+    var_val = 'a value'
+    command = ['-q',
+               'run',
+               'testprojects/src/python/print_env',
+               '--',
+               var_key]
+    pants_run = self.run_pants(command=command, extra_env={var_key: var_val})
+    self.assert_success(pants_run)
+    self.assertEquals(var_val, pants_run.stdout_data.strip())
+
   def _maybe_run_version(self, version):
     if self.has_python_version(version):
       print('Found python {}. Testing running on it.'.format(version))
