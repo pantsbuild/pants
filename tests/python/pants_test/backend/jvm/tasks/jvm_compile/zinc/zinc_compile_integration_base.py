@@ -5,9 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import xml.etree.ElementTree as ET
+from textwrap import dedent
 
-from pants.util.contextutil import open_zip
+from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import open_zip, temporary_dir
+from pants.util.dirutil import safe_open
 
 
 SHAPELESS_CLSFILE = 'org/pantsbuild/testproject/unicode/shapeless/ShapelessExample.class'
@@ -15,6 +19,15 @@ SHAPELESS_TARGET = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/sh
 
 
 class BaseZincCompileIntegrationTest(object):
+
+  def create_file(self, path, value):
+    with safe_open(path, 'w') as f:
+      f.write(value)
+
+  def run_run(self, target_spec, config, workdir):
+    args = ['run', target_spec]
+    pants_run = self.run_pants_with_workdir(args, workdir, config)
+    self.assert_success(pants_run)
 
   def test_scala_compile_jar(self):
     jar_suffix = 'z.jar'
@@ -180,3 +193,128 @@ class BaseZincCompileIntegrationTest(object):
                             'testprojects/src/scala/org/pantsbuild/testproject/javasources')
 
       self.assertNotIn('isolation-zinc-pool-bootstrap', second_run.stdout_data)
+
+  def test_source_compat_binary_incompat_scala_change(self):
+    with temporary_dir() as cache_dir, \
+      self.temporary_workdir() as workdir, \
+      temporary_dir(root_dir=get_buildroot()) as src_dir:
+
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.zinc': {'incremental_caching': True },
+      }
+
+      srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.scala')
+      srcfile_b = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'B.scala')
+      buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
+
+      self.create_file(buildfile,
+        dedent("""
+                  scala_library(name='a',
+                               sources=['A.scala'])
+                  scala_library(name='b',
+                               sources=['B.scala'],
+                               dependencies=[':a'])
+                  jvm_binary(name='bin',
+                   main='org.pantsbuild.cachetest.B',
+                   dependencies=[':b']
+                  )
+                  """))
+      self.create_file(srcfile,
+        dedent("""
+                          package org.pantsbuild.cachetest
+                          object A {
+                            def x(y: Option[Int] = None) = {
+                              println("x");
+                            }
+                          }
+                          """))
+
+      self.create_file(srcfile_b,
+        dedent("""
+                                package org.pantsbuild.cachetest
+                                object B extends App {
+                                  A.x();
+                                  System.exit(0);
+                                }
+                                """))
+
+      cachetest_bin_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild',
+        'cachetest:bin')
+      cachetest_spec = cachetest_bin_spec
+
+      # Caches values A.class, B.class
+      self.run_run(cachetest_spec, config, workdir)
+
+      self.create_file(srcfile,
+        dedent("""
+                          package org.pantsbuild.cachetest;
+                          object A {
+                            def x(y: Option[Int] = None, z:Option[Int]=None) = {
+                              println("x");
+                            }
+                          }
+                          """))
+      self.run_run(cachetest_bin_spec, config, workdir)
+
+  def test_source_compat_binary_incompat_java_change(self):
+    with temporary_dir() as cache_dir, \
+      self.temporary_workdir() as workdir, \
+      temporary_dir(root_dir=get_buildroot()) as src_dir:
+
+      config = {
+        'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
+        'compile.zinc': {'incremental_caching': True },
+      }
+
+      srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.java')
+      srcfile_b = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'B.java')
+      buildfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'BUILD')
+
+      self.create_file(buildfile,
+        dedent("""
+                  java_library(name='cachetest',
+                               sources=['A.java'])
+                  java_library(name='b',
+                               sources=['B.java'],
+                               dependencies=[':a']
+                               )
+                  jvm_binary(name='bin',
+                      main='org.pantsbuild.cachetest.B',
+                      dependencies=[':b']
+                     )
+                  """))
+      self.create_file(srcfile,
+        dedent("""package org.pantsbuild.cachetest;
+                          class A {
+                            public static void x() {
+                              System.out.println("x");
+                            }
+                          }
+                          """))
+
+      self.create_file(srcfile_b,
+        dedent("""package org.pantsbuild.cachetest;
+                                class B {
+                                  public static void main(String[] args) {
+                                    A.x();
+                                  }
+                                }
+                                """))
+
+      cachetest_spec = os.path.join(os.path.basename(src_dir), 'org', 'pantsbuild',
+        'cachetest:cachetest')
+
+      self.run_run(cachetest_spec, config, workdir)
+
+      self.create_file(srcfile,
+        dedent("""package org.pantsbuild.cachetest;
+                                class A {
+                                  public static int x() {
+                                    System.out.println("x");
+                                    return 0;
+                                  }
+                                }
+                                """))
+
+      self.run_run(cachetest_spec, config, workdir)
