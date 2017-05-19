@@ -1,8 +1,8 @@
 # Pants Build System
 
 Pants is a build system for software projects in a variety of languages.
-It works particularly well for a source code repository that contains
-many distinct projects.
+It works particularly well for a source code repository that contains many
+distinct projects.
 
 Friendly documentation: http://www.pantsbuild.org/
 
