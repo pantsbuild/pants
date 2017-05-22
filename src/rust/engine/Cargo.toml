@@ -27,5 +27,5 @@ lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.4"
 # TODO: Waiting for a 0.4.11 release: https://github.com/alexcrichton/tar-rs/pull/99
-tar = { git = "https://github.com/alexcrichton/tar-rs", branch = "master" }
+tar = { git = "https://github.com/stuhood/tar-rs", branch = "stuhood/check-mode" }
 tempdir = "0.3.5"
