@@ -26,5 +26,6 @@ ignore = "0.1.8"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.4"
-tar = { git = "https://github.com/stuhood/tar-rs", rev = "631916ee81a67df4056a38025bf7301d7d2c8ff4" }
+# TODO: See https://github.com/alexcrichton/tar-rs/pull/107.
+tar = { git = "https://github.com/stuhood/tar-rs", rev = "3531782a1081f855874db7b247100a7e3299bb0e" }
 tempdir = "0.3.5"
