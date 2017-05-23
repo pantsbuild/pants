@@ -346,8 +346,6 @@ def _eager_fileset_with_spec(spec_path, filespec, snapshot):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
 
-  # NB: In order to preserve declared ordering, we record a list of matched files
-  # independent of the file hash dict.
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
                               files=files,

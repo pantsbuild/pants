@@ -12,7 +12,7 @@ dependencies = [
  "lazy_static 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordermap 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "tar 0.4.10 (git+https://github.com/alexcrichton/tar-rs)",
+ "tar 0.4.12 (git+https://github.com/stuhood/tar-rs?rev=893a96e89c84f44f60f0e2398d27ae3267d196f8)",
  "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -201,8 +201,8 @@ dependencies = [
 
 [[package]]
 name = "tar"
-version = "0.4.10"
-source = "git+https://github.com/alexcrichton/tar-rs#f30ccbbe1fd3e66015e04f4f367f9da0000161fd"
+version = "0.4.12"
+source = "git+https://github.com/stuhood/tar-rs?rev=893a96e89c84f44f60f0e2398d27ae3267d196f8#893a96e89c84f44f60f0e2398d27ae3267d196f8"
 dependencies = [
  "filetime 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.21 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -307,7 +307,7 @@ dependencies = [
 "checksum regex 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4278c17d0f6d62dfef0ab00028feb45bd7d2102843f80763474eeb1be8a10c01"
 "checksum regex-syntax 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "2f9191b1f57603095f105d317e375d19b1c9c5c3185ea9633a99a6dcbed04457"
 "checksum same-file 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "d931a44fdaa43b8637009e7632a02adc4f2b2e0733c08caa4cf00e8da4a117a7"
-"checksum tar 0.4.10 (git+https://github.com/alexcrichton/tar-rs)" = "<none>"
+"checksum tar 0.4.12 (git+https://github.com/stuhood/tar-rs?rev=893a96e89c84f44f60f0e2398d27ae3267d196f8)" = "<none>"
 "checksum tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "87974a6f5c1dfb344d733055601650059a3363de2a6104819293baff662132d6"
 "checksum thread-id 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4437c97558c70d129e40629a5b385b3fb1ffac301e63941335e4d354081ec14a"
 "checksum thread_local 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c85048c6260d17cf486ceae3282d9fb6b90be220bf5b28c400f5485ffc29f0c7"
