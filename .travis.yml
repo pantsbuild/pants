@@ -101,7 +101,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -129,7 +128,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -157,7 +155,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -185,7 +182,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -213,7 +209,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -241,7 +236,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -269,7 +263,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -297,7 +290,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -325,7 +317,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -353,7 +344,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
@@ -381,7 +371,6 @@ matrix:
             - lib32stdc++6
             - lib32z1
             - lib32z1-dev
-            - oracle-java6-installer
             - gcc-multilib
             - python-dev
       language: python
