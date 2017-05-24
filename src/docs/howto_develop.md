@@ -84,7 +84,7 @@ You'll need to setup some files one-time in your own repo:
 
     python_binary(
       name='pants',
-      entry_point='pants.bin.pants_exe:main',
+      entry_point='pants.bin.pants_loader:main',
       # You may want to tweak the list of supported platforms to match your environment.
       platforms=[
         'current',
