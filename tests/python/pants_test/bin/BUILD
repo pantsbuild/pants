@@ -12,8 +12,8 @@ python_tests(
 )
 
 python_tests(
-  name='exe_integration',
-  sources=['test_exe_integration.py'],
+  name='loader_integration',
+  sources=['test_loader_integration.py'],
   dependencies=[
     'tests/python/pants_test:int-test',
   ],

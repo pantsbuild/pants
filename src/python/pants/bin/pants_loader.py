@@ -28,15 +28,15 @@ class PantsLoader(object):
     # See https://docs.python.org/2/library/warnings.html#the-warnings-filter for the complete list.
     warnings.simplefilter('default', DeprecationWarning)
 
-  @staticmethod
-  def ensure_locale():
+  @classmethod
+  def ensure_locale(cls):
     # Sanity check for locale, See https://github.com/pantsbuild/pants/issues/2465.
     # This check is done early to give good feedback to user on how to fix the problem. Other
     # libraries called by Pants may fail with more obscure errors.
     try:
       locale.getlocale()[1] or locale.getdefaultlocale()[1]
     except Exception as e:
-      raise InvalidLocaleError(
+      raise cls.InvalidLocaleError(
         '{}: {}\n'
         '  Could not get a valid locale. Check LC_* and LANG environment settings.\n'
         '  Example for US English:\n'
