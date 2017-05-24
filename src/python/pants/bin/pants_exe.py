@@ -5,8 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.bin.pants_runner import PantsRunner
 from pants.bin.exiter import Exiter
+from pants.bin.pants_runner import PantsRunner
 
 
 TEST_STR = 'T E S T'
