@@ -532,7 +532,11 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
       with open(os.path.join(xml_dir, 'TEST-a.xml'), 'w') as fp:
         fp.write("""
         <testsuite errors="1">
-          <testcase classname="org.pantsbuild.Green" name="testOK" time="1.290" file="file.py"/>
+          <testcase classname="org.pantsbuild.Green" name="testOK1" time="1.290" file="file.py"/>
+          <testcase classname="org.pantsbuild.Green" name="testOK2" time="1.12"/>
+          <testcase classname="org.pantsbuild.Green" name="testOK3" file="file.py"/>
+          <testcase name="testOK4" time="1.79" file="file.py"/>
+          <testcase name="testOK5" time="0.832"/>
           <testcase classname="org.pantsbuild.Error" name="testError" time="0.27" file="file.py">
             <error/>
           </testcase>
@@ -542,11 +546,35 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
       tests_info = self.parse_test_info(xml_dir, self._raise_handler, ['file', 'classname'])
       self.assertEqual(
         {
-          'testOK': {
+          'testOK1': {
             'file': 'file.py',
             'classname': 'org.pantsbuild.Green',
             'result_code': 'success',
             'time': 1.290
+          },
+          'testOK2': {
+            'file': '',
+            'classname': 'org.pantsbuild.Green',
+            'result_code': 'success',
+            'time': 1.12
+          },
+          'testOK3': {
+            'file': 'file.py',
+            'classname': 'org.pantsbuild.Green',
+            'result_code': 'success',
+            'time': ''
+          },
+          'testOK4': {
+            'file': 'file.py',
+            'classname': '',
+            'result_code': 'success',
+            'time': 1.79
+          },
+          'testOK5': {
+            'file': '',
+            'classname': '',
+            'result_code': 'success',
+            'time': 0.832
           },
           'testError': {
             'file': 'file.py',
