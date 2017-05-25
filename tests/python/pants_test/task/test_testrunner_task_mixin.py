@@ -453,7 +453,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
         {
           'testOK': {
             'result_code': 'success',
-            'time': ''
+            'time': None
           },
           '': {
             'result_code': 'failure',
@@ -495,13 +495,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
     with temporary_dir() as xml_dir:
       bad_file1 = os.path.join(xml_dir, 'TEST-bad1.xml')
       with open(bad_file1, 'w') as fp:
-        fp.write("""
-        <testsuite failures="0" errors="1">
-          <testcase classname="org.pantsbuild.Error" name="testError" time="zero">
-            <error/>
-          </testcase>
-        </testsuite>
-        """)
+        fp.write('<invalid></xml>')
       with open(os.path.join(xml_dir, 'TEST-good.xml'), 'w') as fp:
         fp.write("""
         <testsuite failures="0" errors="1">
@@ -510,14 +504,11 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
           </testcase>
         </testsuite>
         """)
-      bad_file2 = os.path.join(xml_dir, 'TEST-bad2.xml')
-      with open(bad_file2, 'w') as fp:
-        fp.write('<invalid></xml>')
 
       collect_handler = self.CollectHandler()
       tests_info = self.parse_test_info(xml_dir, collect_handler)
-      self.assertEqual(2, len(collect_handler.errors))
-      self.assertEqual({bad_file1, bad_file2}, {e.xml_path for e in collect_handler.errors})
+      self.assertEqual(1, len(collect_handler.errors))
+      self.assertEqual({bad_file1}, {e.xml_path for e in collect_handler.errors})
 
       self.assertEqual(
         {'testError':
@@ -562,7 +553,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
             'file': 'file.py',
             'classname': 'org.pantsbuild.Green',
             'result_code': 'success',
-            'time': ''
+            'time': None
           },
           'testOK4': {
             'file': 'file.py',

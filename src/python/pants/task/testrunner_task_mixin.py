@@ -133,11 +133,12 @@ class TestRunnerTaskMixin(object):
       try:
         xml = XmlParser.from_file(path)
         for testcase in xml.parsed.getElementsByTagName('testcase'):
-          test_info = {'time': testcase.getAttribute('time')}
+          test_info = {}
 
-          time_to_float = test_info.get('time')
-          if time_to_float:
-            test_info['time'] = float(time_to_float)
+          try:
+            test_info.update({'time': float(testcase.getAttribute('time'))})
+          except:
+            test_info.update({'time': None})
 
           for attribute in testcase_attributes:
             test_info[attribute] = testcase.getAttribute(attribute)
