@@ -433,6 +433,38 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
           }
         }, tests_info)
 
+  def test_parse_test_info_with_missing_attributes(self):
+    with temporary_dir() as xml_dir:
+      with open(os.path.join(xml_dir, 'TEST-a.xml'), 'w') as fp:
+        fp.write("""
+        <testsuite failures="1">
+          <testcase classname="org.pantsbuild.Green" name="testOK"/>
+          <testcase classname="org.pantsbuild.Failure" time="0.27">
+            <failure/>
+          </testcase>
+          <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1" extra="">
+            <skipped/>
+          </testcase>
+        </testsuite>
+        """)
+
+      tests_info = self.parse_test_info(xml_dir, self._raise_handler)
+      self.assertEqual(
+        {
+          'testOK': {
+            'result_code': 'success',
+            'time': ''
+          },
+          '': {
+            'result_code': 'failure',
+            'time': 0.27
+          },
+          'testSkipped': {
+            'result_code': 'skipped',
+            'time': 0.1
+          }
+        }, tests_info)
+
   def test_parse_test_info_invalid_file_name(self):
     with temporary_dir() as xml_dir:
       with open(os.path.join(xml_dir, 'random.xml'), 'w') as fp:
