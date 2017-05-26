@@ -32,17 +32,8 @@ jvm_app(name='rel_path',
   bundles=[
     bundle(
       rel_path='testprojects/src/java/org/pantsbuild/testproject/bundle/a',
-      fileset=['b/file1.txt'],
+      fileset=['b/file1.txt']
     )
-  ]
-)
-
-jvm_app(name='directory',
-  binary=':bundle-bin',
-  bundles=[
-    bundle(
-      fileset=['a/b'],
-    ),
   ]
 )
 
