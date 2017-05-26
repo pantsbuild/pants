@@ -237,7 +237,7 @@ class TestSetupPy(PythonTaskTestBase):
     self.create_python_binary(
       relpath='src/python/pants/bin',
       name='bin',
-      entry_point='pants.bin.pants_exe:main',
+      entry_point='pants.bin.pants_loader:main',
       dependencies=[
         # Should be stripped in reduced_dependencies since pants_packaged provides these sources.
         'src/python/pants/base',

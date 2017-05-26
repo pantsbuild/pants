@@ -50,7 +50,7 @@ python_library(
 # $ pants
 python_binary(
   name='pants',
-  entry_point='pants.bin.pants_exe:main',
+  entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':bin',
   ],
@@ -61,7 +61,7 @@ python_binary(
 # separate sdists from the core `pantsbuild.pants` sdist that this repo uses.
 python_binary(
   name='pants_local_binary',
-  entry_point='pants.bin.pants_exe:main',
+  entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':bin',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',

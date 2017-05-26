@@ -38,7 +38,7 @@ HERE=$(cd `dirname "${BASH_SOURCE[0]}"` && pwd)
 source ${HERE}/build-support/pants_venv
 source ${HERE}/build-support/bin/native/bootstrap.sh
 
-PANTS_EXE="${HERE}/src/python/pants/bin/pants_exe.py"
+PANTS_EXE="${HERE}/src/python/pants/bin/pants_loader.py"
 
 PY=${PY:-$(which python2.7)}
 
