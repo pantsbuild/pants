@@ -9,14 +9,13 @@ import os
 
 from twitter.common.collections import OrderedSet
 
-from pants.base.deprecated import deprecated_conditional
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-from pants.base.exceptions import TargetDefinitionException
+from pants.base.deprecated import deprecated_conditional
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdir_for
@@ -224,7 +223,9 @@ class BundleCreate(JvmBinaryTask):
         os.symlink(path, bundle_path)
 
       if file_count == 0 and dir_count == 0:
-        raise TargetDefinitionException(app.target, 'Bundle index {} of "bundles" field does not match any files: {}'.format(bundle_counter, bundle))
+        raise TargetDefinitionException(app.target,
+                                        'Bundle index {} of "bundles" field '
+                                        'does not match any files.'.format(bundle_counter))
 
       if dir_count == 1 and file_count == 0:
         # When this deprecation finishes, we should remove symlinking of directories into the
