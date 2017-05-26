@@ -101,9 +101,12 @@ class TestRunnerTaskMixin(object):
     """Parses the junit file for information needed about each test.
 
     Will include:
-      - test result
-      - test run time duration
       - test name
+      - test result
+      - test run time duration or None if not a parsable float
+
+    If additional test case attributes are defined, then it will include those as well.
+
     :param string xml_path: The path of the xml file to be parsed.
     :param function error_handler: The error handler function.
     :param list of string additional_testcase_attributes: A list of additional attributes belonging
