@@ -4,6 +4,67 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev1 (5/26/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Change method of reporting target data (#4593)
+  `PR #4593 <https://github.com/pantsbuild/pants/pull/4593>`_
+
+Bugfixes
+~~~~~~~~
+
+* Check that test case attribute exists in junit xml file before converting it (#4623)
+  `Issue #4619 <https://github.com/pantsbuild/pants/issues/4619>`_
+  `PR #4623 <https://github.com/pantsbuild/pants/pull/4623>`_
+
+* [engine] Check for duplicate deps in v2 graph construction. (#4616)
+  `PR #4616 <https://github.com/pantsbuild/pants/pull/4616>`_
+
+* Improve Snapshot determinism (#4614)
+  `PR #4614 <https://github.com/pantsbuild/pants/pull/4614>`_
+
+* Revert "Enable --compile-zinc-use-classpath-jars by default" (#4607)
+  `PR #4607 <https://github.com/pantsbuild/pants/pull/4607>`_
+
+* Pass env vars through in ./pants run for python (#4606)
+  `PR #4606 <https://github.com/pantsbuild/pants/pull/4606>`_
+
+* Fix broken export-classpath (#4603)
+  `PR #4603 <https://github.com/pantsbuild/pants/pull/4603>`_
+
+* Switch to a conditional deprecation for the list-targets behaviour change. (#4600)
+  `PR #4600 <https://github.com/pantsbuild/pants/pull/4600>`_
+
+* Fix export-classpaths exclude behavior (#4592)
+  `PR #4592 <https://github.com/pantsbuild/pants/pull/4592>`_
+
+* Fix splitting of the build_flags. (#4580)
+  `PR #4580 <https://github.com/pantsbuild/pants/pull/4580>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Add an alternate entrypoint loader. (#4620)
+  `PR #4620 <https://github.com/pantsbuild/pants/pull/4620>`_
+
+* Remove Oracle Java6, which is now 404ing. (#4615)
+  `PR #4615 <https://github.com/pantsbuild/pants/pull/4615>`_
+
+* Don't register newpython tasks in the oldpython backend (#4602)
+  `PR #4602 <https://github.com/pantsbuild/pants/pull/4602>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Prepare notes for 1.3.0rc3 (#4617)
+  `PR #4617 <https://github.com/pantsbuild/pants/pull/4617>`_
+
+* Prepare the release notes for 1.3.0rc2 (#4609)
+  `PR #4609 <https://github.com/pantsbuild/pants/pull/4609>`_
+
 1.4.0.dev0 (5/12/2017)
 ----------------------
 
