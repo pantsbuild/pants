@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.base.deprecated import deprecated_conditional
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
@@ -54,6 +55,29 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run)
         self.assertTrue(os.path.isfile(
           '{}/{}.rel_path-bundle/b/file1.txt'.format(temp_distdir, self.TARGET_PATH.replace('/', '.'))))
+
+  @ensure_engine
+  def test_bundle_directory(self):
+    with temporary_dir() as temp_distdir:
+      with self.pants_results(
+        ['-q',
+          '--pants-distdir={}'.format(temp_distdir),
+          'bundle',
+          '{}:directory'.format(self.TARGET_PATH)]) as pants_run:
+        self.assert_success(pants_run)
+
+        root = '{}/{}.directory-bundle/a/b'.format(temp_distdir, self.TARGET_PATH.replace('/', '.'))
+
+        self.assertTrue(os.path.isdir(root))
+
+        # NB: The behaviour of this test will change with the relevant deprecation
+        # in `pants.backend.jvm.tasks.bundle_create`.
+        deprecated_conditional(
+            lambda: os.path.isfile(os.path.join(root, 'file1.txt')),
+            '1.5.0.dev0',
+            'default recursive inclusion of files in directory',
+            'A non-recursive/literal glob should no longer include child paths.'
+        )
 
   @ensure_engine
   def test_bundle_resource_ordering(self):
