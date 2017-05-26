@@ -383,8 +383,8 @@ def hydrate_bundles(bundles_field, snapshot_list):
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
     # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
-    # a (deprecated) default inclusion of their recursive contents. See the related deprecation
-    # in `pants.backend.jvm.tasks.bundle_create`.
+    # to trigger a (deprecated) default inclusion of their recursive contents. See the related
+    # deprecation in `pants.backend.jvm.tasks.bundle_create`.
     kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
                                                  snapshot,
