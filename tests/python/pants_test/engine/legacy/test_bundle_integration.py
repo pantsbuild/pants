@@ -6,11 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 
 from pants.base.deprecated import deprecated_conditional
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
-from contextlib import contextmanager
 
 
 class BundleIntegrationTest(PantsRunIntegrationTest):
