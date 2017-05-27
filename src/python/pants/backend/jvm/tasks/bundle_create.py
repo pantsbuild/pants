@@ -208,16 +208,33 @@ class BundleCreate(JvmBinaryTask):
         # TODO run in parallel to speed up
         self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
+    self._symlink_bundles(app, bundle_dir)
+
+    return bundle_dir
+
+  def _symlink_bundles(self, app, bundle_dir):
+    """For each bundle in the given app, symlinks relevant matched paths from shortest to longest.
+
+    Validates that at least one path was matched by a bundle, and (temporarily: see the
+    deprecation) symlinks matched directories to recursively include their contents.
+
+    """
     for bundle_counter, bundle in enumerate(app.bundles):
       file_count = 0
       dir_count = 0
-      for path, relpath in bundle.filemap.items():
+      # Create in ascending path-length order to ensure that symlinks to directories
+      # are created before the parent-directories of non-symlinks. Can remove ordering along
+      # with the 'recursive inclusion' deprecation (when only files and not directories
+      # are symlinked).
+      for path, relpath in sorted(bundle.filemap.items(), key=lambda e: len(e[0])):
         bundle_path = os.path.join(bundle_dir, relpath)
         if os.path.isfile(path):
           file_count += 1
         elif os.path.isdir(path):
           dir_count += 1
         else:
+          continue
+        if os.path.exists(bundle_path):
           continue
         safe_mkdir(os.path.dirname(bundle_path))
         os.symlink(path, bundle_path)
@@ -242,8 +259,6 @@ class BundleCreate(JvmBinaryTask):
               fixed_spec=os.path.join(spec, '**', '*'),
             )
         )
-
-    return bundle_dir
 
   def check_basename_conflicts(self, targets):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
