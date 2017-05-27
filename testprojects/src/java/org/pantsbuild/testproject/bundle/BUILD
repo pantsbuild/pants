@@ -46,6 +46,15 @@ jvm_app(name='directory',
   ]
 )
 
+jvm_app(name='explicit_recursion',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(
+      fileset=['a/**/*'],
+    ),
+  ]
+)
+
 # The binary, the "runnable" part:
 
 jvm_binary(name = 'bundle-bin',
