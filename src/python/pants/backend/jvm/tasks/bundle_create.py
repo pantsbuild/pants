@@ -217,15 +217,14 @@ class BundleCreate(JvmBinaryTask):
 
     Validates that at least one path was matched by a bundle, and (temporarily: see the
     deprecation) symlinks matched directories to recursively include their contents.
-
     """
     for bundle_counter, bundle in enumerate(app.bundles):
       file_count = 0
       dir_count = 0
       # Create in ascending path-length order to ensure that symlinks to directories
-      # are created before the parent-directories of non-symlinks. Can remove ordering along
-      # with the 'recursive inclusion' deprecation (when only files and not directories
-      # are symlinked).
+      # are created before their contents would be. Can remove ordering along with the
+      # 'recursive inclusion' deprecation (when only files and not directories are
+      # symlinked).
       for path, relpath in sorted(bundle.filemap.items(), key=lambda e: len(e[0])):
         bundle_path = os.path.join(bundle_dir, relpath)
         if os.path.isfile(path):
@@ -252,9 +251,9 @@ class BundleCreate(JvmBinaryTask):
             lambda: True,
             '1.5.0.dev0',
             'default recursive inclusion of files in directory',
-            '''The bundle filespec `{spec}` corresponds to exactly one directory: if you'd like to '''
-            '''continue to recursively include directory contents in future versions, please switch '''
-            '''to a recursive glob like `{fixed_spec}`.'''.format(
+            'The bundle filespec `{spec}` corresponds to exactly one directory: if you\'d like to '
+            'continue to recursively include directory contents in future versions, please switch '
+            'to a recursive glob like `{fixed_spec}`.'.format(
               spec=spec,
               fixed_spec=os.path.join(spec, '**', '*'),
             )
