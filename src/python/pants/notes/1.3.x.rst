@@ -3,6 +3,24 @@
 
 This document describes releases leading up to the ``1.3.x`` ``stable`` series.
 
+1.3.0rc4 (05/27/2017)
+---------------------
+
+The fifth release candidate for 1.3.0, with fixes for two more user reported issues.
+
+Bugfixes
+~~~~~~~~
+
+* Temporarily restore recursive behaviour for bundle filesets (#4630)
+  `PR #4630 <https://github.com/pantsbuild/pants/pull/4630>`_
+  `PR #4624 <https://github.com/pantsbuild/pants/pull/4624>`_
+  `PR #4624 <https://github.com/pantsbuild/pants/pull/4624>`_
+
+* Check that test case attribute exists in junit xml file before converting it (#4623)
+  `Issue #4619 <https://github.com/pantsbuild/pants/issues/4619>`_
+  `PR #4623 <https://github.com/pantsbuild/pants/pull/4623>`_
+
+
 1.3.0rc3 (05/23/2017)
 ---------------------
 
