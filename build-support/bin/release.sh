@@ -376,7 +376,8 @@ function check_owner() {
 
    for owner in $(get_owners ${package_name})
    do
-     if [[ "${username}" == "${owner}" ]]
+     # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
+     if [[ "${username^^}" == "${owner^^}" ]]
      then
        return 0
      fi
