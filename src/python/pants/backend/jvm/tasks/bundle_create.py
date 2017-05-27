@@ -14,7 +14,8 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.deprecated import deprecated_conditional
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdir_for
@@ -207,20 +208,56 @@ class BundleCreate(JvmBinaryTask):
         # TODO run in parallel to speed up
         self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
-    for bundle_counter, bundle in enumerate(app.bundles):
-      fileset_empty = True
-      for path, relpath in bundle.filemap.items():
-        bundle_path = os.path.join(bundle_dir, relpath)
-        if os.path.exists(path):
-          safe_mkdir(os.path.dirname(bundle_path))
-          os.symlink(path, bundle_path)
-          fileset_empty = False
-
-      if fileset_empty:
-        raise TaskError('In target {}, bundle index {} of "bundles" field does not match any files.'.format(
-          app.address.spec, bundle_counter))
+    self._symlink_bundles(app, bundle_dir)
 
     return bundle_dir
+
+  def _symlink_bundles(self, app, bundle_dir):
+    """For each bundle in the given app, symlinks relevant matched paths from shortest to longest.
+
+    Validates that at least one path was matched by a bundle, and (temporarily: see the
+    deprecation) symlinks matched directories to recursively include their contents.
+    """
+    for bundle_counter, bundle in enumerate(app.bundles):
+      file_count = 0
+      dir_count = 0
+      # Create in ascending path-length order to ensure that symlinks to directories
+      # are created before their contents would be. Can remove ordering along with the
+      # 'recursive inclusion' deprecation (when only files and not directories are
+      # symlinked).
+      for path, relpath in sorted(bundle.filemap.items(), key=lambda e: len(e[0])):
+        bundle_path = os.path.join(bundle_dir, relpath)
+        if os.path.isfile(path):
+          file_count += 1
+        elif os.path.isdir(path):
+          dir_count += 1
+        else:
+          continue
+        if os.path.exists(bundle_path):
+          continue
+        safe_mkdir(os.path.dirname(bundle_path))
+        os.symlink(path, bundle_path)
+
+      if file_count == 0 and dir_count == 0:
+        raise TargetDefinitionException(app.target,
+                                        'Bundle index {} of "bundles" field '
+                                        'does not match any files.'.format(bundle_counter))
+
+      if dir_count == 1 and file_count == 0:
+        # When this deprecation finishes, we should remove symlinking of directories into the
+        # bundle (which implicitly includes their contents), and instead create them using mkdir.
+        spec = os.path.relpath(bundle.filemap.keys()[0], get_buildroot())
+        deprecated_conditional(
+            lambda: True,
+            '1.5.0.dev0',
+            'default recursive inclusion of files in directory',
+            'The bundle filespec `{spec}` corresponds to exactly one directory: if you\'d like to '
+            'continue to recursively include directory contents in future versions, please switch '
+            'to a recursive glob like `{fixed_spec}`.'.format(
+              spec=spec,
+              fixed_spec=os.path.join(spec, '**', '*'),
+            )
+        )
 
   def check_basename_conflicts(self, targets):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""
