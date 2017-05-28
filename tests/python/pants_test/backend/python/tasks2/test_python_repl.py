@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.python_repl import PythonRepl
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
@@ -111,11 +112,17 @@ class PythonReplTest(PythonTaskTestBase):
 
     # The easiest way to create products required by the PythonRepl task is to
     # execute the relevant tasks.
+    pt_task_type = self.synthesize_task_subtype(PartitionTargets, 'pt_scope')
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
     rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
-    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type],
+    context = self.context(for_task_types=[pt_task_type, si_task_type, rr_task_type, gs_task_type],
                            target_roots=targets)
+    context.products.require_data(PartitionTargets.TARGETS_PARTITION)
+    context.products.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
+    context.products.require_data(GatherSources.PYTHON_SOURCES)
+    context.products.require_data(ResolveRequirements.REQUIREMENTS_PEX)
+    pt_task_type(context, os.path.join(self.pants_workdir, 'pt')).execute()
     si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
     rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
     gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()

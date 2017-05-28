@@ -16,10 +16,13 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.dirutil import safe_concurrent_creation
 
@@ -65,7 +68,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   @classmethod
   def prepare(cls, options, round_manager):
     super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
-    round_manager.require_data(PythonInterpreter)
+    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
 
@@ -76,10 +80,13 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return []
 
-  def create_pex(self, pex_info=None):
+  def create_pex(self, targets, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
-    relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)))
+    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITION)
+    subset = partition.find_subset_for_targets(targets)
+    relevant_targets = filter(
+      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)),
+      Target.closure_for_targets(subset))
     with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving
@@ -91,7 +98,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       else:
         target_set_id = 'no_targets'
 
-      interpreter = self.context.products.get_data(PythonInterpreter)
+      interpreter = self.context.products.get_data(SelectInterpreter.PYTHON_INTERPRETERS)[subset]
       path = os.path.join(self.workdir, str(interpreter.identity), target_set_id)
       extra_pex_paths_file_path = path + '.extra_pex_paths'
       extra_pex_paths = None
@@ -100,18 +107,20 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       # to cover the empty case.
       if not os.path.isdir(path):
         pexes = [
-          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
-          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
+          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)[subset],
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES)[subset]
         ]
 
         if self.extra_requirements():
           extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]
+          import random
           addr = Address.parse('{}_extra_reqs'.format(self.__class__.__name__))
           self.context.build_graph.inject_synthetic_target(
             addr, PythonRequirementLibrary, requirements=extra_reqs)
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
-          pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
+          pexes = [self.resolve_requirements(
+              [self.context.build_graph.get_target(addr)], interpreter=interpreter)] + pexes
 
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 

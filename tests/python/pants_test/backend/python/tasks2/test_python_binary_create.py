@@ -9,6 +9,7 @@ import os
 from textwrap import dedent
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.run_info import RunInfo
@@ -36,16 +37,17 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
     # The easiest way to create products required by the PythonBinaryCreate task is to
     # execute the relevant tasks.
+    pt_task_type = self.synthesize_task_subtype(PartitionTargets, 'pt_scope')
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
-    gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
 
-    self.task_context = self.context(for_task_types=[si_task_type, gs_task_type],
+    self.task_context = self.context(for_task_types=[pt_task_type, si_task_type],
                                      target_roots=[self.binary])
+    self.task_context.products.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     self.run_info_dir = os.path.join(self.pants_workdir, self.options_scope, 'test/info')
     self.task_context.run_tracker.run_info = RunInfo(self.run_info_dir)
 
+    pt_task_type(self.task_context, os.path.join(self.pants_workdir, 'pt')).execute()
     si_task_type(self.task_context, os.path.join(self.pants_workdir, 'si')).execute()
-    gs_task_type(self.task_context, os.path.join(self.pants_workdir, 'gs')).execute()
 
     self.test_task = self.create_task(self.task_context)
     self.dist_root = os.path.join(self.build_root, 'dist')

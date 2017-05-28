@@ -12,6 +12,7 @@ import coverage
 from mock import patch
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.pytest_run import PytestRun
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
@@ -44,7 +45,7 @@ class PytestTestBase(PythonTaskTestBase):
       self._do_run_tests(context)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
-  def _prepare_test_run(self, targets, **options):
+  def _prepare_test_run(self, targets, partition_strategy=None, **options):
     self.reset_build_graph()
     test_options = {
       'colors': False,
@@ -53,13 +54,22 @@ class PytestTestBase(PythonTaskTestBase):
     test_options.update(options)
     self.set_options(**test_options)
 
+    if partition_strategy is not None:
+      self.set_options_for_scope('pt_scope', strategy=partition_strategy)
+
     # The easiest way to create products required by the PythonTest task is to
     # execute the relevant tasks.
+    pt_task_type = self.synthesize_task_subtype(PartitionTargets, 'pt_scope')
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
     rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
-    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type],
+    context = self.context(for_task_types=[pt_task_type, si_task_type, rr_task_type, gs_task_type],
                            target_roots=targets)
+    context.products.require_data(PartitionTargets.TARGETS_PARTITION)
+    context.products.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
+    context.products.require_data(GatherSources.PYTHON_SOURCES)
+    context.products.require_data(ResolveRequirements.REQUIREMENTS_PEX)
+    pt_task_type(context, os.path.join(self.pants_workdir, 'pt')).execute()
     si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
     rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
     gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
@@ -308,13 +318,31 @@ class PytestTest(PytestTestBase):
   def test_red(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
 
-  def test_fail_fast_skips_second_red_test_with_single_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red],
-                           fail_fast=True, fast=False)
+  def test_fail_fast_skips_second_red_test_with_single_chroot_run_per_target(self):
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red],
+                           fail_fast=True,
+                           run_per_target=True,
+                           partition_strategy=PartitionTargets.STRATEGY_GLOBAL)
+    self.run_failing_tests(targets=[self.red_in_class, self.red],
+                           failed_targets=[self.red_in_class],
+                           fail_fast=True,
+                           run_per_target=True,
+                           partition_strategy=PartitionTargets.STRATEGY_GLOBAL)
 
-  def test_fail_fast_skips_second_red_test_with_isolated_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red_in_class],
-                           fail_fast=True, fast=True)
+  def test_fail_fast_skips_second_red_test_with_single_chroot_single_run(self):
+    # We pass the sources to pytest sorted by lexicgraphic order, so the same
+    # tests fail regardless of target order.
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red],
+                           fail_fast=True,
+                           run_per_target=False,
+                           partition_strategy=PartitionTargets.STRATEGY_GLOBAL)
+    self.run_failing_tests(targets=[self.red_in_class, self.red],
+                           failed_targets=[self.red],
+                           fail_fast=True,
+                           run_per_target=False,
+                           partition_strategy=PartitionTargets.STRATEGY_GLOBAL)
 
   def test_red_test_in_class(self):
     # for test in a class, the failure line is in the following format
@@ -360,7 +388,10 @@ class PytestTest(PytestTestBase):
     return all_statements, not_run_statements
 
   def test_coverage_auto_option(self):
-    simple_coverage_kwargs = {'coverage': 'auto'}
+    simple_coverage_kwargs = {
+        'coverage': 'auto',
+        'partition_strategy': PartitionTargets.STRATEGY_GLOBAL
+    }
 
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
@@ -420,9 +451,9 @@ class PytestTest(PytestTestBase):
     self.assertEqual([], not_run_statements)
 
   def test_sharding(self):
-    self.run_tests(targets=[self.red, self.green], test_shard='1/2')
+    self.run_tests(targets=[self.red, self.green], test_shard='0/2')
     self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red],
-                           test_shard='0/2')
+                           test_shard='1/2')
 
   def test_sharding_single(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red], test_shard='0/1')

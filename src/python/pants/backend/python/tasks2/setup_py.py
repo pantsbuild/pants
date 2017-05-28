@@ -15,7 +15,6 @@ from collections import OrderedDict, defaultdict
 
 from pex.compatibility import string, to_bytes
 from pex.installer import InstallerBase, Packager
-from pex.interpreter import PythonInterpreter
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
@@ -23,6 +22,8 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
+from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses
@@ -273,7 +274,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     return reduced_dependencies
 
 
-class SetupPy(Task):
+class SetupPy(PythonTaskMixin, Task):
   """Generate setup.py-based Python projects."""
 
   SOURCE_ROOT = b'src'
@@ -321,7 +322,7 @@ class SetupPy(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
-    round_manager.require_data(PythonInterpreter)
+    round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
 
   @classmethod
   def register_options(cls, register):
@@ -587,24 +588,23 @@ class SetupPy(Task):
 
     created = {}
 
-    def create(target):
+    def create(target, interpreter):
       if target not in created:
         self.context.log.info('Creating setup.py project for {}'.format(target))
         setup_dir, dependencies = self.create_setup_py(target, dist_dir)
-        created[target] = setup_dir
+        created[target] = (setup_dir, interpreter)
         if self._recursive:
           for dep in dependencies:
             if self.has_provides(dep):
-              create(dep)
+              create(dep, interpreter)
 
     for target in targets:
-      create(target)
+      create(target, self.interpreter_for_targets([target]))
 
-    interpreter = self.context.products.get_data(PythonInterpreter)
     python_dists = self.context.products.get_data(self.PYTHON_DISTS_PRODUCT, lambda: {})
     for target in reversed(sort_targets(created.keys())):
-      setup_dir = created.get(target)
-      if setup_dir:
+      if target in created:
+        setup_dir, interpreter = created.get(target)
         if not self._run:
           self.context.log.info('Running packager against {}'.format(setup_dir))
           setup_runner = Packager(setup_dir, interpreter=interpreter)

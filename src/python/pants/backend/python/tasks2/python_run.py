@@ -10,6 +10,7 @@ import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
+from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.strutil import safe_shlex_split
@@ -33,8 +34,8 @@ class PythonRun(PythonExecutionTaskBase):
       # We can't throw if binary isn't a PythonBinary, because perhaps we were called on a
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
       # TODO(benjy): Use MutexTask to coordinate this.
+      pex = self.create_pex([binary], pex_info=binary.pexinfo)
 
-      pex = self.create_pex(binary.pexinfo)
       self.context.release_lock()
       with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
         args = []
