@@ -14,6 +14,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.pytest_prep import PytestPrep
 from pants.backend.python.tasks2.pytest_run import PytestRun
 from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
@@ -50,6 +51,7 @@ def build_file_aliases():
 
 
 def register_goals():
+  task(name='partition', action=PartitionTargets).install('pyprep')
   task(name='interpreter', action=SelectInterpreter).install('pyprep')
   task(name='requirements', action=ResolveRequirements).install('pyprep')
   task(name='sources', action=GatherSources).install('pyprep')

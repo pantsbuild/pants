@@ -34,7 +34,7 @@ class PythonRun(PythonExecutionTaskBase):
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
       # TODO(benjy): Use MutexTask to coordinate this.
 
-      pex = self.create_pex(binary.pexinfo)
+      pex = self.create_pex([binary], pex_info=binary.pexinfo)
       args = []
       for arg in self.get_options().args:
         args.extend(safe_shlex_split(arg))

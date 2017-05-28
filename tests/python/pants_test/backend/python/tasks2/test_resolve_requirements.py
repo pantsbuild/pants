@@ -14,7 +14,9 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.tasks2.partition_targets import PartitionTargets, TargetsPartition
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
+from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file
@@ -107,6 +109,8 @@ class ResolveRequirementsTest(TaskTestBase):
   def _resolve_requirements(self, target_roots, options=None):
     context = self.context(target_roots=target_roots, options=options,
                            for_subsystems=[PythonSetup, PythonRepos])
+    partition = TargetsPartition([target_roots])
+    context.products.get_data(PartitionTargets.TARGETS_PARTITION, lambda: partition)
 
     # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
     # to ensure that the interpreter has setuptools and wheel support.
@@ -116,12 +120,17 @@ class ResolveRequirementsTest(TaskTestBase):
                                                logger=context.log.debug)
     interpreters = interpreter_cache.setup(paths=[os.path.dirname(interpreter.binary)],
                                            filters=[str(interpreter.identity.requirement)])
-    context.products.get_data(PythonInterpreter, lambda: interpreters[0])
+    context.products.get_data(
+        SelectInterpreter.PYTHON_INTERPRETERS,
+        lambda: {subset: interpreters[0] for subset in partition.subsets})
+    context.products.get_data(
+        SelectInterpreter.PYTHON_INTERPRETERS,
+        lambda: {tgt: interpreters[0] for tgt in target_roots})
 
     task = self.create_task(context)
     task.execute()
 
-    return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
+    return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX).items()[0][1]
 
   def _exercise_module(self, pex, expected_module):
     with temporary_file() as f:

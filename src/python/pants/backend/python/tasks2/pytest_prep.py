@@ -12,13 +12,13 @@ from pants.backend.python.tasks2.python_execution_task_base import PythonExecuti
 
 
 class PytestPrep(PythonExecutionTaskBase):
-  """Prepares a pex binary for the current test context with py.test as its entry-point."""
+  """Prepares pex binaries for the current test context with py.test as its entry-point."""
 
-  PYTEST_BINARY = 'pytest_binary'
+  PYTEST_BINARIES = 'pytest_binaries'
 
   @classmethod
   def product_types(cls):
-    return [cls.PYTEST_BINARY]
+    return [cls.PYTEST_BINARIES]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -30,5 +30,9 @@ class PytestPrep(PythonExecutionTaskBase):
   def execute(self):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
-    pytest_binary = self.create_pex(pex_info)
-    self.context.products.register_data(self.PYTEST_BINARY, pytest_binary)
+    pytest_binaries = self.context.products.register_data(self.PYTEST_BINARIES, {})
+    for partition_name in self.target_roots_partitions():
+      pytest_binaries[partition_name] = {}
+      for targets_subset in target_roots_subsets(partition_name):
+         pytest_binaries[partition_name][targets_subset] = self.create_pex(
+             targets, pex_info=pex_info)

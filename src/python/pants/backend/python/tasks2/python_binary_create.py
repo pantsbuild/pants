@@ -7,14 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
                                                         has_resources)
+from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
+from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -24,7 +26,7 @@ from pants.util.dirutil import safe_mkdir_for
 from pants.util.fileutil import atomic_copy
 
 
-class PythonBinaryCreate(Task):
+class PythonBinaryCreate(PythonTaskMixin, Task):
   """Create an executable .pex file."""
 
   @classmethod
@@ -41,7 +43,8 @@ class PythonBinaryCreate(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data(PythonInterpreter)
+    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     round_manager.require_data('python')  # For codegen.
 
   @staticmethod
@@ -92,7 +95,7 @@ class PythonBinaryCreate(Task):
     # and PYTHON_SOURCES products, because those products are already-built pexes, and there's
     # no easy way to merge them into a single pex file (for example, they each have a __main__.py,
     # metadata, and so on, which the merging code would have to handle specially).
-    interpreter = self.context.products.get_data(PythonInterpreter)
+    interpreter = self.interpreter_for_targets([binary_tgt])
     with temporary_dir() as tmpdir:
       # Create the pex_info for the binary.
       run_info_dict = self.context.run_tracker.run_info.get_as_dict()

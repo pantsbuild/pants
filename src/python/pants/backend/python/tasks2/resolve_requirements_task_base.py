@@ -11,7 +11,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.pex_build_util import dump_requirements
+from pants.backend.python.tasks2.pex_build_util import dump_requirements, has_python_requirements
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -24,12 +24,7 @@ class ResolveRequirementsTaskBase(Task):
   This PEX can be merged with other PEXes to create a unified Python environment
   for running the relevant python code.
   """
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    round_manager.require_data(PythonInterpreter)
-
-  def resolve_requirements(self, req_libs):
+  def resolve_requirements(self, req_libs, interpreter):
     with self.invalidated(req_libs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
@@ -40,7 +35,6 @@ class ResolveRequirementsTaskBase(Task):
       else:
         target_set_id = 'no_targets'
 
-      interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,

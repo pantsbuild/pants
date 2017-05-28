@@ -17,8 +17,9 @@ from six import StringIO
 from six.moves import configparser
 
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.pytest_prep import PytestPrep
+from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.hash_utils import Sharder
@@ -77,15 +78,17 @@ class PytestResult(object):
     return self._failed_targets
 
 
-class PytestRun(TestRunnerTaskMixin, Task):
+class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
-    register('--fast', type=bool, default=True,
-             help='Run all tests in a single pytest invocation. If turned off, each test target '
-                  'will run in its own pytest invocation, which will be slower, but isolates '
-                  'tests from process-wide state created by tests in other targets.')
+    register('--run-per-target', type=bool, default=False,
+             help='Invoke pytest for each target separately. This is slower, but isolates tests '
+                  'from process-wide state created by tests in other targets. If turned off, '
+                  'pytest will be invoked once for each subset in the partition. Each subset '
+                  'may contain multiple test targets. See --pyprep-partition-strategy for further '
+                  'control over test isolation.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
@@ -113,11 +116,11 @@ class PytestRun(TestRunnerTaskMixin, Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(PytestRun, cls).prepare(options, round_manager)
-    round_manager.require_data(PytestPrep.PYTEST_BINARY)
+    round_manager.require_data(PytestPrep.PYTEST_BINARIES)
 
   def _test_target_filter(self):
     def target_filter(target):
-      return isinstance(target, PythonTests)
+      return isinstance(target, PythonTests) and target in self.context.target_roots
 
     return target_filter
 
@@ -229,8 +232,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       yield []
       return
 
-    pex_src_root = os.path.relpath(
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
+    pex_src_root = os.path.relpath(self.sources_for_targets(targets).path(), get_buildroot())
 
     source_mappings = {}
     for target in targets:
@@ -336,7 +338,8 @@ class PytestRun(TestRunnerTaskMixin, Task):
           removed = 0
           def is_conftest(itm):
             return itm.fspath and itm.fspath.basename == 'conftest.py'
-          for i, item in enumerate(list(x for x in items if not is_conftest(x))):
+          for i, item in enumerate(list(items)):
+            if is_conftest(item): continue
             if i % {nshards} != {shard}:
               del items[i - removed]
               removed += 1
@@ -404,7 +407,8 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
   @contextmanager
   def _test_runner(self, targets, sources_map):
-    pex = self.context.products.get_data(PytestPrep.PYTEST_BINARY)
+    pex = self.context.products.get_data(PytestPrep.PYTEST_BINARIES)[targets]
+
     with self._conftest(sources_map) as conftest:
       with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
         yield pex, [conftest] + coverage_args
@@ -447,8 +451,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
-    pex_src_root = os.path.relpath(
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
+    pex_src_root = os.path.relpath(self.sources_for_targets(targets).path(), get_buildroot())
     # First map chrooted sources back to their targets.
     relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
       for src in target.sources_relative_to_source_root()}
@@ -486,11 +489,31 @@ class PytestRun(TestRunnerTaskMixin, Task):
     file_info = test_info['file']
     return relsrc_to_target.get(file_info)
 
+  def _split_targets_to_groups(self, targets):
+    # Splits the targets into groups according to the partition. Provides a
+    # deterministic order of the groups and the targets within each group.
+    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITION)
+    result = []
+    groups_by_subset = {}
+    for target in targets:
+      subset = partition.find_subset_for_target(target)
+
+      group = groups_by_subset.setdefault(subset, [])
+      if not group:
+        result.append(group)
+      group.append(target)
+    return result
+
   def _run_tests(self, targets):
-    if self.get_options().fast:
-      result = self._do_run_tests(targets)
-      if not result.success:
-        raise ErrorWhileTesting(failed_targets=result.failed_targets)
+    if not self.get_options().run_per_target:
+      failed_targets = []
+      for subset in self._split_targets_to_subsets(targets):
+        rv = self._do_run_tests(subset)
+        if not rv.success:
+          if self.get_options().fail_fast:
+            raise ErrorWhileTesting(failed_targets=rv.failed_targets)
+          else:
+            failed_targets.extend(rv.failed_targets)
     else:
       results = {}
       for target in targets:
@@ -501,8 +524,9 @@ class PytestRun(TestRunnerTaskMixin, Task):
       for target in sorted(results):
         self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
       failed_targets = [target for target, _rv in results.items() if not _rv.success]
-      if failed_targets:
-        raise ErrorWhileTesting(failed_targets=failed_targets)
+
+    if failed_targets:
+      raise ErrorWhileTesting(failed_targets=failed_targets)
 
   def _do_run_tests(self, targets):
     if not targets:
@@ -510,7 +534,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
     buildroot = get_buildroot()
     source_chroot = os.path.relpath(
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), buildroot)
+        self.sources_for_targets(targets).path(), buildroot)
     sources_map = {}  # Path from chroot -> Path from buildroot.
     for t in targets:
       for p in t.sources_relative_to_source_root():
@@ -541,7 +565,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       for options in self.get_options().options + self.get_passthru_args():
         args.extend(safe_shlex_split(options))
       args.extend(test_args)
-      args.extend(sources_map.keys())
+      args.extend(sorted(sources_map.keys()))
 
       result = self._do_run_tests_with_args(pex, args)
       external_junit_xml_dir = self.get_options().junit_xml_dir
