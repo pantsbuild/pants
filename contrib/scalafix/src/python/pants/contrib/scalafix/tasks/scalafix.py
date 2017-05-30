@@ -9,7 +9,6 @@ import os
 import shutil
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -31,14 +30,10 @@ class ScalaFix(NailgunTask):
     super(ScalaFix, cls).register_options(register)
     register('--config', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
-    # NB: Because we mix the compiler classpath into the scalafix classpath later, we
-    # don't shade (ie, specify a `main=`) here.
-    # TODO: This is full-versioned, which we don't have great support for in ScalaPlatform.
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.8', rev='0.3.3-ASNAPSHOT-mirror-7'),
-                            JarDependency(org='org.scalameta', name='scalahost-nsc_2.11.8', rev='1.7.0-485-086c4ac9', classifier='compile'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.4.0'),
                           ])
 
   @classmethod
@@ -77,25 +72,6 @@ class ScalaFix(NailgunTask):
     safe_mkdir_for(dest_dir, clean=True)
     relative_symlink(vt.current_results_dir, dest_dir)
 
-  @memoized_method
-  def _complete_tool_classpath(self):
-    """Include the compiler with the scalafix classpath."""
-    cp = list(ScalaPlatform.global_instance().compiler_classpath(self.context.products))
-    cp.extend(self.tool_classpath('scalafix'))
-    return cp
-
-  @memoized_method
-  def _jvm_options(self):
-    """Extends the user provided jvm_options to specify the location of the scalahost jar."""
-    opts = list(self.get_options().jvm_options)
-    tool_classpath = [cpe for cpe in self.tool_classpath('scalafix')
-                      if self._SCALAHOST_NAME in cpe and '-javadoc' not in cpe and '-sources' not in cpe]
-    if not len(tool_classpath) == 1:
-      raise TaskError('Expected exactly one classpath entry for scalahost: got {} from {}'.format(
-        tool_classpath, self.tool_classpath('scalafix')))
-    opts.append('-Dscalahost.jar={}'.format(tool_classpath[0]))
-    return tuple(opts)
-
   def _run(self, target, results_dir, classpaths):
     # We operate on copies of the files, so we execute in place.
     args = ['--in-place', '--files={}'.format(results_dir)]
@@ -116,9 +92,9 @@ class ScalaFix(NailgunTask):
       shutil.copy(abs_path, dest_file)
 
     # Execute.
-    result = self.runjava(classpath=self._complete_tool_classpath(),
+    result = self.runjava(classpath=self.tool_classpath('scalafix'),
                           main=self._SCALAFIX_MAIN,
-                          jvm_options=self._jvm_options(),
+                          jvm_options=self.get_options().jvm_options,
                           args=args, workunit_name='scalafix')
     if result != 0:
       raise TaskError(
