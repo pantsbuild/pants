@@ -30,6 +30,8 @@ class ScalaFix(NailgunTask):
     super(ScalaFix, cls).register_options(register)
     register('--config', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
+    register('--rewrites', default=None, fingerprint=True,
+             help='The `rewrites` arg to scalafix: generally a name like `ProcedureSyntax`.')
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
@@ -39,6 +41,10 @@ class ScalaFix(NailgunTask):
   @classmethod
   def subsystem_dependencies(cls):
     return super(ScalaFix, cls).subsystem_dependencies() + (ScalaPlatform,)
+
+  @classmethod
+  def implementation_version(cls):
+    return super(ScalaFix, cls).implementation_version() + [('ScalaFix', 1)]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -74,20 +80,27 @@ class ScalaFix(NailgunTask):
 
   def _run(self, target, results_dir, classpaths):
     # We operate on copies of the files, so we execute in place.
-    args = ['--in-place', '--files={}'.format(results_dir)]
-    args.append('--sourcepath={}'.format(results_dir))
+    args = ['--in-place']
+    # FIXME: This argument is not used currently, meaning that files are implicitly
+    # fixed in the buildroot itself. Once this issue is fixed, we should copy back
+    # out of the results_dir to the final location on success.
+    #  see https://github.com/scalacenter/scalafix/issues/176
+    args.append('--sourceroot={}'.format(results_dir))
+    # NB: Only the classpath of the target itself is necessary:
+    #  see https://github.com/scalacenter/scalafix/issues/177
     args.append('--classpath={}'.format(
-      ':'.join(jar for _, jar in classpaths.get_for_targets(target.closure(bfs=True)))))
+      ':'.join(jar for _, jar in classpaths.get_for_targets([target]))))
     if self.get_options().config:
       args.append('--config={}'.format(self.get_options().config))
+    if self.get_options().rewrites:
+      args.append('--rewrites={}'.format(self.get_options().rewrites))
     if self.get_options().level == 'debug':
-      args.append('--debug')
+      args.append('--verbose')
 
     # Clone all sources to relative names in their destination directory.
-    for source, short_name in zip(target.sources_relative_to_buildroot(),
-                                  target.sources_relative_to_target_base()):
+    for source in target.sources_relative_to_buildroot():
       abs_path = os.path.join(get_buildroot(), source)
-      dest_file = os.path.join(results_dir, short_name)
+      dest_file = os.path.join(results_dir, source)
       safe_mkdir_for(dest_file)
       shutil.copy(abs_path, dest_file)
 
