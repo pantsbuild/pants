@@ -44,6 +44,7 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.create_file('y/morx.java')
     self.create_file('y/fleem.java')
     self.create_file('z/w/foo.java')
+    self.create_file('z/.u/bar.java')
     os.symlink('../../y', os.path.join(self.build_root, 'z/w/y'))
 
   def test_no_dir_glob(self):
@@ -210,6 +211,12 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.add_to_build_file('y/BUILD', 'dummy_target(name="y", sources=globs("/root/?.scala"))')
     with self.assertRaises(AddressLookupError):
       self.context().scan()
+
+  def test_rglob_finds_dot_directories(self):
+    self.add_to_build_file('z/BUILD', 'dummy_target(name="z", sources=rglobs("*.java"))')
+    graph = self.context().scan()
+    relative_sources = list(graph.get_target_from_spec('z').sources_relative_to_source_root())
+    assert ['.u/bar.java', 'w/y/morx.java', 'w/foo.java', 'w/y/fleem.java'] == relative_sources
 
   def test_rglob_follows_symlinked_dirs_by_default(self):
     self.add_to_build_file('z/w/BUILD', 'dummy_target(name="w", sources=rglobs("*.java"))')

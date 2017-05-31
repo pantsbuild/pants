@@ -619,6 +619,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'resources_integration',
+  sources = ['test_resources_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'scalafmt',
   sources = ['test_scalafmt.py'],
   dependencies = [
