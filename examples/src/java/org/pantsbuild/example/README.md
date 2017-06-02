@@ -189,7 +189,7 @@ To create a <a pantsref="jvm_bundles">bundle</a> (a binary and its dependencies,
 including helper files):
 
     :::bash
-    $ ./pants bundle --archive=zip examples/src/java/org/pantsbuild/example/hello/main
+    $ ./pants bundle --bundle-jvm-archive=zip examples/src/java/org/pantsbuild/example/hello/main
        ...lots of build output...
     08:50:54 00:02       [create-monolithic-jar]
     08:50:54 00:02         [add-internal-classes]
@@ -373,14 +373,14 @@ contains code compiled for this target.
 
 ### Deploying a Bundle
 
-Instead of just creating a directory tree, you can specify `bundle --archive=zip` to
+Instead of just creating a directory tree, you can specify `bundle --bundle-jvm-archive=zip` to
 `./pants bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
 format) instead.
 
 To use such an archive, put it where you want it, unpack it, and run:
 
     :::bash
-    $ ./pants bundle --archive=zip examples/src/java/org/pantsbuild/example/hello/main
+    $ ./pants bundle --bundle-jvm-archive=zip examples/src/java/org/pantsbuild/example/hello/main
         ...lots of build output...
     10:14:26 00:01       [create-monolithic-jar]
     10:14:26 00:01         [add-internal-classes]
