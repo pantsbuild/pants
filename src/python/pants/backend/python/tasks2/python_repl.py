@@ -9,6 +9,7 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
 from pants.task.repl_task_mixin import ReplTaskMixin
@@ -30,6 +31,11 @@ class PythonRepl(ReplTaskMixin, PythonTaskMixin, PythonExecutionTaskBase):
              help='The IPython interpreter version to use.')
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    super(cls, PythonRepl).prepare(options, round_manager)
+    round_manager.require_data(PartitionTargets.STRATEGY_GLOBAL)
+
+  @classmethod
   def select_targets(cls, target):
     return isinstance(target, (PythonTarget, PythonRequirementLibrary))
 
@@ -46,7 +52,7 @@ class PythonRepl(ReplTaskMixin, PythonTaskMixin, PythonExecutionTaskBase):
       entry_point = 'code:interact'
     pex_info = PexInfo.default()
     pex_info.entry_point = entry_point
-    return self.create_pex(targets, pex_info=pex_info)
+    return self.create_pex(PartitionTargets.STRATEGY_GLOBAL, targets, pex_info=pex_info)
 
   # NB: **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):

@@ -43,9 +43,10 @@ class PythonBinaryCreate(PythonTaskMixin, Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(PartitionTargets.STRATEGY_MINIMAL)
     round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     round_manager.require_data('python')  # For codegen.
+
 
   @staticmethod
   def is_binary(target):
@@ -95,7 +96,7 @@ class PythonBinaryCreate(PythonTaskMixin, Task):
     # and PYTHON_SOURCES products, because those products are already-built pexes, and there's
     # no easy way to merge them into a single pex file (for example, they each have a __main__.py,
     # metadata, and so on, which the merging code would have to handle specially).
-    interpreter = self.interpreter_for_targets([binary_tgt])
+    interpreter = self.interpreter_for_targets(PartitionTargets.STRATEGY_MINIMAL, [binary_tgt])
     with temporary_dir() as tmpdir:
       # Create the pex_info for the binary.
       run_info_dict = self.context.run_tracker.run_info.get_as_dict()

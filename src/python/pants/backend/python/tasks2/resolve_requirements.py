@@ -19,7 +19,7 @@ class ResolveRequirements(PythonTaskMixin, ResolveRequirementsTaskBase):
 
   @classmethod
   def prepare(self, options, round_manager):
-    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(PartitionTargets.TARGETS_PARTITIONS)
     round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
 
   @classmethod
@@ -27,10 +27,10 @@ class ResolveRequirements(PythonTaskMixin, ResolveRequirementsTaskBase):
     return [cls.REQUIREMENTS_PEX]
 
   def execute(self):
-    pex = {}
-    self.context.products.get_data(self.REQUIREMENTS_PEX, lambda: {})
-    for subset in self.target_roots_subsets():
-      req_libs = filter(has_python_requirements, Target.closure_for_targets(subset))
-      requirements_pex[subset] = self.resolve_requirements(
-          req_libs, interpreter=self.interpreter_for_targets(subset))
-    self.context.products.register_data(self.REQUIREMENTS_PEX, requirements_pex)
+    requirements_pex_by_partition = self.context.products.register_data(self.REQUIREMENTS_PEX, {})
+    for partition_name in self.target_roots_partitions():
+      requirements_pex = requirements_pex_by_partition[partition_name] = {}
+      for subset in self.target_roots_subsets(partition_name):
+        req_libs = filter(has_python_requirements, Target.closure_for_targets(subset))
+        requirements_pex[subset] = self.resolve_requirements(
+            req_libs, interpreter=self.interpreter_for_targets(partition_name, subset))

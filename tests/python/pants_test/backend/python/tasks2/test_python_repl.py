@@ -118,7 +118,8 @@ class PythonReplTest(PythonTaskTestBase):
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
     context = self.context(for_task_types=[pt_task_type, si_task_type, rr_task_type, gs_task_type],
                            target_roots=targets)
-    context.products.require_data(PartitionTargets.TARGETS_PARTITION)
+    context.products.require_data(PartitionTargets.STRATEGY_GLOBAL)
+    context.products.require_data(PartitionTargets.TARGETS_PARTITIONS)
     context.products.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     context.products.require_data(GatherSources.PYTHON_SOURCES)
     context.products.require_data(ResolveRequirements.REQUIREMENTS_PEX)

@@ -22,6 +22,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
@@ -322,6 +323,7 @@ class SetupPy(PythonTaskMixin, Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
+    round_manager.require_data(PartitionTargets.STRATEGY_MINIMAL)
     round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
 
   @classmethod
@@ -599,7 +601,7 @@ class SetupPy(PythonTaskMixin, Task):
               create(dep, interpreter)
 
     for target in targets:
-      create(target, self.interpreter_for_targets([target]))
+      create(target, self.interpreter_for_targets(PartitionTargets.STRATEGY_MINIMAL, [target]))
 
     interpreter = self.context.products.get_data(PythonInterpreter)
     python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})

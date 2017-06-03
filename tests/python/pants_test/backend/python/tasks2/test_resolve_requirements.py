@@ -109,8 +109,8 @@ class ResolveRequirementsTest(TaskTestBase):
   def _resolve_requirements(self, target_roots, options=None):
     context = self.context(target_roots=target_roots, options=options,
                            for_subsystems=[PythonSetup, PythonRepos])
-    partition = TargetsPartition([target_roots])
-    context.products.get_data(PartitionTargets.TARGETS_PARTITION, lambda: partition)
+    partitions = {'x': TargetsPartition([target_roots])}
+    context.products.get_data(PartitionTargets.TARGETS_PARTITIONS, lambda: partitions)
 
     # We must get an interpreter via the cache, instead of using PythonInterpreter.get() directly,
     # to ensure that the interpreter has setuptools and wheel support.
@@ -122,15 +122,12 @@ class ResolveRequirementsTest(TaskTestBase):
                                            filters=[str(interpreter.identity.requirement)])
     context.products.get_data(
         SelectInterpreter.PYTHON_INTERPRETERS,
-        lambda: {subset: interpreters[0] for subset in partition.subsets})
-    context.products.get_data(
-        SelectInterpreter.PYTHON_INTERPRETERS,
-        lambda: {tgt: interpreters[0] for tgt in target_roots})
+        lambda: {'x': {subset: interpreters[0] for subset in partitions['x'].subsets}})
 
     task = self.create_task(context)
     task.execute()
 
-    return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX).items()[0][1]
+    return context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)['x'].items()[0][1]
 
   def _exercise_module(self, pex, expected_module):
     with temporary_file() as f:

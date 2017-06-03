@@ -41,7 +41,7 @@ class GatherSources(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(PartitionTargets.TARGETS_PARTITIONS)
     round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     round_manager.require_data('python')  # For codegen.
 
@@ -49,14 +49,15 @@ class GatherSources(Task):
     if not self.context.products.is_required_data(self.PYTHON_SOURCES):
       return
     interpreters = self.context.products.get_data(SelectInterpreter.PYTHON_INTERPRETERS)
-    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITION)
-    python_sources = {}
-    for subset in partition.subsets:
-      target_set = filter(has_python_sources, Target.closure_for_targets(subset))
-      with self.invalidated(target_set) as invalidation_check:
-         python_sources[subset] = self._get_pex_for_versioned_targets(
-             interpreters[subset], invalidation_check.all_vts)
-    self.context.products.register_data(self.PYTHON_SOURCES, python_sources)
+    partitions = self.context.products.get_data(PartitionTargets.TARGETS_PARTITIONS)
+    python_sources_by_partition = self.context.products.register_data(self.PYTHON_SOURCES, {})
+    for partition_name, partition in partitions.items():
+      python_sources = python_sources_by_partition[partition_name] = {}
+      for subset in partition.subsets:
+        target_set = filter(has_python_sources, Target.closure_for_targets(subset))
+        with self.invalidated(target_set) as invalidation_check:
+          python_sources[subset] = self._get_pex_for_versioned_targets(
+              interpreters[partition_name][subset], invalidation_check.all_vts)
 
   def _get_pex_for_versioned_targets(self, interpreter, versioned_targets):
     if versioned_targets:

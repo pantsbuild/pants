@@ -58,8 +58,8 @@ class SelectInterpreterTest(TaskTestBase):
     """Return the version string of the interpreter selected for the target roots."""
     context = self.context(target_roots=[tgt for group in groups for tgt in group])
     context.products.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
-    partition = TargetsPartition(groups)
-    context.products.get_data(PartitionTargets.TARGETS_PARTITION, lambda: partition)
+    partition = {'p1': TargetsPartition(groups)}
+    context.products.get_data(PartitionTargets.TARGETS_PARTITIONS, lambda: partition)
 
     task = self.create_task(context)
     if should_invalidate is not None:
@@ -80,7 +80,7 @@ class SelectInterpreterTest(TaskTestBase):
       else:
         task._create_interpreter_path_file.assert_not_called()
 
-    interpreters = context.products.get_data(SelectInterpreter.PYTHON_INTERPRETERS)
+    interpreters = context.products.get_data(SelectInterpreter.PYTHON_INTERPRETERS)['p1']
     for interpreter in interpreters.values():
       self.assertTrue(isinstance(interpreter, PythonInterpreter))
     return {subset: i.version_string for (subset, i) in interpreters.items()}

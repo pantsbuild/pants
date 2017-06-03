@@ -87,8 +87,11 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
              help='Invoke pytest for each target separately. This is slower, but isolates tests '
                   'from process-wide state created by tests in other targets. If turned off, '
                   'pytest will be invoked once for each subset in the partition. Each subset '
-                  'may contain multiple test targets. See --pyprep-partition-strategy for further '
+                  'may contain multiple test targets. See --single-source-root for further '
                   'control over test isolation.')
+    register('--single-source-root', type=bool, default=True,
+             help='Groups all the targets into a single source root. The targets need to be'
+                  'compatible with each other.')
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
@@ -110,6 +113,14 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
                   'run tests number 2, 5, 8, 11, ...')
 
   @classmethod
+  def prepare(cls, options, round_manager):
+    if options.single_source_root:
+      round_manager.require_data(PartitionTargets.STRATEGY_GLOBAL)
+    else:
+      round_manager.require_data(PartitionTargets.STRATEGY_MINIMAL)
+    super(PytestRun, cls).prepare(options, round_manager)
+
+  @classmethod
   def supports_passthru_args(cls):
     return True
 
@@ -126,6 +137,12 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   def _validate_target(self, target):
     pass
+
+  def _partition_name(self):
+    if self.get_options().single_source_root:
+      return PartitionTargets.STRATEGY_GLOBAL
+    else:
+      return PartitionTargets.STRATEGY_MINIMAL
 
   def _execute(self, all_targets):
     test_targets = self._get_test_targets()
@@ -232,7 +249,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       yield []
       return
 
-    pex_src_root = os.path.relpath(self.sources_for_targets(targets).path(), get_buildroot())
+    pex_src_root = os.path.relpath(self.sources_for_targets(
+        self._partition_name(), targets).path(), get_buildroot())
 
     source_mappings = {}
     for target in targets:
@@ -407,7 +425,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @contextmanager
   def _test_runner(self, targets, sources_map):
-    pex = self.context.products.get_data(PytestPrep.PYTEST_BINARIES)[targets]
+    pex = self.context.products.get_data(
+        PytestPrep.PYTEST_BINARIES)[self._partition_name()][targets]
 
     with self._conftest(sources_map) as conftest:
       with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
@@ -451,7 +470,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
-    pex_src_root = os.path.relpath(self.sources_for_targets(targets).path(), get_buildroot())
+    pex_src_root = os.path.relpath(self.sources_for_targets(
+        self._partition_name(), targets).path(), get_buildroot())
     # First map chrooted sources back to their targets.
     relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
       for src in target.sources_relative_to_source_root()}
@@ -492,7 +512,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def _split_targets_to_groups(self, targets):
     # Splits the targets into groups according to the partition. Provides a
     # deterministic order of the groups and the targets within each group.
-    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITION)
+    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITIONS)[
+        self._partition_name()]
     result = []
     groups_by_subset = {}
     for target in targets:
@@ -534,7 +555,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
     buildroot = get_buildroot()
     source_chroot = os.path.relpath(
-        self.sources_for_targets(targets).path(), buildroot)
+        self.sources_for_targets(self._partition_name(), targets).path(), buildroot)
     sources_map = {}  # Path from chroot -> Path from buildroot.
     for t in targets:
       for p in t.sources_relative_to_source_root():

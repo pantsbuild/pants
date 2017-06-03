@@ -52,32 +52,53 @@ class TargetsPartition(object):
 
 
 class PartitionTargets(Task):
-  TARGETS_PARTITION = 'targets_partition'
+  """Split the target roots into partitions.
 
+  This task implements multiple strategies for partitioning the target roots. A partition is a
+  grouping of the target roots into non-empty disjoint subsets. Interpreter and external
+  requirements are resolved for each subset, and therefore the targets within each subset
+  must be compatible with each other.
+
+  Supported strategies:
+
+  STRATEGY_MINIMAL:
+      groups the target roots into the smallest possible number of subsets such that if one target
+      root depends on another, then both of them will be in the subset. This ensures
+      that incompatible target roots will fall into different subsets while minimizing the number
+      of chroots.
+  STRATEGY_PER_TARGET:
+      A partition in which Each target root will be in its own isolated group.
+      This provides maximal isolation but can be slower if there are many target
+      roots.
+  STRATEGY_GLOBAL:
+      A partition with one single subset for all target roots. This means that all target
+      roots need to be compatible with each other.
+
+  The strategies that are requested via require_data() will be provided.  In addition a product
+  TARGETS_PARTITION is provided which is a map between the requested partition types and the
+  partition.
+  """
+
+  TARGETS_PARTITIONS = 'tagets_partitions'
   STRATEGY_MINIMAL = 'minimal'
   STRATEGY_PER_TARGET = 'per_target'
   STRATEGY_GLOBAL = 'global'
 
   @classmethod
   def product_types(cls):
-    return [cls.TARGETS_PARTITION]
+    return [cls.TARGETS_PARTITIONS,
+            cls.STRATEGY_MINIMAL,
+            cls.STRATEGY_PER_TARGET,
+            cls.STRATEGY_GLOBAL]
 
   @classmethod
   def register_options(cls, register):
     super(PartitionTargets, cls).register_options(register)
+    return
     register(
         '--strategy',
         choices=[cls.STRATEGY_MINIMAL, cls.STRATEGY_PER_TARGET, cls.STRATEGY_GLOBAL],
-        help='Specifies how to partition the targets into subsets. '
-             '"global": creates a single subset for all target roots. This means a single '
-             'source tree, interpreter and external requirements pex will be provided for all '
-             'targets, and therefore the targets must be compatible with each other. '
-             '"minimal": groups the target roots into the smallest possible number of subsets '
-             'such that if one target root depends on another, then both of them will be in the '
-             'subset. This ensures that incompatible target roots will fall into different subsets '
-             'while minimizing the number of chroots. '
-             '"per_target": each target root will be in its own isolated group. This provides '
-             'maximal isolation but can be slower if there are many target roots.',
+        help='Specifies how to partition the targets into subsets.',
         default=cls.STRATEGY_GLOBAL)
 
   @classmethod
@@ -111,13 +132,15 @@ class PartitionTargets(Task):
     return TargetsPartition([targets] if targets else [])
 
   def execute(self):
-    strategy = self.get_options().strategy
-    if strategy == self.STRATEGY_MINIMAL:
-      partition = self._minimal_partition(self.context.target_roots)
-    elif strategy == self.STRATEGY_PER_TARGET:
-      partition = self._per_target_partition(self.context.target_roots)
-    elif strategy == self.STRATEGY_GLOBAL:
-      partition = self._global_partition(self.context.target_roots)
-    else:
-      assert False, 'Unexpected partitioning strategy.'
-    self.context.products.get_data(self.TARGETS_PARTITION, lambda: partition)
+    products = self.context.products
+    partitions = products.get_data(self.TARGETS_PARTITIONS, lambda: {})
+    strategies = {
+        self.STRATEGY_MINIMAL: self._minimal_partition,
+        self.STRATEGY_PER_TARGET: self._per_target_partition,
+        self.STRATEGY_GLOBAL: self._global_partition,
+    }
+
+    for product_name, get_partition in strategies.items():
+      if products.is_required_data(product_name):
+        partitions[product_name] = products.get_data(
+          product_name, lambda: get_partition(self.context.target_roots))

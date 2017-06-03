@@ -43,6 +43,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     self.task_context = self.context(for_task_types=[pt_task_type, si_task_type],
                                      target_roots=[self.binary])
     self.task_context.products.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
+    self.task_context.products.require_data(PartitionTargets.STRATEGY_MINIMAL)
     self.run_info_dir = os.path.join(self.pants_workdir, self.options_scope, 'test/info')
     self.task_context.run_tracker.run_info = RunInfo(self.run_info_dir)
 

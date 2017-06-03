@@ -88,10 +88,11 @@ class TestSetupPy(PythonTaskTestBase):
     context = self.context(target_roots=[target])
 
     partition = TargetsPartition([[target]])
-    context.products.get_data(PartitionTargets.TARGETS_PARTITION, lambda: partition)
+    context.products.get_data(PartitionTargets.TARGETS_PARTITIONS,
+                              lambda: {PartitionTargets.STRATEGY_MINIMAL: partition})
     context.products.get_data(
         SelectInterpreter.PYTHON_INTERPRETERS,
-        lambda: {subset: None for subset in partition.subsets})
+        lambda: {PartitionTargets.STRATEGY_MINIMAL: {subset: None for subset in partition.subsets}})
 
     setup_py = self.create_task(context)
     setup_py.execute()

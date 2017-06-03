@@ -105,18 +105,18 @@ class GatherSourcesTest(TaskTestBase):
     context = self.context(target_roots=[tgt for group in groups for tgt in group],
                            for_subsystems=[PythonSetup, PythonRepos])
     interpreter = self._get_interpreter(context)
-    partition = TargetsPartition(groups)
-    context.products.get_data(PartitionTargets.TARGETS_PARTITION, lambda: partition)
+    partitions = {'p1': TargetsPartition(groups)}
+    context.products.get_data(PartitionTargets.TARGETS_PARTITIONS, lambda: partitions)
 
     context.products.get_data(
         SelectInterpreter.PYTHON_INTERPRETERS,
-        lambda: {subset: interpreter for subset in partition.subsets})
+        lambda: {'p1': {subset: interpreter for subset in partitions['p1'].subsets}})
 
     context.products.require_data(GatherSources.PYTHON_SOURCES)
 
     task = self.create_task(context)
     task.execute()
 
-    sources = context.products.get_data(GatherSources.PYTHON_SOURCES)
+    sources = context.products.get_data(GatherSources.PYTHON_SOURCES)['p1']
 
     return {subset: pex.cmdline()[1] for (subset, pex) in sources.items()}

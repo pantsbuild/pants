@@ -52,7 +52,7 @@ class SelectInterpreter(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(PartitionTargets.TARGETS_PARTITIONS)
 
   @classmethod
   def product_types(cls):
@@ -77,13 +77,14 @@ class SelectInterpreter(Task):
 
       return self._get_interpreter(interpreter_path_file)
 
-    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITION)
+    partitions = self.context.products.get_data(PartitionTargets.TARGETS_PARTITIONS)
     if self.context.products.is_required_data(self.PYTHON_INTERPRETERS):
-      interpreters = {}
-      for subset in partition.subsets:
-          interpreters[subset] = _get_interpreter_for_target_set(
-              Target.closure_for_targets(subset))
-      self.context.products.register_data(self.PYTHON_INTERPRETERS,interpreters)
+      interpreters_by_partition = self.context.products.register_data(self.PYTHON_INTERPRETERS, {})
+      for partition_name, partition in partitions.items():
+        interpreters = interpreters_by_partition[partition_name] = {}
+        for subset in partition.subsets:
+            interpreters[subset] = _get_interpreter_for_target_set(
+                Target.closure_for_targets(subset))
 
   @memoized_method
   def _interpreter_cache(self):

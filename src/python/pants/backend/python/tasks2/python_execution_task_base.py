@@ -83,7 +83,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   @classmethod
   def prepare(cls, options, round_manager):
     super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
-    round_manager.require_data(PartitionTargets.TARGETS_PARTITION)
+    round_manager.require_data(PartitionTargets.TARGETS_PARTITIONS)
     round_manager.require_data(SelectInterpreter.PYTHON_INTERPRETERS)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
     round_manager.require_data(GatherSources.PYTHON_SOURCES)
@@ -95,9 +95,9 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     """
     return []
 
-  def create_pex(self, targets, pex_info=None):
+  def create_pex(self, partition_name, targets, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
-    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITION)
+    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITIONS)[partition_name]
     subset = partition.find_subset_for_targets(targets)
     relevant_targets = filter(
       lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)),
@@ -113,7 +113,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       else:
         target_set_id = 'no_targets'
 
-      interpreter = self.context.products.get_data(SelectInterpreter.PYTHON_INTERPRETERS)[subset]
+      interpreter = self.context.products.get_data(SelectInterpreter.PYTHON_INTERPRETERS)[
+          partition_name][subset]
       path = os.path.join(self.workdir, str(interpreter.identity), target_set_id)
       extra_pex_paths_file_path = path + '.extra_pex_paths'
       extra_pex_paths = None
@@ -122,8 +123,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       # to cover the empty case.
       if not os.path.isdir(path):
         pexes = [
-          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)[subset],
-          self.context.products.get_data(GatherSources.PYTHON_SOURCES)[subset]
+          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)[
+              partition_name][subset],
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES)[
+              partition_name][subset]
         ]
 
         if self.extra_requirements():
