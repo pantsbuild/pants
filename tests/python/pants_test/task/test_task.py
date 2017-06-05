@@ -29,6 +29,7 @@ class DummyTask(Task):
   """A task that appends the content of a DummyLibrary's source into its results_dir."""
 
   _implementation_version = 0
+  _cache_target_dirs = True
 
   @property
   def incremental(self):
@@ -36,7 +37,7 @@ class DummyTask(Task):
 
   @property
   def cache_target_dirs(self):
-    return True
+    return self._cache_target_dirs
 
   @classmethod
   def implementation_version_str(cls):
@@ -52,10 +53,12 @@ class DummyTask(Task):
       if not was_valid:
         if vt.is_incremental:
           assert os.path.isdir(vt.previous_results_dir)
-        with open(os.path.join(get_buildroot(), vt.target.source), 'r') as infile:
-          outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
-          with open(outfile_name, 'a') as outfile:
-            outfile.write(infile.read())
+        # Noop if cache_target_dirs is disabled, since there will be no results_dir created.
+        if self.cache_target_dirs:
+          with open(os.path.join(get_buildroot(), vt.target.source), 'r') as infile:
+            outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
+            with open(outfile_name, 'a') as outfile:
+              outfile.write(infile.read())
         vt.update()
       return vt, was_valid
 
@@ -84,11 +87,12 @@ class TaskTest(TaskTestBase):
       read=enable_artifact_cache,
     )
 
-  def _fixture(self, incremental):
+  def _fixture(self, incremental, target_dir_caching=True):
     target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
     context = self.context(target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
+    task._cache_target_dirs = target_dir_caching
     return task, target
 
   def _run_fixture(self, content=None, incremental=False, artifact_cache=False):
@@ -273,3 +277,48 @@ class TaskTest(TaskTestBase):
     vtC_live = list(vtC.live_dirs())
     self.assertNotIn(vtB.current_results_dir, vtC_live)
     self.assertEqual(len(vtC_live), 2)
+
+  def test_create_results_dir_outside_automatic_cache(self):
+    # Task.py only calls create_results_dir in invalidated if caching is enabled, but tasks may manage their own
+    # caching. Calls to create_results_dir should be supported and result in legal state.
+    task, target = self._fixture(incremental=False, target_dir_caching=False)
+    self._create_clean_file(target, self._file_contents)
+    vtA, vtA_was_valid = task.execute()
+
+    # Task was ran for the first time, the _results_dir was left unset, and there were no files created.
+    self.assertFalse(vtA_was_valid)
+    self.assertEqual(vtA._results_dir, None)
+    self.assertFalse(self.buildroot_files(relpath=task.workdir))
+
+    # Now call vt.results_dir and see the "not created" exception.
+    with self.assertRaises(ValueError):
+      vtA.results_dir
+
+    # Manually create the results_dirs with create_results_dir, now able to directly reference the results_dir.
+    vtA.create_results_dir(task.workdir)
+    self.assertTrue(os.path.isdir(vtA.results_dir))
+
+  def test_uncached_results_dir_wiped_if_invalid(self):
+    #  This will write the contents string to the results_dir.
+    task, vtA, _ = self._run_fixture(incremental=True)
+    self.assertContent(vtA, self._file_contents)
+
+    results_path = vtA.results_dir
+    generated_file = os.path.join(vtA.current_results_dir, self._filename)
+    # Force invalidate, disable cache_target_dirs and then manually enter the invalidation block again.
+    # Calling create_results should wipe the results_dirs.
+    vtA.force_invalidate()
+    task._cache_target_dirs = False
+
+    with task.invalidated([vtA.target]) as invalidation:
+      vtB = invalidation.invalid_vts[0]
+      self.assertTrue(os.path.isdir(results_path))
+      self.assertTrue(os.path.isfile(generated_file))
+
+      with self.assertRaises(ValueError):
+        vtB.results_dir
+
+      # The call to create on an invalid target results in it being wiped.
+      vtB.create_results_dir(task.workdir)
+      self.assertTrue(os.path.isdir(vtB.results_dir))
+      self.assertFalse(os.path.isfile(generated_file))

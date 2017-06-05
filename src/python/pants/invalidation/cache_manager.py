@@ -182,8 +182,12 @@ class VersionedTarget(VersionedTargetSet):
 
     if not self.valid:
       # Clean the workspace for invalid vts.
-      safe_mkdir(self._current_results_dir, clean=True)
-      relative_symlink(self._current_results_dir, self._results_dir)
+      safe_rmtree(self._current_results_dir)
+
+    # Tasks may not enable cache_target_dirs but still call this outside of invalidated(). If so, the dirs
+    # should still be made and pass ensure_legal().
+    safe_mkdir(self._current_results_dir)
+    relative_symlink(self._current_results_dir, self._results_dir)
     self.ensure_legal()
 
   def copy_previous_results(self, root_dir):
