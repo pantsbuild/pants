@@ -24,21 +24,21 @@ class PythonTestBuilderTestBase(PythonTaskTestBase):
   def task_type(cls):
     return PytestRun
 
-  def run_tests(self, targets, **options):
+  def run_tests(self, targets, *passthrough_args, **options):
     test_options = {
       'colors': False,
       'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
     }
     test_options.update(options)
     self.set_options(**test_options)
-    context = self.context(target_roots=targets)
+    context = self.context(target_roots=targets, passthru_args=list(passthrough_args))
     pytest_run_task = self.create_task(context)
     with pushd(self.build_root):
       pytest_run_task.execute()
 
-  def run_failing_tests(self, targets, failed_targets, **options):
+  def run_failing_tests(self, targets, failed_targets, *passthrough_args, **options):
     with self.assertRaises(ErrorWhileTesting) as cm:
-      self.run_tests(targets=targets, **options)
+      self.run_tests(targets=targets, *passthrough_args, **options)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
 
@@ -261,6 +261,12 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
   def test_green(self):
     self.run_tests(targets=[self.green])
+
+  def test_out_of_band_deselect_fast_success(self):
+    self.run_tests([self.green, self.red], '-kno_tests_should_match_at_all', fast=True)
+
+  def test_out_of_band_deselect_no_fast_success(self):
+    self.run_tests([self.green, self.red], '-ktest_core_green', fast=False)
 
   def test_red(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
