@@ -186,13 +186,14 @@ class VersionedTarget(VersionedTargetSet):
       relative_symlink(self._current_results_dir, self._results_dir)
     self.ensure_legal()
 
-  def copy_previous_results(self, root_dir):
+  def copy_previous_results(self):
     """Use the latest valid results_dir as the starting contents of the current results_dir.
 
-    Should be called after the cache is checked, since previous_results are not useful if there is a cached artifact.
+    Should be called after the cache is checked, since previous_results are not useful if there is
+    a cached artifact.
     """
-    # TODO(mateo): An immediate followup removes the root_dir param, it is identical to the task.workdir.
-    # TODO(mateo): This should probably be managed by the task, which manages the rest of the incremental support.
+    # TODO(mateo): This should probably be managed by the task, which manages the rest of the
+    # incremental support.
     if not self.previous_cache_key:
       return None
     previous_path = self._cache_manager.results_dir_path(self.previous_cache_key, stable=False)
