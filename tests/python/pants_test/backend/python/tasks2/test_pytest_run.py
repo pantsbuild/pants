@@ -28,23 +28,23 @@ class PytestTestBase(PythonTaskTestBase):
 
   _CONFTEST_CONTENT = '# I am an existing root-level conftest file.'
 
-  def run_tests(self, targets, **options):
+  def run_tests(self, targets, *passthru_args, **options):
     """Run the tests in the specified targets, with the specified PytestRun task options.
 
     Returns the path of the sources pex, so that calling code can map files from the
     source tree to files as pytest saw them.
     """
-    context = self._prepare_test_run(targets, **options)
+    context = self._prepare_test_run(targets, *passthru_args, **options)
     self._do_run_tests(context)
     return context
 
-  def run_failing_tests(self, targets, failed_targets, **options):
-    context = self._prepare_test_run(targets, **options)
+  def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
+    context = self._prepare_test_run(targets, *passthru_args, **options)
     with self.assertRaises(ErrorWhileTesting) as cm:
       self._do_run_tests(context)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
-  def _prepare_test_run(self, targets, **options):
+  def _prepare_test_run(self, targets, *passthru_args, **options):
     self.reset_build_graph()
     test_options = {
       'colors': False,
@@ -59,7 +59,8 @@ class PytestTestBase(PythonTaskTestBase):
     rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
     context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type],
-                           target_roots=targets)
+                           target_roots=targets,
+                           passthru_args=list(passthru_args))
     si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
     rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
     gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
@@ -304,6 +305,12 @@ class PytestTest(PytestTestBase):
 
   def test_green(self):
     self.run_tests(targets=[self.green])
+
+  def test_out_of_band_deselect_fast_success(self):
+    self.run_tests([self.green, self.red], '-kno_tests_should_match_at_all', fast=True)
+
+  def test_out_of_band_deselect_no_fast_success(self):
+    self.run_tests([self.green, self.red], '-ktest_core_green', fast=False)
 
   def test_red(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
