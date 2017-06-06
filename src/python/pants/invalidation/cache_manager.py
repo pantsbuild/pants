@@ -156,8 +156,7 @@ class VersionedTargetSet(object):
 
 
 class VersionedTarget(VersionedTargetSet):
-  """This class represents a singleton VersionedTargetSet, and has links to VersionedTargets that
-  the wrapped target depends on (after having resolved through any "alias" targets.
+  """This class represents a singleton VersionedTargetSet.
 
   :API: public
   """
