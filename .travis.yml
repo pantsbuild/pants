@@ -192,9 +192,35 @@ matrix:
       before_script:
         - ./build-support/bin/install-android-sdk.sh
       env:
-        - SHARD="Python contrib tests"
+        - SHARD="Python contrib tests - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrcjlp "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrcjlp -y 0/2 "${SHARD}"
+
+   - os: linux
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python contrib tests - shard 2"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrcjlp -y 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty

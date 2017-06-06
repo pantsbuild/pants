@@ -12,7 +12,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpuncia)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpuyncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -32,6 +32,10 @@ function usage() {
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
+  echo " -y SHARD_NUMBER/TOTAL_SHARDS"
+  echo "              if running contrib python tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -c           skip pants integration tests (includes examples and testprojects)"
   echo " -i SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running integration tests, divide them into"
@@ -51,9 +55,10 @@ bootstrap_compile_args=(
 
 # No python test sharding (1 shard) by default.
 python_unit_shard="0/1"
+python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:nci:a" opt; do
+while getopts "hfxbkmsrjlpu:ny:ci:a" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -69,6 +74,7 @@ while getopts "hfxbkmsrjlpu:nci:a" opt; do
     u) python_unit_shard=${OPTARG} ;;
     a) skip_android="true" ;;
     n) skip_contrib="true" ;;
+    y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
@@ -200,14 +206,14 @@ if [[ "${skip_python:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_contrib:-false}" == "false" ]]; then
-  start_travis_section "ContribTests" "Running contrib python tests"
+  if [[ "0/1" != "${python_contrib_shard}" ]]; then
+    shard_desc=" [shard ${python_contrib_shard}]"
+  fi
+  start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    # We run python tests using --no-fast - aka test chroot per target - to work around issues with
-    # test (ie: pants_test.contrib) namespace packages.
-    # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
-    #  https://github.com/pantsbuild/pants/issues/1149
     ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
     --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    --test-pytest-test-shard=${python_contrib_shard} \
     --compile-python-eval-skip \
     contrib:: \
   ) || die "Contrib python test failure"
