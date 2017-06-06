@@ -196,7 +196,7 @@ matrix:
       script:
         - ./build-support/bin/ci.sh -x -fkmsrcjlp -y 0/2 "${SHARD}"
 
-   - os: linux
+    - os: linux
       dist: trusty
       sudo: required
       addons:
