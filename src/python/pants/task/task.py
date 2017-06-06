@@ -384,9 +384,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     # Cache has been checked to create the full list of invalid VTs.
     # Only copy previous_results for this subset of VTs.
-    for vts in invalidation_check.invalid_vts:
-      if self.incremental:
-        vts.copy_previous_results(self.workdir)
+    if self.incremental:
+      for vts in invalidation_check.invalid_vts:
+        vts.copy_previous_results()
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
