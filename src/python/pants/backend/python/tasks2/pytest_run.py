@@ -34,17 +34,32 @@ from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
-class PythonTestResult(object):
+class PytestResult(object):
   @staticmethod
   def exception():
-    return PythonTestResult('EXCEPTION')
+    return PytestResult('EXCEPTION')
 
-  @staticmethod
-  def rc(value):
-    return PythonTestResult('SUCCESS' if value == 0 else 'FAILURE', rc=value)
+  _SUCCESS_EXIT_CODES = (
+    0,
+
+    # This is returned by pytest when no tests are collected (EXIT_NOTESTSCOLLECTED).
+    # We already short-circuit test runs with no test _targets_ to return 0 emulated exit codes and
+    # we should do the same for cases when there are test targets but tests themselves have been
+    # de-selected out of band via `py.test -k`.
+    5
+  )
+
+  @classmethod
+  def _map_exit_code(cls, value):
+    return 0 if value in cls._SUCCESS_EXIT_CODES else value
+
+  @classmethod
+  def rc(cls, value):
+    exit_code = cls._map_exit_code(value)
+    return PytestResult('SUCCESS' if exit_code == 0 else 'FAILURE', rc=exit_code)
 
   def with_failed_targets(self, failed_targets):
-    return PythonTestResult(self._msg, self._rc, failed_targets)
+    return PytestResult(self._msg, self._rc, failed_targets)
 
   def __init__(self, msg, rc=None, failed_targets=None):
     self._rc = rc
@@ -422,7 +437,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       with self.context.new_workunit(name='run',
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
-        return PythonTestResult.rc(rc)
+        return PytestResult.rc(rc)
     except ErrorWhileTesting:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
       # fail with a ErrorWhileTesting. We can't just set PythonTestResult
@@ -433,7 +448,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     except Exception:
       self.context.log.error('Failed to run test!')
       self.context.log.info(traceback.format_exc())
-      return PythonTestResult.exception()
+      return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
     pex_src_root = os.path.relpath(
@@ -495,7 +510,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   def _do_run_tests(self, targets):
     if not targets:
-      return PythonTestResult.rc(0)
+      return PytestResult.rc(0)
 
     buildroot = get_buildroot()
     source_chroot = os.path.relpath(
@@ -506,7 +521,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         sources_map[os.path.join(source_chroot, p)] = os.path.join(t.target_base, p)
 
     if not sources_map:
-      return PythonTestResult.rc(0)
+      return PytestResult.rc(0)
 
     with self._test_runner(targets, sources_map) as (pex, test_args):
       # Validate that the user didn't provide any passthru args that conflict
