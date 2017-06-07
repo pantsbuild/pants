@@ -3,6 +3,34 @@
 
 This document describes releases leading up to the ``1.3.x`` ``stable`` series.
 
+1.3.0 (06/06/2017)
+------------------
+
+The ``1.3.0`` stable release, with no addition changes since the rc4 release!
+
+A quick summary of exciting changes since the ``1.2.x`` branch:
+
+* Pants' python backend has been overhauled and modernized to support caching, and to lower the
+  latency of re-running tests after a code edit.
+* Pants now uses a `native code 'engine' <https://docs.google.com/document/d/1C64MreDeVoZAl3HrqtWUVE-qnj3MyWW0NQ52xejjaWw/edit?usp=sharing>`_
+  implemented in rust, which unlocks significant performance improvements in the future.
+* A daemon that caches BUILD file parsing and file fingerprinting (and more to follow!) is now `ready
+  for alpha testing <https://github.com/pantsbuild/pants/blob/b5eaf05ef533df4c5f93a3728107a27f25726941/pants.daemon.ini>`_
+  (with `two significant caveats <http://www.pantsbuild.org/invoking.html#the-pants-daemon>`_).
+* A default set of `implicit_sources <https://rbcommons.com/s/twitter/r/4300>`_ can now be
+  manually enabled to further reduce BUILD file boilerplate. This option should become the
+  default in the next stable release.
+* The Zinc incremental scala compiler is now at 1.0.0, with improved incremental behaviour.
+* Style-related tasks that used to be in the `compile` goal have moved to a new `lint` goal.
+* The `fmt` goal was added, with support for scalafmt, `gofmt`, and python `isort` to start.
+* `Support for yarnpkg <https://github.com/pantsbuild/pants/pull/4255>`_ in the node contrib module.
+* Support for `relative 'jar' declarations <https://github.com/pantsbuild/pants/pull/4279>`_, to
+  allow for committing jars in your repo (if that's your bag!)
+* A contrib module for `errorprone <https://github.com/pantsbuild/pants/pull/4163>`_ was added.
+* Direct support for `scalatest` tests in the pants JVM test runner.
+
+See the rest of this page for the complete list of changes.
+
 1.3.0rc4 (05/27/2017)
 ---------------------
 
