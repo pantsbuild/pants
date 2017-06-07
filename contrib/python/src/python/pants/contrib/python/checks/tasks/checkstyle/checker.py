@@ -167,8 +167,7 @@ class PythonCheckStyleTask(Task):
 
     if failure_count > 0 and self.options.fail:
       raise TaskError(
-        '{} Python Style issues found. For import order related issues, please try '
-        '`./pants fmt.isort <targets>`'.format(failure_count))
+        '{} Python Style issues found. You may try `./pants fmt <targets>`'.format(failure_count))
     return failure_count
 
   def execute(self):
