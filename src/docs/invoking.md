@@ -110,3 +110,36 @@ You can use `test` instead of `test.pytest` above; Pants then applies the passth
 through all tasks in `test` that support them. In this case, it would pass them to JUnit as well.
 So it only makes sense to do this if you know that JUnit won't be invoked in practice (because
 you're not invoking Pants on any Java tests).
+
+The Pants Daemon
+----------------
+
+The `1.3.0` release of pants includes an alpha release of a daemon to accelerate common
+graph operations including build file parsing and source fingerprinting.
+
+### Benefits
+
+The daemon caches many filesystem operations run over run, and uses watchman to invalidate that
+cache. This can significantly improve the performance of incremental and noop builds (ie,
+cases where relatively small portions of the repo have changed since the previous build).
+
+### Caveats
+
+In this "alpha" release, there are two significant caveats to using the daemon:
+
+1. Changes to `pants.ini` [require running clean-all](https://github.com/pantsbuild/pants/issues/3941)
+in order to force re-reading configuration. While this is unlikely to happen directly within your
+branch, it will occasionally happen when switching back and forth between branches.
+2. `./pants repl` and `./pants run` are [not yet supported](https://github.com/pantsbuild/pants/issues/3774).
+
+### Usage
+
+To enable the daemon, see the example in `pants.daemon.ini` in the root of the pantsbuild repo:
+
+!inc(../../pants.daemon.ini)
+
+### Rollout
+
+The daemon will be in "alpha" until the Caveats mentioned above are addressed, after which we
+hope to move it into a "beta" period where we recommend its use more widely. Finally, we hope to
+enable the daemon by default for the [`1.4.0` release of pants](https://github.com/pantsbuild/pants/milestone/9).
