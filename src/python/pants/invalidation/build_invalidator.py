@@ -20,8 +20,6 @@ from pants.util.dirutil import safe_mkdir
 #  - id identifies the set of targets.
 #  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
 #    determines a given version of the artifacts created when building the target set.
-#    to the chunking algorithm.  Right now this is used to count the number of source files
-#    in a scala target set for breaking up zinc invocations.
 
 CacheKey = namedtuple('CacheKey', ['id', 'hash'])
 
