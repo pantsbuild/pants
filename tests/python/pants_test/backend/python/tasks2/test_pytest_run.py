@@ -12,6 +12,7 @@ import coverage
 from mock import patch
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.pytest_prep import PytestPrep
 from pants.backend.python.tasks2.pytest_run import PytestRun
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
@@ -58,12 +59,14 @@ class PytestTestBase(PythonTaskTestBase):
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
     rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
     gs_task_type = self.synthesize_task_subtype(GatherSources, 'gs_scope')
-    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type],
+    pp_task_type = self.synthesize_task_subtype(PytestPrep, 'pp_scope')
+    context = self.context(for_task_types=[si_task_type, rr_task_type, gs_task_type, pp_task_type],
                            target_roots=targets,
                            passthru_args=list(passthru_args))
     si_task_type(context, os.path.join(self.pants_workdir, 'si')).execute()
     rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
     gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
+    pp_task_type(context, os.path.join(self.pants_workdir, 'pp')).execute()
     return context
 
   def _do_run_tests(self, context):

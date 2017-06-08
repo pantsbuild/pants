@@ -13,19 +13,18 @@ import traceback
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
+from pants.backend.python.tasks2.pytest_prep import PytestPrep
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.task.task import Task
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
@@ -78,11 +77,7 @@ class PytestResult(object):
     return self._failed_targets
 
 
-class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
+class PytestRun(TestRunnerTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):
@@ -115,11 +110,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def supports_passthru_args(cls):
     return True
 
-  def __init__(self, *args, **kwargs):
-    super(PytestRun, self).__init__(*args, **kwargs)
-
-  def extra_requirements(self):
-    return PyTest.global_instance().get_requirement_strings()
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(PytestRun, cls).prepare(options, round_manager)
+    round_manager.require_data(PytestPrep.PYTEST_BINARY)
 
   def _test_target_filter(self):
     def target_filter(target):
@@ -139,8 +133,12 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
+  def _ensure_workdir(self):
+    safe_mkdir(self.workdir)
+    return self.workdir
+
   def _get_junit_xml_path(self, targets):
-    xml_path = os.path.join(self.workdir, 'junitxml',
+    xml_path = os.path.join(self._ensure_workdir(), 'junitxml',
                             'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
     safe_mkdir_for(xml_path)
     return xml_path
@@ -213,7 +211,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
-    with temporary_file(root_dir=self.workdir) as fp:
+    with temporary_file(root_dir=self._ensure_workdir()) as fp:
       cp.write(fp)
       fp.close()
       coverage_rc = fp.name
@@ -398,7 +396,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     # Note that it's important to put the tmpdir under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
-    with temporary_dir(root_dir=self.workdir) as conftest_dir:
+    with temporary_dir(root_dir=self._ensure_workdir()) as conftest_dir:
       conftest = os.path.join(conftest_dir, 'conftest.py')
       with open(conftest, 'w') as fp:
         fp.write(conftest_content)
@@ -406,10 +404,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @contextmanager
   def _test_runner(self, targets, sources_map):
-    pex_info = PexInfo.default()
-    pex_info.entry_point = 'pytest'
-    pex = self.create_pex(pex_info)
-
+    pex = self.context.products.get_data(PytestPrep.PYTEST_BINARY)
     with self._conftest(sources_map) as conftest:
       with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
         yield pex, [conftest] + coverage_args
