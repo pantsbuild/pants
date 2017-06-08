@@ -8,11 +8,11 @@ import java.io.File
 import java.util.{ List => JList }
 
 import scala.collection.JavaConverters._
+import scala.compat.java8.OptionConverters._
 import scala.util.matching.Regex
 
 import sbt.io.Path._
 import sbt.util.{Level, Logger}
-import sbt.util.Logger.{m2o, o2m}
 import xsbti.Maybe
 import xsbti.compile.{
   ClassfileManagerType,
@@ -120,11 +120,12 @@ case class IncOptions(
   relationsDebug: Boolean        = defaultIncOptions.relationsDebug,
   apiDebug: Boolean              = defaultIncOptions.apiDebug,
   apiDiffContextSize: Int        = defaultIncOptions.apiDiffContextSize,
-  apiDumpDirectory: Option[File] = m2o(defaultIncOptions.apiDumpDirectory),
+  apiDumpDirectory: Option[File] = defaultIncOptions.apiDumpDirectory.asScala,
   transactional: Boolean         = false,
   useZincFileManager: Boolean    = true,
   backup: Option[File]           = None,
-  recompileOnMacroDef: Option[Boolean] = m2o(defaultIncOptions.recompileOnMacroDef).map(_.booleanValue)
+  recompileOnMacroDef: Option[Boolean] =
+    defaultIncOptions.recompileOnMacroDef.asScala.map(_.booleanValue)
 ) {
   def options(log: Logger): xsbti.compile.IncOptions = {
     new xsbti.compile.IncOptions(
@@ -133,10 +134,10 @@ case class IncOptions(
       relationsDebug,
       apiDebug,
       apiDiffContextSize,
-      o2m(apiDumpDirectory),
+      apiDumpDirectory.asJava,
       classfileManager(log),
       useZincFileManager,
-      o2m(recompileOnMacroDef.map(java.lang.Boolean.valueOf)),
+      recompileOnMacroDef.map(java.lang.Boolean.valueOf).asJava,
       true, // nameHashing
       false, // storeApis, apis is stored separately after 1.0.0
       false, // antStyle

@@ -9,8 +9,6 @@ import java.net.URLClassLoader
 import sbt.internal.inc.{
   AnalyzingCompiler,
   CompileOutput,
-  CompilerCache,
-  CompilerBridgeProvider,
   IncrementalCompilerImpl,
   RawCompiler,
   ScalaInstance,
@@ -20,6 +18,9 @@ import sbt.io.Path
 import sbt.io.syntax._
 import sbt.util.Logger
 import xsbti.compile.{
+  ClasspathOptionsUtil,
+  CompilerBridgeProvider,
+  CompilerCache,
   GlobalsCache,
   JavaCompiler,
   ScalaInstance => XScalaInstance
@@ -72,8 +73,8 @@ object Compiler {
   def newScalaCompiler(instance: XScalaInstance, interfaceJar: File): AnalyzingCompiler =
     new AnalyzingCompiler(
       instance,
-      CompilerBridgeProvider.constant(interfaceJar),
-      sbt.internal.inc.ClasspathOptionsUtil.auto,
+      CompilerBridgeProvider.constant(interfaceJar, instance),
+      ClasspathOptionsUtil.auto,
       _ => (), None
     )
 
@@ -94,9 +95,11 @@ object Compiler {
   /**
    * Create new globals cache.
    */
-  def createResidentCache(maxCompilers: Int): GlobalsCache = {
-    if (maxCompilers <= 0) CompilerCache.fresh else CompilerCache(maxCompilers)
-  }
+  def createResidentCache(maxCompilers: Int): GlobalsCache =
+    if (maxCompilers <= 0)
+      CompilerCache.fresh
+    else
+      CompilerCache.createCacheFor(maxCompilers)
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
@@ -139,7 +142,7 @@ object Compiler {
         targetJar,
         Seq(setup.compilerInterface),
         CompilerInterfaceId,
-        new RawCompiler(scalaInstance, sbt.internal.inc.ClasspathOptionsUtil.auto, log),
+        new RawCompiler(scalaInstance, ClasspathOptionsUtil.auto, log),
         log
       )
     val dir = setup.cacheDir / interfaceId(scalaInstance.actualVersion)
