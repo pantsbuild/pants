@@ -430,6 +430,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
 
       with self.context.new_workunit(name='run',
+                                     cmd=pex.cmdline(args),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
         return PytestResult.rc(rc)
@@ -563,6 +564,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
+                                   cmd=pex.cmdline(args),
                                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()

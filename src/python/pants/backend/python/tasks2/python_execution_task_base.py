@@ -30,6 +30,8 @@ class WrappedPEX(object):
   Allows us to set the PEX_PATH in the environment when running.
   """
 
+  _PEX_PATH_ENV_VAR_NAME = 'PEX_PATH'
+
   def __init__(self, pex, extra_pex_paths, interpreter):
     """
     :param pex: The main pex we wrap.
@@ -44,15 +46,28 @@ class WrappedPEX(object):
   def interpreter(self):
     return self._interpreter
 
+  def path(self):
+    return self._pex.path()
+
+  def cmdline(self, args=()):
+    cmdline = ' '.join(self._pex.cmdline(args))
+    pex_path = self._pex_path()
+    if pex_path:
+      return '{env_var_name}={pex_path} {cmdline}'.format(env_var_name=self._PEX_PATH_ENV_VAR_NAME,
+                                                          pex_path=pex_path,
+                                                          cmdline=cmdline)
+    else:
+      return cmdline
+
   def run(self, *args, **kwargs):
     kwargs_copy = copy(kwargs)
     env = copy(kwargs_copy.get('env')) if 'env' in kwargs_copy else {}
-    env['PEX_PATH'] = ':'.join(self._extra_pex_paths)
+    env[self._PEX_PATH_ENV_VAR_NAME] = self._pex_path()
     kwargs_copy['env'] = env
     return self._pex.run(*args, **kwargs_copy)
 
-  def path(self):
-    return self._pex.path()
+  def _pex_path(self):
+    return ':'.join(self._extra_pex_paths)
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
