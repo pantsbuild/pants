@@ -107,6 +107,7 @@ impl RawNode {
   }
 }
 
+#[repr(C)]
 pub struct RawNodes {
   nodes_ptr: *const RawNode,
   nodes_len: u64,
