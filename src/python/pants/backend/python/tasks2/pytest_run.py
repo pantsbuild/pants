@@ -13,19 +13,18 @@ import traceback
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
+from pants.backend.python.tasks2.pytest_prep import PytestPrep
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.task.task import Task
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for
@@ -78,11 +77,7 @@ class PytestResult(object):
     return self._failed_targets
 
 
-class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
+class PytestRun(TestRunnerTaskMixin, Task):
 
   @classmethod
   def register_options(cls, register):
@@ -115,11 +110,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def supports_passthru_args(cls):
     return True
 
-  def __init__(self, *args, **kwargs):
-    super(PytestRun, self).__init__(*args, **kwargs)
-
-  def extra_requirements(self):
-    return PyTest.global_instance().get_requirement_strings()
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(PytestRun, cls).prepare(options, round_manager)
+    round_manager.require_data(PytestPrep.PYTEST_BINARY)
 
   def _test_target_filter(self):
     def target_filter(target):
@@ -406,10 +400,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @contextmanager
   def _test_runner(self, targets, sources_map):
-    pex_info = PexInfo.default()
-    pex_info.entry_point = 'pytest'
-    pex = self.create_pex(pex_info)
-
+    pex = self.context.products.get_data(PytestPrep.PYTEST_BINARY)
     with self._conftest(sources_map) as conftest:
       with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
         yield pex, [conftest] + coverage_args
