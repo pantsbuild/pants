@@ -35,12 +35,15 @@ class PythonRun(PythonExecutionTaskBase):
       # TODO(benjy): Use MutexTask to coordinate this.
 
       pex = self.create_pex(binary.pexinfo)
+      args = []
+      for arg in self.get_options().args:
+        args.extend(safe_shlex_split(arg))
+      args += self.get_passthru_args()
+
       self.context.release_lock()
-      with self.context.new_workunit(name='run', labels=[WorkUnitLabel.RUN]):
-        args = []
-        for arg in self.get_options().args:
-          args.extend(safe_shlex_split(arg))
-        args += self.get_passthru_args()
+      with self.context.new_workunit(name='run',
+                                     cmd=pex.cmdline(args),
+                                     labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
         po = pex.run(blocking=False, args=args, env=os.environ.copy())
         try:
           result = po.wait()
