@@ -67,7 +67,7 @@ class SelectInterpreter(Task):
     if not interpreter:
       interpreter = self._get_interpreter(interpreter_path_file)
 
-    self.context.products.get_data(PythonInterpreter, lambda: interpreter)
+    self.context.products.register_data(PythonInterpreter, interpreter)
 
   @memoized_method
   def _interpreter_cache(self):

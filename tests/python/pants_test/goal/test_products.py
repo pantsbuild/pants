@@ -9,7 +9,7 @@ import os
 from collections import defaultdict
 from contextlib import contextmanager
 
-from pants.goal.products import MultipleRootedProducts, Products
+from pants.goal.products import MultipleRootedProducts, ProductError, Products
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants_test.base_test import BaseTest
@@ -69,6 +69,12 @@ class ProductsTest(BaseTest):
     self.assertFalse(self.products.is_required_data('foo'))
     self.products.require_data('foo')
     self.assertTrue(self.products.is_required_data('foo'))
+
+  def test_register_data(self):
+    data = {}
+    self.assertIs(data, self.products.register_data('foo', data))
+    with self.assertRaises(ProductError):
+      self.products.register_data('foo', data)
 
   def test_empty_products(self):
     foo_product_mapping = self.products.get('foo')
