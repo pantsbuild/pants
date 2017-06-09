@@ -9,7 +9,8 @@ import os
 
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
-from pants.option.custom_types import dict_option, file_option, list_option, target_option
+from pants.option.custom_types import (UnsetBool, dict_option, file_option, list_option,
+                                       target_option)
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
@@ -95,3 +96,8 @@ class OptionsFingerprinterTest(BaseTest):
   def test_fingerprint_primitive(self):
     fp1, fp2 = (self.options_fingerprinter.fingerprint('', v) for v in ('foo', 5))
     self.assertNotEquals(fp1, fp2)
+
+  def test_fingerprint_unset_bool(self):
+    fp1 = self.options_fingerprinter.fingerprint(UnsetBool, UnsetBool)
+    fp2 = self.options_fingerprinter.fingerprint(UnsetBool, UnsetBool)
+    self.assertEqual(fp1, fp2)
