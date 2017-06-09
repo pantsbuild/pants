@@ -84,10 +84,12 @@ or otherwise depends on code in other targets, list those targets here.
 
 The source files in this target. These are usually defined in one of three ways:
 
-+ If the `sources` argument is _not_ passed, many target types define a default ("implicit")
-  source glob to collect all relevant files in the current directory.
-  <br>When possible, this style is recommended because it encourages 1:1:1 (see the
++ If the `sources` argument is _not_ passed (and the `--target-arguments-implicit-sources` option is
+  set: enabled by default in `1.4.0.dev2`), many target types define a default ("implicit") source
+  glob to collect all relevant files in the current directory. When possible, this style is
+  recommended because it encourages 1:1:1 (see the
   [[Target Granularity|pants('src/docs:build_files')]] section for more information).
+    - As an example: `java_library` defaults to collecting `globs('*.java', exclude=[globs('*Test.java')])`.
 + Explicitly globbing over the files in the BUILD file's directory: `sources=globs('*.java')`.
 + Enumerating the files: `sources=['FileUtil.java', 'NetUtil.java']`.
 
