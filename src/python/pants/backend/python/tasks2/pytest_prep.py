@@ -31,4 +31,4 @@ class PytestPrep(PythonExecutionTaskBase):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
     pytest_binary = self.create_pex(pex_info)
-    self.context.products.get_data(self.PYTEST_BINARY, init_func=lambda: pytest_binary)
+    self.context.products.register_data(self.PYTEST_BINARY, pytest_binary)

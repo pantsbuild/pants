@@ -601,7 +601,7 @@ class SetupPy(Task):
       create(target)
 
     interpreter = self.context.products.get_data(PythonInterpreter)
-    python_dists = self.context.products.get_data(self.PYTHON_DISTS_PRODUCT, lambda: {})
+    python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:

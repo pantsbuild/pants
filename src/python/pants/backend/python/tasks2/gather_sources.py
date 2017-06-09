@@ -45,7 +45,7 @@ class GatherSources(Task):
 
     with self.invalidated(targets) as invalidation_check:
       pex = self._get_pex_for_versioned_targets(interpreter, invalidation_check.all_vts)
-      self.context.products.get_data(self.PYTHON_SOURCES, lambda: pex)
+      self.context.products.register_data(self.PYTHON_SOURCES, pex)
 
   def _get_pex_for_versioned_targets(self, interpreter, versioned_targets):
     if versioned_targets:
