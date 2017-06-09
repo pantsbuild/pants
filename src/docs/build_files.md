@@ -50,20 +50,25 @@ A target definition in a `BUILD` file looks something like
       sources=globs('*.java', exclude=[['Base.java']]),
     )
 
-**java_library**<br>
+### type
+
 Each target will have a different _target type_, which is `java_library` in this case.
 This tells Pants tasks what can be done with the target.
 
 
-**name**<br>
-The target's name, along with the path to its BUILD file, forms its _address_.
+### name
+
+The target's name, along with the path to its `BUILD` file, forms its _address_.
 The address has two important roles:
 
 + It's used on the command line to specify which targets to operate on.
 + It's used in other `BUILD` files to reference the target as a dependency.
 
+If a target does _not_ explicitly pass a name, it will be assigned the name of the current
+directory (of course, at most one target may do this per directory).
 
-**dependencies**<br>
+### dependencies
+
 List of targets that this target depends upon. If this target's code imports
 or otherwise depends on code in other targets, list those targets here.
 
@@ -75,12 +80,18 @@ or otherwise depends on code in other targets, list those targets here.
 + [[More details|pants('src/docs:target_addresses')]] on how to address targets in a list of dependencies.
 
 
-**sources**<br>
-The source files in this target. These are usually specified in one of two ways:
+### sources
 
+The source files in this target. These are usually defined in one of three ways:
+
++ If the `sources` argument is _not_ passed (and the `--target-arguments-implicit-sources` option is
+  set: enabled by default in `1.4.0.dev2`), many target types define a default ("implicit") source
+  glob to collect all relevant files in the current directory. When possible, this style is
+  recommended because it encourages 1:1:1 (see the
+  [[Target Granularity|pants('src/docs:build_files')]] section for more information).
+    - As an example: `java_library` defaults to collecting `globs('*.java', exclude=[globs('*Test.java')])`.
++ Explicitly globbing over the files in the BUILD file's directory: `sources=globs('*.java')`.
 + Enumerating the files: `sources=['FileUtil.java', 'NetUtil.java']`.
-+ Globbing over the files in the BUILD file's directory: `sources=globs('*.java')`.
-  <br>This means you don't have to modify your BUILD file when you add a new source file.
 
 You can exclude files from the results of a glob. For example, to glob over unit tests
 but not integration tests you could use something like this:
