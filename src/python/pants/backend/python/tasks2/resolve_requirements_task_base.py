@@ -12,12 +12,12 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.tasks2.pex_build_util import dump_requirements, has_python_requirements
+from pants.backend.python.tasks2.python_task import PythonTask
 from pants.invalidation.cache_manager import VersionedTargetSet
-from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
 
 
-class ResolveRequirementsTaskBase(Task):
+class ResolveRequirementsTaskBase(PythonTask):
   """Base class for tasks that resolve 3rd-party Python requirements.
 
   Creates an (unzipped) PEX on disk containing all the resolved requirements.

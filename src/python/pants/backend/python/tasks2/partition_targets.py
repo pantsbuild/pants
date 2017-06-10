@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -12,7 +12,7 @@ from pants.task.task import Task
 
 
 class TargetsPartition(object):
-  """Represents a grouping of targets into non-empty subsets."""
+  """Represents a partitioning of a set of targets into non-empty subsets."""
   def __init__(self, subsets):
     """Constructs a new TargetsPartition from a given collection of subsets.
 
@@ -33,41 +33,42 @@ class TargetsPartition(object):
   def find_subset_for_target(self, target):
     """Returns a subset containing the given targets.
 
-    Raises a KeyError if such target does not exist."""
+    Raises a KeyError if such target does not exist.
+    """
     return self._subset_by_target[target]
 
   def find_subset_for_targets(self, targets):
     """Returns a single subset that contains all given targets.
 
-    If such subset does not exists within the partition a ValueError is raised."""
+    If such subset does not exists within the partition a ValueError is raised.
+    """
     if not self._subsets:
       raise ValueError('No subsets.')
     if not targets:
-      # Any subset will do
+      # Any subset will do.
       return next(iter(self._subsets))
     subset = self._subset_by_target.get(next(iter(targets)))
-    if not subset or not subset.issuperset(set(targets)):
-      raise ValueError('No subset contains all targets')
+    if not subset or not subset.issuperset(targets):
+      raise ValueError('No subset contains all targets: {}'.format(
+          ' '.join(tgt.address.spec for tgt in targets)))
     return subset
 
 
 class PartitionTargets(Task):
-  """Split the target roots into partitions.
+  """Generates partitions of the target roots.
 
-  This task implements multiple strategies for partitioning the target roots. A partition is a
-  grouping of the target roots into non-empty disjoint subsets. Interpreter and external
-  requirements are resolved for each subset, and therefore the targets within each subset
-  must be compatible with each other.
+  This tasks produces `TargetPartition`s. Each representing a partition of the target roots into
+  non-empty disjoint subsets of targets based on a requested partitioning strategy.
 
-  Supported strategies:
+  There are several supported strategies to produce a TargetPartition from a set of target roots:
 
   STRATEGY_MINIMAL:
-      groups the target roots into the smallest possible number of subsets such that if one target
+      partitions the target roots into the smallest possible number of subsets such that if one target
       root depends on another, then both of them will be in the subset. This ensures
       that incompatible target roots will fall into different subsets while minimizing the number
       of chroots.
   STRATEGY_PER_TARGET:
-      A partition in which Each target root will be in its own isolated group.
+      A partition in which Each target root will be in its own isolated subset.
       This provides maximal isolation but can be slower if there are many target
       roots.
   STRATEGY_GLOBAL:
@@ -75,14 +76,14 @@ class PartitionTargets(Task):
       roots need to be compatible with each other.
 
   The strategies that are requested via require_data() will be provided.  In addition a product
-  TARGETS_PARTITION is provided which is a map between the requested partition types and the
+  TARGETS_PARTITION is provided which is a map between the requested strategy and the
   partition.
   """
 
-  TARGETS_PARTITIONS = 'tagets_partitions'
-  STRATEGY_MINIMAL = 'minimal'
-  STRATEGY_PER_TARGET = 'per_target'
-  STRATEGY_GLOBAL = 'global'
+  TARGETS_PARTITIONS = 'targets_partitions'
+  STRATEGY_MINIMAL = 'targets_partition_minimal'
+  STRATEGY_PER_TARGET = 'targets_partition_per_target'
+  STRATEGY_GLOBAL = 'targets_partition_global'
 
   @classmethod
   def product_types(cls):
@@ -103,7 +104,7 @@ class PartitionTargets(Task):
 
   @classmethod
   def _minimal_partition(cls, targets):
-    groups_by_head = {}
+    subsets_by_head = {}
 
     closures = {target: target.closure() for target in targets}
 
@@ -111,17 +112,17 @@ class PartitionTargets(Task):
       is_head = all(target not in closures[other] or other == target
                    for other in targets)
       if is_head:
-        groups_by_head[target] = {target}
+        subsets_by_head[target] = {target}
 
     for target in targets:
-      for head in groups_by_head:
+      for head in subsets_by_head:
         if target in closures[head]:
-          groups_by_head[head].add(target)
+          subsets_by_head[head].add(target)
           break
       else:
         assert False, 'Target not in closure of any head.'
 
-    return TargetsPartition(groups_by_head.values())
+    return TargetsPartition(subsets_by_head.values())
 
   @classmethod
   def _per_target_partition(cls, targets):
@@ -132,8 +133,7 @@ class PartitionTargets(Task):
     return TargetsPartition([targets] if targets else [])
 
   def execute(self):
-    products = self.context.products
-    partitions = products.get_data(self.TARGETS_PARTITIONS, lambda: {})
+    partitions = self.context.products.register_data(self.TARGETS_PARTITIONS, {})
     strategies = {
         self.STRATEGY_MINIMAL: self._minimal_partition,
         self.STRATEGY_PER_TARGET: self._per_target_partition,
@@ -141,6 +141,6 @@ class PartitionTargets(Task):
     }
 
     for product_name, get_partition in strategies.items():
-      if products.is_required_data(product_name):
-        partitions[product_name] = products.get_data(
-          product_name, lambda: get_partition(self.context.target_roots))
+      if self.context.products.is_required_data(product_name):
+        partitions[product_name] = self.context.products.register_data(
+            product_name, get_partition(self.context.target_roots))

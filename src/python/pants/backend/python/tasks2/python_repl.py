@@ -11,11 +11,10 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
-from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
 from pants.task.repl_task_mixin import ReplTaskMixin
 
 
-class PythonRepl(ReplTaskMixin, PythonTaskMixin, PythonExecutionTaskBase):
+class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
   """Launch an interactive Python interpreter session."""
 
   @classmethod
@@ -32,7 +31,7 @@ class PythonRepl(ReplTaskMixin, PythonTaskMixin, PythonExecutionTaskBase):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(cls, PythonRepl).prepare(options, round_manager)
+    super(PythonRepl, cls).prepare(options, round_manager)
     round_manager.require_data(PartitionTargets.STRATEGY_GLOBAL)
 
   @classmethod

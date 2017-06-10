@@ -97,7 +97,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
   def create_pex(self, partition_name, targets, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
-    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITIONS)[partition_name]
+    partition = self.target_roots_partitions()[partition_name]
     subset = partition.find_subset_for_targets(targets)
     relevant_targets = filter(
       lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)),

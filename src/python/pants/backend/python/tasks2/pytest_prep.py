@@ -33,6 +33,6 @@ class PytestPrep(PythonExecutionTaskBase):
     pytest_binaries = self.context.products.register_data(self.PYTEST_BINARIES, {})
     for partition_name in self.target_roots_partitions():
       pytest_binaries[partition_name] = {}
-      for targets_subset in target_roots_subsets(partition_name):
+      for targets_subset in self.target_roots_subsets(partition_name):
          pytest_binaries[partition_name][targets_subset] = self.create_pex(
-             targets, pex_info=pex_info)
+             partition_name, targets_subset, pex_info=pex_info)

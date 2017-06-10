@@ -7,13 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.pex_build_util import has_python_requirements
-from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.build_graph.target import Target
 
 
-class ResolveRequirements(PythonTaskMixin, ResolveRequirementsTaskBase):
+class ResolveRequirements(ResolveRequirementsTaskBase):
   """Resolve external Python requirements."""
   REQUIREMENTS_PEX = 'python_requirements_pex'
 

@@ -15,7 +15,7 @@ from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
                                                         has_resources)
-from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
+from pants.backend.python.tasks2.python_task import PythonTask
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -26,7 +26,7 @@ from pants.util.dirutil import safe_mkdir_for
 from pants.util.fileutil import atomic_copy
 
 
-class PythonBinaryCreate(PythonTaskMixin, Task):
+class PythonBinaryCreate(PythonTask):
   """Create an executable .pex file."""
 
   @classmethod

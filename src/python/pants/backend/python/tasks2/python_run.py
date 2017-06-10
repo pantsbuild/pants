@@ -9,6 +9,7 @@ import os
 import signal
 
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.tasks2.partition_targets import PartitionTargets
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
@@ -17,6 +18,11 @@ from pants.util.strutil import safe_shlex_split
 
 class PythonRun(PythonExecutionTaskBase):
   """Run a Python executable."""
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(PythonRun, cls).prepare(options, round_manager)
+    round_manager.require_data(PartitionTargets.STRATEGY_GLOBAL)
 
   @classmethod
   def register_options(cls, register):
@@ -34,7 +40,7 @@ class PythonRun(PythonExecutionTaskBase):
       # jvm_binary, in which case we have to no-op and let jvm_run do its thing.
       # TODO(benjy): Use MutexTask to coordinate this.
 
-      pex = self.create_pex([binary], pex_info=binary.pexinfo)
+      pex = self.create_pex(PartitionTargets.STRATEGY_GLOBAL, [binary], pex_info=binary.pexinfo)
       args = []
       for arg in self.get_options().args:
         args.extend(safe_shlex_split(arg))

@@ -113,20 +113,16 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
                   'run tests number 2, 5, 8, 11, ...')
 
   @classmethod
-  def prepare(cls, options, round_manager):
-    if options.single_source_root:
-      round_manager.require_data(PartitionTargets.STRATEGY_GLOBAL)
-    else:
-      round_manager.require_data(PartitionTargets.STRATEGY_MINIMAL)
-    super(PytestRun, cls).prepare(options, round_manager)
-
-  @classmethod
   def supports_passthru_args(cls):
     return True
 
   @classmethod
   def prepare(cls, options, round_manager):
     super(PytestRun, cls).prepare(options, round_manager)
+    if options.single_source_root:
+      round_manager.require_data(PartitionTargets.STRATEGY_GLOBAL)
+    else:
+      round_manager.require_data(PartitionTargets.STRATEGY_MINIMAL)
     round_manager.require_data(PytestPrep.PYTEST_BINARIES)
 
   def _test_target_filter(self):
@@ -425,8 +421,9 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   @contextmanager
   def _test_runner(self, targets, sources_map):
+    subset = self.find_subset_for_targets(self._partition_name(), targets)
     pex = self.context.products.get_data(
-        PytestPrep.PYTEST_BINARIES)[self._partition_name()][targets]
+        PytestPrep.PYTEST_BINARIES)[self._partition_name()][subset]
 
     with self._conftest(sources_map) as conftest:
       with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
@@ -509,26 +506,29 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     file_info = test_info['file']
     return relsrc_to_target.get(file_info)
 
-  def _split_targets_to_groups(self, targets):
-    # Splits the targets into groups according to the partition. Provides a
-    # deterministic order of the groups and the targets within each group.
-    partition = self.context.products.get_data(PartitionTargets.TARGETS_PARTITIONS)[
-        self._partition_name()]
+  def _ordered_targets_by_subset(self, targets):
+    # Partitions the given list of targets according to the selected
+    # partition. Returns the partition as a list of lists of targets in a
+    # deterministic order so consecutive runs with the same target roots will
+    # result in the same execution order.
+    partition = self.target_roots_partitions()[self._partition_name()]
     result = []
-    groups_by_subset = {}
+    # Maps the partition subsets for targets processed so far into the ordered
+    # list of targets contained in them.
+    partition_subsets = {}
     for target in targets:
-      subset = partition.find_subset_for_target(target)
+      partition_subset = partition.find_subset_for_target(target)
 
-      group = groups_by_subset.setdefault(subset, [])
-      if not group:
-        result.append(group)
-      group.append(target)
+      subset = partition_subsets.setdefault(partition_subset, [])
+      if not subset:
+        result.append(subset)
+      subset.append(target)
     return result
 
   def _run_tests(self, targets):
     if not self.get_options().run_per_target:
       failed_targets = []
-      for subset in self._split_targets_to_subsets(targets):
+      for subset in self._ordered_targets_by_subset(targets):
         rv = self._do_run_tests(subset)
         if not rv.success:
           if self.get_options().fail_fast:

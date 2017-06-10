@@ -43,7 +43,8 @@ class SelectInterpreter(Task):
   """Select a Python interpreter for each root target.
 
   Produces under PYTHON_INTERPRETERS a mapping between each partition subset and interpreters
-  that matches the transitive constraints of that subset."""
+  that matches the transitive constraints of that subset.
+  """
   PYTHON_INTERPRETERS = 'PYTHON_INTERPRETERS'
 
   @classmethod

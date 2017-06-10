@@ -23,7 +23,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.partition_targets import PartitionTargets
-from pants.backend.python.tasks2.python_task_mixin import PythonTaskMixin
+from pants.backend.python.tasks2.python_task import PythonTask
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -275,7 +275,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     return reduced_dependencies
 
 
-class SetupPy(PythonTaskMixin, Task):
+class SetupPy(PythonTask):
   """Generate setup.py-based Python projects."""
 
   SOURCE_ROOT = b'src'
@@ -603,7 +603,6 @@ class SetupPy(PythonTaskMixin, Task):
     for target in targets:
       create(target, self.interpreter_for_targets(PartitionTargets.STRATEGY_MINIMAL, [target]))
 
-    interpreter = self.context.products.get_data(PythonInterpreter)
     python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})
     for target in reversed(sort_targets(created.keys())):
       if target in created:
