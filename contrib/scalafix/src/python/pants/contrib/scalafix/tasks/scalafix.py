@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import filecmp
 import os
 import shutil
-
 from abc import abstractmethod
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -16,8 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
-from pants.util.dirutil import relative_symlink, safe_mkdir_for
-from pants.util.memo import memoized_method
+from pants.util.dirutil import safe_mkdir_for
 from pants.util.meta import AbstractClass
 
 
@@ -48,6 +46,10 @@ class ScalaFix(NailgunTask, AbstractClass):
     super(ScalaFix, cls).prepare(options, round_manager)
     round_manager.require_data('runtime_classpath')
 
+  @abstractmethod
+  def _finalize_target(self, target, results_dir):
+    """Given a Target and a successfully populated results_dir containing its sources, finalize."""
+
   def _is_fixed(self, target):
     return target.has_sources(self._SCALA_SOURCE_EXTENSION) and (not target.is_synthetic)
 
@@ -63,15 +65,8 @@ class ScalaFix(NailgunTask, AbstractClass):
           self._run(vt.target, vt.results_dir, classpath)
         else:
           self.context.log.debug('Already fixed {}'.format(vt.target.address.spec))
-        # Target outputs are valid: link them to dist.
+        # Target outputs are valid: finalize them.
         self._finalize_target(vt.target, vt.results_dir)
-
-  @abstractmethod
-  def _finalize_target(self, target, results_dir):
-    for rel_source in target.sources_relative_to_buildroot():
-      src = os.path.join(results_dir, rel_source)
-      dst = os.path.join(get_buildroot(), rel_source)
-      shutil.copy(src, dst)
 
   def _run(self, target, results_dir, classpath):
     # We always operate on copies of the files, so we execute in place.

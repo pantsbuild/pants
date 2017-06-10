@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.scalafix.tasks.scalafix import ScalaFixFix, ScalaFixCheck
+from pants.contrib.scalafix.tasks.scalafix import ScalaFixCheck, ScalaFixFix
 
 
 def register_goals():
