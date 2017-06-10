@@ -7,8 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.scalafix.tasks.scalafix import ScalaFix
+from pants.contrib.scalafix.tasks.scalafix import ScalaFixFix, ScalaFixCheck
 
 
 def register_goals():
-  task(name='scalafix', action=ScalaFix).install('fmt')
+  task(name='scalafix', action=ScalaFixCheck).install('lint')
+  task(name='scalafix', action=ScalaFixFix).install('fmt')
