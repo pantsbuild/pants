@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import inspect
 import json
 import os
 from hashlib import sha1
@@ -15,11 +14,9 @@ from pants.option.custom_types import UnsetBool, dict_with_files_option, file_op
 
 
 class Encoder(json.JSONEncoder):
-  _UNSET_BOOL_ENCODING = '__type::{}::{}'.format(inspect.getmodule(UnsetBool), UnsetBool.__name__)
-
   def default(self, o):
     if o is UnsetBool:
-      return self._UNSET_BOOL_ENCODING
+      return '_UNSET_BOOL_ENCODING'
     return super(Encoder, self).default(o)
 
 
