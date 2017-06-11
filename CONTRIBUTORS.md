@@ -57,6 +57,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jackson Davis
 + Jake Donham
 + James Bench
++ James Koch
 + James Mouradian
 + Jason Jackson
 + Jason Song

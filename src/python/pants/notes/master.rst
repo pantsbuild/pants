@@ -4,6 +4,80 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.4.0.dev2 (6/10/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Enable implicit_sources by default, and improve its docs. (#4661)
+  `PR #4661 <https://github.com/pantsbuild/pants/pull/4661>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Support registering product data from one task. (#4663)
+  `PR #4663 <https://github.com/pantsbuild/pants/pull/4663>`_
+
+* Expose pex invocation cmdlines. (#4659)
+  `PR #4659 <https://github.com/pantsbuild/pants/pull/4659>`_
+
+* Audit engine struct `repr` values. (#4658)
+  `PR #4658 <https://github.com/pantsbuild/pants/pull/4658>`_
+
+* Break `py.test` execution into two stages. (#4656)
+  `PR #4656 <https://github.com/pantsbuild/pants/pull/4656>`_
+
+* Skip a test that assumes the current version is a pre-release version. (#4654)
+  `PR #4654 <https://github.com/pantsbuild/pants/pull/4654>`_
+
+* Shard contrib tests. (#4650)
+  `PR #4650 <https://github.com/pantsbuild/pants/pull/4650>`_
+
+* Fix new `PytestRun` task deselction handling. (#4648)
+  `PR #4648 <https://github.com/pantsbuild/pants/pull/4648>`_
+
+* Simplify `TaskBase.invalidated`. (#4642)
+  `PR #4642 <https://github.com/pantsbuild/pants/pull/4642>`_
+
+* Eliminate obsolete OSX ci support. (#4636)
+  `PR #4636 <https://github.com/pantsbuild/pants/pull/4636>`_
+
+* Temporarily restore recursive behaviour for bundle filesets (#4630)
+  `PR #4630 <https://github.com/pantsbuild/pants/pull/4630>`_
+
+* Fix ownership check to be case-insensitive. (#4629)
+  `PR #4629 <https://github.com/pantsbuild/pants/pull/4629>`_
+
+Bugfixes
+~~~~~~~~
+
+* Support fingerprinting of `UnsetBool` options. (#4665)
+  `PR #4665 <https://github.com/pantsbuild/pants/pull/4665>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Kill dead dangling num_sources docs. (#4655)
+  `PR #4655 <https://github.com/pantsbuild/pants/pull/4655>`_
+
+* Add notes for 1.3.0, and a section explaining the daemon. (#4651)
+  `PR #4651 <https://github.com/pantsbuild/pants/pull/4651>`_
+
+* Rename and expand usage of the needs-cherrypick label (#4652)
+  `PR #4652 <https://github.com/pantsbuild/pants/pull/4652>`_
+
+* Generalize fmt msg (#4649)
+  `PR #4649 <https://github.com/pantsbuild/pants/pull/4649>`_
+
+* Fixup VersionedTarget class doc. (#4643)
+  `PR #4643 <https://github.com/pantsbuild/pants/pull/4643>`_
+
+* Fixes docs around bundle-jvm-archive. (#4637)
+  `PR #4637 <https://github.com/pantsbuild/pants/pull/4637>`_
+
+
 1.4.0.dev1 (5/26/2017)
 ----------------------
 
