@@ -33,7 +33,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
   PartialCmd = namedtuple('PartialCmd',
-    ['language', 'rpc_style', 'namespace_map', 'default_java_namespace', 'include_paths'])
+    ['language', 'rpc_style', 'namespace_map', 'default_java_namespace', 'include_paths', 'compiler_args'])
 
   @classmethod
   def register_options(cls, register):
@@ -135,20 +135,22 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     self._must_have_sources(target)
 
     namespace_map = self._thrift_defaults.namespace_map(target)
+    compiler_args = self._thrift_defaults.compiler_args(target)
 
     partial_cmd = self.PartialCmd(
         language=self._validate_language(target),
         rpc_style=self._validate_rpc_style(target),
         namespace_map=tuple(sorted(namespace_map.items())) if namespace_map else (),
         default_java_namespace=self._thrift_defaults.default_java_namespace(target),
-        include_paths=target.include_paths)
+        include_paths=target.include_paths,
+        compiler_args=compiler_args)
 
     self.gen(partial_cmd, target, target_workdir)
 
   def gen(self, partial_cmd, target, target_workdir):
     import_paths, _ = calculate_compile_sources([target], self.is_gentarget)
 
-    args = []
+    args = partial_cmd.compiler_args
 
     if partial_cmd.default_java_namespace:
       args.extend(['--default-java-namespace', partial_cmd.default_java_namespace])

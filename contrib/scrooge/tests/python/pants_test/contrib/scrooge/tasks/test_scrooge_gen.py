@@ -21,6 +21,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen
 
+GEN_ADAPT = '--gen-adapt'
 
 # TODO (tdesai) Issue-240: Use JvmToolTaskTestBase for ScroogeGenTest
 class ScroogeGenTest(TaskTestBase):
@@ -33,6 +34,7 @@ class ScroogeGenTest(TaskTestBase):
     return BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary,
                                      'java_library': JavaLibrary,
                                      'scala_library': ScalaLibrary})
+
 
   def setUp(self):
     super(ScroogeGenTest, self).setUp()
@@ -82,21 +84,32 @@ class ScroogeGenTest(TaskTestBase):
 
   def test_scala(self):
     sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
-    self._test_help('scala', 'finagle', ScalaLibrary, sources)
+    self._test_help('scala', 'finagle', ScalaLibrary, [GEN_ADAPT], sources)
 
   def test_android(self):
     sources = [os.path.join(self.task_outdir, 'org/pantsbuild/android_example/Example.java')]
-    self._test_help('android', 'finagle', JavaLibrary, sources)
+    self._test_help('android', 'finagle', JavaLibrary, [GEN_ADAPT], sources)
 
   def test_invalid_lang(self):
     with self.assertRaises(TargetDefinitionException):
-      self._test_help('not-a-lang', 'finagle', JavaLibrary, [])
+      self._test_help('not-a-lang', 'finagle', JavaLibrary, [GEN_ADAPT], [])
 
   def test_invalid_style(self):
     with self.assertRaises(TargetDefinitionException):
-      self._test_help('scala', 'not-a-style', JavaLibrary, [])
+      self._test_help('scala', 'not-a-style', JavaLibrary, [GEN_ADAPT], [])
 
-  def _test_help(self, language, rpc_style, library_type, sources):
+  def test_empty_compiler_args(self):
+    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help('scala', 'finagle', ScalaLibrary, [], sources)
+
+  def compiler_args_to_string(self, compiler_args):
+    quoted = map(lambda x: "'{}'".format(x), compiler_args)
+    comma_separated = ', '.join(quoted)
+    return '[{}]'.format(comma_separated)
+
+  def _test_help(self, language, rpc_style, library_type, compiler_args, sources):
+    compiler_args_str = self.compiler_args_to_string(compiler_args)
+    print(compiler_args_str)
     contents = dedent('''#@namespace android org.pantsbuild.android_example
       namespace java org.pantsbuild.example
       struct Example {
@@ -111,9 +124,10 @@ class ScroogeGenTest(TaskTestBase):
         compiler='scrooge',
         language='{language}',
         rpc_style='{rpc_style}',
+        compiler_args={compiler_args},
         strict_deps=True,
       )
-    '''.format(language=language, rpc_style=rpc_style))
+    '''.format(language=language, rpc_style=rpc_style, compiler_args=compiler_args_str))
 
     self.create_file(relpath='test_smoke/a.thrift', contents=contents)
     self.add_to_build_file('test_smoke', build_string)

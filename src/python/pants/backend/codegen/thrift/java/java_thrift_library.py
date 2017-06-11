@@ -29,6 +29,7 @@ class JavaThriftLibrary(JvmTarget):
                thrift_linter_strict=None,
                default_java_namespace=None,
                include_paths=None,
+               compiler_args=None,
                **kwargs):
     """
     :API: public
@@ -44,6 +45,7 @@ class JavaThriftLibrary(JvmTarget):
     :param default_java_namespace: The namespace used for Java generated code when a Java
       namespace is not explicitly specified in the IDL. The default is defined in the global
       options under ``--thrift-default-default-java-namespace``.
+    :param compiler_args: Extra arguments to the compiler.
     """
     super(JavaThriftLibrary, self).__init__(**kwargs)
 
@@ -63,6 +65,7 @@ class JavaThriftLibrary(JvmTarget):
     self.thrift_linter_strict = thrift_linter_strict
     self._default_java_namespace = default_java_namespace
     self._include_paths = include_paths
+    self._compiler_args = compiler_args
 
   @property
   def compiler(self):
@@ -75,6 +78,10 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def rpc_style(self):
     return self._rpc_style
+
+  @property
+  def compiler_args(self):
+    return self._compiler_args
 
   @property
   def default_java_namespace(self):

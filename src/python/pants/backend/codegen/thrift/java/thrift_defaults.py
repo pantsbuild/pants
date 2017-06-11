@@ -29,6 +29,8 @@ class ThriftDefaults(Subsystem):
              help='The default Java namespace to generate for java_thrift_library targets.')
     register('--namespace-map', type=dict, advanced=True, default={},
              help='The default namespace map to generate for java_thrift_library targets, {old: new}.')
+    register('--compiler-args', type=list, advanced=True, default=[],
+             help='Extra arguments for the thrift compiler.')
 
   def __init__(self, *args, **kwargs):
     super(ThriftDefaults, self).__init__(*args, **kwargs)
@@ -37,6 +39,7 @@ class ThriftDefaults(Subsystem):
     self._default_rpc_style = self.get_options().rpc_style
     self._default_default_java_namespace = self.get_options().default_java_namespace
     self._default_namespace_map = self.get_options().namespace_map
+    self._default_compiler_args = self.get_options().compiler_args
 
   def compiler(self, target):
     """Returns the thrift compiler to use for the given target.
@@ -70,6 +73,17 @@ class ThriftDefaults(Subsystem):
     """
     self._check_target(target)
     return target.namespace_map or self._default_namespace_map
+
+  def compiler_args(self, target):
+    """Returns the compiler_args used for Thrift generation.
+
+    :param target: The target to extract the compiler args from.
+    :type target: :class:`pants.backend.codegen.targets.java_thrift_library.JavaThriftLibrary`
+    :returns: Extra arguments for the thrift compiler
+    :rtype: list
+    """
+    self._check_target(target)
+    return target.compiler_args or self._default_compiler_args
 
   def default_java_namespace(self, target):
     """Returns the default_java_namespace used for Thrift generation.
