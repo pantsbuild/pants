@@ -54,8 +54,7 @@ class IvyImportsTest(NailgunTaskTestBase):
                                     include_patterns=['a/b/c/*.proto'])
 
       self.set_options(use_nailgun=False)
-      ivy_imports_task = self.create_task(self.context(target_roots=[foo_target]))
-      ivy_imports_task.execute()
+      ivy_imports_task = self.execute(self.context(target_roots=[foo_target]))
 
       # Make sure the product is properly populated
       jar_import_products = ivy_imports_task.context.products.get_data(JarImportProducts)
