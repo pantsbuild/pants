@@ -150,7 +150,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   def gen(self, partial_cmd, target, target_workdir):
     import_paths, _ = calculate_compile_sources([target], self.is_gentarget)
 
-    args = partial_cmd.compiler_args
+    args = list(partial_cmd.compiler_args)
 
     if partial_cmd.default_java_namespace:
       args.extend(['--default-java-namespace', partial_cmd.default_java_namespace])
