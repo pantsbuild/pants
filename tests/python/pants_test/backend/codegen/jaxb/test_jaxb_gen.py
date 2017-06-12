@@ -11,10 +11,11 @@ from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
 from pants.backend.codegen.jaxb.register import build_file_aliases as register_codegen
 from pants.build_graph.register import build_file_aliases as register_core
-from pants_test.tasks.task_test_base import TaskTestBase
+
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 
-class JaxbGenJavaTest(TaskTestBase):
+class JaxbGenJavaTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
     return JaxbGen
@@ -79,12 +80,10 @@ class JaxbGenJavaTest(TaskTestBase):
                      'Failed with no prefix: {0}'.format(guess_history[-1]))
 
   def test_simple(self):
-    self.set_options(use_nailgun=False)
     self.create_file('foo/vegetable.xml', self.create_schema('Vegetable'))
     jaxblib = self.make_target('foo:jaxblib', JaxbLibrary, sources=['vegetable.xml'])
     context = self.context(target_roots=[jaxblib])
-    task = self.create_task(context)
-    task.execute()
+    task = self.execute(context)
     files = []
     for (dirpath, dirnames, filenames) in os.walk(task.workdir):
       for filename in filenames:

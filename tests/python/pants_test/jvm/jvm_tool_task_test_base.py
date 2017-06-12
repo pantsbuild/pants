@@ -18,6 +18,8 @@ from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.util.dirutil import safe_mkdir
+
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
@@ -78,9 +80,12 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
                                read_from=artifact_caches,
                                write_to=artifact_caches)
 
-    # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it
-    # into our test workspace.
+    # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it and
+    # its dependency BUILD files into our test workspace.
     shutil.copy(os.path.join(self.real_build_root, 'BUILD.tools'), self.build_root)
+    third_party = os.path.join(self.build_root, '3rdparty')
+    safe_mkdir(third_party)
+    shutil.copy(os.path.join(self.real_build_root, '3rdparty', 'BUILD'), third_party)
 
     Bootstrapper.reset_instance()
 

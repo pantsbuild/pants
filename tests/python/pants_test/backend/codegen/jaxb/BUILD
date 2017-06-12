@@ -7,6 +7,6 @@ python_tests(
     'src/python/pants/backend/codegen/jaxb',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base'
   ],
 )

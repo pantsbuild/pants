@@ -148,7 +148,7 @@ class Parser(object):
     mutex_map = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
-      dest = kwargs.get('dest') or self._select_dest(args)
+      dest = self.parse_dest(*args, **kwargs)
 
       # Compute the values provided on the command line for this option.  Note that there may be
       # multiple values, for any combination of the following reasons:
@@ -242,7 +242,7 @@ class Parser(object):
     """
     def normalize_kwargs(args, orig_kwargs):
       nkwargs = copy.copy(orig_kwargs)
-      dest = nkwargs.get('dest') or self._select_dest(args)
+      dest = self.parse_dest(*args, **nkwargs)
       nkwargs['dest'] = dest
       if not ('default' in nkwargs and isinstance(nkwargs['default'], RankedValue)):
         nkwargs['default'] = self._compute_value(dest, nkwargs, [])
@@ -395,11 +395,17 @@ class Parser(object):
 
   _ENV_SANITIZER_RE = re.compile(r'[.-]')
 
-  def _select_dest(self, args):
-    """Select the dest name for the option.
+  @staticmethod
+  def parse_dest(*args, **kwargs):
+    """Select the dest name for an option registration.
 
-    '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
+    If an explicit `dest` is specified, returns that and otherwise derives a default from the
+    option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
     """
+    explicit_dest = kwargs.get('dest')
+    if explicit_dest:
+      return explicit_dest
+
     arg = next((a for a in args if a.startswith('--')), args[0])
     return arg.lstrip('-').replace('-', '_')
 

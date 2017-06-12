@@ -16,5 +16,5 @@ class ErrorProneTest(NailgunTaskTestBase):
     return ErrorProne
 
   def test_no_sources(self):
-    task = self.create_task(self.context())
+    task = self.prepare_execute(self.context())
     self.assertEqual(None, task.execute())
