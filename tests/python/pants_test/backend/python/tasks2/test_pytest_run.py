@@ -388,7 +388,8 @@ class PytestTest(PytestTestBase):
                            **simple_coverage_kwargs)
     all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
+    # The green target run should be cached and thus not covered in this second run.
+    self.assertEqual([2], not_run_statements)
 
     # The all target has no coverage attribute and the code under test does not follow the
     # auto-discover pattern so we should get no coverage.
