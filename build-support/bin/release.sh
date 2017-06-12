@@ -377,6 +377,8 @@ function check_owner() {
    for owner in $(get_owners ${package_name})
    do
      # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
+     # Note that the ^^ case operator requires bash 4.  If you're on a Mac you may need to brew
+     # install bash, as the version that comes with MacOS is ancient.
      if [[ "${username^^}" == "${owner^^}" ]]
      then
        return 0

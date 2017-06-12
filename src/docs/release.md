@@ -1,7 +1,7 @@
 Release Process
 ===============
 
-This page describes how to make a versioned release of Pants and and
+This page describes how to make a versioned release of Pants and
 other related packages to PyPi.  If you need to release pants jvm tools
 (jars), see the
 [[JVM Artifact Release Process|pants('src/docs:release_jvm')]]
@@ -69,6 +69,9 @@ script fail:
         password: <fill me in>
         EOF
         
+  - The release script requires Bash 4.  If you're on MacOS you may have to run `brew install bash`,
+    as the Bash that ships with MacOS is ancient.
+    
   - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
     If you have another name for it, you should `git remote rename othername origin` before running
     the release script, and rename it back afterwards.
