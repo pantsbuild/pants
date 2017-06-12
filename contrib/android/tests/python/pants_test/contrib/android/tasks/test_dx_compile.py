@@ -188,7 +188,7 @@ class DxCompileTest(TestAndroidBase):
           # Initialize the classpath, but not for the relevant target.
           self._mock_products(context, other, [])
           # Then run for the empty target.
-          dx_task = self.create_task(context)
+          dx_task = self.prepare_execute(context)
 
           with self.assertRaises(DxCompile.EmptyDexError):
             dx_task.execute()
