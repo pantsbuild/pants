@@ -33,7 +33,6 @@ python_library(
     'contrib/android/src/python/pants/contrib/android/tasks:aapt_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/util:dirutil',
   ],
 )
 

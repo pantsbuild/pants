@@ -103,8 +103,6 @@ class JvmdocGen(JvmTask):
       return
 
     with self.invalidated(targets) as invalidation_check:
-      safe_mkdir(self.workdir)
-
       def find_jvmdoc_targets():
         invalid_targets = set()
         for vt in invalidation_check.invalid_vts:

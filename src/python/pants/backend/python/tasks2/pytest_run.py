@@ -133,12 +133,8 @@ class PytestRun(TestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
-  def _ensure_workdir(self):
-    safe_mkdir(self.workdir)
-    return self.workdir
-
   def _get_junit_xml_path(self, targets):
-    xml_path = os.path.join(self._ensure_workdir(), 'junitxml',
+    xml_path = os.path.join(self.workdir, 'junitxml',
                             'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
     safe_mkdir_for(xml_path)
     return xml_path
@@ -211,7 +207,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
-    with temporary_file(root_dir=self._ensure_workdir()) as fp:
+    with temporary_file(root_dir=self.workdir) as fp:
       cp.write(fp)
       fp.close()
       coverage_rc = fp.name
@@ -396,7 +392,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
     # Note that it's important to put the tmpdir under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
-    with temporary_dir(root_dir=self._ensure_workdir()) as conftest_dir:
+    with temporary_dir(root_dir=self.workdir) as conftest_dir:
       conftest = os.path.join(conftest_dir, 'conftest.py')
       with open(conftest, 'w') as fp:
         fp.write(conftest_content)
