@@ -244,8 +244,6 @@ class IvyResolveStep(IvyResolutionStep):
     return result
 
   def _do_resolve(self, executor, extra_args, targets, jvm_options, workunit_name, workunit_factory):
-    safe_mkdir(self.workdir)
-
     ivyxml = self.ivy_xml_path
     hash_name = '{}-resolve'.format(self.hash_name)
     self._prepare_ivy_xml(targets, ivyxml, hash_name)

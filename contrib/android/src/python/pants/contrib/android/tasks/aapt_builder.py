@@ -11,7 +11,6 @@ import subprocess
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.util.dirutil import safe_mkdir
 
 from pants.contrib.android.targets.android_resources import AndroidResources
 from pants.contrib.android.tasks.aapt_task import AaptTask
@@ -67,7 +66,6 @@ class AaptBuilder(AaptTask):
     return args
 
   def execute(self):
-    safe_mkdir(self.workdir)
     binaries = self.context.targets(self.is_android_binary)
     with self.invalidated(binaries) as invalidation_check:
       invalid_targets = []

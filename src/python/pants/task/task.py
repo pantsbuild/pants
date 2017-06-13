@@ -23,7 +23,7 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.dirutil import safe_rm_oldest_items_in_dir
+from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 
@@ -201,15 +201,16 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
 
-  @property
+  @memoized_property
   def workdir(self):
     """A scratch-space for this task that will be deleted by `clean-all`.
 
-    It's not guaranteed that the workdir exists, just that no other task has been given this
-    workdir path to use.
+    It's guaranteed that no other task has been given this workdir path to use and that the workdir
+    exists.
 
     :API: public
     """
+    safe_mkdir(self._workdir)
     return self._workdir
 
   def _options_fingerprint(self, scope):
