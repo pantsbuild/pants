@@ -41,7 +41,8 @@ class ApacheThriftJavaGenTest(TaskTestBase):
     one = self.make_target(spec='src/thrift/com/foo:one',
                            target_type=JavaThriftLibrary,
                            sources=['one.thrift'],
-                           compiler='thrift')
+                           compiler='thrift',
+                           compiler_args = [])
     synthetic_target = self.generate_single_thrift_target(one)
     self.assertEqual(['com/foo/One.java'], list(synthetic_target.sources_relative_to_source_root()))
 

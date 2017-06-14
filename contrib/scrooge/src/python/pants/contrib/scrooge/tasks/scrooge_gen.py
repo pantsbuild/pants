@@ -32,8 +32,14 @@ _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
-  PartialCmd = namedtuple('PartialCmd',
-    ['language', 'rpc_style', 'namespace_map', 'default_java_namespace', 'include_paths', 'compiler_args'])
+  PartialCmd = namedtuple('PartialCmd', [
+    'language', 
+    'rpc_style', 
+    'namespace_map', 
+    'default_java_namespace', 
+    'include_paths', 
+    'compiler_args'
+  ])
 
   @classmethod
   def register_options(cls, register):
@@ -152,6 +158,9 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     args = list(partial_cmd.compiler_args)
 
+    def compiler_args_has_rpc_style():
+      return bool(_RPC_STYLES & set(partial_cmd.compiler_args))
+
     if partial_cmd.default_java_namespace:
       args.extend(['--default-java-namespace', partial_cmd.default_java_namespace])
 
@@ -163,11 +172,13 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     for lhs, rhs in partial_cmd.namespace_map:
       args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
 
-    if partial_cmd.rpc_style == 'ostrich':
-      args.append('--finagle')
-      args.append('--ostrich')
-    elif partial_cmd.rpc_style == 'finagle':
-      args.append('--finagle')
+    # ignore rpc_style if we think compiler_args is setting it
+    if not compiler_args_has_rpc_style():
+      if partial_cmd.rpc_style == 'ostrich':
+        args.append('--finagle')
+        args.append('--ostrich')
+      elif partial_cmd.rpc_style == 'finagle':
+        args.append('--finagle')
 
     args.extend(['--dest', target_workdir])
 

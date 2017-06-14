@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -59,6 +60,16 @@ class JavaThriftLibrary(JvmTarget):
     # values impact the outcome of the task.  See JavaThriftLibraryFingerprintStrategy.
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = language
+
+    deprecated_conditional(
+      lambda: rpc_style is not None,
+      '1.5.0.dev0',
+      'rpc_style', 
+      'Pass rpc_style as compiler_args instead e.g. [ \'--finagle\'] for \'finagle\' rpc_style.' 
+      'If both rpc_style and compiler_args are set then only compiler_args is used,'
+      ' rpc_style is discarded.'
+    )
+
     self._rpc_style = rpc_style
 
     self.namespace_map = namespace_map

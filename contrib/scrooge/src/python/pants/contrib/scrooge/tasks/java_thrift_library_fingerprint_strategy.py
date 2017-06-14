@@ -31,6 +31,8 @@ class JavaThriftLibraryFingerprintStrategy(FingerprintStrategy):
     hasher.update(self._thrift_defaults.language(target))
     hasher.update(self._thrift_defaults.rpc_style(target))
 
+    hasher.update(str(self._thrift_defaults.compiler_args(target)))
+
     namespace_map = self._thrift_defaults.namespace_map(target)
     if namespace_map:
       hasher.update(str(sorted(namespace_map.items())))
