@@ -21,6 +21,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen
 
+GEN_ADAPT = '--gen-adapt'
 
 class ScroogeGenTest(NailgunTaskTestBase):
   @classmethod
@@ -74,21 +75,60 @@ class ScroogeGenTest(NailgunTaskTestBase):
 
   def test_scala(self):
     sources = [os.path.join(self.test_workdir, 'org/pantsbuild/example/Example.scala')]
-    self._test_help('scala', 'finagle', ScalaLibrary, sources)
+    self._test_help('scala', ScalaLibrary, [GEN_ADAPT], sources, 'finagle')
+
+  def test_compiler_args_no_rpc_style(self):
+    sources = [os.path.join(self.test_workdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help('scala', ScalaLibrary, [GEN_ADAPT], sources)
 
   def test_android(self):
     sources = [os.path.join(self.test_workdir, 'org/pantsbuild/android_example/Example.java')]
-    self._test_help('android', 'finagle', JavaLibrary, sources)
+    self._test_help('android', JavaLibrary, [GEN_ADAPT], sources, 'finagle')
 
   def test_invalid_lang(self):
     with self.assertRaises(TargetDefinitionException):
-      self._test_help('not-a-lang', 'finagle', JavaLibrary, [])
+      self._test_help('not-a-lang', JavaLibrary, [GEN_ADAPT], [], 'finagle')
 
   def test_invalid_style(self):
     with self.assertRaises(TargetDefinitionException):
-      self._test_help('scala', 'not-a-style', JavaLibrary, [])
+      self._test_help('scala', JavaLibrary, [GEN_ADAPT], [], 'not-a-style')
 
-  def _test_help(self, language, rpc_style, library_type, sources):
+  def test_empty_compiler_args(self):
+    sources = [os.path.join(self.test_workdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help('scala', ScalaLibrary, [], sources, 'finagle')
+
+  def compiler_args_to_string(self, compiler_args):
+    quoted = map(lambda x: "'{}'".format(x), compiler_args)
+    comma_separated = ', '.join(quoted)
+    return '[{}]'.format(comma_separated)
+
+  def _test_create_build_str(self, language, compiler_args, rpc_style=None):
+    compiler_args_str = self.compiler_args_to_string(compiler_args)
+    if rpc_style is None:
+      return dedent('''
+        java_thrift_library(name='a',
+          sources=['a.thrift'],
+          dependencies=[],
+          compiler='scrooge',
+          language='{language}',
+          compiler_args={compiler_args},
+          strict_deps=True,
+        )
+      '''.format(language=language, compiler_args=compiler_args_str))
+    else:
+      return dedent('''
+        java_thrift_library(name='a',
+          sources=['a.thrift'],
+          dependencies=[],
+          compiler='scrooge',
+          language='{language}',
+          rpc_style='{rpc_style}',
+          compiler_args={compiler_args},
+          strict_deps=True,
+        )
+      '''.format(language=language, rpc_style=rpc_style, compiler_args=compiler_args_str))
+
+  def _test_help(self, language, library_type, compiler_args, sources, rpc_style = None):
     contents = dedent('''#@namespace android org.pantsbuild.android_example
       namespace java org.pantsbuild.example
       struct Example {
@@ -96,18 +136,8 @@ class ScroogeGenTest(NailgunTaskTestBase):
       }
     ''')
 
-    build_string = dedent('''
-      java_thrift_library(name='a',
-        sources=['a.thrift'],
-        dependencies=[],
-        compiler='scrooge',
-        language='{language}',
-        rpc_style='{rpc_style}',
-        strict_deps=True,
-      )
-    '''.format(language=language, rpc_style=rpc_style))
-
     self.create_file(relpath='test_smoke/a.thrift', contents=contents)
+    build_string = self._test_create_build_str(language, compiler_args, rpc_style)
     self.add_to_build_file('test_smoke', build_string)
 
     target = self.target('test_smoke:a')

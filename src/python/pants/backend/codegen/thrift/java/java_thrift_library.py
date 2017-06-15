@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 
 
@@ -29,6 +30,7 @@ class JavaThriftLibrary(JvmTarget):
                thrift_linter_strict=None,
                default_java_namespace=None,
                include_paths=None,
+               compiler_args=None,
                **kwargs):
     """
     :API: public
@@ -44,6 +46,7 @@ class JavaThriftLibrary(JvmTarget):
     :param default_java_namespace: The namespace used for Java generated code when a Java
       namespace is not explicitly specified in the IDL. The default is defined in the global
       options under ``--thrift-default-default-java-namespace``.
+    :param compiler_args: Extra arguments to the compiler.
     """
     super(JavaThriftLibrary, self).__init__(**kwargs)
 
@@ -57,12 +60,27 @@ class JavaThriftLibrary(JvmTarget):
     # values impact the outcome of the task.  See JavaThriftLibraryFingerprintStrategy.
     self._compiler = check_value_for_arg('compiler', compiler, self._COMPILERS)
     self._language = language
+
+    deprecated_conditional(
+      lambda: rpc_style is not None,
+      '1.6.0.dev0',
+      'rpc_style', 
+      '''
+      Deprecated property rpc_style used for {target}, use compiler_args instead.
+      e.g. [ \'--finagle\'] for \'finagle\'
+      and [\'--finagle\', \'--ostrich\'] for \'ostrich\'. 
+      If both rpc_style and compiler_args are set then only compiler_args is used
+      and rpc_style is discarded.
+      '''.format(target=self.address.spec)
+    )
+
     self._rpc_style = rpc_style
 
     self.namespace_map = namespace_map
     self.thrift_linter_strict = thrift_linter_strict
     self._default_java_namespace = default_java_namespace
     self._include_paths = include_paths
+    self._compiler_args = compiler_args
 
   @property
   def compiler(self):
@@ -75,6 +93,10 @@ class JavaThriftLibrary(JvmTarget):
   @property
   def rpc_style(self):
     return self._rpc_style
+
+  @property
+  def compiler_args(self):
+    return self._compiler_args
 
   @property
   def default_java_namespace(self):
