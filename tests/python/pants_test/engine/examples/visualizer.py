@@ -11,7 +11,6 @@ import sys
 from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.engine.engine import LocalSerialEngine
 from pants.engine.fs import PathGlobs
 from pants.engine.storage import Storage
 from pants.engine.subsystem.native import Native
@@ -37,9 +36,8 @@ def visualize_build_request(build_root, goals, subjects):
     scheduler = setup_json_scheduler(build_root, native_factory.create())
 
     execution_request = scheduler.build_request(goals, subjects)
-    # NB: Calls `reduce` independently of `execute`, in order to render a graph before validating it.
-    engine = LocalSerialEngine(scheduler, Storage.create())
-    engine.reduce(execution_request)
+    # NB: Calls `schedule` independently of `execute`, in order to render a graph before validating it.
+    scheduler.schedule(execution_request)
     visualize_execution_graph(scheduler)
 
 

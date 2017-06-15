@@ -15,7 +15,6 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.build_files import UnhydratedStruct, create_graph_rules
-from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
@@ -173,7 +172,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     # TODO reenable using SelectDependencies
     select = Select(UnhydratedStructs)
     request = self.scheduler.selection_request([(select, spec)])
-    result = LocalSerialEngine(self.scheduler).execute(request)
+    result = self.scheduler.execute(request)
     if result.error:
       raise result.error
 

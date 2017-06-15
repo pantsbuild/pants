@@ -12,7 +12,6 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import (Exactly, SubclassesOf, addressable, addressable_dict,
                                       addressable_list)
 from pants.engine.build_files import ResolvedTypeMismatchError, create_graph_rules
-from pants.engine.engine import LocalSerialEngine
 from pants.engine.mapper import AddressMapper, ResolveError
 from pants.engine.nodes import Return, Throw
 from pants.engine.parser import SymbolTable
@@ -110,8 +109,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
     request = scheduler.execution_request([TestTable.constraint()], [address])
-    LocalSerialEngine(scheduler).reduce(request)
-    root_entries = scheduler.root_entries(request).items()
+    root_entries = scheduler.execute(request).root_products.items()
     self.assertEquals(1, len(root_entries))
     return root_entries[0]
 

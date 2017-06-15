@@ -12,7 +12,6 @@ from textwrap import dedent
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import TaskRule
 from pants.engine.selectors import Select, SelectVariant
@@ -34,7 +33,6 @@ class SchedulerTest(unittest.TestCase):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
     self.scheduler = setup_json_scheduler(build_root, self._native)
-    self.engine = LocalSerialEngine(self.scheduler)
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
@@ -56,7 +54,7 @@ class SchedulerTest(unittest.TestCase):
 
   def build(self, build_request):
     """Execute the given request and return roots as a list of ((subject, product), value) tuples."""
-    result = self.engine.execute(build_request)
+    result = self.scheduler.execute(build_request)
     self.assertIsNone(result.error)
     return self.scheduler.root_entries(build_request).items()
 
