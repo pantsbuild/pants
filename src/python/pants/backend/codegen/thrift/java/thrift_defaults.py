@@ -24,6 +24,8 @@ class ThriftDefaults(Subsystem):
     register('--language', type=str, advanced=True, default='java',
              help='The default language to generate for java_thrift_library targets.')
     register('--rpc-style', type=str, advanced=True, default='sync',
+             removal_version='1.6.0.dev0',
+             removal_hint='Use --compiler-args instead of --rpc-style.',
              help='The default rpc-style to generate for java_thrift_library targets.')
     register('--default-java-namespace', type=str, advanced=True, default=None,
              help='The default Java namespace to generate for java_thrift_library targets.')

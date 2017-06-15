@@ -63,11 +63,15 @@ class JavaThriftLibrary(JvmTarget):
 
     deprecated_conditional(
       lambda: rpc_style is not None,
-      '1.5.0.dev0',
+      '1.6.0.dev0',
       'rpc_style', 
-      'Pass rpc_style as compiler_args instead e.g. [ \'--finagle\'] for \'finagle\' rpc_style.' 
-      'If both rpc_style and compiler_args are set then only compiler_args is used,'
-      ' rpc_style is discarded.'
+      '''
+      Deprecated property rpc_style used for {target}, use compiler_args instead.
+      e.g. [ \'--finagle\'] for \'finagle\'
+      and [\'--finagle\', \'--ostrich\'] for \'ostrich\'. 
+      If both rpc_style and compiler_args are set then only compiler_args is used
+      and rpc_style is discarded.
+      '''.format(target=self.address.spec)
     )
 
     self._rpc_style = rpc_style
