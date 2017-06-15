@@ -72,7 +72,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
       target_cmd.extend(('-I', base))
 
     if hasattr(target, 'compiler_args'):
-      target_cmd.extend(list(target.compiler_args))
+      target_cmd.extend(list(target.compiler_args or []))
 
     target_cmd.extend(('-o', target_workdir))
 
