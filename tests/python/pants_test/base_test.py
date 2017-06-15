@@ -28,7 +28,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
-from pants_test.base.context_utils import create_context
+from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
 
 
@@ -310,19 +310,19 @@ class BaseTest(unittest.TestCase):
 
     options = create_options_for_optionables(optionables,
                                              extra_scopes=extra_scopes,
-                                             options=options)
+                                             options=options,
+                                             passthru_args=passthru_args)
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(options)
 
-    context = create_context(options=options,
-                             passthru_args=passthru_args,
-                             target_roots=target_roots,
-                             build_graph=self.build_graph,
-                             build_file_parser=self.build_file_parser,
-                             address_mapper=self.address_mapper,
-                             console_outstream=console_outstream,
-                             workspace=workspace)
+    context = create_context_from_options(options,
+                                          target_roots=target_roots,
+                                          build_graph=self.build_graph,
+                                          build_file_parser=self.build_file_parser,
+                                          address_mapper=self.address_mapper,
+                                          console_outstream=console_outstream,
+                                          workspace=workspace)
     return context
 
   def tearDown(self):
