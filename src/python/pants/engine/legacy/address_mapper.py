@@ -27,15 +27,14 @@ class LegacyAddressMapper(AddressMapper):
   This allows tasks to use the context's address_mapper when the v2 engine is enabled.
   """
 
-  def __init__(self, scheduler, engine, build_root):
+  def __init__(self, scheduler, build_root):
     self._scheduler = scheduler
-    self._engine = engine
     self._build_root = build_root
 
   def scan_build_files(self, base_path):
     request = self._scheduler.execution_request([BuildFilesCollection], [(DescendantAddresses(base_path))])
 
-    result = self._engine.execute(request)
+    result = self._scheduler.execute(request)
     if result.error:
       raise result.error
 
@@ -70,7 +69,7 @@ class LegacyAddressMapper(AddressMapper):
 
   def _internal_scan_specs(self, specs, fail_fast=True, missing_is_fatal=True):
     request = self._scheduler.execution_request([BuildFileAddresses], specs)
-    result = self._engine.execute(request)
+    result = self._scheduler.execute(request)
     if result.error:
       raise self.BuildFileScanError(str(result.error))
     root_entries = result.root_products

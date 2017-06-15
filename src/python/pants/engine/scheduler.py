@@ -11,6 +11,9 @@ import threading
 import time
 from contextlib import contextmanager
 
+from twitter.common.collections import maybe_list
+
+from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
@@ -40,6 +43,34 @@ class ExecutionRequest(datatype('ExecutionRequest', ['roots'])):
   :param roots: Roots for this request.
   :type roots: list of tuples of subject and product.
   """
+
+
+class ExecutionResult(datatype('ExecutionResult', ['error', 'root_products'])):
+  """Represents the result of a single execution."""
+
+  @classmethod
+  def finished(cls, root_products):
+    """Create a success or partial success result from a finished run.
+
+    Runs can either finish with no errors, satisfying all promises, or they can partially finish
+    if run in fail-slow mode producing as many products as possible.
+    :param root_products: Mapping of root SelectNodes to their State values.
+    :rtype: `Engine.Result`
+    """
+    return cls(error=None, root_products=root_products)
+
+  @classmethod
+  def failure(cls, error):
+    """Create a failure result.
+
+    A failure result represent a run with a fatal error.  It presents the error but no
+    products.
+
+    :param error: The execution error encountered.
+    :type error: :class:`pants.base.exceptions.TaskError`
+    :rtype: `Engine.Result`
+    """
+    return cls(error=error, root_products=None)
 
 
 class WrappedNativeScheduler(object):
@@ -291,6 +322,7 @@ class LocalScheduler(object):
                rules,
                project_tree,
                native,
+               include_trace_on_error=True,
                graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
@@ -299,11 +331,14 @@ class LocalScheduler(object):
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
     :param native: An instance of engine.subsystem.native.Native.
+    :param include_trace_on_error: Include the trace through the graph upon encountering errors.
+    :type include_trace_on_error: bool
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
                        instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
+    self._include_trace_on_error = include_trace_on_error
     self._product_graph_lock = graph_lock or threading.RLock()
     self._run_count = 0
 
@@ -473,3 +508,62 @@ class LocalScheduler(object):
         time.time() - start_time,
         self._scheduler.graph_len()
       )
+
+  def execute(self, execution_request):
+    """Executes the requested build and returns the resulting root entries.
+
+    TODO: Merge with `schedule`.
+    TODO2: Use of TaskError here is... odd.
+
+    :param execution_request: The description of the goals to achieve.
+    :type execution_request: :class:`ExecutionRequest`
+    :returns: The result of the run.
+    :rtype: :class:`Engine.Result`
+    """
+    try:
+      self.schedule(execution_request)
+      return ExecutionResult.finished(self._scheduler.root_entries(execution_request))
+    except TaskError as e:
+      return ExecutionResult.failure(e)
+
+  def product_request(self, product, subjects):
+    """Executes a request for a singular product type from the scheduler for one or more subjects
+    and yields the products.
+
+    :param class product: A product type for the request.
+    :param list subjects: A list of subjects for the request.
+    :yields: The requested products.
+    """
+    request = self.execution_request([product], subjects)
+    result = self.execute(request)
+    if result.error:
+      raise result.error
+    result_items = result.root_products.items()
+
+    # State validation.
+    unknown_state_types = tuple(
+      type(state) for _, state in result_items if type(state) not in (Throw, Return)
+    )
+    if unknown_state_types:
+      State.raise_unrecognized(unknown_state_types)
+
+    # Throw handling.
+    # TODO: See https://github.com/pantsbuild/pants/issues/3912
+    throw_root_states = tuple(state for root, state in result_items if type(state) is Throw)
+    if throw_root_states:
+      if self._include_trace_on_error:
+        cumulative_trace = '\n'.join(self.trace())
+        raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
+
+      if len(throw_root_states) == 1:
+        raise throw_root_states[0].exc
+      else:
+        raise ExecutionError('Multiple exceptions encountered:\n  {}'
+                             .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
+                                                 for t in throw_root_states)))
+
+    # Return handling.
+    returns = tuple(state.value for _, state in result_items if type(state) is Return)
+    for return_value in returns:
+      for computed_product in maybe_list(return_value, expected_type=product):
+        yield computed_product

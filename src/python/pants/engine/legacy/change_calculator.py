@@ -19,16 +19,15 @@ logger = logging.getLogger(__name__)
 class EngineChangeCalculator(ChangeCalculator):
   """A ChangeCalculator variant that uses the v2 engine for source mapping."""
 
-  def __init__(self, scheduler, engine, symbol_table_cls, scm):
+  def __init__(self, scheduler, symbol_table_cls, scm):
     """
     :param Engine engine: The `Engine` instance to use for computing file to target mappings.
     :param Scm engine: The `Scm` instance to use for computing changes.
     """
     super(EngineChangeCalculator, self).__init__(scm)
     self._scheduler = scheduler
-    self._engine = engine
     self._symbol_table_cls = symbol_table_cls
-    self._mapper = EngineSourceMapper(engine)
+    self._mapper = EngineSourceMapper(self._scheduler)
 
   def iter_changed_target_addresses(self, changed_request):
     """Given a `ChangedRequest`, compute and yield all affected target addresses."""
@@ -47,7 +46,7 @@ class EngineChangeCalculator(ChangeCalculator):
       return
 
     # For dependee finding, we need to parse all build files.
-    graph = LegacyBuildGraph.create(self._scheduler, self._engine, self._symbol_table_cls)
+    graph = LegacyBuildGraph.create(self._scheduler, self._symbol_table_cls)
     for _ in graph.inject_specs_closure([DescendantAddresses('')]):
       pass
 

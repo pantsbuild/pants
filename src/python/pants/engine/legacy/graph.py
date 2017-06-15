@@ -51,27 +51,24 @@ class LegacyBuildGraph(BuildGraph):
     """Raised when command line spec is not a valid directory"""
 
   @classmethod
-  def create(cls, scheduler, engine, symbol_table_cls, include_trace_on_error=True):
+  def create(cls, scheduler, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, engine, cls._get_target_types(symbol_table_cls), include_trace_on_error=include_trace_on_error)
+    return cls(scheduler, cls._get_target_types(symbol_table_cls))
 
-  def __init__(self, scheduler, engine, target_types, include_trace_on_error=True):
+  def __init__(self, scheduler, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
     :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
-    :param engine: An Engine subclass to execute calls to `inject`.
     :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
-    self._include_trace_on_error = include_trace_on_error
     self._scheduler = scheduler
-    self._engine = engine
     self._target_types = target_types
     super(LegacyBuildGraph, self).__init__()
 
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
-    return LegacyBuildGraph(self._scheduler, self._engine, self._target_types)
+    return LegacyBuildGraph(self._scheduler, self._target_types)
 
   @staticmethod
   def _get_target_types(symbol_table_cls):
@@ -243,7 +240,7 @@ class LegacyBuildGraph(BuildGraph):
     logger.debug('Injecting to %s: %s', self, subjects)
     request = self._scheduler.execution_request([HydratedTargets, BuildFileAddresses], subjects)
 
-    result = self._engine.execute(request)
+    result = self._scheduler.execute(request)
     if result.error:
       raise result.error
     # Update the base class indexes for this request.
@@ -277,7 +274,8 @@ class LegacyBuildGraph(BuildGraph):
     if isinstance(state.exc, ResolveError):
       raise AddressLookupError(str(state.exc))
     else:
-      if self._include_trace_on_error:
+      # TODO: Port all code related to rendering traces into `scheduler.execute`.
+      if self._scheduler._include_trace_on_error:
         trace = '\n'.join(self._scheduler.trace())
         raise AddressLookupError(
           'Build graph construction failed for {}:\n{}'.format(node, trace))

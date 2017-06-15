@@ -34,8 +34,8 @@ def resolve_and_parse_specs(*args, **kwargs):
 class EngineSourceMapper(SourceMapper):
   """A v2 engine backed SourceMapper that supports pre-`BuildGraph` cache warming in the daemon."""
 
-  def __init__(self, engine):
-    self._engine = engine
+  def __init__(self, scheduler):
+    self._scheduler = scheduler
 
   def _unique_dirs_for_sources(self, sources):
     """Given an iterable of sources, yield unique dirname'd paths."""
@@ -89,7 +89,7 @@ class EngineSourceMapper(SourceMapper):
       elif isinstance(target_resources, list):
         resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
                                                         target_resources)
-        for hydrated_targets in self._engine.product_request(HydratedTargets, resource_dep_subjects):
+        for hydrated_targets in self._scheduler.product_request(HydratedTargets, resource_dep_subjects):
           for hydrated_target in hydrated_targets.dependencies:
             resource_sources = hydrated_target.adaptor.kwargs().get('sources')
             if resource_sources and self._match_source(source, resource_sources):
@@ -105,7 +105,7 @@ class EngineSourceMapper(SourceMapper):
     sources_set = set(sources)
     subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
 
-    for hydrated_targets in self._engine.product_request(HydratedTargets, subjects):
+    for hydrated_targets in self._scheduler.product_request(HydratedTargets, subjects):
       for hydrated_target in hydrated_targets.dependencies:
         legacy_address = hydrated_target.adaptor.address
 
