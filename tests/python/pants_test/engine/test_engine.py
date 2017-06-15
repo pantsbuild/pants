@@ -16,8 +16,9 @@ from pants.engine.rules import TaskRule
 from pants.engine.scheduler import ExecutionRequest
 from pants.engine.selectors import Select
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
-from pants_test.engine.util import (assert_equal_with_printing, create_native_scheduler,
-                                    init_native, remove_locations_from_traceback)
+from pants_test.engine.scheduler_test_base import SchedulerTestBase
+from pants_test.engine.util import (assert_equal_with_printing, init_native,
+                                    remove_locations_from_traceback)
 
 
 class EngineTest(unittest.TestCase):
@@ -64,60 +65,34 @@ def nested_raise(x):
   fn_raises(x)
 
 
-class SimpleScheduler(object):
-  def __init__(self, native_scheduler):
-    self._scheduler = native_scheduler
-
-  def trace(self):
-    for line in self._scheduler.graph_trace():
-      yield line
-
-  def execution_request(self, products, subjects):
-    return ExecutionRequest(tuple((s, Select(p)) for s in subjects for p in products))
-
-  def schedule(self, execution_request):
-    self._scheduler.exec_reset()
-    for subject, selector in execution_request.roots:
-      self._scheduler.add_root_selection(subject, selector)
-    self._scheduler.run_and_return_stat()
-
-  def root_entries(self, execution_request):
-    return self._scheduler.root_entries(execution_request)
-
-
-class EngineTraceTest(unittest.TestCase):
+class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
 
   assert_equal_with_printing = assert_equal_with_printing
 
-  def scheduler(self, root_subject_types, rules):
-    return SimpleScheduler(
-      create_native_scheduler(root_subject_types, rules))
+  def scheduler(self, root_subject_types, rules, include_trace_on_error):
+    """Create a scheduler with validation disabled."""
+    return self.mk_scheduler(tasks=rules,
+                             include_trace_on_error=include_trace_on_error,
+                             root_subject_types=root_subject_types)
 
   def test_no_include_trace_error_raises_boring_error(self):
     rules = [
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = self.create_scheduler({B},
-                                      rules,
-                                      include_trace_on_error=False)
+    scheduler = self.scheduler({B}, rules, include_trace_on_error=False)
 
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 
     self.assert_equal_with_printing('An exception for B', str(cm.exception))
 
-  def create_scheduler(self, root_subject_types, rules, include_trace_on_error):
-    return self.scheduler(root_subject_types, rules, include_trace_on_error=include_trace_on_error)
-
   def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
     rules = [
       TaskRule(A, [Select(B)], nested_raise),
     ]
 
-    scheduler = self.create_scheduler({B},
-                                      rules,
-                                      include_trace_on_error=False)
+    scheduler = self.scheduler({B}, rules, include_trace_on_error=False)
 
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[B(), B()]))
@@ -133,9 +108,7 @@ class EngineTraceTest(unittest.TestCase):
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = self.create_scheduler({B},
-                                rules,
-                                include_trace_on_error=True)
+    scheduler = self.scheduler({B}, rules, include_trace_on_error=True)
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 

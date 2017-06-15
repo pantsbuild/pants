@@ -109,14 +109,15 @@ python_tests(
 python_tests(
   sources=['test_engine.py'],
   dependencies=[
+    '3rdparty/python:mock',
+    ':scheduler_test_base',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/build_graph',
-    'tests/python/pants_test/engine:util',
+    'src/python/pants/engine:nodes',
+    'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-    'src/python/pants/engine:scheduler',
-    'src/python/pants/engine:nodes',
-    '3rdparty/python:mock',
+    'tests/python/pants_test/engine:util',
   ]
 )
 
