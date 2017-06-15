@@ -12,7 +12,7 @@ from textwrap import dedent
 
 from pants.build_graph.address import Address
 from pants.engine.nodes import Return
-from pants.engine.rules import TaskRule
+from pants.engine.rules import RootRule, TaskRule
 from pants.engine.scheduler import ExecutionRequest
 from pants.engine.selectors import Select
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
@@ -69,18 +69,16 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
 
   assert_equal_with_printing = assert_equal_with_printing
 
-  def scheduler(self, root_subject_types, rules, include_trace_on_error):
-    """Create a scheduler with validation disabled."""
-    return self.mk_scheduler(tasks=rules,
-                             include_trace_on_error=include_trace_on_error,
-                             root_subject_types=root_subject_types)
+  def scheduler(self, rules, include_trace_on_error):
+    return self.mk_scheduler(rules=rules, include_trace_on_error=include_trace_on_error)
 
   def test_no_include_trace_error_raises_boring_error(self):
     rules = [
+      RootRule(B),
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = self.scheduler({B}, rules, include_trace_on_error=False)
+    scheduler = self.scheduler(rules, include_trace_on_error=False)
 
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
@@ -89,10 +87,11 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
 
   def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
     rules = [
+      RootRule(B),
       TaskRule(A, [Select(B)], nested_raise),
     ]
 
-    scheduler = self.scheduler({B}, rules, include_trace_on_error=False)
+    scheduler = self.scheduler(rules, include_trace_on_error=False)
 
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[B(), B()]))
@@ -105,10 +104,11 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
 
   def test_include_trace_error_raises_error_with_trace(self):
     rules = [
+      RootRule(B),
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = self.scheduler({B}, rules, include_trace_on_error=True)
+    scheduler = self.scheduler(rules, include_trace_on_error=True)
     with self.assertRaises(Exception) as cm:
       list(scheduler.product_request(A, subjects=[(B())]))
 

@@ -13,7 +13,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import TaskRule
+from pants.engine.rules import RootRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
@@ -252,10 +252,11 @@ class SchedulerTraceTest(unittest.TestCase):
 
   def test_trace_includes_rule_exception_traceback(self):
     rules = [
+      RootRule(B),
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = create_native_scheduler({B}, rules)
+    scheduler = create_native_scheduler(rules)
     subject = B()
     scheduler.add_root_selection(subject, Select(A))
     scheduler.run_and_return_stat()

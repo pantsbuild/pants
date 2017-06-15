@@ -78,11 +78,11 @@ class ExecutionError(Exception):
 
 
 class WrappedNativeScheduler(object):
-  def __init__(self, native, build_root, work_dir, ignore_patterns, rule_index, root_subject_types):
+  def __init__(self, native, build_root, work_dir, ignore_patterns, rule_index):
     self._native = native
     # TODO: The only (?) case where we use inheritance rather than exact type unions.
     has_products_constraint = SubclassesOf(HasProducts)
-    self._root_subject_types = sorted(root_subject_types)
+    self._root_subject_types = sorted(rule_index.roots)
 
     # Create the ExternContext, and the native Scheduler.
     self._tasks = native.new_tasks()
@@ -327,8 +327,7 @@ class LocalScheduler(object):
                project_tree,
                native,
                include_trace_on_error=True,
-               graph_lock=None,
-               root_subject_types=None):
+               graph_lock=None):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -340,7 +339,6 @@ class LocalScheduler(object):
     :type include_trace_on_error: bool
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
                        instance. Defaults to creating a new threading.RLock().
-    :param root_subject_types: A set of legal root_subject types to override the default.
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
@@ -351,29 +349,14 @@ class LocalScheduler(object):
     # Create the ExternContext, and the native Scheduler.
     self._execution_request = None
 
-
     # Validate and register all provided and intrinsic tasks.
-    # TODO: This bounding of input Subject types allows for closed-world validation, but is not
-    # strictly necessary for execution. We might eventually be able to remove it by only executing
-    # validation below the execution roots (and thus not considering paths that aren't in use).
-
-    root_subject_types = root_subject_types or {
-      Address,
-      BuildFileAddress,
-      AscendantAddresses,
-      DescendantAddresses,
-      PathGlobs,
-      SiblingAddresses,
-      SingleAddress,
-    }
     rules = list(rules) + create_snapshot_rules()
     rule_index = RuleIndex.create(rules)
     self._scheduler = WrappedNativeScheduler(native,
                                              project_tree.build_root,
                                              work_dir,
                                              project_tree.ignore_patterns,
-                                             rule_index,
-                                             root_subject_types)
+                                             rule_index)
 
     # If configured, visualize the rule graph before asserting that it is valid.
     if self._scheduler.visualize_to_dir() is not None:

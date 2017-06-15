@@ -9,7 +9,7 @@ import os
 import tarfile
 import unittest
 
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import SingletonRule
@@ -208,7 +208,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    return self.mk_scheduler(tasks=rules, project_tree=self.mk_example_fs_tree())
+    rules = list(rules) + create_fs_rules()
+    return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())
 
   def assertReturn(self, state, scheduler):
     is_return = isinstance(state, Return)

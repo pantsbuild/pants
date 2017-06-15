@@ -15,6 +15,7 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.build_files import UnhydratedStruct, create_graph_rules
+from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
@@ -147,11 +148,11 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
                                    build_patterns=('*.BUILD.json',))
-    tasks = create_graph_rules(address_mapper, symbol_table_cls)
+    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table_cls)
     # TODO handle updating the rule graph when passed unexpected root selectors.
     # Adding the following task allows us to get around the fact that SelectDependencies
     # requests are not currently supported.
-    tasks.append(TaskRule(UnhydratedStructs,
+    rules.append(TaskRule(UnhydratedStructs,
                           [SelectDependencies(UnhydratedStruct,
                                               BuildFileAddresses,
                                               field_types=(Address,),
@@ -160,7 +161,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root
-    self.scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
+    self.scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',

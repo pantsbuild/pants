@@ -9,7 +9,6 @@ import os
 import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.fs import create_fs_rules
 from pants.engine.nodes import Return
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -52,26 +51,21 @@ class SchedulerTestBase(object):
     return FileSystemProjectTree(build_root, ignore_patterns=ignore_patterns)
 
   def mk_scheduler(self,
-                   tasks=None,
-                   goals=None,
+                   rules=None,
                    project_tree=None,
                    work_dir=None,
-                   include_trace_on_error=True,
-                   root_subject_types=None):
-    """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
-    goals = goals or dict()
-    tasks = tasks or []
+                   include_trace_on_error=True):
+    """Creates a Scheduler with the given Rules installed."""
+    rules = rules or []
+    goals = {}
     work_dir = work_dir or self._create_work_dir()
     project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
-    # FIXME: in all locations where `rules` are overridden, also necessary to override roots.
-    tasks = list(tasks) # + create_fs_rules()
     return LocalScheduler(work_dir,
                           goals,
-                          tasks,
+                          rules,
                           project_tree,
                           self._native,
-                          include_trace_on_error=include_trace_on_error,
-                          root_subject_types=root_subject_types)
+                          include_trace_on_error=include_trace_on_error)
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
