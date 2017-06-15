@@ -20,7 +20,6 @@ python_library(
     'src/python/pants/engine/legacy:parser',
     'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:build_files',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/engine:mapper',

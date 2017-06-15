@@ -59,7 +59,6 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
     'src/python/pants/engine/subsystem:native',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',

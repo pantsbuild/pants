@@ -67,7 +67,6 @@ python_tests(
   coverage=['pants.engine.graph'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:planners',
   ]
@@ -115,7 +114,6 @@ python_tests(
     'tests/python/pants_test/engine:util',
     'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:nodes',
     '3rdparty/python:mock',
@@ -129,9 +127,9 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',
+    'src/python/pants/engine:scheduler',
     'src/python/pants/engine:storage',
     'src/python/pants/engine:struct',
     'tests/python/pants_test/engine/examples:graph_test',
@@ -198,7 +196,6 @@ python_tests(
   dependencies=[
     ':util',
     'src/python/pants/build_graph',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:scheduler',
     'tests/python/pants_test/engine/examples:planners',
     'tests/python/pants_test/engine/examples:scheduler_inputs',
@@ -211,7 +208,6 @@ python_tests(
   dependencies=[
     ':util',
     'src/python/pants/base:project_tree',
-    'src/python/pants/engine:engine',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
