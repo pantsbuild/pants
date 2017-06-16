@@ -26,6 +26,8 @@ import xsbti.compile.{
   ScalaInstance => XScalaInstance
 }
 
+import scala.compat.java8.OptionConverters._
+
 import org.pantsbuild.zinc.cache.Cache
 import org.pantsbuild.zinc.cache.Cache.Implicits
 
@@ -173,7 +175,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
   /**
    * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
    */
-  def compile(inputs: Inputs, cwd: Option[File], reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
+  def compile(inputs: Inputs, reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
     import inputs._
 
     // load the existing analysis
@@ -186,25 +188,26 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
        }
 
     val result =
-       compiler.incrementalCompile(
+       compiler.compile(
          scalac,
          javac,
-         sources,
-         classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath),
+         sources.toArray,
+         classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath).toArray,
          output = CompileOutput(classesDirectory),
          cache = Compiler.residentCache,
-         Some(progress),
-         options = scalacOptions,
-         javacOptions,
-         previousAnalysis,
-         previousSetup,
+         scalaOptions = scalacOptions.toArray,
+         javacOptions.toArray,
+         previousAnalysis.asJava,
+         previousSetup.asJava,
          perClasspathEntryLookup = analysisMap.getPCELookup,
          reporter,
          compileOrder,
          skip = false,
+         progress = Some(progress).asJava,
          incOptions.options(log),
-         extra = Nil
-       )(log)
+         extra = Array(),
+         logger = log
+      )
 
     // if the compile resulted in modified analysis, persist it
     if (result.hasModified) {
