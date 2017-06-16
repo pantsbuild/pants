@@ -559,7 +559,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         raise TaskError('Error parsing xml file at {}: {}'
           .format(parse_error.xml_path, parse_error.cause))
 
-      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler, ['file', 'name'])
+      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler,
+                                            ['file', 'name', 'classname'])
       for test_name, test_info in all_tests_info.items():
         test_target = self._get_target_from_test(test_info, targets)
         self.report_all_info_for_single_test(self.options_scope, test_target, test_name, test_info)

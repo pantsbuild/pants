@@ -144,7 +144,10 @@ class TestRunnerTaskMixin(object):
             test_info.update({'time': None})
 
           for attribute in testcase_attributes:
-            test_info[attribute] = testcase.getAttribute(attribute)
+            attribute_value = testcase.getAttribute(attribute)
+            if not attribute_value:
+              attribute_value = None
+            test_info[attribute] = attribute_value
 
           test_error = testcase.getElementsByTagName('error')
           test_fail = testcase.getElementsByTagName('failure')

@@ -544,7 +544,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
             'time': 1.290
           },
           'testOK2': {
-            'file': '',
+            'file': None,
             'classname': 'org.pantsbuild.Green',
             'result_code': 'success',
             'time': 1.12
@@ -557,13 +557,13 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
           },
           'testOK4': {
             'file': 'file.py',
-            'classname': '',
+            'classname': None,
             'result_code': 'success',
             'time': 1.79
           },
           'testOK5': {
-            'file': '',
-            'classname': '',
+            'file': None,
+            'classname': None,
             'result_code': 'success',
             'time': 0.832
           },
