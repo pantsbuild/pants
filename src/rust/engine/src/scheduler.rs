@@ -8,10 +8,10 @@ use std::sync::Arc;
 use futures::future::{self, Future};
 
 use context::{Context, ContextFactory, Core};
-use core::{Failure, Field, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
-use nodes::{NodeKey, Select, SelectDependencies};
+use nodes::{NodeKey, Select};
 use rule_graph;
 use selectors;
 
@@ -26,17 +26,11 @@ pub struct Scheduler {
 
 impl Scheduler {
   ///
-  /// Roots are limited to either `SelectDependencies` and `Select`, which are known to
-  /// produce Values. But this method exists to satisfy Graph APIs which only need instances
-  /// of the NodeKey enum.
+  /// Roots are limited to `Select`, which are known to produce Values. But this method exists
+  /// to satisfy Graph APIs which only need instances of the NodeKey enum.
   ///
   fn root_nodes(&self) -> Vec<NodeKey> {
-    self.roots.iter()
-      .map(|r| match r {
-        &Root::Select(ref s) => s.clone().into(),
-        &Root::SelectDependencies(ref s) => s.clone().into(),
-      })
-      .collect()
+    self.roots.iter().map(|r| r.clone().into()).collect()
   }
 
   ///
@@ -66,12 +60,9 @@ impl Scheduler {
 
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<RootResult>)> {
     self.roots.iter()
-      .map(|root| match root {
-        &Root::Select(ref s) =>
-          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
-        &Root::SelectDependencies(ref s) =>
-          (&s.subject, &s.selector.product, self.core.graph.peek(s.clone())),
-      })
+      .map(|s|
+        (&s.subject, &s.selector.product, self.core.graph.peek(s.clone()))
+      )
       .collect()
   }
 
@@ -80,43 +71,7 @@ impl Scheduler {
       subject.type_id().clone(),
       selectors::Selector::Select(selectors::Select::without_variant(product))
     );
-    self.roots.push(
-      Root::Select(Select::new(product,
-                               subject,
-                               Default::default(),
-                               &edges)
-      )
-    );
-  }
-
-  pub fn add_root_select_dependencies(
-    &mut self,
-    subject: Key,
-    product: TypeConstraint,
-    dep_product: TypeConstraint,
-    field: Field,
-    field_types: Vec<TypeId>
-  ) {
-    let selector = selectors::SelectDependencies {
-      product: product,
-      dep_product: dep_product,
-      field: field,
-      field_types: field_types,
-    };
-
-    let edges = self.find_root_edges_or_update_rule_graph(
-      subject.type_id().clone(),
-      selectors::Selector::SelectDependencies(selector.clone()));
-    self.roots.push(
-      Root::SelectDependencies(
-        SelectDependencies::new(
-          selector.clone(),
-          subject,
-          Default::default(),
-          &edges
-        )
-      )
-    );
+    self.roots.push(Select::new(product, subject, Default::default(), &edges));
   }
 
   fn find_root_edges_or_update_rule_graph(&self, subject_type: TypeId, selector: selectors::Selector) -> rule_graph::RuleEdges {
@@ -173,10 +128,7 @@ impl Scheduler {
 ///
 /// Root requests are limited to Selectors that produce (python) Values.
 ///
-enum Root {
-  Select(Select),
-  SelectDependencies(SelectDependencies),
-}
+type Root = Select;
 
 pub type RootResult = Result<Value, Failure>;
 

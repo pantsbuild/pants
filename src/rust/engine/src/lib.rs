@@ -299,26 +299,6 @@ pub extern fn execution_add_root_select(
 }
 
 #[no_mangle]
-pub extern fn execution_add_root_select_dependencies(
-  scheduler_ptr: *mut Scheduler,
-  subject: Key,
-  product: TypeConstraint,
-  dep_product: TypeConstraint,
-  field: Buffer,
-  field_types: TypeIdBuffer,
-) {
-  with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.add_root_select_dependencies(
-      subject,
-      product,
-      dep_product,
-      field.to_string().expect("field name to be string"),
-      field_types.to_vec(),
-    );
-  })
-}
-
-#[no_mangle]
 pub extern fn execution_execute(
   scheduler_ptr: *mut Scheduler,
 ) -> ExecutionStat {
