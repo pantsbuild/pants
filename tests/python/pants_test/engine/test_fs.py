@@ -11,7 +11,7 @@ import unittest
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, Link
-from pants.engine.fs import FilesContent, PathGlobs, Snapshot
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.util.meta import AbstractClass
 from pants_test.engine.scheduler_test_base import SchedulerTestBase
 
@@ -48,20 +48,20 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
 
   def assert_walk_snapshot(self, field, filespecs, paths, ignore_patterns=None):
     with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
-      scheduler = self.mk_scheduler(project_tree=project_tree)
+      scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
       self.assertEquals(sorted([p.path for p in getattr(result, field)]), sorted(paths))
 
   def assert_content(self, filespecs, expected_content):
     with self.mk_project_tree() as project_tree:
-      scheduler = self.mk_scheduler(project_tree=project_tree)
+      scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, FilesContent, self.specs('', *filespecs))[0]
       actual_content = {f.path: f.content for f in result.dependencies}
       self.assertEquals(expected_content, actual_content)
 
   def assert_digest(self, filespecs, expected_files):
     with self.mk_project_tree() as project_tree:
-      scheduler = self.mk_scheduler(project_tree=project_tree)
+      scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       result = self.execute(scheduler, Snapshot, self.specs('', *filespecs))[0]
       # Confirm all expected files were digested.
       self.assertEquals(set(expected_files), set(f.path for f in result.files))
@@ -69,7 +69,7 @@ class FSTest(unittest.TestCase, SchedulerTestBase, AbstractClass):
 
   def assert_fsnodes(self, filespecs, subject_product_pairs):
     with self.mk_project_tree() as project_tree:
-      scheduler = self.mk_scheduler(project_tree=project_tree)
+      scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
       request = self.execute_request(scheduler, Snapshot, self.specs('', *filespecs))
 
       # Validate that FilesystemNodes for exactly the given subjects are reachable under this

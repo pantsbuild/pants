@@ -196,12 +196,6 @@ void graph_trace(Scheduler*, char*);
 
 void execution_reset(Scheduler*);
 void execution_add_root_select(Scheduler*, Key, TypeConstraint);
-void execution_add_root_select_dependencies(Scheduler*,
-                                            Key,
-                                            TypeConstraint,
-                                            TypeConstraint,
-                                            Buffer,
-                                            TypeIdBuffer);
 ExecutionStat execution_execute(Scheduler*);
 RawNodes* execution_roots(Scheduler*);
 

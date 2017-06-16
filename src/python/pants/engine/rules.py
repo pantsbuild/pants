@@ -100,7 +100,19 @@ class SingletonRule(datatype('SingletonRule', ['output_constraint', 'value']), R
     return '{}({}, {})'.format(type(self).__name__, type_or_constraint_repr(self.output_constraint), self.value)
 
 
-class RuleIndex(datatype('RuleIndex', ['rules'])):
+class RootRule(datatype('RootRule', ['output_constraint']), Rule):
+  """Represents a root input to an execution of a rule graph.
+  
+  Roots act roughly like parameters, in that in some cases the only source of a
+  particular type might be when a value is provided as a root subject at the beginning
+  of an execution.
+  """
+
+  def input_selectors(self):
+    return []
+
+
+class RuleIndex(datatype('RuleIndex', ['rules', 'roots'])):
   """Holds an index of Tasks and Singletons used to instantiate Nodes."""
 
   @classmethod
@@ -108,6 +120,7 @@ class RuleIndex(datatype('RuleIndex', ['rules'])):
     """Creates a NodeBuilder with tasks indexed by their output type."""
     # NB make tasks ordered so that gen ordering is deterministic.
     serializable_rules = OrderedDict()
+    serializable_roots = set()
 
     def add_task(product_type, rule):
       if product_type not in serializable_rules:
@@ -115,6 +128,9 @@ class RuleIndex(datatype('RuleIndex', ['rules'])):
       serializable_rules[product_type].add(rule)
 
     def add_rule(rule):
+      if isinstance(rule, RootRule):
+        serializable_roots.add(rule.output_constraint)
+        return
       # TODO: The heterogenity here has some confusing implications here:
       # see https://github.com/pantsbuild/pants/issues/4005
       for kind in rule.output_constraint.types:
@@ -136,4 +152,4 @@ class RuleIndex(datatype('RuleIndex', ['rules'])):
                         "Rules either extend Rule, or are static functions "
                         "decorated with @rule.".format(type(entry)))
 
-    return cls(serializable_rules)
+    return cls(serializable_rules, serializable_roots)

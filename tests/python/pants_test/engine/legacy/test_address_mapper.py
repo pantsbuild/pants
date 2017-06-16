@@ -14,9 +14,9 @@ from pants.base.specs import SiblingAddresses, SingleAddress
 from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_mapper import AddressMapper
-from pants.engine.engine import Engine
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.nodes import Throw
+from pants.engine.scheduler import ExecutionResult
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir
 from pants_test.engine.util import init_native
@@ -57,13 +57,13 @@ class LegacyAddressMapperTest(unittest.TestCase):
 
   def create_address_mapper(self, build_root):
     work_dir = os.path.join(build_root, '.pants.d')
-    scheduler, engine, _, _ = EngineInitializer.setup_legacy_graph(
+    scheduler, _, _ = EngineInitializer.setup_legacy_graph(
       [],
       work_dir,
       build_root=build_root,
       native=self._native
     )
-    return LegacyAddressMapper(scheduler, engine, build_root)
+    return LegacyAddressMapper(scheduler, build_root)
 
   def test_is_valid_single_address(self):
     with temporary_dir() as build_root:
@@ -105,7 +105,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
 
   def test_is_declaring_file(self):
     scheduler = mock.Mock()
-    mapper = LegacyAddressMapper(scheduler, None, '')
+    mapper = LegacyAddressMapper(scheduler, '')
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD'))
     self.assertTrue(mapper.is_declaring_file(Address('path', 'name'), 'path/BUILD.suffix'))
     self.assertFalse(mapper.is_declaring_file(Address('path', 'name'), 'path/not_a_build_file'))
@@ -191,12 +191,11 @@ class LegacyAddressMapperTest(unittest.TestCase):
       def execution_request(self, *args):
         pass
 
-    class ThrowResultingEngine(object):
       def execute(self, *args):
-        return Engine.Result(None, {('some-thing', None): Throw(Exception('just an exception'))})
+        return ExecutionResult(None, [(('some-thing', None), Throw(Exception('just an exception')))])
 
     with temporary_dir() as build_root:
-      mapper = LegacyAddressMapper(ThrowReturningScheduler(), ThrowResultingEngine(), build_root)
+      mapper = LegacyAddressMapper(ThrowReturningScheduler(), build_root)
 
       with self.assertRaises(LegacyAddressMapper.BuildFileScanError) as cm:
         mapper.scan_addresses(os.path.join(build_root, 'foo'))

@@ -10,7 +10,7 @@ from os.path import join
 
 from pants.base.project_tree import Dir, File
 from pants.engine.addressable import Collection
-from pants.engine.rules import rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Select
 from pants.util.objects import datatype
 
@@ -101,4 +101,5 @@ def create_fs_rules():
   return [
     files_content_noop,
     snapshot_noop,
+    RootRule(PathGlobs),
   ]

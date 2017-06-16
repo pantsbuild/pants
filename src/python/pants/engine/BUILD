@@ -41,17 +41,6 @@ python_library(
 )
 
 python_library(
-  sources=['engine.py'],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':objects',
-    ':storage',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
   name='fs',
   sources=['fs.py'],
   dependencies=[
@@ -175,6 +164,7 @@ python_library(
     ':isolated_process',
     ':nodes',
     ':rules',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/engine/subsystem:native',

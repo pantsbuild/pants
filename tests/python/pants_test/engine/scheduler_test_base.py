@@ -9,8 +9,6 @@ import os
 import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import create_fs_rules
 from pants.engine.nodes import Return
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
@@ -53,23 +51,26 @@ class SchedulerTestBase(object):
     return FileSystemProjectTree(build_root, ignore_patterns=ignore_patterns)
 
   def mk_scheduler(self,
-                   tasks=None,
-                   goals=None,
+                   rules=None,
                    project_tree=None,
-                   work_dir=None):
-    """Creates a Scheduler with "native" tasks already included, and the given additional tasks."""
-    goals = goals or dict()
-    tasks = tasks or []
+                   work_dir=None,
+                   include_trace_on_error=True):
+    """Creates a Scheduler with the given Rules installed."""
+    rules = rules or []
+    goals = {}
     work_dir = work_dir or self._create_work_dir()
     project_tree = project_tree or self.mk_fs_tree(work_dir=work_dir)
-    tasks = list(tasks) + create_fs_rules()
-    return LocalScheduler(work_dir, goals, tasks, project_tree, self._native)
+    return LocalScheduler(work_dir,
+                          goals,
+                          rules,
+                          project_tree,
+                          self._native,
+                          include_trace_on_error=include_trace_on_error)
 
   def execute_request(self, scheduler, product, *subjects):
     """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
     request = scheduler.execution_request([product], subjects)
-    engine = LocalSerialEngine(scheduler)
-    res = engine.execute(request)
+    res = scheduler.execute(request)
     if res.error:
       raise res.error
     return request
@@ -77,7 +78,7 @@ class SchedulerTestBase(object):
   def execute(self, scheduler, product, *subjects):
     """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
     request = self.execute_request(scheduler, product, *subjects)
-    states = scheduler.root_entries(request).values()
+    states = [state for _, state in scheduler.root_entries(request)]
     if any(type(state) is not Return for state in states):
       with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
         scheduler.visualize_graph_to_file(dot_file)

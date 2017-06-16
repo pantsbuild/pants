@@ -109,8 +109,7 @@ class GoalRunnerFactory(object):
       target_roots = TargetRoots.create(options=self._options,
                                         build_root=self._root_dir,
                                         change_calculator=graph_helper.change_calculator)
-      graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir,
-                                                              include_trace_on_error=self._global_options.print_exception_stacktrace)
+      graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
       return graph, address_mapper, target_roots.as_specs()
     else:
       spec_roots = TargetRoots.parse_specs(target_specs, self._root_dir)

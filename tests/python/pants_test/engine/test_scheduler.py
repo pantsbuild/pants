@@ -12,9 +12,8 @@ from textwrap import dedent
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
-from pants.engine.engine import LocalSerialEngine
 from pants.engine.nodes import Return, Throw
-from pants.engine.rules import TaskRule
+from pants.engine.rules import RootRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant
 from pants.util.contextutil import temporary_dir
 from pants_test.engine.examples.planners import (ApacheThriftJavaConfiguration, Classpath, GenGoal,
@@ -34,7 +33,6 @@ class SchedulerTest(unittest.TestCase):
     build_root = os.path.join(os.path.dirname(__file__), 'examples', 'scheduler_inputs')
     self.spec_parser = CmdLineSpecParser(build_root)
     self.scheduler = setup_json_scheduler(build_root, self._native)
-    self.engine = LocalSerialEngine(self.scheduler)
 
     self.guava = Address.parse('3rdparty/jvm:guava')
     self.thrift = Address.parse('src/thrift/codegen/simple')
@@ -56,9 +54,9 @@ class SchedulerTest(unittest.TestCase):
 
   def build(self, build_request):
     """Execute the given request and return roots as a list of ((subject, product), value) tuples."""
-    result = self.engine.execute(build_request)
+    result = self.scheduler.execute(build_request)
     self.assertIsNone(result.error)
-    return self.scheduler.root_entries(build_request).items()
+    return self.scheduler.root_entries(build_request)
 
   def request(self, goals, *subjects):
     return self.scheduler.build_request(goals=goals, subjects=subjects)
@@ -189,8 +187,7 @@ class SchedulerTest(unittest.TestCase):
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm::')
-    selector = Select(BuildFileAddresses)
-    build_request = self.scheduler.selection_request([(selector, spec)])
+    build_request = self.scheduler.execution_request([BuildFileAddresses], [spec])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
@@ -205,8 +202,7 @@ class SchedulerTest(unittest.TestCase):
   def test_sibling_specs(self):
     """Test that sibling Addresses are parsed in the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm:')
-    selector = Select(BuildFileAddresses)
-    build_request = self.scheduler.selection_request([(selector,spec)])
+    build_request = self.scheduler.execution_request([BuildFileAddresses], [spec])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
@@ -254,12 +250,13 @@ class SchedulerTraceTest(unittest.TestCase):
 
   def test_trace_includes_rule_exception_traceback(self):
     rules = [
+      RootRule(B),
       TaskRule(A, [Select(B)], nested_raise)
     ]
 
-    scheduler = create_native_scheduler({B}, rules)
+    scheduler = create_native_scheduler(rules)
     subject = B()
-    scheduler.add_root_selection(subject, Select(A))
+    scheduler.add_root_selection(subject, A)
     scheduler.run_and_return_stat()
 
     trace = '\n'.join(scheduler.graph_trace())

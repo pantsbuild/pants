@@ -8,7 +8,6 @@ python_library(
     'src/python/pants/base:build_file',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
-    'src/python/pants/engine',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:mapper',

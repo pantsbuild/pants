@@ -22,11 +22,11 @@ def init_native():
   return Native.Factory.global_instance().create()
 
 
-def create_native_scheduler(root_subject_types, rules):
+def create_native_scheduler(rules):
   """Create a WrappedNativeScheduler, with an initialized native instance."""
   rule_index = RuleIndex.create(rules)
   native = init_native()
-  scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index, root_subject_types)
+  scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index)
   return scheduler
 
 
