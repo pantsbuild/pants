@@ -39,7 +39,7 @@ class LegacyAddressMapper(AddressMapper):
       raise result.error
 
     build_files_set = set()
-    for state in result.root_products.values():
+    for _, state in result.root_products:
       for build_files in state.value.dependencies:
         build_files_set.update(f.path for f in build_files.files_content.dependencies)
 
@@ -72,10 +72,9 @@ class LegacyAddressMapper(AddressMapper):
     result = self._scheduler.execute(request)
     if result.error:
       raise self.BuildFileScanError(str(result.error))
-    root_entries = result.root_products
 
     addresses = set()
-    for (spec, _), state in root_entries.items():
+    for (spec, _), state in result.root_products:
       if isinstance(state, Throw):
         if isinstance(state.exc, ResolveError):
           if missing_is_fatal:

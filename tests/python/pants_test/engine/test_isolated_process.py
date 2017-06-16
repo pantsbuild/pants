@@ -119,7 +119,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', include=['fs_test/a/b/*'])])
 
-    root_entries = scheduler.execute(request).root_products.items()
+    root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     concatted = state.value
@@ -142,7 +142,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     request = scheduler.execution_request(
       [ClasspathEntry],
       [sources])
-    root_entries = scheduler.execute(request).root_products.items()
+    root_entries = scheduler.execute(request).root_products
 
     self.assertEquals(1, len(root_entries))
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
@@ -163,7 +163,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    root_entries = scheduler.execute(request).root_products.items()
+    root_entries = scheduler.execute(request).root_products
 
     self.assertEquals(1, len(root_entries))
     self.assertFirstEntryIsThrow(root_entries,
@@ -182,7 +182,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    root_entries = scheduler.execute(request).root_products.items()
+    root_entries = scheduler.execute(request).root_products
 
     self.assertEquals(1, len(root_entries))
     self.assertFirstEntryIsThrow(root_entries,

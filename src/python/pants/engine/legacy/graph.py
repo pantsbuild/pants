@@ -88,11 +88,9 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for node, state in roots.items():
-      self._assert_type_is_return(node, state)
-      self._assert_correct_value_type(state, HydratedTargets)
+    for product in roots.values():
       # We have a successful HydratedTargets value (for a particular input Spec).
-      for hydrated_target in state.value.dependencies:
+      for hydrated_target in product.dependencies:
         target_adaptor = hydrated_target.adaptor
         address = target_adaptor.address
         all_addresses.add(address)
@@ -238,61 +236,32 @@ class LegacyBuildGraph(BuildGraph):
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to %s: %s', self, subjects)
-    request = self._scheduler.execution_request([HydratedTargets, BuildFileAddresses], subjects)
+    try:
+      product_results = self._scheduler.products_request([HydratedTargets, BuildFileAddresses],
+                                                         subjects)
+    except ResolveError as e:
+      # NB: ResolveError means that a target was not found, which is a common user facing error.
+      raise AddressLookupError(str(e.exc))
+    except Exception as e:
+      raise AddressLookupError(
+        'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
+      )
 
-    result = self._scheduler.execute(request)
-    if result.error:
-      raise result.error
     # Update the base class indexes for this request.
-    root_entries = result.root_products
-    address_entries = {k: v for k, v in root_entries.items() if k[1].product is BuildFileAddresses}
-    target_entries = {k: v for k, v in root_entries.items() if k[1].product is HydratedTargets}
+    address_entries = dict(zip(subjects, product_results[BuildFileAddresses]))
+    target_entries = dict(zip(subjects, product_results[HydratedTargets]))
+
     self._index(target_entries)
 
     yielded_addresses = set()
-    for (subject, _), state in address_entries.items():
-      self._assert_type_is_return(subject, state)
-      self._assert_correct_value_type(state, BuildFileAddresses)
-
-      if not state.value.dependencies:
+    for subject, product in address_entries.items():
+      if not product.dependencies:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(subject))
-      for address in state.value.dependencies:
+      for address in product.dependencies:
         if address not in yielded_addresses:
           yielded_addresses.add(address)
           yield address
-
-  def _assert_type_is_return(self, node, state):
-    # TODO Verifying the type is return should be handled in a more central way.
-    #      It's related to the clean up tracked via https://github.com/pantsbuild/pants/issues/4229
-    if type(state) is Return:
-      return
-
-    # NB: ResolveError means that a target was not found, which is a common user facing error.
-    # TODO Come up with a better error reporting mechanism so that we don't need this as a special case.
-    #      Possibly as part of https://github.com/pantsbuild/pants/issues/4446
-    if isinstance(state.exc, ResolveError):
-      raise AddressLookupError(str(state.exc))
-    else:
-      # TODO: Port all code related to rendering traces into `scheduler.execute`.
-      if self._scheduler._include_trace_on_error:
-        trace = '\n'.join(self._scheduler.trace())
-        raise AddressLookupError(
-          'Build graph construction failed for {}:\n{}'.format(node, trace))
-      else:
-        raise AddressLookupError(
-          'Build graph construction failed for {}: {} {}'
-            .format(node,
-                    type(state.exc).__name__,
-                    str(state.exc))
-        )
-
-  def _assert_correct_value_type(self, state, expected_type):
-    # TODO This is a pretty general assertion, and it should live closer to where the result is generated.
-    #      It's related to the clean up tracked via https://github.com/pantsbuild/pants/issues/4229
-    if type(state.value) is not expected_type:
-      raise TypeError('Expected roots to hold {}; got: {}'.format(
-        expected_type, type(state.value)))
 
 
 class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):

@@ -192,7 +192,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
         pass
 
       def execute(self, *args):
-        return ExecutionResult(None, {('some-thing', None): Throw(Exception('just an exception'))})
+        return ExecutionResult(None, [(('some-thing', None), Throw(Exception('just an exception')))])
 
     with temporary_dir() as build_root:
       mapper = LegacyAddressMapper(ThrowReturningScheduler(), build_root)

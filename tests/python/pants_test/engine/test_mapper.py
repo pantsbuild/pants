@@ -170,15 +170,15 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    # TODO reenable using SelectDependencies
-    select = Select(UnhydratedStructs)
-    request = self.scheduler.selection_request([(select, spec)])
+    request = self.scheduler.execution_request([UnhydratedStructs], [spec])
     result = self.scheduler.execute(request)
     if result.error:
       raise result.error
 
     # Expect a single root.
-    state, = result.root_products.values()
+    if len(result.root_products) != 1:
+      raise Exception('Wrong number of result products: {}'.format(result.root_products))
+    state = result.root_products[0][1]
     if type(state) is Throw:
       raise Exception(state.exc)
     return state.value.dependencies

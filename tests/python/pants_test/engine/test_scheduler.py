@@ -56,7 +56,7 @@ class SchedulerTest(unittest.TestCase):
     """Execute the given request and return roots as a list of ((subject, product), value) tuples."""
     result = self.scheduler.execute(build_request)
     self.assertIsNone(result.error)
-    return self.scheduler.root_entries(build_request).items()
+    return self.scheduler.root_entries(build_request)
 
   def request(self, goals, *subjects):
     return self.scheduler.build_request(goals=goals, subjects=subjects)
@@ -187,8 +187,7 @@ class SchedulerTest(unittest.TestCase):
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm::')
-    selector = Select(BuildFileAddresses)
-    build_request = self.scheduler.selection_request([(selector, spec)])
+    build_request = self.scheduler.execution_request([BuildFileAddresses], [spec])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
@@ -203,8 +202,7 @@ class SchedulerTest(unittest.TestCase):
   def test_sibling_specs(self):
     """Test that sibling Addresses are parsed in the 3rdparty/jvm directory."""
     spec = self.spec_parser.parse_spec('3rdparty/jvm:')
-    selector = Select(BuildFileAddresses)
-    build_request = self.scheduler.selection_request([(selector,spec)])
+    build_request = self.scheduler.execution_request([BuildFileAddresses], [spec])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
@@ -258,7 +256,7 @@ class SchedulerTraceTest(unittest.TestCase):
 
     scheduler = create_native_scheduler(rules)
     subject = B()
-    scheduler.add_root_selection(subject, Select(A))
+    scheduler.add_root_selection(subject, A)
     scheduler.run_and_return_stat()
 
     trace = '\n'.join(scheduler.graph_trace())

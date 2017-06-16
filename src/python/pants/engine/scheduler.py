@@ -9,6 +9,7 @@ import logging
 import os
 import threading
 import time
+from collections import defaultdict
 from contextlib import contextmanager
 
 from twitter.common.collections import maybe_list
@@ -54,8 +55,8 @@ class ExecutionResult(datatype('ExecutionResult', ['error', 'root_products'])):
 
     Runs can either finish with no errors, satisfying all promises, or they can partially finish
     if run in fail-slow mode producing as many products as possible.
-    :param root_products: Mapping of root SelectNodes to their State values.
-    :rtype: `Engine.Result`
+    :param root_products: List of ((subject, product), State) tuples.
+    :rtype: `ExecutionResult`
     """
     return cls(error=None, root_products=root_products)
 
@@ -68,7 +69,7 @@ class ExecutionResult(datatype('ExecutionResult', ['error', 'root_products'])):
 
     :param error: The execution error encountered.
     :type error: :class:`pants.base.exceptions.TaskError`
-    :rtype: `Engine.Result`
+    :rtype: `ExecutionResult`
     """
     return cls(error=error, root_products=None)
 
@@ -265,21 +266,9 @@ class WrappedNativeScheduler(object):
   def exec_reset(self):
     self._native.lib.execution_reset(self._scheduler)
 
-  def add_root_selection(self, subject, selector):
-    if type(selector) is Select:
-      self._native.lib.execution_add_root_select(self._scheduler, self._to_key(subject),
-                                                 self._to_constraint(selector.product))
-    elif type(selector) is SelectDependencies:
-      self._native.lib.execution_add_root_select_dependencies(self._scheduler,
-                                                              self._to_key(subject),
-                                                              self._to_constraint(selector.product),
-                                                              self._to_constraint(
-                                                                selector.dep_product),
-                                                              self._to_utf8_buf(selector.field),
-                                                              self._to_ids_buf(
-                                                                selector.field_types))
-    else:
-      raise ValueError('Unsupported root selector type: {}'.format(selector))
+  def add_root_selection(self, subject, product):
+    self._native.lib.execution_add_root_select(self._scheduler, self._to_key(subject),
+                                               self._to_constraint(product))
 
   def run_and_return_stat(self):
     return self._native.lib.execution_execute(self._scheduler)
@@ -296,7 +285,7 @@ class WrappedNativeScheduler(object):
   def root_entries(self, execution_request):
     raw_roots = self._native.lib.execution_roots(self._scheduler)
     try:
-      roots = {}
+      roots = []
       for root, raw_root in zip(execution_request.roots,
                                 self._native.unpack(raw_roots.nodes_ptr,
                                                     raw_roots.nodes_len)):
@@ -311,7 +300,7 @@ class WrappedNativeScheduler(object):
         else:
           raise ValueError(
             'Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
-        roots[root] = state
+        roots.append((root, state))
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
@@ -413,18 +402,7 @@ class LocalScheduler(object):
       :class:`pants.engine.fs.PathGlobs` objects.
     :returns: An ExecutionRequest for the given products and subjects.
     """
-    return ExecutionRequest(tuple((s, Select(p)) for s in subjects for p in products))
-
-  def selection_request(self, requests):
-    """Create and return an ExecutionRequest for the given (selector, subject) tuples.
-
-    This method allows users to specify their own selectors. It has the potential to replace
-    execution_request, which is a subset of this method, because it uses default selectors.
-    :param requests: A list of (selector, subject) tuples.
-    :return: An ExecutionRequest for the given selectors and subjects.
-    """
-    #TODO: Think about how to deprecate the existing execution_request API.
-    return ExecutionRequest(tuple((subject, selector) for selector, subject in requests))
+    return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
 
   @contextmanager
   def locked(self):
@@ -432,7 +410,9 @@ class LocalScheduler(object):
       yield
 
   def root_entries(self, execution_request):
-    """Returns the roots for the given ExecutionRequest as a dict of tuples to State."""
+    """Returns the roots for the given ExecutionRequest as a list of tuples of:
+         ((subject, product), State)
+    """
     with self._product_graph_lock:
       if self._execution_request is not execution_request:
         raise AssertionError(
@@ -460,8 +440,8 @@ class LocalScheduler(object):
     if self._execution_request is not None:
       self._scheduler.exec_reset()
     self._execution_request = execution_request
-    for subject, selector in execution_request.roots:
-      self._scheduler.add_root_selection(subject, selector)
+    for subject, product in execution_request.roots:
+      self._scheduler.add_root_selection(subject, product)
 
   def pre_fork(self):
     self._scheduler.pre_fork()
@@ -515,30 +495,28 @@ class LocalScheduler(object):
     except TaskError as e:
       return ExecutionResult.failure(e)
 
-  def product_request(self, product, subjects):
-    """Executes a request for a singular product type from the scheduler for one or more subjects
-    and yields the products.
+  def products_request(self, products, subjects):
+    """Executes a request for multiple products for some subjects, and returns the products.
 
-    :param class product: A product type for the request.
+    :param list products: A list of product type for the request.
     :param list subjects: A list of subjects for the request.
-    :yields: The requested products.
+    :returns: A dict from product type to lists of products each with length matching len(subjects).
     """
-    request = self.execution_request([product], subjects)
+    request = self.execution_request(products, subjects)
     result = self.execute(request)
     if result.error:
       raise result.error
-    result_items = result.root_products.items()
 
     # State validation.
     unknown_state_types = tuple(
-      type(state) for _, state in result_items if type(state) not in (Throw, Return)
+      type(state) for _, state in result.root_products if type(state) not in (Throw, Return)
     )
     if unknown_state_types:
       State.raise_unrecognized(unknown_state_types)
 
     # Throw handling.
     # TODO: See https://github.com/pantsbuild/pants/issues/3912
-    throw_root_states = tuple(state for root, state in result_items if type(state) is Throw)
+    throw_root_states = tuple(state for root, state in result.root_products if type(state) is Throw)
     if throw_root_states:
       if self._include_trace_on_error:
         cumulative_trace = '\n'.join(self.trace())
@@ -551,8 +529,18 @@ class LocalScheduler(object):
                              .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
                                                  for t in throw_root_states)))
 
-    # Return handling.
-    returns = tuple(state.value for _, state in result_items if type(state) is Return)
-    for return_value in returns:
-      for computed_product in maybe_list(return_value, expected_type=product):
-        yield computed_product
+    # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
+    # order in output lists.
+    product_results = defaultdict(list)
+    for (_, product), state in result.root_products:
+      product_results[product].append(state.value)
+    return product_results
+
+  def product_request(self, product, subjects):
+    """Executes a request for a single product for some subjects, and returns the products.
+
+    :param class product: A product type for the request.
+    :param list subjects: A list of subjects for the request.
+    :returns: A list of the requested products, with length match len(subjects).
+    """
+    return self.products_request([product], subjects)[product]
