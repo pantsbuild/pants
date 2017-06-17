@@ -11,59 +11,22 @@ import scala.collection.JavaConverters._
 
 import sbt.io.syntax._
 import sbt.util.Logger
-import xsbti.compile.CompileOrder
+import xsbti.compile.{ CompileOrder, Inputs }
 
-/**
- * All inputs for a compile run.
- */
-case class Inputs(
-  classpath: Seq[File],
-  sources: Seq[File],
-  classesDirectory: File,
-  scalacOptions: Seq[String],
-  javacOptions: Seq[String],
-  cacheFile: File,
-  analysisMap: AnalysisMap,
-  javaOnly: Boolean,
-  compileOrder: CompileOrder,
-  incOptions: IncOptions)
-
-object Inputs {
+object InputUtils {
   /**
    * Create inputs based on command-line settings.
    */
-  def apply(log: Logger, settings: Settings): Inputs = {
+  def create(log: Logger, settings: Settings): Inputs = {
     import settings._
-    inputs(
-      log,
-      classpath,
-      sources,
-      classesDirectory,
-      scalacOptions,
-      javacOptions,
-      analysis.cache,
-      analysis.cacheMap,
-      javaOnly,
-      compileOrder,
-      incOptions)
-  }
 
-  /**
-   * Create normalised and defaulted Inputs.
-   */
-  def inputs(
-    log: Logger,
-    classpath: Seq[File],
-    sources: Seq[File],
-    classesDirectory: File,
-    scalacOptions: Seq[String],
-    javacOptions: Seq[String],
-    analysisCache: Option[File],
-    analysisCacheMap: Map[File, File],
-    javaOnly: Boolean,
-    compileOrder: CompileOrder,
-    incOptions: IncOptions): Inputs =
-  {
+    val progress =
+      new SimpleCompileProgress(
+        consoleLog.logPhases,
+        consoleLog.printProgress,
+        consoleLog.heartbeatSecs
+      )(log)
+
     val normalise: File => File = { _.getAbsoluteFile }
     val cp = classpath map normalise
     val srcs = sources map normalise

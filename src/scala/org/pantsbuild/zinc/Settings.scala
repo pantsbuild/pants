@@ -29,7 +29,6 @@ case class Settings(
   help: Boolean              = false,
   version: Boolean           = false,
   consoleLog: ConsoleOptions = ConsoleOptions(),
-  captureLog: Option[File]   = None,
   sources: Seq[File]         = Seq.empty,
   classpath: Seq[File]       = Seq.empty,
   classesDirectory: File     = new File("."),
@@ -192,8 +191,6 @@ object Settings {
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
     string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ re.r))),
-    file(      "-capture-log", "file",         "Captures all logging (unfiltered) to the given file",
-      (s: Settings, f: File) => s.copy(captureLog = Some(f))),
 
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),

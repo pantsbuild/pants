@@ -22,6 +22,7 @@ import xsbti.compile.{
   CompilerBridgeProvider,
   CompilerCache,
   GlobalsCache,
+  Inputs,
   JavaCompiler,
   ScalaInstance => XScalaInstance
 }
@@ -175,7 +176,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
   /**
    * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
    */
-  def compile(inputs: Inputs, reporter: xsbti.Reporter, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
+  def compile(inputs: Inputs, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
     import inputs._
 
     // load the existing analysis
@@ -185,7 +186,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
         case (a, s) => (Some(a), Some(s))
       } getOrElse {
         (None, None)
-       }
+      }
 
     val result =
        compiler.compile(
@@ -212,7 +213,7 @@ class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
     // if the compile resulted in modified analysis, persist it
     if (result.hasModified) {
       targetAnalysisStore.set(result.analysis, result.setup)
-     }
+    }
   }
 
   /**

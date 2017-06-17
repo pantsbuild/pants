@@ -29,25 +29,8 @@ object Main {
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
 
-    val log =
-      Loggers.create(
-        settings.consoleLog.logLevel,
-        settings.consoleLog.color,
-        captureLog = settings.captureLog
-      )
+    val log = Loggers.create(settings.consoleLog.logLevel, settings.consoleLog.color)
     val isDebug = settings.consoleLog.logLevel == Level.Debug
-    val reporter =
-      Reporters.create(
-        log,
-        settings.consoleLog.fileFilters,
-        settings.consoleLog.msgFilters
-      )
-    val progress =
-      new SimpleCompileProgress(
-        settings.consoleLog.logPhases,
-        settings.consoleLog.printProgress,
-        settings.consoleLog.heartbeatSecs
-      )(log)
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {
@@ -60,7 +43,7 @@ object Main {
 
     if (settings.help) Settings.printUsage()
 
-    val inputs = Inputs(log, settings)
+    val inputs = InputsUtils.create(log, settings)
     val setup = Setup(settings)
 
     // if there are no sources provided, print outputs based on current analysis if requested,
@@ -81,12 +64,12 @@ object Main {
     }
 
     // verify inputs
-    Inputs.verify(inputs)
+    InputUtils.verify(inputs)
 
     if (isDebug) {
       val debug: String => Unit = log.debug(_)
       Setup.show(setup, debug)
-      Inputs.show(inputs, debug)
+      InputUtils.show(inputs, debug)
       debug("Setup and Inputs parsed " + Util.timing(startTime))
     }
 
@@ -94,7 +77,7 @@ object Main {
     try {
       val compiler = Compiler(setup, log)
       log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(inputs, cwd, reporter, progress)(log)
+      compiler.compile(inputs, progress)(log)
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>
