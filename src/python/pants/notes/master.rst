@@ -5,6 +5,49 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev3 (6/16/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Add compiler_args property to JavaThriftLibrary target.  (#4669)
+  `PR #4669 <https://github.com/pantsbuild/pants/pull/4669>`_
+
+Bugfixes
+~~~~~~~~
+
+* Add classname to target data reported by pytest (#4675)
+  `PR #4675 <https://github.com/pantsbuild/pants/pull/4675>`_
+
+* Support options fingerprinting in `Task` tests. (#4666)
+  `PR #4666 <https://github.com/pantsbuild/pants/pull/4666>`_
+
+* Simplify `UnsetBool` fingerprint encoding. (#4667)
+  `PR #4667 <https://github.com/pantsbuild/pants/pull/4667>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove engine.engine.Engine and add RootRule (#4679)
+  `PR #4679 <https://github.com/pantsbuild/pants/pull/4679>`_
+
+* Ensure `Task.workdir` is available when needed. (#4672)
+  `PR #4672 <https://github.com/pantsbuild/pants/pull/4672>`_
+
+* Add support for local test caching. (#4660)
+  `PR #4660 <https://github.com/pantsbuild/pants/pull/4660>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Link the HTML report image in the docs to the page describing it. (#4671)
+  `PR #4671 <https://github.com/pantsbuild/pants/pull/4671>`_
+
+* Document that the release script now requires Bash 4. (#4670)
+  `PR #4670 <https://github.com/pantsbuild/pants/pull/4670>`_
+
+
 1.4.0.dev2 (6/10/2017)
 ----------------------
 
