@@ -9,6 +9,7 @@ import java.io.File
 import scala.compat.java8.OptionConverters._
 
 import sbt.util.Level
+import sbt.internal.inc.IncrementalCompilerImpl
 import xsbti.CompileFailed
 import xsbti.compile.{
   PreviousResult
@@ -19,6 +20,40 @@ import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
  * Command-line main class.
  */
 object Main {
+  val Command     = "zinc"
+  val Description = "scala incremental compiler"
+
+  /**
+   * Full zinc version info.
+   */
+  case class Version(published: String, timestamp: String, commit: String)
+
+  /**
+   * Get the zinc version from a generated properties file.
+   */
+  lazy val zincVersion: Version = {
+    val props = Util.propertiesFromResource("zinc.version.properties", getClass.getClassLoader)
+    Version(
+      props.getProperty("version", "unknown"),
+      props.getProperty("timestamp", ""),
+      props.getProperty("commit", "")
+    )
+  }
+
+  /**
+   * For snapshots the zinc version includes timestamp and commit.
+   */
+  lazy val versionString: String = {
+    import zincVersion._
+    if (published.endsWith("-SNAPSHOT")) "%s %s-%s" format (published, timestamp, commit take 10)
+    else published
+  }
+
+  /**
+   * Print the zinc version to standard out.
+   */
+  def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
+
   def main(args: Array[String]): Unit = run(args, None)
 
   /**
@@ -32,38 +67,29 @@ object Main {
     // normalise relative paths to the current working directory (if provided)
     val settings = Settings.normaliseRelative(rawSettings, cwd)
 
-    // if nailed then also set any system properties provided
-    if (cwd.isDefined) Util.setProperties(settings.properties)
-
     val log = Loggers.create(settings.consoleLog.logLevel, settings.consoleLog.color)
     val isDebug = settings.consoleLog.logLevel == Level.Debug
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {
       for (error <- errors) log.error(error)
-      log.error("See %s -help for information about options" format Setup.Command)
+      log.error("See %s -help for information about options" format Command)
       sys.exit(1)
     }
 
-    if (settings.version) Setup.printVersion()
+    if (settings.version) printVersion()
 
-    if (settings.help) Settings.printUsage()
+    if (settings.help) Settings.printUsage(Command)
 
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
     if (settings.sources.isEmpty) {
       if (!settings.version && !settings.help) {
-        Setup.printVersion()
-        Settings.printUsage()
+        printVersion()
+        Settings.printUsage(Command)
         sys.exit(1)
       }
       sys.exit(0)
-    }
-
-    // check we have all necessary files
-    if (!Setup.verify(setup, log)) {
-      log.error("See %s -help for information about locating necessary files" format Setup.Command)
-      sys.exit(1)
     }
 
     // Load the existing analysis for the destination, if any.
@@ -77,17 +103,15 @@ object Main {
           (None, None)
         }
       InputUtils.create(
-        log,
         settings,
-        new PreviousResult(previousAnalysis.asJava, previousSetup.asJava)
+        new PreviousResult(previousAnalysis.asJava, previousSetup.asJava),
+        log
       )
     }
 
     if (isDebug) {
-      val debug: String => Unit = log.debug(_)
-      Setup.show(setup, debug)
-      InputUtils.show(inputs, debug)
-      debug("Setup and Inputs valid " + Util.timing(startTime))
+      log.debug(s"Inputs: $inputs")
+      log.debug(s"Setup and Inputs valid ${Util.timing(startTime)}")
     }
 
     try {

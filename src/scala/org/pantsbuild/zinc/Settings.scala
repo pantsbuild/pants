@@ -43,13 +43,12 @@ case class Settings(
   compileOrder: CompileOrder = CompileOrder.Mixed,
   sbt: SbtJars               = SbtJars(),
   _incOptions: IncOptions     = IncOptions(),
-  analysis: AnalysisOptions  = AnalysisOptions(),
-  properties: Seq[String]    = Seq.empty
+  analysis: AnalysisOptions  = AnalysisOptions()
 ) {
   import Settings._
 
   lazy val zincCacheDir: File = _zincCacheDir.getOrElse {
-    throw new RuntimeException(s"The ${Settings.ZincCacheDirName} option is required.")
+    throw new RuntimeException(s"The ${Settings.ZincCacheDirOpt} option is required.")
   }
 
   lazy val classpath: Seq[File] = _classpath map normalise
@@ -139,7 +138,18 @@ object ScalaLocation {
 case class SbtJars(
   compilerBridgeSrc: Option[File] = None,
   compilerInterface: Option[File] = None
-)
+) {
+  lazy val jars: (File, File) = (compilerBridgeSrc, compilerInterface) match {
+    case (Some(x), Some(y)) if x.exists && y.exists => (x, y)
+    case (Some(x), Some(y)) =>
+      throw new RuntimeException(s"One or both of $x and $y do not exist.")
+    case _ =>
+      throw new RuntimeException(
+        s"Both the ${Settings.CompilerBridgeOpt} and " +
+        s"${Settings.CompilerInterfaceOpt} options are required."
+      )
+  }
+}
 
 /**
  * Wrapper around incremental compiler options.
@@ -196,7 +206,10 @@ case class AnalysisOptions(
 )
 
 object Settings {
-  val ZincCacheDirName = "-zinc-cache-dir"
+  val ZincCacheDirOpt = "-zinc-cache-dir"
+  val CompilerBridgeOpt = "-compiler-bridge"
+  val CompilerInterfaceOpt = "-compiler-interface"
+
   /**
    * All available command-line options.
    */
@@ -243,9 +256,9 @@ object Settings {
     prefix(    "-C", "<javac-option>",         "Pass option to javac",                       (s: Settings, o: String) => s.copy(javacOptions = s.javacOptions :+ o)),
 
     header("sbt options:"),
-    file(      "-compiler-bridge", "file",     "Specify compiler bridge sources jar",        (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridgeSrc = Some(f)))),
-    file(      "-compiler-interface", "file",  "Specify compiler interface jar",             (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterface = Some(f)))),
-    file(      ZincCacheDirName, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
+    file(      CompilerBridgeOpt, "file",     "Specify compiler bridge sources jar",        (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerBridgeSrc = Some(f)))),
+    file(      CompilerInterfaceOpt, "file",  "Specify compiler interface jar",             (s: Settings, f: File) => s.copy(sbt = s.sbt.copy(compilerInterface = Some(f)))),
+    file(      ZincCacheDirOpt, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
 
     header("Incremental compiler options:"),
     int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(transitiveStep = i))),
@@ -264,11 +277,7 @@ object Settings {
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis =
       s.analysis.copy(_cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
-      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m))),
-
-    header("JVM options:"),
-    prefix(    "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
-    dummy(     "-J<flag>",                     "Set JVM flag directly for this process")
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m)))
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -276,12 +285,17 @@ object Settings {
   /**
    * Print out the usage message.
    */
-  def printUsage(): Unit = {
+  def printUsage(cmdName: String): Unit = {
     val column = options.map(_.length).max + 2
-    println("Usage: %s <options> <sources>" format Setup.Command)
+    println(s"Usage: ${cmdName} <options> <sources>")
     options foreach { opt => if (opt.extraline) println(); println(opt.usage(column)) }
     println()
   }
+
+  /**
+   * The string name for system property with the given name suffix (prefixed with `zinc.`).
+   */
+  def prop(name: String) = s"zinc.${name}"
 
   /**
    * Anything starting with '-' is considered an option, not a source file.
@@ -366,6 +380,12 @@ object Settings {
   def defaultBackupLocation(classesDir: File) = {
     classesDir.getParentFile / "backup" / classesDir.getName
   }
+
+  // NB: These cannot be options, because they are consumed statically.
+  val cacheLimit         = Util.intProperty(prop("cache.limit"), 5)
+  val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
+  val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
+  val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), 0)
 
   // helpers for creating options
 

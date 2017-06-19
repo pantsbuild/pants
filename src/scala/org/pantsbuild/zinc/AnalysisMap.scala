@@ -8,15 +8,18 @@ package org.pantsbuild.zinc
 import java.io.{File, IOException}
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import xsbti.Maybe
-import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup}
+import java.util.Optional
+
+import scala.compat.java8.OptionConverters._
+
+import org.pantsbuild.zinc.cache.Cache.Implicits
+import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
+
 import sbt.internal.inc.{Analysis, AnalysisStore, CompanionsStore, Locate, TextAnalysisFormat}
 import sbt.io.{IO, Using}
 import sbt.util.Logger
-import sbt.util.Logger.o2m
-import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
-import org.pantsbuild.zinc.cache.Cache.Implicits
 import xsbti.api.Companions
+import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup}
 
 /**
  * A facade around the analysis cache to:
@@ -40,8 +43,8 @@ case class AnalysisMap private[AnalysisMap] (
      * Gets analysis for a classpath entry (if it exists) by translating its path to a potential
      * cache location and then checking the cache.
      */
-    def analysis(classpathEntry: File): Maybe[CompileAnalysis] =
-      o2m(analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get))
+    def analysis(classpathEntry: File): Optional[CompileAnalysis] =
+      analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get).asJava
 
     /**
      * An implementation of definesClass that will use analysis for an input directory to determine
@@ -90,7 +93,7 @@ object AnalysisMap {
    * know if, on a cache miss, the underlying file will yield a valid Analysis.
    */
   private val analysisCache =
-    Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](Setup.Defaults.analysisCacheLimit)
+    Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](Settings.analysisCacheLimit)
 
   def create(
     // a map of classpath entries to cache file locations, excluding the current compile destination

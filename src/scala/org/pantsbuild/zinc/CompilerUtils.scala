@@ -42,23 +42,25 @@ object CompilerUtils {
   /**
    * Static cache for zinc compilers.
    */
-  private val compilerCache = Cache[Setup, Compilers](Setup.Defaults.compilerCacheLimit)
+  private val compilerCache = Cache[CompilerCacheKey, Compilers](Settings.compilerCacheLimit)
 
   /**
    * Static cache for resident scala compilers.
    */
-  private val residentCache: GlobalsCache = createResidentCache(Setup.Defaults.residentCacheLimit)
+  private val residentCache: GlobalsCache = createResidentCache(Settings.residentCacheLimit)
 
   /**
    * Get or create a zinc compiler based on compiler setup.
    */
-  def getOrCreate(setup: Setup, log: Logger): Compilers =
+  def getOrCreate(settings: Settings, log: Logger): Compilers = {
+    val setup = CompilerCacheKey(settings)
     compilerCache.getOrElseUpdate(setup) {
       val instance     = scalaInstance(setup)
       val interfaceJar = compilerInterface(setup, instance, log)
       val scalac       = newScalaCompiler(instance, interfaceJar)
       ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, setup.javaHome, scalac)
     }
+  }
 
   /**
    * Create a new scala compiler.
@@ -83,7 +85,7 @@ object CompilerUtils {
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.
    */
-  def scalaInstance(setup: Setup): XScalaInstance = {
+  def scalaInstance(setup: CompilerCacheKey): XScalaInstance = {
     import setup.{scalaCompiler, scalaExtra, scalaLibrary}
     val allJars = scalaLibrary +: scalaCompiler +: scalaExtra
     val loader = scalaLoader(allJars)
@@ -114,7 +116,7 @@ object CompilerUtils {
    * multiple zinc processes (ie, without nailgun) we need to be more careful not to clobber
    * another compilation attempt.
    */
-  def compilerInterface(setup: Setup, scalaInstance: XScalaInstance, log: Logger): File = {
+  def compilerInterface(setup: CompilerCacheKey, scalaInstance: XScalaInstance, log: Logger): File = {
     def compile(targetJar: File): Unit =
       AnalyzingCompiler.compileSources(
         Seq(setup.compilerBridgeSrc),
