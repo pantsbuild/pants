@@ -47,7 +47,13 @@ object CompilerUtils {
   /**
    * Static cache for resident scala compilers.
    */
-  private val residentCache: GlobalsCache = createResidentCache(Settings.residentCacheLimit)
+  private val residentCache: GlobalsCache = {
+    val maxCompilers = Settings.residentCacheLimit
+    if (maxCompilers <= 0)
+      CompilerCache.fresh
+    else
+      CompilerCache.createCacheFor(maxCompilers)
+  }
 
   /**
    * Get or create a zinc compiler based on compiler setup.
@@ -63,6 +69,11 @@ object CompilerUtils {
   }
 
   /**
+   * Get the instance of the GlobalsCache.
+   */
+  def getGlobalsCache = residentCache
+
+  /**
    * Create a new scala compiler.
    */
   def newScalaCompiler(instance: XScalaInstance, interfaceJar: File): AnalyzingCompiler =
@@ -72,15 +83,6 @@ object CompilerUtils {
       ClasspathOptionsUtil.auto,
       _ => (), None
     )
-
-  /**
-   * Create new globals cache.
-   */
-  def createResidentCache(maxCompilers: Int): GlobalsCache =
-    if (maxCompilers <= 0)
-      CompilerCache.fresh
-    else
-      CompilerCache.createCacheFor(maxCompilers)
 
   /**
    * Create the scala instance for the compiler. Includes creating the classloader.

@@ -8,15 +8,18 @@ import java.io.{File, IOException}
 import java.util.{ List => JList, Map => JMap }
 
 import scala.collection.JavaConverters._
+import scala.compat.java8.OptionConverters._
 
 import sbt.util.Logger
 import xsbti.{F1, Position}
 import xsbti.compile.{
-  CompileOrder,
   CompileOptions,
+  CompileOrder,
+  CompileProgress,
   Compilers,
   Inputs,
-  PreviousResult
+  PreviousResult,
+  Setup
 }
 
 object InputUtils {
@@ -26,8 +29,7 @@ object InputUtils {
   def create(settings: Settings, previousResult: PreviousResult, log: Logger): Inputs = {
     import settings._
 
-    // TODO: unused?
-    val progress =
+    val progress: CompileProgress =
       new SimpleCompileProgress(
         consoleLog.logPhases,
         consoleLog.printProgress,
@@ -57,11 +59,22 @@ object InputUtils {
         },
         compileOrder
       )
+    val setup =
+      new Setup(
+        analysisMap.getPCELookup,
+        false,
+        settings.cacheFile,
+        CompilerUtils.getGlobalsCache,
+        incOptions,
+        ???, // TODO: No clear way to create a Reporter currently.
+        Some(progress).asJava,
+        Array()
+      )
 
     new Inputs(
       compilers,
       compileOptions,
-      ???,
+      setup,
       previousResult
     )
   }
