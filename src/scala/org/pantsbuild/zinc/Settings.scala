@@ -176,6 +176,7 @@ case class IncOptions(
       useZincFileManager,
       recompileOnMacroDef.map(java.lang.Boolean.valueOf).asJava,
       true, // nameHashing
+      // TODO: what are the implications of disabling `storeApis`?
       false, // storeApis, apis is stored separately after 1.0.0
       false, // antStyle
       Map.empty.asJava, // extra

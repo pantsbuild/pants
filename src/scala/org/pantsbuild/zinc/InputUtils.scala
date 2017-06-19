@@ -57,8 +57,9 @@ object InputUtils {
         false,
         settings.cacheFile,
         CompilerUtils.getGlobalsCache,
-        incOptions,
-        // TODO: No clear way to create a Reporter currently.
+        incOptions.options(log),
+        // TODO: No clear way to create a Reporter currently:
+        //   see https://github.com/sbt/zinc/pull/304
         ???,
         None.asJava,
         Array()
