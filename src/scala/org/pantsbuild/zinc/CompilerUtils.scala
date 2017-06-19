@@ -12,7 +12,8 @@ import sbt.internal.inc.{
   IncrementalCompilerImpl,
   RawCompiler,
   ScalaInstance,
-  javac
+  javac,
+  ZincUtil
 }
 import sbt.io.Path
 import sbt.io.syntax._
@@ -21,9 +22,11 @@ import xsbti.compile.{
   ClasspathOptionsUtil,
   CompilerBridgeProvider,
   CompilerCache,
+  Compilers,
   GlobalsCache,
   Inputs,
-  JavaCompiler,
+  JavaTools,
+  ScalaCompiler,
   ScalaInstance => XScalaInstance
 }
 
@@ -32,14 +35,14 @@ import scala.compat.java8.OptionConverters._
 import org.pantsbuild.zinc.cache.Cache
 import org.pantsbuild.zinc.cache.Cache.Implicits
 
-object Compiler {
+object CompilerUtils {
   val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")
 
   /**
    * Static cache for zinc compilers.
    */
-  private val compilerCache = Cache[Setup, Compiler](Setup.Defaults.compilerCacheLimit)
+  private val compilerCache = Cache[Setup, Compilers](Setup.Defaults.compilerCacheLimit)
 
   /**
    * Static cache for resident scala compilers.
@@ -49,26 +52,13 @@ object Compiler {
   /**
    * Get or create a zinc compiler based on compiler setup.
    */
-  def apply(setup: Setup, log: Logger): Compiler =
+  def getOrCreate(setup: Setup, log: Logger): Compilers =
     compilerCache.getOrElseUpdate(setup) {
-      create(setup, log)
+      val instance     = scalaInstance(setup)
+      val interfaceJar = compilerInterface(setup, instance, log)
+      val scalac       = newScalaCompiler(instance, interfaceJar)
+      ZincUtil.compilers(instance, ClasspathOptionsUtil.auto, setup.javaHome, scalac)
     }
-
-  /**
-   * Java API for creating compiler.
-   */
-  def getOrCreate(setup: Setup, log: Logger): Compiler = apply(setup, log)
-
-  /**
-   * Create a new zinc compiler based on compiler setup.
-   */
-  def create(setup: Setup, log: Logger): Compiler = {
-    val instance     = scalaInstance(setup)
-    val interfaceJar = compilerInterface(setup, instance, log)
-    val scalac       = newScalaCompiler(instance, interfaceJar)
-    val javac        = newJavaCompiler(instance, setup.javaHome, setup.forkJava)
-    new Compiler(scalac, javac, setup)
-  }
 
   /**
    * Create a new scala compiler.
@@ -80,20 +70,6 @@ object Compiler {
       ClasspathOptionsUtil.auto,
       _ => (), None
     )
-
-  /**
-   * Create a new java compiler.
-   */
-  def newJavaCompiler(instance: XScalaInstance, javaHome: Option[File], fork: Boolean): JavaCompiler =
-    if (fork || javaHome.isDefined) {
-      javac.JavaCompiler.fork(javaHome)
-    } else {
-      javac.JavaCompiler.local.getOrElse {
-        throw new RuntimeException(
-          "Unable to locate javac directly. Please ensure that a JDK is on zinc's classpath."
-        )
-      }
-    }
 
   /**
    * Create new globals cache.
@@ -164,68 +140,4 @@ object Compiler {
   }
 
   def interfaceId(scalaVersion: String) = CompilerInterfaceId + "-" + scalaVersion + "-" + JavaClassVersion
-}
-
-/**
- * A zinc compiler for incremental recompilation.
- */
-class Compiler(scalac: AnalyzingCompiler, javac: JavaCompiler, setup: Setup) {
-
-  private[this] val compiler = new IncrementalCompilerImpl()
-
-  /**
-   * Run a compile. The resulting analysis is pesisted to `inputs.cacheFile`.
-   */
-  def compile(inputs: Inputs, progress: xsbti.compile.CompileProgress)(log: Logger): Unit = {
-    import inputs._
-
-    // load the existing analysis
-    val targetAnalysisStore = AnalysisMap.cachedStore(cacheFile)
-    val (previousAnalysis, previousSetup) =
-      targetAnalysisStore.get().map {
-        case (a, s) => (Some(a), Some(s))
-      } getOrElse {
-        (None, None)
-      }
-
-    val result =
-       compiler.compile(
-         scalac,
-         javac,
-         sources.toArray,
-         classpath = autoClasspath(classesDirectory, scalac.scalaInstance.allJars, javaOnly, classpath).toArray,
-         output = CompileOutput(classesDirectory),
-         cache = Compiler.residentCache,
-         scalaOptions = scalacOptions.toArray,
-         javacOptions.toArray,
-         previousAnalysis.asJava,
-         previousSetup.asJava,
-         perClasspathEntryLookup = analysisMap.getPCELookup,
-         reporter,
-         compileOrder,
-         skip = false,
-         progress = Some(progress).asJava,
-         incOptions.options(log),
-         extra = Array(),
-         logger = log
-      )
-
-    // if the compile resulted in modified analysis, persist it
-    if (result.hasModified) {
-      targetAnalysisStore.set(result.analysis, result.setup)
-    }
-  }
-
-  /**
-   * Automatically add the output directory and scala library to the classpath.
-   */
-  def autoClasspath(classesDirectory: File, allScalaJars: Seq[File], javaOnly: Boolean, classpath: Seq[File]): Seq[File] = {
-    if (javaOnly) classesDirectory +: classpath
-    else Setup.splitScala(allScalaJars) match {
-      case Some(scalaJars) => classesDirectory +: scalaJars.library +: classpath
-      case None            => classesDirectory +: classpath
-    }
-  }
-
-  override def toString = "Compiler(Scala %s)" format scalac.scalaInstance.actualVersion
 }

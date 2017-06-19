@@ -5,8 +5,14 @@
 package org.pantsbuild.zinc
 
 import java.io.File
+
+import scala.compat.java8.OptionConverters._
+
 import sbt.util.Level
 import xsbti.CompileFailed
+import xsbti.compile.{
+  PreviousResult
+}
 import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
 
 /**
@@ -24,7 +30,7 @@ object Main {
     val Parsed(rawSettings, residual, errors) = Settings.parse(args)
 
     // normalise relative paths to the current working directory (if provided)
-    val settings = Settings.normalise(rawSettings, cwd)
+    val settings = Settings.normaliseRelative(rawSettings, cwd)
 
     // if nailed then also set any system properties provided
     if (cwd.isDefined) Util.setProperties(settings.properties)
@@ -43,12 +49,9 @@ object Main {
 
     if (settings.help) Settings.printUsage()
 
-    val inputs = InputsUtils.create(log, settings)
-    val setup = Setup(settings)
-
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
-    if (inputs.sources.isEmpty) {
+    if (settings.sources.isEmpty) {
       if (!settings.version && !settings.help) {
         Setup.printVersion()
         Settings.printUsage()
@@ -63,21 +66,39 @@ object Main {
       sys.exit(1)
     }
 
-    // verify inputs
-    InputUtils.verify(inputs)
+    // Load the existing analysis for the destination, if any.
+    // TODO: Noisy in this method. Should factor out the "analysisStore is open" section.
+    val targetAnalysisStore = AnalysisMap.cachedStore(settings.cacheFile)
+    val inputs = {
+      val (previousAnalysis, previousSetup) =
+        targetAnalysisStore.get().map {
+          case (a, s) => (Some(a), Some(s))
+        } getOrElse {
+          (None, None)
+        }
+      InputUtils.create(
+        log,
+        settings,
+        new PreviousResult(previousAnalysis.asJava, previousSetup.asJava)
+      )
+    }
 
     if (isDebug) {
       val debug: String => Unit = log.debug(_)
       Setup.show(setup, debug)
       InputUtils.show(inputs, debug)
-      debug("Setup and Inputs parsed " + Util.timing(startTime))
+      debug("Setup and Inputs valid " + Util.timing(startTime))
     }
 
-    // run the compile
     try {
-      val compiler = Compiler(setup, log)
-      log.debug("Zinc compiler = %s [%s]" format (compiler, compiler.hashCode.toHexString))
-      compiler.compile(inputs, progress)(log)
+      // Run the compile.
+      val result = new IncrementalCompilerImpl().compile(inputs, log)
+
+      // Store the output if the result changed.
+      if (result.hasModified) {
+        targetAnalysisStore.set(result.analysis, result.setup)
+      }
+
       log.info("Compile success " + Util.timing(startTime))
     } catch {
       case e: CompileFailed =>

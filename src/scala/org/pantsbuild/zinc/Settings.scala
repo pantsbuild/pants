@@ -12,10 +12,11 @@ import scala.compat.java8.OptionConverters._
 import scala.util.matching.Regex
 
 import sbt.io.Path._
+import sbt.io.syntax._
 import sbt.util.{Level, Logger}
 import xsbti.Maybe
 import xsbti.compile.{
-  ClassfileManagerType,
+  ClassFileManagerType,
   CompileOrder,
   TransactionalManagerType
 }
@@ -29,9 +30,9 @@ case class Settings(
   help: Boolean              = false,
   version: Boolean           = false,
   consoleLog: ConsoleOptions = ConsoleOptions(),
-  sources: Seq[File]         = Seq.empty,
-  classpath: Seq[File]       = Seq.empty,
-  classesDirectory: File     = new File("."),
+  _sources: Seq[File]         = Seq.empty,
+  _classpath: Seq[File]       = Seq.empty,
+  _classesDirectory: File     = new File("."),
   scala: ScalaLocation       = ScalaLocation(),
   scalacOptions: Seq[String] = Seq.empty,
   javaHome: Option[File]     = None,
@@ -41,12 +42,42 @@ case class Settings(
   javacOptions: Seq[String]  = Seq.empty,
   compileOrder: CompileOrder = CompileOrder.Mixed,
   sbt: SbtJars               = SbtJars(),
-  incOptions: IncOptions     = IncOptions(),
+  _incOptions: IncOptions     = IncOptions(),
   analysis: AnalysisOptions  = AnalysisOptions(),
   properties: Seq[String]    = Seq.empty
 ) {
-  def zincCacheDir: File = _zincCacheDir.getOrElse {
+  import Settings._
+
+  lazy val zincCacheDir: File = _zincCacheDir.getOrElse {
     throw new RuntimeException(s"The ${Settings.ZincCacheDirName} option is required.")
+  }
+
+  lazy val classpath: Seq[File] = _classpath map normalise
+
+  lazy val sources: Seq[File] = _sources map normalise
+
+  lazy val classesDirectory: File = normalise(_classesDirectory)
+
+  lazy val cacheFile: File = {
+    normalise(analysis._cache.getOrElse(defaultCacheLocation(classesDirectory)))
+  }
+
+  lazy val cacheMap: Map[File, File] =
+    analysis._cacheMap.collect {
+      case (k, v) if normalise(k) != classesDirectory =>
+        (normalise(k), normalise(v))
+    }
+
+  lazy val incOptions: IncOptions = {
+    _incOptions.copy(
+      apiDumpDirectory = _incOptions.apiDumpDirectory map normalise,
+      backup = {
+        if (_incOptions.transactional)
+          Some(normalise(_incOptions.backup.getOrElse(defaultBackupLocation(classesDirectory))))
+        else
+          None
+      }
+    )
   }
 }
 
@@ -134,7 +165,7 @@ case class IncOptions(
       apiDebug,
       apiDiffContextSize,
       apiDumpDirectory.asJava,
-      classfileManager(log),
+      classfileManager(log).asJava,
       useZincFileManager,
       recompileOnMacroDef.map(java.lang.Boolean.valueOf).asJava,
       true, // nameHashing
@@ -149,19 +180,19 @@ case class IncOptions(
   def defaultApiDumpDirectory =
     defaultIncOptions.apiDumpDirectory
 
-  def classfileManager(log: Logger): Maybe[ClassfileManagerType] =
+  def classfileManager(log: Logger): Option[ClassFileManagerType] =
     if (transactional && backup.isDefined)
-      Maybe.just(new TransactionalManagerType(backup.get, log))
+      Some(new TransactionalManagerType(backup.get, log))
     else
-      Maybe.nothing[ClassfileManagerType]
+      None
 }
 
 /**
  * Configuration for sbt analysis and analysis output options.
  */
 case class AnalysisOptions(
-  cache: Option[File]           = None,
-  cacheMap: Map[File, File]     = Map.empty
+  _cache: Option[File]           = None,
+  _cacheMap: Map[File, File]     = Map.empty
 )
 
 object Settings {
@@ -193,8 +224,8 @@ object Settings {
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ re.r))),
 
     header("Compile options:"),
-    path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
-    file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(classesDirectory = f)),
+    path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(_classpath = cp)),
+    file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = f)),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
@@ -217,21 +248,23 @@ object Settings {
     file(      ZincCacheDirName, "file",       "A cache directory for compiler interfaces",  (s: Settings, f: File) => s.copy(_zincCacheDir = Some(f))),
 
     header("Incremental compiler options:"),
-    int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(transitiveStep = i))),
-    fraction(  "-recompile-all-fraction", "x", "Limit before recompiling all sources",       (s: Settings, d: Double) => s.copy(incOptions = s.incOptions.copy(recompileAllFraction = d))),
-    boolean(   "-debug-relations",             "Enable debug logging of analysis relations", (s: Settings) => s.copy(incOptions = s.incOptions.copy(relationsDebug = true))),
-    boolean(   "-debug-api",                   "Enable analysis API debugging",              (s: Settings) => s.copy(incOptions = s.incOptions.copy(apiDebug = true))),
-    file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(apiDumpDirectory = Some(f)))),
-    int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(incOptions = s.incOptions.copy(apiDiffContextSize = i))),
-    boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(incOptions = s.incOptions.copy(transactional = true))),
-    boolean(   "-no-zinc-file-manager",        "Disable zinc provided file manager",           (s: Settings) => s.copy(incOptions = s.incOptions.copy(useZincFileManager = false))),
-    file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(incOptions = s.incOptions.copy(backup = Some(f)))),
+    int(       "-transitive-step", "n",        "Steps before transitive closure",            (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(transitiveStep = i))),
+    fraction(  "-recompile-all-fraction", "x", "Limit before recompiling all sources",       (s: Settings, d: Double) => s.copy(_incOptions = s._incOptions.copy(recompileAllFraction = d))),
+    boolean(   "-debug-relations",             "Enable debug logging of analysis relations", (s: Settings) => s.copy(_incOptions = s._incOptions.copy(relationsDebug = true))),
+    boolean(   "-debug-api",                   "Enable analysis API debugging",              (s: Settings) => s.copy(_incOptions = s._incOptions.copy(apiDebug = true))),
+    file(      "-api-dump", "directory",       "Destination for analysis API dump",          (s: Settings, f: File) => s.copy(_incOptions = s._incOptions.copy(apiDumpDirectory = Some(f)))),
+    int(       "-api-diff-context-size", "n",  "Diff context size (in lines) for API debug", (s: Settings, i: Int) => s.copy(_incOptions = s._incOptions.copy(apiDiffContextSize = i))),
+    boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(_incOptions = s._incOptions.copy(transactional = true))),
+    boolean(   "-no-zinc-file-manager",        "Disable zinc provided file manager",           (s: Settings) => s.copy(_incOptions = s._incOptions.copy(useZincFileManager = false))),
+    file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(_incOptions = s._incOptions.copy(backup = Some(f)))),
     boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
-      (s: Settings) => s.copy(incOptions = s.incOptions.copy(recompileOnMacroDef = Some(false)))),
+      (s: Settings) => s.copy(_incOptions = s._incOptions.copy(recompileOnMacroDef = Some(false)))),
 
     header("Analysis options:"),
-    file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(cache = Some(f)))),
-    fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",  (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
+    file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis =
+      s.analysis.copy(_cache = Some(f)))),
+    fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m))),
 
     header("JVM options:"),
     prefix(    "-D", "property=value",         "Pass property to runtime system",            (s: Settings, o: String) => s.copy(properties = s.properties :+ o)),
@@ -264,7 +297,7 @@ object Settings {
     val (unknown, residual) = remaining partition isOpt
     val sources = residual map (new File(_))
     val unknownErrors = unknown map ("Unknown option: " + _)
-    Parsed(settings.copy(sources = sources), Seq.empty, errors ++ unknownErrors)
+    Parsed(settings.copy(_sources = sources), Seq.empty, errors ++ unknownErrors)
   }
 
   /**
@@ -279,16 +312,23 @@ object Settings {
   }
 
   /**
-   * Normalise all relative paths to the actual current working directory, if provided.
+   * Normalise all relative paths to absolute paths.
    */
-  def normalise(settings: Settings, cwd: Option[File]): Settings = {
+  def normalise(f: File): File = f.getAbsoluteFile
+
+  /**
+   * Normalise all relative paths to the actual current working directory, if provided.
+   * TODO: Actually necessary? If so, then the other absolute normalization is not
+   * necessary.
+   */
+  def normaliseRelative(settings: Settings, cwd: Option[File]): Settings = {
     if (cwd.isEmpty) settings
     else {
       import settings._
       settings.copy(
-        sources = Util.normaliseSeq(cwd)(sources),
-        classpath = Util.normaliseSeq(cwd)(classpath),
-        classesDirectory = Util.normalise(cwd)(classesDirectory),
+        _sources = Util.normaliseSeq(cwd)(_sources),
+        _classpath = Util.normaliseSeq(cwd)(_classpath),
+        _classesDirectory = Util.normalise(cwd)(_classesDirectory),
         scala = scala.copy(
           home = Util.normaliseOpt(cwd)(scala.home),
           path = Util.normaliseSeq(cwd)(scala.path),
@@ -301,16 +341,30 @@ object Settings {
           compilerBridgeSrc = Util.normaliseOpt(cwd)(sbt.compilerBridgeSrc),
           compilerInterface = Util.normaliseOpt(cwd)(sbt.compilerInterface)
         ),
-        incOptions = incOptions.copy(
+        _incOptions = _incOptions.copy(
           apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory),
           backup = Util.normaliseOpt(cwd)(incOptions.backup)
         ),
         analysis = analysis.copy(
-          cache = Util.normaliseOpt(cwd)(analysis.cache),
-          cacheMap = Util.normaliseMap(cwd)(analysis.cacheMap)
+          _cache = Util.normaliseOpt(cwd)(analysis._cache),
+          _cacheMap = Util.normaliseMap(cwd)(analysis._cacheMap)
         )
       )
     }
+  }
+
+  /**
+   * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).
+   */
+  def defaultCacheLocation(classesDir: File) = {
+    classesDir.getParentFile / "cache" / classesDir.getName
+  }
+
+  /**
+   * By default the backup location is relative to the classes directory (for example, target/classes/../backup/classes).
+   */
+  def defaultBackupLocation(classesDir: File) = {
+    classesDir.getParentFile / "backup" / classesDir.getName
   }
 
   // helpers for creating options
