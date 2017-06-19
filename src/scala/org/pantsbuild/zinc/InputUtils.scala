@@ -15,7 +15,6 @@ import xsbti.{F1, Position}
 import xsbti.compile.{
   CompileOptions,
   CompileOrder,
-  CompileProgress,
   Compilers,
   Inputs,
   PreviousResult,
@@ -28,13 +27,6 @@ object InputUtils {
    */
   def create(settings: Settings, previousResult: PreviousResult, log: Logger): Inputs = {
     import settings._
-
-    val progress: CompileProgress =
-      new SimpleCompileProgress(
-        consoleLog.logPhases,
-        consoleLog.printProgress,
-        consoleLog.heartbeatSecs
-      )(log)
 
     val analysisMap = AnalysisMap.create(cacheMap, log)
 
@@ -66,8 +58,9 @@ object InputUtils {
         settings.cacheFile,
         CompilerUtils.getGlobalsCache,
         incOptions,
-        ???, // TODO: No clear way to create a Reporter currently.
-        Some(progress).asJava,
+        // TODO: No clear way to create a Reporter currently.
+        ???,
+        None.asJava,
         Array()
       )
 

@@ -133,10 +133,6 @@ object Main {
         val message = e.getMessage
         if (message ne null) log.error(message)
         sys.exit(1)
-    } finally {
-      if (settings.consoleLog.printProgress || settings.consoleLog.heartbeatSecs > 0) {
-        System.out.println("Done.")
-      }
     }
   }
 }

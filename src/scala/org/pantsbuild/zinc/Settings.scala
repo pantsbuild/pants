@@ -85,9 +85,6 @@ case class Settings(
 case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
-  logPhases: Boolean         = false,
-  printProgress: Boolean     = false,
-  heartbeatSecs: Int         = 0,
   fileFilters: Seq[Regex]    = Seq.empty,
   msgFilters: Seq[Regex]     = Seq.empty
 )
@@ -225,12 +222,6 @@ object Settings {
       (s: Settings, l: String) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.withName(l)))),
     boolean(   "-no-color",                    "No color in logging to stdout",
       (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
-    boolean(   "-log-phases",                  "Log phases of compilation for each file to stdout",
-      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(logPhases = true))),
-    boolean(   "-print-progress",              "Periodically print compilation progress to stdout",
-      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(printProgress = true))),
-    int(       "-heartbeat", "interval (sec)", "Print '.' to stdout every n seconds while compiling",
-      (s: Settings, b: Int) => s.copy(consoleLog = s.consoleLog.copy(heartbeatSecs = b))),
     string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
     string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
