@@ -45,6 +45,13 @@ class PytestTestBase(PythonTaskTestBase):
       self._do_run_tests(context)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
 
+  def try_run_tests(self, targets, *passthru_args, **options):
+    try:
+      self.run_tests(targets, *passthru_args, **options)
+      return []
+    except ErrorWhileTesting as e:
+      return e.failed_targets
+
   def _prepare_test_run(self, targets, *passthru_args, **options):
     self.reset_build_graph()
     test_options = {
@@ -431,9 +438,12 @@ class PytestTest(PytestTestBase):
     self.assertEqual([], not_run_statements)
 
   def test_sharding(self):
-    self.run_tests(targets=[self.red, self.green], test_shard='1/2')
-    self.run_failing_tests(targets=[self.red, self.green], failed_targets=[self.red],
-                           test_shard='0/2')
+    shard0_failed_targets = self.try_run_tests(targets=[self.red, self.green], test_shard='0/2')
+    shard1_failed_targets = self.try_run_tests(targets=[self.red, self.green], test_shard='1/2')
+
+    # One shard should have no failed targets and the other should have found red failed. We're not
+    # sure how pytest will order tests, so measure this in an order-agnostic manner.
+    self.assertEqual([self.red], shard0_failed_targets + shard1_failed_targets)
 
   def test_sharding_single(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red], test_shard='0/1')
