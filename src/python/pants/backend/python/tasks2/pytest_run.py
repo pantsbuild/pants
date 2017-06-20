@@ -522,9 +522,10 @@ class PytestRun(TestRunnerTaskMixin, Task):
         break
 
     for partition in sorted(results):
-      rv = str(results[partition])
+      rv = results[partition]
       for target in partition:
-        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, rv))
+        log = self.context.log.info if rv.success else self.context.log.error
+        log('{0:80}.....{1:>10}'.format(target.id, rv))
 
     failed_targets = [target
                       for _rv in results.values() if not _rv.success

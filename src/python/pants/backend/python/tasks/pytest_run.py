@@ -138,8 +138,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
         if not rv.success and self.get_options().fail_fast:
           break
 
-      for target in sorted(results):
-        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
+      for target, rv in sorted(results.items()):
+        log = self.context.log.info if rv.success else self.context.log.error
+        log('{0:80}.....{1:>10}'.format(target.id, rv))
 
       failed_targets = [target for target, _rv in results.items() if not _rv.success]
       if failed_targets:
