@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 
 import sbt.util.Logger
-import xsbti.{F1, Position}
+import xsbti.{F1, Position, Problem, Reporter, Severity}
 import xsbti.compile.{
   CompileOptions,
   CompileOrder,
@@ -58,9 +58,7 @@ object InputUtils {
         settings.cacheFile,
         CompilerUtils.getGlobalsCache,
         incOptions.options(log),
-        // TODO: No clear way to create a Reporter currently:
-        //   see https://github.com/sbt/zinc/pull/304
-        ???,
+        ConsoleReporter,
         None.asJava,
         Array()
       )
@@ -149,4 +147,19 @@ object InputUtils {
    * The scala jars split into compiler, library, and extra.
    */
   case class ScalaJars(compiler: File, library: File, extra: Seq[File])
+}
+
+/**
+ * TODO: No clear way to create a LoggerReporter currently:
+ *  see https://github.com/sbt/zinc/pull/304
+ */
+private object ConsoleReporter extends Reporter {
+  def reset(): Unit = ()
+  def hasErrors: Boolean = false
+  def hasWarnings: Boolean = false
+  def printWarnings(): Unit = ()
+  def problems: Array[Problem] = Array.empty
+  def log(pos: Position, msg: String, sev: Severity): Unit = println(msg)
+  def comment(pos: Position, msg: String): Unit = ()
+  def printSummary(): Unit = ()
 }
