@@ -5,15 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
+from pants.base.deprecated import deprecated
 from pants.task.task import Task
-from pants.util.dirutil import safe_rmtree
 
 
 class Invalidate(Task):
   """Invalidate the entire build."""
 
+  @deprecated(removal_version='1.6.0.dev0', hint_message='Use `./pants --force ...` instead.')
   def execute(self):
-    build_invalidator_dir = os.path.join(self.get_options().pants_workdir, 'build_invalidator')
-    safe_rmtree(build_invalidator_dir)
+    self._build_invalidator(root=True).force_invalidate_all()

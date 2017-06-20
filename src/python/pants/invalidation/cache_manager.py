@@ -245,7 +245,7 @@ class InvalidationCacheManager(object):
   def __init__(self,
                results_dir_root,
                cache_key_generator,
-               build_invalidator_dir,
+               build_invalidator,
                invalidate_dependents,
                fingerprint_strategy=None,
                invalidation_report=None,
@@ -259,7 +259,7 @@ class InvalidationCacheManager(object):
     self._task_name = task_name or 'UNKNOWN'
     self._task_version = task_version or 'Unknown_0'
     self._invalidate_dependents = invalidate_dependents
-    self._invalidator = BuildInvalidator(build_invalidator_dir)
+    self._invalidator = build_invalidator
     self._fingerprint_strategy = fingerprint_strategy
     self._artifact_write_callback = artifact_write_callback
     self.invalidation_report = invalidation_report

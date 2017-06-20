@@ -36,8 +36,6 @@ class IndexJava(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(IndexJava, cls).register_options(register)
-    register('--force', type=bool, fingerprint=True,
-             help='Re-index all targets, even if they are valid.')
     cls.register_jvm_tool(register,
                           'kythe-indexer',
                           main=cls._KYTHE_INDEXER_MAIN)
@@ -50,9 +48,6 @@ class IndexJava(NailgunTask):
 
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
       kindex_files = self.context.products.get_data('kindex_files')
-      vts_to_index = (invalidation_check.all_vts if self.get_options().force
-                      else invalidation_check.invalid_vts)
-
       indexer_cp = self.tool_classpath('kythe-indexer')
       # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
       # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
@@ -60,7 +55,7 @@ class IndexJava(NailgunTask):
       jvm_options = ['-Xbootclasspath/p:{}'.format(':'.join(indexer_cp))]
       jvm_options.extend(self.get_options().jvm_options)
 
-      for vt in vts_to_index:
+      for vt in invalidation_check.invalid_vts:
         self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
         kindex_file = kindex_files.get(vt.target)
         if not kindex_file:

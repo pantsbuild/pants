@@ -324,8 +324,6 @@ class JarPublish(ScmPublishMixin, JarTask):
                   'where many artifacts must align.')
     register('--transitive', default=True, type=bool,
              help='Publish the specified targets and all their internal dependencies transitively.')
-    register('--force', type=bool,
-             help='Force pushing jars even if there have been no changes since the last push.')
     register('--override', type=list,
              help='Specifies a published jar revision override in the form: '
                   '([org]#[name]|[target spec])=[new revision] '
