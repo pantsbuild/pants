@@ -19,5 +19,6 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
 
   def execute(self):
     req_libs = self.context.targets(has_python_requirements)
-    pex = self.resolve_requirements(req_libs)
-    self.context.products.register_data(self.REQUIREMENTS_PEX, pex)
+    if req_libs:
+      pex = self.resolve_requirements(req_libs)
+      self.context.products.register_data(self.REQUIREMENTS_PEX, pex)
