@@ -24,7 +24,6 @@ class ScalaFix(NailgunTask, AbstractClass):
 
   _SCALAFIX_MAIN = 'scalafix.cli.Cli'
   _SCALA_SOURCE_EXTENSION = '.scala'
-  _SCALAHOST_NAME = 'scalahost-nsc'
 
   cache_target_dirs = True
 
