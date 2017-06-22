@@ -4,7 +4,6 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/node/src/python/pants/contrib/node:plugin',
     'contrib/scalafix/src/python/pants/contrib/scalafix/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',

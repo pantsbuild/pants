@@ -31,6 +31,8 @@ class ScalaFix(NailgunTask, AbstractClass):
   @classmethod
   def register_options(cls, register):
     super(ScalaFix, cls).register_options(register)
+    register('--skip', type=bool, fingerprint=True,
+             help='Skip running scalafix.')
     register('--config', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
     register('--rewrites', default=None, fingerprint=True,
@@ -54,10 +56,15 @@ class ScalaFix(NailgunTask, AbstractClass):
     return target.has_sources(self._SCALA_SOURCE_EXTENSION) and (not target.is_synthetic)
 
   def execute(self):
+    if self.get_options().skip:
+      return
+
     classpaths = self.context.products.get_data('runtime_classpath')
-    # NB: This task uses only the literal classpath of each target, so does not need
-    # `invalidate_dependents=True`.
-    with self.invalidated(self.context.targets(self._is_fixed)) as invalidation_check:
+    # NB: While this task uses only the classes directly generated from the sources of each
+    # target, the content of the generated semantic DBs will be affected by changes to
+    # dependencies. Thus, we use invalidate_dependents=True.
+    with self.invalidated(self.context.targets(self._is_fixed),
+                          invalidate_dependents=True) as invalidation_check:
       for vt in invalidation_check.all_vts:
         if not vt.valid:
           self.context.log.debug('Fixing {}...'.format(vt.target.address.spec))
