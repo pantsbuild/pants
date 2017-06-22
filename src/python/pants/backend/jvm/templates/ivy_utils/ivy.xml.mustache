@@ -29,6 +29,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
                 {{^transitive}}transitive="false"{{/transitive}}
                 {{#mutable}}changing="true"{{/mutable}}
     >
+      <conf name="default" mapped="default"/>
       {{^any_have_url}}
       {{#lib.extra_configurations}}
       <conf name="{{.}}" mapped="{{.}}"/>
