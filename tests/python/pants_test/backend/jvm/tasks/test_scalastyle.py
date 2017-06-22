@@ -69,7 +69,7 @@ class ScalastyleTest(NailgunTaskTestBase):
     # Default scalastyle config (import grouping rule) and no excludes.
     init_subsystem(ScalaPlatform, {
       ScalaPlatform.options_scope: {
-        'version': '2.10'
+        'version': '2.11'
       }
     })
 

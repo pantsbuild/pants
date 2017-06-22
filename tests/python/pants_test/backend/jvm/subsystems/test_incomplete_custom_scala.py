@@ -41,6 +41,10 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     command.extend([target, '--quiet'])
     return self.run_pants(command=command, stdin_data=program)
 
+  @classmethod
+  def hermetic(cls):
+    return True
+
   def setUp(self):
     self.target_path = 'testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform'
     self.tmp_build_file_path = 'BUILD.CustomScalaIntegTests'
