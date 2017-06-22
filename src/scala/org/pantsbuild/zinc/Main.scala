@@ -14,7 +14,7 @@ import xsbti.CompileFailed
 import xsbti.compile.{
   PreviousResult
 }
-import org.pantsbuild.zinc.logging.{ Loggers, Reporters }
+import org.pantsbuild.zinc.logging.Loggers
 
 /**
  * Command-line main class.
@@ -111,7 +111,6 @@ object Main {
 
     if (isDebug) {
       log.debug(s"Inputs: $inputs")
-      log.debug(s"Setup and Inputs valid ${Util.timing(startTime)}")
     }
 
     try {

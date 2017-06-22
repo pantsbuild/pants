@@ -9,23 +9,26 @@ import sbt.internal.inc.LoggerReporter
 import xsbti.{ Logger, Position, Reporter, Severity }
 
 import scala.util.matching.Regex
+import sbt.internal.util.ManagedLogger
 
-// TODO: Not currently possible to extend LoggerReporter in a useful way.
 
 object Reporters {
-/*
   def create(
-    log: Logger,
+    log: ManagedLogger,
     fileFilters: Seq[Regex],
     msgFilters: Seq[Regex],
     maximumErrors: Int = 100
-  ): Option[Reporter] =
+  ): Reporter = {
+    new LoggerReporter(maximumErrors, log)
+    // TODO: Not currently possible to extend/wrap LoggerReporter in a useful way.
+    /*
     if (fileFilters.isEmpty && msgFilters.isEmpty) {
-      new LoggerReporter(maximumErrors, log)
+      ???
     } else {
       new RegexFilterReporter(fileFilters, msgFilters, maximumErrors, log)
     }
-*/
+    */
+  }
 }
 
 /**

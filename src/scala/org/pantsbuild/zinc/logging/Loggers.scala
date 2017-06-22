@@ -8,19 +8,21 @@ package org.pantsbuild.zinc.logging
 
 import java.io.{ BufferedOutputStream, File, FileOutputStream, PrintWriter }
 
-import sbt.util.{ Level, Logger }
+import sbt.util.{ Level, LogExchange }
 
-import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
+import sbt.internal.util.{ ConsoleOut, ManagedLogger }
 
 object Loggers {
-  /** Create a new console logger based on level and color settings. */
+  /**
+   * Create a new console logger based on level and color settings.
+   *
+   * TODO: The `ManagedLogger` API is inscrutable, so no clear way to use those
+   *
+   */
   def create(
     level: Level.Value,
     color: Boolean,
     out: ConsoleOut = ConsoleOut.systemOut
-  ): Logger = {
-    val cl = ConsoleLogger(out, useColor = ConsoleLogger.formatEnabled && color)
-    cl.setLevel(level)
-    cl
-  }
+  ): ManagedLogger =
+    LogExchange.logger("")
 }

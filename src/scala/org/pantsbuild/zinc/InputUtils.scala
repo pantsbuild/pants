@@ -10,8 +10,8 @@ import java.util.{ List => JList, Map => JMap }
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 
-import sbt.util.Logger
-import xsbti.{F1, Position, Problem, Reporter, Severity}
+import sbt.internal.util.ManagedLogger
+import xsbti.{F1, Position, Problem, Severity}
 import xsbti.compile.{
   CompileOptions,
   CompileOrder,
@@ -21,11 +21,13 @@ import xsbti.compile.{
   Setup
 }
 
+import org.pantsbuild.zinc.logging.Reporters
+
 object InputUtils {
   /**
    * Create Inputs based on command-line settings.
    */
-  def create(settings: Settings, previousResult: PreviousResult, log: Logger): Inputs = {
+  def create(settings: Settings, previousResult: PreviousResult, log: ManagedLogger): Inputs = {
     import settings._
 
     val analysisMap = AnalysisMap.create(cacheMap, log)
@@ -51,6 +53,12 @@ object InputUtils {
         },
         compileOrder
       )
+    val reporter =
+      Reporters.create(
+        log,
+        settings.consoleLog.fileFilters,
+        settings.consoleLog.msgFilters
+      )
     val setup =
       new Setup(
         analysisMap.getPCELookup,
@@ -58,7 +66,7 @@ object InputUtils {
         settings.cacheFile,
         CompilerUtils.getGlobalsCache,
         incOptions.options(log),
-        ConsoleReporter,
+        reporter,
         None.asJava,
         Array()
       )
@@ -147,19 +155,4 @@ object InputUtils {
    * The scala jars split into compiler, library, and extra.
    */
   case class ScalaJars(compiler: File, library: File, extra: Seq[File])
-}
-
-/**
- * TODO: No clear way to create a LoggerReporter currently:
- *  see https://github.com/sbt/zinc/pull/304
- */
-private object ConsoleReporter extends Reporter {
-  def reset(): Unit = ()
-  def hasErrors: Boolean = false
-  def hasWarnings: Boolean = false
-  def printWarnings(): Unit = ()
-  def problems: Array[Problem] = Array.empty
-  def log(pos: Position, msg: String, sev: Severity): Unit = println(msg)
-  def comment(pos: Position, msg: String): Unit = ()
-  def printSummary(): Unit = ()
 }
