@@ -264,7 +264,7 @@ class DirutilTest(unittest.TestCase):
       self.assertFalse(os.path.exists(expected_file))
       self.assertTrue(os.path.exists(os.path.dirname(expected_file)))
 
-  def test_safe_concurrent_creation_exception_cleanup(self):
+  def test_safe_concurrent_creation_exception_handling(self):
     with temporary_dir() as td:
       expected_file = os.path.join(td, 'expected_file')
 
