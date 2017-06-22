@@ -20,13 +20,18 @@ jar_library(
 )
 ```
 
-Then, you will additionally need to enable the `-Yrangepos` flag for scalac in `pants.ini`:
+Then, you will additionally need to enable plugin, and pass the `-Yrangepos` flag for scalac
+in `pants.ini`:
 ```
 [compile.zinc]
 args: [
     # The `-S` prefix here indicates that zinc should pass this option to scalac rather than
     # to javac (`-C` prefix).
     '-S-Yrangepos',
+  ]
+
+scalac_plugins: [
+    'scalahost',
   ]
 ```
 
