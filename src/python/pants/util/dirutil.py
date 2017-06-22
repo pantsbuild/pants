@@ -250,7 +250,10 @@ def safe_concurrent_creation(target_path):
   tmp_path = '{}.tmp.{}'.format(target_path, uuid.uuid4().hex)
   try:
     yield tmp_path
-  finally:
+  except Exception:
+    rm_rf(tmp_path)
+    raise
+  else:
     if os.path.exists(tmp_path):
       safe_concurrent_rename(tmp_path, target_path)
 
