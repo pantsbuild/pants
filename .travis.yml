@@ -70,7 +70,9 @@ matrix:
       services:
         - docker
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       env:
         - SHARD="Linux Bintray Builder"
         # Use the standard python manylinux image for ideal binary compatibility.
@@ -104,7 +106,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -130,7 +134,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -156,7 +162,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -182,7 +190,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -208,7 +218,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -234,7 +246,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -260,7 +274,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -286,7 +302,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -312,7 +330,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -338,7 +358,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -364,7 +386,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -390,7 +414,9 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python: "2.7.13"
+      python:
+        "2.6"
+        "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
