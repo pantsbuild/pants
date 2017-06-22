@@ -64,15 +64,14 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       # Docker runs will write files as root, so avoid caching for this shard.
       cache: false
       services:
         - docker
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       env:
         - SHARD="Linux Bintray Builder"
         # Use the standard python manylinux image for ideal binary compatibility.
@@ -96,6 +95,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -106,9 +106,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -124,6 +122,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -134,9 +133,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -152,6 +149,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -162,9 +160,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -180,6 +176,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -190,9 +187,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -208,6 +203,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -218,9 +214,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -236,6 +230,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -246,9 +241,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -264,6 +257,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -274,9 +268,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -292,6 +284,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -302,9 +295,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -320,6 +311,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -330,9 +322,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -348,6 +338,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -358,9 +349,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -376,6 +365,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -386,9 +376,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
@@ -404,6 +392,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -414,9 +403,7 @@ matrix:
             - gcc-multilib
             - python-dev
       language: python
-      python:
-        - "2.6"
-        - "2.7.13"
+      python: "2.7.13"
       before_install:
         # Remove bad openjdk6 from trusty image, so
         # Pants will pick up oraclejdk6 from `packages` above.
