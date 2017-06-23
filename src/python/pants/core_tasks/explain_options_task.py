@@ -80,18 +80,18 @@ class ExplainOptionsTask(ConsoleTask):
     )
 
   def _format_record(self, record):
-    value_color = green if self.get_options().colors else lambda x: x
-    rank_color = self._rank_color(record.rank)
-    simple_value = str(record.value)
-    formatted_value = value_color(simple_value)
     simple_rank = RankedValue.get_rank_name(record.rank)
-    formatted_rank = '(from {rank}{details})'.format(
-      rank=simple_rank,
-      details=rank_color(' {}'.format(record.details)) if record.details else '',
-    )
     if self.is_json():
-      return simple_value.replace('\n', ''), simple_rank
+      return record.value, simple_rank
     elif self.is_text():
+      simple_value = str(record.value)
+      value_color = green if self.get_options().colors else lambda x: x
+      formatted_value = value_color(simple_value)
+      rank_color = self._rank_color(record.rank)
+      formatted_rank = '(from {rank}{details})'.format(
+        rank=simple_rank,
+        details=rank_color(' {}'.format(record.details)) if record.details else '',
+      )
       return '{value} {rank}'.format(
         value=formatted_value,
         rank=formatted_rank,
@@ -148,9 +148,16 @@ class ExplainOptionsTask(ConsoleTask):
           if parent_scope is not None and parent_value == history.latest.value:
             continue
         if self.is_json():
-          opt_vals = self._format_record(history.latest)
+          value, rank_name = self._format_record(history.latest)
           scope_key = self._format_scope(scope, option, True)
-          inner_map = dict(value=opt_vals[0], source=opt_vals[1])
+          # We rely on the fact that option values are restricted to a set of types compatible with
+          # json. In particular, we expect dict, list, str, bool, int and float, and so do no
+          # processing here.
+          # TODO(John Sirois): The option parsing system currently lets options of unexpected types
+          # slide by, which can lead to un-overridable values and which would also blow up below in
+          # json encoding, fix options to restrict the allowed `type`s:
+          #   https://github.com/pantsbuild/pants/issues/4695
+          inner_map = dict(value=value, source=rank_name)
           output_map[scope_key] = inner_map
         elif self.is_text():
           yield '{} = {}'.format(self._format_scope(scope, option),
