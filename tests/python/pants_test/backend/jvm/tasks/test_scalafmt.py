@@ -54,7 +54,7 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     fmt_result = self.run_pants(['fmt', target], {'fmt.scalafmt':options})
     self.assert_success(fmt_result)
 
-    # verify that the compile check passes.
+    # verify that the lint check passes.
     test_fmt = self.run_pants(['lint', target], {'lint.scalafmt':options})
     self.assert_success(test_fmt)
 
