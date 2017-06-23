@@ -33,9 +33,9 @@ class ScalaFmt(NailgunTask, AbstractClass):
     register('--configuration', advanced=True, type=file_option, fingerprint=False,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
     register('--target-types',
-             default={'scala_library', 'junit_tests', 'java_tests'},
+             default=['scala_library', 'junit_tests', 'java_tests'],
              advanced=True,
-             type=set,
+             type=list,
              help='The target types to apply formatting to.')
     cls.register_jvm_tool(register,
                           'scalafmt',
@@ -47,7 +47,7 @@ class ScalaFmt(NailgunTask, AbstractClass):
 
   @memoized_property
   def _formatted_target_types(self):
-    aliases = self.get_options().target_types
+    aliases = set(self.get_options().target_types)
     registered_aliases = self.context.build_file_parser.registered_aliases()
     return tuple({target_type
                   for alias in aliases
