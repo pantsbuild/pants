@@ -11,7 +11,7 @@ import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 
 import sbt.internal.util.ManagedLogger
-import xsbti.{F1, Position, Problem, Severity}
+import xsbti.{F1, Position, Problem, Severity, ReporterConfig, ReporterUtil}
 import xsbti.compile.{
   CompileOptions,
   CompileOrder,
@@ -20,8 +20,6 @@ import xsbti.compile.{
   PreviousResult,
   Setup
 }
-
-import org.pantsbuild.zinc.logging.Reporters
 
 object InputUtils {
   /**
@@ -54,10 +52,11 @@ object InputUtils {
         compileOrder
       )
     val reporter =
-      Reporters.create(
-        log,
-        settings.consoleLog.fileFilters,
-        settings.consoleLog.msgFilters
+      ReporterUtil.getReporter(
+        new ReporterConfig(
+          settings.consoleLog.fileFilters,
+          settings.consoleLog.msgFilters
+        )
       )
     val setup =
       new Setup(
