@@ -642,7 +642,7 @@ class Target(AbstractTarget):
 
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
-    assert kwargs is None or payload is None, 'must provide either kwargs or payload'
+    assert kwargs is not None or payload is not None, 'must provide either kwargs or payload'
     assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
     assert not (kwargs and not isinstance(kwargs, dict)), (
       'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))

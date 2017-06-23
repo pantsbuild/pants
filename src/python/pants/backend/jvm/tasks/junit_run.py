@@ -415,7 +415,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           self.context.log.debug('CWD = {}'.format(workdir))
           self.context.log.debug('platform = {}'.format(platform))
           with environment_as(**dict(target_env_vars)):
-            result += abs(self._spawn_and_wait(
+            subprocess_result = self._spawn_and_wait(
               executor=SubprocessExecutor(distribution),
               distribution=distribution,
               classpath=complete_classpath,
@@ -428,7 +428,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               cwd=workdir,
               synthetic_jar_dir=output_dir,
               create_synthetic_jar=self.synthetic_classpath,
-            ))
+            )
+            self.context.log.debug('JUnit subprocess exited with result ({})'.format(subprocess_result))
+            result += abs(subprocess_result)
 
           tests_info = self.parse_test_info(output_dir, parse_error_handler, ['classname'])
           for test_name, test_info in tests_info.items():
@@ -546,7 +548,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if coverage:
         coverage.report(all_targets, self.execute_java_for_coverage, tests_failed_exception=exc)
       if self._html_report:
+        self.context.log.debug('Generating JUnit HTML report...')
         html_file_path = JUnitHtmlReport().report(output_dir, os.path.join(output_dir, 'reports'))
+        self.context.log.debug('JUnit HTML report generated to {}'.format(html_file_path))
         if self._open:
           desktop.ui_open(html_file_path)
 
