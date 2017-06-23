@@ -12,7 +12,8 @@ from pants.task.task import Task
 class Invalidate(Task):
   """Invalidate the entire build."""
 
-  @deprecated(removal_version='1.6.0.dev0', hint_message='Use `./pants --force ...` instead.')
+  @deprecated(removal_version='1.6.0.dev0',
+              hint_message='Use `./pants --cache-ignore ...` instead.')
   def execute(self):
     # TODO(John Sirois): Remove the `root` argument `_build_invalidator` once this deprecation cycle
     # is complete. This is the only caller using the argument:
