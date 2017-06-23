@@ -14,4 +14,7 @@ class Invalidate(Task):
 
   @deprecated(removal_version='1.6.0.dev0', hint_message='Use `./pants --force ...` instead.')
   def execute(self):
+    # TODO(John Sirois): Remove the `root` argument `_build_invalidator` once this deprecation cycle
+    # is complete. This is the only caller using the argument:
+    #   https://github.com/pantsbuild/pants/issues/4697
     self._build_invalidator(root=True).force_invalidate_all()

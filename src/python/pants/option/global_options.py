@@ -201,5 +201,3 @@ class GlobalOptionsRegistrar(Optionable):
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
-    register('--force', type=bool, recursive=True,
-             help='Force Pants to execute the specified action; ie: ignore caches.')

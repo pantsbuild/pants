@@ -50,6 +50,8 @@ class CacheSetup(Subsystem):
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
     default_cache = [os.path.join(get_buildroot(), '.cache')]
+    register('--ignore', type=bool,
+             help='Ignore all other cache configuration and skip using the cache.')
     register('--read', type=bool, default=True,
              help='Read build artifacts from cache, if available.')
     register('--write', type=bool, default=True,
@@ -129,11 +131,15 @@ class CacheFactory(object):
     else:
       self._resolver = NoopResolver()
 
+  @property
+  def ignore(self):
+    return self._options.ignore
+
   def read_cache_available(self):
-    return self._options.read and bool(self._options.read_from) and self.get_read_cache()
+    return not self.ignore and self._options.read and self.get_read_cache()
 
   def write_cache_available(self):
-    return self._options.write and bool(self._options.write_to) and self.get_write_cache()
+    return not self.ignore and self._options.write and self.get_write_cache()
 
   def overwrite(self):
     return self._options.overwrite

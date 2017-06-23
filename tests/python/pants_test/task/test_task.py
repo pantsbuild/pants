@@ -282,7 +282,7 @@ class TaskTest(TaskTestBase):
     self.assertNotIn(vtB.current_results_dir, vtC_live)
     self.assertEqual(len(vtC_live), 2)
 
-  def test_force_global(self):
+  def test_ignore_global(self):
     _, _, was_valid = self._run_fixture()
     self.assertFalse(was_valid)
 
@@ -291,10 +291,10 @@ class TaskTest(TaskTestBase):
     self.assertTrue(was_valid)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture(options={'': {'force': True}})
+    _, _, was_valid = self._run_fixture(options={'cache': {'ignore': True}})
     self.assertFalse(was_valid)
 
-  def test_force(self):
+  def test_ignore(self):
     _, _, was_valid = self._run_fixture()
     self.assertFalse(was_valid)
 
@@ -303,5 +303,6 @@ class TaskTest(TaskTestBase):
     self.assertTrue(was_valid)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture(options={self.options_scope: {'force': True}})
+    _, _, was_valid = self._run_fixture(options={'cache.{}'.format(self.options_scope):
+                                                   {'ignore': True}})
     self.assertFalse(was_valid)

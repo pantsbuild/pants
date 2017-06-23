@@ -178,7 +178,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._cache_key_errors = set()
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
-    self._forced = False
+    self._force_invalidated = False
 
   @memoized_method
   def _build_invalidator(self, root=False):
@@ -342,9 +342,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                                              artifact_write_callback=self.maybe_write_artifact)
 
     # If this Task's execution has been forced, invalidate all our target fingerprints.
-    if self.get_options().force and not self._forced:
+    if self._cache_factory.ignore and not self._force_invalidated:
       self.invalidate()
-      self._forced = True
+      self._force_invalidated = True
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
