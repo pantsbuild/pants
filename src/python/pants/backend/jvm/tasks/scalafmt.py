@@ -43,7 +43,7 @@ class ScalaFmt(NailgunTask, AbstractClass):
                           classpath=[
                           JarDependency(org='com.geirsson',
                                         name='scalafmt-cli_2.11',
-                                        rev='0.2.11')
+                                        rev='1.0.0-RC4')
                           ])
 
   @classmethod
@@ -134,7 +134,7 @@ class ScalaFmtCheckFormat(ScalaFmt):
     # If no config file is specified use default scalafmt config.
     config_file = self.get_options().configuration
     args = ['--test', '--files', files]
-    if config_file!= None:
+    if config_file != None:
       args.extend(['--config', config_file])
 
     return args
@@ -159,7 +159,7 @@ class ScalaFmtFormat(ScalaFmt):
     # If no config file is specified use default scalafmt config.
     config_file = self.get_options().configuration
     args = ['-i', '--files', files]
-    if config_file!= None:
+    if config_file != None:
       args.extend(['--config', config_file])
 
     return args
