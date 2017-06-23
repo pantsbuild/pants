@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.build_graph.address import Address
 
 
 class JavacPlugin(JavaLibrary):

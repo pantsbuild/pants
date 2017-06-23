@@ -13,7 +13,6 @@ from collections import namedtuple
 from six.moves import range
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.cache.artifact_cache import ArtifactCacheError
 from pants.cache.local_artifact_cache import LocalArtifactCache, TempLocalArtifactCache
 from pants.cache.pinger import BestUrlSelector, Pinger

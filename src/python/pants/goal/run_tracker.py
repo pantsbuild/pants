@@ -439,7 +439,6 @@ class RunTracker(Subsystem):
     else:
       raise ValueError('Keys must contain at least one key.')
 
-
   @classmethod
   def _merge_list_of_keys_into_dict(cls, data, keys, value, index=0):
     """Recursively merge list of keys that points to the given value into data.

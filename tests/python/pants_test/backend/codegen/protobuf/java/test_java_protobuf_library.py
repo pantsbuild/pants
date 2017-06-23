@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
 from textwrap import dedent
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
@@ -85,7 +84,7 @@ class JavaProtobufLibraryTest(BaseTest):
       )
       '''))
     with self.assertRaises(JarLibrary.ExpectedAddressError):
-      target = self.target('//:foo')
+      self.target('//:foo')
 
   def test_traversable_specs(self):
     self.add_to_build_file('BUILD', dedent('''

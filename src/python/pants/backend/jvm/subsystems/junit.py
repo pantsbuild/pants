@@ -11,7 +11,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method
 
 
 class JUnit(JvmToolMixin, Subsystem):

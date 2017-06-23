@@ -11,6 +11,7 @@ python_library(
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:mapper',
+    'src/python/pants/engine:nodes',
     'src/python/pants/engine:selectors',
     'src/python/pants/util:dirutil',
   ],
