@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import os
 from unittest import TestCase
+from xml.etree.ElementTree import ParseError
 
 from mock import patch
 
@@ -18,7 +19,6 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler
 from pants.util.timeout import TimeoutReached
-from pants.util.xml_parser import XmlParser
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -489,7 +489,7 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
       with self.assertRaises(Exception) as exc:
         self.parse_test_info(xml_dir, self._raise_handler)
       self.assertEqual(xml_file, exc.exception.xml_path)
-      self.assertIsInstance(exc.exception.cause, XmlParser.XmlError)
+      self.assertIsInstance(exc.exception.cause, ParseError)
 
   def test_parse_test_info_error_continue(self):
     with temporary_dir() as xml_dir:
