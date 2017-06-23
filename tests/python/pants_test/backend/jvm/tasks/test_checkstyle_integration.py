@@ -53,7 +53,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           self._create_config_file(config_file, config)
           args = [
             'clean-all',
-            'lint',
+            'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
             '--lint-checkstyle-configuration={}'.format(config_file)
@@ -77,7 +77,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
           config_file = os.path.join(tmp, config_name)
           self._create_config_file(config_file, config)
           args = [
-            'lint',
+            'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
             '--lint-checkstyle-configuration={}'.format(config_file)
@@ -142,7 +142,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         previous_names.add(config_file)
         self._create_config_file(config_file, config)
         args = [
-          'lint',
+          'lint.checkstyle',
           cache_args,
           'examples/src/java/org/pantsbuild/example/hello/simple',
           '--lint-checkstyle-configuration={}'.format(config_file),
@@ -173,7 +173,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'checkstyle.suppression.files': suppression_file,
           }
           args = [
-            'lint',
+            'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
             "--lint-checkstyle-properties={}".format(json.dumps(properties)),
@@ -216,7 +216,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'checkstyle.suppression.files': suppression_file,
           }
           args = [
-            'lint',
+            'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
             "--lint-checkstyle-properties={}".format(json.dumps(properties)),
@@ -235,7 +235,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             'my.value': value,
           }
           args = [
-            'lint',
+            'lint.checkstyle',
             cache_args,
             'examples/src/java/org/pantsbuild/example/hello/simple',
             "--lint-checkstyle-properties={}".format(json.dumps(properties)),
