@@ -86,7 +86,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),)
+    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),
+                                                            BuildInvalidator.Factory)
 
   @classmethod
   def product_types(cls):
@@ -175,15 +176,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._workdir = workdir
 
     self._cache_key_errors = set()
-
-    self._build_invalidator_dir = os.path.join(
-      self.context.options.for_global_scope().pants_workdir,
-      'build_invalidator',
-      self.stable_name())
-
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
-
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
+    self._force_invalidated = False
+
+  @memoized_method
+  def _build_invalidator(self, root=False):
+    build_task = None if root else self.stable_name()
+    return BuildInvalidator.Factory.create(build_task=build_task)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -248,7 +248,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def invalidate(self):
     """Invalidates all targets for this task."""
-    BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
+    self._build_invalidator().force_invalidate_all()
 
   @property
   def create_target_dirs(self):
@@ -333,13 +333,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.fingerprint)
     cache_manager = InvalidationCacheManager(self.workdir,
                                              cache_key_generator,
-                                             self._build_invalidator_dir,
+                                             self._build_invalidator(),
                                              invalidate_dependents,
                                              fingerprint_strategy=fingerprint_strategy,
                                              invalidation_report=self.context.invalidation_report,
                                              task_name=type(self).__name__,
                                              task_version=self.implementation_version_str(),
                                              artifact_write_callback=self.maybe_write_artifact)
+
+    # If this Task's execution has been forced, invalidate all our target fingerprints.
+    if self._cache_factory.ignore and not self._force_invalidated:
+      self.invalidate()
+      self._force_invalidated = True
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 

@@ -7,6 +7,7 @@ python_library(
     'src/python/pants/base:hash_utils',
     'src/python/pants/build_graph',
     'src/python/pants/fs',
+    'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],

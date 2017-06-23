@@ -7,7 +7,8 @@ python_tests(
   dependencies = [
     'src/python/pants/invalidation',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
 

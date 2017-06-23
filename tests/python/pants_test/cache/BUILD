@@ -29,6 +29,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/cache',
+    'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/task',

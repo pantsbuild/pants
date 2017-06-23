@@ -9,7 +9,7 @@ import os
 import shutil
 import tempfile
 
-from pants.invalidation.build_invalidator import CacheKeyGenerator
+from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTargetSet
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants_test.base_test import BaseTest
@@ -38,7 +38,7 @@ class InvalidationCacheManagerTest(BaseTest):
     self.cache_manager = InvalidationCacheManager(
       results_dir_root=os.path.join(self._dir, 'results'),
       cache_key_generator=CacheKeyGenerator(),
-      build_invalidator_dir=os.path.join(self._dir, 'build_invalidator'),
+      build_invalidator=BuildInvalidator(os.path.join(self._dir, 'build_invalidator')),
       invalidate_dependents=True,
     )
 
