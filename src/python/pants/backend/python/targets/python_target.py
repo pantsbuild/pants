@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
@@ -19,7 +17,6 @@ from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_addressable import TargetAddressable
-from pants.util.memo import memoized_property
 
 
 class PythonTarget(Target):

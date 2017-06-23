@@ -12,7 +12,6 @@ from textwrap import dedent
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.engine.fs import PathGlobs
-from pants.engine.storage import Storage
 from pants.engine.subsystem.native import Native
 from pants.util import desktop
 from pants.util.contextutil import temporary_file_path

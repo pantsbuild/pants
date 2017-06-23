@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
@@ -21,7 +20,7 @@ from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, Diffe
 from pants.engine.nodes import Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import TaskRule
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import SelectDependencies
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser

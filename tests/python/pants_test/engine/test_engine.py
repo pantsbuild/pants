@@ -7,13 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import unittest
-from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.build_graph.address import Address
 from pants.engine.nodes import Return
 from pants.engine.rules import RootRule, TaskRule
-from pants.engine.scheduler import ExecutionRequest
 from pants.engine.selectors import Select
 from pants_test.engine.examples.planners import Classpath, setup_json_scheduler
 from pants_test.engine.scheduler_test_base import SchedulerTestBase

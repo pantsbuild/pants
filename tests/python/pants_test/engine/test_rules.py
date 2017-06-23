@@ -8,14 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 from textwrap import dedent
 
-from twitter.common.collections import OrderedSet
-
-from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress)
-from pants.build_graph.address import Address
 from pants.engine.addressable import Exactly
 from pants.engine.build_files import create_graph_rules
-from pants.engine.fs import PathGlobs, create_fs_rules
+from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import AddressMapper
 from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
 from pants.engine.scheduler import WrappedNativeScheduler
@@ -23,9 +18,7 @@ from pants.engine.selectors import Select, SelectDependencies, SelectProjection,
 from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
-from pants_test.engine.util import (TargetTable, assert_equal_with_printing,
-                                    create_native_scheduler, init_native)
-from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.engine.util import TargetTable, assert_equal_with_printing, create_native_scheduler
 
 
 class AGoal(Goal):

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
-from pants.base.deprecated import deprecated, deprecated_conditional
+from pants.base.deprecated import deprecated
 from pants.util.dirutil import longest_dir_prefix
 from pants.util.strutil import strip_prefix
 

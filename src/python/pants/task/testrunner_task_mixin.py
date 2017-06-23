@@ -140,7 +140,7 @@ class TestRunnerTaskMixin(object):
 
           try:
             test_info.update({'time': float(testcase.attrib.get('time'))})
-          except:
+          except (TypeError, ValueError):
             test_info.update({'time': None})
 
           for attribute in testcase_attributes:

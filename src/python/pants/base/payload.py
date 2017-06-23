@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from hashlib import sha1
 
-from pants.base.payload_field import PayloadField
-
 
 class PayloadFieldAlreadyDefinedError(Exception): pass
 

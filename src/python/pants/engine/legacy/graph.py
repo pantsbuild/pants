@@ -23,7 +23,6 @@ from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.mapper import ResolveError
-from pants.engine.nodes import Return
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper

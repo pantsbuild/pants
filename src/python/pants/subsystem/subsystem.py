@@ -250,6 +250,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
     if specs_len == 0:
       return None
     if specs_len != 1:
-      raise TooManySpecsForKey('injectables spec mapping for key included {} elements, expected 1'
+      raise self.TooManySpecsForKey('injectables spec mapping for key included {} elements, expected 1'
                                .format(specs_len))
     return specs[0]

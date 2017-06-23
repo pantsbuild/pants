@@ -40,7 +40,7 @@ class ManagedJarDependencies(Target):
       yield spec
 
     if kwargs:
-      _, specs = self._split_jars_and_specs(kwargs.get('artifacts', ()))
+      _, specs = cls._split_jars_and_specs(kwargs.get('artifacts', ()))
       for spec in specs:
         yield spec
     elif payload:

@@ -12,17 +12,13 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager
 
-from twitter.common.collections import maybe_list
-
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
-from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
-                              SingleAddress)
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
-from pants.engine.nodes import Return, Throw
+from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
                                     SelectVariant, constraint_for)
