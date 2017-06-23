@@ -32,6 +32,12 @@ object InputUtils {
 
     val compilers = CompilerUtils.getOrCreate(settings, log)
 
+    // Noop
+    val positionMapper = 
+      new F1[Position, Position] {
+        override def apply(p: Position): Position = p
+      }
+
     val compileOptions =
       new CompileOptions(
         autoClasspath(
@@ -45,17 +51,19 @@ object InputUtils {
         scalacOptions.toArray,
         javacOptions.toArray,
         Int.MaxValue,
-        // Noop `sourcePositionMapper`.
-        new F1[Position, Position] {
-          override def apply(p: Position): Position = p
-        },
+        positionMapper,
         compileOrder
       )
     val reporter =
       ReporterUtil.getReporter(
         new ReporterConfig(
-          settings.consoleLog.fileFilters,
+          "",
+          Int.MaxValue,
+          true,
           settings.consoleLog.msgFilters
+          settings.consoleLog.fileFilters,
+          settings.consoleLog.javaLogLevel,
+          positionMapper
         )
       )
     val setup =

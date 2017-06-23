@@ -5,7 +5,7 @@
 package org.pantsbuild.zinc
 
 import java.io.File
-import java.util.{ List => JList }
+import java.util.{ List => JList, logging => jlogging }
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
@@ -80,14 +80,28 @@ case class Settings(
   }
 }
 
-/** Due to the limit of 22 elements in a case class, options must get broken down into sub-groups.
- * TODO: further break options into sensible subgroups. */
+/**
+ * Console logging options.
+ */
 case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
   fileFilters: Seq[Regex]    = Seq.empty,
   msgFilters: Seq[Regex]     = Seq.empty
-)
+) {
+  def javaLogLevel: jlogging.Level = logLevel match {
+    case Level.Info =>
+      jlogging.Level.INFO   
+    case Level.Warn =>
+      jlogging.Level.WARNING
+    case Level.Error =>
+      jlogging.Level.SEVERE 
+    case Level.Debug =>
+      jlogging.Level.SEVERE 
+    case x =>
+      sys.error(s"Unsupported log level: $x")    
+  }
+}
 
 /**
  * Alternative ways to locate the scala jars.
