@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from threading import Timer
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.util.timeout import Timeout, TimeoutReached
-from pants.util.xml_parser import XmlParser
 
 
 class TestRunnerTaskMixin(object):
@@ -132,40 +132,33 @@ class TestRunnerTaskMixin(object):
         self.xml_path = xml_path
         self.cause = cause
 
-    def parse_xml_file(path):
+    def parse_xml_file(xml_file_path):
       try:
-        xml = XmlParser.from_file(path)
-        for testcase in xml.parsed.getElementsByTagName('testcase'):
+        root = ET.parse(xml_file_path).getroot()
+        for testcase in root.iter('testcase'):
           test_info = {}
 
           try:
-            test_info.update({'time': float(testcase.getAttribute('time'))})
+            test_info.update({'time': float(testcase.attrib.get('time'))})
           except:
             test_info.update({'time': None})
 
           for attribute in testcase_attributes:
-            attribute_value = testcase.getAttribute(attribute)
-            if not attribute_value:
-              attribute_value = None
-            test_info[attribute] = attribute_value
+            test_info[attribute] = testcase.attrib.get(attribute)
 
-          test_error = testcase.getElementsByTagName('error')
-          test_fail = testcase.getElementsByTagName('failure')
-          test_skip = testcase.getElementsByTagName('skipped')
+          result = SUCCESS
+          if next(testcase.iter('error'), None) is not None:
+            result = ERROR
+          elif next(testcase.iter('failure'), None) is not None:
+            result = FAILURE
+          elif next(testcase.iter('skipped'), None) is not None:
+            result = SKIPPED
+          test_info.update({'result_code': result})
 
-          if test_fail:
-            test_info.update({'result_code': FAILURE})
-          elif test_error:
-            test_info.update({'result_code': ERROR})
-          elif test_skip:
-            test_info.update({'result_code': SKIPPED})
-          else:
-            test_info.update({'result_code': SUCCESS})
+          tests_in_path.update({testcase.attrib.get('name', ''): test_info})
 
-          tests_in_path.update({testcase.getAttribute('name'): test_info})
-
-      except (XmlParser.XmlError, ValueError) as e:
-        error_handler(ParseError(path, e))
+      except (ET.ParseError, ValueError) as e:
+        error_handler(ParseError(xml_file_path, e))
 
     if os.path.isdir(xml_path):
       for name in os.listdir(xml_path):
