@@ -12,7 +12,7 @@ from hashlib import sha1
 
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
-from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.invalidation.build_invalidator import CacheKeyGenerator
 from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method
 
