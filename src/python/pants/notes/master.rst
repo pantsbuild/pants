@@ -5,6 +5,49 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev3 (6/23/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Replace the `invalidate` goal with `--cache-ignore`. (#4686)
+  `PR #4686 <https://github.com/pantsbuild/pants/pull/4686>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix pythonstyle warnings and some python-eval warnings (#4698)
+  `PR #4698 <https://github.com/pantsbuild/pants/pull/4698>`_
+
+* Add debug logging to prepare_resources and junit_run and fix payload asserts (#4694)
+  `PR #4694 <https://github.com/pantsbuild/pants/pull/4694>`_
+
+* Improve safe_concurrent_creation contextmanager. (#4690)
+  `PR #4690 <https://github.com/pantsbuild/pants/pull/4690>`_
+
+* Fix pytest result summary colors. (#4685)
+  `PR #4685 <https://github.com/pantsbuild/pants/pull/4685>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Use ElementTree to parse JUnit XML files because it is much faster than minidom (#4693)
+  `PR #4693 <https://github.com/pantsbuild/pants/pull/4693>`_
+
+* Use link.checkstyle target for checkstyle integration (#4699)
+  `PR #4699 <https://github.com/pantsbuild/pants/pull/4699>`_
+
+* Stabilize sharding test. (#4687)
+  `PR #4687 <https://github.com/pantsbuild/pants/pull/4687>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Fixup explain options json output. (#4696)
+  `PR #4696 <https://github.com/pantsbuild/pants/pull/4696>`_
+
+
 1.4.0.dev3 (6/16/2017)
 ----------------------
 
