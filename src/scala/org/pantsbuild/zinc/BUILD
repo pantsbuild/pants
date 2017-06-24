@@ -16,5 +16,5 @@ scala_library(
     'src/scala/org/pantsbuild/zinc/logging',
   ],
   strict_deps=True,
-  platform='java7',
+  platform='java8',
 )

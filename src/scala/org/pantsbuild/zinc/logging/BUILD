@@ -10,5 +10,5 @@ scala_library(
     '3rdparty/jvm/org/scala-sbt:zinc',
   ],
   strict_deps=True,
-  platform='java7',
+  platform='java8',
 )

@@ -32,9 +32,13 @@ object InputUtils {
 
     val compilers = CompilerUtils.getOrCreate(settings, log)
 
-    // Noop
-    val positionMapper = 
+    // TODO: Remove duplication once on Scala 2.12.x.
+    val positionMapperF1 =
       new F1[Position, Position] {
+        override def apply(p: Position): Position = p
+      }
+    val positionMapper =
+      new java.util.function.Function[Position, Position] {
         override def apply(p: Position): Position = p
       }
 
@@ -51,17 +55,17 @@ object InputUtils {
         scalacOptions.toArray,
         javacOptions.toArray,
         Int.MaxValue,
-        positionMapper,
+        positionMapperF1,
         compileOrder
       )
     val reporter =
-      ReporterUtil.getReporter(
+      ReporterUtil.getDefault(
         new ReporterConfig(
           "",
           Int.MaxValue,
           true,
-          settings.consoleLog.msgFilters
-          settings.consoleLog.fileFilters,
+          settings.consoleLog.msgFilters.toArray,
+          settings.consoleLog.fileFilters.toArray,
           settings.consoleLog.javaLogLevel,
           positionMapper
         )

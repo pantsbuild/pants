@@ -6,10 +6,10 @@ package org.pantsbuild.zinc
 
 import java.io.File
 import java.util.{ List => JList, logging => jlogging }
+import java.util.regex.Pattern
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
-import scala.util.matching.Regex
 
 import sbt.io.Path._
 import sbt.io.syntax._
@@ -86,8 +86,8 @@ case class Settings(
 case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
-  fileFilters: Seq[Regex]    = Seq.empty,
-  msgFilters: Seq[Regex]     = Seq.empty
+  fileFilters: Seq[Pattern]    = Seq.empty,
+  msgFilters: Seq[Pattern]     = Seq.empty
 ) {
   def javaLogLevel: jlogging.Level = logLevel match {
     case Level.Info =>
@@ -237,9 +237,9 @@ object Settings {
     boolean(   "-no-color",                    "No color in logging to stdout",
       (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
     string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ Pattern.compile(re)))),
     string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ re.r))),
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ Pattern.compile(re)))),
 
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(_classpath = cp)),
