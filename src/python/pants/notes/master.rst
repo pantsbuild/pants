@@ -5,7 +5,7 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
-1.4.0.dev3 (6/23/2017)
+1.4.0.dev4 (6/23/2017)
 ----------------------
 
 API Changes
