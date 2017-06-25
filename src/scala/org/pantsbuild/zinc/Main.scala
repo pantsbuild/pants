@@ -68,7 +68,7 @@ object Main {
     val settings = Settings.normaliseRelative(rawSettings, cwd)
 
     val log = Loggers.create(settings.consoleLog.logLevel, settings.consoleLog.color)
-    val isDebug = settings.consoleLog.logLevel == Level.Debug
+    val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
     // bail out on any command-line option errors
     if (errors.nonEmpty) {

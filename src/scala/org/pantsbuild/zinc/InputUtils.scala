@@ -10,7 +10,7 @@ import java.util.{ List => JList, Map => JMap }
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 
-import sbt.internal.util.ManagedLogger
+import sbt.util.Logger
 import xsbti.{F1, Position, Problem, Severity, ReporterConfig, ReporterUtil}
 import xsbti.compile.{
   CompileOptions,
@@ -25,7 +25,7 @@ object InputUtils {
   /**
    * Create Inputs based on command-line settings.
    */
-  def create(settings: Settings, previousResult: PreviousResult, log: ManagedLogger): Inputs = {
+  def create(settings: Settings, previousResult: PreviousResult, log: Logger): Inputs = {
     import settings._
 
     val analysisMap = AnalysisMap.create(cacheMap, log)

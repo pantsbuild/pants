@@ -97,7 +97,7 @@ case class ConsoleOptions(
     case Level.Error =>
       jlogging.Level.SEVERE 
     case Level.Debug =>
-      jlogging.Level.SEVERE 
+      jlogging.Level.FINE
     case x =>
       sys.error(s"Unsupported log level: $x")    
   }
