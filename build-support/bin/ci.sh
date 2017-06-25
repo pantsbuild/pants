@@ -58,7 +58,7 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:ny:ci:a" opt; do
+while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -72,12 +72,12 @@ while getopts "hfxbkmsrjlpu:ny:ci:a" opt; do
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     n) skip_contrib="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
+    t) skip_lint="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -156,6 +156,14 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
     echo "* Executing command '${cmd}' as a sanity test"
     ${cmd} >/dev/null 2>&1 || die "Failed to execute '${cmd}'."
   done
+  end_travis_section
+fi
+
+if [[ "${skip_lint:-false}" == "false" ]]; then
+  start_travis_section "Lint" "Running lint checks"
+  (
+    ./pants.pex ${PANTS_ARGS[@]} lint contrib:: examples:: src:: tests:: zinc::
+  ) || die "Lint check failure"
   end_travis_section
 fi
 

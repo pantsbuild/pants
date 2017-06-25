@@ -23,6 +23,7 @@ from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen
 
 GEN_ADAPT = '--gen-adapt'
 
+
 class ScroogeGenTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
