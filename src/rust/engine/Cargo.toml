@@ -10,7 +10,7 @@ build = "src/cffi_build.rs"
 debug = true
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
 [build-dependencies]
 gcc = "0.3"
