@@ -91,7 +91,7 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for node, state in roots.items():
+    for node, state in roots:
       self._assert_type_is_return(node, state)
       self._assert_correct_value_type(state, HydratedTargets)
       # We have a successful HydratedTargets value (for a particular input Spec).
@@ -248,12 +248,12 @@ class LegacyBuildGraph(BuildGraph):
       raise result.error
     # Update the base class indexes for this request.
     root_entries = result.root_products
-    address_entries = {k: v for k, v in root_entries.items() if k[1].product is BuildFileAddresses}
-    target_entries = {k: v for k, v in root_entries.items() if k[1].product is HydratedTargets}
+    address_entries = [(k, v) for k, v in root_entries.items() if k[1].product is BuildFileAddresses]
+    target_entries = [(k, v) for k, v in root_entries.items() if k[1].product is HydratedTargets]
     self._index(target_entries)
 
     yielded_addresses = set()
-    for (subject, _), state in address_entries.items():
+    for (subject, _), state in address_entries:
       self._assert_type_is_return(subject, state)
       self._assert_correct_value_type(state, BuildFileAddresses)
 

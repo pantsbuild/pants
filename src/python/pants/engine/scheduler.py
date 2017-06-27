@@ -9,6 +9,7 @@ import logging
 import os
 import threading
 import time
+from collections import OrderedDict
 from contextlib import contextmanager
 
 from pants.base.project_tree import Dir, File, Link
@@ -261,7 +262,7 @@ class WrappedNativeScheduler(object):
   def root_entries(self, execution_request):
     raw_roots = self._native.lib.execution_roots(self._scheduler)
     try:
-      roots = {}
+      roots = OrderedDict()
       for root, raw_root in zip(execution_request.roots,
                                 self._native.unpack(raw_roots.nodes_ptr,
                                                     raw_roots.nodes_len)):
