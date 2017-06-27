@@ -45,6 +45,8 @@ object InputUtils {
         override def apply(p: Position): Position = p
       }
 
+    println(s"Input sources are: ${sources.mkString("[", ", ", "]")}")
+
     val compileOptions =
       new CompileOptions(
         autoClasspath(

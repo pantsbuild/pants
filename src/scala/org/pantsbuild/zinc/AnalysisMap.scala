@@ -91,32 +91,34 @@ class AnalysisMap private[AnalysisMap] (
   /**
    * Create an analysis store backed by analysisCache.
    */
-  def cachedStore(cacheFile: File): AnalysisStore = {
-    val fileStore = mkFileBasedStore(cacheFile)
+  def cachedStore(cacheFile: File): AnalysisStore =
+    AnalysisStore.sync(
+      new AnalysisStore {
+        val fileStore = mkFileBasedStore(cacheFile)
 
-    val fprintStore = new AnalysisStore {
-      def set(analysis: CompileAnalysis, setup: MiniSetup) {
-        fileStore.set(analysis, setup)
-        FileFPrint.fprint(cacheFile).foreach { fprint =>
-          AnalysisMap.analysisCache.put(fprint, Some((analysis, setup)))
+        def set(analysis: CompileAnalysis, setup: MiniSetup) {
+          println(s"Storing analysis to $cacheFile...")
+          fileStore.set(analysis, setup)
+          FileFPrint.fprint(cacheFile).foreach { fprint =>
+            println(s"...storing with $fprint with allSources: ${analysis.readStamps.getAllSourceStamps}.")
+            AnalysisMap.analysisCache.put(fprint, Some((analysis, setup)))
+          }
         }
-      }
-      def get(): Option[(CompileAnalysis, MiniSetup)] = {
-        println(s"Getting analysis from $cacheFile...")
-        FileFPrint.fprint(cacheFile) flatMap { fprint =>
-          println(s"...analysis has fingerprint $fprint")
-          AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
-            println(s"...loading analysis from disk...")
-            val x = fileStore.get
-            println(s"...loaded $x.")
-            x
+
+        def get(): Option[(CompileAnalysis, MiniSetup)] = {
+          println(s"Getting analysis from $cacheFile...")
+          FileFPrint.fprint(cacheFile) flatMap { fprint =>
+            println(s"...analysis has fingerprint $fprint")
+            AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
+              println(s"...loading analysis from disk...")
+              val x = fileStore.get
+              println(s"...loaded $x with allSources: ${x.map(_._1.readStamps.getAllSourceStamps)}.")
+              x
+            }
           }
         }
       }
-    }
-
-    AnalysisStore.sync(fprintStore)
-  }
+    )
 
   private def cacheLookup(cacheFPrint: FileFPrint): Option[CompileAnalysis] =
     AnalysisMap.analysisCache.getOrElseUpdate(cacheFPrint) {
@@ -124,7 +126,7 @@ class AnalysisMap private[AnalysisMap] (
       if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
         throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
       }
-      AnalysisStore.cached(mkFileBasedStore(cacheFPrint.file)).get()
+      mkFileBasedStore(cacheFPrint.file).get()
     }.map(_._1)
 
   private def mkFileBasedStore(file: File): AnalysisStore = FileBasedStore(file, analysisMappers)
@@ -183,6 +185,7 @@ class PortableAnalysisMappers(rebases: Set[(Path, Path)]) extends AnalysisMapper
       orderedRebases
         .collectFirst {
           case (from, to) if p.startsWith(from) =>
+            println(s"Rebasing $p with $from")
             to.resolve(from.relativize(p)).toFile
         }
         .getOrElse(f)
