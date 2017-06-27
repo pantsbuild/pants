@@ -92,7 +92,7 @@ class AnalysisMap private[AnalysisMap] (
    * Create an analysis store backed by analysisCache.
    */
   def cachedStore(cacheFile: File): AnalysisStore = {
-    val fileStore = AnalysisStore.cached(mkFileBasedStore(cacheFile))
+    val fileStore = mkFileBasedStore(cacheFile)
 
     val fprintStore = new AnalysisStore {
       def set(analysis: CompileAnalysis, setup: MiniSetup) {
@@ -102,15 +102,20 @@ class AnalysisMap private[AnalysisMap] (
         }
       }
       def get(): Option[(CompileAnalysis, MiniSetup)] = {
+        println(s"Getting analysis from $cacheFile...")
         FileFPrint.fprint(cacheFile) flatMap { fprint =>
+          println(s"...analysis has fingerprint $fprint")
           AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
-            fileStore.get
+            println(s"...loading analysis from disk...")
+            val x = fileStore.get
+            println(s"...loaded $x.")
+            x
           }
         }
       }
     }
 
-    AnalysisStore.sync(AnalysisStore.cached(fprintStore))
+    AnalysisStore.sync(fprintStore)
   }
 
   private def cacheLookup(cacheFPrint: FileFPrint): Option[CompileAnalysis] =
