@@ -112,6 +112,15 @@ python_tests(
 )
 
 python_tests(
+  name='paths_integration',
+  sources=['test_paths_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name = 'sorttargets',
   sources = ['test_sorttargets.py'],
   dependencies = [
