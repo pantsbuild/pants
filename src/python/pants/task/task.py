@@ -388,6 +388,22 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       for vts in invalidation_check.invalid_vts:
         vts.copy_previous_results()
 
+    # This may seem odd: why would we need to invalidate a VersionedTargetSet that is already
+    # invalid?  But the name force_invalidate() is slightly misleading in this context - what it
+    # actually does is delete the key file created at the end of the last successful task run.
+    # This is necessary to avoid the following scenario:
+    #
+    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 2) In state B: Task fails, but writes some output.  Key is not recorded.
+    # 3) After reverting back to state A: The current key is the same as the one recorded at the
+    #    end of step 1), so it looks like no work needs to be done, but actually the task
+    #   must re-run, to overwrite the output written in step 2.
+    #
+    # Deleting the file ensures that if a task fails, there is no key for which we might think
+    # we're in a valid state.
+    for vts in invalidation_check.invalid_vts:
+      vts.force_invalidate()
+
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
 
