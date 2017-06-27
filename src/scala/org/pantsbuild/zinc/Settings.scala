@@ -213,7 +213,8 @@ case class IncOptions(
  */
 case class AnalysisOptions(
   _cache: Option[File]           = None,
-  _cacheMap: Map[File, File]     = Map.empty
+  _cacheMap: Map[File, File]     = Map.empty,
+  rebaseMap: Map[File, File]     = Map.empty
 )
 
 object Settings {
@@ -282,7 +283,9 @@ object Settings {
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis =
       s.analysis.copy(_cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
-      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m)))
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m))),
+    fileMap(   "-rebase-map",                  "Soure and destination paths to rebase in persisted analysis (file:file,...)",
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m)))
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet

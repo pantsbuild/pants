@@ -25,10 +25,13 @@ object InputUtils {
   /**
    * Create Inputs based on command-line settings.
    */
-  def create(settings: Settings, previousResult: PreviousResult, log: Logger): Inputs = {
+  def create(
+    settings: Settings,
+    analysisMap: AnalysisMap,
+    previousResult: PreviousResult,
+    log: Logger
+  ): Inputs = {
     import settings._
-
-    val analysisMap = AnalysisMap.create(cacheMap, log)
 
     val compilers = CompilerUtils.getOrCreate(settings, log)
 

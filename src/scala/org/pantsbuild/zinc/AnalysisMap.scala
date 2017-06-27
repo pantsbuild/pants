@@ -6,8 +6,7 @@
 package org.pantsbuild.zinc
 
 import java.io.{File, IOException}
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import java.nio.file.Path
 import java.util.Optional
 
 import scala.compat.java8.OptionConverters._
@@ -15,7 +14,7 @@ import scala.compat.java8.OptionConverters._
 import org.pantsbuild.zinc.cache.Cache.Implicits
 import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
 
-import sbt.internal.inc.{Analysis, AnalysisStore, CompanionsStore, Locate, TextAnalysisFormat}
+import sbt.internal.inc.{Analysis, AnalysisMappersAdapter, AnalysisStore, CompanionsStore, Mapper, FileBasedStore, Locate}
 import sbt.io.{IO, Using}
 import sbt.util.Logger
 import xsbti.api.Companions
@@ -31,12 +30,15 @@ import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntr
  * on classpath entries until it finds a classpath entry defining a particular class. When it finds
  * the appropriate classpath entry, it will use `getAnalysis` to fetch the API for that class.
  */
-case class AnalysisMap private[AnalysisMap] (
+class AnalysisMap private[AnalysisMap] (
   // a map of classpath entries to cache file fingerprints, excluding the current compile destination
   analysisLocations: Map[File, FileFPrint],
+  // a Set of Path bases and destinations to re-relativize them to
+  rebases: Set[(Path, Path)],
   // log
   log: Logger
 ) {
+  private val analysisMappers = new PortableAnalysisMappers(rebases)
 
   def getPCELookup = new PerClasspathEntryLookup {
     /**
@@ -44,7 +46,7 @@ case class AnalysisMap private[AnalysisMap] (
      * cache location and then checking the cache.
      */
     def analysis(classpathEntry: File): Optional[CompileAnalysis] =
-      analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get).asJava
+      analysisLocations.get(classpathEntry).flatMap(cacheLookup).asJava
 
     /**
      * An implementation of definesClass that will use analysis for an input directory to determine
@@ -83,8 +85,44 @@ case class AnalysisMap private[AnalysisMap] (
      * cache location and then checking the cache.
      */
     def getAnalysis(classpathEntry: File): Option[CompileAnalysis] =
-       analysisLocations.get(classpathEntry).flatMap(AnalysisMap.get)
+       analysisLocations.get(classpathEntry).flatMap(cacheLookup)
   }
+
+  /**
+   * Create an analysis store backed by analysisCache.
+   */
+  def cachedStore(cacheFile: File): AnalysisStore = {
+    val fileStore = AnalysisStore.cached(mkFileBasedStore(cacheFile))
+
+    val fprintStore = new AnalysisStore {
+      def set(analysis: CompileAnalysis, setup: MiniSetup) {
+        fileStore.set(analysis, setup)
+        FileFPrint.fprint(cacheFile).foreach { fprint =>
+          AnalysisMap.analysisCache.put(fprint, Some((analysis, setup)))
+        }
+      }
+      def get(): Option[(CompileAnalysis, MiniSetup)] = {
+        FileFPrint.fprint(cacheFile) flatMap { fprint =>
+          AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
+            fileStore.get
+          }
+        }
+      }
+    }
+
+    AnalysisStore.sync(AnalysisStore.cached(fprintStore))
+  }
+
+  private def cacheLookup(cacheFPrint: FileFPrint): Option[CompileAnalysis] =
+    AnalysisMap.analysisCache.getOrElseUpdate(cacheFPrint) {
+      // re-fingerprint the file on miss, to ensure that analysis hasn't changed since we started
+      if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
+        throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
+      }
+      AnalysisStore.cached(mkFileBasedStore(cacheFPrint.file)).get()
+    }.map(_._1)
+
+  private def mkFileBasedStore(file: File): AnalysisStore = FileBasedStore(file, analysisMappers)
 }
 
 object AnalysisMap {
@@ -96,94 +134,61 @@ object AnalysisMap {
     Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](Settings.analysisCacheLimit)
 
   def create(
-    // a map of classpath entries to cache file locations, excluding the current compile destination
     analysisLocations: Map[File, File],
-    // log
+    rebases: Map[File, File],
     log: Logger
   ): AnalysisMap =
-    AnalysisMap(
+    new AnalysisMap(
       // create fingerprints for all inputs at startup
       analysisLocations.flatMap {
         case (classpathEntry, cacheFile) => FileFPrint.fprint(cacheFile).map(classpathEntry -> _)
       },
+      rebases
+        .toSeq
+        .map {
+          case (k, v) => (k.toPath, v.toPath)
+        }
+        .toSet,
       log
     )
-
-  private def get(cacheFPrint: FileFPrint): Option[CompileAnalysis] =
-    analysisCache.getOrElseUpdate(cacheFPrint) {
-      // re-fingerprint the file on miss, to ensure that analysis hasn't changed since we started
-      if (!FileFPrint.fprint(cacheFPrint.file).exists(_ == cacheFPrint)) {
-        throw new IOException(s"Analysis at $cacheFPrint has changed since startup!")
-      }
-      AnalysisStore.cached(SafeFileBasedStore(cacheFPrint.file)).get()
-    }.map(_._1)
-
-  /**
-   * Create an analysis store backed by analysisCache.
-   */
-  def cachedStore(cacheFile: File): AnalysisStore = {
-    val fileStore = AnalysisStore.cached(SafeFileBasedStore(cacheFile))
-
-    val fprintStore = new AnalysisStore {
-      def set(analysis: CompileAnalysis, setup: MiniSetup) {
-        fileStore.set(analysis, setup)
-        FileFPrint.fprint(cacheFile) foreach { analysisCache.put(_, Some((analysis, setup))) }
-      }
-      def get(): Option[(CompileAnalysis, MiniSetup)] = {
-        FileFPrint.fprint(cacheFile) flatMap { fprint =>
-          analysisCache.getOrElseUpdate(fprint) {
-            fileStore.get
-          }
-        }
-      }
-    }
-
-    AnalysisStore.sync(AnalysisStore.cached(fprintStore))
-  }
 }
 
 /**
- * Safely update analysis file by writing to a temp file first
- * and only rename to the original file upon successful write.
+ * Given a Set of Path bases and destination bases, adapts written analysis to rewrite
+ * all of the bases.
  *
- * TODO: merge this upstream https://github.com/sbt/zinc/issues/178
+ * Intended usecase is to rebase each distinct non-portable base path contained in the analysis:
+ * in pants this is generally
+ *   1) the buildroot
+ *   2) the workdir (generally named `.pants.d`, but not always located under the buildroot)
+ *   3) the base of the JVM that is in use
  */
-object SafeFileBasedStore {
-  def apply(file: File): AnalysisStore = new AnalysisStore {
-    override def set(analysis: CompileAnalysis, setup: MiniSetup): Unit = {
-      val tmpAnalysisFile = File.createTempFile(file.getName, ".tmp")
-      val analysisStore = PlainTextFileBasedStore(tmpAnalysisFile)
-      analysisStore.set(analysis, setup)
-      Files.move(tmpAnalysisFile.toPath, file.toPath, StandardCopyOption.REPLACE_EXISTING)
+class PortableAnalysisMappers(rebases: Set[(Path, Path)]) extends AnalysisMappersAdapter {
+  private val rebaser = {
+    // Sort the rebases from longest to shortest (to ensure that a prefix is rebased
+    // before a suffix).
+    val orderedRebases =
+      rebases.toSeq.sortBy {
+        case (path, slug) => -path.toString.size
+      }
+
+    val rebaseFile: File => File = { f =>
+      val p = f.toPath
+      // Attempt each rebase in length order, applying the longest one that matches.
+      orderedRebases
+        .collectFirst {
+          case (from, to) if p.startsWith(from) =>
+            to.resolve(from.relativize(p)).toFile
+        }
+        .getOrElse(f)
     }
 
-    override def get(): Option[(CompileAnalysis, MiniSetup)] =
-      PlainTextFileBasedStore(file).get
-  }
-}
-
-/**
- * Zinc 1.0 changes its analysis file format to zip, and split into two files.
- * The following provides a plain text adaptor for pants parser. Long term though,
- * we should consider define an internal analysis format that's 1) more stable
- * 2) better performance because we can pick and choose only the fields we care about
- * - string processing in rebase can be slow for example.
- * https://github.com/pantsbuild/pants/issues/4039
- */
-object PlainTextFileBasedStore {
-  def apply(file: File): AnalysisStore = new AnalysisStore {
-    override def set(analysis: CompileAnalysis, setup: MiniSetup): Unit = {
-      Using.fileWriter(IO.utf8)(file) { writer => TextAnalysisFormat.write(writer, analysis, setup) }
-    }
-
-    override def get(): Option[(CompileAnalysis, MiniSetup)] =
-      try { Some(getUncaught()) } catch { case _: Exception => None }
-    def getUncaught(): (CompileAnalysis, MiniSetup) =
-      Using.fileReader(IO.utf8)(file) { reader => TextAnalysisFormat.read(reader, noopCompanionsStore) }
+    Mapper.forFile.map(rebaseFile, rebaseFile)
   }
 
-  val noopCompanionsStore = new CompanionsStore {
-    override def get(): Option[(Map[String, Companions], Map[String, Companions])] = Some(getUncaught())
-    override def getUncaught(): (Map[String, Companions], Map[String, Companions]) = (Map(), Map())
-  }
+  override val outputDirMapper: Mapper[File] = rebaser
+  override val sourceDirMapper: Mapper[File] = rebaser
+  override val sourceMapper: Mapper[File] = rebaser
+  override val productMapper: Mapper[File] = rebaser
+  override val binaryMapper: Mapper[File] = rebaser
 }

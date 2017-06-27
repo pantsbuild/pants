@@ -94,7 +94,8 @@ object Main {
 
     // Load the existing analysis for the destination, if any.
     // TODO: Noisy in this method. Should factor out the "analysisStore is open" section.
-    val targetAnalysisStore = AnalysisMap.cachedStore(settings.cacheFile)
+    val analysisMap = AnalysisMap.create(settings.cacheMap, settings.analysis.rebaseMap, log)
+    val targetAnalysisStore = analysisMap.cachedStore(settings.cacheFile)
     val inputs = {
       val (previousAnalysis, previousSetup) =
         targetAnalysisStore.get().map {
@@ -104,6 +105,7 @@ object Main {
         }
       InputUtils.create(
         settings,
+        analysisMap,
         new PreviousResult(previousAnalysis.asJava, previousSetup.asJava),
         log
       )
