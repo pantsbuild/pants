@@ -81,7 +81,8 @@ object CompilerUtils {
       instance,
       CompilerBridgeProvider.constant(interfaceJar, instance),
       ClasspathOptionsUtil.auto,
-      _ => (), None
+      _ => (),
+      None
     )
 
   /**

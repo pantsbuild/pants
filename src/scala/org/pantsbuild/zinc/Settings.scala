@@ -18,6 +18,7 @@ import xsbti.Maybe
 import xsbti.compile.{
   ClassFileManagerType,
   CompileOrder,
+  IncOptionsUtil,
   TransactionalManagerType
 }
 import xsbti.compile.IncOptionsUtil.defaultIncOptions
@@ -174,32 +175,18 @@ case class IncOptions(
   apiDumpDirectory: Option[File] = defaultIncOptions.apiDumpDirectory.asScala,
   transactional: Boolean         = false,
   useZincFileManager: Boolean    = true,
-  backup: Option[File]           = None,
-  recompileOnMacroDef: Option[Boolean] =
-    defaultIncOptions.recompileOnMacroDef.asScala.map(_.booleanValue)
+  backup: Option[File]           = None
 ) {
-  def options(log: Logger): xsbti.compile.IncOptions = {
-    new xsbti.compile.IncOptions(
-      transitiveStep,
-      recompileAllFraction,
-      relationsDebug,
-      apiDebug,
-      apiDiffContextSize,
-      apiDumpDirectory.asJava,
-      classfileManager(log).asJava,
-      useZincFileManager,
-      recompileOnMacroDef.map(java.lang.Boolean.valueOf).asJava,
-      true, // nameHashing
-      false, // storeApis: not actually used for incremental compile as of 1.0.0-X16.
-      false, // antStyle
-      Map.empty.asJava, // extra
-      defaultIncOptions.logRecompileOnMacro,
-      defaultIncOptions.externalHooks
-    )
-  }
-
-  def defaultApiDumpDirectory =
-    defaultIncOptions.apiDumpDirectory
+  def options(log: Logger): xsbti.compile.IncOptions =
+    IncOptionsUtil.defaultIncOptions
+      .withTransitiveStep(transitiveStep)
+      .withRecompileAllFraction(recompileAllFraction)
+      .withRelationsDebug(relationsDebug)
+      .withApiDebug(apiDebug)
+      .withApiDiffContextSize(apiDiffContextSize)
+      .withApiDumpDirectory(apiDumpDirectory.asJava)
+      .withClassfileManagerType(classfileManager(log).asJava)
+      .withUseCustomizedFileManager(useZincFileManager)
 
   def classfileManager(log: Logger): Option[ClassFileManagerType] =
     if (transactional && backup.isDefined)
@@ -276,8 +263,6 @@ object Settings {
     boolean(   "-transactional",               "Restore previous class files on failure",    (s: Settings) => s.copy(_incOptions = s._incOptions.copy(transactional = true))),
     boolean(   "-no-zinc-file-manager",        "Disable zinc provided file manager",           (s: Settings) => s.copy(_incOptions = s._incOptions.copy(useZincFileManager = false))),
     file(      "-backup", "directory",         "Backup location (if transactional)",         (s: Settings, f: File) => s.copy(_incOptions = s._incOptions.copy(backup = Some(f)))),
-    boolean(   "-recompileOnMacroDefDisabled", "Disable recompilation of all dependencies of a macro def",
-      (s: Settings) => s.copy(_incOptions = s._incOptions.copy(recompileOnMacroDef = Some(false)))),
 
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis =
