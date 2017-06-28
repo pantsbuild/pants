@@ -172,31 +172,38 @@ object AnalysisMap {
  */
 class PortableAnalysisMappers(rebases: Set[(Path, Path)]) extends AnalysisMappersAdapter {
   private val rebaser = {
+    val forWrite = PortableAnalysisMappers.mkFileRebaser(rebases)
+    val forRead = PortableAnalysisMappers.mkFileRebaser(rebases.map { case (src, dst) => (dst, src) })
+    Mapper.forFile.map(forRead, forWrite)
+  }
+
+  // TODO: scalac/javac options and a few other items are not currently rebased.
+  override val outputDirMapper: Mapper[File] = rebaser
+  override val sourceDirMapper: Mapper[File] = rebaser
+  override val sourceMapper: Mapper[File] = rebaser
+  override val productMapper: Mapper[File] = rebaser
+  override val binaryMapper: Mapper[File] = rebaser
+  override val classpathMapper: Mapper[File] = rebaser
+}
+
+object PortableAnalysisMappers {
+  private def mkFileRebaser(rebases: Set[(Path, Path)]): File => File = {
     // Sort the rebases from longest to shortest (to ensure that a prefix is rebased
     // before a suffix).
     val orderedRebases =
       rebases.toSeq.sortBy {
         case (path, slug) => -path.toString.size
       }
-
-    val rebaseFile: File => File = { f =>
+    val rebaser: File => File = { f =>
       val p = f.toPath
       // Attempt each rebase in length order, applying the longest one that matches.
       orderedRebases
         .collectFirst {
           case (from, to) if p.startsWith(from) =>
-            println(s"Rebasing $p with $from")
             to.resolve(from.relativize(p)).toFile
         }
         .getOrElse(f)
     }
-
-    Mapper.forFile.map(rebaseFile, rebaseFile)
+    rebaser
   }
-
-  override val outputDirMapper: Mapper[File] = rebaser
-  override val sourceDirMapper: Mapper[File] = rebaser
-  override val sourceMapper: Mapper[File] = rebaser
-  override val productMapper: Mapper[File] = rebaser
-  override val binaryMapper: Mapper[File] = rebaser
 }
