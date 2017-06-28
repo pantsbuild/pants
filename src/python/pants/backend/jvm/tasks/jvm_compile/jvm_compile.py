@@ -794,7 +794,7 @@ class JvmCompile(NailgunTaskBase):
         suggestion_msg = (
           '\nIf the above information is correct, '
           'please add the following to the dependencies of ({}):\n  {}\n\n'
-          'Remember to sort the dependencies in your BUILD file for easier maintanence.\n'
+          'Remember to sort the dependencies in your BUILD file for easier maintenance.\n'
             .format(target.address.spec, '\n  '.join(sorted(list(formatted_suggested_deps))))
         )
         self.context.log.info(suggestion_msg)
