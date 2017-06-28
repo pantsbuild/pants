@@ -120,7 +120,6 @@ object Main {
       val result = new IncrementalCompilerImpl().compile(inputs, log)
 
       // Store the output if the result changed.
-      println(s"Result is $result")
       if (result.hasModified) {
         targetAnalysisStore.set(result.analysis, result.setup)
       }

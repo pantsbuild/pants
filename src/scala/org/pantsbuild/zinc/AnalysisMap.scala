@@ -97,23 +97,16 @@ class AnalysisMap private[AnalysisMap] (
         val fileStore = mkFileBasedStore(cacheFile)
 
         def set(analysis: CompileAnalysis, setup: MiniSetup) {
-          println(s"Storing analysis to $cacheFile...")
           fileStore.set(analysis, setup)
           FileFPrint.fprint(cacheFile).foreach { fprint =>
-            println(s"...storing with $fprint with allSources: ${analysis.readStamps.getAllSourceStamps}.")
             AnalysisMap.analysisCache.put(fprint, Some((analysis, setup)))
           }
         }
 
         def get(): Option[(CompileAnalysis, MiniSetup)] = {
-          println(s"Getting analysis from $cacheFile...")
           FileFPrint.fprint(cacheFile) flatMap { fprint =>
-            println(s"...analysis has fingerprint $fprint")
             AnalysisMap.analysisCache.getOrElseUpdate(fprint) {
-              println(s"...loading analysis from disk...")
-              val x = fileStore.get
-              println(s"...loaded $x with allSources: ${x.map(_._1.readStamps.getAllSourceStamps)}.")
-              x
+              fileStore.get
             }
           }
         }
