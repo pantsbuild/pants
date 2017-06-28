@@ -787,10 +787,14 @@ class JvmCompile(NailgunTaskBase):
         for classname, candidates in missing_dep_suggestions.items():
           suggested_deps.add(list(candidates)[0])
           self.context.log.info('  {}: {}'.format(classname, ', '.join(candidates)))
+
+        # We format the suggested deps with single quotes and commas so that
+        # they can be easily cut/pasted into a BUILD file.
+        formatted_suggested_deps = ["'%s'," % dep for dep in suggested_deps]
         suggestion_msg = (
           '\nIf the above information is correct, '
           'please add the following to the dependencies of ({}):\n  {}\n'
-            .format(target.address.spec, '\n  '.join(sorted(list(suggested_deps))))
+            .format(target.address.spec, '\n  '.join(sorted(list(formatted_suggested_deps))))
         )
         self.context.log.info(suggestion_msg)
 

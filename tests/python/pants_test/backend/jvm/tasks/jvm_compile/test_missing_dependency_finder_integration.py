@@ -20,6 +20,9 @@ class MissingDependencyFinderIntegrationTest(PantsRunIntegrationTest):
                               'that provide the missing classes:.*'
                               'com.google.common.io.Closer: 3rdparty:guava', run.stdout_data,
                               re.DOTALL))
+    self.assertTrue(re.search('please add the following to the dependencies of.*'
+                              '\'3rdparty:guava\',', run.stdout_data,
+                              re.DOTALL))
 
   def test_missing_deps_not_found(self):
     target = 'testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target'
