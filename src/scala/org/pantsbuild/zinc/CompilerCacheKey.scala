@@ -11,6 +11,8 @@ import scala.collection.JavaConverters._
 import sbt.io.syntax._
 import sbt.util.Logger
 
+import org.pantsbuild.zinc.options.Settings
+
 /**
  * All identity-affecting options for a zinc compiler. All fields in this struct
  * must have a useful definition of equality.

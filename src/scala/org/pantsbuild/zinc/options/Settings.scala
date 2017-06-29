@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.options
 
 import java.io.File
 import java.util.{ List => JList, logging => jlogging }
@@ -204,10 +204,11 @@ case class IncOptions(
  * Configuration for sbt analysis and analysis output options.
  */
 case class AnalysisOptions(
-  _cache: Option[File]           = None,
-  _cacheMap: Map[File, File]     = Map.empty,
-  rebaseMap: Map[File, File]     = Map.empty,
-  clearInvalid: Boolean         = true
+  _cache: Option[File]         = None,
+  _cacheMap: Map[File, File]   = Map.empty,
+  rebaseMap: Map[File, File]   = Map.empty,
+  clearInvalid: Boolean        = true,
+  summaryJson: Option[File]    = None
 )
 
 object Settings {
@@ -279,7 +280,9 @@ object Settings {
     fileMap(   "-rebase-map",                  "Source and destination paths to rebase in persisted analysis (file:file,...)",
       (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m))),
     boolean(   "-no-clear-invalid-analysis",   "If set, zinc will fail rather than purging illegal analysis.",
-      (s: Settings) => s.copy(analysis = s.analysis.copy(clearInvalid = false)))
+      (s: Settings) => s.copy(analysis = s.analysis.copy(clearInvalid = false))),
+    file(      "-analysis-summary-json", "file",      "Output file to write an analysis summary (containing dependency and product info) to.",
+      (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(summaryJson = Some(f))))
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -293,11 +296,6 @@ object Settings {
     options foreach { opt => if (opt.extraline) println(); println(opt.usage(column)) }
     println()
   }
-
-  /**
-   * The string name for system property with the given name suffix (prefixed with `zinc.`).
-   */
-  def prop(name: String) = s"zinc.${name}"
 
   /**
    * Anything starting with '-' is considered an option, not a source file.
@@ -345,12 +343,6 @@ object Settings {
   def defaultBackupLocation(classesDir: File) = {
     classesDir.getParentFile / "backup" / classesDir.getName
   }
-
-  // NB: These cannot be options, because they are consumed statically.
-  val cacheLimit         = Util.intProperty(prop("cache.limit"), 5)
-  val analysisCacheLimit = Util.intProperty(prop("analysis.cache.limit"), cacheLimit)
-  val compilerCacheLimit = Util.intProperty(prop("compiler.cache.limit"), cacheLimit)
-  val residentCacheLimit = Util.intProperty(prop("resident.cache.limit"), 0)
 
   // helpers for creating options
 

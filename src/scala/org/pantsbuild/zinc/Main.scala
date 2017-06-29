@@ -11,7 +11,11 @@ import scala.compat.java8.OptionConverters._
 import sbt.util.Level
 import sbt.internal.inc.IncrementalCompilerImpl
 import xsbti.CompileFailed
+
+import org.pantsbuild.zinc.analysis.AnalysisMap
 import org.pantsbuild.zinc.logging.Loggers
+import org.pantsbuild.zinc.util.Util
+import org.pantsbuild.zinc.options.{Settings, Parsed}
 
 /**
  * Command-line main class.

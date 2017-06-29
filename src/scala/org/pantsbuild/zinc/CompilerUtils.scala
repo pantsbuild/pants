@@ -34,21 +34,26 @@ import scala.compat.java8.OptionConverters._
 
 import org.pantsbuild.zinc.cache.Cache
 import org.pantsbuild.zinc.cache.Cache.Implicits
+import org.pantsbuild.zinc.options.Settings
+import org.pantsbuild.zinc.util.Util
 
 object CompilerUtils {
   val CompilerInterfaceId = "compiler-interface"
   val JavaClassVersion = System.getProperty("java.class.version")
 
+  private val compilerCacheLimit = Util.intProperty("zinc.compiler.cache.limit", 5)
+  private val residentCacheLimit = Util.intProperty("zinc.resident.cache.limit", 0)
+
   /**
    * Static cache for zinc compilers.
    */
-  private val compilerCache = Cache[CompilerCacheKey, Compilers](Settings.compilerCacheLimit)
+  private val compilerCache = Cache[CompilerCacheKey, Compilers](compilerCacheLimit)
 
   /**
    * Static cache for resident scala compilers.
    */
   private val residentCache: GlobalsCache = {
-    val maxCompilers = Settings.residentCacheLimit
+    val maxCompilers = residentCacheLimit
     if (maxCompilers <= 0)
       CompilerCache.fresh
     else

@@ -21,6 +21,9 @@ import xsbti.compile.{
   Setup
 }
 
+import org.pantsbuild.zinc.analysis.AnalysisMap
+import org.pantsbuild.zinc.options.{ScalaLocation, Settings}
+
 object InputUtils {
   /**
    * Create Inputs based on command-line settings.

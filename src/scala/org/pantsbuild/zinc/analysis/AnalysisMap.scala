@@ -1,9 +1,9 @@
 /**
- * Copyright (C) 2015 Pants project contributors (see CONTRIBUTORS.md).
+ * Copyright (C) 2017 Pants project contributors (see CONTRIBUTORS.md).
  * Licensed under the Apache License, Version 2.0 (see LICENSE).
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.analysis
 
 import java.io.{File, IOException}
 import java.nio.file.Path
@@ -11,14 +11,16 @@ import java.util.Optional
 
 import scala.compat.java8.OptionConverters._
 
-import org.pantsbuild.zinc.cache.Cache.Implicits
-import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
-
 import sbt.internal.inc.{Analysis, AnalysisMappersAdapter, AnalysisStore, CompanionsStore, Mapper, FileBasedStore, Locate}
 import sbt.io.{IO, Using}
 import sbt.util.Logger
 import xsbti.api.Companions
 import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup, PreviousResult}
+
+import org.pantsbuild.zinc.cache.Cache.Implicits
+import org.pantsbuild.zinc.cache.{Cache, FileFPrint}
+import org.pantsbuild.zinc.util.Util
+import org.pantsbuild.zinc.options.Settings
 
 /**
  * A facade around the analysis cache to:
@@ -91,7 +93,10 @@ class AnalysisMap private[AnalysisMap] (
   /**
    * Load the analysis for the destination, creating it if necessary.
    */
-  def loadDestinationAnalysis(settings: Settings, log: Logger): (AnalysisStore, PreviousResult) = {
+  def loadDestinationAnalysis(
+    settings: Settings,
+    log: Logger
+  ): (AnalysisStore, PreviousResult) = {
     def load() = {
       val analysisStore = cachedStore(settings.cacheFile)
       analysisStore.get() match {
@@ -150,12 +155,13 @@ class AnalysisMap private[AnalysisMap] (
 }
 
 object AnalysisMap {
+  private val analysisCacheLimit = Util.intProperty("zinc.analysis.cache.limit", 100)
   /**
    * Static cache for compile analyses. Values must be Options because in get() we don't yet
    * know if, on a cache miss, the underlying file will yield a valid Analysis.
    */
   private val analysisCache =
-    Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](Settings.analysisCacheLimit)
+    Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](analysisCacheLimit)
 
   def create(
     analysisLocations: Map[File, File],
