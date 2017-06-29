@@ -114,7 +114,7 @@ class PluginResolver(object):
 
     # Ignore command line flags since we'd blow up on any we don't understand (most of them).
     # If someone wants to bootstrap plugins in a one-off custom way they'll need to use env vars
-    # or a --config-override pointing to a custom pants.ini snippet.
+    # or a --pants-config-files pointing to a custom pants.ini snippet.
     defaulted_only_options = options.drop_flag_values()
 
     GlobalOptionsRegistrar.register_options_on_scope(defaulted_only_options)
