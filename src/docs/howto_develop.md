@@ -122,7 +122,7 @@ To (re-)generate a `pants.pex` you then run these 2 commands:
 2. In your own repo the following command will create a locally built `pants.pex` for all platforms:
 
         :::bash
-        $ /tmp/pantsbuild/pants -c=pants-production.ini clean-all binary //:pants
+        $ /tmp/pantsbuild/pants --pants-config-files=pants-production.ini clean-all binary //:pants
 
 The resulting `pants.pex` will be in the `dist/` directory:
 

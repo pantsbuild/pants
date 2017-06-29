@@ -230,15 +230,15 @@ command line:
 Sometimes it's convenient to keep `.ini` settings in more than one file. Perhaps you usually
 operate Pants in one "mode", but occasionally need to use a tweaked set of settings.
 
-Use the `--pants-config-files` command-line option (`-c` for short) to specify a second `.ini` file.
-Each of this `.ini` file's values override the corresponding value in `pants.ini`, if any.
+Use the `--pants-config-files` command-line option to specify a second `.ini` file. Each of
+this `.ini` file's values override the corresponding value in `pants.ini`, if any.
 For example, if your `pants.ini` contains the section
 
     [test.junit]
     coverage_html_open: True
     debug: False
 
-...and you invoke `-c=quick.ini` and your `quick.ini` says
+...and you invoke `--pants-config-files=quick.ini` and your `quick.ini` says
 
     [test.junit]
     coverage_html_open: False
@@ -251,9 +251,10 @@ For example, if your `pants.ini` contains the section
     skip: True
     debug: False
 
-Note that `--pants-config-files` is a list-valued option, so all the idioms of lists work. You can
-add a third file with another invocation of `-c=<path>`, or you can replace the standard one
-entirely with `-c=[<list>]`.
+Note that `--pants-config-files` is a list-valued option, so all the
+idioms of lists work. You can add a third file with another invocation
+of `--pants-config-files=<path>`, or you can replace the standard one
+entirely with `--pants-config-files=[<list>]`.
 
 Troubleshooting Config Files
 ----------------------------
