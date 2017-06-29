@@ -17,7 +17,7 @@ from xml.etree import ElementTree
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.subsystems.shader import Shader
+from pants.backend.jvm.subsystems.zinc import Zinc
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -31,7 +31,6 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
-from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_open
 from pants.util.memo import memoized_method, memoized_property
@@ -52,8 +51,6 @@ logger = logging.getLogger(__name__)
 
 class BaseZincCompile(JvmCompile):
   """An abstract base class for zinc compilation tasks."""
-
-  _ZINC_MAIN = 'org.pantsbuild.zinc.Main'
 
   _supports_concurrent_execution = True
 
@@ -181,44 +178,13 @@ class BaseZincCompile(JvmCompile):
                   'This is unset by default, because it is generally a good precaution to cache '
                   'only clean/cold builds.')
 
-    def sbt_jar(name, **kwargs):
-      return JarDependency(org='org.scala-sbt', name=name, rev='1.0.0-X5', **kwargs)
+    Zinc.register_options_for(cls, register,
+                              removal_version='1.6.0.dev0',
+                              removal_hint='Zinc tools should be registered via the `zinc` scope.')
 
-    shader_rules = [
-        # The compiler-interface and compiler-bridge tool jars carry xsbt and
-        # xsbti interfaces that are used across the shaded tool jar boundary so
-        # we preserve these root packages wholesale along with the core scala
-        # APIs.
-        Shader.exclude_package('scala', recursive=True),
-        Shader.exclude_package('xsbt', recursive=True),
-        Shader.exclude_package('xsbti', recursive=True),
-      ]
-
-    cls.register_jvm_tool(register,
-                          'zinc',
-                          classpath=[
-                            JarDependency('org.pantsbuild', 'zinc_2.10', '0.0.5'),
-                          ],
-                          main=cls._ZINC_MAIN,
-                          custom_rules=shader_rules)
-
-    cls.register_jvm_tool(register,
-                          'compiler-bridge',
-                          classpath=[
-                            sbt_jar(name='compiler-bridge_2.10',
-                                    classifier='sources',
-                                    intransitive=True)
-                          ])
-    cls.register_jvm_tool(register,
-                          'compiler-interface',
-                          classpath=[
-                            sbt_jar(name='compiler-interface')
-                          ],
-                          # NB: We force a noop-jarjar'ing of the interface, since it is now broken
-                          # up into multiple jars, but zinc does not yet support a sequence of jars
-                          # for the interface.
-                          main='no.such.main.Main',
-                          custom_rules=shader_rules)
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BaseZincCompile, cls).subsystem_dependencies() + (Zinc,)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -238,6 +204,28 @@ class BaseZincCompile(JvmCompile):
   def cache_incremental(self):
     """Optionally write the results of incremental compiles to the cache."""
     return self.get_options().incremental_caching
+
+  @memoized_property
+  def _zinc_tools(self):
+    """Get the instance of the JvmToolMixin to use for zinc.
+
+    TODO: Remove and use Zinc.global_instance() directly once the old tool location is removed
+    in `1.6.0.dev0`.
+    """
+    # If any tools were explicitly specified on self, use them... else, use the Zinc subsystem.
+    explicit_keys = set(self.get_options().get_explicit_keys())
+    explicit_on_self = explicit_keys & set(['zinc', 'compiler-bridge', 'compiler-interface'])
+    return self if explicit_on_self else Zinc.global_instance()
+
+  def _zinc_tool_classpath(self, toolname):
+    return self._zinc_tools.tool_classpath_from_products(self.context.products,
+                                                         toolname,
+                                                         scope=self.options_scope)
+
+  def _zinc_tool_jar(self, toolname):
+    return self._zinc_tools.tool_jar_from_products(self.context.products,
+                                                   toolname,
+                                                   scope=self.options_scope)
 
   def __init__(self, *args, **kwargs):
     super(BaseZincCompile, self).__init__(*args, **kwargs)
@@ -259,9 +247,6 @@ class BaseZincCompile(JvmCompile):
   def create_analysis_tools(self):
     return AnalysisTools(self.dist.real_home, ZincAnalysisParser(), ZincAnalysis,
                          get_buildroot(), self.get_options().pants_workdir)
-
-  def zinc_classpath(self):
-    return self.tool_classpath('zinc')
 
   def javac_classpath(self):
     # Note that if this classpath is empty then Zinc will automatically use the javac from
@@ -297,7 +282,8 @@ class BaseZincCompile(JvmCompile):
     """
     hasher = sha1()
     for tool in ['zinc', 'compiler-interface', 'compiler-bridge']:
-      hasher.update(os.path.relpath(self.tool_jar(tool), self.get_options().pants_workdir))
+      hasher.update(os.path.relpath(self._zinc_tool_jar(tool),
+                                    self.get_options().pants_workdir))
     key = hasher.hexdigest()[:12]
     return os.path.join(self.get_options().pants_bootstrapdir, 'zinc', key)
 
@@ -320,8 +306,8 @@ class BaseZincCompile(JvmCompile):
     if log_file:
       zinc_args.extend(['-capture-log', log_file])
 
-    zinc_args.extend(['-compiler-interface', self.tool_jar('compiler-interface')])
-    zinc_args.extend(['-compiler-bridge', self.tool_jar('compiler-bridge')])
+    zinc_args.extend(['-compiler-interface', self._zinc_tool_jar('compiler-interface')])
+    zinc_args.extend(['-compiler-bridge', self._zinc_tool_jar('compiler-bridge')])
     zinc_args.extend(['-zinc-cache-dir', self._zinc_cache_dir])
     zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
 
@@ -377,8 +363,8 @@ class BaseZincCompile(JvmCompile):
         fp.write(arg)
         fp.write(b'\n')
 
-    if self.runjava(classpath=self.zinc_classpath(),
-                    main=self._ZINC_MAIN,
+    if self.runjava(classpath=self._zinc_tool_classpath('zinc'),
+                    main=Zinc.ZINC_COMPILE_MAIN,
                     jvm_options=jvm_options,
                     args=zinc_args,
                     workunit_name=self.name(),
