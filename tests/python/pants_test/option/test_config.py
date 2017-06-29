@@ -56,6 +56,7 @@ class ConfigTest(unittest.TestCase):
           """))
         ini2.close()
         self.config = Config.load(configpaths=[ini1.name, ini2.name])
+        self.assertEqual([ini1.name, ini2.name], self.config.sources())
 
   def test_getstring(self):
     self.assertEquals('/a/b/42', self.config.get('a', 'path'))
