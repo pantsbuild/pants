@@ -583,10 +583,6 @@ class JvmCompile(NailgunTaskBase):
         progress_message,
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
-        # The compiler may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
         if self.get_options().capture_classpath:
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
