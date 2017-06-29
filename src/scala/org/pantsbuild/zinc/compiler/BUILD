@@ -1,7 +1,7 @@
 scala_library(
   provides=scala_artifact(
     org='org.pantsbuild',
-    name='zinc',
+    name='zinc-compiler',
     repo=public,
     publication_metadata=pants_library('The SBT incremental compiler for nailgun')
   ),
@@ -14,7 +14,6 @@ scala_library(
     '3rdparty:jsr305',
     'src/scala/org/pantsbuild/zinc/analysis',
     'src/scala/org/pantsbuild/zinc/cache',
-    'src/scala/org/pantsbuild/zinc/logging',
     'src/scala/org/pantsbuild/zinc/util',
     'src/scala/org/pantsbuild/zinc/options',
   ],

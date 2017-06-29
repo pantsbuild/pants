@@ -1,8 +1,7 @@
 jvm_binary(
-  basename='zinc',
-  main='org.pantsbuild.zinc.Main',
+  main='org.pantsbuild.zinc.compiler.Main',
   dependencies=[
-    'src/scala/org/pantsbuild/zinc',
+    'src/scala/org/pantsbuild/zinc/compiler',
   ],
   description='zinc -- the scala compiler in nailgun',
 )

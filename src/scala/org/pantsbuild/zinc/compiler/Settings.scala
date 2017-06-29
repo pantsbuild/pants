@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc.options
+package org.pantsbuild.zinc.compiler
 
 import java.io.File
 import java.util.{ List => JList, logging => jlogging }
@@ -23,6 +23,7 @@ import xsbti.compile.{
 }
 import xsbti.compile.IncOptionsUtil.defaultIncOptions
 
+import org.pantsbuild.zinc.options.OptionSet
 
 /**
  * All parsed command-line options.

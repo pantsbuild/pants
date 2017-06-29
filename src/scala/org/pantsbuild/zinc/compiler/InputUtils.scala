@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.compiler
 
 import java.io.{File, IOException}
 import java.util.{ List => JList, Map => JMap }
@@ -10,6 +10,8 @@ import java.util.{ List => JList, Map => JMap }
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 
+import sbt.internal.inc.AnalysisStore
+import sbt.io.IO
 import sbt.util.Logger
 import xsbti.{F1, Position, Problem, Severity, ReporterConfig, ReporterUtil}
 import xsbti.compile.{
@@ -22,7 +24,6 @@ import xsbti.compile.{
 }
 
 import org.pantsbuild.zinc.analysis.AnalysisMap
-import org.pantsbuild.zinc.options.{ScalaLocation, Settings}
 
 object InputUtils {
   /**
@@ -94,6 +95,37 @@ object InputUtils {
       setup,
       previousResult
     )
+  }
+
+  /**
+   * Load the analysis for the destination, creating it if necessary.
+   */
+  def loadDestinationAnalysis(
+    settings: Settings,
+    analysisMap: AnalysisMap,
+    log: Logger
+  ): (AnalysisStore, PreviousResult) = {
+    def load() = {
+      val analysisStore = analysisMap.cachedStore(settings.cacheFile)
+      analysisStore.get() match {
+        case Some((a, s)) => (analysisStore, Some(a), Some(s))
+        case _ => (analysisStore, None, None)
+      }
+    }
+
+    // Try loading, and optionally remove/retry on failure.
+    val (analysisStore, previousAnalysis, previousSetup) =
+      try {
+        load()
+      } catch {
+        case e: Throwable if settings.analysis.clearInvalid =>
+          // Remove the corrupted analysis and output directory.
+          log.warn(s"Failed to load analysis from ${settings.cacheFile} ($e): will execute a clean compile.")
+          IO.delete(settings.cacheFile)
+          IO.delete(settings.classesDirectory)
+          load()
+      }
+    (analysisStore, new PreviousResult(previousAnalysis.asJava, previousSetup.asJava))
   }
 
   /**

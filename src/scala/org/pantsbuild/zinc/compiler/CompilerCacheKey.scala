@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.compiler
 
 import java.io.File
 import java.util.{ List => JList }
@@ -10,8 +10,6 @@ import scala.collection.JavaConverters._
 
 import sbt.io.syntax._
 import sbt.util.Logger
-
-import org.pantsbuild.zinc.options.Settings
 
 /**
  * All identity-affecting options for a zinc compiler. All fields in this struct

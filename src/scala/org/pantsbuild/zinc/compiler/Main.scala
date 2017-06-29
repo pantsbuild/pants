@@ -2,20 +2,16 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.compiler
 
-import java.io.File
-
-import scala.compat.java8.OptionConverters._
-
-import sbt.util.Level
 import sbt.internal.inc.IncrementalCompilerImpl
+import sbt.internal.util.{ ConsoleLogger, ConsoleOut }
+import sbt.util.Level
 import xsbti.CompileFailed
 
 import org.pantsbuild.zinc.analysis.AnalysisMap
-import org.pantsbuild.zinc.logging.Loggers
+import org.pantsbuild.zinc.options.Parsed
 import org.pantsbuild.zinc.util.Util
-import org.pantsbuild.zinc.options.{Settings, Parsed}
 
 /**
  * Command-line main class.
@@ -55,6 +51,16 @@ object Main {
    */
   def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
 
+  def mkLogger(settings: Settings) = {
+    val cl =
+      ConsoleLogger(
+        ConsoleOut.systemOut,
+        useColor = ConsoleLogger.formatEnabled && settings.consoleLog.color
+      )
+    cl.setLevel(settings.consoleLog.logLevel)
+    cl
+  }
+
   /**
    * Run a compile.
    */
@@ -63,7 +69,7 @@ object Main {
 
     val Parsed(settings, residual, errors) = Settings.parse(args)
 
-    val log = Loggers.create(settings.consoleLog.logLevel, settings.consoleLog.color)
+    val log = mkLogger(settings)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
 
     // bail out on any command-line option errors
@@ -90,7 +96,8 @@ object Main {
 
     // Load the existing analysis for the destination, if any.
     val analysisMap = AnalysisMap.create(settings.cacheMap, settings.analysis.rebaseMap, log)
-    val (targetAnalysisStore, previousResult) = analysisMap.loadDestinationAnalysis(settings, log)
+    val (targetAnalysisStore, previousResult) =
+      InputUtils.loadDestinationAnalysis(settings, analysisMap, log)
     val inputs = InputUtils.create(settings, analysisMap, previousResult, log)
 
     if (isDebug) {

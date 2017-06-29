@@ -10,7 +10,6 @@ scala_library(
     '3rdparty/jvm/com/fasterxml/jackson/module:scala',
     '3rdparty/jvm/org/scala-sbt:zinc',
     'src/scala/org/pantsbuild/zinc/cache',
-    'src/scala/org/pantsbuild/zinc/options',
     'src/scala/org/pantsbuild/zinc/util',
   ],
   strict_deps=True,

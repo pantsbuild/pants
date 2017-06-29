@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.compiler
 
 import java.io.File
 import java.net.URLClassLoader
@@ -34,7 +34,6 @@ import scala.compat.java8.OptionConverters._
 
 import org.pantsbuild.zinc.cache.Cache
 import org.pantsbuild.zinc.cache.Cache.Implicits
-import org.pantsbuild.zinc.options.Settings
 import org.pantsbuild.zinc.util.Util
 
 object CompilerUtils {
