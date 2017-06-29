@@ -17,7 +17,7 @@ import org.pantsbuild.zinc.util.Util
  * Command-line main class.
  */
 object Main {
-  val Command     = "zinc"
+  val Command = "zinc-compiler"
   val Description = "scala incremental compiler"
 
   /**
@@ -81,7 +81,7 @@ object Main {
 
     if (settings.version) printVersion()
 
-    if (settings.help) Settings.printUsage(Command)
+    if (settings.help) Settings.printUsage(Command, residualArgs = "<sources>")
 
     // if there are no sources provided, print outputs based on current analysis if requested,
     // else print version and usage by default
@@ -95,7 +95,7 @@ object Main {
     }
 
     // Load the existing analysis for the destination, if any.
-    val analysisMap = AnalysisMap.create(settings.cacheMap, settings.analysis.rebaseMap, log)
+    val analysisMap = AnalysisMap.create(settings.cacheMap, settings.analysis.rebaseMap)
     val (targetAnalysisStore, previousResult) =
       InputUtils.loadDestinationAnalysis(settings, analysisMap, log)
     val inputs = InputUtils.create(settings, analysisMap, previousResult, log)

@@ -34,9 +34,7 @@ class AnalysisMap private[AnalysisMap] (
   // a map of classpath entries to cache file fingerprints, excluding the current compile destination
   analysisLocations: Map[File, FileFPrint],
   // a Set of Path bases and destinations to re-relativize them to
-  rebases: Set[(Path, Path)],
-  // log
-  log: Logger
+  rebases: Set[(Path, Path)]
 ) {
   private val analysisMappers = new PortableAnalysisMappers(rebases)
 
@@ -57,7 +55,6 @@ class AnalysisMap private[AnalysisMap] (
      */
     def definesClass(classpathEntry: File): DefinesClass = {
       getAnalysis(classpathEntry).map { analysis =>
-        log.debug(s"Hit analysis cache for class definitions with ${classpathEntry}")
         // strongly hold the classNames, and transform them to ensure that they are unlinked from
         // the remainder of the analysis
         val classNames = analysis.asInstanceOf[Analysis].relations.srcProd.reverseMap.keys.toList.toSet.map(
@@ -131,11 +128,7 @@ object AnalysisMap {
   private val analysisCache =
     Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](analysisCacheLimit)
 
-  def create(
-    analysisLocations: Map[File, File],
-    rebases: Map[File, File],
-    log: Logger
-  ): AnalysisMap =
+  def create(analysisLocations: Map[File, File], rebases: Map[File, File]): AnalysisMap =
     new AnalysisMap(
       // create fingerprints for all inputs at startup
       analysisLocations.flatMap {
@@ -146,8 +139,7 @@ object AnalysisMap {
         .map {
           case (k, v) => (k.toPath, v.toPath)
         }
-        .toSet,
-      log
+        .toSet
     )
 }
 

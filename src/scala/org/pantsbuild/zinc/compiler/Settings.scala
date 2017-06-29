@@ -23,6 +23,7 @@ import xsbti.compile.{
 }
 import xsbti.compile.IncOptionsUtil.defaultIncOptions
 
+import org.pantsbuild.zinc.analysis.AnalysisOptions
 import org.pantsbuild.zinc.options.OptionSet
 
 /**
@@ -201,17 +202,6 @@ case class IncOptions(
       None
 }
 
-/**
- * Configuration for sbt analysis and analysis output options.
- */
-case class AnalysisOptions(
-  _cache: Option[File]         = None,
-  _cacheMap: Map[File, File]   = Map.empty,
-  rebaseMap: Map[File, File]   = Map.empty,
-  clearInvalid: Boolean        = true,
-  summaryJson: Option[File]    = None
-)
-
 object Settings extends OptionSet[Settings] {
   val DestinationOpt = "-d"
   val ZincCacheDirOpt = "-zinc-cache-dir"
@@ -223,9 +213,6 @@ object Settings extends OptionSet[Settings] {
   override def applyResidual(t: Settings, residualArgs: Seq[String]) =
     t.copy(_sources = residualArgs map (new File(_)))
 
-  /**
-   * All available command-line options.
-   */
   override val options = Seq(
     header("Output options:"),
     boolean(  ("-help", "-h"),                 "Print this usage message",                   (s: Settings) => s.copy(help = true)),
@@ -286,9 +273,7 @@ object Settings extends OptionSet[Settings] {
     fileMap(   "-rebase-map",                  "Source and destination paths to rebase in persisted analysis (file:file,...)",
       (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m))),
     boolean(   "-no-clear-invalid-analysis",   "If set, zinc will fail rather than purging illegal analysis.",
-      (s: Settings) => s.copy(analysis = s.analysis.copy(clearInvalid = false))),
-    file(      "-analysis-summary-json", "file",      "Output file to write an analysis summary (containing dependency and product info) to.",
-      (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(summaryJson = Some(f))))
+      (s: Settings) => s.copy(analysis = s.analysis.copy(clearInvalid = false)))
   )
 
   /**

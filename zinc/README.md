@@ -38,7 +38,8 @@ Options
 
 To get information about options
 
-    ./pants run zinc: -- -help
+    ./pants run zinc:compiler -- -help
+    ./pants run zinc:extractor -- -help
 
 ### Compile
 

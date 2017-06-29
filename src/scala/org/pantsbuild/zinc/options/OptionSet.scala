@@ -12,7 +12,14 @@ trait OptionSet[T] {
   def empty: T
 
   /** Apply any residual entries to an instance of T and return a new T. */
-  def applyResidual(t: T, residualArgs: Seq[String]): T
+  def applyResidual(t: T, residualArgs: Seq[String]): T =
+    if (residualArgs.nonEmpty) {
+      throw new RuntimeException(
+        s"Unexpected residual arguments: ${residualArgs.mkString("[", ", ", "]")}"
+      )
+    } else {
+      t
+    }
 
   /** All available command-line options. */
   def options: Seq[OptionDef[T]]
@@ -22,9 +29,9 @@ trait OptionSet[T] {
   /**
    * Print out the usage message.
    */
-  def printUsage(cmdName: String): Unit = {
+  def printUsage(cmdName: String, residualArgs: String = ""): Unit = {
     val column = options.map(_.length).max + 2
-    println(s"Usage: ${cmdName} <options> <sources>")
+    println(s"Usage: ${cmdName} <options> ${residualArgs}")
     options foreach { opt => if (opt.extraline) println(); println(opt.usage(column)) }
     println()
   }
