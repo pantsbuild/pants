@@ -96,12 +96,11 @@ class GlobalOptionsRegistrar(Optionable):
                   'subprocesses that outlive the workdir data (e.g. `./pants server`).')
     register('--pants-config-files', advanced=True, type=list,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
-    # TODO: Deprecate --config-override in favor of --pants-config-files.
-    # But only once we're able to both append and override list-valued options, as there are
-    # use-cases for both here.
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
     register('--config-override', advanced=True, type=list, metavar='<path>',
+             removal_version='1.6.0.dev0',
+             removal_hint='Use --pants-config-files=<second config file path> instead.',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, type=bool, default=True,
              help='Use pantsrc files.')
