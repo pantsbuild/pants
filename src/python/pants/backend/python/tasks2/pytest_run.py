@@ -512,14 +512,17 @@ class PytestRun(TestRunnerTaskMixin, Task):
     partitions = self._partition(targets)
 
     results = {}
+    failure = False
     for partition in partitions:
       try:
         rv = self._do_run_tests(partition)
       except ErrorWhileTesting as e:
         rv = PytestResult.from_error(e)
       results[partition] = rv
-      if not rv.success and self.get_options().fail_fast:
-        break
+      if not rv.success:
+        failure = True
+        if self.get_options().fail_fast:
+          break
 
     for partition in sorted(results):
       rv = results[partition]
@@ -532,6 +535,9 @@ class PytestRun(TestRunnerTaskMixin, Task):
                       for target in _rv.failed_targets]
     if failed_targets:
       raise ErrorWhileTesting(failed_targets=failed_targets)
+    elif failure:
+      # A low-level test execution failure occurred before tests were run.
+      raise TaskError()
 
   def _do_run_tests(self, targets):
     with self.invalidated(targets,
@@ -581,7 +587,18 @@ class PytestRun(TestRunnerTaskMixin, Task):
       args.extend(test_args)
       args.extend(sources_map.keys())
 
+      # We want to ensure our reporting based off junit xml is from this run so kill results from
+      # prior runs.
+      if os.path.exists(junitxml_path):
+        os.unlink(junitxml_path)
+
       result = self._do_run_tests_with_args(pex, args)
+
+      # There was a problem prior to test execution preventing junit xml file creation so just let
+      # the failure result bubble.
+      if not os.path.exists(junitxml_path):
+        return result
+
       external_junit_xml_dir = self.get_options().junit_xml_dir
       if external_junit_xml_dir:
         safe_mkdir(external_junit_xml_dir)
@@ -591,7 +608,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       def parse_error_handler(parse_error):
         # Simple error handler to pass to xml parsing function.
         raise TaskError('Error parsing xml file at {}: {}'
-          .format(parse_error.xml_path, parse_error.cause))
+                        .format(parse_error.xml_path, parse_error.cause))
 
       all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler,
                                             ['file', 'name', 'classname'])
