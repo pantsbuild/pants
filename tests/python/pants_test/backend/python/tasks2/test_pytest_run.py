@@ -13,11 +13,12 @@ from mock import patch
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.pytest_prep import PytestPrep
-from pants.backend.python.tasks2.pytest_run import PytestRun
+from pants.backend.python.tasks2.pytest_run import PytestResult, PytestRun
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
-from pants.base.exceptions import ErrorWhileTesting
+from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.util.contextutil import pushd
+from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
@@ -85,6 +86,67 @@ class PytestTestBase(PythonTaskTestBase):
 class PytestTestEmpty(PytestTestBase):
   def test_empty(self):
     self.run_tests(targets=[])
+
+
+class PytestTestFailedPexRun(PytestTestBase):
+  class AlwaysFailingPexRunPytestRun(PytestRun):
+    @classmethod
+    def set_up(cls):
+      junitxml_dir = safe_mkdtemp()
+      cls.junitxml_path = os.path.join(junitxml_dir, 'junit.xml')
+      cls._get_junit_xml_path = lambda *args, **kwargs: cls.junitxml_path
+      return lambda: safe_rmtree(junitxml_dir)
+
+    def _do_run_tests_with_args(self, *args, **kwargs):
+      return PytestResult.rc(42)
+
+  @classmethod
+  def task_type(cls):
+    return cls.AlwaysFailingPexRunPytestRun
+
+  def setUp(self):
+    super(PytestTestFailedPexRun, self).setUp()
+    self.create_file(
+      'tests/test_green.py',
+      dedent("""
+          import unittest
+
+          class GreenTest(unittest.TestCase):
+            def test_green(self):
+              self.assertTrue(True)
+        """))
+    self.add_to_build_file('tests', 'python_tests(sources=["test_green.py"])')
+    self.tests = self.target('tests')
+
+    self.addCleanup(self.AlwaysFailingPexRunPytestRun.set_up())
+
+  def do_test_failed_pex_run(self):
+    with self.assertRaises(TaskError) as cm:
+      self.run_tests(targets=[self.tests])
+
+    # We expect a `TaskError` as opposed to an `ErrorWhileTesting` since execution fails outside
+    # the actual test run.
+    self.assertEqual(TaskError, type(cm.exception))
+
+  def test_failed_pex_run(self):
+    self.do_test_failed_pex_run()
+
+  def test_failed_pex_run_does_not_see_prior_failures(self):
+    # Setup a prior failure.
+    with open(self.AlwaysFailingPexRunPytestRun.junitxml_path, mode='wb') as fp:
+      fp.write(b"""
+          <testsuite errors="0" failures="1" name="pytest" skips="0" tests="1" time="0.001">
+            <testcase classname="tests.test_green.GreenTest"
+                      file=".pants.d/gs/8...6-DefaultFingerprintStrategy_e88d80fa140b/test_green.py"
+                      line="4"
+                      name="test_green"
+                      time="0.0001">
+              <failure message="AssertionError: False is not true"/>
+            </testcase>
+          </testsuite>
+          """)
+
+    self.do_test_failed_pex_run()
 
 
 class PytestTest(PytestTestBase):
