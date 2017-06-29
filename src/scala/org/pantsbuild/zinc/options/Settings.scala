@@ -211,16 +211,21 @@ case class AnalysisOptions(
   summaryJson: Option[File]    = None
 )
 
-object Settings {
+object Settings extends OptionSet[Settings] {
   val DestinationOpt = "-d"
   val ZincCacheDirOpt = "-zinc-cache-dir"
   val CompilerBridgeOpt = "-compiler-bridge"
   val CompilerInterfaceOpt = "-compiler-interface"
 
+  override def empty = Settings()
+
+  override def applyResidual(t: Settings, residualArgs: Seq[String]) =
+    t.copy(_sources = residualArgs map (new File(_)))
+
   /**
    * All available command-line options.
    */
-  val options = Seq(
+  override val options = Seq(
     header("Output options:"),
     boolean(  ("-help", "-h"),                 "Print this usage message",                   (s: Settings) => s.copy(help = true)),
     boolean(   "-version",                     "Print version",                              (s: Settings) => s.copy(version = true)),
@@ -285,35 +290,6 @@ object Settings {
       (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(summaryJson = Some(f))))
   )
 
-  val allOptions: Set[OptionDef[Settings]] = options.toSet
-
-  /**
-   * Print out the usage message.
-   */
-  def printUsage(cmdName: String): Unit = {
-    val column = options.map(_.length).max + 2
-    println(s"Usage: ${cmdName} <options> <sources>")
-    options foreach { opt => if (opt.extraline) println(); println(opt.usage(column)) }
-    println()
-  }
-
-  /**
-   * Anything starting with '-' is considered an option, not a source file.
-   */
-  def isOpt(s: String) = s startsWith "-"
-
-  /**
-   * Parse all args into a Settings object.
-   * Residual args are either unknown options or source files.
-   */
-  def parse(args: Seq[String]): Parsed[Settings] = {
-    val Parsed(settings, remaining, errors) = Options.parse(Settings(), allOptions, args, stopOnError = false)
-    val (unknown, residual) = remaining partition isOpt
-    val sources = residual map (new File(_))
-    val unknownErrors = unknown map ("Unknown option: " + _)
-    Parsed(settings.copy(_sources = sources), Seq.empty, errors ++ unknownErrors)
-  }
-
   /**
    * Create a CompileOrder value based on string input.
    */
@@ -343,22 +319,4 @@ object Settings {
   def defaultBackupLocation(classesDir: File) = {
     classesDir.getParentFile / "backup" / classesDir.getName
   }
-
-  // helpers for creating options
-
-  def boolean(opt: String, desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opt), desc, action)
-  def boolean(opts: (String, String), desc: String, action: Settings => Settings) = new BooleanOption[Settings](Seq(opts._1, opts._2), desc, action)
-  def string(opt: String, arg: String, desc: String, action: (Settings, String) => Settings) = new StringOption[Settings](Seq(opt), arg, desc, action)
-  def int(opt: String, arg: String, desc: String, action: (Settings, Int) => Settings) = new IntOption[Settings](Seq(opt), arg, desc, action)
-  def double(opt: String, arg: String, desc: String, action: (Settings, Double) => Settings) = new DoubleOption[Settings](Seq(opt), arg, desc, action)
-  def fraction(opt: String, arg: String, desc: String, action: (Settings, Double) => Settings) = new FractionOption[Settings](Seq(opt), arg, desc, action)
-  def file(opt: String, arg: String, desc: String, action: (Settings, File) => Settings) = new FileOption[Settings](Seq(opt), arg, desc, action)
-  def path(opt: String, arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opt), arg, desc, action)
-  def path(opts: (String, String), arg: String, desc: String, action: (Settings, Seq[File]) => Settings) = new PathOption[Settings](Seq(opts._1, opts._2), arg, desc, action)
-  def prefix(pre: String, arg: String, desc: String, action: (Settings, String) => Settings) = new PrefixOption[Settings](pre, arg, desc, action)
-  def filePair(opt: String, arg: String, desc: String, action: (Settings, (File, File)) => Settings) = new FilePairOption[Settings](Seq(opt), arg, desc, action)
-  def fileMap(opt: String, desc: String, action: (Settings, Map[File, File]) => Settings) = new FileMapOption[Settings](Seq(opt), desc, action)
-  def fileSeqMap(opt: String, desc: String, action: (Settings, Map[Seq[File], File]) => Settings) = new FileSeqMapOption[Settings](Seq(opt), desc, action)
-  def header(label: String) = new HeaderOption[Settings](label)
-  def dummy(opt: String, desc: String) = new DummyOption[Settings](opt, desc)
 }
