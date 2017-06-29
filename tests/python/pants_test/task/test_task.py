@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
@@ -29,6 +30,7 @@ class DummyTask(Task):
   """A task that appends the content of a DummyLibrary's source into its results_dir."""
 
   _implementation_version = 0
+  _force_fail = False
 
   @property
   def incremental(self):
@@ -56,6 +58,8 @@ class DummyTask(Task):
           outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
           with open(outfile_name, 'a') as outfile:
             outfile.write(infile.read())
+        if self._force_fail:
+          raise TaskError('Task forced to fail before updating vt state.')
         vt.update()
       return vt, was_valid
 
@@ -103,6 +107,38 @@ class TaskTest(TaskTestBase):
   def _create_clean_file(self, target, content):
     self.create_file(self._filename, content)
     target.mark_invalidation_hash_dirty()
+
+  def test_revert_after_failure(self):
+    # Regression test to catch the following scenario:
+    #
+    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 2) In state B: Task fails, but writes some output.  Key is not recorded.
+    # 3) After reverting back to state A: The current key is the same as the one recorded at the
+    #    end of step 1), so it looks like no work needs to be done, but actually the task
+    #    must re-run, to overwrite the output written in step 2.
+
+    good_content = "good_content"
+    bad_content = "bad_content"
+    task, target = self._fixture(incremental=False)
+
+    # Clean run succeeds.
+    self._create_clean_file(target, good_content)
+    vt, was_valid = task.execute()
+    self.assertFalse(was_valid)
+    self.assertContent(vt, good_content)
+
+    # Change causes the task to fail.
+    self._create_clean_file(target, bad_content)
+    task._force_fail = True
+    self.assertRaises(TaskError, task.execute)
+    task._force_fail = False
+
+    # Reverting to the previous content should invalidate, so the task
+    # can reset any state created by the failed run.
+    self._create_clean_file(target, good_content)
+    vt, was_valid = task.execute()
+    self.assertFalse(was_valid)
+    self.assertContent(vt, good_content)
 
   def test_incremental(self):
     """Run three times with two unique fingerprints."""
