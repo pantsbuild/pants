@@ -18,7 +18,7 @@ import sbt.internal.inc.{Analysis, AnalysisMappersAdapter, AnalysisStore, Compan
 import sbt.io.{IO, Using}
 import sbt.util.Logger
 import xsbti.api.Companions
-import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup}
+import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup, PreviousResult}
 
 /**
  * A facade around the analysis cache to:
@@ -89,9 +89,33 @@ class AnalysisMap private[AnalysisMap] (
   }
 
   /**
-   * Create an analysis store backed by analysisCache.
+   * Load the analysis for the destination, creating it if necessary.
    */
-  def cachedStore(cacheFile: File): AnalysisStore =
+  def loadDestinationAnalysis(settings: Settings, log: Logger): (AnalysisStore, PreviousResult) = {
+    def load() = {
+      val analysisStore = cachedStore(settings.cacheFile)
+      analysisStore.get() match {
+        case Some((a, s)) => (analysisStore, Some(a), Some(s))
+        case _ => (analysisStore, None, None)
+      }
+    }
+
+    // Try loading, and optionally remove/retry on failure.
+    val (analysisStore, previousAnalysis, previousSetup) =
+      try {
+        load()
+      } catch {
+        case e: Throwable if settings.analysis.clearInvalid =>
+          // Remove the corrupted analysis and output directory.
+          log.warn(s"Failed to load analysis from ${settings.cacheFile} ($e): will execute a clean compile.")
+          IO.delete(settings.cacheFile)
+          IO.delete(settings.classesDirectory)
+          load()
+      }
+    (analysisStore, new PreviousResult(previousAnalysis.asJava, previousSetup.asJava))
+  }
+
+  private def cachedStore(cacheFile: File): AnalysisStore =
     AnalysisStore.sync(
       new AnalysisStore {
         val fileStore = mkFileBasedStore(cacheFile)

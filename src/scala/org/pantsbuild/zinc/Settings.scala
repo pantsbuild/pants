@@ -28,23 +28,23 @@ import xsbti.compile.IncOptionsUtil.defaultIncOptions
  * All parsed command-line options.
  */
 case class Settings(
-  help: Boolean              = false,
-  version: Boolean           = false,
-  consoleLog: ConsoleOptions = ConsoleOptions(),
-  _sources: Seq[File]         = Seq.empty,
-  _classpath: Seq[File]       = Seq.empty,
-  _classesDirectory: File     = new File("."),
-  scala: ScalaLocation       = ScalaLocation(),
-  scalacOptions: Seq[String] = Seq.empty,
-  javaHome: Option[File]     = None,
-  forkJava: Boolean          = false,
-  _zincCacheDir: Option[File] = None,
-  javaOnly: Boolean          = false,
-  javacOptions: Seq[String]  = Seq.empty,
-  compileOrder: CompileOrder = CompileOrder.Mixed,
-  sbt: SbtJars               = SbtJars(),
-  _incOptions: IncOptions     = IncOptions(),
-  analysis: AnalysisOptions  = AnalysisOptions()
+  help: Boolean                     = false,
+  version: Boolean                  = false,
+  consoleLog: ConsoleOptions        = ConsoleOptions(),
+  _sources: Seq[File]               = Seq.empty,
+  _classpath: Seq[File]             = Seq.empty,
+  _classesDirectory: Option[File]   = None,
+  scala: ScalaLocation              = ScalaLocation(),
+  scalacOptions: Seq[String]        = Seq.empty,
+  javaHome: Option[File]            = None,
+  forkJava: Boolean                 = false,
+  _zincCacheDir: Option[File]       = None,
+  javaOnly: Boolean                 = false,
+  javacOptions: Seq[String]         = Seq.empty,
+  compileOrder: CompileOrder        = CompileOrder.Mixed,
+  sbt: SbtJars                      = SbtJars(),
+  _incOptions: IncOptions           = IncOptions(),
+  analysis: AnalysisOptions         = AnalysisOptions()
 ) {
   import Settings._
 
@@ -56,7 +56,12 @@ case class Settings(
 
   lazy val sources: Seq[File] = _sources map normalise
 
-  lazy val classesDirectory: File = normalise(_classesDirectory)
+  lazy val classesDirectory: File =
+    normalise(
+      _classesDirectory.getOrElse {
+        throw new RuntimeException(s"The ${Settings.ZincCacheDirOpt} option is required.")
+      }
+    )
 
   lazy val cacheFile: File = {
     normalise(analysis._cache.getOrElse(defaultCacheLocation(classesDirectory)))
@@ -201,10 +206,12 @@ case class IncOptions(
 case class AnalysisOptions(
   _cache: Option[File]           = None,
   _cacheMap: Map[File, File]     = Map.empty,
-  rebaseMap: Map[File, File]     = Map.empty
+  rebaseMap: Map[File, File]     = Map.empty,
+  clearInvalid: Boolean         = true
 )
 
 object Settings {
+  val DestinationOpt = "-d"
   val ZincCacheDirOpt = "-zinc-cache-dir"
   val CompilerBridgeOpt = "-compiler-bridge"
   val CompilerInterfaceOpt = "-compiler-interface"
@@ -231,7 +238,7 @@ object Settings {
 
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(_classpath = cp)),
-    file(      "-d", "directory",              "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = f)),
+    file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
 
     header("Scala options:"),
     file(      "-scala-home", "directory",     "Scala home directory (for locating jars)",   (s: Settings, f: File) => s.copy(scala = s.scala.copy(home = Some(f)))),
@@ -269,8 +276,10 @@ object Settings {
       s.analysis.copy(_cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
       (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m))),
-    fileMap(   "-rebase-map",                  "Soure and destination paths to rebase in persisted analysis (file:file,...)",
-      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m)))
+    fileMap(   "-rebase-map",                  "Source and destination paths to rebase in persisted analysis (file:file,...)",
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m))),
+    boolean(   "-no-clear-invalid-analysis",   "If set, zinc will fail rather than purging illegal analysis.",
+      (s: Settings) => s.copy(analysis = s.analysis.copy(clearInvalid = false)))
   )
 
   val allOptions: Set[OptionDef[Settings]] = options.toSet
@@ -322,43 +331,6 @@ object Settings {
    * Normalise all relative paths to absolute paths.
    */
   def normalise(f: File): File = f.getAbsoluteFile
-
-  /**
-   * Normalise all relative paths to the actual current working directory, if provided.
-   * TODO: Actually necessary? If so, then the other absolute normalization is not
-   * necessary.
-   */
-  def normaliseRelative(settings: Settings, cwd: Option[File]): Settings = {
-    if (cwd.isEmpty) settings
-    else {
-      import settings._
-      settings.copy(
-        _sources = Util.normaliseSeq(cwd)(_sources),
-        _classpath = Util.normaliseSeq(cwd)(_classpath),
-        _classesDirectory = Util.normalise(cwd)(_classesDirectory),
-        scala = scala.copy(
-          home = Util.normaliseOpt(cwd)(scala.home),
-          path = Util.normaliseSeq(cwd)(scala.path),
-          compiler = Util.normaliseOpt(cwd)(scala.compiler),
-          library = Util.normaliseOpt(cwd)(scala.library),
-          extra = Util.normaliseSeq(cwd)(scala.extra)
-        ),
-        javaHome = Util.normaliseOpt(cwd)(javaHome),
-        sbt = sbt.copy(
-          compilerBridgeSrc = Util.normaliseOpt(cwd)(sbt.compilerBridgeSrc),
-          compilerInterface = Util.normaliseOpt(cwd)(sbt.compilerInterface)
-        ),
-        _incOptions = _incOptions.copy(
-          apiDumpDirectory = Util.normaliseOpt(cwd)(incOptions.apiDumpDirectory),
-          backup = Util.normaliseOpt(cwd)(incOptions.backup)
-        ),
-        analysis = analysis.copy(
-          _cache = Util.normaliseOpt(cwd)(analysis._cache),
-          _cacheMap = Util.normaliseMap(cwd)(analysis._cacheMap)
-        )
-      )
-    }
-  }
 
   /**
    * By default the cache location is relative to the classes directory (for example, target/classes/../cache/classes).

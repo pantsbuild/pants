@@ -11,9 +11,6 @@ import scala.compat.java8.OptionConverters._
 import sbt.util.Level
 import sbt.internal.inc.IncrementalCompilerImpl
 import xsbti.CompileFailed
-import xsbti.compile.{
-  PreviousResult
-}
 import org.pantsbuild.zinc.logging.Loggers
 
 /**
@@ -54,18 +51,13 @@ object Main {
    */
   def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
 
-  def main(args: Array[String]): Unit = run(args, None)
-
   /**
-   * Compile run. Current working directory can be provided (for nailed zinc).
+   * Run a compile.
    */
-  def run(args: Array[String], cwd: Option[File]): Unit = {
+  def main(args: Array[String]): Unit = {
     val startTime = System.currentTimeMillis
 
-    val Parsed(rawSettings, residual, errors) = Settings.parse(args)
-
-    // normalise relative paths to the current working directory (if provided)
-    val settings = Settings.normaliseRelative(rawSettings, cwd)
+    val Parsed(settings, residual, errors) = Settings.parse(args)
 
     val log = Loggers.create(settings.consoleLog.logLevel, settings.consoleLog.color)
     val isDebug = settings.consoleLog.logLevel <= Level.Debug
@@ -93,23 +85,9 @@ object Main {
     }
 
     // Load the existing analysis for the destination, if any.
-    // TODO: Noisy in this method. Should factor out the "analysisStore is open" section.
     val analysisMap = AnalysisMap.create(settings.cacheMap, settings.analysis.rebaseMap, log)
-    val targetAnalysisStore = analysisMap.cachedStore(settings.cacheFile)
-    val inputs = {
-      val (previousAnalysis, previousSetup) =
-        targetAnalysisStore.get().map {
-          case (a, s) => (Some(a), Some(s))
-        } getOrElse {
-          (None, None)
-        }
-      InputUtils.create(
-        settings,
-        analysisMap,
-        new PreviousResult(previousAnalysis.asJava, previousSetup.asJava),
-        log
-      )
-    }
+    val (targetAnalysisStore, previousResult) = analysisMap.loadDestinationAnalysis(settings, log)
+    val inputs = InputUtils.create(settings, analysisMap, previousResult, log)
 
     if (isDebug) {
       log.debug(s"Inputs: $inputs")
