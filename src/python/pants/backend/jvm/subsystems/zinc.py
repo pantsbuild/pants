@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.subsystem.subsystem import Subsystem
-from pants.java.jar.jar_dependency import JarDependency
 from pants.backend.jvm.subsystems.shader import Shader
+from pants.java.jar.jar_dependency import JarDependency
+from pants.subsystem.subsystem import Subsystem
 
 
 class Zinc(Subsystem, JvmToolMixin):
