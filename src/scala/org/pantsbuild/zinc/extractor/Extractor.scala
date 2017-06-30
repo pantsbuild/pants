@@ -14,7 +14,7 @@ import xsbti.compile.CompileAnalysis
 import org.pantsbuild.zinc.analysis.AnalysisMap
 
 /**
- * Class to encapsulate extracting analysis
+ * Class to encapsulate extracting information from zinc analysis.
  */
 class Extractor(
   classpath: Seq[File],
@@ -49,10 +49,15 @@ class Extractor(
     val external =
       relations
         .allExternalDeps
-        .flatMap(relations.libraryDefinesClass)
+        .flatMap { classname =>
+          definesClass(classname).orElse {
+            // This case should be rare: should only occur when a compiler plugin generates
+            // additional classes.
+            System.err.println(s"No analysis declares class $classname")
+            None
+          }
+        }
         .toSet
-
-    println(external)
 
     val library =
       relations

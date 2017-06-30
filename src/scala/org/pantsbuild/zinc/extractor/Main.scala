@@ -5,7 +5,13 @@
 
 package org.pantsbuild.zinc.extractor
 
+import java.io.File
+
 import sbt.internal.inc.FileBasedStore
+
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 
 import org.pantsbuild.zinc.analysis.{AnalysisMap, PortableAnalysisMappers}
 import org.pantsbuild.zinc.options.Parsed
@@ -15,6 +21,12 @@ import org.pantsbuild.zinc.options.Parsed
  */
 object Main {
   val Command = "zinc-extractor"
+
+  private val om = {
+    val mapper = new ObjectMapper with ScalaObjectMapper
+    mapper.registerModule(DefaultScalaModule)
+    mapper
+  }
 
   def main(args: Array[String]): Unit = {
     val Parsed(settings, residual, errors) = Settings.parse(args)
@@ -26,10 +38,18 @@ object Main {
       sys.exit(1)
     }
 
-    if (settings.help) Settings.printUsage(Command)
+    if (settings.help) {
+      Settings.printUsage(Command)
+      return
+    }
 
+    val summaryJson =
+      settings.summaryJson.getOrElse {
+        throw new RuntimeException(s"An output file is required.")
+      }
+
+    // Load relevant analysis.
     val analysisMap = AnalysisMap.create(settings.analysis)
-
     val analysis = {
       FileBasedStore(
         settings.analysis.cache,
@@ -45,8 +65,14 @@ object Main {
     // Extract products and dependencies.
     val extractor = new Extractor(settings.classpath, analysis, analysisMap)
 
-    println(s"Products:\n${extractor.products.mkString("\n")}")
-
-    println(s"Dependencies:\n${extractor.dependencies.mkString("\n")}")
+    om.writeValue(
+      summaryJson,
+      Summary(
+        extractor.products,
+        extractor.dependencies
+      )
+    )
   }
 }
+
+case class Summary(products: Map[File, Set[File]], dependencies: Set[File])
