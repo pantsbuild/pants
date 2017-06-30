@@ -11,6 +11,9 @@ scala_library(
     'src/scala/org/pantsbuild/zinc/cache',
     'src/scala/org/pantsbuild/zinc/util',
   ],
+  exports=[
+    'src/scala/org/pantsbuild/zinc/cache',
+  ],
   strict_deps=True,
   platform='java8',
 )

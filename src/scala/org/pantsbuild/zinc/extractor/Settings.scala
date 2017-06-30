@@ -31,6 +31,8 @@ object Settings extends OptionSet[Settings] {
     header("Analysis options:"),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",
       (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(_cache = Some(f)))),
+    fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
     fileMap(   "-rebase-map",                  "Source and destination paths to rebase in persisted analysis (file:file,...)",
       (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m)))
   )

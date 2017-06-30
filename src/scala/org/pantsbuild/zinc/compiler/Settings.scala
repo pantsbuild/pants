@@ -65,12 +65,6 @@ case class Settings(
       }
     )
 
-  lazy val cacheMap: Map[File, File] =
-    analysis._cacheMap.collect {
-      case (k, v) if normalise(k) != classesDirectory =>
-        (normalise(k), normalise(v))
-    }
-
   lazy val incOptions: IncOptions = {
     _incOptions.copy(
       apiDumpDirectory = _incOptions.apiDumpDirectory map normalise,
@@ -265,7 +259,7 @@ object Settings extends OptionSet[Settings] {
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",            (s: Settings, f: File) => s.copy(analysis =
       s.analysis.copy(_cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",
-      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(_cacheMap = m))),
+      (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(cacheMap = m))),
     fileMap(   "-rebase-map",                  "Source and destination paths to rebase in persisted analysis (file:file,...)",
       (s: Settings, m: Map[File, File]) => s.copy(analysis = s.analysis.copy(rebaseMap = m))),
     boolean(   "-no-clear-invalid-analysis",   "If set, zinc will fail rather than purging illegal analysis.",

@@ -95,7 +95,7 @@ object Main {
     }
 
     // Load the existing analysis for the destination, if any.
-    val analysisMap = AnalysisMap.create(settings.cacheMap, settings.analysis.rebaseMap)
+    val analysisMap = AnalysisMap.create(settings.analysis)
     val (targetAnalysisStore, previousResult) =
       InputUtils.loadDestinationAnalysis(settings, analysisMap, log)
     val inputs = InputUtils.create(settings, analysisMap, previousResult, log)

@@ -7,7 +7,7 @@ package org.pantsbuild.zinc.extractor
 
 import sbt.internal.inc.FileBasedStore
 
-import org.pantsbuild.zinc.analysis.PortableAnalysisMappers
+import org.pantsbuild.zinc.analysis.{AnalysisMap, PortableAnalysisMappers}
 import org.pantsbuild.zinc.options.Parsed
 
 /**
@@ -28,17 +28,23 @@ object Main {
 
     if (settings.help) Settings.printUsage(Command)
 
-    val analysis =
-      FileBasedStore(
-        settings.analysis.cache,
-        new PortableAnalysisMappers(settings.analysis.rebaseMap)
-      )
-        .get()
-        .getOrElse {
-          throw new RuntimeException(s"Failed to load analysis from ${settings.analysis.cache}")
-        }
-        ._1
+    val analysisMap = AnalysisMap.create(settings.analysis)
 
-    println(analysis)
+    val extractor =
+      new Extractor(
+        FileBasedStore(
+          settings.analysis.cache,
+          new PortableAnalysisMappers(settings.analysis.rebaseMap)
+        )
+          .get()
+          .getOrElse {
+            throw new RuntimeException(s"Failed to load analysis from ${settings.analysis.cache}")
+          }
+          ._1
+      )
+
+    println(s"Products:\n${extractor.products.mkString("\n")}")
+
+    println(s"Dependencies:\n${extractor.dependencies.mkString("\n")}")
   }
 }

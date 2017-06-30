@@ -127,12 +127,12 @@ object AnalysisMap {
   private val analysisCache =
     Cache[FileFPrint, Option[(CompileAnalysis, MiniSetup)]](analysisCacheLimit)
 
-  def create(analysisLocations: Map[File, File], rebases: Map[File, File]): AnalysisMap =
+  def create(options: AnalysisOptions): AnalysisMap =
     new AnalysisMap(
       // create fingerprints for all inputs at startup
-      analysisLocations.flatMap {
+      options.cacheMap.flatMap {
         case (classpathEntry, cacheFile) => FileFPrint.fprint(cacheFile).map(classpathEntry -> _)
       },
-      rebases
+      options.rebaseMap
     )
 }

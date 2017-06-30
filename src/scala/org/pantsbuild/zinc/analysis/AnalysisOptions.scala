@@ -12,7 +12,7 @@ import java.io.File
  */
 case class AnalysisOptions(
   _cache: Option[File]         = None,
-  _cacheMap: Map[File, File]   = Map.empty,
+  cacheMap: Map[File, File]    = Map.empty,
   rebaseMap: Map[File, File]   = Map.empty,
   clearInvalid: Boolean        = true
 ) {
