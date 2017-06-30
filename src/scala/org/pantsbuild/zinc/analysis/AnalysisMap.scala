@@ -6,12 +6,11 @@
 package org.pantsbuild.zinc.analysis
 
 import java.io.{File, IOException}
-import java.nio.file.Path
 import java.util.Optional
 
 import scala.compat.java8.OptionConverters._
 
-import sbt.internal.inc.{Analysis, AnalysisMappersAdapter, AnalysisStore, CompanionsStore, Mapper, FileBasedStore, Locate}
+import sbt.internal.inc.{Analysis, AnalysisStore, CompanionsStore, FileBasedStore, Locate}
 import sbt.util.Logger
 import xsbti.api.Companions
 import xsbti.compile.{CompileAnalysis, DefinesClass, MiniSetup, PerClasspathEntryLookup}
@@ -33,8 +32,8 @@ import org.pantsbuild.zinc.util.Util
 class AnalysisMap private[AnalysisMap] (
   // a map of classpath entries to cache file fingerprints, excluding the current compile destination
   analysisLocations: Map[File, FileFPrint],
-  // a Set of Path bases and destinations to re-relativize them to
-  rebases: Set[(Path, Path)]
+  // a Map of File bases to destinations to re-relativize them to
+  rebases: Map[File, File]
 ) {
   private val analysisMappers = new PortableAnalysisMappers(rebases)
 
@@ -135,58 +134,5 @@ object AnalysisMap {
         case (classpathEntry, cacheFile) => FileFPrint.fprint(cacheFile).map(classpathEntry -> _)
       },
       rebases
-        .toSeq
-        .map {
-          case (k, v) => (k.toPath, v.toPath)
-        }
-        .toSet
     )
-}
-
-/**
- * Given a Set of Path bases and destination bases, adapts written analysis to rewrite
- * all of the bases.
- *
- * Intended usecase is to rebase each distinct non-portable base path contained in the analysis:
- * in pants this is generally
- *   1) the buildroot
- *   2) the workdir (generally named `.pants.d`, but not always located under the buildroot)
- *   3) the base of the JVM that is in use
- */
-class PortableAnalysisMappers(rebases: Set[(Path, Path)]) extends AnalysisMappersAdapter {
-  private val rebaser = {
-    val forWrite = PortableAnalysisMappers.mkFileRebaser(rebases)
-    val forRead = PortableAnalysisMappers.mkFileRebaser(rebases.map { case (src, dst) => (dst, src) })
-    Mapper.forFile.map(forRead, forWrite)
-  }
-
-  // TODO: scalac/javac options and a few other items are not currently rebased.
-  override val outputDirMapper: Mapper[File] = rebaser
-  override val sourceDirMapper: Mapper[File] = rebaser
-  override val sourceMapper: Mapper[File] = rebaser
-  override val productMapper: Mapper[File] = rebaser
-  override val binaryMapper: Mapper[File] = rebaser
-  override val classpathMapper: Mapper[File] = rebaser
-}
-
-object PortableAnalysisMappers {
-  private def mkFileRebaser(rebases: Set[(Path, Path)]): File => File = {
-    // Sort the rebases from longest to shortest (to ensure that a prefix is rebased
-    // before a suffix).
-    val orderedRebases =
-      rebases.toSeq.sortBy {
-        case (path, slug) => -path.toString.size
-      }
-    val rebaser: File => File = { f =>
-      val p = f.toPath
-      // Attempt each rebase in length order, applying the longest one that matches.
-      orderedRebases
-        .collectFirst {
-          case (from, to) if p.startsWith(from) =>
-            to.resolve(from.relativize(p)).toFile
-        }
-        .getOrElse(f)
-    }
-    rebaser
-  }
 }

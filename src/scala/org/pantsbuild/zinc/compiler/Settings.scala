@@ -65,10 +65,6 @@ case class Settings(
       }
     )
 
-  lazy val cacheFile: File = {
-    normalise(analysis._cache.getOrElse(defaultCacheLocation(classesDirectory)))
-  }
-
   lazy val cacheMap: Map[File, File] =
     analysis._cacheMap.collect {
       case (k, v) if normalise(k) != classesDirectory =>

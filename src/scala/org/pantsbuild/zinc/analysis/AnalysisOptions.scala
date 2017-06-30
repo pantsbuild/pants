@@ -15,4 +15,9 @@ case class AnalysisOptions(
   _cacheMap: Map[File, File]   = Map.empty,
   rebaseMap: Map[File, File]   = Map.empty,
   clearInvalid: Boolean        = true
-)
+) {
+  lazy val cache: File =
+    _cache.getOrElse {
+      throw new RuntimeException(s"An analysis cache file is required.")
+    }
+}

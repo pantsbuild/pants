@@ -81,7 +81,7 @@ object InputUtils {
       new Setup(
         analysisMap.getPCELookup,
         false,
-        settings.cacheFile,
+        settings.analysis.cache,
         CompilerUtils.getGlobalsCache,
         incOptions.options(log),
         reporter,
@@ -106,7 +106,7 @@ object InputUtils {
     log: Logger
   ): (AnalysisStore, PreviousResult) = {
     def load() = {
-      val analysisStore = analysisMap.cachedStore(settings.cacheFile)
+      val analysisStore = analysisMap.cachedStore(settings.analysis.cache)
       analysisStore.get() match {
         case Some((a, s)) => (analysisStore, Some(a), Some(s))
         case _ => (analysisStore, None, None)
@@ -120,8 +120,8 @@ object InputUtils {
       } catch {
         case e: Throwable if settings.analysis.clearInvalid =>
           // Remove the corrupted analysis and output directory.
-          log.warn(s"Failed to load analysis from ${settings.cacheFile} ($e): will execute a clean compile.")
-          IO.delete(settings.cacheFile)
+          log.warn(s"Failed to load analysis from ${settings.analysis.cache} ($e): will execute a clean compile.")
+          IO.delete(settings.analysis.cache)
           IO.delete(settings.classesDirectory)
           load()
       }
