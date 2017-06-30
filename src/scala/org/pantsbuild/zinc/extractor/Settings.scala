@@ -14,8 +14,9 @@ import org.pantsbuild.zinc.analysis.AnalysisOptions
  */
 case class Settings(
   help: Boolean             = false,
-  analysis: AnalysisOptions = AnalysisOptions(),
-  summaryJson: Option[File] = None
+  summaryJson: Option[File] = None,
+  classpath: Seq[File]      = Seq(),
+  analysis: AnalysisOptions = AnalysisOptions()
 )
 
 object Settings extends OptionSet[Settings] {
@@ -28,7 +29,9 @@ object Settings extends OptionSet[Settings] {
     file(      "-summary-json", "file",        "Output file to write an analysis summary to.",
       (s: Settings, f: File) => s.copy(summaryJson = Some(f))),
 
-    header("Analysis options:"),
+    header("Input options:"),
+    path(     ("-classpath", "-cp"), "path",   "Specify the classpath",
+      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(      "-analysis-cache", "file",      "Cache file for compile analysis",
       (s: Settings, f: File) => s.copy(analysis = s.analysis.copy(_cache = Some(f)))),
     fileMap(   "-analysis-map",                "Upstream analysis mapping (file:file,...)",

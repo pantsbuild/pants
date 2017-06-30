@@ -30,18 +30,20 @@ object Main {
 
     val analysisMap = AnalysisMap.create(settings.analysis)
 
-    val extractor =
-      new Extractor(
-        FileBasedStore(
-          settings.analysis.cache,
-          new PortableAnalysisMappers(settings.analysis.rebaseMap)
-        )
-          .get()
-          .getOrElse {
-            throw new RuntimeException(s"Failed to load analysis from ${settings.analysis.cache}")
-          }
-          ._1
+    val analysis = {
+      FileBasedStore(
+        settings.analysis.cache,
+        new PortableAnalysisMappers(settings.analysis.rebaseMap)
       )
+        .get()
+        .getOrElse {
+          throw new RuntimeException(s"Failed to load analysis from ${settings.analysis.cache}")
+        }
+        ._1
+    }
+
+    // Extract products and dependencies.
+    val extractor = new Extractor(settings.classpath, analysis, analysisMap)
 
     println(s"Products:\n${extractor.products.mkString("\n")}")
 

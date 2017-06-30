@@ -34,7 +34,7 @@ case class Settings(
   version: Boolean                  = false,
   consoleLog: ConsoleOptions        = ConsoleOptions(),
   _sources: Seq[File]               = Seq.empty,
-  _classpath: Seq[File]             = Seq.empty,
+  classpath: Seq[File]             = Seq.empty,
   _classesDirectory: Option[File]   = None,
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
@@ -53,8 +53,6 @@ case class Settings(
   lazy val zincCacheDir: File = _zincCacheDir.getOrElse {
     throw new RuntimeException(s"The ${Settings.ZincCacheDirOpt} option is required.")
   }
-
-  lazy val classpath: Seq[File] = _classpath map normalise
 
   lazy val sources: Seq[File] = _sources map normalise
 
@@ -221,7 +219,7 @@ object Settings extends OptionSet[Settings] {
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ Pattern.compile(re)))),
 
     header("Compile options:"),
-    path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(_classpath = cp)),
+    path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
     file(     DestinationOpt, "directory",     "Destination for compiled classes",           (s: Settings, f: File) => s.copy(_classesDirectory = Some(f))),
 
     header("Scala options:"),

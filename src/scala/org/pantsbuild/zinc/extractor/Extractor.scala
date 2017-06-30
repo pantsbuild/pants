@@ -7,16 +7,24 @@ package org.pantsbuild.zinc.extractor
 
 import java.io.File
 
-import sbt.internal.inc.{Analysis, FileBasedStore}
+import sbt.internal.inc.{Analysis, FileBasedStore, Locate}
 
 import xsbti.compile.CompileAnalysis
 
+import org.pantsbuild.zinc.analysis.AnalysisMap
 
 /**
  * Class to encapsulate extracting analysis
  */
-class Extractor(_analysis: CompileAnalysis) {
-  private val relations = _analysis.asInstanceOf[Analysis].relations
+class Extractor(
+  classpath: Seq[File],
+  analysis: CompileAnalysis,
+  analysisMap: AnalysisMap
+) {
+  private val relations = analysis.asInstanceOf[Analysis].relations
+
+  // A lookup from classname to defining classpath entry File.
+  private val definesClass = Locate.entry(classpath, analysisMap.getPCELookup)
 
   /**
    * Extract a mapping from source file to produced classfiles.
