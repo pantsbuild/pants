@@ -123,59 +123,33 @@ class VersionedTargetSet(object):
 
   def ensure_legal(self):
     """Return True as long as the state does not break any internal contracts."""
-    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
+    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping
+    # between error states.
     if self._results_dir:
       errors = ''
       if not os.path.islink(self._results_dir):
         errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self._results_dir)
       if not os.path.isdir(self._current_results_dir):
-        errors += '\nThe current_results_dir directory was not found\n\t* {}'.format(self._current_results_dir)
+        errors += ('\nThe current_results_dir directory was not found\n\t* {}'
+                   .format(self._current_results_dir))
       if errors:
-        raise self.IllegalResultsDir(
-          '\nThe results_dirs state should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
-        )
+        raise self.IllegalResultsDir('\nThe results_dirs state should not be manually cleaned or '
+                                     'recreated by tasks.\n{}'.format(errors))
     return True
 
   def live_dirs(self):
     """Yields directories that must exist for this VersionedTarget to function."""
-    # The only caller of this function is the workdir cleaning pipeline. It is not clear that the previous_results_dir
-    # should be returned for that purpose. And, by the time this is called, the contents have already been copied.
+    # The only caller of this function is the workdir cleaning pipeline. It is not clear that the
+    # previous_results_dir should be returned for that purpose. And, by the time this is called,
+    # the contents have already been copied.
     if self.has_results_dir:
       yield self.results_dir
       yield self.current_results_dir
       if self.has_previous_results_dir:
         yield self.previous_results_dir
 
-  @memoized_method
-  def _target_to_vt(self):
-    return {vt.target: vt for vt in self.versioned_targets}
-
-  def __repr__(self):
-    return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
-                                'valid' if self.valid else 'invalid')
-
-
-class VersionedTarget(VersionedTargetSet):
-  """This class represents a singleton VersionedTargetSet.
-
-  :API: public
-  """
-
-  def __init__(self, cache_manager, target, cache_key):
-    """
-    :API: public
-    """
-    if not isinstance(target, Target):
-      raise ValueError("The target {} must be an instance of Target but is not.".format(target.id))
-
-    self.target = target
-    self.cache_key = cache_key
-    # Must come after the assignments above, as they are used in the parent's __init__.
-    super(VersionedTarget, self).__init__(cache_manager, [self])
-    self.id = target.id
-
   def create_results_dir(self):
-    """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
+    """Ensure an empty results directory and a stable symlink exist for these versioned targets."""
     self._current_results_dir = self._cache_manager.results_dir_path(self.cache_key, stable=False)
     self._results_dir = self._cache_manager.results_dir_path(self.cache_key, stable=True)
 
@@ -204,6 +178,33 @@ class VersionedTarget(VersionedTargetSet):
     relative_symlink(self._current_results_dir, self.results_dir)
     # Set the self._previous last, so that it is only True after the copy completed.
     self._previous_results_dir = previous_path
+
+  @memoized_method
+  def _target_to_vt(self):
+    return {vt.target: vt for vt in self.versioned_targets}
+
+  def __repr__(self):
+    return 'VTS({}, {})'.format(','.join(target.address.spec for target in self.targets),
+                                'valid' if self.valid else 'invalid')
+
+
+class VersionedTarget(VersionedTargetSet):
+  """This class represents a singleton VersionedTargetSet.
+
+  :API: public
+  """
+
+  def __init__(self, cache_manager, target, cache_key):
+    """
+    :API: public
+    """
+    if not isinstance(target, Target):
+      raise ValueError("The target {} must be an instance of Target but is not.".format(target.id))
+
+    self.target = target
+    self.cache_key = cache_key
+    # Must come after the assignments above, as they are used in the parent's __init__.
+    super(VersionedTarget, self).__init__(cache_manager, [self])
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
@@ -332,8 +333,8 @@ class InvalidationCacheManager(object):
   def wrap_targets(self, targets, topological_order=False):
     """Wrap targets and their computed cache keys in VersionedTargets.
 
-    If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will not
-    have an associated VersionedTarget returned.
+    If the FingerprintStrategy opted out of providing a fingerprint for a target, that target will
+    not have an associated VersionedTarget returned.
 
     Returns a list of VersionedTargets, each representing one input target.
     """
@@ -354,9 +355,11 @@ class InvalidationCacheManager(object):
 
   def _key_for(self, target):
     try:
-      return self._cache_key_generator.key_for_target(target,
-                                                      transitive=self._invalidate_dependents,
-                                                      fingerprint_strategy=self._fingerprint_strategy)
+      return self._cache_key_generator.key_for_target(
+        target,
+        transitive=self._invalidate_dependents,
+        fingerprint_strategy=self._fingerprint_strategy
+      )
     except Exception as e:
       # This is a catch-all for problems we haven't caught up with and given a better diagnostic.
       # TODO(Eric Ayers): If you see this exception, add a fix to catch the problem earlier.

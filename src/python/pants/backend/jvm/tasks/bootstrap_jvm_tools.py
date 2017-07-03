@@ -244,7 +244,9 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       if not invalidation_check.all_vts:
         return []
 
-      tool_vts = self.tool_vts(invalidation_check)
+      # TODO(John Sirois): XXX: This works in concert with `check_artifact_cache_for`!
+      tool_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+
       jar_name = '{main}-{hash}.jar'.format(main=jvm_tool.main, hash=tool_vts.cache_key.hash)
       shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
 
@@ -296,13 +298,9 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       return [shaded_jar]
 
   def check_artifact_cache_for(self, invalidation_check):
-    tool_vts = self.tool_vts(invalidation_check)
-    return [tool_vts]
-
-  def tool_vts(self, invalidation_check):
     # The monolithic shaded tool jar is a single output dependent on the entire target set, and is
     # not divisible by target. So we can only cache it keyed by the entire target set.
-    return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+    return [VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)]
 
   def _bootstrap_jvm_tool(self, dep_spec, jvm_tool):
     targets = self._resolve_tool_targets(dep_spec, jvm_tool)

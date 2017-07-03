@@ -14,7 +14,8 @@ from itertools import repeat
 from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
-from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
+from pants.cache.artifact_cache import (CacheRead, UnreadableArtifact, call_insert,
+                                        call_use_cached_files)
 from pants.cache.cache_setup import CacheSetup
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
@@ -351,30 +352,34 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
+      # TODO(John Sirois): XXX: Incorporate cache_for into the artifact_write_callback flow.
+      cache_for_vtss = self.check_artifact_cache_for(invalidation_check)
+
       with self.context.new_workunit('cache'):
-        cached_vts, uncached_vts, uncached_causes = \
-          self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
-      if cached_vts:
-        cached_targets = [vt.target for vt in cached_vts]
+        cached_vtss, uncached_vtss, uncached_causes = self.check_artifact_cache(cache_for_vtss)
+
+      if cached_vtss:
+        cached_targets = [vts.target for vts in cached_vtss]  # TODO(John Sirois): XXX .target?
         self.context.run_tracker.artifact_cache_stats.add_hits(cache_manager.task_name,
                                                                cached_targets)
         if not silent:
           self._report_targets('Using cached artifacts for ', cached_targets, '.')
-      if uncached_vts:
-        uncached_targets = [vt.target for vt in uncached_vts]
+
+      if uncached_vtss:
+        uncached_targets = [vts.target for vts in uncached_vtss]  # TODO(John Sirois): XXX .target?
         self.context.run_tracker.artifact_cache_stats.add_misses(cache_manager.task_name,
                                                                  uncached_targets,
                                                                  uncached_causes)
         if not silent:
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
+
       # Now that we've checked the cache, re-partition whatever is still invalid.
-      invalidation_check = \
-        InvalidationCheck(invalidation_check.all_vts, uncached_vts)
+      invalidation_check = InvalidationCheck(invalidation_check.all_vts, uncached_vtss)
 
     if not silent:
       targets = []
-      for vt in invalidation_check.invalid_vts:
-        targets.extend(vt.targets)
+      for vts in invalidation_check.invalid_vts:
+        targets.extend(vts.targets)
 
       if len(targets):
         msg_elements = ['Invalidated ',
@@ -399,7 +404,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # actually does is delete the key file created at the end of the last successful task run.
     # This is necessary to avoid the following scenario:
     #
-    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 1) In state A: Task succeeds and writes some output.  Key is recorded by the invalidator.
     # 2) In state B: Task fails, but writes some output.  Key is not recorded.
     # 3) After reverting back to state A: The current key is the same as the one recorded at the
     #    end of step 1), so it looks like no work needs to be done, but actually the task
@@ -418,8 +423,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
                                     phase='post-check')
 
-    for vt in invalidation_check.invalid_vts:
-      vt.update()
+    # TODO(John Sirois): XXX: The actual artifact_write_callback is triggered here.
+    for vts in invalidation_check.invalid_vts:
+      vts.update()
 
     # Background work to clean up previous builds.
     if self.context.options.for_global_scope().workdir_max_build_entries is not None:
@@ -476,42 +482,44 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     return self.do_check_artifact_cache(vts)
 
-  def do_check_artifact_cache(self, vts, post_process_cached_vts=None):
+  def do_check_artifact_cache(self, vtss, post_process_cached_vts=None):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
 
     Returns a pair (cached, uncached) of VersionedTargets that were
     satisfied/unsatisfied from the cache.
     """
-    if not vts:
+    if not vtss:
       return [], [], []
 
     read_cache = self._cache_factory.get_read_cache()
-    items = [(read_cache, vt.cache_key, vt.current_results_dir if self.cache_target_dirs else None)
-             for vt in vts]
-    res = self.context.subproc_map(call_use_cached_files, items)
+    reads = [CacheRead(cache=read_cache,
+                       key=vts.cache_key,
+                       results_dir=(vts.current_results_dir if self.cache_target_dirs else None))
+             for vts in vtss]
+    res = self.context.subproc_map(call_use_cached_files, reads)
 
-    cached_vts = []
-    uncached_vts = []
+    cached_vtss = []
+    uncached_vtss = []
     uncached_causes = []
 
     # Note that while the input vts may represent multiple targets (for tasks that overrride
     # check_artifact_cache_for), the ones we return must represent single targets.
     # Once flattened, cached/uncached vts are in separate lists. Each uncached vts is paired
     # with why it is missed for stat reporting purpose.
-    for vt, was_in_cache in zip(vts, res):
+    for vts, was_in_cache in zip(vtss, res):
       if was_in_cache:
-        cached_vts.extend(vt.versioned_targets)
+        cached_vtss.extend(vts.versioned_targets)
       else:
-        uncached_vts.extend(vt.versioned_targets)
-        uncached_causes.extend(repeat(was_in_cache, len(vt.versioned_targets)))
+        uncached_vtss.extend(vts.versioned_targets)
+        uncached_causes.extend(repeat(was_in_cache, len(vts.versioned_targets)))
         if isinstance(was_in_cache, UnreadableArtifact):
           self._cache_key_errors.update(was_in_cache.key)
 
     if post_process_cached_vts:
-      post_process_cached_vts(cached_vts)
-    for vt in cached_vts:
-      vt.update()
-    return cached_vts, uncached_vts, uncached_causes
+      post_process_cached_vts(cached_vtss)
+    for vts in cached_vtss:
+      vts.update()
+    return cached_vtss, uncached_vtss, uncached_causes
 
   def update_artifact_cache(self, vts_artifactfiles_pairs):
     """Write to the artifact cache, if we're configured to.

@@ -9,6 +9,8 @@ import logging
 import os
 import sys
 
+from pants.util.objects import datatype
+
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
 # originally built and where the cache restores them to) and the cache root path/URL (which is
@@ -144,18 +146,23 @@ class ArtifactCache(object):
     pass
 
 
-def call_use_cached_files(tup):
+class CacheRead(datatype('CacheRead', ['cache', 'key', 'results_dir'])):
+  """Represents a read from a cache for a given key."""
+
+
+def call_use_cached_files(cache_read):
   """Importable helper for multi-proc calling of ArtifactCache.use_cached_files on a cache instance.
 
   Multiprocessing map/apply/etc require functions which can be imported, not bound methods.
   To call a bound method, instead call a helper like this and pass tuple of the instance and args.
   The helper can then call the original method on the deserialized instance.
 
-  :param tup: A tuple of an ArtifactCache and args (eg CacheKey) for ArtifactCache.use_cached_files.
+  :param cache_read: A tuple of an ArtifactCache and args (eg CacheKey) for
+                     ArtifactCache.use_cached_files.
   """
 
   try:
-    cache, key, results_dir = tup
+    cache, key, results_dir = cache_read
     res = cache.use_cached_files(key, results_dir)
     if res:
       sys.stderr.write('.')

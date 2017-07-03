@@ -226,6 +226,7 @@ class IvyTaskMixin(TaskBase):
       if not invalidation_check.all_vts:
         return NO_RESOLVE_RUN_RESULT
 
+      # TODO(John Sirois): XXX: This works in concert with `check_artifact_cache_for` in the Mixee!
       resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
       resolve_hash_name = resolve_vts.cache_key.hash
