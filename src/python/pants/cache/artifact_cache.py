@@ -8,8 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import sys
-
-from pants.util.objects import datatype
+from collections import namedtuple
 
 
 # Note throughout the distinction between the artifact_root (which is where the artifacts are
@@ -146,7 +145,7 @@ class ArtifactCache(object):
     pass
 
 
-class CacheRead(datatype('CacheRead', ['cache', 'key', 'results_dir'])):
+class CacheRead(namedtuple('CacheRead', ['cache', 'key', 'results_dir'])):
   """Represents a read from a cache for a given key."""
 
 
@@ -161,8 +160,8 @@ def call_use_cached_files(cache_read):
                      ArtifactCache.use_cached_files.
   """
 
+  cache, key, results_dir = cache_read
   try:
-    cache, key, results_dir = cache_read
     res = cache.use_cached_files(key, results_dir)
     if res:
       sys.stderr.write('.')

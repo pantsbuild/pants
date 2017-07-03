@@ -502,7 +502,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     uncached_vtss = []
     uncached_causes = []
 
-    # Note that while the input vts may represent multiple targets (for tasks that overrride
+    # Note that while the input vts may represent multiple targets (for tasks that override
     # check_artifact_cache_for), the ones we return must represent single targets.
     # Once flattened, cached/uncached vts are in separate lists. Each uncached vts is paired
     # with why it is missed for stat reporting purpose.

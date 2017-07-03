@@ -657,14 +657,14 @@ class JvmCompile(NailgunTaskBase):
           logs.append(outpath)
     return logs
 
-  def check_artifact_cache(self, vts):
+  def check_artifact_cache(self, vtss):
     """Localizes the fetched analysis for targets we found in the cache."""
-    def post_process(cached_vts):
-      for vt in cached_vts:
-        cc = self._compile_context(vt.target, vt.results_dir)
+    def post_process(cached_vtss):
+      for vts in cached_vtss:
+        cc = self._compile_context(vts.target, vts.results_dir)  # TODO(John Sirois): XXX .target?
         safe_delete(cc.analysis_file)
         self._analysis_tools.localize(cc.portable_analysis_file, cc.analysis_file)
-    return self.do_check_artifact_cache(vts, post_process_cached_vts=post_process)
+    return self.do_check_artifact_cache(vtss, post_process_cached_vts=post_process)
 
   def _create_empty_products(self):
     if self.context.products.is_required_data('classes_by_source'):
