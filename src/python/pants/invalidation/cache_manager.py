@@ -51,11 +51,11 @@ class VersionedTargetSet(object):
   def __init__(self, cache_manager, versioned_targets):
     self._cache_manager = cache_manager
     self.versioned_targets = versioned_targets
-    self.targets = [vt.target for vt in versioned_targets]
+    self.targets = [target for vts in versioned_targets for target in vts.targets]
 
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
-    self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
-                                                           for vt in versioned_targets])
+    self.cache_key = CacheKeyGenerator.combine_cache_keys([vts.cache_key
+                                                           for vts in versioned_targets])
     # NB: previous_cache_key may be None on the first build of a target.
     self.previous_cache_key = cache_manager.previous_key(self.cache_key)
     self.valid = self.previous_cache_key == self.cache_key
@@ -201,10 +201,13 @@ class VersionedTarget(VersionedTargetSet):
     if not isinstance(target, Target):
       raise ValueError("The target {} must be an instance of Target but is not.".format(target.id))
 
-    self.target = target
+    self.targets = [target]
     self.cache_key = cache_key
     # Must come after the assignments above, as they are used in the parent's __init__.
     super(VersionedTarget, self).__init__(cache_manager, [self])
+
+    # Unique property to VersionedTarget
+    self.target = target
 
   def __repr__(self):
     return 'VT({}, {})'.format(self.target.id, 'valid' if self.valid else 'invalid')
@@ -225,10 +228,11 @@ class InvalidationCheck(object):
     :API: public
     """
     if invalid_vts:
-      unaccounted_invalid = frozenset(invalid_vts) - frozenset(all_vts)
+      unaccounted_invalid = (frozenset(target for vts in invalid_vts for target in vts.targets) -
+                             frozenset(target for vts in all_vts for target in vts.targets))
       if unaccounted_invalid:
         # TODO(John Sirois): XXX: Investigate and use appropriate exception type.
-        raise ValueError('The following invalid target (sets) are not contained by this '
+        raise ValueError('The following invalid targets would not contained by this '
                          'InvalidationCheck:\n\t{}'
                          .format('\n\t'.join(map(repr, unaccounted_invalid))))
     else:
@@ -250,6 +254,10 @@ class InvalidationCheck(object):
   def re_partition(self, invalid_vts):
     """TODO(John Sirois): XXX: DOCME"""
     return InvalidationCheck(self.all_vts, invalid_vts)
+
+  def __repr__(self):
+    return 'InvalidationCheck(all_vts={!r}, invalid_vts={!r})'.format(self.all_vts,
+                                                                      self.invalid_vts)
 
 
 class InvalidationCacheManager(object):

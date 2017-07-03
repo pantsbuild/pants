@@ -348,9 +348,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self._force_invalidated = True
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
-
-    cache_for_vtss = self.check_artifact_cache_for(invalidation_check)
-    invalidation_check = InvalidationCheck(cache_for_vtss)
+    if invalidation_check.invalid_vts:
+      cache_for_vtss = self.check_artifact_cache_for(invalidation_check)
+      invalidation_check = InvalidationCheck(cache_for_vtss)
 
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 
