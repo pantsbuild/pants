@@ -220,16 +220,36 @@ class InvalidationCheck(object):
   are implemented.
   """
 
-  def __init__(self, all_vts, invalid_vts):
+  def __init__(self, all_vts, invalid_vts=None):
     """
     :API: public
     """
+    if invalid_vts:
+      unaccounted_invalid = frozenset(invalid_vts) - frozenset(all_vts)
+      if unaccounted_invalid:
+        # TODO(John Sirois): XXX: Investigate and use appropriate exception type.
+        raise ValueError('The following invalid target (sets) are not contained by this '
+                         'InvalidationCheck:\n\t{}'
+                         .format('\n\t'.join(map(repr, unaccounted_invalid))))
+    else:
+      invalid_vts = [vts for vts in all_vts if not vts.valid]
 
-    # All the targets, valid and invalid.
-    self.all_vts = all_vts
+    self._all_vts = all_vts
+    self._invalid_vts = invalid_vts
 
-    # Just the invalid targets.
-    self.invalid_vts = invalid_vts
+  @property
+  def all_vts(self):
+    """All the targets, valid and invalid."""
+    return self._invalid_vts
+
+  @property
+  def invalid_vts(self):
+    """Just the invalid targets."""
+    return self._invalid_vts
+
+  def re_partition(self, invalid_vts):
+    """TODO(John Sirois): XXX: DOCME"""
+    return InvalidationCheck(self.all_vts, invalid_vts)
 
 
 class InvalidationCacheManager(object):
@@ -309,8 +329,7 @@ class InvalidationCacheManager(object):
     Callers can inspect these vts and rebuild the invalid ones, for example.
     """
     all_vts = self.wrap_targets(targets, topological_order=topological_order)
-    invalid_vts = filter(lambda vt: not vt.valid, all_vts)
-    return InvalidationCheck(all_vts, invalid_vts)
+    return InvalidationCheck(all_vts)
 
   @property
   def task_name(self):

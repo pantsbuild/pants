@@ -349,24 +349,26 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
+    cache_for_vtss = self.check_artifact_cache_for(invalidation_check)
+    invalidation_check = InvalidationCheck(cache_for_vtss)
+
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 
     if invalidation_check.invalid_vts and self.artifact_cache_reads_enabled():
-      # TODO(John Sirois): XXX: Incorporate cache_for into the artifact_write_callback flow.
-      cache_for_vtss = self.check_artifact_cache_for(invalidation_check)
-
       with self.context.new_workunit('cache'):
-        cached_vtss, uncached_vtss, uncached_causes = self.check_artifact_cache(cache_for_vtss)
+        (cached_vtss,
+         uncached_vtss,
+         uncached_causes) = self.check_artifact_cache(invalidation_check.invalid_vts)
 
       if cached_vtss:
-        cached_targets = [vts.target for vts in cached_vtss]  # TODO(John Sirois): XXX .target?
+        cached_targets = [target for vts in cached_vtss for target in vts.targets]
         self.context.run_tracker.artifact_cache_stats.add_hits(cache_manager.task_name,
                                                                cached_targets)
         if not silent:
           self._report_targets('Using cached artifacts for ', cached_targets, '.')
 
       if uncached_vtss:
-        uncached_targets = [vts.target for vts in uncached_vtss]  # TODO(John Sirois): XXX .target?
+        uncached_targets = [target for vts in uncached_vtss for target in vts.targets]
         self.context.run_tracker.artifact_cache_stats.add_misses(cache_manager.task_name,
                                                                  uncached_targets,
                                                                  uncached_causes)
@@ -374,7 +376,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
 
       # Now that we've checked the cache, re-partition whatever is still invalid.
-      invalidation_check = InvalidationCheck(invalidation_check.all_vts, uncached_vtss)
+      invalidation_check = invalidation_check.re_partition(uncached_vtss)
 
     if not silent:
       targets = []
@@ -423,7 +425,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
                                     phase='post-check')
 
-    # TODO(John Sirois): XXX: The actual artifact_write_callback is triggered here.
     for vts in invalidation_check.invalid_vts:
       vts.update()
 
@@ -436,12 +437,15 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.update_artifact_cache([(vt, [vt.current_results_dir])])
 
   def _launch_background_workdir_cleanup(self, vts):
-    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds, [(vts,)], 'workdir_build_cleanup')
+    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
+                                     [(vts,)],
+                                     'workdir_build_cleanup')
     self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
   def _cleanup_workdir_stale_builds(self, vts):
     # workdir_max_build_entries has been assured of not None before invoking this method.
-    max_entries_per_target = max(2, self.context.options.for_global_scope().workdir_max_build_entries)
+    workdir_max_build_entries = self.context.options.for_global_scope().workdir_max_build_entries
+    max_entries_per_target = max(2, workdir_max_build_entries)
     for vt in vts:
       live_dirs = list(vt.live_dirs())
       if not live_dirs:
@@ -467,10 +471,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   def check_artifact_cache_for(self, invalidation_check):
     """Decides which VTS to check the artifact cache for.
 
-    By default we check for each invalid target. Can be overridden, e.g., to
-    instead check only for a single artifact for the entire target set.
+    By default we check for each target. Can be overridden, e.g., to instead check only for a single
+    artifact for the entire target set.
     """
-    return invalidation_check.invalid_vts
+    return invalidation_check.all_vts  # [VT, VT, ...]
 
   def check_artifact_cache(self, vts):
     """Checks the artifact cache for the specified list of VersionedTargetSets.
@@ -504,8 +508,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     # Note that while the input vts may represent multiple targets (for tasks that override
     # check_artifact_cache_for), the ones we return must represent single targets.
+    # TODO(John Sirois): The above seems to be untrue. The returned VTSs should match the shape of
+    # TODO(John Sirois): check_artifact_cache_for. By default that is [VT], over-riders generally
+    # TODO(John Sirois): do [VTS].
+    # TODO(John Sirois): ... but pay attention to the stats reporting case below:
     # Once flattened, cached/uncached vts are in separate lists. Each uncached vts is paired
-    # with why it is missed for stat reporting purpose.
+    # with why it is missed for stat reporting purposes.
     for vts, was_in_cache in zip(vtss, res):
       if was_in_cache:
         cached_vtss.extend(vts.versioned_targets)
