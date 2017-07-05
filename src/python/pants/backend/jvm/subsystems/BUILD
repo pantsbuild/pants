@@ -113,6 +113,15 @@ python_library(
 )
 
 python_library(
+  name = 'zinc',
+  sources = ['zinc.py'],
+  dependencies = [
+    ':jvm_tool_mixin',
+    'src/python/pants/subsystem',
+  ]
+)
+
+python_library(
   name = 'zinc_language_mixin',
   sources = ['zinc_language_mixin.py'],
   dependencies = [
