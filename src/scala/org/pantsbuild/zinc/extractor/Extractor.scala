@@ -50,13 +50,9 @@ class Extractor(
     // Look up the external deps for each classfile for each sourcefile.
     for {
       source <- relations.allSources
-      _ = println(s">>> source: $source")
       sourceClassname <- relations.classNames(source)
-      _ = println(s">>>   sourceClassname: $sourceClassname")
       classname <- relations.externalDeps(sourceClassname)
-      _ = println(s">>>     classname: $classname")
       dep <- warningDefinesClass(classname)
-      _ = println(s">>>       dep: $dep")
     } {
       mm.addBinding(source, dep)
     }
@@ -64,9 +60,7 @@ class Extractor(
     // And library dependencies.
     for {
       source <- relations.allSources
-      _ = println(s">>> source: $source")
       dep <- relations.libraryDeps(source)
-      _ = println(s">>>   dep: $dep")
     } {
       mm.addBinding(source, dep)
     }
