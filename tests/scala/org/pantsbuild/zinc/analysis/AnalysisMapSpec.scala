@@ -4,10 +4,6 @@
 package org.pantsbuild.zinc.analysis
 
 import sbt.io.IO
-import sbt.internal.util.{
-  ConsoleLogger,
-  ConsoleOut
-}
 
 import org.junit.runner.RunWith
 import org.scalatest.WordSpec
@@ -19,7 +15,7 @@ class AnalysisMapSpec extends WordSpec with MustMatchers {
   "AnalysisMap" should {
     "succeed for empty analysis" in {
       IO.withTemporaryDirectory { classpathEntry =>
-        val am = AnalysisMap.create(Map(), Map(), ConsoleLogger(ConsoleOut.systemOut))
+        val am = AnalysisMap.create(AnalysisOptions())
         val dc = am.getPCELookup.definesClass(classpathEntry)
         dc("NonExistent.class") must be(false)
       }
