@@ -75,4 +75,7 @@ object Main {
   }
 }
 
-case class Summary(products: Map[File, Set[File]], dependencies: Set[File])
+case class Summary(
+  products: collection.Map[File, collection.Set[File]],
+  dependencies: collection.Map[File, collection.Set[File]]
+)

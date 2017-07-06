@@ -7,6 +7,8 @@ package org.pantsbuild.zinc.extractor
 
 import java.io.File
 
+import scala.collection.mutable
+
 import sbt.internal.inc.{Analysis, FileBasedStore, Locate}
 
 import xsbti.compile.CompileAnalysis
@@ -41,31 +43,36 @@ class Extractor(
   /**
    * Extract all file or classname dependencies of this compilation unit that can be
    * determined from analysis.
-   *
-   * TODO: In future, this could use the analysis for the relevant dependencies of the
-   * module to walk through classnames to actual file deps.
    */
-  def dependencies: Set[File] = {
-    val external =
-      relations
-        .allExternalDeps
-        .flatMap { classname =>
-          definesClass(classname).orElse {
-            // This case should be rare: should only occur when a compiler plugin generates
-            // additional classes.
-            System.err.println(s"No analysis declares class $classname")
-            None
-          }
-        }
-        .toSet
+  def dependencies: collection.Map[File, collection.Set[File]] = {
+    val mm = new mutable.HashMap[File, mutable.Set[File]] with mutable.MultiMap[File, File]
 
-    val library =
-      relations
-        .allSources
-        .flatMap { source =>
-          relations.libraryDeps(source)
-        }
-        .toSet
-    external ++ library
+    // Look up the external deps for each classfile for each sourcefile.
+    for {
+      source <- relations.allSources
+      sourceClassname <- relations.classNames(source)
+      classname <- relations.externalDeps(sourceClassname)
+      dep <- warningDefinesClass(classname)
+    } {
+      mm.addBinding(source, dep)
+    }
+
+    // And library dependencies.
+    for {
+      source <- relations.allSources
+      dep <- relations.libraryDeps(source)
+    } {
+      mm.addBinding(source, dep)
+    }
+
+    mm
   }
+
+  private def warningDefinesClass(classname: String): Option[File] =
+    definesClass(classname).orElse {
+      // This case should be rare: should only occur when a compiler plugin generates
+      // additional classes.
+      System.err.println(s"No analysis declares class $classname")
+      None
+    }
 }
