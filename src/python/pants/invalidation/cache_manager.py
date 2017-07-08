@@ -244,7 +244,7 @@ class InvalidationCheck(object):
   @property
   def all_vts(self):
     """All the targets, valid and invalid."""
-    return self._invalid_vts
+    return self._all_vts
 
   @property
   def invalid_vts(self):
