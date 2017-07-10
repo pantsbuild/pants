@@ -39,6 +39,12 @@ class ScroogeGenTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
 
+  def test_both_compiler_args_and_rpc_style(self):
+    # scrooge_gen should pass when both compiler_args and rpc_style are specified
+    cmd = ['gen', self.thrift_test_target('both-compiler-args-and-rpc-style')]
+    pants_run = self.run_pants(cmd)
+    self.assert_success(pants_run)
+
   def test_namespace_map(self):
     # scrooge_gen should pass with namespace_map specified
     cmd = ['gen', self.thrift_test_target('namespace-map-thrift')]

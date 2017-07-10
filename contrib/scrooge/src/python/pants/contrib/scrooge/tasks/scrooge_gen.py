@@ -140,7 +140,7 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     self._must_have_sources(target)
 
     def compiler_args_has_rpc_style(compiler_args):
-      return bool(_RPC_STYLES & set(compiler_args))
+      return "--finagle" in compiler_args or "--ostrich" in compiler_args
 
     def merge_rpc_style_with_compiler_args(compiler_args, rpc_style):
       new_compiler_args = list(compiler_args)
