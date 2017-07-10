@@ -39,3 +39,12 @@ java_thrift_library(
     'some_dir',
   ],
 )
+
+java_thrift_library(
+  name = 'both-compiler-args-and-rpc-style',
+  sources = ['good.thrift'],
+  compiler='scrooge',
+  language='scala',
+  compiler_args=['--finagle'],
+  rpc_style='finagle',
+)
