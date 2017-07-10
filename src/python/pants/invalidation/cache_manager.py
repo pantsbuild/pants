@@ -304,12 +304,14 @@ class InvalidationCacheManager(object):
 
   def update(self, vts):
     """Mark a changed or invalidated VersionedTargetSet as successfully processed."""
-    for vt in vts.versioned_targets:
-      vt.ensure_legal()
-      if not vt.valid:
-        self._invalidator.update(vt.cache_key)
-        vt.valid = True
-        self._artifact_write_callback(vt)
+    # TODO(John Sirois): XXX: This should probably not descend into VTs from VTSs.
+    if isinstance(vts, VersionedTarget):
+      for vt in vts.versioned_targets:
+        vt.ensure_legal()
+        if not vt.valid:
+          self._invalidator.update(vt.cache_key)
+          vt.valid = True
+          self._artifact_write_callback(vt)
     if not vts.valid:
       vts.ensure_legal()
       self._invalidator.update(vts.cache_key)

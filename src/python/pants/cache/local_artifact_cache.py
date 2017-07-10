@@ -140,7 +140,7 @@ class LocalArtifactCache(BaseLocalArtifactCache):
       artifact = self._artifact_for(cache_key)
       if artifact.exists():
         if results_dir is not None:
-          safe_rmtree(results_dir)
+          safe_mkdir(results_dir, clean=True)
         artifact.extract()
         return True
     except Exception as e:

@@ -18,7 +18,8 @@ from pants.cache.artifact_cache import (CacheRead, UnreadableArtifact, call_inse
                                         call_use_cached_files)
 from pants.cache.cache_setup import CacheSetup
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
-from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
+from pants.invalidation.cache_manager import (InvalidationCacheManager, InvalidationCheck,
+                                              VersionedTarget)
 from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
@@ -307,7 +308,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                   invalidate_dependents=False,
                   silent=False,
                   fingerprint_strategy=None,
-                  topological_order=False):
+                  topological_order=False,
+                  work_subdir=None):
     """Checks targets for invalidation, first checking the artifact cache.
 
     Subclasses call this to figure out what to work on.
@@ -321,7 +323,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :param fingerprint_strategy: A FingerprintStrategy instance, which can do per task,
                                 finer grained fingerprinting of a given Target.
     :param topological_order: Whether to invalidate in dependency order.
-
+    :param work_subdir: A custom work sub-directory for tasks that perform invalidation in multiple
+                        contexts.
     If no exceptions are thrown by work in the block, the build cache is updated for the targets.
     Note: the artifact cache is not updated. That must be done manually.
 
@@ -332,7 +335,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     cache_key_generator = CacheKeyGenerator(
       self.context.options.for_global_scope().cache_key_gen_version,
       self.fingerprint)
-    cache_manager = InvalidationCacheManager(self.workdir,
+
+    workdir = os.path.join(self.workdir, work_subdir) if work_subdir else self.workdir
+    cache_manager = InvalidationCacheManager(workdir,
                                              cache_key_generator,
                                              self._build_invalidator(),
                                              invalidate_dependents,
@@ -453,12 +458,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       root_dir = os.path.dirname(vt.results_dir)
       safe_rm_oldest_items_in_dir(root_dir, max_entries_per_target, excludes=live_dirs)
 
-  def _should_cache_target_dir(self, vt):
+  def _should_cache_target_dir(self, vts):
     """Return true if the given vt should be written to a cache (if configured)."""
     return (
       self.cache_target_dirs and
-      not vt.target.has_label('no_cache') and
-      (not vt.is_incremental or self.cache_incremental) and
+      all(not target.has_label('no_cache') for target in vts.targets) and
+      (not vts.is_incremental or self.cache_incremental) and
       self.artifact_cache_writes_enabled()
     )
 
@@ -515,11 +520,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # Once flattened, cached/uncached vts are in separate lists. Each uncached vts is paired
     # with why it is missed for stat reporting purposes.
     for vts, was_in_cache in zip(vtss, res):
+      versioned_targets = vts.versioned_targets if isinstance(vts, VersionedTarget) else [vts]
       if was_in_cache:
-        cached_vtss.extend(vts.versioned_targets)
+        cached_vtss.extend(versioned_targets)
       else:
-        uncached_vtss.extend(vts.versioned_targets)
-        uncached_causes.extend(repeat(was_in_cache, len(vts.versioned_targets)))
+        uncached_vtss.extend(versioned_targets)
+        uncached_causes.extend(repeat(was_in_cache, len(versioned_targets)))
         if isinstance(was_in_cache, UnreadableArtifact):
           self._cache_key_errors.update(was_in_cache.key)
 

@@ -168,10 +168,6 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     # it at a time in the engine lifecycle cut out for handling that.
     return None
 
-  def __init__(self, *args, **kwargs):
-    super(BootstrapJvmTools, self).__init__(*args, **kwargs)
-    self._tool_cache_path = os.path.join(self.workdir, 'tool_cache')
-
   def execute(self):
     registered_tools = JvmToolMixin.get_registered_tools()
     if registered_tools:
@@ -245,16 +241,18 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         return []
 
       # TODO(John Sirois): XXX: This works in concert with `check_artifact_cache_for`!
-      tool_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+      # tool_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+      tool_vts = invalidation_check.all_vts[0]
+      tool_cache_path = tool_vts.results_dir
 
-      jar_name = '{main}-{hash}.jar'.format(main=jvm_tool.main, hash=tool_vts.cache_key.hash)
-      shaded_jar = os.path.join(self._tool_cache_path, 'shaded_jars', jar_name)
+      jar_name = '{main}.jar'.format(main=jvm_tool.main)
+      shaded_jar = os.path.join(tool_cache_path, 'shaded_jars', jar_name)
 
       if not invalidation_check.invalid_vts and os.path.exists(shaded_jar):
         return [shaded_jar]
 
       # Ensure we have a single binary jar we can shade.
-      binary_jar = os.path.join(self._tool_cache_path, 'binary_jars', jar_name)
+      binary_jar = os.path.join(tool_cache_path, 'binary_jars', jar_name)
       safe_mkdir_for(binary_jar)
 
       classpath = self._bootstrap_classpath(jvm_tool, targets)
@@ -292,10 +290,11 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
                                                      scope=jvm_tool.scope,
                                                      exception=e))
 
-      if self.artifact_cache_writes_enabled():
-        self.update_artifact_cache([(tool_vts, [shaded_jar])])
-
       return [shaded_jar]
+
+  @property
+  def cache_target_dirs(self):
+    return True
 
   def check_artifact_cache_for(self, invalidation_check):
     # The monolithic shaded tool jar is a single output dependent on the entire target set, and is

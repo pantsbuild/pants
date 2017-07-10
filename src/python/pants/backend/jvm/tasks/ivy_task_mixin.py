@@ -221,13 +221,14 @@ class IvyTaskMixin(TaskBase):
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,
                           silent=silent,
-                          fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+                          fingerprint_strategy=fingerprint_strategy,
+                          work_subdir='resolve') as invalidation_check:
       # In case all the targets were filtered out because they didn't participate in fingerprinting.
       if not invalidation_check.all_vts:
         return NO_RESOLVE_RUN_RESULT
 
       # TODO(John Sirois): XXX: This works in concert with `check_artifact_cache_for` in the Mixee!
-      resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+      resolve_vts = invalidation_check.all_vts[0]
 
       resolve_hash_name = resolve_vts.cache_key.hash
       global_ivy_workdir = os.path.join(self.context.options.for_global_scope().pants_workdir,

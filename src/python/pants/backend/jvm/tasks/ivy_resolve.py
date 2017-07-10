@@ -99,6 +99,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
         for result in results_with_resolved_artifacts:
           self._generate_ivy_report(result)
 
+  @property
+  def cache_target_dirs(self):
+    return True
+
   def check_artifact_cache_for(self, invalidation_check):
     # Ivy resolution is an output dependent on the entire target set, and is not divisible
     # by target. So we can only cache it keyed by the entire target set.
