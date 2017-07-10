@@ -90,7 +90,7 @@ class ResolveRequirementsTest(TaskTestBase):
     # pycparser is a dependency of cffi only on CPython.  We might as well check for it,
     # as extra verification that we correctly fetch transitive dependencies.
     if PythonInterpreter.get().identity.interpreter == 'CPython':
-      expected_name_and_platforms.add(('pycparser-2.17', 'any'))
+      expected_name_and_platforms.add(('pycparser-2.18', 'any'))
 
     self.assertTrue(expected_name_and_platforms.issubset(names_and_platforms),
                     '{} is not a subset of {}'.format(expected_name_and_platforms,
