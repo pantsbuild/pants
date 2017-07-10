@@ -35,7 +35,7 @@ class AnalysisMap private[AnalysisMap] (
   // a Map of File bases to destinations to re-relativize them to
   rebases: Map[File, File]
 ) {
-  private val analysisMappers = new PortableAnalysisMappers(rebases)
+  private val analysisMappers = PortableAnalysisMappers.create(rebases)
 
   def getPCELookup = new PerClasspathEntryLookup {
     /**

@@ -8,7 +8,10 @@ package org.pantsbuild.zinc.analysis
 import java.io.File
 import java.nio.file.Path
 
-import sbt.internal.inc.{AnalysisMappersAdapter, Mapper}
+import sbt.inc.{GenericMapper, ReadMapper, ReadWriteMappers, WriteMapper}
+
+import xsbti.compile.MiniSetup
+import xsbti.compile.analysis.Stamp
 
 
 /**
@@ -21,8 +24,8 @@ import sbt.internal.inc.{AnalysisMappersAdapter, Mapper}
  *   2) the workdir (generally named `.pants.d`, but not always located under the buildroot)
  *   3) the base of the JVM that is in use
  */
-class PortableAnalysisMappers(rebaseMap: Map[File, File]) extends AnalysisMappersAdapter {
-  private val rebaser = {
+object PortableAnalysisMappers {
+  def create(rebaseMap: Map[File, File]): ReadWriteMappers = {
     val rebases =
       rebaseMap
         .toSeq
@@ -30,21 +33,11 @@ class PortableAnalysisMappers(rebaseMap: Map[File, File]) extends AnalysisMapper
           case (k, v) => (k.toPath, v.toPath)
         }
         .toSet
-    val forWrite = PortableAnalysisMappers.mkFileRebaser(rebases)
-    val forRead = PortableAnalysisMappers.mkFileRebaser(rebases.map { case (src, dst) => (dst, src) })
-    Mapper.forFile.map(forRead, forWrite)
+    val forWrite = mkFileRebaser(rebases)
+    val forRead = mkFileRebaser(rebases.map { case (src, dst) => (dst, src) })
+    new ReadWriteMappers(PortableReadMapper(forRead), PortableWriteMapper(forWrite))
   }
 
-  // TODO: scalac/javac options and a few other items are not currently rebased.
-  override val outputDirMapper: Mapper[File] = rebaser
-  override val sourceDirMapper: Mapper[File] = rebaser
-  override val sourceMapper: Mapper[File] = rebaser
-  override val productMapper: Mapper[File] = rebaser
-  override val binaryMapper: Mapper[File] = rebaser
-  override val classpathMapper: Mapper[File] = rebaser
-}
-
-object PortableAnalysisMappers {
   private def mkFileRebaser(rebases: Set[(Path, Path)]): File => File = {
     // Sort the rebases from longest to shortest (to ensure that a prefix is rebased
     // before a suffix).
@@ -64,4 +57,26 @@ object PortableAnalysisMappers {
     }
     rebaser
   }
+}
+
+case class PortableReadMapper(mapper: File => File) extends PortableMapper with ReadMapper
+case class PortableWriteMapper(mapper: File => File) extends PortableMapper with WriteMapper
+
+trait PortableMapper extends GenericMapper {
+  def mapper: File => File
+
+  def mapSourceFile(x: File): File = mapper(x)
+  def mapBinaryFile(x: File): File = mapper(x)
+  def mapProductFile(x: File): File = mapper(x)
+  def mapOutputDir(x: File): File = mapper(x)
+  def mapSourceDir(x: File): File = mapper(x)
+  def mapClasspathEntry(x: File): File = mapper(x)
+
+  // TODO: Determine whether the rest of these need to be overridden in practice.
+  def mapJavacOption(x: String): String = x
+  def mapScalacOption(x: String): String = x
+  def mapBinaryStamp(f: File, x: Stamp): Stamp = x
+  def mapSourceStamp(f: File, x: Stamp): Stamp = x
+  def mapProductStamp(f: File, x: Stamp): Stamp = x
+  def mapMiniSetup(x: MiniSetup): MiniSetup = x
 }
