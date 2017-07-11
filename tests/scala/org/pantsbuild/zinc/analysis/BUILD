@@ -3,8 +3,6 @@
 
 junit_tests(
   dependencies=[
-    '3rdparty/jvm/org/scala-sbt:io',
-    '3rdparty/jvm/org/scala-sbt:util-logging',
     '3rdparty/jvm/org/scala-sbt:zinc',
     '3rdparty:guava',
     '3rdparty:jsr305',
