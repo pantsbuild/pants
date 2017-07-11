@@ -27,6 +27,6 @@ jar_library(
   jars=[
     # TODO: `zinc` only declares a dep on the `tests` classifier for
     # io. We redefine the dep here to get the full package.
-    scala_jar(org='org.scala-sbt', name='io', rev='1.0.0-M11', force=True),
+    scala_jar(org='org.scala-sbt', name='io', rev='1.0.0-M10', force=True),
   ],
 )
