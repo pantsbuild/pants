@@ -27,8 +27,7 @@ import xsbti.compile.{
   Inputs,
   JavaTools,
   ScalaCompiler,
-  ScalaInstance => XScalaInstance,
-  ZincCompilerUtil
+  ScalaInstance => XScalaInstance
 }
 
 import scala.compat.java8.OptionConverters._
@@ -84,7 +83,7 @@ object CompilerUtils {
   def newScalaCompiler(instance: XScalaInstance, interfaceJar: File): AnalyzingCompiler =
     new AnalyzingCompiler(
       instance,
-      ZincCompilerUtil.constantBridgeProvider(instance, interfaceJar),
+      CompilerBridgeProvider.constant(interfaceJar, instance),
       ClasspathOptionsUtil.auto,
       _ => (),
       None

@@ -110,7 +110,10 @@ object Main {
 
       // Store the output if the result changed.
       if (result.hasModified) {
-        targetAnalysisStore.set(result.analysis, result.setup)
+        targetAnalysisStore.set(
+          // TODO
+          sbt.internal.inc.ConcreteAnalysisContents(result.analysis, result.setup)
+        )
       }
 
       log.info("Compile success " + Util.timing(startTime))

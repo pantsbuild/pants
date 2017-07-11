@@ -7,7 +7,7 @@ package org.pantsbuild.zinc.extractor
 
 import java.io.File
 
-import sbt.internal.inc.FileBasedStore
+import scala.compat.java8.OptionConverters._
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
@@ -50,17 +50,14 @@ object Main {
 
     // Load relevant analysis.
     val analysisMap = AnalysisMap.create(settings.analysis)
-    val analysis = {
-      FileBasedStore(
-        settings.analysis.cache,
-        new PortableAnalysisMappers(settings.analysis.rebaseMap)
-      )
+    val analysis =
+      analysisMap.cachedStore(settings.analysis.cache)
         .get()
+        .asScala
         .getOrElse {
           throw new RuntimeException(s"Failed to load analysis from ${settings.analysis.cache}")
         }
-        ._1
-    }
+        .getAnalysis
 
     // Extract products and dependencies.
     val extractor = new Extractor(settings.classpath, analysis, analysisMap)

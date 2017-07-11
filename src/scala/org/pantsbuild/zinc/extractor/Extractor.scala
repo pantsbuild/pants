@@ -9,7 +9,7 @@ import java.io.File
 
 import scala.collection.mutable
 
-import sbt.internal.inc.{Analysis, FileBasedStore, Locate}
+import sbt.internal.inc.{Analysis, FileAnalysisStore, Locate}
 
 import xsbti.compile.CompileAnalysis
 

@@ -10,11 +10,11 @@ import java.util.{ List => JList, Map => JMap }
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
 
-import sbt.internal.inc.AnalysisStore
 import sbt.io.IO
 import sbt.util.Logger
 import xsbti.{F1, Position, Problem, Severity, ReporterConfig, ReporterUtil}
 import xsbti.compile.{
+  AnalysisStore,
   CompileOptions,
   CompileOrder,
   Compilers,
@@ -107,8 +107,8 @@ object InputUtils {
   ): (AnalysisStore, PreviousResult) = {
     def load() = {
       val analysisStore = analysisMap.cachedStore(settings.analysis.cache)
-      analysisStore.get() match {
-        case Some((a, s)) => (analysisStore, Some(a), Some(s))
+      analysisStore.get().asScala match {
+        case Some(a) => (analysisStore, Some(a.getAnalysis), Some(a.getMiniSetup))
         case _ => (analysisStore, None, None)
       }
     }
