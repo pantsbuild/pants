@@ -11,6 +11,7 @@ python_library(
     ':python_requirements',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
+    'src/python/pants/backend/python/tasks2',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]
@@ -18,6 +19,7 @@ python_library(
 
 python_library(
   name = 'all_utils',
+  sources = globs('*.py', exclude=[['__init__.py', 'register.py']]),
   dependencies = [
     ':antlr_builder',
     ':code_generator',
@@ -26,7 +28,6 @@ python_library(
     ':python_chroot',
     ':python_requirement',
     ':python_requirements',
-    ':python_setup',
     ':sdist_builder',
     ':thrift_builder',
   ]
@@ -37,17 +38,6 @@ page(
   source = 'README.md',
   links = [
     'src/python/pants:readme',
-  ]
-)
-
-python_library(
-  name = 'python_setup',
-  sources = ['python_setup.py'],
-  dependencies = [
-    '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
-    'src/python/pants/option',
-    'src/python/pants/subsystem',
   ]
 )
 
@@ -79,7 +69,10 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:pex',
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/util:dirutil',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/backend/python/targets',
   ]
 )
 
@@ -111,7 +104,8 @@ python_library(
     ':antlr_builder',
     ':python_requirement',
     ':thrift_builder',
-    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/antlr/python',
+    'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
@@ -146,11 +140,11 @@ python_library(
     ':code_generator',
       # Note that this is part of a gnarly dependency chain:
       #  backend/python:thrift_builder ->
-      #  backend/codegen/targets:python ->
+      #  src/python/pants/backend/codegen/thrift/python ->
       #  backend/python/targets:python
       # This isn't circular, but it's still bad that it crosses between backends and back again.
       # TODO: Clean this up. thrift_builder should almost certainly be in the codegen backend.
-    'src/python/pants/backend/codegen/targets:python',
+    'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/base:build_environment',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

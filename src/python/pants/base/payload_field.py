@@ -172,3 +172,23 @@ class PrimitiveField(PayloadField):
 
   def _compute_fingerprint(self):
     return stable_json_sha1(self._underlying)
+
+
+class SetOfPrimitivesField(PayloadField):
+  """A general field for order-insensitive sets of primitive, ordered types.
+
+  As long as the underlying elements are JSON representable and have a consistent sort order,
+  their hash can be stably inferred.
+
+  :API: public
+  """
+
+  def __init__(self, underlying=None):
+    self._underlying = tuple(sorted(set(underlying or [])))
+
+  @property
+  def value(self):
+    return self._underlying
+
+  def _compute_fingerprint(self):
+    return stable_json_sha1(self._underlying)

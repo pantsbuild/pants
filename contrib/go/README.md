@@ -6,8 +6,8 @@ tooling easier.
 
 ## Installation
 
-Go support is provided by a plugin distributed to [pypi]
-(https://pypi.python.org/pypi/pantsbuild.pants.contrib.go).
+Go support is provided by a plugin distributed to 
+[pypi](https://pypi.python.org/pypi/pantsbuild.pants.contrib.go).
 Assuming you have already [installed pants](http://www.pantsbuild.org/install.html), you'll need to
 add the Go plugin in your `pants.ini`, like so:
 ```ini
@@ -43,42 +43,49 @@ Pants requires:
 
 You likely comply with 1 already, the Go standards push almost all projects in this direction, but 2
 and 3 may be new concepts if you haven't used Pants or a tool like it before. You may want to read
-up on [BUILD files](/src/docs/build_files.md) and the [3rdparty pattern](/src/docs/3rdparty.md)
+up on [[BUILD files|pants('src/docs:build_files')]] and the [[3rdparty pattern|pants('src/docs:3rdparty')]]
 before continuing.
 
 ## Codebase setup
 
-Pants has tooling to help maintain your Go BUILD files, but it needs some configuration and seeding
-to work.
+Pants has tooling to help maintain your Go BUILD files, but it may need
+some configuration and seeding to work.
 
 ### Source root configuration
 
 Internally, pants uses the concept of a "source root" to determine the portion of a source file's
-path that represents the package for the language in question. For Go code in a standard layout, the
-source root is `$GOPATH/src`, but pants may not guess this correctly. Suppose we're setting up Pants
-for a multi-language repo layed out with Java code under `src/java/com/yourcompany/...` and Go code
-under `src/go/src/...`. You can inspect Pants' source root guesses for this layout with:
-```
-./pants roots
-src/go: go
-src/java: java
-```
+path that represents the package for the language in question. 
 
-In this example the Java guess is correct but the Go guess is not, we need `src/go/src`. We can
-explicitly set the source root for Go with this addition to `pants.ini`:
+Pants attempts to guess where your source roots are via pattern matching.  For example, it assumes
+by default that `src/*` and `src/main/*`, where `*` is some language name, are possible source 
+roots for that language. 
+
+However when it comes to Go, `src/go` is probably not the correct source root. For Go code in a 
+standard multi-language repo layout, `src/go` is probably on the $GOPATH, which means that 
+`src/go/src` is the actual source root. 
+
+Pants corrects for this in the case of its default patterns: It will correctly detect
+that `src/go/src` and `src/main/go/src` are the possible source roots for Go. 
+
+But if your Go code does not live in one of these locations then you'll need to tell Pants where
+to find it, e.g., by adding this to `pants.ini`:
+
 ```ini
 [source]
 source_roots: {
-    'src/go/src': ['go']
+    'my/custom/path/go/src': ['go']
   }
 ```
 
-This tells pants that the `src/go/src` source root houses one type of code, Go code. We can verify
-the setting:
+This tells pants that the `src/go/src` source root houses one type of code, Go code.
+
+You can inspect Pants' source root guesses with:
+
 ```
 ./pants roots
 src/go/src: go
 src/java: java
+...
 ```
 
 Unless your Go code has no 3rdparty dependencies, we also need to seed a source root where 3rdparty
@@ -265,9 +272,9 @@ default.
 
 ## Testing
 
-You can run your Go tests with `./pants test [go targets]`. Any [standard Go tests]
-(https://golang.org/pkg/testing/) found amongst the targets will be compiled and run with output
-sent to the console.
+You can run your Go tests with `./pants test [go targets]`. Any 
+[standard Go tests](https://golang.org/pkg/testing/) found amongst the targets will be compiled and 
+run with output sent to the console.
 
 ## Working with other Go ecosystem tools
 

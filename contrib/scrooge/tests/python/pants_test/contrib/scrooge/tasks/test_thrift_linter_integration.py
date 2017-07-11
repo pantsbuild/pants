@@ -20,7 +20,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     full_config = {
       'GLOBAL': {
         'pythonpath': ["%(buildroot)s/contrib/scrooge/src/python"],
-        'backend_packages': ["pants.contrib.scrooge"]
+        'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.scrooge"]
       },
     }
     if config:
@@ -75,6 +75,23 @@ class ThriftLinterTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(cmd)
     self.assert_failure(pants_run)
     self.assertIn(self.lint_error_token, pants_run.stdout_data)
+
+  def test_multiple_bad_strict_override(self):
+    # Using -q to make sure bad thrift files are in the final exception messages.
+    target_a = self.thrift_test_target('bad-thrift-strict')
+    target_b = self.thrift_test_target('bad-thrift-strict2')
+    cmd = ['-q',
+           'thrift-linter',
+           '--strict',
+           target_a,
+           target_b,
+           ]
+    pants_run = self.run_pants(cmd)
+    self.assert_failure(pants_run)
+    self.assertIn('bad-strict2.thrift', pants_run.stdout_data)
+    self.assertIn('bad-strict.thrift', pants_run.stdout_data)
+    self.assertIn(target_a, pants_run.stdout_data)
+    self.assertIn(target_b, pants_run.stdout_data)
 
   def test_bad_strict_override(self):
     # thrift-linter passes with non-strict command line flag overriding the BUILD section.

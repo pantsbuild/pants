@@ -10,6 +10,7 @@ import logging
 import os
 from types import NoneType
 
+from pants.base.deprecated import deprecated
 from pants.base.project_tree import Dir, File, Link, ProjectTree
 from pants.util.dirutil import fast_relpath
 from pants.util.memo import memoized
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class ScmProjectTree(ProjectTree):
+  @deprecated('1.5.0.dev0',
+              hint_message="ScmProjectTree was lightly used, and is now deprecated.")
   def __init__(self, build_root, scm, rev, ignore_patterns=None):
     super(ScmProjectTree, self).__init__(build_root, ignore_patterns)
     self._scm = scm

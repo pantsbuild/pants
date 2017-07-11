@@ -15,7 +15,6 @@ from setproctitle import setproctitle as set_process_title
 from pants.goal.run_tracker import RunTracker
 from pants.logging.setup import setup_logging
 from pants.pantsd.process_manager import ProcessManager
-from pants.pantsd.util import clean_global_runtime_state
 
 
 class _StreamLogger(object):
@@ -36,6 +35,9 @@ class _StreamLogger(object):
   def flush(self):
     return
 
+  def isatty(self):
+    return False
+
 
 class PantsDaemon(ProcessManager):
   """A daemon that manages PantsService instances."""
@@ -46,22 +48,27 @@ class PantsDaemon(ProcessManager):
   class StartupFailure(Exception): pass
   class RuntimeFailure(Exception): pass
 
-  def __init__(self, build_root, work_dir, log_level, log_dir=None, services=None,
-               metadata_base_dir=None):
+  def __init__(self, build_root, work_dir, log_level, native, log_dir=None, services=None,
+               metadata_base_dir=None, reset_func=None):
     """
     :param string build_root: The pants build root.
     :param string work_dir: The pants work directory.
-    :param int log_level: The log level to use for daemon logging.
+    :param string log_level: The log level to use for daemon logging.
     :param string log_dir: The directory to use for file-based logging via the daemon. (Optional)
     :param tuple services: A tuple of PantsService instances to launch/manage. (Optional)
+    :param callable reset_func: Called after the daemon is forked to reset
+                                any state inherited from the parent process. (Optional)
+
     """
     super(PantsDaemon, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
     self._logger = logging.getLogger(__name__)
     self._build_root = build_root
     self._work_dir = work_dir
     self._log_level = log_level
+    self._native = native
     self._log_dir = log_dir or os.path.join(work_dir, self.name)
     self._services = services or ()
+    self._reset_func = reset_func
     self._socket_map = {}
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
@@ -164,7 +171,8 @@ class PantsDaemon(ProcessManager):
     self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
     # Purge as much state as possible from the pants run that launched us.
-    clean_global_runtime_state()
+    if self._reset_func:
+      self._reset_func()
 
     # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
     set_process_title('pantsd [{}]'.format(self._build_root))
@@ -178,6 +186,9 @@ class PantsDaemon(ProcessManager):
 
   def pre_fork(self):
     """Pre-fork() callback for ProcessManager.daemonize()."""
+    for service in self._services:
+      service.pre_fork()
+
     # Teardown the RunTracker's SubprocPool pre-fork.
     RunTracker.global_instance().shutdown_worker_pool()
     # TODO(kwlzn): This currently aborts tracking of the remainder of the pants run that launched
@@ -185,4 +196,5 @@ class PantsDaemon(ProcessManager):
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemonize()."""
+    self._native.set_panic_handler()
     self._run()

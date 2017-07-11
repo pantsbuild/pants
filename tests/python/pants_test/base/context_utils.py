@@ -55,6 +55,8 @@ class TestContext(Context):
 
     artifact_cache_stats = DummyArtifactCacheStats()
 
+    def report_target_info(self, scope, target, keys, val): pass
+
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """
@@ -100,6 +102,25 @@ def create_context(options=None, passthru_args=None, target_roots=None, build_gr
   Other params are as for ``Context``.
   """
   options = create_options(options or {}, passthru_args=passthru_args)
+  return create_context_from_options(options,
+                                     passthru_args=passthru_args,
+                                     target_roots=target_roots,
+                                     build_graph=build_graph,
+                                     build_file_parser=build_file_parser,
+                                     address_mapper=address_mapper,
+                                     console_outstream=console_outstream,
+                                     workspace=workspace)
+
+
+def create_context_from_options(options, target_roots=None, build_graph=None,
+                                build_file_parser=None, address_mapper=None, console_outstream=None,
+                                workspace=None):
+  """Creates a ``Context`` with the given options and no targets by default.
+
+  :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
+
+  Other params are as for ``Context``.
+  """
   run_tracker = TestContext.DummyRunTracker()
   target_roots = maybe_list(target_roots, Target) if target_roots else []
   return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,

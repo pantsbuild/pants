@@ -10,6 +10,8 @@ import warnings
 
 import six
 
+from pants.build_graph.address import BuildFileAddress
+
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +82,7 @@ class BuildFileParser(object):
               "Both {conflicting_file} and {addressable_file} define the same address: "
               "'{target_name}'"
               .format(conflicting_file=sibling_build_file,
-                      addressable_file=address.build_file,
+                      addressable_file=address.rel_path,
                       target_name=address.target_name))
       family_address_map_by_build_file[bf] = bf_address_map
     return family_address_map_by_build_file
@@ -143,22 +145,27 @@ class BuildFileParser(object):
       raise self.ExecuteError("{message}\n while executing BUILD file {build_file}"
                               .format(message=e, build_file=build_file))
 
-    address_map = {}
-    for address, addressable in parse_state.registered_addressable_instances:
-      logger.debug('Adding {addressable} to the BuildFileParser address map with {address}'
+    name_map = {}
+    for addressable in parse_state.objects:
+      name = addressable.addressed_name
+      logger.debug('Adding {addressable} to the BuildFileParser address map for {build_file} with {name}'
                    .format(addressable=addressable,
-                           address=address))
-      if address in address_map:
+                           build_file=build_file,
+                           name=name))
+      if name in name_map:
         raise self.AddressableConflictException(
           "File {conflicting_file} defines address '{target_name}' more than once."
-          .format(conflicting_file=address.build_file,
-                  target_name=address.target_name))
-      address_map[address] = addressable
+          .format(conflicting_file=build_file,
+                  target_name=name))
+      name_map[name] = addressable
 
     logger.debug("{build_file} produced the following Addressables:"
                  .format(build_file=build_file))
-    for address, addressable in address_map.items():
-      logger.debug("  * {address}: {addressable}"
-                   .format(address=address,
+    address_map = {}
+    for name, addressable in name_map.items():
+      address_map[BuildFileAddress(build_file=build_file, target_name=name)] = addressable
+      logger.debug("  * {name}: {addressable}"
+                   .format(name=name,
                            addressable=addressable))
+
     return address_map

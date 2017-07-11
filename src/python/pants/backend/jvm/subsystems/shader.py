@@ -11,11 +11,12 @@ from collections import namedtuple
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
-from pants.util.contextutil import open_zip, temporary_file
+from pants.util.contextutil import temporary_file
 
 
 class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
@@ -236,7 +237,7 @@ class Shader(object):
       cls.register_jvm_tool(register,
                             'jarjar',
                             classpath=[
-                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.6.2')
+                              JarDependency(org='org.pantsbuild', name='jarjar', rev='1.6.4')
                             ])
 
     @classmethod
@@ -320,12 +321,11 @@ class Shader(object):
 
   @classmethod
   def _iter_jar_packages(cls, path):
-    with open_zip(path) as jar:
-      paths = set()
-      for pathname in jar.namelist():
-        if cls._potential_package_path(pathname):
-          paths.add(os.path.dirname(pathname))
-      return cls._iter_packages(paths)
+    paths = set()
+    for pathname in ClasspathUtil.classpath_entries_contents([path]):
+      if cls._potential_package_path(pathname):
+        paths.add(os.path.dirname(pathname))
+    return cls._iter_packages(paths)
 
   def __init__(self, jarjar_classpath, executor):
     """Creates a `Shader` the will use the given `jarjar` jar to create shaded jars.

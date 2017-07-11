@@ -18,6 +18,8 @@ migrations = {
   # E.g.:
   #('backends', 'packages'): ('DEFAULT', 'backend_packages'),
   #('unknown-arguments', 'ignored'): None,
+
+  ('gen', 'thrift'): ('gen', 'thrift-java'),
 }
 
 

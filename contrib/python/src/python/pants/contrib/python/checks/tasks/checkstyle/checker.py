@@ -9,10 +9,10 @@ import re
 from collections import namedtuple
 
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.option.custom_types import file_option
+from pants.task.task import Task
 
 from pants.contrib.python.checks.tasks.checkstyle.common import CheckSyntaxError, Nit, PythonFile
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
@@ -39,7 +39,7 @@ def noqa_file_filter(python_file):
   return any(_NOQA_FILE_SEARCH(line) is not None for line in python_file.lines)
 
 
-class PythonCheckStyleTask(PythonTask):
+class PythonCheckStyleTask(Task):
   _PYTHON_SOURCE_EXTENSION = '.py'
   _plugins = []
   _subsystems = tuple()
@@ -51,8 +51,11 @@ class PythonCheckStyleTask(PythonTask):
     self.excluder = FileExcluder(self.options.suppress, self.context.log)
 
   @classmethod
-  def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + cls._subsystems
+  def subsystem_dependencies(cls):
+    return super(Task, cls).subsystem_dependencies() + cls._subsystems
+
+  deprecated_options_scope = 'compile.pythonstyle'
+  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   @classmethod
   def register_options(cls, register):
@@ -74,7 +77,8 @@ class PythonCheckStyleTask(PythonTask):
     return True
 
   def _is_checked(self, target):
-    return isinstance(target, PythonTarget) and target.has_sources(self._PYTHON_SOURCE_EXTENSION)
+    return (not target.is_synthetic and isinstance(target, PythonTarget) and
+            target.has_sources(self._PYTHON_SOURCE_EXTENSION))
 
   @classmethod
   def clear_plugins(cls):
@@ -163,12 +167,11 @@ class PythonCheckStyleTask(PythonTask):
 
     if failure_count > 0 and self.options.fail:
       raise TaskError(
-        '{} Python Style issues found. For import order related issues, please try '
-        '`./pants fmt.isort <targets>`'.format(failure_count))
+        '{} Python Style issues found. You may try `./pants fmt <targets>`'.format(failure_count))
     return failure_count
 
   def execute(self):
-    """Run Checkstyle on all found source files."""
+    """Run Checkstyle on all found non-synthetic source files."""
     if self.options.skip:
       return
 

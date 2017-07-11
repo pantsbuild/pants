@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import logging
 from abc import abstractmethod
 from collections import OrderedDict, defaultdict, deque
@@ -101,6 +102,19 @@ class BuildGraph(AbstractClass):
 
   def __init__(self):
     self.reset()
+
+  @abstractmethod
+  def clone_new(self):
+    """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
+
+  def apply_injectables(self, targets):
+    """Given an iterable of `Target` instances, apply their transitive injectables."""
+    target_types = {type(t) for t in targets}
+    target_subsystem_deps = {s for s in itertools.chain(*(t.subsystems() for t in target_types))}
+    for subsystem in target_subsystem_deps:
+      # TODO: This check is primarily for tests and would be nice to do away with.
+      if subsystem.is_initialized():
+        subsystem.global_instance().injectables(self)
 
   def reset(self):
     """Clear out the state of the BuildGraph, in particular Target mappings and dependencies.
@@ -510,6 +524,15 @@ class BuildGraph(AbstractClass):
     # NB: This is an idempotent, short-circuiting call.
     self.inject_address_closure(address)
     return self.transitive_subgraph_of_addresses([address])
+
+  @abstractmethod
+  def resolve_address(self, address):
+    """Maps an address in the virtual address space to an object.
+
+    :param Address address: the address to lookup in a BUILD file
+    :raises AddressLookupError: if the path to the address is not found.
+    :returns: The Addressable which address points to.
+    """
 
 
 class CycleException(Exception):

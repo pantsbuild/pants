@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-jvm_binary(name='shadingdep',
+jvm_binary(
   main='org.pantsbuild.testproject.shadingdep.Dependency',
   basename='shadingdep',
   dependencies=[
@@ -18,6 +18,4 @@ jvm_binary(name='other',
   ],
 )
 
-java_library(name='lib',
-  sources=globs('*.java'),
-)
+java_library(name='lib')

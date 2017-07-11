@@ -61,19 +61,6 @@ class AnalysisParser(object):
                                                                   firstline,
                                                                   self.current_test_header))
 
-  def is_nonempty_analysis(self, path):
-    """Does the specified analysis file contain information for at least one source file."""
-    if not os.path.exists(path):
-      return False
-    with open(path, 'rb') as infile:
-      with raise_on_eof(infile):
-        # Skip until we get to the section that will be nonempty iff the analysis is nonempty.
-        expected_header = b'{0}:\n'.format(self.empty_test_header)
-        while infile.next() != expected_header:
-          pass
-        # Now see if this section is empty or not.
-        return self.parse_num_items(infile.next()) > 0
-
   def parse_from_path(self, infile_path):
     """Parse an analysis instance from a text file."""
     with open(infile_path, 'rb') as infile:
@@ -122,20 +109,21 @@ class AnalysisParser(object):
       raise ParseError('Expected: "<num> items". Found: "{0}"'.format(line))
     return int(matchobj.group(1))
 
-  def rebase_from_path(self, infile_path, outfile_path, old_base, new_base, java_home=None):
+  def rebase_from_path(self, infile_path, outfile_path, rebase_mappings, java_home=None):
     """Rebase an analysis at infile_path, writing the result to outfile_path.
 
     See rebase() below for an explanation of rebasing.
     """
     with open(infile_path, 'rb') as infile:
       with open(outfile_path, 'wb') as outfile:
-        self.rebase(infile, outfile, old_base, new_base, java_home)
+        self.rebase(infile, outfile, rebase_mappings, java_home)
 
-  def rebase(self, infile, outfile, old_base, new_base, java_home=None):
+  def rebase(self, infile, outfile, rebase_mappings, java_home=None):
     """Rebase an analysis read from infile and write the result to outfile.
 
     Rebasing means replacing references to paths under old_base with references to
-    equivalent paths under new_base.
+    equivalent paths under new_base. old_base to new_base mappings are stored
+    in `rebase_mappings`.
 
     If java_home is specified then any references to paths under it are scrubbed entirely.
     """

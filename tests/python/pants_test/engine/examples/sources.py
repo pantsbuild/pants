@@ -12,6 +12,7 @@ from pants.engine.addressable import Exactly, addressable
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
 from pants.engine.struct import Struct
+from pants.source import wrapped_globs
 
 
 class Sources(Struct, Locatable):
@@ -40,12 +41,14 @@ class Sources(Struct, Locatable):
     """
     super(Sources, self).__init__(name=name, files=files, globs=globs, rglobs=rglobs, zglobs=zglobs,
                                   **kwargs)
-    if files and self.extensions:
-      for f in files:
-        if not self._accept_file(f):
-          # TODO: TargetDefinitionError or similar
-          raise ValueError('Path `{}` selected by {} is not a {} file.'.format(
-            f, self, self.extensions))
+    self.filespecs = []
+    for glob_cls, entries in ((wrapped_globs.Files, files),
+                              (wrapped_globs.Globs, globs),
+                              (wrapped_globs.RGlobs, rglobs),
+                              (wrapped_globs.ZGlobs, zglobs)):
+      if not entries:
+        continue
+      self.filespecs.extend(glob_cls.create_fileset_with_spec('', *entries))
     self.excludes = excludes
 
   def _accept_file(self, f):
@@ -59,11 +62,7 @@ class Sources(Struct, Locatable):
 
     This field may be projected to request the content of the files for this Sources object.
     """
-    return PathGlobs.create(self.spec_path,
-                            files=self.files,
-                            globs=self.globs,
-                            rglobs=self.rglobs,
-                            zglobs=self.zglobs)
+    return PathGlobs.create(self.spec_path, include=self.filespecs, exclude=(self.excludes or []))
 
   @abstractproperty
   def extensions(self):

@@ -1,4 +1,4 @@
-target(name='tests',
+target(
   dependencies=[
     ':one',
     ':two',
@@ -10,19 +10,19 @@ java_library(name='base',
   dependencies=['3rdparty:junit'],
 )
 
-java_tests(name='one',
+junit_tests(name='one',
   sources=['OneTest.java'],
   dependencies=[':base'],
   strict_deps=False,
 )
 
-java_tests(name='two',
+junit_tests(name='two',
   sources=['TwoTest.java'],
   dependencies=[':base'],
   strict_deps=False,
 )
 
-java_tests(name='three',
+junit_tests(name='three',
   sources=['subtest/ThreeTest.java'],
   dependencies=[':base'],
   strict_deps=False,

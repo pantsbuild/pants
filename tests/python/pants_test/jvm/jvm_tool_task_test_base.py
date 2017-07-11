@@ -9,8 +9,6 @@ import os
 import shutil
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
@@ -18,6 +16,10 @@ from pants.base.build_environment import get_pants_cachedir
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
+from pants.util.dirutil import safe_mkdir
+
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
@@ -78,9 +80,12 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
                                read_from=artifact_caches,
                                write_to=artifact_caches)
 
-    # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it
-    # into our test workspace.
+    # Tool option defaults currently point to targets in the real BUILD.tools, so we copy it and
+    # its dependency BUILD files into our test workspace.
     shutil.copy(os.path.join(self.real_build_root, 'BUILD.tools'), self.build_root)
+    third_party = os.path.join(self.build_root, '3rdparty')
+    safe_mkdir(third_party)
+    shutil.copy(os.path.join(self.real_build_root, '3rdparty', 'BUILD'), third_party)
 
     Bootstrapper.reset_instance()
 
@@ -115,9 +120,9 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     # Bootstrap the tools needed by the task under test.
     # We need the bootstrap task's workdir to be under the test's .pants.d, so that it can
     # use artifact caching.  Making it a sibling of the main task's workdir achieves this.
-    self.bootstrap_task_type._alternate_target_roots(context.options,
-                                                     self.address_mapper,
-                                                     self.build_graph)
+    self.bootstrap_task_type.get_alternate_target_roots(context.options,
+                                                        self.address_mapper,
+                                                        self.build_graph)
     bootstrap_workdir = os.path.join(os.path.dirname(task.workdir), 'bootstrap_jvm_tools')
     self.bootstrap_task_type(context, bootstrap_workdir).execute()
     return task

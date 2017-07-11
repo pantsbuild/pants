@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.targets.python_tests import PythonTests
 
 
 class PythonLibrary(PythonTarget):
@@ -13,4 +14,10 @@ class PythonLibrary(PythonTarget):
 
   :API: public
   """
-  pass
+
+  @classmethod
+  def alias(cls):
+    return 'python_library'
+
+  default_sources_globs = '*.py'
+  default_sources_exclude_globs = PythonTests.default_sources_globs

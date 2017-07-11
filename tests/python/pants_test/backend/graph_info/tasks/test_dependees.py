@@ -7,9 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
@@ -18,6 +17,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -62,12 +62,14 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
     def add_to_build_file(path, name, alias=False, deps=()):
       self.add_to_build_file(path, dedent("""
           {type}(name='{name}',
-            dependencies=[{deps}]
+            dependencies=[{deps}],
+            {sources}
           )
           """.format(
         type='target' if alias else 'python_library',
         name=name,
-        deps=','.join("'{0}'".format(dep) for dep in list(deps)))
+        deps=','.join("'{0}'".format(dep) for dep in list(deps)),
+        sources='' if alias else 'sources=[]'),
       ))
 
     add_to_build_file('common/a', 'a', deps=['common/d'])
@@ -91,7 +93,8 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
     self.add_to_build_file('src/java/a', dedent("""
       java_library(
         name='a_java',
-        resources=['resources/a:a_resources']
+        sources=[],
+        dependencies=['resources/a:a_resources']
       )
     """))
 
@@ -205,10 +208,10 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       dedent("""
       {
           "common/b:b": [
+              "overlaps:five",
               "overlaps:four",
-              "overlaps:three",
               "overlaps:one",
-              "overlaps:five"
+              "overlaps:three"
           ]
       }""").lstrip('\n'),
       targets=[self.target('common/b')],
@@ -220,9 +223,9 @@ class ReverseDepmapTest(BaseReverseDepmapTest):
       dedent("""
       {
           "common/a:a": [
-              "overlaps:two",
+              "overlaps:one",
               "overlaps:three",
-              "overlaps:one"
+              "overlaps:two"
           ],
           "overlaps:one": [
               "overlaps:three"

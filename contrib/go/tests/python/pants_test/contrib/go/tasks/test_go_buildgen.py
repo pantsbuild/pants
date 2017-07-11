@@ -63,37 +63,37 @@ class GoBuildgenTest(TaskTestBase):
     self.assertEqual(expected, context.targets())
 
   def test_no_local_roots_failure(self):
-    context = self.context(target_roots=[self.make_target('src/go/fred', GoBinary)])
+    context = self.context(target_roots=[self.make_target('src/go/src/fred', GoBinary)])
     task = self.create_task(context)
     with self.assertRaises(task.NoLocalRootsError):
       task.execute()
 
   def test_multiple_local_roots_failure(self):
-    self.create_dir('src/go')
-    self.create_dir('src/main/go')
-    context = self.context(target_roots=[self.make_target('src/go/fred', GoBinary)])
+    self.create_dir('src/go/src')
+    self.create_dir('src/main/go/src')
+    context = self.context(target_roots=[self.make_target('src/go/src/fred', GoBinary)])
     task = self.create_task(context)
     with self.assertRaises(task.InvalidLocalRootsError):
       task.execute()
 
   def test_unrooted_failure(self):
-    self.create_dir('src/go')
-    context = self.context(target_roots=[self.make_target('src2/go/fred', GoBinary)])
+    self.create_dir('src/go/src')
+    context = self.context(target_roots=[self.make_target('src2/go/src/fred', GoBinary)])
     task = self.create_task(context)
     with self.assertRaises(task.UnrootedLocalSourceError):
       task.execute()
 
   def test_multiple_remote_roots_failure(self):
     self.create_dir('3rdparty/go')
-    self.create_dir('src/go')
-    self.create_dir('src/go_remote')
-    context = self.context(target_roots=[self.make_target('src/go/fred', GoLibrary)])
+    self.create_dir('src/go/src/fred')
+    self.create_dir('other/3rdparty/go')
+    context = self.context(target_roots=[self.make_target('src/go/src/fred', GoLibrary)])
     task = self.create_task(context)
     with self.assertRaises(task.InvalidRemoteRootsError):
       task.execute()
 
   def test_existing_targets_wrong_type(self):
-    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
       package main
 
       import "fmt"
@@ -102,14 +102,14 @@ class GoBuildgenTest(TaskTestBase):
               fmt.Printf("Hello World!")
       }
     """))
-    context = self.context(target_roots=[self.make_target('src/go/fred', GoLibrary)])
+    context = self.context(target_roots=[self.make_target('src/go/src/fred', GoLibrary)])
     task = self.create_task(context)
     with self.assertRaises(task.GenerationError) as exc:
       task.execute()
     self.assertEqual(GoTargetGenerator.WrongLocalSourceTargetTypeError, type(exc.exception.cause))
 
   def test_noop_applicable_targets_simple(self):
-    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
       package main
 
       import "fmt"
@@ -118,20 +118,20 @@ class GoBuildgenTest(TaskTestBase):
               fmt.Printf("Hello World!")
       }
     """))
-    context = self.context(target_roots=[self.make_target('src/go/fred', GoBinary)])
+    context = self.context(target_roots=[self.make_target('src/go/src/fred', GoBinary)])
     expected = context.targets()
     task = self.create_task(context)
     task.execute()
     self.assertEqual(expected, context.targets())
 
   def test_noop_applicable_targets_complete_graph(self):
-    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
       package jane
 
       var PublicConstant = 42
     """))
-    jane = self.make_target('src/go/jane', GoLibrary)
-    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+    jane = self.make_target('src/go/src/jane', GoLibrary)
+    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
       package main
 
       import (
@@ -143,7 +143,7 @@ class GoBuildgenTest(TaskTestBase):
               fmt.Printf("Hello %s!", jane.PublicConstant)
       }
     """))
-    fred = self.make_target('src/go/fred', GoBinary, dependencies=[jane])
+    fred = self.make_target('src/go/src/fred', GoBinary, dependencies=[jane])
     context = self.context(target_roots=[fred])
     expected = context.targets()
     task = self.create_task(context)
@@ -155,14 +155,14 @@ class GoBuildgenTest(TaskTestBase):
 
     if materialize:
       # We need physical directories on disk for `--materialize` since it does scans.
-      self.create_dir('src/go')
+      self.create_dir('src/go/src')
 
-    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
         package jane
 
         var PublicConstant = 42
       """))
-    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
         package main
 
         import (
@@ -176,11 +176,11 @@ class GoBuildgenTest(TaskTestBase):
       """))
     if materialize:
       # We need physical BUILD files on disk for `--materialize` since it does scans.
-      self.add_to_build_file('src/go/fred', 'go_binary()')
-      fred = self.target('src/go/fred')
+      self.add_to_build_file('src/go/src/fred', 'go_binary()')
+      fred = self.target('src/go/src/fred')
       target_roots = None
     else:
-      fred = self.make_target('src/go/fred', GoBinary)
+      fred = self.make_target('src/go/src/fred', GoBinary)
       target_roots = [fred]
 
     context = self.context(target_roots=target_roots)
@@ -188,7 +188,7 @@ class GoBuildgenTest(TaskTestBase):
     task = self.create_task(context)
     task.execute()
 
-    jane = self.target('src/go/jane')
+    jane = self.target('src/go/src/jane')
     self.assertIsNotNone(jane)
     self.assertEqual([jane], fred.dependencies)
     self.assertEqual({jane, fred}, set(self.build_graph.targets()))
@@ -201,13 +201,13 @@ class GoBuildgenTest(TaskTestBase):
 
   def test_stitch_deps_generate_builds(self):
     pre_execute_files = self.stitch_deps_local(materialize=True)
-    self.assertEqual({'src/go/jane/BUILD'}, self.buildroot_files() - pre_execute_files)
+    self.assertEqual({'src/go/src/jane/BUILD'}, self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_generate_builds_custom_extension(self):
     self.set_options(extension='.gen')
     pre_execute_files = self.stitch_deps_local(materialize=True)
     # NB: The src/go/fred/BUILD file on disk was deleted and replaced with src/go/fred/BUILD.gen.
-    self.assertEqual({'src/go/fred/BUILD.gen', 'src/go/jane/BUILD.gen'},
+    self.assertEqual({'src/go/src/fred/BUILD.gen', 'src/go/src/jane/BUILD.gen'},
                      self.buildroot_files() - pre_execute_files)
 
   def stitch_deps_remote(self, remote=True, materialize=False, fail_floating=False):
@@ -216,16 +216,16 @@ class GoBuildgenTest(TaskTestBase):
     if materialize:
       # We need physical directories on disk for `--materialize` since it does scans.
       self.create_dir('3rdparty/go')
-      self.create_dir('src/go')
+      self.create_dir('src/go/src')
 
-    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
         package jane
 
         import "pantsbuild.org/fake/prod"
 
         var PublicConstant = prod.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
       """))
-    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
         package main
 
         import (
@@ -239,11 +239,11 @@ class GoBuildgenTest(TaskTestBase):
       """))
     if materialize:
       # We need physical BUILD files on disk for `--materialize` since it does a scan.
-      self.add_to_build_file('src/go/fred', 'go_binary()')
-      fred = self.target('src/go/fred')
+      self.add_to_build_file('src/go/src/fred', 'go_binary()')
+      fred = self.target('src/go/src/fred')
       target_roots = None
     else:
-      fred = self.make_target('src/go/fred', GoBinary)
+      fred = self.make_target('src/go/src/fred', GoBinary)
       target_roots = [fred]
 
     context = self.context(target_roots=target_roots)
@@ -251,7 +251,7 @@ class GoBuildgenTest(TaskTestBase):
     task = self.create_task(context)
     task.execute()
 
-    jane = self.target('src/go/jane')
+    jane = self.target('src/go/src/jane')
     self.assertIsNotNone(jane)
     self.assertEqual([jane], fred.dependencies)
 
@@ -287,12 +287,12 @@ class GoBuildgenTest(TaskTestBase):
     pre_execute_files = self.stitch_deps_remote(materialize=True)
     self.build_graph.reset()  # Force targets to be loaded off disk
     self.assertEqual('v1.2.3', self.target('3rdparty/go/pantsbuild.org/fake:prod').rev)
-    self.assertEqual({'src/go/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
+    self.assertEqual({'src/go/src/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
                      self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_generate_builds(self):
     pre_execute_files = self.stitch_deps_remote(materialize=True)
-    self.assertEqual({'src/go/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
+    self.assertEqual({'src/go/src/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
                      self.buildroot_files() - pre_execute_files)
 
   def test_stitch_deps_remote_disabled_fails(self):
@@ -318,14 +318,14 @@ class GoBuildgenTest(TaskTestBase):
     self.add_to_build_file(relpath='3rdparty/go/pantsbuild.org/fake',
                            target='go_remote_library(rev="v4.5.6")')
 
-    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
         package jane
 
         import "pantsbuild.org/fake"
 
         var PublicConstant = fake.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
       """))
-    self.add_to_build_file(relpath='src/go/jane', target='go_library()')
+    self.add_to_build_file(relpath='src/go/src/jane', target='go_library()')
 
     context = self.context(target_roots=[])
     pre_execute_files = self.buildroot_files()
@@ -339,12 +339,12 @@ class GoBuildgenTest(TaskTestBase):
   def test_issues_2616(self):
     self.set_options(remote=False)
 
-    self.create_file(relpath='src/go/jane/bar.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/jane/bar.go', contents=dedent("""
         package jane
 
         var PublicConstant = 42
       """))
-    self.create_file(relpath='src/go/fred/foo.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/fred/foo.go', contents=dedent("""
         package main
 
         /*
@@ -362,12 +362,12 @@ class GoBuildgenTest(TaskTestBase):
           fmt.Printf("Random from C: %d", int(C.random()))
         }
       """))
-    fred = self.make_target('src/go/fred', GoBinary)
+    fred = self.make_target('src/go/src/fred', GoBinary)
     context = self.context(target_roots=[fred])
     task = self.create_task(context)
     task.execute()
 
-    jane = self.target('src/go/jane')
+    jane = self.target('src/go/src/jane')
     self.assertIsNotNone(jane)
     self.assertEqual([jane], fred.dependencies)
     self.assertEqual({jane, fred}, set(self.build_graph.targets()))
@@ -379,19 +379,19 @@ class GoBuildgenTest(TaskTestBase):
 
     self.set_options(remote=False, materialize=False)
 
-    self.create_file(relpath='src/go/helper/helper.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/helper/helper.go', contents=dedent("""
         package helper
 
         const PublicConstant = 42
       """))
 
-    self.create_file(relpath='src/go/lib/lib.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/lib/lib.go', contents=dedent("""
         package lib
 
         const privateConstant = 42
       """))
 
-    self.create_file(relpath='src/go/lib/lib_test.go', contents=dedent("""
+    self.create_file(relpath='src/go/src/lib/lib_test.go', contents=dedent("""
         package lib_test
 
         import (
@@ -406,12 +406,12 @@ class GoBuildgenTest(TaskTestBase):
         }
       """))
 
-    lib = self.make_target('src/go/lib', GoLibrary)
+    lib = self.make_target('src/go/src/lib', GoLibrary)
     self.assertEqual([], lib.dependencies)
 
     context = self.context(target_roots=[lib])
     task = self.create_task(context)
     task.execute()
 
-    helper = self.target('src/go/helper')
+    helper = self.target('src/go/src/helper')
     self.assertEqual([helper], lib.dependencies)

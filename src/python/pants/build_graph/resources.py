@@ -10,16 +10,19 @@ from pants.build_graph.target import Target
 
 
 class Resources(Target):
-  """JVM resource files.
+  """Resource files.
 
-  Looking for loose files in your application bundle? Those are
-  `bundle <#bundle>`_\s.
+  Looking for loose files in your JVM application bundle? Those are `bundle <#bundle>`_\s.
 
-  Resources are Java-style resources accessible via the ``Class.getResource``
-  and friends API. In the ``jar`` goal, the resource files are placed in the resulting `.jar`.
+  Resources are files included in deployable units like Java jars or Python wheels and accessible
+  via language-specific APIs.
 
   :API: public
   """
+
+  @classmethod
+  def alias(cls):
+    return 'resources'
 
   def __init__(self, address=None, payload=None, sources=None, **kwargs):
     """

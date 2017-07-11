@@ -69,8 +69,14 @@ especially relevant.
 
 > A `junit_tests` BUILD target holds source code for some JUnit tests;
 > typically, it would have one or more `java_library` targets as
-> dependencies and would import and test their code.  Note that most
-> popular scala test frameworks support running with JUnit via a base
+> dependencies and would import and test their code.
+>
+> Pants also includes support for using the ScalaTest framework.  The
+> testing framework automatically picks up scala tests that extend the
+> org.scalatest.Suite class and runs them
+> using org.scalatest.junit.JUnitRunner.
+>
+> Most other scala test frameworks support running with JUnit via a base
 > class/trait or via a `@RunWith` annotation; so you can use
 > `junit_tests` for your scala tests as well.
 >
@@ -183,7 +189,7 @@ To create a <a pantsref="jvm_bundles">bundle</a> (a binary and its dependencies,
 including helper files):
 
     :::bash
-    $ ./pants bundle --archive=zip examples/src/java/org/pantsbuild/example/hello/main
+    $ ./pants bundle --bundle-jvm-archive=zip examples/src/java/org/pantsbuild/example/hello/main
        ...lots of build output...
     08:50:54 00:02       [create-monolithic-jar]
     08:50:54 00:02         [add-internal-classes]
@@ -281,8 +287,7 @@ should design your bootclasspath to reference the union of all possible jars
 you might need to pull in from different JVMs (any paths that aren't available
 will simply be ignored by java).
 
-**Note:** Currently, pants is known to work with OpenJDK version 7 or greater,
-and Oracle JDK version 6 or greater.
+**Note:** Currently, pants is known to work with OpenJDK and Oracle JDK version 7 or greater.
 
 
 <a pantsmark="jvm_bundles"></a>
@@ -368,14 +373,14 @@ contains code compiled for this target.
 
 ### Deploying a Bundle
 
-Instead of just creating a directory tree, you can specify `bundle --archive=zip` to
+Instead of just creating a directory tree, you can specify `bundle --bundle-jvm-archive=zip` to
 `./pants bundle` to generate an archive file (a `.zip`, monolithic `.jar`, or some other
 format) instead.
 
 To use such an archive, put it where you want it, unpack it, and run:
 
     :::bash
-    $ ./pants bundle --archive=zip examples/src/java/org/pantsbuild/example/hello/main
+    $ ./pants bundle --bundle-jvm-archive=zip examples/src/java/org/pantsbuild/example/hello/main
         ...lots of build output...
     10:14:26 00:01       [create-monolithic-jar]
     10:14:26 00:01         [add-internal-classes]
@@ -508,7 +513,7 @@ Target Scopes
 
 ### Overview
 
-Pants supports marking targets with a `scope` value which the JVM backend will use to filter
+Pants supports marking targets with one or more `scope` values which the JVM backend will use to filter
 dependency subgraphs at compiletime and runtime. Scopes are also used for unused dependency
 detection: only `default` scoped targets are eligible to be considered as "unused" deps.
 
@@ -533,6 +538,9 @@ Pants' built in scopes are:
 * `runtime`: Indicates that a target is only used at runtime, and should not be presented to the
   compiler. Targets which are only used via JVM reflection are good examples of runtime-only
   dependencies.
+* `test`: Indicates that a target is used when running tests. This scope is typically used in
+  addition to another scope (e.g.: `scope='compile test'`). Targets which are are provided by an
+  external execution environment are good examples of compile+test dependencies.
 * `forced` _(available from pants 1.1.0)_: The `forced` scope is equivalent to the `default` scope, but additionally indicates
   that a target is not eligible to be considered an "unused" dependency. It is sometimes necessary
   to mark a target `forced` due to false positives in the static analysis used for unused
@@ -548,6 +556,15 @@ that target:
     java_library(name='lib',
       ..,
       scope='runtime',
+    )
+
+Multiple scopes can be specified. The equivalent of Maven's `provided` scope can be expressed by
+specifying both compile and test scopes.
+
+    :::python
+    java_library(name='lib',
+      ..,
+      scope='compile test',
     )
 
 If the scope of a target is not matched for a particular context, the entire subgraph represented
@@ -625,6 +642,16 @@ The summary mode is great when users want to inspect their own targets. But for 
 analysis, disabling summary mode (by passing the `--no-summary` flag) will output raw usage data
 for each dependency edge. This mode does no aggregation, so using it effectively usually means
 doing analytics or graph analysis with an external tool.
+
+Compiler Plugins
+----------------
+
+Pants has robust support for both developing and using compiler plugins for
+javac and scalac.  For more details:
+
+- [[javac plugins with Pants|pants('examples/src/java/org/pantsbuild/example/javac/plugin:readme')]].
+- [[scalac plugins with Pants|pants('examples/src/scala/org/pantsbuild/example/scalac/plugin:readme')]].
+
 
 Further Reading
 ---------------

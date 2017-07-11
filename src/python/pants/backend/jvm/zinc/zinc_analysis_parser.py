@@ -12,8 +12,9 @@ from collections import defaultdict
 import six
 from six.moves import range
 
-from pants.backend.jvm.zinc.zinc_analysis import (APIs, Compilations, CompileSetup, Relations,
-                                                  SourceInfos, Stamps, ZincAnalysis)
+from pants.backend.jvm.zinc.zinc_analysis import ZincAnalysis
+from pants.backend.jvm.zinc.zinc_analysis_element_types import (APIs, Compilations, CompileSetup,
+                                                                Relations, SourceInfos, Stamps)
 
 
 class ZincAnalysisParser(object):
@@ -48,11 +49,22 @@ class ZincAnalysisParser(object):
     return self._find_repeated_at_header(infile, b'products')
 
   def parse_deps(self, infile, classes_dir):
+    # Note: relies on the fact that these headers appear in this order in the file to use
+    # the same file handle to read them mostly-sequentially.
     self._verify_version(infile)
-    # Note: relies on the fact that these headers appear in this order in the file.
-    bin_deps = self._find_repeated_at_header(infile, b'binary dependencies')
-    src_deps = self._find_repeated_at_header(infile, b'direct source dependencies')
-    ext_deps = self._find_repeated_at_header(infile, b'direct external dependencies')
+
+    # Library dependencies: source -> jar.
+    bin_deps = self._find_repeated_at_header(infile, b'library dependencies')
+    # Class dependencies: classname -> classname.
+    ext_deps = []
+    for ext_dep_header in (b'member reference internal dependencies',
+                           b'member reference external dependencies'):
+      ext_deps.append(self._find_repeated_at_header(infile, ext_dep_header))
+
+    classname_to_sources = {}
+    for src, classnames in self._find_repeated_at_header(infile, b'class names').items():
+      for classname in classnames:
+        classname_to_sources[classname] = src
 
     # TODO(benjy): Temporary hack until we inject a dep on the scala runtime jar.
     scalalib_re = re.compile(r'scala-library-\d+\.\d+\.\d+\.jar$')
@@ -60,30 +72,36 @@ class ZincAnalysisParser(object):
     for src, deps in six.iteritems(bin_deps):
       filtered_bin_deps[src] = filter(lambda x: scalalib_re.search(x) is None, deps)
 
-    transformed_ext_deps = {}
+    transformed_ext_deps = defaultdict(list)
     def fqcn_to_path(fqcn):
       return os.path.join(classes_dir, fqcn.replace(b'.', os.sep) + b'.class')
-    for src, fqcns in ext_deps.items():
-      transformed_ext_deps[src] = [fqcn_to_path(fqcn) for fqcn in fqcns]
+    for ext_deps_dict in ext_deps:
+      for clz, fqcns in ext_deps_dict.items():
+        transformed_ext_deps[classname_to_sources[clz]].extend(fqcn_to_path(fqcn) for fqcn in fqcns)
 
+    # TODO: We skip converting the source classname to a target-internal sourcefile, although it
+    # looks like we could do that by parsing the `class names` header from this section.
     ret = defaultdict(list)
-    for d in [filtered_bin_deps, src_deps, transformed_ext_deps]:
+    for d in [filtered_bin_deps, transformed_ext_deps]:
       for src, deps in d.items():
         ret[src].extend(deps)
     return ret
 
-  def rebase_from_path(self, infile_path, outfile_path, pants_home_from, pants_home_to, java_home=None):
+  def rebase_from_path(self, infile_path, outfile_path, rebase_mappings, java_home=None):
     with open(infile_path, 'rb') as infile:
       with open(outfile_path, 'wb') as outfile:
-        self.rebase(infile, outfile, pants_home_from, pants_home_to, java_home)
+        self.rebase(infile, outfile, rebase_mappings, java_home)
 
-  def rebase(self, infile, outfile, pants_home_from, pants_home_to, java_home=None):
+  def rebase(self, infile, outfile, rebase_mappings, java_home=None):
     self._verify_version(infile)
     outfile.write(ZincAnalysis.FORMAT_VERSION_LINE)
 
+    # Ensure we replace the longest match first, since the shorter one might be prefix of the longer.
+    rebase_mappings_sorted = [(old_base, rebase_mappings[old_base])
+                              for old_base in sorted(rebase_mappings, key=len, reverse=True)]
     def rebase_element(cls):
       for header in cls.headers:
-        self._rebase_section(cls, header, infile, outfile, pants_home_from, pants_home_to, java_home)
+        self._rebase_section(cls, header, infile, outfile, rebase_mappings_sorted, java_home)
 
     rebase_element(CompileSetup)
     rebase_element(Relations)
@@ -92,8 +110,7 @@ class ZincAnalysisParser(object):
     rebase_element(SourceInfos)
     rebase_element(Compilations)
 
-  def _rebase_section(self, cls, header, lines_iter, outfile,
-                      pants_home_from, pants_home_to, java_home=None):
+  def _rebase_section(self, cls, header, lines_iter, outfile, rebase_mappings, java_home=None):
     # Booleans describing the rebasing logic to apply, if any.
     rebase_pants_home_anywhere = header in cls.pants_home_anywhere
     rebase_pants_home_prefix = header in cls.pants_home_prefix_only
@@ -114,12 +131,15 @@ class ZincAnalysisParser(object):
       drop_line = ((filter_java_home_anywhere and java_home in line) or
                    (filter_java_home_prefix and line.startswith(java_home)))
       if not drop_line:
+        rebased_line = line
         if rebase_pants_home_anywhere:
-          rebased_line = line.replace(pants_home_from, pants_home_to)
-        elif rebase_pants_home_prefix and line.startswith(pants_home_from):
-          rebased_line = pants_home_to + line[len(pants_home_from):]
-        else:
-          rebased_line = line
+          for rebased_from, rebased_to in rebase_mappings:
+            rebased_line = rebased_line.replace(rebased_from, rebased_to)
+        elif rebase_pants_home_prefix:
+          for rebased_from, rebased_to in rebase_mappings:
+            if line.startswith(rebased_from):
+              rebased_line = rebased_to + line[len(rebased_from):]
+              break
         rebased_lines.append(rebased_line)
         num_rebased_items += 1
         if not cls.inline_vals:  # These values are blobs and never need to be rebased.

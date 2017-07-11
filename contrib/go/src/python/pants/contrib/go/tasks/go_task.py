@@ -26,8 +26,8 @@ from pants.contrib.go.targets.go_target import GoTarget
 class GoTask(Task):
 
   @classmethod
-  def global_subsystems(cls):
-    return super(GoTask, cls).global_subsystems() + (GoDistribution.Factory,)
+  def subsystem_dependencies(cls):
+    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.Factory,)
 
   @staticmethod
   def is_binary(target):
@@ -143,7 +143,8 @@ class ImportOracle(object):
              of `pkg`.
     """
     go_cmd = self._go_dist.create_go_cmd('list', args=['-json', pkg], gopath=gopath)
-    with self._workunit_factory(pkg, cmd=str(go_cmd), labels=[WorkUnitLabel.TOOL]) as workunit:
+    with self._workunit_factory('list {}'.format(pkg), cmd=str(go_cmd),
+                                labels=[WorkUnitLabel.TOOL]) as workunit:
       # TODO(John Sirois): It would be nice to be able to tee the stdout to the workunit to we have
       # a capture of the json available for inspection in the server console.
       process = go_cmd.spawn(stdout=subprocess.PIPE, stderr=workunit.output('stderr'))

@@ -1,6 +1,7 @@
-benchmark(name='bench',
-          dependencies=[':caliper'],
-          sources=['CaliperBench.java'])
+benchmark(
+  dependencies=[':caliper'],
+  sources=['CaliperBench.java']
+)
 
 jar_library(
   name= 'caliper',
@@ -9,4 +10,14 @@ jar_library(
       exclude(org='com.google.guava', name='guava'),
     ]),
   ],
+)
+
+java_library(name='jmh',
+  dependencies=[
+    '3rdparty/jvm/org/openjdk/jmh:jmh',
+  ],
+  sources=['JmhBench.java'],
+  # Turn off zinc provided file manager, incompatible with jmh.
+  # See https://github.com/sbt/zinc/issues/185
+  zinc_file_manager=False,
 )

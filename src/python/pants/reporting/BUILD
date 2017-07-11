@@ -2,16 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='reporting',
   sources=globs('*.py', exclude=[['report.py']]),
-  resource_targets=[
-    ':reporting_resources',
-  ],
   dependencies=[
     '3rdparty/python:ansicolors',
     '3rdparty/python:pystache',
     '3rdparty/python:six',
     ':report',
+    ':reporting_resources',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/base:mustache',

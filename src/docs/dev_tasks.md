@@ -52,6 +52,15 @@ goal `foo`, use `Goal.by_name('foo').install`. You can install more than
 one task in a goal; e.g., there are separate tasks to run Java tests and
 Python tests; but both are in the `test` goal.
 
+Generally you'll be installing your task into an existing goal like `test`,
+`fmt` or `compile`. You can find most of these goals and their purpose by
+running the `./pants goals` command; however, some goals of a general nature
+are installed by pants without tasks and are thus hidden from `./pants goals`
+output. The `buildgen` goal is an example of this, reserving a slot for tasks
+that can auto-generate BUILD files for various languages; none of which are
+installed by default. You can hunt for these by searching for `Goal.register`
+calls in `src/python/pants/core_tasks/register.py`.
+
 Products: How one Task consumes the output of another
 ---------------------------------------------------
 
@@ -216,22 +225,16 @@ shows some useful idioms for JVM tasks.
 Enabling Artifact Caching For Tasks
 --------------------------
 
-An artifact is the output file produced by a task processing some target.
-For example, the artifacts of a `JavaCompile` task on a target
-`java_library` would be the `.class` files produced by compiling the library.
-In this scenario, the `java_library` (i.e. the target) would have its sources
-used to compute a cache key, and the `.class` files would be used as the cached value.
+* **Artifacts** are the output created when a task processes a target.
+    - For example, the artifacts of a `JavaCompile` task on a target `java_library` would be the `.class` files produced by compiling the library.
 
-If your task follows an isolated strategy where each target produces artifacts into
-its own directory, then the task will be able to take advantage of automatic
-target workdir caching. If your task has more complicated behavior
-(for example, all targets produce artifacts into the same directory), then check
-out the manual caching section below.
+* **VersionedTarget** (VT) is a wrapper around a Pants target that is used to determine whether a task should do work for that target.
+    - If a task determines the VT has already been processed, that VT is considered "valid".
 
-**Automatic target workdir caching**
+**Automatic caching**
 
-Automatic target workdir caching works by assigning a results directory to
-each VersionedTarget (VT) of the InvalidationCheck yielded by `Task->invalidated`.
+Pants offers automatic caching of a target's output directory. Automatic caching works by assigning a results directory to each VT of the InvalidationCheck yielded by `Task->invalidated`.
+
 A task operating on a given VT should place the resulting artifacts in the VT's
 `results_dir`. After exiting the `invalidated` context block, these artifacts
 will be automatically uploaded to the artifact cache.
@@ -239,42 +242,38 @@ will be automatically uploaded to the artifact cache.
 This interface for caching is disabled by default. To enable, override
 `Task->cache_target_dirs` to return True.
 
-**Manual caching**
+**VersionedTargetSets**
 
-Manual caching is much more complicated than automatic target workdir caching,
-and as such should only be used for non-standard usecases. Instead of placing
-artifacts in known target directories, artifacts may be placed anywhere -- although
-it is now the responsibility of the task developer to manually upload
-VT / artifact pairs to the cache. Here is a template for how manual caching
-would be implemented in the `execute` method:
+By default, Pants caching operates on (VT, artifacts) pairs. But certain tasks may need to write multiple targets and their artifacts together under a single cache key. For example, Ivy resolution, where the set of resolved 3rd party dependencies is a property of all targets taken together, not of each target individually.
 
-    def execute(self):
-      targets = self.context.targets()
-      with self.invalidated(targets) as invalidation_check:
-
-        # for each VersionedTarget in invalidation_check.invalid_vts,
-        # run your task on the target and remember where the output files are
-        output_files = do_some_work()
-
-        if self.artifact_cache_writes_enabled():
-          # build a list of (VersionedTarget, output_files) pairs
-          pairs = match_up(invalidation_check.invalid_vts, output_files)
-
-          self.update_artifact_cache(pairs)
-
-The above implementation writes each target/artifact (key/val) pair to the cache
-independently of all other targets. However you might want to write multiple
-targets and their artifacts together under a single cache key. A good example of
-this is Ivy resolution, where the set of resolved 3rd party dependencies is a property
-of all targets taken together, not of each target individually.
-
-To implement caching for groupings of targets, you can use a `VersionedTargetSet`
-in place of a `VersionedTarget`, and group the `invalid_vts` within
-`VersionedTargetSet`s. If you choose to do this, however, you must override the
-`check_artifact_cache_for` method in your task to return the groupings
-of targets you want to read (`VersionedTargetSet`s). If you don't, you will miss
-the cache, because by default Pants reads each target from the cache
-independently.
+To implement caching for groupings of targets, you can override the `check_artifact_cache_for` method in your task to check for the collected `VersionedTarget`s as a `VersionedTargetSet`:
 
     def check_artifact_cache_for(self, invalidation_check):
-      return [VersionedTargetSet.from_versioned_targets(invalidation_check.invalid_vts)]
+      return [VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)]
+
+**Manual caching**
+
+Pants allows more fine grained cache management, although it then becomes the responsibility of the task developer to manually upload VT / artifact pairs to the cache. Here is a template for how manual caching might be implemented:
+
+    def execute(self):
+      targets = self.context.targets(lambda t: isinstance(t, YourTarget)):
+      with self.invalidated(targets) as invalidation_check:
+
+        # Run your task over the invalid vts and cache the output.
+        for vt in invalidation_check.invalids_vts:
+          output_location = do_some_work()
+          if self.artifact_cache_writes_enabled():
+            self.update_artifact_cache((vt, [output_location]))
+
+Recording Target Specific Data
+------------------------------
+If you would like to track target information such as the targets being run,
+their run times, or some other target-specific piece of data, `run_tracker`
+provides this ability via the `report_target_info` method. The data reported
+will be stored in the `run_info` JSON blob along with timestamp, run id, etc.
+
+There are various reasons you might want to collect target information. The
+information could be used for things like tracking developer behavior (for
+example, inferring what code developers are constantly changing by observing
+which targets are run most often) or target heath (for example, a historical
+look at targets and their flakiness).

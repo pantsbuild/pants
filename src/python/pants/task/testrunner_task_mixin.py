@@ -5,10 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+import re
+import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from threading import Timer
 
-from pants.base.exceptions import TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting
 from pants.util.timeout import Timeout, TimeoutReached
 
 
@@ -24,19 +27,22 @@ class TestRunnerTaskMixin(object):
     super(TestRunnerTaskMixin, cls).register_options(register)
     register('--skip', type=bool, help='Skip running tests.')
     register('--timeouts', type=bool, default=True,
-             help='Enable test target timeouts. If timeouts are enabled then tests with a timeout= parameter '
-             'set on their target will time out after the given number of seconds if not completed. '
-             'If no timeout is set, then either the default timeout is used or no timeout is configured. '
-             'In the current implementation, all the timeouts for the test targets to be run are summed and '
-             'all tests are run with the total timeout covering the entire run of tests. If a single target '
-             'in a test run has no timeout and there is no default, the entire run will have no timeout. This '
-             'should change in the future to provide more granularity.')
+             help='Enable test target timeouts. If timeouts are enabled then tests with a '
+                  'timeout= parameter set on their target will time out after the given number of '
+                  'seconds if not completed. If no timeout is set, then either the default timeout '
+                  'is used or no timeout is configured. In the current implementation, all the '
+                  'timeouts for the test targets to be run are summed and all tests are run with '
+                  'the total timeout covering the entire run of tests. If a single target in a '
+                  'test run has no timeout and there is no default, the entire run will have no '
+                  'timeout. This should change in the future to provide more granularity.')
     register('--timeout-default', type=int, advanced=True,
-             help='The default timeout (in seconds) for a test if timeout is not set on the target.')
+             help='The default timeout (in seconds) for a test if timeout is not set on the '
+                  'target.')
     register('--timeout-maximum', type=int, advanced=True,
              help='The maximum timeout (in seconds) that can be set on a test target.')
     register('--timeout-terminate-wait', type=int, advanced=True, default=10,
-             help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before sending a SIGKILL.')
+             help='If a test does not terminate on a SIGTERM, how long to wait (in seconds) before '
+                  'sending a SIGKILL.')
 
   def execute(self):
     """Run the task."""
@@ -50,15 +56,118 @@ class TestRunnerTaskMixin(object):
         self.get_options().timeout_default
       )
       self.context.log.error(message)
-      raise TestFailedTaskError(message)
+      raise ErrorWhileTesting(message)
 
     if not self.get_options().skip:
       test_targets = self._get_test_targets()
-      all_targets = self._get_targets()
       for target in test_targets:
         self._validate_target(target)
 
+      all_targets = self._get_targets()
       self._execute(all_targets)
+
+  def report_all_info_for_single_test(self, scope, target, test_name, test_info):
+    """Add all of the test information for a single test.
+
+    Given the dict of test information
+    {'time': 0.124, 'result_code': 'success', 'classname': 'some.test.class'}
+    iterate through each item and report the single item with _report_test_info.
+
+    :param string scope: The scope for which we are reporting the information.
+    :param Target target: The target that we want to store the test information under.
+    :param string test_name: The test's name.
+    :param dict test_info: The test's information, including run duration and result.
+    """
+    for test_info_key, test_info_val in test_info.items():
+      key_list = [test_name, test_info_key]
+      self._report_test_info(scope, target, key_list, test_info_val)
+
+  def _report_test_info(self, scope, target, keys, test_info):
+    """Add test information to target information.
+
+    :param string scope: The scope for which we are reporting information.
+    :param Target target: The target that we want to store the test information under.
+    :param list of string keys: The keys that will point to the information being stored.
+    :param primitive test_info: The information being stored.
+    """
+    if target and scope:
+      address = target.address.spec
+      target_type = target.type_alias
+      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info(scope, address, keys, test_info)
+
+  @staticmethod
+  def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
+    """Parses the junit file for information needed about each test.
+
+    Will include:
+      - test name
+      - test result
+      - test run time duration or None if not a parsable float
+
+    If additional test case attributes are defined, then it will include those as well.
+
+    :param string xml_path: The path of the xml file to be parsed.
+    :param function error_handler: The error handler function.
+    :param list of string additional_testcase_attributes: A list of additional attributes belonging
+           to each testcase that should be included in test information.
+    :return: A dictionary of test information.
+    """
+    tests_in_path = {}
+    testcase_attributes = additional_testcase_attributes or []
+
+    SUCCESS = 'success'
+    SKIPPED = 'skipped'
+    FAILURE = 'failure'
+    ERROR = 'error'
+
+    _XML_MATCHER = re.compile(r'^TEST-.+\.xml$')
+
+    class ParseError(Exception):
+      """Indicates an error parsing a xml report file."""
+
+      def __init__(self, xml_path, cause):
+        super(ParseError, self).__init__('Error parsing test result file {}: {}'
+          .format(xml_path, cause))
+        self.xml_path = xml_path
+        self.cause = cause
+
+    def parse_xml_file(xml_file_path):
+      try:
+        root = ET.parse(xml_file_path).getroot()
+        for testcase in root.iter('testcase'):
+          test_info = {}
+
+          try:
+            test_info.update({'time': float(testcase.attrib.get('time'))})
+          except (TypeError, ValueError):
+            test_info.update({'time': None})
+
+          for attribute in testcase_attributes:
+            test_info[attribute] = testcase.attrib.get(attribute)
+
+          result = SUCCESS
+          if next(testcase.iter('error'), None) is not None:
+            result = ERROR
+          elif next(testcase.iter('failure'), None) is not None:
+            result = FAILURE
+          elif next(testcase.iter('skipped'), None) is not None:
+            result = SKIPPED
+          test_info.update({'result_code': result})
+
+          tests_in_path.update({testcase.attrib.get('name', ''): test_info})
+
+      except (ET.ParseError, ValueError) as e:
+        error_handler(ParseError(xml_file_path, e))
+
+    if os.path.isdir(xml_path):
+      for name in os.listdir(xml_path):
+        if _XML_MATCHER.match(name):
+          parse_xml_file(os.path.join(xml_path, name))
+    else:
+      parse_xml_file(xml_path)
+
+    return tests_in_path
 
   def _get_test_targets_for_spawn(self):
     """Invoked by _spawn_and_wait to know targets being executed. Defaults to _get_test_targets().
@@ -92,7 +201,8 @@ class TestRunnerTaskMixin(object):
             # We can't use the context logger because it might not exist.
             import logging
             logger = logging.getLogger(__name__)
-            logger.warn("Timed out test did not terminate gracefully after %s seconds, killing..." % wait_time)
+            logger.warn('Timed out test did not terminate gracefully after {} seconds, killing...'
+                        .format(wait_time))
             handler.kill()
 
         timer = Timer(wait_time, kill_if_not_terminated)
@@ -103,10 +213,11 @@ class TestRunnerTaskMixin(object):
     try:
       with Timeout(timeout,
                    threading_timer=Timer,
-                   abort_handler=_graceful_terminate(process_handler, self.get_options().timeout_terminate_wait)):
+                   abort_handler=_graceful_terminate(process_handler,
+                                                     self.get_options().timeout_terminate_wait)):
         return process_handler.wait()
     except TimeoutReached as e:
-      raise TestFailedTaskError(str(e), failed_targets=test_targets)
+      raise ErrorWhileTesting(str(e), failed_targets=test_targets)
 
   @abstractmethod
   def _spawn(self, *args, **kwargs):
@@ -135,14 +246,15 @@ class TestRunnerTaskMixin(object):
     """Calculate the total timeout based on the timeout configuration for all the targets.
 
     Because the timeout wraps all the test targets rather than individual tests, we have to somehow
-    aggregate all the target specific timeouts into one value that will cover all the tests. If some targets
-    have no timeout configured (or set to 0), their timeout will be set to the default timeout.
-    If there is no default timeout, or if it is set to zero, there will be no timeout, if any of the test targets
-    have a timeout set to 0 or no timeout configured.
+    aggregate all the target specific timeouts into one value that will cover all the tests. If some
+    targets have no timeout configured (or set to 0), their timeout will be set to the default
+    timeout. If there is no default timeout, or if it is set to zero, there will be no timeout, if
+    any of the test targets have a timeout set to 0 or no timeout configured.
 
-    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be very confusing,
-    and should change so that timeout=0 actually sets the timeout to 0, and only timeout=None
-    should set the timeout to the default timeout. This will require a deprecation cycle.
+    TODO(sbrenn): This behavior where timeout=0 is the same as timeout=None has turned out to be
+    very confusing, and should change so that timeout=0 actually sets the timeout to 0, and only
+    timeout=None should set the timeout to the default timeout. This will require a deprecation
+    cycle.
 
     :param targets: list of test targets
     :return: timeout to cover all the targets, in seconds
@@ -207,6 +319,6 @@ class TestRunnerTaskMixin(object):
   def _execute(self, all_targets):
     """Actually goes ahead and runs the tests for the targets.
 
-    :param targets: list of the targets whose tests are to be run
+    :param all_targets: list of the targets whose tests are to be run
     """
     raise NotImplementedError

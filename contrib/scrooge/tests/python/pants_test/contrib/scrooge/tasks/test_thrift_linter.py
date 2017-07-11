@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from mock import Mock, patch
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -43,11 +44,12 @@ class ThriftLinterTest(TaskTestBase):
     expected_include_paths = {'src/thrift/tweet', 'src/thrift/users'}
     expected_paths = {'src/thrift/tweet/a.thrift', 'src/thrift/tweet/b.thrift'}
     mock_calculate_compile_sources.return_value = (expected_include_paths, expected_paths)
-    task._lint(thrift_target)
+    task._lint(thrift_target, task.tool_classpath('scrooge-linter'))
 
-    self._run_java_mock.assert_called_once_with(classpath='foo_classpath',
+    self._run_java_mock.assert_called_once_with(
+      classpath='foo_classpath',
       main='com.twitter.scrooge.linter.Main',
       args=['--ignore-errors', '--include-path', 'src/thrift/users', '--include-path',
             'src/thrift/tweet', 'src/thrift/tweet/b.thrift', 'src/thrift/tweet/a.thrift'],
       jvm_options=get_default_jvm_options(),
-      workunit_labels=['COMPILER'])
+      workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])

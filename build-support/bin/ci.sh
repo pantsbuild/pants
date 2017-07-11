@@ -12,7 +12,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpuncia)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpuyncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -32,6 +32,10 @@ function usage() {
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
+  echo " -y SHARD_NUMBER/TOTAL_SHARDS"
+  echo "              if running contrib python tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -c           skip pants integration tests (includes examples and testprojects)"
   echo " -i SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running integration tests, divide them into"
@@ -51,9 +55,10 @@ bootstrap_compile_args=(
 
 # No python test sharding (1 shard) by default.
 python_unit_shard="0/1"
+python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:nci:a" opt; do
+while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -67,11 +72,12 @@ while getopts "hfxbkmsrjlpu:nci:a" opt; do
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     n) skip_contrib="true" ;;
+    y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
+    t) skip_lint="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -83,27 +89,36 @@ if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
   export SKIP_ANDROID_PATTERN='contrib/android'
 fi
 
+echo
 if [[ $# > 0 ]]; then
   banner "CI BEGINS: $@"
 else
   banner "CI BEGINS"
 fi
 
-if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
-  banner "Running pre-commit checks"
+case "${OSTYPE}" in
+  darwin*) export CXX="clang++";
+           ;;
+  *)       export CXX="g++";
+           ;;
+esac
 
+if [[ "${skip_pre_commit_checks:-false}" == "false" ]]; then
+  start_travis_section "PreCommit" "Running pre-commit checks"
   FULL_CHECK=1 ./build-support/bin/pre-commit.sh || exit 1
+  end_travis_section
 fi
 
 # TODO(John sirois): Re-plumb build such that it grabs constraints from the built python_binary
 # target(s).
+# TODO: This doesn't seem necessary? We set this in pants.ini.
 INTERPRETER_CONSTRAINTS=(
   "CPython>=2.7,<3"
 )
 for constraint in ${INTERPRETER_CONSTRAINTS[@]}; do
   INTERPRETER_ARGS=(
     ${INTERPRETER_ARGS[@]}
-    --interpreter="${constraint}"
+    --python-setup-interpreter-constraints="${constraint}"
   )
 done
 
@@ -111,9 +126,8 @@ PANTS_ARGS=(
   "${INTERPRETER_ARGS[@]}"
 )
 
-
 if [[ "${skip_bootstrap:-false}" == "false" ]]; then
-  banner "Bootstrapping pants"
+  start_travis_section "Bootstrap" "Bootstrapping pants"
   (
     if [[ "${skip_bootstrap_clean:-false}" == "false" ]]; then
       ./build-support/python/clean.sh || die "Failed to clean before bootstrapping pants."
@@ -121,13 +135,13 @@ if [[ "${skip_bootstrap:-false}" == "false" ]]; then
     ./pants ${PANTS_ARGS[@]} ${bootstrap_compile_args[@]} binary \
       src/python/pants/bin:pants_local_binary && \
     mv dist/pants_local_binary.pex pants.pex && \
-    ./pants.pex -V && \
-    ./pants.pex --version
+    ./pants.pex -V
   ) || die "Failed to bootstrap pants."
+  end_travis_section
 fi
 
 if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
-  banner "Sanity checking bootstrapped pants and repo BUILD files"
+  start_travis_section "SanityCheck" "Sanity checking bootstrapped pants and repo BUILD files"
   sanity_tests=(
     "bash-completion"
     "reference"
@@ -139,13 +153,22 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
   )
   for cur_test in "${sanity_tests[@]}"; do
     cmd="./pants.pex ${PANTS_ARGS[@]} ${cur_test}"
-    echo "Executing command '${cmd}' as a sanity test:"
-    ${cmd} >/dev/null || die "Failed to execute '${cmd}'."
-    echo ""
+    echo "* Executing command '${cmd}' as a sanity test"
+    ${cmd} >/dev/null 2>&1 || die "Failed to execute '${cmd}'."
   done
+  end_travis_section
+fi
+
+if [[ "${skip_lint:-false}" == "false" ]]; then
+  start_travis_section "Lint" "Running lint checks"
+  (
+    ./pants.pex ${PANTS_ARGS[@]} lint contrib:: examples:: src:: tests:: zinc::
+  ) || die "Lint check failure"
+  end_travis_section
 fi
 
 if [[ "${skip_distribution:-false}" == "false" ]]; then
+  # N.B. Defer start_travis_section to those within release.sh, since we can't nest.
   banner "Running pants distribution tests"
   (
     ./build-support/bin/release.sh -n
@@ -153,68 +176,72 @@ if [[ "${skip_distribution:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_docs:-false}" == "false" ]]; then
-  banner "Running site doc generation test"
+  start_travis_section "DocGen" "Running site doc generation test"
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
+  end_travis_section
 fi
 
 if [[ "${skip_jvm:-false}" == "false" ]]; then
-  banner "Running core jvm tests"
+  start_travis_section "CoreJVM" "Running core jvm tests"
   (
     ./pants.pex ${PANTS_ARGS[@]} doc test {src,tests}/{java,scala}:: zinc::
   ) || die "Core jvm test failure"
+  end_travis_section
 fi
 
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
-  banner "Running internal backend python tests"
+  start_travis_section "BackendTests" "Running internal backend python tests"
   (
-    targets=$(
-      ./pants.pex list pants-plugins/tests/python:: | \
-      xargs ./pants.pex filter --filter-type=python_tests
-    ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest --compile-python-eval-skip \
+    pants-plugins/tests/python::
   ) || die "Internal backend python test failure"
+  end_travis_section
 fi
 
 if [[ "${skip_python:-false}" == "false" ]]; then
   if [[ "0/1" != "${python_unit_shard}" ]]; then
     shard_desc=" [shard ${python_unit_shard}]"
   fi
-  banner "Running core python tests${shard_desc}"
+  start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    targets=$(
-      ./pants.pex list tests/python:: | \
-      xargs ./pants.pex --tag='-integration' filter --filter-type=python_tests
-    ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
-      --coverage=paths:pants/ \
+    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
+      --coverage=pants \
       --test-pytest-test-shard=${python_unit_shard} \
-      ${targets}
+      --compile-python-eval-skip \
+      tests/python::
   ) || die "Core python test failure"
+  end_travis_section
 fi
 
 if [[ "${skip_contrib:-false}" == "false" ]]; then
-  banner "Running contrib python tests"
+  if [[ "0/1" != "${python_contrib_shard}" ]]; then
+    shard_desc=" [shard ${python_contrib_shard}]"
+  fi
+  start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    # We run python tests using --no-fast - aka test chroot per target - to work around issues with
-    # test (ie: pants_test.contrib) namespace packages.
-    # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
-    #  https://github.com/pantsbuild/pants/issues/1149
-    ./pants.pex ${PANTS_ARGS[@]}  --exclude-target-regexp='.*/testprojects/.*' --ignore-patterns=$SKIP_ANDROID_PATTERN test.pytest --no-fast contrib::
+    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
+    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    --test-pytest-test-shard=${python_contrib_shard} \
+    --compile-python-eval-skip \
+    contrib:: \
   ) || die "Contrib python test failure"
+  end_travis_section
 fi
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
   if [[ "0/1" != "${python_intg_shard}" ]]; then
     shard_desc=" [shard ${python_intg_shard}]"
   fi
-  banner "Running Pants Integration tests${shard_desc}"
+  start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
-    targets=$(
-      ./pants.pex list tests/python:: | \
-      xargs ./pants.pex --tag='+integration' filter --filter-type=python_tests
-    ) && \
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --test-pytest-test-shard=${python_intg_shard} ${targets}
+    ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
+      --compile-python-eval-skip \
+      --test-pytest-test-shard=${python_intg_shard} \
+      tests/python::
   ) || die "Pants Integration test failure"
+  end_travis_section
 fi
 
-banner "CI SUCCESS"
+banner "CI ENDS"
+echo
+green "SUCCESS"

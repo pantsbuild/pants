@@ -47,6 +47,7 @@ class PantsDaemonTest(BaseTest):
     self.pantsd = PantsDaemon('test_buildroot',
                               'test_work_dir',
                               logging.INFO,
+                              None,
                               log_dir='/non_existent',
                               metadata_base_dir=self.subprocess_dir)
     self.pantsd.set_services([])

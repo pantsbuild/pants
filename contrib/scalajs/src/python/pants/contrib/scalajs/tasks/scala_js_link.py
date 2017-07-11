@@ -43,8 +43,8 @@ class ScalaJSLink(NailgunTask):
     return ['scala_js_binaries', 'runtime_classpath']
 
   @classmethod
-  def global_subsystems(cls):
-    return {ScalaJSPlatform}
+  def subsystem_dependencies(cls):
+    return super(ScalaJSLink, cls).subsystem_dependencies() + (ScalaJSPlatform,)
 
   @property
   def cache_target_dirs(self):

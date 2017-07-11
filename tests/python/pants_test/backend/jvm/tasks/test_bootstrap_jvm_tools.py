@@ -10,29 +10,29 @@ import subprocess
 from contextlib import contextmanager
 
 from pants.backend.jvm.subsystems.shader import Shading
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class BootstrapJvmToolsTestBase(JvmToolTaskTestBase):
   @contextmanager
   def execute_tool(self, classpath, main, args=None):
-    with subsystem_instance(DistributionLocator):
-      executor = SubprocessExecutor(DistributionLocator.cached())
-      process = executor.spawn(classpath, main, args=args,
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-      out, err = process.communicate()
-      self.assertEqual(0, process.returncode)
-      self.assertEqual('', err.strip())
-      yield out
+    init_subsystem(DistributionLocator)
+    executor = SubprocessExecutor(DistributionLocator.cached())
+    process = executor.spawn(classpath, main, args=args,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = process.communicate()
+    self.assertEqual(0, process.returncode)
+    self.assertEqual('', err.strip())
+    yield out
 
 
 class BootstrapJvmToolsShadingTest(BootstrapJvmToolsTestBase):

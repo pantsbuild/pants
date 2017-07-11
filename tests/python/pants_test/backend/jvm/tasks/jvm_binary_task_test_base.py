@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 
 
@@ -32,7 +32,7 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     :param bool materialize: `False` to populate the returned resolved_jar with a `pants_path` that
                              does not exist; defaults to `True` and `touch`es the `pants_path`.
     :returns: A resolved jar describing the artifact.
-    :rtype: :class:`pants.backend.jvm.jar_dependency_utils.ResolvedJar`
+    :rtype: :class:`pants.java.jar.ResolvedJar`
     """
     coordinate = M2Coordinate(org=org, name=name, rev=rev, classifier=classifier, ext=ext)
     cache_path = 'not/a/real/cache/path'
@@ -64,4 +64,18 @@ class JvmBinaryTaskTestBase(JvmToolTaskTestBase):
     :returns: The classpath products associated with the given `context`
     :rtype: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
     """
-    return context.products.get_data('runtime_classpath', init_func=ClasspathProducts.init_func(self.pants_workdir))
+    return context.products.get_data('runtime_classpath',
+                                     init_func=ClasspathProducts.init_func(self.pants_workdir))
+
+  def ensure_consolidated_classpath_products(self, context):
+    """Gets or creates the classpath products expected by `JvmBinaryTask`.
+
+    :API: public
+
+    :param context: The pants run context to get/create/associate classpath products with.
+    :type context: :class:`pants.goal.context.Context`
+    :returns: The classpath products associated with the given `context`
+    :rtype: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
+    """
+    runtime_classpath = self.ensure_classpath_products(context)
+    return context.products.get_data('consolidated_classpath', runtime_classpath.copy)

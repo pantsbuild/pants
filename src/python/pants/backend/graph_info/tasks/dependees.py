@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 from collections import defaultdict
 
-from pants.backend.graph_info.tasks.target_filter_task_mixin import TargetFilterTaskMixin
+from pants.base.specs import DescendantAddresses
 from pants.task.console_task import ConsoleTask
 
 
-class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
+class ReverseDepmap(ConsoleTask):
   """List all targets that depend on any of the input targets."""
 
   @classmethod
@@ -33,25 +33,15 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
     self._closed = self.get_options().closed
 
   def console_output(self, _):
-    address_mapper = self.context.address_mapper
-    buildfiles = address_mapper.scan_build_files(base_path=None)
-
-    build_graph = self.context.build_graph
-    build_file_parser = self.context.build_file_parser
-
     dependees_by_target = defaultdict(set)
-    for build_file in buildfiles:
-      address_map = build_file_parser.parse_build_file(build_file)
-      for address in address_map.keys():
-        build_graph.inject_address_closure(address)
-      for address in address_map.keys():
-        target = build_graph.get_target(address)
-        # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
-        # user vs. targets created by pants at runtime.
-        target = self.get_concrete_target(target)
-        for dependency in target.dependencies:
-          dependency = self.get_concrete_target(dependency)
-          dependees_by_target[dependency].add(target)
+    for address in self.context.build_graph.inject_specs_closure([DescendantAddresses('')]):
+      target = self.context.build_graph.get_target(address)
+      # TODO(John Sirois): tighten up the notion of targets written down in a BUILD by a
+      # user vs. targets created by pants at runtime.
+      concrete_target = self.get_concrete_target(target)
+      for dependency in concrete_target.dependencies:
+        dependency = self.get_concrete_target(dependency)
+        dependees_by_target[dependency].add(concrete_target)
 
     roots = set(self.context.target_roots)
     if self.get_options().output_format == 'json':
@@ -61,7 +51,9 @@ class ReverseDepmap(TargetFilterTaskMixin, ConsoleTask):
           deps[root.address.spec].append(root.address.spec)
         for dependent in self.get_dependents(dependees_by_target, [root]):
           deps[root.address.spec].append(dependent.address.spec)
-      yield json.dumps(deps, indent=4, separators=(',', ': '))
+      for address in deps.keys():
+        deps[address].sort()
+      yield json.dumps(deps, indent=4, separators=(',', ': '), sort_keys=True)
     else:
       if self._closed:
         for root in roots:

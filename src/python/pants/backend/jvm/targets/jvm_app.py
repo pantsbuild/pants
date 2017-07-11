@@ -114,7 +114,7 @@ class Bundle(object):
   """
 
   def __init__(self, parse_context):
-    self._rel_path = parse_context.rel_path
+    self._parse_context = parse_context
 
   def __call__(self, rel_path=None, mapper=None, relative_to=None, fileset=None):
     """
@@ -128,9 +128,10 @@ class Bundle(object):
       filenames, or a Fileset object (e.g. globs()).
       E.g., ``relative_to='common'`` removes that prefix from all files in the application bundle.
     """
+
     if fileset is None:
       raise ValueError("In {}:\n  Bare bundle() declarations without a `fileset=` parameter "
-                       "are no longer supported.".format(self._rel_path))
+                       "are no longer supported.".format(self._parse_context.rel_path))
 
     if mapper and relative_to:
       raise ValueError("Must specify exactly one of 'mapper' or 'relative_to'")
@@ -147,7 +148,7 @@ class Bundle(object):
     else:
       fileset = assert_list(fileset, key_arg='fileset')
 
-    real_rel_path = rel_path or self._rel_path
+    real_rel_path = rel_path or self._parse_context.rel_path
 
     if relative_to:
       base = os.path.join(get_buildroot(), real_rel_path, relative_to)
@@ -262,12 +263,15 @@ class JvmApp(Target):
       globs += super_globs['globs']
     return {'globs': globs}
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(JvmApp, self).traversable_dependency_specs:
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(JvmApp, cls).compute_dependency_specs(kwargs, payload):
       yield spec
-    if self.payload.binary:
-      yield self.payload.binary
+
+    target_representation = kwargs or payload.as_dict()
+    binary = target_representation.get('binary')
+    if binary:
+      yield binary
 
   @property
   def basename(self):

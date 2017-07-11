@@ -1,0 +1,10 @@
+<ivy-module version="1.0">
+  <info organisation="org.pantsbuild.tools.ivy"
+      module="test"
+      revision="1.0"
+      status="release"
+  />
+  <dependencies>
+    <dependency org="org" name="example2" rev="2.0"/>
+  </dependencies>
+</ivy-module>

@@ -47,6 +47,7 @@ def register_goals():
   Goal.register('doc', 'Generate documentation.')
   Goal.register('publish', 'Publish a build artifact.')
   Goal.register('dep-usage', 'Collect target dependency usage data.')
+  Goal.register('lint', 'Find formatting errors in source code.')
   Goal.register('fmt', 'Autoformat source code.')
 
   # Register tasks.
@@ -82,6 +83,7 @@ def register_goals():
   task(name='test', action=NoopTest).install('test')
 
   # Operations on files that the SCM detects as changed.
+  # TODO: Remove these in `1.5.0dev0` as part of the changed goal deprecations.
   task(name='changed', action=WhatChanged).install()
   task(name='compile-changed', action=CompileChanged).install()
   task(name='test-changed', action=TestChanged).install()

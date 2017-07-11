@@ -6,9 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.import_jars_mixin import ImportJarsMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
 
@@ -23,8 +23,8 @@ class UnpackedJarsTest(BaseTest):
     target = self.make_target(':foo', UnpackedJars, libraries=[':import_jars'])
 
     self.assertIsInstance(target, UnpackedJars)
-    traversable_dependency_specs = [spec for spec in target.traversable_dependency_specs]
-    self.assertSequenceEqual([':import_jars'], traversable_dependency_specs)
+    dependency_specs = [spec for spec in target.compute_dependency_specs(payload=target.payload)]
+    self.assertSequenceEqual([':import_jars'], dependency_specs)
     self.assertEquals(1, len(target.imported_jars))
     import_jar_dep = target.imported_jars[0]
     self.assertIsInstance(import_jar_dep, JarDependency)

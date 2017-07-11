@@ -23,6 +23,7 @@ from pants.contrib.node.tasks.node_task import NodeTask
 class NodeTaskTest(TaskTestBase):
 
   class TestNodeTask(NodeTask):
+
     def execute(self):
       # We never execute the task, we just want to exercise the helpers it provides subclasses.
       raise NotImplementedError()
@@ -92,7 +93,7 @@ class NodeTaskTest(TaskTestBase):
           fs.writeFile("{proof}", "Hello World!", function(err) {{}});
           """).format(proof=proof))
       self.assertFalse(os.path.exists(proof))
-      returncode, command = task.execute_node([script])
+      returncode, command = task.execute_node([script], workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))
@@ -114,7 +115,29 @@ class NodeTaskTest(TaskTestBase):
       with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
         json.dump(package, fp)
       with pushd(chroot):
-        returncode, command = task.execute_npm(['run-script', 'proof'])
+        returncode, _ = task.execute_npm(['run-script', 'proof'], workunit_name='test')
+
+      self.assertEqual(0, returncode)
+      self.assertTrue(os.path.exists(proof))
+      with open(proof) as fp:
+        self.assertEqual('42', fp.read().strip())
+
+  def test_execute_yarnpkg(self):
+    task = self.create_task(self.context())
+    with temporary_dir() as chroot:
+      proof = os.path.join(chroot, 'proof')
+      self.assertFalse(os.path.exists(proof))
+      package = {
+        'name': 'pantsbuild.pants.test',
+        'version': '0.0.0',
+        'scripts': {
+          'proof': 'echo "42" > {}'.format(proof)
+        }
+      }
+      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
+        json.dump(package, fp)
+      with pushd(chroot):
+        returncode, _ = task.execute_yarnpkg(['run', 'proof'], workunit_name='test')
 
       self.assertEqual(0, returncode)
       self.assertTrue(os.path.exists(proof))

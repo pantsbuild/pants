@@ -7,22 +7,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants.backend.codegen.targets.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
-from pants.backend.jvm.targets.jar_dependency import JarDependency
+from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.scala_jar_dependency import ScalaJarDependency
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.from_target import FromTarget
+from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.resources import Resources
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.workspace import Workspace
+from pants.java.jar.jar_dependency import JarDependency
 from pants.source.wrapped_globs import Globs, RGlobs
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
@@ -35,7 +34,7 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       # TODO: Use dummy target types here, instead of depending on other backends.
       targets={
         'java_library': JavaLibrary,
-        'python_library': PythonLibrary,
+        'python_library': TargetMacro.Factory.wrap(PythonLibrary.create, PythonLibrary),
         'jar_library': JarLibrary,
         'unpacked_jars': UnpackedJars,
         'resources': Resources,
@@ -47,7 +46,6 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
       context_aware_object_factories={
         'globs': Globs,
         'rglobs': RGlobs,
-        'from_target': FromTarget,
       },
       objects={
         'jar': JarDependency,
@@ -80,7 +78,6 @@ class BaseWhatChangedTest(ConsoleTaskTestBase):
 
 
 class WhatChangedTestBasic(BaseWhatChangedTest):
-
   def test_nochanges(self):
     self.assert_console_output(workspace=self.workspace())
 
@@ -114,6 +111,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         ]
       )
     """))
+    self.create_file('root/src/py/a/b/c', contents='', mode='w')
+    self.create_file('root/src/py/a/d', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/1', dedent("""
       python_library(
@@ -121,6 +120,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['2']
       )
     """))
+    self.create_file('root/src/py/1/2', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/dependency_tree/a', dedent("""
       python_library(
@@ -128,6 +128,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a.py'],
       )
     """))
+    self.create_file('root/src/py/dependency_tree/a/a.py', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/dependency_tree/b', dedent("""
       python_library(
@@ -136,6 +137,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         dependencies=['root/src/py/dependency_tree/a']
       )
     """))
+    self.create_file('root/src/py/dependency_tree/b/b.py', contents='', mode='w')
 
     self.add_to_build_file('root/src/py/dependency_tree/c', dedent("""
       python_library(
@@ -144,6 +146,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         dependencies=['root/src/py/dependency_tree/b']
       )
     """))
+    self.create_file('root/src/py/dependency_tree/c/c.py', contents='', mode='w')
 
     self.add_to_build_file('root/src/thrift', dedent("""
       java_thrift_library(
@@ -156,6 +159,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a.thrift']
       )
     """))
+    self.create_file('root/src/thrift/a.thrift', contents='', mode='w')
 
     self.add_to_build_file('root/src/resources/a', dedent("""
       resources(
@@ -163,6 +167,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a.resources']
       )
     """))
+    self.create_file('root/src/resources/a/a.resources', contents='', mode='w')
 
     self.add_to_build_file('root/src/java/a', dedent("""
       java_library(
@@ -170,6 +175,17 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=rglobs("*.java"),
       )
     """))
+    self.create_file('root/src/java/a/foo.java', contents='', mode='w')
+    self.create_file('root/src/java/a/b/foo.java', contents='', mode='w')
+
+    self.add_to_build_file('root/src/java/b', dedent("""
+          java_library(
+            name='b_java',
+            sources=globs("*.java"),
+          )
+        """))
+    self.create_file('root/src/java/b/foo.java', contents='', mode='w')
+    self.create_file('root/src/java/b/b/foo.java', contents='', mode='w')
 
     self.add_to_build_file('root/3rdparty/BUILD.twitter', dedent("""
       jar_library(
@@ -197,6 +213,7 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources=['a/build/scripts.java'],
       )
     """))
+    self.create_file('root/scripts/a/build/scripts.java', contents='', mode='w')
 
     self.add_to_build_file('BUILD.config', dedent("""
       resources(
@@ -204,6 +221,8 @@ class WhatChangedTestBasic(BaseWhatChangedTest):
         sources = globs('pants.ini*')
       )
     """))
+    self.create_file('pants.ini', contents='', mode='w')
+    self.create_file('pants.ini.backup', contents='', mode='w')
 
 
 class WhatChangedTest(WhatChangedTestBasic):
@@ -225,6 +244,7 @@ class WhatChangedTest(WhatChangedTestBasic):
     self.assert_console_output(
       'root/src/py/a:alpha',
       'root/src/py/a:beta',
+      'root/src/py/a:alpha_synthetic_resources',
       workspace=self.workspace(files=['root/src/py/a/BUILD'])
     )
 
@@ -238,6 +258,10 @@ class WhatChangedTest(WhatChangedTestBasic):
   def test_resource_changed(self):
     self.assert_console_output(
       'root/src/py/a:alpha',
+      # Currently, `ParseContext` created objects cannot be synthetic - so these surface as
+      # concrete targets. This should be fine for now, since the `resources=` field is
+      # deprecated anyway - so this usage pattern is quickly going away.
+      'root/src/py/a:alpha_synthetic_resources',
       workspace=self.workspace(files=['root/src/py/a/test.resources'])
     )
 
@@ -295,12 +319,15 @@ class WhatChangedTest(WhatChangedTestBasic):
     )
 
   def test_diffspec_removed_files(self):
+    # This file was not created in setup stage.
+    file_in_target = 'root/src/java/a/b/c/Foo.java'
+
     self.assert_console_output(
       'root/src/java/a:a_java',
       options={'diffspec': '42'},
       workspace=self.workspace(
         diffspec='42',
-        diff_files=['root/src/java/a/b/c/Foo.java'],
+        diff_files=[file_in_target],
       ),
     )
 
@@ -341,33 +368,6 @@ class WhatChangedTest(WhatChangedTestBasic):
       workspace=self.workspace(files=['root/src/py/dependency_tree/a/a.py'])
     )
 
-  def test_deferred_sources(self):
-    self.add_to_build_file('root/proto', dedent("""
-      java_protobuf_library(name='unpacked_jars',
-        sources=from_target(':external-source'),
-      )
-
-      unpacked_jars(name='external-source',
-        libraries=[':external-source-jars'],
-        include_patterns=[
-          'com/squareup/testing/**/*.proto',
-        ],
-      )
-
-      jar_library(name='external-source-jars',
-        jars=[
-          jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),
-        ],
-      )
-    """))
-
-    self.assert_console_output(
-      'root/proto:unpacked_jars',
-      'root/proto:external-source',
-      'root/proto:external-source-jars',
-      workspace=self.workspace(files=['root/proto/BUILD'])
-    )
-
   def test_deferred_sources_new(self):
     self.add_to_build_file('root/proto', dedent("""
       remote_sources(name='unpacked_jars',
@@ -396,7 +396,28 @@ class WhatChangedTest(WhatChangedTestBasic):
       workspace=self.workspace(files=['root/proto/BUILD'])
     )
 
-  def test_globs_in_resources(self):
+  def test_rglobs_in_sources(self):
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      workspace=self.workspace(files=['root/src/java/a/foo.java'])
+    )
+
+    self.assert_console_output(
+      'root/src/java/a:a_java',
+      workspace=self.workspace(files=['root/src/java/a/b/foo.java'])
+    )
+
+  def test_globs_in_sources(self):
+    self.assert_console_output(
+      'root/src/java/b:b_java',
+      workspace=self.workspace(files=['root/src/java/b/foo.java'])
+    )
+
+    self.assert_console_output(
+      workspace=self.workspace(files=['root/src/java/b/b/foo.java'])
+    )
+
+  def test_globs_in_resources_1(self):
     self.add_to_build_file('root/resources', dedent("""
       resources(
         name='resources',
@@ -404,15 +425,57 @@ class WhatChangedTest(WhatChangedTestBasic):
       )
     """))
 
+    file_in_target = 'root/resources/foo/bar/baz.yml'
+    self.create_file(file_in_target, contents='', mode='w')
+    self.assert_console_output(
+      workspace=self.workspace(files=[file_in_target])
+    )
+
+  def test_globs_in_resources_2(self):
+    self.add_to_build_file('root/resources', dedent("""
+      resources(
+        name='resources',
+        sources=globs('*')
+      )
+    """))
+
+    file_in_target = 'root/resources/baz.yml'
+    self.create_file(file_in_target, contents='', mode='w')
+
     self.assert_console_output(
       'root/resources:resources',
-      workspace=self.workspace(files=['root/resources/foo/bar/baz.yml'])
+      workspace=self.workspace(files=[file_in_target])
     )
 
   def test_root_config(self):
     self.assert_console_output(
       '//:pants-config',
       workspace=self.workspace(files=['pants.ini'])
+    )
+
+  def test_exclude_sources(self):
+    self.create_file(relpath='root/resources_exclude/a.png', contents='', mode='w')
+    self.create_file(relpath='root/resources_exclude/dir_a/b.png', contents='', mode='w')
+    self.create_file(relpath='root/resources_exclude/dir_a/dir_b/c.png', contents='', mode='w')
+
+    # Create a resources target that skips subdir contents and BUILD file.
+    self.add_to_build_file('root/resources_exclude/BUILD', dedent("""
+      resources(
+        name='abc',
+        sources=globs('*', exclude=[globs('BUILD*'), globs('*/**')])
+      )
+    """))
+
+    # In target file touched should be reflected in the changed list.
+    self.assert_console_output(
+      'root/resources_exclude:abc',
+      workspace=self.workspace(files=['root/resources_exclude/a.png'])
+    )
+
+    # Changed subdir files should not show up in the changed list.
+    self.assert_console_output(
+      workspace=self.workspace(files=['root/resources_exclude/dir_a/b.png',
+                                      'root/resources_exclude/dir_a/dir_b/c.png'])
     )
 
 

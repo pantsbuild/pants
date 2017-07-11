@@ -10,12 +10,12 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprintStrategy
+from pants.java.jar.jar_dependency import JarDependency
+from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_walk
 from pants_test.tasks.task_test_base import TaskTestBase

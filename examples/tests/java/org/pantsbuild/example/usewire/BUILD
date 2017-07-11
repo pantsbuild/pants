@@ -3,7 +3,7 @@
 
 # Tests functionality of wire generating java code.
 
-junit_tests(name='usewire',
+junit_tests(
   sources=['UseWireTest.java',],
   dependencies=[
     '3rdparty:junit',

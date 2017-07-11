@@ -9,7 +9,6 @@ import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
-from pants.util.dirutil import safe_mkdir
 
 
 ##
@@ -34,9 +33,6 @@ class ExtraTestJarExample(JarTask):
   # This method is called by pants, when the RoundEngine gets to the phase where your task is
   # attached.
   def execute(self):
-    # Ensure that we have a work directory to create a temporary jar.
-    safe_mkdir(self.workdir)
-
     # For each node in the graph that was selected below, create a jar, and store a reference to
     # the jar in the product map.
     def process(target):

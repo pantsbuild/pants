@@ -3,6 +3,7 @@
 
 python_library(
   name='test_infra',
+  sources=[],
   dependencies=[
     'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test',
@@ -10,6 +11,7 @@ python_library(
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/engine:engine_test_base',
+    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testinfra',
@@ -31,7 +33,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
-    'src/python/pants/pantsd:util',
+    'src/python/pants/init',
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
@@ -50,6 +52,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
     'src/python/pants/fs',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/testutils:file_test_util',
@@ -61,6 +64,7 @@ python_tests(
   sources = ['test_maven_layout.py'],
   dependencies = [
     ':base_test',
+    'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/build_graph',
     'src/python/pants/source',
     'tests/python/pants_test/subsystem:subsystem_utils',

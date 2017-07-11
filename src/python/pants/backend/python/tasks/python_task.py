@@ -13,16 +13,15 @@ from contextlib import contextmanager
 
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
-from twitter.common.collections import OrderedSet
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.base import hash_utils
-from pants.base.exceptions import TaskError
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.python.python_repos import PythonRepos
 from pants.task.task import Task
 
 
@@ -35,16 +34,12 @@ class PythonTask(Task):
     return super(PythonTask, cls).implementation_version() + [('PythonTask', 1)]
 
   @classmethod
-  def global_subsystems(cls):
-    return super(PythonTask, cls).global_subsystems() + (IvySubsystem, PythonSetup, PythonRepos)
-
-  @classmethod
-  def task_subsystems(cls):
-    return super(PythonTask, cls).task_subsystems() + (ThriftBinary.Factory,)
+  def subsystem_dependencies(cls):
+    return (super(PythonTask, cls).subsystem_dependencies() +
+            (IvySubsystem, PythonSetup, PythonRepos, ThriftBinary.Factory.scoped(cls)))
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
-    self._compatibilities = self.get_options().interpreter or [b'']
     self._interpreter_cache = None
     self._interpreter = None
 
@@ -58,53 +53,14 @@ class PythonTask(Task):
       # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
       self.context.acquire_lock()
       try:
-        # We pass in filters=compatibilities because setting up some python versions
-        # (e.g., 3<=python<3.3) crashes, and this gives us an escape hatch.
-        self._interpreter_cache.setup(filters=self._compatibilities)
+        self._interpreter_cache.setup()
       finally:
         self.context.release_lock()
     return self._interpreter_cache
 
-  @property
-  def interpreter(self):
-    """Subclasses can use this if they're fine with the default interpreter (the usual case)."""
-    if self._interpreter is None:
-      self._interpreter = self.select_interpreter(self._compatibilities)
-    return self._interpreter
-
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
-    allowed_interpreters = OrderedSet(self.interpreter_cache.interpreters)
-    targets_with_compatibilities = []  # Used only for error messages.
-
-    # Constrain allowed_interpreters based on each target's compatibility requirements.
-    for target in targets:
-      if target.is_python and hasattr(target, 'compatibility') and target.compatibility:
-        targets_with_compatibilities.append(target)
-        compatible_with_target = list(self.interpreter_cache.matched_interpreters(target.compatibility))
-        allowed_interpreters &= compatible_with_target
-
-    if not allowed_interpreters:
-      # Create a helpful error message.
-      unique_compatibilities = set(tuple(t.compatibility) for t in targets_with_compatibilities)
-      unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
-      targets_with_compatibilities_strs = [str(t) for t in targets_with_compatibilities]
-      raise TaskError('Unable to detect a suitable interpreter for compatibilities: {} '
-                      '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
-                                                         ', '.join(targets_with_compatibilities_strs)))
-
-    # Return the lowest compatible interpreter.
-    return self.interpreter_cache.select_interpreter(allowed_interpreters)[0]
-
-  def select_interpreter(self, filters):
-    """Subclasses can use this to be more specific about interpreter selection."""
-    interpreters = self.interpreter_cache.select_interpreter(
-      list(self.interpreter_cache.matched_interpreters(filters)))
-    if len(interpreters) != 1:
-      raise TaskError('Unable to detect a suitable interpreter.')
-    interpreter = interpreters[0]
-    self.context.log.debug('Selected {}'.format(interpreter))
-    return interpreter
+    return self.interpreter_cache.select_interpreter_for_targets(targets)
 
   @property
   def chroot_cache_dir(self):

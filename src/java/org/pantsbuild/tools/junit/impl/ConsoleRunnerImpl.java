@@ -49,7 +49,8 @@ import org.pantsbuild.args4j.InvalidCmdLineArgumentException;
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestSerial;
 import org.pantsbuild.tools.junit.impl.experimental.ConcurrentComputer;
-import org.pantsbuild.tools.junit.withretry.AllDefaultPossibilitiesBuilderWithRetry;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * An alternative to {@link JUnitCore} with stream capture and junit-report xml output capabilities.
@@ -290,8 +291,8 @@ public class ConsoleRunnerImpl {
         if (caseCaptures.containsKey(failure.getDescription())) {
           InMemoryStreamCapture capture = caseCaptures.remove(failure.getDescription());
           capture.close();
-          swappableOut.getOriginal().append(new String(capture.readOut()));
-          swappableErr.getOriginal().append(new String(capture.readErr()));
+          swappableOut.getOriginal().append(new String(capture.readOut(), UTF_8));
+          swappableErr.getOriginal().append(new String(capture.readErr(), UTF_8));
         } else {
           // Do nothing.
           // In case of exception in @BeforeClass method testFailure executes without testStarted.
@@ -323,7 +324,7 @@ public class ConsoleRunnerImpl {
   /**
    * A run listener that will stop the test run after the first test failure.
    */
-  public class FailFastListener extends RunListener {
+  public static class FailFastListener extends RunListener {
     private final RunNotifier runNotifier;
     private final Result result = new Result();
 
@@ -344,7 +345,7 @@ public class ConsoleRunnerImpl {
    * A runner that wraps the original test runner so we can add a listener
    * to stop the tests after the first test failure.
    */
-  public class FailFastRunner extends Runner {
+  public static class FailFastRunner extends Runner {
     private final Runner wrappedRunner;
 
     public FailFastRunner(Runner wrappedRunner) {
@@ -450,27 +451,24 @@ public class ConsoleRunnerImpl {
         createUnexpectedExitHook(shutdownListener, swappableOut.getOriginal());
     Runtime.getRuntime().addShutdownHook(unexpectedExitHook);
 
-    int failures = 0;
+    int failures = 1;
     try {
-      List<Spec> parsedTests = new SpecParser(tests).parse();
-
+      Collection<Spec> parsedTests = new SpecParser(tests).parse();
       if (useExperimentalRunner) {
         failures = runExperimental(parsedTests, core);
       } else {
         failures = runLegacy(parsedTests, core);
       }
     } catch (SpecException e) {
-      failures = 1;
       swappableErr.getOriginal().println("Error parsing specs: " + e.getMessage());
     } catch (InitializationError e) {
-      failures = 1;
       swappableErr.getOriginal().println("Error initializing JUnit: " + e.getMessage());
     } finally {
       // If we're exiting via a thrown exception, we'll get a better message by letting it
       // propagate than by halt()ing.
       Runtime.getRuntime().removeShutdownHook(unexpectedExitHook);
     }
-    exit(failures);
+    exit(failures == 0 ? 0 : 1);
   }
 
   /**
@@ -495,7 +493,7 @@ public class ConsoleRunnerImpl {
     };
   }
 
-  private int runExperimental(List<Spec> parsedTests, JUnitCore core)
+  private int runExperimental(Collection<Spec> parsedTests, JUnitCore core)
       throws InitializationError {
     Preconditions.checkNotNull(core);
 
@@ -521,16 +519,18 @@ public class ConsoleRunnerImpl {
     return failures;
   }
 
-  private int runConcurrentTests(JUnitCore core, SpecSet specSet, Concurrency concurrency) {
+  private int runConcurrentTests(JUnitCore core, SpecSet specSet, Concurrency concurrency)
+      throws InitializationError {
     Computer junitComputer = new ConcurrentComputer(concurrency, parallelThreads);
     Class<?>[] classes = specSet.extract(concurrency).classes();
-    return core.run(junitComputer, classes).getFailureCount();
+    CustomAnnotationBuilder builder =
+        new CustomAnnotationBuilder(numRetries, swappableErr.getOriginal());
+    Runner suite = junitComputer.getSuite(builder, classes);
+    return core.run(Request.runner(suite)).getFailureCount();
   }
 
-  private int runLegacy(List<Spec> parsedTests, JUnitCore core) throws InitializationError {
-    List<Request> requests =
-        legacyParseRequests(swappableOut.getOriginal(), swappableErr.getOriginal(), parsedTests);
-
+  private int runLegacy(Collection<Spec> parsedTests, JUnitCore core) throws InitializationError {
+    List<Request> requests = legacyParseRequests(swappableErr.getOriginal(), parsedTests);
     if (numTestShards > 0) {
       requests = setFilterForTestShard(requests);
     }
@@ -558,9 +558,7 @@ public class ConsoleRunnerImpl {
     return failures;
   }
 
-  private List<Request> legacyParseRequests(PrintStream out, PrintStream err,
-      List<Spec> specs) {
-
+  private List<Request> legacyParseRequests(PrintStream err, Collection<Spec> specs) {
     Set<TestMethod> testMethods = Sets.newLinkedHashSet();
     Set<Class<?>> classes = Sets.newLinkedHashSet();
     for (Spec spec: specs) {
@@ -578,7 +576,12 @@ public class ConsoleRunnerImpl {
       if (this.perTestTimer || this.parallelThreads > 1) {
         for (Class<?> clazz : classes) {
           if (legacyShouldRunParallelMethods(clazz)) {
-            testMethods.addAll(TestMethod.fromClass(clazz));
+            if (ScalaTestUtil.isScalaTestTest(clazz)) {
+              // legacy and scala doesn't work easily.  just adding the class
+              requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
+            } else {
+              testMethods.addAll(TestMethod.fromClass(clazz));
+            }
           } else {
             requests.add(new AnnotatedClassRequest(clazz, numRetries, err));
           }
@@ -588,8 +591,8 @@ public class ConsoleRunnerImpl {
         // requests.add(Request.classes(classes.toArray(new Class<?>[classes.size()])));
         // does, except that it instantiates our own builder, needed to support retries.
         try {
-          AllDefaultPossibilitiesBuilderWithRetry builder =
-              new AllDefaultPossibilitiesBuilderWithRetry(numRetries, err);
+          CustomAnnotationBuilder builder =
+              new CustomAnnotationBuilder(numRetries, err);
           Runner suite = new Computer().getSuite(
               builder, classes.toArray(new Class<?>[classes.size()]));
           requests.add(Request.runner(suite));

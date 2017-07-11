@@ -6,15 +6,21 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import pstats
 import shutil
 import subprocess
 import sys
 import unittest
+import zipfile
 
 import mock
 
-from pants.util.contextutil import (Timer, environment_as, exception_logging, open_zip, pushd,
-                                    stdio_as, temporary_dir, temporary_file)
+from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as,
+                                    exception_logging, hard_exit_handler, maybe_profiled, open_zip,
+                                    pushd, stdio_as, temporary_dir, temporary_file)
+
+
+PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -155,6 +161,22 @@ class ContextutilTest(unittest.TestCase):
       with open_zip(os.path.join(tempdir, 'test'), 'w', allowZip64=False) as zf:
         self.assertFalse(zf._allowZip64)
 
+  def test_open_zip_raises_exception_on_falsey_paths(self):
+    falsey = (None, '', False)
+    for invalid in falsey:
+      with self.assertRaises(InvalidZipPath):
+        open_zip(invalid).gen.next()
+
+  def test_open_zip_returns_realpath_on_badzipfile(self):
+    # In case of file corruption, deleting a Pants-constructed symlink would not resolve the error.
+    with temporary_file() as not_zip:
+      with temporary_dir() as tempdir:
+        file_symlink = os.path.join(tempdir, 'foo')
+        os.symlink(not_zip.name, file_symlink)
+        self.assertEquals(os.path.realpath(file_symlink), os.path.realpath(not_zip.name))
+        with self.assertRaisesRegexp(zipfile.BadZipfile, r'{}'.format(not_zip.name)):
+          open_zip(file_symlink).gen.next()
+
   def test_stdio_as(self):
     old_stdout, old_stderr, old_stdin = sys.stdout, sys.stderr, sys.stdin
 
@@ -193,3 +215,24 @@ class ContextutilTest(unittest.TestCase):
         assert True is False
 
     fake_logger.exception.assert_called_once_with('error!')
+
+  def test_maybe_profiled(self):
+    with temporary_dir() as td:
+      profile_path = os.path.join(td, 'profile.prof')
+
+      with maybe_profiled(profile_path):
+        for _ in range(5):
+          print('test')
+
+      # Ensure the profile data was written.
+      self.assertTrue(os.path.exists(profile_path))
+
+      # Ensure the profile data is valid.
+      pstats.Stats(profile_path).print_stats()
+
+  def test_hard_exit_handler(self):
+    with mock.patch('os._exit', **PATCH_OPTS) as mock_exit:
+      with hard_exit_handler():
+        raise HardSystemExit()
+
+    mock_exit.assert_called_once_with(0)

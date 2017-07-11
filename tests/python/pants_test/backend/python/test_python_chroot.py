@@ -13,12 +13,12 @@ from textwrap import dedent
 from pex.pex_builder import PEXBuilder
 from pex.platforms import Platform
 
-from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -26,9 +26,11 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.java.distribution.distribution import DistributionLocator
+from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 def test_get_current_platform():
@@ -40,23 +42,26 @@ class PythonChrootTest(BaseTest):
 
   def setUp(self):
     # Capture PythonSetup with the real BUILD_ROOT before that is reset to a tmpdir by super.
-    with subsystem_instance(PythonSetup) as python_setup:
-      self.python_setup = python_setup
+    self.python_setup = global_subsystem_instance(PythonSetup)
     super(PythonChrootTest, self).setUp()
 
   @contextmanager
   def dumped_chroot(self, targets):
+    # TODO(benjy): We shouldn't need to mention DistributionLocator here, as IvySubsystem
+    # declares it as a dependency. However if we don't then test_antlr() below fails on
+    # uninitialized options for that subsystem.  Hopefully my pending (as of 9/2016) change
+    # to clean up how we initialize and create instances of subsystems in tests will make
+    # this problem go away.
     self.context(for_subsystems=[PythonRepos, PythonSetup, IvySubsystem,
-                                 ThriftBinary.Factory, BinaryUtil.Factory])
+                                 DistributionLocator, ThriftBinary.Factory, BinaryUtil.Factory])
     python_repos = PythonRepos.global_instance()
     ivy_bootstrapper = Bootstrapper(ivy_subsystem=IvySubsystem.global_instance())
     thrift_binary_factory = ThriftBinary.Factory.global_instance().create
 
     interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
     interpreter_cache.setup()
-    interpreters = list(interpreter_cache.matched_interpreters([
-      self.python_setup.interpreter_requirement
-    ]))
+    interpreters = list(interpreter_cache.matched_interpreters(
+      self.python_setup.interpreter_constraints))
     self.assertGreater(len(interpreters), 0)
     interpreter = interpreters[0]
 

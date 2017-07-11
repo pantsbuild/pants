@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
 import json
 import multiprocessing
 import os
@@ -86,8 +87,8 @@ class RunTracker(Subsystem):
     # run_id is safe for use in paths.
     millis = int((run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}_{}'.format(
-               time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
-               uuid.uuid4().hex)
+      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
+      uuid.uuid4().hex)
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
@@ -143,6 +144,20 @@ class RunTracker(Subsystem):
     SubprocPool.foreground()
 
     self._aborted = False
+
+    # Data will be organized first by target and then scope.
+    # Eg:
+    # {
+    #   'target/address:name': {
+    #     'running_scope': {
+    #       'run_duration': 356.09
+    #     },
+    #     'GLOBAL': {
+    #       'target_type': 'pants.test'
+    #     }
+    #   }
+    # }
+    self._target_to_data = {}
 
   def register_thread(self, parent_workunit):
     """Register the parent workunit for all work in the calling thread.
@@ -285,8 +300,13 @@ class RunTracker(Subsystem):
 
   def store_stats(self):
     """Store stats about this run in local and optionally remote stats dbs."""
+    run_information = self.run_info.get_as_dict()
+    target_data = run_information.get('target_data', None)
+    if target_data:
+      run_information['target_data'] = ast.literal_eval(target_data)
+
     stats = {
-      'run_info': self.run_info.get_as_dict(),
+      'run_info': run_information,
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
@@ -304,7 +324,12 @@ class RunTracker(Subsystem):
     # Upload to remote stats db.
     stats_url = self.get_options().stats_upload_url
     if stats_url:
-      self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+      pid = os.fork()
+      if pid == 0:
+        try:
+          self.post_stats(stats_url, stats, timeout=self.get_options().stats_upload_timeout)
+        finally:
+          os._exit(0)
 
     # Write stats to local json file.
     stats_json_file_name = self.get_options().stats_local_json_file
@@ -317,6 +342,8 @@ class RunTracker(Subsystem):
     """This pants run is over, so stop tracking it.
 
     Note: If end() has been called once, subsequent calls are no-ops.
+
+    :return: 0 for success, 1 for failure.
     """
     if self._background_worker_pool:
       if self._aborted:
@@ -346,8 +373,13 @@ class RunTracker(Subsystem):
       # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
       self.run_info.add_info('outcome', outcome_str, ignore_errors=True)
 
+    if self._target_to_data:
+      self.run_info.add_info('target_data', self._target_to_data)
+
     self.report.close()
     self.store_stats()
+
+    return 1 if outcome in [WorkUnit.FAILURE, WorkUnit.ABORTED] else 0
 
   def end_workunit(self, workunit):
     self.report.end_workunit(workunit)
@@ -381,3 +413,95 @@ class RunTracker(Subsystem):
     N.B. This exists only for internal use and to afford for fork()-safe operation in pantsd.
     """
     SubprocPool.shutdown(self._aborted)
+
+  @classmethod
+  def _create_dict_with_nested_keys_and_val(cls, keys, value):
+    """Recursively constructs a nested dictionary with the keys pointing to the value.
+
+    For example:
+    Given the list of keys ['a', 'b', 'c', 'd'] and a primitive
+    value 'hello world', the method will produce the nested dictionary
+    {'a': {'b': {'c': {'d': 'hello world'}}}}. The number of keys in the list
+    defines the depth of the nested dict. If the list of keys is ['a'] and
+    the value is 'hello world', then the result would be {'a': 'hello world'}.
+
+    :param list of string keys: A list of keys to be nested as a dictionary.
+    :param primitive value: The value of the information being stored.
+    :return: dict of nested keys leading to the value.
+    """
+
+    if len(keys) > 1:
+      new_keys = keys[:-1]
+      new_val = {keys[-1]: value}
+      return cls._create_dict_with_nested_keys_and_val(new_keys, new_val)
+    elif len(keys) == 1:
+      return {keys[0]: value}
+    else:
+      raise ValueError('Keys must contain at least one key.')
+
+  @classmethod
+  def _merge_list_of_keys_into_dict(cls, data, keys, value, index=0):
+    """Recursively merge list of keys that points to the given value into data.
+
+    Will override a primitive value with another primitive value, but will not
+    override a primitive with a dictionary.
+
+    For example:
+    Given the dictionary {'a': {'b': {'c': 1}}, {'x': {'y': 100}}}, the keys
+    ['a', 'b', 'd'] and the value 2, the updated dictionary would be
+    {'a': {'b': {'c': 1, 'd': 2}}, {'x': {'y': 100}}}. Given this newly updated
+    dictionary, the keys ['a', 'x', 'y', 'z'] and the value 200, the method would raise
+    an error because we would be trying to override the primitive value 100 with the
+    dict {'z': 200}.
+
+    :param dict data: Dictionary to be updated.
+    :param list of string keys: The keys that point to where the value should be stored.
+           Will recursively find the correct place to store in the nested dicts.
+    :param primitive value: The value of the information being stored.
+    :param int index: The index into the list of keys (starting from the beginning).
+    """
+    if len(keys) == 0 or index < 0 or index >= len(keys):
+      raise ValueError('Keys must contain at least one key and index must be'
+                       'an integer greater than 0 and less than the number of keys.')
+    if len(keys) < 2 or not data:
+      new_data_to_add = cls._create_dict_with_nested_keys_and_val(keys, value)
+      data.update(new_data_to_add)
+
+    this_keys_contents = data.get(keys[index])
+    if this_keys_contents:
+      if isinstance(this_keys_contents, dict):
+        cls._merge_list_of_keys_into_dict(this_keys_contents, keys, value, index + 1)
+      elif index < len(keys) - 1:
+        raise ValueError('Keys must point to a dictionary.')
+      else:
+        data[keys[index]] = value
+    else:
+      new_keys = keys[index:]
+      new_data_to_add = cls._create_dict_with_nested_keys_and_val(new_keys, value)
+      data.update(new_data_to_add)
+
+  def report_target_info(self, scope, target, keys, val):
+    """Add target information to run_info under target_data.
+
+    Will Recursively construct a nested dict with the keys provided.
+
+    Primitive values can be overwritten with other primitive values,
+    but a primitive value cannot be overwritten with a dictionary.
+
+    For example:
+    Where the dictionary being updated is {'a': {'b': 16}}, reporting the value
+    15 with the key list ['a', 'b'] will result in {'a': {'b':15}};
+    but reporting the value 20 with the key list ['a', 'b', 'c'] will throw
+    an error.
+
+    :param string scope: The scope for which we are reporting the information.
+    :param string target: The target for which we want to store information.
+    :param list of string keys: The keys that will be recursively
+           nested and pointing to the information being stored.
+    :param primitive val: The value of the information being stored.
+
+    :API: public
+    """
+    new_key_list = [target, scope]
+    new_key_list += keys
+    self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)

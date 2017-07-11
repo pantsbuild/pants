@@ -6,13 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import os
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
-from pants.base.payload_field import JarsField
+from pants.base.payload_field import JarsField, PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.memo import memoized_property
 
 
@@ -25,22 +26,33 @@ class ManagedJarDependencies(Target):
       Versions are pinned per (org, name, classifier, ext) artifact coordinate (excludes, etc are
       ignored for the purposes of pinning).
     """
-    jar_objects, self._library_specs = self._split_jars_and_specs(artifacts or ())
+    jar_objects, library_specs = self._split_jars_and_specs(artifacts or ())
     payload = payload or Payload()
     payload.add_fields({
       'artifacts': JarsField(jar_objects),
+      'library_specs': PrimitiveField(library_specs)
     })
     super(ManagedJarDependencies, self).__init__(payload=payload, **kwargs)
 
-  @property
-  def traversable_specs(self):
-    return iter(self.library_specs)
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    for spec in super(ManagedJarDependencies, cls).compute_injectable_specs(kwargs, payload):
+      yield spec
+
+    if kwargs:
+      _, specs = cls._split_jars_and_specs(kwargs.get('artifacts', ()))
+      for spec in specs:
+        yield spec
+    elif payload:
+      payload_dict = payload.as_dict()
+      for spec in payload_dict.get('library_specs', ()):
+        yield spec
 
   @memoized_property
   def library_specs(self):
     """Lists of specs to resolve to jar_libraries containing more jars."""
     return [Address.parse(spec, relative_to=self.address.spec_path).spec
-            for spec in self._library_specs]
+            for spec in self.payload.library_specs]
 
   @classmethod
   def _split_jars_and_specs(cls, jars):
@@ -112,13 +124,16 @@ class ManagedJarLibraries(object):
   def __init__(self, parse_context):
     self._parse_context = parse_context
 
-  def __call__(self, name, artifacts=None, **kwargs):
+  def __call__(self, name=None, artifacts=None, **kwargs):
     """
-    :param string name: The name of the generated managed_jar_dependencies() target.
+    :param string name: The optional name of the generated managed_jar_dependencies() target.
     :param artifacts: List of `jar <#jar>`_\s or specs to jar_library targets with pinned versions.
       Versions are pinned per (org, name, classifier, ext) artifact coordinate (excludes, etc are
       ignored for the purposes of pinning).
     """
+    # Support the default target name protocol.
+    if name is None:
+      name = os.path.basename(self._parse_context.rel_path)
     management = self._parse_context.create_object('managed_jar_dependencies',
                                                    name=name,
                                                    artifacts=artifacts,

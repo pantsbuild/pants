@@ -18,6 +18,7 @@ jar_library(name = 'zinc',
 java_library(name='foo',
   sources=globs('Main.java'),
   dependencies=[
+    ':baz',
     ':zinc',
   ],
   excludes=[
@@ -34,4 +35,8 @@ java_library(name='bar',
     ':nailgun-server',
     ':jmake',
   ]
+)
+
+java_library(name='baz',
+  sources=globs('Main.java'),
 )

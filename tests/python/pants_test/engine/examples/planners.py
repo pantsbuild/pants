@@ -13,19 +13,19 @@ from os.path import join as os_path_join
 
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.project_tree import Dir
 from pants.build_graph.address import Address
-from pants.engine.addressable import SubclassesOf, addressable_list
-from pants.engine.fs import Dirs, Files, FilesContent, PathGlobs, create_fs_tasks
-from pants.engine.graph import create_graph_tasks
+from pants.engine.addressable import BuildFileAddresses, SubclassesOf, addressable_list
+from pants.engine.build_files import create_graph_rules
+from pants.engine.fs import FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
+from pants.engine.rules import SingletonRule, TaskRule, rule
 from pants.engine.scheduler import LocalScheduler
-from pants.engine.selectors import (Select, SelectDependencies, SelectLiteral, SelectProjection,
-                                    SelectVariant)
+from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
-from pants_test.engine.examples.graph_validator import GraphValidator
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.sources import Sources
 
@@ -102,6 +102,13 @@ class JVMPackageName(datatype('JVMPackageName', ['name'])):
   pass
 
 
+class SourceRoots(datatype('SourceRoots', ['srcroots'])):
+  """Placeholder for the SourceRoot subsystem."""
+
+
+@rule(Address,
+      [Select(JVMPackageName),
+       SelectDependencies(AddressFamily, Snapshot, field='dir_stats', field_types=(Dir,))])
 @printing_func
 def select_package_address(jvm_package_name, address_families):
   """Return the Address from the given AddressFamilies which provides the given package."""
@@ -113,30 +120,36 @@ def select_package_address(jvm_package_name, address_families):
   elif len(addresses) > 1:
     raise ValueError('Multiple targets might be able to provide {}:\n  {}'.format(
       jvm_package_name, '\n  '.join(str(a) for a in addresses)))
-  return addresses[0]
+  return addresses[0].to_address()
 
 
+@rule(PathGlobs, [Select(JVMPackageName), Select(SourceRoots)])
 @printing_func
 def calculate_package_search_path(jvm_package_name, source_roots):
   """Return PathGlobs to match directories where the given JVMPackageName might exist."""
   rel_package_dir = jvm_package_name.name.replace('.', os_sep)
   specs = [os_path_join(srcroot, rel_package_dir) for srcroot in source_roots.srcroots]
-  return PathGlobs.create_from_specs('', specs)
+  return PathGlobs.create('', include=specs)
 
 
+@rule(ImportedJVMPackages,
+      [SelectProjection(FilesContent, PathGlobs, 'path_globs', ScalaInferredDepsSources)])
 @printing_func
 def extract_scala_imports(source_files_content):
   """A toy example of dependency inference. Would usually be a compiler plugin."""
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
-  for _, content in source_files_content.dependencies:
-    for line in content.splitlines():
+  for filecontent in source_files_content.dependencies:
+    for line in filecontent.content.splitlines():
       match = import_re.search(line)
       if match:
         packages.add(match.group(1).rsplit('.', 1)[0])
   return ImportedJVMPackages([JVMPackageName(p) for p in packages])
 
 
+@rule(ScalaSources,
+      [Select(ScalaInferredDepsSources),
+       SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))])
 @printing_func
 def reify_scala_sources(sources, dependency_addresses):
   """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
@@ -201,6 +214,7 @@ class ManagedJar(Struct):
     super(ManagedJar, self).__init__(org=org, name=name, **kwargs)
 
 
+@rule(Jar, [Select(ManagedJar), SelectVariant(ManagedResolve, 'resolve')])
 @printing_func
 def select_rev(managed_jar, managed_resolve):
   (org, name) = (managed_jar.org, managed_jar.name)
@@ -210,11 +224,13 @@ def select_rev(managed_jar, managed_resolve):
   return Jar(org=managed_jar.org, name=managed_jar.name, rev=rev)
 
 
+@rule(Classpath, [Select(Jar)])
 @printing_func
 def ivy_resolve(jars):
   return Classpath(creator='ivy_resolve')
 
 
+@rule(Classpath, [Select(ResourceSources)])
 @printing_func
 def isolate_resources(resources):
   """Copies resources into a private directory, and provides them as a Classpath entry."""
@@ -246,6 +262,16 @@ class ApacheThriftError(TaskError):
   pass
 
 
+@rule(JavaSources, [Select(ThriftSources), SelectVariant(ApacheThriftJavaConfiguration, 'thrift')])
+def gen_apache_java_thrift(sources, config):
+  return gen_apache_thrift(sources, config)
+
+
+@rule(PythonSources, [Select(ThriftSources), SelectVariant(ApacheThriftPythonConfiguration, 'thrift')])
+def gen_apache_python_thrift(sources, config):
+  return gen_apache_thrift(sources, config)
+
+
 @printing_func
 def gen_apache_thrift(sources, config):
   if config.rev == 'fail':
@@ -261,10 +287,15 @@ class BuildPropertiesConfiguration(Struct):
   pass
 
 
+@rule(Classpath, [Select(BuildPropertiesConfiguration)])
 @printing_func
 def write_name_file(name):
   """Write a file containing the name of this target in the CWD."""
   return Classpath(creator='write_name_file')
+
+
+class Scrooge(datatype('Scrooge', ['tool_address'])):
+  """Placeholder for a Scrooge subsystem."""
 
 
 class ScroogeConfiguration(ThriftConfiguration):
@@ -284,6 +315,22 @@ class ScroogeJavaConfiguration(ScroogeConfiguration):
   pass
 
 
+@rule(ScalaSources,
+      [Select(ThriftSources),
+       SelectVariant(ScroogeScalaConfiguration, 'thrift'),
+       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
+def gen_scrooge_scala_thrift(sources, config, scrooge_classpath):
+  return gen_scrooge_thrift(sources, config, scrooge_classpath)
+
+
+@rule(JavaSources,
+      [Select(ThriftSources),
+       SelectVariant(ScroogeJavaConfiguration, 'thrift'),
+       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
+def gen_scrooge_java_thrift(sources, config, scrooge_classpath):
+  return gen_scrooge_thrift(sources, config, scrooge_classpath)
+
+
 @printing_func
 def gen_scrooge_thrift(sources, config, scrooge_classpath):
   if isinstance(config, ScroogeJavaConfiguration):
@@ -292,35 +339,20 @@ def gen_scrooge_thrift(sources, config, scrooge_classpath):
     return ScalaSources(files=['Fake.scala'], dependencies=config.dependencies)
 
 
+@rule(Classpath,
+      [Select(JavaSources),
+       SelectDependencies(Classpath, JavaSources, field_types=(Address, Jar))])
 @printing_func
 def javac(sources, classpath):
   return Classpath(creator='javac')
 
 
+@rule(Classpath,
+      [Select(ScalaSources),
+       SelectDependencies(Classpath, ScalaSources, field_types=(Address, Jar))])
 @printing_func
 def scalac(sources, classpath):
   return Classpath(creator='scalac')
-
-
-# TODO(John Sirois): When https://github.com/pantsbuild/pants/issues/2413 is resolved, move the
-# unpickleable input and output test planners below to engine test.  There will be less setup
-# required at that point since no target addresses will need to be supplied in the build_request.
-class UnpickleableOutput(object):
-  pass
-
-
-class UnpickleableResult(object):
-  pass
-
-
-def unpickleable_output():
-  """Generates an unpickleable output."""
-  # Nested functions like this lambda are unpicklable.
-  return lambda: None
-
-
-def unpickleable_input(unpickleable):
-  raise Exception('This function should never run, because its selected input is unpickleable.')
 
 
 class Goal(AbstractClass):
@@ -338,13 +370,13 @@ class Goal(AbstractClass):
     """Returns the name of the Goal."""
 
   @classmethod
-  def signature(cls):
-    """Returns a task triple for this Goal, used to install the Goal.
+  def rule(cls):
+    """Returns a Rule for this Goal, used to install the Goal.
 
     A Goal is it's own synthetic output product, and its constructor acts as its task function. It
     selects each of its products as optional, but fails synchronously if none of them are available.
     """
-    return (cls, [Select(p, optional=True) for p in cls.products()], cls)
+    return TaskRule(cls, [Select(p, optional=True) for p in cls.products()], cls)
 
   @classmethod
   @abstractmethod
@@ -379,10 +411,6 @@ class GenGoal(Goal):
     return [JavaSources, PythonSources, ResourceSources, ScalaSources]
 
 
-class SourceRoots(datatype('SourceRoots', ['srcroots'])):
-  """Placeholder for the SourceRoot subsystem."""
-
-
 class ExampleTable(SymbolTable):
   @classmethod
   def table(cls):
@@ -405,7 +433,7 @@ class ExampleTable(SymbolTable):
             'inferred_scala': ScalaInferredDepsSources}
 
 
-def setup_json_scheduler(build_root, inline_nodes=True):
+def setup_json_scheduler(build_root, native):
   """Return a build graph and scheduler configured for BLD.json files under the given build root.
 
   :rtype :class:`pants.engine.scheduler.LocalScheduler`
@@ -416,102 +444,55 @@ def setup_json_scheduler(build_root, inline_nodes=True):
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
   address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                                  build_pattern='BLD.json',
-                                                  parser_cls=JsonParser)
-  source_roots = SourceRoots(('src/java','src/scala'))
-  scrooge_tool_address = Address.parse('src/scala/scrooge')
+                                 build_patterns=('BLD.json',),
+                                 parser_cls=JsonParser)
+
+  work_dir = os_path_join(build_root, '.pants.d')
+  project_tree = FileSystemProjectTree(build_root)
 
   goals = {
       'compile': Classpath,
       # TODO: to allow for running resolve alone, should split out a distinct 'IvyReport' product.
       'resolve': Classpath,
-      'list': Address,
+      'list': BuildFileAddresses,
       GenGoal.name(): GenGoal,
-      'unpickleable': UnpickleableResult,
-      'ls': Files,
+      'ls': Snapshot,
       'cat': FilesContent,
     }
   tasks = [
       # Codegen
-      GenGoal.signature(),
-      (JavaSources,
-       [Select(ThriftSources),
-        SelectVariant(ApacheThriftJavaConfiguration, 'thrift')],
-       gen_apache_thrift),
-      (PythonSources,
-       [Select(ThriftSources),
-        SelectVariant(ApacheThriftPythonConfiguration, 'thrift')],
-       gen_apache_thrift),
-      (ScalaSources,
-       [Select(ThriftSources),
-        SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
-       gen_scrooge_thrift),
-      (JavaSources,
-       [Select(ThriftSources),
-        SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-        SelectLiteral(scrooge_tool_address, Classpath)],
-       gen_scrooge_thrift),
+      GenGoal.rule(),
+      gen_apache_java_thrift,
+      gen_apache_python_thrift,
+      gen_scrooge_scala_thrift,
+      gen_scrooge_java_thrift,
+      SingletonRule(Scrooge, Scrooge(Address.parse('src/scala/scrooge')))
     ] + [
       # scala dependency inference
-      (ScalaSources,
-       [Select(ScalaInferredDepsSources),
-        SelectDependencies(Address, ImportedJVMPackages)],
-       reify_scala_sources),
-      (ImportedJVMPackages,
-       [SelectProjection(FilesContent, PathGlobs, ('path_globs',), ScalaInferredDepsSources)],
-       extract_scala_imports),
-      (Address,
-       [Select(JVMPackageName),
-        SelectDependencies(AddressFamily, Dirs, field='stats')],
-       select_package_address),
-      (PathGlobs,
-       [Select(JVMPackageName),
-        SelectLiteral(source_roots, SourceRoots)],
-       calculate_package_search_path),
+      reify_scala_sources,
+      extract_scala_imports,
+      select_package_address,
+      calculate_package_search_path,
+      SingletonRule(SourceRoots, SourceRoots(('src/java','src/scala'))),
     ] + [
       # Remote dependency resolution
-      (Classpath,
-       [Select(Jar)],
-       ivy_resolve),
-      (Jar,
-       [Select(ManagedJar),
-        SelectVariant(ManagedResolve, 'resolve')],
-       select_rev),
+      ivy_resolve,
+      select_rev,
     ] + [
       # Compilers
-      (Classpath,
-       [Select(ResourceSources)],
-       isolate_resources),
-      (Classpath,
-       [Select(BuildPropertiesConfiguration)],
-       write_name_file),
-      (Classpath,
-       [Select(JavaSources),
-        SelectDependencies(Classpath, JavaSources)],
-       javac),
-      (Classpath,
-       [Select(ScalaSources),
-        SelectDependencies(Classpath, ScalaSources)],
-       scalac),
-    ] + [
-      # TODO
-      (UnpickleableOutput,
-        [],
-        unpickleable_output),
-      (UnpickleableResult,
-       [Select(UnpickleableOutput)],
-       unpickleable_input),
+      isolate_resources,
+      write_name_file,
+      javac,
+      scalac,
     ] + (
-      create_graph_tasks(address_mapper, symbol_table_cls)
+      create_graph_rules(address_mapper, symbol_table_cls)
     ) + (
-      create_fs_tasks()
+      create_fs_rules()
     )
 
-  project_tree = FileSystemProjectTree(build_root)
-  return LocalScheduler(goals,
+  return LocalScheduler(work_dir,
+                        goals,
                         tasks,
                         project_tree,
-                        graph_lock=None,
-                        inline_nodes=inline_nodes,
-                        graph_validator=GraphValidator(symbol_table_cls))
+                        native,
+                        graph_lock=None)

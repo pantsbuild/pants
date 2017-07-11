@@ -1,6 +1,6 @@
 # Pants plugin for FindBugs
 
-The FindBugs plugin runs FindBugs bytecode analysis on Java class files and looks for various 
+The FindBugs plugin runs FindBugs bytecode analysis on Java class files and looks for various
 [bug patterns](http://findbugs.sourceforge.net/bugDescriptions.html) not reported by the compiler.
 
 A full description of FindBugs can be found on the [FindBugs home page](http://findbugs.sourceforge.net/factSheet.html).
@@ -26,7 +26,7 @@ plugins: [
 ## Running
 
 When you run `./pants compile` the plugin is executed after the compile step and will run FindBugs
-on any `java_library` or `java_tests` targets.
+on any `java_library` or `junit_tests` targets.
 
 ```
 ./pants compile <target>
@@ -42,7 +42,7 @@ on any `java_library` or `java_tests` targets.
 ```
 
 ## Options
- 
+
 The plugin currently supports the following subset of the [FindBugs command line options](http://findbugs.sourceforge.net/manual/running.html#commandLineOptions).
 
 ```
@@ -72,7 +72,7 @@ The plugin will not fail the build unless you enable
 If you enable this option then you may also want to set `--compile-findbugs-max-rank` so the build will
 only fail for bugs above a certain rank.
 
-Alternatively you can exclude files with the `--compile-findbugs-exclude-patterns` and setup a findbugsExclude.xml fill
+Alternatively you can exclude files with the `--compile-findbugs-exclude-patterns` and setup a findbugsExclude.xml file
 to filter out specific bug reports.  The format of the exclude file is documented on the [FindBugs site](http://findbugs.sourceforge.net/manual/filter.html).
 
 Here are example settings that fail the build only for highly ranked bugs and exclude all test files

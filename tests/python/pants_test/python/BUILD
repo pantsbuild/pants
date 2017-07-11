@@ -8,9 +8,7 @@ python_tests(
   sources = ['test_antlr_builder.py'],
   dependencies = [
     '3rdparty/python:antlr-3.1.3',
-    'testprojects/src/antlr/pants/backend/python/test:csv',
-    'testprojects/src/antlr/pants/backend/python/test:eval',
-    'src/python/pants/backend/python:python_setup',
+    'testprojects/src/antlr/python/test:eval',
   ],
 )
 
@@ -35,24 +33,12 @@ python_tests(
 )
 
 python_tests(
-  name = 'python_run_integration',
-  sources = ['test_python_run_integration.py'],
+  name = 'python_binary_integration',
+  sources = ['test_python_binary_integration.py'],
   dependencies = [
+    '3rdparty/python:pex',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
-)
-
-python_tests(
-  name = 'test_interpreter_cache',
-  sources = ['test_interpreter_cache.py'],
-  dependencies = [
-    '3rdparty/python:mock',
-    '3rdparty/python:pex',
-    'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_setup',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
-  ],
 )

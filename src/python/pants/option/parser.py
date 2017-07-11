@@ -15,8 +15,10 @@ import six
 
 from pants.base.deprecated import validate_removal_semver, warn_or_error
 from pants.option.arg_splitter import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION
-from pants.option.custom_types import (DictValueComponent, ListValueComponent, dict_option,
-                                       file_option, list_option, target_option)
+from pants.option.config import Config
+from pants.option.custom_types import (DictValueComponent, ListValueComponent, UnsetBool,
+                                       dict_option, dir_option, file_option, list_option,
+                                       target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
                                  InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
                                  NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
@@ -46,6 +48,9 @@ class Parser(object):
 
   class FromfileError(ParseError):
     """Indicates a problem reading a value @fromfile."""
+
+  class MutuallyExclusiveOptionError(ParseError):
+    """Raised when more than one option belonging to the same mutually exclusive group is specified."""
 
   @staticmethod
   def _ensure_bool(s):
@@ -140,13 +145,10 @@ class Parser(object):
     """Set values for this parser's options on the namespace object."""
     flag_value_map = self._create_flag_value_map(flags)
 
+    mutex_map = defaultdict(list)
     for args, kwargs in self._unnormalized_option_registrations_iter():
       self._validate(args, kwargs)
-      dest = kwargs.get('dest') or self._select_dest(args)
-
-      def consume_flag(flag):
-        self._check_deprecated(dest, kwargs)
-        del flag_value_map[flag]
+      dest = self.parse_dest(*args, **kwargs)
 
       # Compute the values provided on the command line for this option.  Note that there may be
       # multiple values, for any combination of the following reasons:
@@ -186,7 +188,7 @@ class Parser(object):
         if arg in flag_value_map:
           for v in flag_value_map[arg]:
             add_flag_val(v)
-          consume_flag(arg)
+          del flag_value_map[arg]
 
       # Get the value for this option, falling back to defaults as needed.
       try:
@@ -199,6 +201,21 @@ class Parser(object):
           'Error computing value for {} in {} (may also be from PANTS_* environment variables).'
           '\nCaused by:\n{}'.format(', '.join(args), self._scope_str(), traceback.format_exc())
         )
+
+      # If the option is explicitly given, check deprecation and mutual exclusion.
+      if val.rank > RankedValue.HARDCODED:
+        self._check_deprecated(dest, kwargs)
+
+        mutex_dest = kwargs.get('mutually_exclusive_group')
+        if mutex_dest:
+          mutex_map[mutex_dest].append(dest)
+          dest = mutex_dest
+        else:
+          mutex_map[dest].append(dest)
+
+        if len(mutex_map[dest]) > 1:
+          raise self.MutuallyExclusiveOptionError(
+            "Can only provide one of the mutually exclusive options {}".format(mutex_map[dest]))
 
       setattr(namespace, dest, val)
 
@@ -225,7 +242,7 @@ class Parser(object):
     """
     def normalize_kwargs(args, orig_kwargs):
       nkwargs = copy.copy(orig_kwargs)
-      dest = nkwargs.get('dest') or self._select_dest(args)
+      dest = self.parse_dest(*args, **nkwargs)
       nkwargs['dest'] = dest
       if not ('default' in nkwargs and isinstance(nkwargs['default'], RankedValue)):
         nkwargs['default'] = self._compute_value(dest, nkwargs, [])
@@ -289,10 +306,15 @@ class Parser(object):
       ancestor._freeze()
       ancestor = ancestor._parent_parser
 
-    # Boolean options always have an implicit boolean-typed default.  They can never be None.
-    # We make that default explicit here.
-    if kwargs.get('type') == bool and kwargs.get('default') is None:
-      kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
+    if kwargs.get('type') == bool:
+      default = kwargs.get('default')
+      if default is None:
+        # Unless a tri-state bool is explicitly opted into with the `UnsetBool` default value,
+        # boolean options always have an implicit boolean-typed default. We make that default
+        # explicit here.
+        kwargs['default'] = not self._ensure_bool(kwargs.get('implicit_value', True))
+      elif default is UnsetBool:
+        kwargs['default'] = None
 
     # Record the args. We'll do the underlying parsing on-demand.
     self._option_registrations.append((args, kwargs))
@@ -318,12 +340,12 @@ class Parser(object):
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
   _allowed_member_types = {
-    str, int, float, dict, dict_option, file_option, target_option
+    str, int, float, dict, dir_option, dict_option, file_option, target_option
   }
 
   def _validate(self, args, kwargs):
@@ -373,11 +395,17 @@ class Parser(object):
 
   _ENV_SANITIZER_RE = re.compile(r'[.-]')
 
-  def _select_dest(self, args):
-    """Select the dest name for the option.
+  @staticmethod
+  def parse_dest(*args, **kwargs):
+    """Select the dest name for an option registration.
 
-    '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
+    If an explicit `dest` is specified, returns that and otherwise derives a default from the
+    option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
     """
+    explicit_dest = kwargs.get('dest')
+    if explicit_dest:
+      return explicit_dest
+
     arg = next((a for a in args if a.startswith('--')), args[0])
     return arg.lstrip('-').replace('-', '_')
 
@@ -430,8 +458,10 @@ class Parser(object):
     # Get value from config files, and capture details about its derivation.
     config_details = None
     config_section = GLOBAL_SCOPE_CONFIG_SECTION if self._scope == GLOBAL_SCOPE else self._scope
+    config_default_val_str = expand(self._config.get(Config.DEFAULT_SECTION, dest, default=None))
     config_val_str = expand(self._config.get(config_section, dest, default=None))
-    config_source_file = self._config.get_source_for_option(config_section, dest)
+    config_source_file = (self._config.get_source_for_option(config_section, dest) or
+        self._config.get_source_for_option(Config.DEFAULT_SECTION, dest))
     if config_source_file is not None:
       config_source_file = os.path.relpath(config_source_file)
       config_details = 'in {}'.format(config_source_file)
@@ -484,14 +514,15 @@ class Parser(object):
     # is idempotent, so this is OK.
 
     values_to_rank = [to_value_type(x) for x in
-                      [flag_val, env_val_str, config_val_str, kwargs.get('default'), None]]
+                      [flag_val, env_val_str, config_val_str,
+                       config_default_val_str, kwargs.get('default'), None]]
     # Note that ranked_vals will always have at least one element, and all elements will be
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
     # Record info about the derivation of each of the values.
     for ranked_val in ranked_vals:
-      if ranked_val.rank == RankedValue.CONFIG:
+      if ranked_val.rank in (RankedValue.CONFIG, RankedValue.CONFIG_DEFAULT):
         details = config_details
       elif ranked_val.rank == RankedValue.ENVIRONMENT:
         details = env_details
@@ -509,10 +540,13 @@ class Parser(object):
       if val is not None:
         choices = kwargs.get('choices')
         if choices is not None and val not in choices:
-          raise ParseError('{} is not an allowed value for option {} in {}. '
+          raise ParseError('`{}` is not an allowed value for option {} in {}. '
                            'Must be one of: {}'.format(val, dest, self._scope_str(), choices))
+        elif kwargs.get('type') == dir_option and not os.path.isdir(val):
+          raise ParseError('Directory value `{}` for option {} in {} does not exist.'.format(
+              val, dest, self._scope_str()))
         elif kwargs.get('type') == file_option and not os.path.isfile(val):
-          raise ParseError('File value {} for option {} in {} does not exist.'.format(
+          raise ParseError('File value `{}` for option {} in {} does not exist.'.format(
               val, dest, self._scope_str()))
 
     # Generate the final value from all available values, and check that it (or its members,

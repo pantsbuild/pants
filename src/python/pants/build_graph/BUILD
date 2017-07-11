@@ -3,8 +3,6 @@
 
 
 python_library(
-  name = 'build_graph',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
@@ -18,6 +16,7 @@ python_library(
     'src/python/pants/base:parse_context',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
+    'src/python/pants/base:specs',
     'src/python/pants/base:validation',
     'src/python/pants/option',
     'src/python/pants/source',

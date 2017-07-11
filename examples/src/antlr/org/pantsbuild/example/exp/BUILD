@@ -1,7 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(name='exp',
+target(
   dependencies=[
     ':exp_antlr3',
     ':exp_antlr4',

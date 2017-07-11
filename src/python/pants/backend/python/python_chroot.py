@@ -18,8 +18,8 @@ from pex.platforms import Platform
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
-from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_binary import PythonBinary
@@ -174,12 +174,6 @@ class PythonChroot(object):
     children = defaultdict(OrderedSet)
 
     def add_dep(trg):
-      # Currently we handle all of our code generation, so we don't want to operate over any
-      # synthetic targets injected upstream.
-      # TODO(John Sirois): Revisit this when building a proper python product pipeline.
-      if trg.is_synthetic:
-        return
-
       for target_type, target_key in self._VALID_DEPENDENCIES.items():
         if isinstance(trg, target_type):
           children[target_key].add(trg)
@@ -241,9 +235,9 @@ class PythonChroot(object):
   def _resolve_multi(self, requirements, find_links):
     """Multi-platform dependency resolution for PEX files.
 
-       Given a pants configuration and a set of requirements, return a list of distributions
-       that must be included in order to satisfy them.  That may involve distributions for
-       multiple platforms.
+       Given a pants configuration and a set of requirements, return a map of platform name -> list
+       of :class:`pkg_resources.Distribution` instances needed to satisfy them on that platform.
+       That may involve distributions for multiple platforms.
 
        :param requirements: A list of :class:`PythonRequirement` objects to resolve.
        :param find_links: Additional paths to search for source packages during resolution.
@@ -255,7 +249,8 @@ class PythonChroot(object):
     context = self._python_repos.get_network_context()
 
     for platform in platforms:
-      requirements_cache_dir = os.path.join(self._python_setup.resolver_cache_dir, str(self._interpreter.identity))
+      requirements_cache_dir = os.path.join(self._python_setup.resolver_cache_dir,
+                                            str(self._interpreter.identity))
       distributions[platform] = resolve(
         requirements=[req.requirement for req in requirements],
         interpreter=self._interpreter,
@@ -263,6 +258,7 @@ class PythonChroot(object):
         platform=platform,
         context=context,
         cache=requirements_cache_dir,
-        cache_ttl=self._python_setup.resolver_cache_ttl)
+        cache_ttl=self._python_setup.resolver_cache_ttl,
+        allow_prereleases=self._python_setup.resolver_allow_prereleases)
 
     return distributions

@@ -3,9 +3,8 @@
 
 # see test_idea_integration.py
 java_library(
-  name='code',
   sources = ['Code.java'],
-  resources=[
+  dependencies=[
       'testprojects/src/resources/org/pantsbuild/testproject/idearesourcesonly:resource',
    ],
 )

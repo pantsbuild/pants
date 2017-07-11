@@ -76,10 +76,11 @@ class PlainTextReporter(PlainTextReporterBase):
   TOOL_OUTPUT_FORMATTING = {
     WorkUnitLabel.MULTITOOL: ToolOutputFormat.SUPPRESS,
     WorkUnitLabel.BOOTSTRAP: ToolOutputFormat.SUPPRESS,
-    WorkUnitLabel.COMPILER : ToolOutputFormat.INDENT,
-    WorkUnitLabel.TEST : ToolOutputFormat.INDENT,
-    WorkUnitLabel.REPL : ToolOutputFormat.UNINDENTED,
-    WorkUnitLabel.RUN : ToolOutputFormat.UNINDENTED
+    WorkUnitLabel.COMPILER: ToolOutputFormat.INDENT,
+    WorkUnitLabel.TEST: ToolOutputFormat.INDENT,
+    WorkUnitLabel.REPL: ToolOutputFormat.UNINDENTED,
+    WorkUnitLabel.RUN: ToolOutputFormat.UNINDENTED,
+    WorkUnitLabel.LINT: ToolOutputFormat.INDENT
   }
 
   # Format the labels from these workunit types as specified.  If no format is specified, the
@@ -126,7 +127,8 @@ class PlainTextReporter(PlainTextReporterBase):
     label_format = self._get_label_format(workunit)
 
     if label_format == LabelFormat.FULL:
-      self._emit_indented_workunit_label(workunit)
+      if not WorkUnitLabel.SUPPRESS_LABEL in workunit.labels:
+        self._emit_indented_workunit_label(workunit)
       # Start output on a new line.
       tool_output_format = self._get_tool_output_format(workunit)
       if tool_output_format == ToolOutputFormat.INDENT:

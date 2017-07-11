@@ -56,6 +56,7 @@ class ConfigTest(unittest.TestCase):
           """))
         ini2.close()
         self.config = Config.load(configpaths=[ini1.name, ini2.name])
+        self.assertEqual([ini1.name, ini2.name], self.config.sources())
 
   def test_getstring(self):
     self.assertEquals('/a/b/42', self.config.get('a', 'path'))
@@ -71,9 +72,9 @@ that.""",
     self._check_defaults(self.config.get, '')
     self._check_defaults(self.config.get, '42')
 
-  def test_default_section_fallback(self):
-    self.assertEquals('foo', self.config.get('defined_section', 'name'))
-    self.assertEquals('foo', self.config.get('not_a_defined_section', 'name'))
+  def test_default_section(self):
+    self.assertEquals('foo', self.config.get(Config.DEFAULT_SECTION, 'name'))
+    self.assertEquals('foo', self.config.get(Config.DEFAULT_SECTION, 'name'))
 
   def test_sections(self):
     self.assertEquals(['a', 'b', 'defined_section'], self.config.sections())

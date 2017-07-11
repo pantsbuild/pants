@@ -104,3 +104,9 @@ targets and their dependencies.
 
     $
 
+Testing
+-------
+Scala tests are run using the `junit_tests` BUILD target.  Both Junit and ScalaTest tests are
+supported by default.  Most other scala test frameworks support running with JUnit via a base
+class/trait or via a `@RunWith` annotation; so you can use
+`junit_tests` for your scala tests as well.

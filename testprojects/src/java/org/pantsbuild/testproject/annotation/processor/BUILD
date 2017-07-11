@@ -3,7 +3,7 @@
 #
 #  annotation_processor() target to test resource mapping
 
-annotation_processor(name='processor',
+annotation_processor(
   sources=globs('*.java'),
   processors=['org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor'],
   dependencies=[

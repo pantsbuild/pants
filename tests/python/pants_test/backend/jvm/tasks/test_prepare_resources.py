@@ -42,9 +42,10 @@ class PrepareResourcesTest(TaskTestBase):
     jvm_target = self.make_target('jvm:target',
                                   target_type=JvmTarget,
                                   resources=[resources1.address.spec])
-    java_library = self.make_target('java:target', target_type=JavaLibrary)
+    java_library = self.make_target('java:target', target_type=JavaLibrary, sources=[])
     java_library2 = self.make_target('java:target2',
                                      target_type=JavaLibrary,
+                                     sources=[],
                                      resources=[resources4.address.spec])
     other_target = self.make_target('other:target',
                                     target_type=self.NonJvmResourcesUsingTarget,
@@ -58,6 +59,20 @@ class PrepareResourcesTest(TaskTestBase):
     relevant_resources_targets = task.find_all_relevant_resources_targets()
     self.assertEqual(sorted([self.target('resources:target1'), self.target('resources:target4')]),
                      sorted(relevant_resources_targets))
+
+  def test_find_all_relevant_resources_targets_transitive(self):
+    # Insert a target alias between the resources and the jvm target.
+    resources_target = self.make_target('resources:target', target_type=Resources)
+    alias_target = self.make_target('alias:target',
+                                    target_type=Target,
+                                    dependencies=[resources_target])
+    jvm_target = self.make_target('jvm:target',
+                                  target_type=JvmTarget,
+                                  dependencies=[alias_target])
+
+    task = self.create_task(self.context(target_roots=[jvm_target]))
+    relevant_resources_targets = task.find_all_relevant_resources_targets()
+    self.assertEqual(sorted([resources_target]), sorted(relevant_resources_targets))
 
   def test_prepare_resources_none(self):
     task = self.create_task(self.context())

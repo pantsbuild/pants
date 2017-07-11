@@ -10,8 +10,9 @@ import warnings
 from functools import wraps
 
 import six
+from packaging.version import InvalidVersion, Version
 
-from pants.base.revision import Revision
+from pants.util.memo import memoized_method
 from pants.version import PANTS_SEMVER
 
 
@@ -25,6 +26,10 @@ class MissingRemovalVersionError(DeprecationApplicationError):
 
 class BadRemovalVersionError(DeprecationApplicationError):
   """Indicates the supplied removal_version was not a valid semver string."""
+
+
+class NonDevRemovalVersionError(DeprecationApplicationError):
+  """Indicates the supplied removal_version was not a pre-release version."""
 
 
 class CodeRemovedError(Exception):
@@ -43,26 +48,37 @@ class BadDecoratorNestingError(DeprecationApplicationError):
 
 def get_deprecated_tense(removal_version, future_tense='will be', past_tense='was'):
   """Provides the grammatical tense for a given deprecated version vs the current version."""
-  return future_tense if (Revision.semver(removal_version) >= PANTS_SEMVER) else past_tense
+  return future_tense if (Version(removal_version) >= PANTS_SEMVER) else past_tense
 
 
+@memoized_method
 def validate_removal_semver(removal_version):
   """Validates that removal_version is a valid semver.
 
   If so, returns that semver.  Raises an error otherwise.
 
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated entity.
-  :rtype: `pants.base.Revision`
+  :rtype: `packaging.version.Version`
   :raises DeprecationApplicationError: if the removal_version parameter is invalid.
   """
   if removal_version is None:
     raise MissingRemovalVersionError('The removal version must be provided.')
   if not isinstance(removal_version, six.string_types):
-    raise BadRemovalVersionError('The removal_version must be a semver version string.')
+    raise BadRemovalVersionError('The removal_version must be a version string.')
   try:
-    return Revision.semver(removal_version)
-  except Revision.BadRevision as e:
-    raise BadRemovalVersionError('The given removal version {} is not a valid semver: '
+    # NB: packaging will see versions like 1.a.0 as 1a0, and are "valid"
+    # We explicitly want our versions to be of the form x.y.z.
+    v = Version(removal_version)
+    if len(v.base_version.split('.')) != 3:
+      raise BadRemovalVersionError('The given removal version is not a valid version: '
+                                   '{}'.format(removal_version))
+    if not v.is_prerelease:
+      raise NonDevRemovalVersionError('The given removal version is not a dev version: {}\n'
+                                      'Features should generally be removed in the first `dev` release '
+                                      'of a release cycle.'.format(removal_version))
+    return v
+  except InvalidVersion as e:
+    raise BadRemovalVersionError('The given removal version {} is not a valid version: '
                                  '{}'.format(removal_version, e))
 
 
@@ -114,7 +130,7 @@ def deprecated_conditional(predicate,
     warn_or_error(removal_version, entity_description, hint_message, stacklevel=stacklevel)
 
 
-def deprecated(removal_version, hint_message=None):
+def deprecated(removal_version, hint_message=None, subject=None):
   """Marks a function or method as deprecated.
 
   A removal version must be supplied and it must be greater than the current 'pantsbuild.pants'
@@ -130,6 +146,8 @@ def deprecated(removal_version, hint_message=None):
   :param str removal_version: The pantsbuild.pants version which will remove the deprecated
                               function.
   :param str hint_message: An optional hint pointing to alternatives to the deprecation.
+  :param str subject: The name of the subject that has been deprecated for logging clarity. Defaults
+                      to the name of the decorated function/method.
   :raises DeprecationApplicationError if the @deprecation is applied improperly.
   """
   validate_removal_semver(removal_version)
@@ -142,7 +160,7 @@ def deprecated(removal_version, hint_message=None):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-      warn_or_error(removal_version, func_full_name, hint_message)
+      warn_or_error(removal_version, subject or func_full_name, hint_message)
       return func(*args, **kwargs)
     return wrapper
   return decorator

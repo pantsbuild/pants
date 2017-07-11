@@ -10,11 +10,18 @@ import os
 from hashlib import sha1
 
 from pants.base.build_environment import get_buildroot
-from pants.option.custom_types import dict_with_files_option, file_option, target_option
+from pants.option.custom_types import UnsetBool, dict_with_files_option, file_option, target_option
+
+
+class Encoder(json.JSONEncoder):
+  def default(self, o):
+    if o is UnsetBool:
+      return '_UNSET_BOOL_ENCODING'
+    return super(Encoder, self).default(o)
 
 
 def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True)
+  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=Encoder)
 
 
 def stable_json_sha1(obj):

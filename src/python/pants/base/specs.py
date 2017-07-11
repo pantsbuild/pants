@@ -27,17 +27,16 @@ class Spec(AbstractClass):
 
 
 class SingleAddress(datatype('SingleAddress', ['directory', 'name']), Spec):
-  """A Spec for a single address, with an optional name.
+  """A Spec for a single address."""
 
-  If the address name is None, then the default address for the directory is assumed...
-  ie, the address with the same name as the directory.
-  """
+  def __new__(cls, directory, name):
+    if directory is None or name is None:
+      raise ValueError('A SingleAddress must have both a directory and name. Got: '
+                       '{}:{}'.format(directory, name))
+    return super(SingleAddress, cls).__new__(cls, directory, name)
 
   def to_spec_string(self):
-    if self.name:
-      return '{}:{}'.format(self.directory, self.name)
-    else:
-      return self.directory
+    return '{}:{}'.format(self.directory, self.name)
 
 
 class SiblingAddresses(datatype('SiblingAddresses', ['directory']), Spec):
@@ -52,3 +51,10 @@ class DescendantAddresses(datatype('DescendantAddresses', ['directory']), Spec):
 
   def to_spec_string(self):
     return '{}::'.format(self.directory)
+
+
+class AscendantAddresses(datatype('AscendantAddresses', ['directory']), Spec):
+  """A Spec representing all addresses located recursively _above_ the given directory."""
+
+  def to_spec_string(self):
+    return '{}^'.format(self.directory)

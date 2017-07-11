@@ -10,8 +10,8 @@ import os
 from abc import abstractmethod, abstractproperty
 
 import six
-from pathspec.gitignore import GitIgnorePattern
 from pathspec.pathspec import PathSpec
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 
 from pants.util.dirutil import fast_relpath
 from pants.util.meta import AbstractClass
@@ -38,7 +38,8 @@ class ProjectTree(AbstractClass):
           'ProjectTree build_root {} must be an absolute path.'.format(build_root))
     self.build_root = os.path.realpath(build_root)
     logger.debug('ProjectTree ignore_patterns: %s', ignore_patterns)
-    self.ignore = PathSpec.from_lines(GitIgnorePattern, ignore_patterns if ignore_patterns else [])
+    self.ignore_patterns = ignore_patterns if ignore_patterns else []
+    self.ignore = PathSpec.from_lines(GitWildMatchPattern, self.ignore_patterns)
 
   @abstractmethod
   def _glob1_raw(self, dir_relpath, glob):
@@ -140,7 +141,7 @@ class ProjectTree(AbstractClass):
       matched_dirs = self.ignore.match_files([os.path.join(root, "{}/".format(d)) for d in dirs])
       matched_files = self.ignore.match_files([os.path.join(root, f) for f in files])
       for matched_dir in matched_dirs:
-        dirs.remove(fast_relpath(matched_dir, root).rstrip('/'))
+        dirs.remove(fast_relpath(matched_dir, root).rstrip(b'/'))
 
       for matched_file in matched_files:
         files.remove(fast_relpath(matched_file, root))
@@ -164,8 +165,7 @@ class ProjectTree(AbstractClass):
     relpath = self._relpath_no_dot(relpath)
     if directory:
       relpath = self._append_trailing_slash(relpath)
-    match_result = list(self.ignore.match_files([relpath]))
-    return len(match_result) > 0
+    return self.ignore.match_file(relpath)
 
   def _filter_ignored(self, entries, selector=None):
     """Given an opaque entry list, filter any ignored entries.
@@ -181,7 +181,7 @@ class ProjectTree(AbstractClass):
     return [entry for path, entry in prefixed_entries if path not in ignored_paths]
 
   def _relpath_no_dot(self, relpath):
-    return relpath.lstrip('./') if relpath != '.' else ''
+    return relpath.lstrip(b'./') if relpath != b'.' else b''
 
   def _raise_access_ignored(self, relpath):
     """Raises exception when accessing ignored path."""
@@ -189,7 +189,7 @@ class ProjectTree(AbstractClass):
 
   def _append_trailing_slash(self, relpath):
     """Add a trailing slash if not already has one."""
-    return relpath if relpath.endswith('/') or len(relpath) == 0 else relpath + '/'
+    return relpath if relpath.endswith(b'/') or len(relpath) == 0 else relpath + b'/'
 
   def _append_slash_if_dir_path(self, relpath):
     """For a dir path return a path that has a trailing slash."""
@@ -215,18 +215,18 @@ class File(datatype('File', ['path']), Stat):
   """A file."""
 
   def __new__(cls, path):
-    return super(File, cls).__new__(cls, six.text_type(path))
+    return super(File, cls).__new__(cls, six.binary_type(path))
 
 
 class Dir(datatype('Dir', ['path']), Stat):
   """A directory."""
 
   def __new__(cls, path):
-    return super(Dir, cls).__new__(cls, six.text_type(path))
+    return super(Dir, cls).__new__(cls, six.binary_type(path))
 
 
 class Link(datatype('Link', ['path']), Stat):
   """A symbolic link."""
 
   def __new__(cls, path):
-    return super(Link, cls).__new__(cls, six.text_type(path))
+    return super(Link, cls).__new__(cls, six.binary_type(path))

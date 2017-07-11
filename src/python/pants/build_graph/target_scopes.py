@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import six
 
-from pants.build_graph.address import Address
+from pants.build_graph.intermediate_target_factory import IntermediateTargetFactoryBase
 
 
 class Scope(frozenset):
@@ -47,9 +47,9 @@ class Scope(frozenset):
     :rtype: bool
     """
     if include_scopes is not None and not isinstance(include_scopes, Scope):
-      raise ValueError('include_scopes must by a Scope instance.')
+      raise ValueError('include_scopes must be a Scope instance.')
     if exclude_scopes is not None and not isinstance(exclude_scopes, Scope):
-      raise ValueError('exclude_scopes must by a Scope instance.')
+      raise ValueError('exclude_scopes must be a Scope instance.')
     if exclude_scopes and any(s in exclude_scopes for s in self):
       return False
     if include_scopes and not any(s in include_scopes for s in self):
@@ -82,10 +82,10 @@ class Scopes(object):
   JVM_TEST_SCOPES = DEFAULT_OR_FORCED | RUNTIME | TEST
 
 
-class ScopedDependencyFactory(object):
-  """Convenience factory which constructs an intermediary target with the appropriate attributes.
+class ScopedDependencyFactory(IntermediateTargetFactoryBase):
+  """Creates a dependency with the given scope.
 
-  This makes the syntax:
+  For example, this makes the syntax:
 
   ```
       jar_library(name='gson',
@@ -123,36 +123,21 @@ class ScopedDependencyFactory(object):
   The syntax for this feature is experimental and may change in the future.
   """
 
-  class ExpectedAddressError(Exception):
-    """Thrown if an object that is not an address is used as the dependency spec."""
-
   def __init__(self, parse_context):
-    self._parse_context = parse_context
-    self.__index = 0
+    super(ScopedDependencyFactory, self).__init__(parse_context)
+    self._scope = None
+
+  @property
+  def extra_target_arguments(self):
+    """Extra keyword arguments to pass to the target constructor."""
+    return dict(scope=self._scope) if self._scope else dict()
 
   def __call__(self, address, scope=None):
     """
-    :param string scope: The scope of this dependency.
     :param string address: A target address.
+    :param string scope: The scope of this dependency.
     :returns: The address of a synthetic intermediary target.
     """
-    if not isinstance(address, six.string_types):
-      raise self.ExpectedAddressError("Expected string address argument, got type {type}"
-                                      .format(type(address)))
     scope = Scope(scope)
-    address = Address.parse(address, self._parse_context.rel_path)
-    self.__index += 1
-    # NB(gmalmquist): Ideally we should hide this from `./pants list` etc somehow (see note in
-    # intransitive_dependency.py dealing with the same issue).
-    name = '{name}-unstable-{scope}-{index}'.format(
-      name=address.target_name,
-      scope=str(scope).replace(' ', '.'),
-      index=self.__index,
-    )
-    self._parse_context.create_object(
-      'target',
-       name=name,
-       scope=str(scope),
-       dependencies=[address.spec],
-    )
-    return ':{}'.format(name)
+    self._scope = str(scope)
+    return self._create_intermediate_target(address, self._scope)

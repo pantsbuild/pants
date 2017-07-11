@@ -16,9 +16,10 @@ import six
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
-                                get_basedir, read_file, relative_symlink, relativize_paths, rm_rf,
-                                safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
-                                safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+                                get_basedir, longest_dir_prefix, read_file, relative_symlink,
+                                relativize_paths, rm_rf, safe_concurrent_creation, safe_file_dump,
+                                safe_mkdir, safe_mkdtemp, safe_rm_oldest_items_in_dir, safe_rmtree,
+                                touch)
 
 
 def strict_patch(target, **kwargs):
@@ -31,6 +32,27 @@ class DirutilTest(unittest.TestCase):
     # Ensure we start in a clean state.
     _mkdtemp_unregister_cleaner()
 
+  def test_longest_dir_prefix(self):
+    # Find the longest prefix (standard case).
+    prefixes = ['hello', 'hello_world', 'hello/world', 'helloworld']
+    self.assertEquals(longest_dir_prefix('hello/world/pants', prefixes),
+                      'hello/world')
+    self.assertEquals(longest_dir_prefix('hello/', prefixes),
+                      'hello')
+    self.assertEquals(longest_dir_prefix('hello', prefixes),
+                      'hello')
+    self.assertEquals(longest_dir_prefix('scoobydoobydoo', prefixes),
+                      None)
+
+  def test_longest_dir_prefix_special(self):
+    # Ensure that something that is a longest prefix, but not a longest dir
+    # prefix, is not tagged.
+    prefixes = ['helloworldhowareyou', 'helloworld']
+    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine/', prefixes),
+                      None)
+    self.assertEquals(longest_dir_prefix('helloworldhowareyoufine', prefixes),
+                      None)
+
   def test_fast_relpath(self):
     def assertRelpath(expected, path, start):
       self.assertEquals(expected, fast_relpath(path, start))
@@ -42,6 +64,8 @@ class DirutilTest(unittest.TestCase):
     assertRelpath('c/', 'b/c/', 'b/')
     assertRelpath('', 'c/', 'c/')
     assertRelpath('', 'c', 'c')
+    assertRelpath('', 'c/', 'c')
+    assertRelpath('', 'c', 'c/')
     assertRelpath('c/', 'c/', '')
     assertRelpath('c', 'c', '')
 
@@ -157,6 +181,24 @@ class DirutilTest(unittest.TestCase):
       with self.assertRaisesRegexp(ValueError, r'Path for link.*absolute'):
         relative_symlink(source, link)
 
+  def test_relative_symlink_overwrite_existing_file(self):
+    # Succeeds, since os.unlink can be safely called on files that aren't symlinks.
+    with temporary_dir() as tmpdir_1:  # source and link in same dir
+      source = os.path.join(tmpdir_1, 'source')
+      link_path = os.path.join(tmpdir_1, 'link')
+      touch(link_path)
+      relative_symlink(source, link_path)
+
+  def test_relative_symlink_exception_on_existing_dir(self):
+    # This historically was an uncaught exception, the tested behavior is to begin catching the error.
+    with temporary_dir() as tmpdir_1:
+      source = os.path.join(tmpdir_1, 'source')
+      link_path = os.path.join(tmpdir_1, 'link')
+
+      safe_mkdir(link_path)
+      with self.assertRaisesRegexp(ValueError, r'Path for link.*overwrite an existing directory*'):
+        relative_symlink(source, link_path)
+
   def test_get_basedir(self):
     self.assertEquals(get_basedir('foo/bar/baz'), 'foo')
     self.assertEquals(get_basedir('/foo/bar/baz'), '')
@@ -222,7 +264,7 @@ class DirutilTest(unittest.TestCase):
       self.assertFalse(os.path.exists(expected_file))
       self.assertTrue(os.path.exists(os.path.dirname(expected_file)))
 
-  def test_safe_concurrent_creation_exception_still_renames(self):
+  def test_safe_concurrent_creation_exception_handling(self):
     with temporary_dir() as td:
       expected_file = os.path.join(td, 'expected_file')
 
@@ -233,7 +275,7 @@ class DirutilTest(unittest.TestCase):
           raise ZeroDivisionError('zomg')
 
       self.assertFalse(os.path.exists(safe_path))
-      self.assertTrue(os.path.exists(expected_file))
+      self.assertFalse(os.path.exists(expected_file))
 
   def test_safe_rm_oldest_items_in_dir(self):
     with temporary_dir() as td:
@@ -278,6 +320,18 @@ class DirutilTest(unittest.TestCase):
       safe_rm_oldest_items_in_dir(td, 1)
       touch(os.path.join(td, 'file1'))
       self.assertEqual(len(os.listdir(td)), 1)
+
+  def test_safe_rmtree_link(self):
+    with temporary_dir() as td:
+      real = os.path.join(td, 'real')
+      link = os.path.join(td, 'link')
+      os.mkdir(real)
+      os.symlink(real, link)
+      self.assertTrue(os.path.exists(real))
+      self.assertTrue(os.path.exists(link))
+      safe_rmtree(link);
+      self.assertTrue(os.path.exists(real))
+      self.assertFalse(os.path.exists(link))
 
 
 class AbsoluteSymlinkTest(unittest.TestCase):

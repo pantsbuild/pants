@@ -11,10 +11,11 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
-from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.jvm_binary_task import JvmBinaryTask
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.deprecated import deprecated_conditional
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.fs import archive
 from pants.util.dirutil import absolute_symlink, safe_mkdir, safe_mkdir_for
@@ -55,6 +56,11 @@ class BundleCreate(JvmBinaryTask):
   @classmethod
   def implementation_version(cls):
     return super(BundleCreate, cls).implementation_version() + [('BundleCreate', 1)]
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(BundleCreate, cls).prepare(options, round_manager)
+    round_manager.require_data('consolidated_classpath')
 
   @classmethod
   def product_types(cls):
@@ -119,19 +125,6 @@ class BundleCreate(JvmBinaryTask):
     self.context.log.debug('created {}'.format(os.path.relpath(path, get_buildroot())))
 
   def execute(self):
-    # NB(peiyu): performance hack to convert loose directories in classpath into jars. This is
-    # more efficient than loading them as individual files.
-    runtime_classpath = self.context.products.get_data('runtime_classpath')
-
-    # TODO (from mateor) The consolidate classpath is something that we could do earlier in the
-    # pipeline and it would be nice to just add those unpacked classed to a product and get the
-    # consolidated classpath for free.
-    targets_to_consolidate = self.find_consolidate_classpath_candidates(
-      runtime_classpath,
-      self.context.targets(**self._target_closure_kwargs),
-    )
-    self.consolidate_classpath(targets_to_consolidate, runtime_classpath)
-
     targets_to_bundle = self.context.targets(self.App.is_app)
 
     if self.get_options().use_basename_prefix:
@@ -177,7 +170,6 @@ class BundleCreate(JvmBinaryTask):
 
     The bundle will contain the target classes, dependencies and resources.
     """
-
     assert(isinstance(app, BundleCreate.App))
 
     bundle_dir = self._get_bundle_dir(app, results_dir)
@@ -192,9 +184,9 @@ class BundleCreate(JvmBinaryTask):
     lib_dir = os.path.join(bundle_dir, self.LIBS_DIR)
     if not app.deployjar:
       os.mkdir(lib_dir)
-      runtime_classpath = self.context.products.get_data('runtime_classpath')
-      classpath.update(ClasspathUtil.create_canonical_classpath(
-        runtime_classpath,
+      consolidated_classpath = self.context.products.get_data('consolidated_classpath')
+      classpath.update(ClasspathProducts.create_canonical_classpath(
+        consolidated_classpath,
         app.target.closure(bfs=True, **self._target_closure_kwargs),
         lib_dir,
         internal_classpath_only=False,
@@ -216,46 +208,56 @@ class BundleCreate(JvmBinaryTask):
         # TODO run in parallel to speed up
         self.shade_jar(shading_rules=app.binary.shading_rules, jar_path=jar_path)
 
-    for bundle in app.bundles:
-      for path, relpath in bundle.filemap.items():
-        bundle_path = os.path.join(bundle_dir, relpath)
-        if not os.path.exists(path):
-          raise TaskError('Given path: {} does not exist in target {}'.format(
-            path, app.address.spec))
-        safe_mkdir(os.path.dirname(bundle_path))
-        os.symlink(path, bundle_path)
+    self._symlink_bundles(app, bundle_dir)
 
     return bundle_dir
 
-  def consolidate_classpath(self, targets, classpath_products):
-    """Convert loose directories in classpath_products into jars. """
+  def _symlink_bundles(self, app, bundle_dir):
+    """For each bundle in the given app, symlinks relevant matched paths from shortest to longest.
 
-    with self.invalidated(targets=targets, invalidate_dependents=True) as invalidation:
-      for vt in invalidation.all_vts:
-        entries = classpath_products.get_internal_classpath_entries_for_targets([vt.target])
-        for index, (conf, entry) in enumerate(entries):
-          if ClasspathUtil.is_dir(entry.path):
-            jarpath = os.path.join(vt.results_dir, 'output-{}.jar'.format(index))
+    Validates that at least one path was matched by a bundle, and (temporarily: see the
+    deprecation) symlinks matched directories to recursively include their contents.
+    """
+    for bundle_counter, bundle in enumerate(app.bundles):
+      file_count = 0
+      dir_count = 0
+      # Create in ascending path-length order to ensure that symlinks to directories
+      # are created before their contents would be. Can remove ordering along with the
+      # 'recursive inclusion' deprecation (when only files and not directories are
+      # symlinked).
+      for path, relpath in sorted(bundle.filemap.items(), key=lambda e: len(e[0])):
+        bundle_path = os.path.join(bundle_dir, relpath)
+        if os.path.isfile(path):
+          file_count += 1
+        elif os.path.isdir(path):
+          dir_count += 1
+        else:
+          continue
+        if os.path.exists(bundle_path):
+          continue
+        safe_mkdir(os.path.dirname(bundle_path))
+        os.symlink(path, bundle_path)
 
-            # regenerate artifact for invalid vts
-            if not vt.valid:
-              with self.open_jar(jarpath, overwrite=True, compressed=False) as jar:
-                jar.write(entry.path)
+      if file_count == 0 and dir_count == 0:
+        raise TargetDefinitionException(app.target,
+                                        'Bundle index {} of "bundles" field '
+                                        'does not match any files.'.format(bundle_counter))
 
-            # replace directory classpath entry with its jarpath
-            classpath_products.remove_for_target(vt.target, [(conf, entry.path)])
-            classpath_products.add_for_target(vt.target, [(conf, jarpath)])
-
-  def find_consolidate_classpath_candidates(self, classpath_products, targets):
-    targets_with_directory_in_classpath = []
-    for target in targets:
-      entries = classpath_products.get_internal_classpath_entries_for_targets([target])
-      for conf, entry in entries:
-        if ClasspathUtil.is_dir(entry.path):
-          targets_with_directory_in_classpath.append(target)
-          break
-
-    return targets_with_directory_in_classpath
+      if dir_count == 1 and file_count == 0:
+        # When this deprecation finishes, we should remove symlinking of directories into the
+        # bundle (which implicitly includes their contents), and instead create them using mkdir.
+        spec = os.path.relpath(bundle.filemap.keys()[0], get_buildroot())
+        deprecated_conditional(
+            lambda: True,
+            '1.5.0.dev0',
+            'default recursive inclusion of files in directory',
+            'The bundle filespec `{spec}` corresponds to exactly one directory: if you\'d like to '
+            'continue to recursively include directory contents in future versions, please switch '
+            'to a recursive glob like `{fixed_spec}`.'.format(
+              spec=spec,
+              fixed_spec=os.path.join(spec, '**', '*'),
+            )
+        )
 
   def check_basename_conflicts(self, targets):
     """Apps' basenames are used as bundle directory names. Ensure they are all unique."""

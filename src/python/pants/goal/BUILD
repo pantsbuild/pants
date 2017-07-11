@@ -22,6 +22,7 @@ python_library(
   name = 'artifact_cache_stats',
   sources = ['artifact_cache_stats.py'],
   dependencies = [
+    'src/python/pants/cache',
     'src/python/pants/util:dirutil',
   ]
 )
@@ -53,7 +54,6 @@ python_library(
 # However the targets in this BUILD file (and elsewhere) are probably too fine-grained anyway, so
 # we may just solve this possible confusion by refactoring out some stuff and unifying the rest.
 python_library(
-  name = 'goal',
   sources = ['goal.py'],
   dependencies = [
     ':error',

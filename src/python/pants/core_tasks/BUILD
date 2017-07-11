@@ -2,12 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='core_tasks',
-  sources=globs('*.py'),
-  resource_targets=[':templates',],
   dependencies=[
+    ':templates',
     '3rdparty/python:ansicolors',
     '3rdparty/python:setuptools',
+    '3rdparty/python:packaging',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
@@ -20,7 +19,6 @@ python_library(
     'src/python/pants/help',
     'src/python/pants/option',
     'src/python/pants/pantsd:process_manager',
-    'src/python/pants/pantsd/subsystem:pants_daemon_launcher',
     'src/python/pants/reporting',
     'src/python/pants/source',
     'src/python/pants/task',

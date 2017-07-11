@@ -17,6 +17,31 @@ java_library(
 )
 
 java_library(
+  name='normal',
+  sources=['NormalWarning.java']
+)
+
+java_library(
+  name='high',
+  sources=['HighWarning.java']
+)
+
+java_library(
+  name='no_sources',
+  sources=[],
+  dependencies=[
+    ':low',
+    ':normal',
+    ':high',
+  ]
+)
+
+target(
   name='all',
-  sources=['AllWarnings.java']
+  dependencies=[
+    ':none',
+    ':low',
+    ':normal',
+    ':high',
+  ]
 )

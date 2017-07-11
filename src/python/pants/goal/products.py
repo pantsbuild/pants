@@ -407,6 +407,22 @@ class Products(object):
     """
     return typename in self.required_data_products
 
+  def register_data(self, typename, value):
+    """Registers a data product, raising if a product was already registered.
+
+    :API: public
+
+    :param typename: The type of product to register a value for.
+    :param value: The data product to register under `typename`.
+    :returns: The registered `value`.
+    :raises: :class:`ProductError` if a value for the given product `typename` is already
+             registered.
+    """
+    if typename in self.data_products:
+      raise ProductError('Already have a product registered for {}, cannot over-write with {}'
+                         .format(typename, value))
+    return self.safe_create_data(typename, lambda: value)
+
   def safe_create_data(self, typename, init_func):
     """Ensures that a data item is created if it doesn't already exist.
 
@@ -416,12 +432,13 @@ class Products(object):
     return self.get_data(typename, init_func)
 
   def get_data(self, typename, init_func=None):
-    """ Returns a data product.
+    """Returns a data product.
 
     :API: public
 
     If the product isn't found, returns None, unless init_func is set, in which case the product's
-    value is set to the return value of init_func(), and returned."""
+    value is set to the return value of init_func(), and returned.
+    """
     if typename not in self.data_products:
       if not init_func:
         return None

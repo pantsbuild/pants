@@ -9,12 +9,12 @@ import logging
 from collections import defaultdict
 from textwrap import dedent
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.revision import Revision
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 
@@ -318,8 +318,8 @@ class JarDependencyManagementSetup(Task):
       )
 
   @classmethod
-  def global_subsystems(cls):
-    return (JarDependencyManagement,)
+  def subsystem_dependencies(cls):
+    return super(JarDependencyManagementSetup, cls).subsystem_dependencies() + (JarDependencyManagement,)
 
   def execute(self):
     self._resolve_default_target()

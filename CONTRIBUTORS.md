@@ -1,6 +1,7 @@
-Created by running `build-support/bin/contributors.sh`.
+Created by running `./build-support/bin/contributors.sh`.
 
 + Aaron Mitchell
++ Adam Chainz
 + Alan Paulin
 + Alexander Johnson
 + Alyssa Pohahau
@@ -9,9 +10,11 @@ Created by running `build-support/bin/contributors.sh`.
 + Antoine Tollenaere
 + Benjy Weinberger
 + Bill Farner
++ Brandon Milton
 + Brian Larson
 + Brian Wickman
 + Bruno Bieth
++ Caitie McCaffrey
 + Chris Aniszczyk
 + Chris Burroughs
 + Chris Chen
@@ -24,18 +27,24 @@ Created by running `build-support/bin/contributors.sh`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Dave Brewster
 + David Taylor
 + David Turner
++ Derek Young
 + Divij Rajkumar
 + Dominic Hamon
++ Dorothy Ordogh
++ Drew Rothstein
 + Dumitru Daniliuc
 + Ebube Chuba
 + Emily Caveness
 + Eric Ayers
 + Eric Danielson
 + Eric Lindvall
++ Eugene Burmako
 + Evan Jones
 + Fedor Korotkov
++ Fiona Condone
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
@@ -47,9 +56,13 @@ Created by running `build-support/bin/contributors.sh`.
 + Ity Kaul
 + Jackson Davis
 + Jake Donham
++ James Bench
++ James Koch
 + James Mouradian
 + Jason Jackson
++ Jason Song
 + Jeff Jenkins
++ Jeremy Hintz
 + Jessica Rosenfield
 + Jin Feng
 + Joe Crobak
@@ -63,15 +76,18 @@ Created by running `build-support/bin/contributors.sh`.
 + John Townsend
 + Jon Boulle
 + Jonathan Coveney
++ Jonathan D. Simms
 + Jonathan Sokolowski
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec
 + Karin Lundberg
 + Ken Kawamoto
++ Kevin Oliver
 + Kevin Sweeney
 + Kris Wilson
 + Kushal Dave
++ Kyle Derr
 + Larry Hosken
 + Lei Wang
 + Leo Kim
@@ -81,33 +97,42 @@ Created by running `build-support/bin/contributors.sh`.
 + Marc Abramowitz
 + Marius Eriksen
 + Mark Chu-Carroll
++ Mark Davis
 + Mark McBride
 + Mateo Rodriguez
 + Mathew Jennings
++ Matt Dee
 + Matt Landis
 + Matt Olsen
 + Matthew Jeffryes
 + Maxim Khutornenko
 + Michael Doherty
++ Mike Cripps
 + Mike Lindsey
 + Misho Krastev
 + Moses Nakamura
++ Nadav Samet
 + Neil Sanchala
++ Nicholas Santos
 + Nick Howard
 + Nik Shkrob
 + Nitay Joffe
++ Ny Saechao
 + Oliver Gould
++ Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas
 + Peiyu Wang
 + Peter Seibel
 + Qicheng Ma
++ Roger Jiang
 + Ryan Williams
 + Sameer Brenn
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
 + Simeon Franklin
++ Stefan Sauer
 + Stu Hood
 + Tansy Arron-Walker
 + Ted Dziuba
@@ -120,8 +145,10 @@ Created by running `build-support/bin/contributors.sh`.
 + Tom Dyas
 + Tom Howland
 + Travis Crawford
++ Troy Howard
 + Ugo Di Girolamo
 + Wei An
 + Wolfram Arnold
++ Xaelias
 + Yi Cheng
 + Yujie Chen

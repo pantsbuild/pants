@@ -9,12 +9,11 @@ import os
 import re
 import subprocess
 
-from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from twitter.common.collections import OrderedSet
@@ -38,17 +37,8 @@ class GoThriftGen(SimpleCodegenTask):
              help='Use this thrift import on symbolic defs.')
 
   @classmethod
-  def global_subsystems(cls):
-    return super(GoThriftGen, cls).global_subsystems() + (ThriftDefaults,)
-
-  @classmethod
-  def task_subsystems(cls):
-    return super(GoThriftGen, cls).task_subsystems() + (ThriftBinary.Factory,)
-
-  @classmethod
   def subsystem_dependencies(cls):
-    return (super(GoThriftGen, cls).subsystem_dependencies() +
-            (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
+    return super(GoThriftGen, cls).subsystem_dependencies() + (ThriftBinary.Factory.scoped(cls),)
 
   @memoized_property
   def _thrift_binary(self):
@@ -63,7 +53,7 @@ class GoThriftGen(SimpleCodegenTask):
 
   @memoized_property
   def _service_deps(self):
-    service_deps = self.get_options().service_deps
+    service_deps = self.get_options().get('service_deps')
     return list(self.resolve_deps(service_deps)) if service_deps else self._deps
 
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')

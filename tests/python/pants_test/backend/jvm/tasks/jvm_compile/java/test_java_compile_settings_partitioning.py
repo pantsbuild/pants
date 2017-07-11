@@ -13,10 +13,11 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.revision import Revision
 from pants.java.distribution.distribution import DistributionLocator
+from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.java.distribution.test_distribution import EXE, distribution
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -26,12 +27,12 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
   def task_type(cls):
     return ZincCompile
 
-  def _java(self, name, platform=None, deps=None, sources=None):
+  def _java(self, name, platform=None, deps=None):
     return self.make_target(spec='java:{}'.format(name),
                             target_type=JavaLibrary,
                             platform=platform,
                             dependencies=deps or [],
-                            sources=sources)
+                            sources=[])
 
   def _platforms(self, *versions):
     return {str(v): {'source': str(v)} for v in versions}
@@ -165,6 +166,7 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
                         JvmPlatformSettings('1.6', '1.6', ['-Xfoo:bar']))
 
   def test_java_home_extraction(self):
+    init_subsystem(DistributionLocator)
     _, source, _, target, foo, bar, composite, single = tuple(ZincCompile._get_zinc_arguments(
       JvmPlatformSettings('1.7', '1.7', [
         'foo', 'bar', 'foo:$JAVA_HOME/bar:$JAVA_HOME/foobar', '$JAVA_HOME',
@@ -217,15 +219,15 @@ class JavaCompileSettingsPartitioningTest(TaskTestBase):
       """
       with fake_distributions(versions) as paths:
         path_options = {
-          'jvm-distributions': {
+          DistributionLocator.options_scope: {
             'paths': {
               os_name: paths,
             }
           }
         }
-        with subsystem_instance(DistributionLocator, **path_options) as locator:
-          yield paths
-          locator._reset()
+        Subsystem.reset()
+        init_subsystem(DistributionLocator, options=path_options)
+        yield paths
 
     # Completely missing a usable distribution.
     with fake_distribution_locator(far_future_version):

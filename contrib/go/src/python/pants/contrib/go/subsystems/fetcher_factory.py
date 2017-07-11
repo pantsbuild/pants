@@ -68,11 +68,6 @@ class FetcherFactory(Subsystem):
                   "'master' for git.\n"
                   "2. An integer indicating the number of leading path components to strip from "
                   "files upacked from the archive.")
-    register('--prefixes', metavar='<paths>', type=list, advanced=True,
-             fromfile=True, default=[],
-             removal_version='1.2.0',
-             removal_hint='Remove this option from pants.ini.  It does nothing now.',
-             help="Does nothing.")
 
   def get_fetcher(self, import_path):
     for matcher, unexpanded_url_info in self._matchers:

@@ -37,21 +37,38 @@ class BuildFileParserBasicsTest(BaseTest):
   def create_buildfile(self, path):
     return BuildFile(FileSystemProjectTree(self.build_root), path)
 
+  def assert_parser_error(self, build_file, err_string):
+    with self.assertRaises(BuildFileParser.BuildFileParserError) as ctx:
+      self.build_file_parser.parse_build_file(build_file)
+    self.assertIn(err_string, str(ctx.exception))
+
+  def test_name_injection(self):
+    # Target with no name is fine: target gets name of directory.
+    self.add_to_build_file('foo/bar/BUILD', '\njava_library()\n')
+    build_file = self.create_buildfile('foo/bar/BUILD')
+    addresses = list(self.build_file_parser.parse_build_file(build_file).keys())
+    self.assertEqual(1, len(addresses))
+    self.assertEqual('bar', addresses[0].target_name)
+
+    # Two targets with no name in the same BUILD file cause an error.
+    self.add_to_build_file('foo/bar/BUILD', '\njvm_binary()\n')
+    self.assert_parser_error(build_file, "defines address 'bar' more than once")
+
+    # Test that omitting the name in a target at the build root is disallowed.
+    self.add_to_build_file('BUILD', '\njava_library()\n')
+    build_file = self.create_buildfile('BUILD')
+    self.assert_parser_error(build_file,
+                             "Targets in root-level BUILD files must be named explicitly")
+
   def test_addressable_exceptions(self):
-    self.add_to_build_file('a/BUILD', 'target()')
-    build_file_a = self.create_buildfile('a/BUILD')
-
-    with self.assertRaises(BuildFileParser.ExecuteError):
-      self.build_file_parser.parse_build_file(build_file_a)
-
-    self.add_to_build_file('b/BUILD', 'target(name="foo", "bad_arg")')
+    self.add_to_build_file('b/BUILD', 'java_library(name="foo", "bad_arg")')
     build_file_b = self.create_buildfile('b/BUILD')
-    with self.assertRaises(BuildFileParser.BuildFileParserError):
-      self.build_file_parser.parse_build_file(build_file_b)
+    self.assert_parser_error(build_file_b,
+                             'non-keyword arg after keyword arg')
 
     self.add_to_build_file('d/BUILD', dedent(
       """
-      target(
+      java_library(
         name="foo",
         dependencies=[
           object(),
@@ -60,8 +77,8 @@ class BuildFileParserBasicsTest(BaseTest):
       """
     ))
     build_file_d = self.create_buildfile('d/BUILD')
-    with self.assertRaises(BuildFileParser.BuildFileParserError):
-      self.build_file_parser.parse_build_file(build_file_d)
+    self.assert_parser_error(build_file_d,
+                             'dependencies passed to Target constructors must be strings')
 
   def test_noop_parse(self):
     self.add_to_build_file('BUILD', '')
@@ -80,8 +97,7 @@ class BuildFileParserBasicsTest(BaseTest):
       """
     )))
     build_file = self.create_buildfile('BUILD')
-    with self.assertRaises(BuildFileParser.BuildFileParserError):
-      self.build_file_parser.parse_build_file(build_file)
+    self.assert_parser_error(build_file, 'invalid syntax')
 
   def test_unicode_string_in_build_file(self):
     """Demonstrates that a string containing unicode should work in a BUILD file."""
@@ -112,7 +128,7 @@ class BuildFileParserTargetTest(BaseTest):
 
     self.assertEqual(len(address_map), 1)
     address, proxy = address_map.popitem()
-    self.assertEqual(address, BuildFileAddress(build_file, 'foozle'))
+    self.assertEqual(address, BuildFileAddress(build_file=build_file, target_name='foozle'))
     self.assertEqual(proxy.addressed_name, 'foozle')
     self.assertEqual(proxy.addressed_type, ErrorTarget)
 
@@ -145,8 +161,8 @@ class BuildFileParserTargetTest(BaseTest):
     address_map = self.build_file_parser.address_map_from_build_files(
       BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), "."))
     addresses = address_map.keys()
-    self.assertEqual({bar_build_file, base_build_file, foo_build_file},
-                     set([address.build_file for address in addresses]))
+    self.assertEqual({bar_build_file.relpath, base_build_file.relpath, foo_build_file.relpath},
+                     set([address.rel_path for address in addresses]))
     self.assertEqual({'//:base', '//:foo', '//:bat'},
                      set([address.spec for address in addresses]))
 

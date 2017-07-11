@@ -13,7 +13,6 @@ import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -29,6 +28,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.option.errors import OptionsError
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
@@ -198,7 +198,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
         'id': current_target.id,
         'target_type': get_target_type(current_target),
         # NB: is_code_gen should be removed when export format advances to 1.1.0 or higher
-        'is_code_gen': current_target.is_codegen,
+        'is_code_gen': current_target.is_synthetic,
         'is_synthetic': current_target.is_synthetic,
         'pants_target_type': self._get_pants_target_alias(type(current_target)),
       }
@@ -229,7 +229,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
         """
         :type jar_lib: :class:`pants.backend.jvm.targets.jar_library.JarLibrary`
         :rtype: :class:`collections.Iterator` of
-                :class:`pants.backend.jvm.jar_dependency_utils.M2Coordinate`
+                :class:`pants.java.jar.M2Coordinate`
         """
         if classpath_products:
           jar_products = classpath_products.get_artifact_classpath_entries_for_targets((jar_lib,))

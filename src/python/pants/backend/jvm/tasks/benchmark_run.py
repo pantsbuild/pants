@@ -9,13 +9,13 @@ import os
 import shutil
 
 from pants.backend.jvm.targets.benchmark import Benchmark
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
+from pants.java.jar.jar_dependency import JarDependency
 from pants.java.util import execute_java
 
 
@@ -50,8 +50,8 @@ class BenchmarkRun(JvmToolTaskMixin, JvmTask):
                           classpath_spec='//:benchmark-java-allocation-instrumenter-2.1')
 
   @classmethod
-  def global_subsystems(cls):
-    return super(BenchmarkRun, cls).global_subsystems() + (DistributionLocator,)
+  def subsystem_dependencies(cls):
+    return super(BenchmarkRun, cls).subsystem_dependencies() + (DistributionLocator,)
 
   def __init__(self, *args, **kwargs):
     super(BenchmarkRun, self).__init__(*args, **kwargs)

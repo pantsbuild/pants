@@ -33,7 +33,6 @@ python_library(
     'contrib/android/src/python/pants/contrib/android/tasks:aapt_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
-    'src/python/pants/util:dirutil',
   ],
 )
 
@@ -97,7 +96,7 @@ python_library(
     'contrib/android/src/python/pants/contrib/android/targets:android',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:jar_import_products',
-    'src/python/pants/backend/jvm:jar_dependency_utils',
+    'src/python/pants/java/jar',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/build_graph',

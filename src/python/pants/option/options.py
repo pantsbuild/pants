@@ -265,7 +265,7 @@ class Options(object):
   def walk_parsers(self, callback):
     self._parser_hierarchy.walk(callback)
 
-  def for_scope(self, scope):
+  def for_scope(self, scope, inherit_from_enclosing_scope=True):
     """Return the option values for the given scope.
 
     Values are attributes of the returned object, e.g., options.foo.
@@ -278,7 +278,7 @@ class Options(object):
       return self._values_by_scope[scope]
 
     # First get enclosing scope's option values, if any.
-    if scope == GLOBAL_SCOPE:
+    if scope == GLOBAL_SCOPE or not inherit_from_enclosing_scope:
       values = OptionValueContainer()
     else:
       values = copy.copy(self.for_scope(enclosing_scope(scope)))
@@ -287,22 +287,25 @@ class Options(object):
     flags_in_scope = self._scope_to_flags.get(scope, [])
     self._parser_hierarchy.get_parser_by_scope(scope).parse_args(flags_in_scope, values)
 
-    # If we're the new name of a deprecated scope, also get values from that scope (but we
-    # take precedence).
+    # If we're the new name of a deprecated scope, also get values from that scope.
     deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
     # Note that deprecated_scope and scope share the same Optionable class, so deprecated_scope's
     # Optionable has a deprecated_options_scope equal to deprecated_scope. Therefore we must
     # check that scope != deprecated_scope to prevent infinite recursion.
     if deprecated_scope is not None and scope != deprecated_scope:
-      deprecated_vals = self.for_scope(deprecated_scope)
-      explicit_keys = deprecated_vals.get_explicit_keys()
+      # Do the deprecation check only on keys that were explicitly set on the deprecated scope
+      # (and not on its enclosing scopes).
+      explicit_keys = self.for_scope(deprecated_scope,
+                                     inherit_from_enclosing_scope=False).get_explicit_keys()
       if explicit_keys:
         warn_or_error(self.known_scope_to_info[scope].deprecated_scope_removal_version,
                       'scope {}'.format(deprecated_scope),
                       'Use scope {} instead (options: {})'.format(scope, ', '.join(explicit_keys)))
+        # Update our values with those of the deprecated scope (now including values inherited
+        # from its enclosing scope).
         # Note that a deprecated val will take precedence over a val of equal rank.
         # This makes the code a bit neater.
-        values.update(deprecated_vals)
+        values.update(self.for_scope(deprecated_scope))
 
     # Record the value derivation.
     for option in values:

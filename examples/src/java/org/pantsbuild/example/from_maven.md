@@ -108,3 +108,29 @@ jvm_binary(name='your-bin',
               Duplicate('^META-INF/services/', Duplicate.CONCAT_TEXT)
           ]))
 ```
+
+**Dependency Scopes**<br>
+
+Pants supports dependency scopes. To emulate Maven's `provided` scope you
+can specify both the `compile` and `test` scopes for a target. For details,
+see [[JVM Projects with Pants|pants('examples/src/java/org/pantsbuild/example:readme')]].
+
+Maven
+```xml
+<dependency>
+  <groupId>org.apache.spark</groupId>
+  <artifactId>spark-core_2.11</artifactId>
+  <scope>provided</scope>
+</dependency>
+```
+
+Pants
+```python
+jar_library(
+  name='spark-core',
+  jars=[
+    scala_jar(org='org.apache.spark', name='spark-core', rev='2.1.0'),
+  ],
+  scope='compile test',
+)
+```

@@ -9,31 +9,30 @@ from collections import namedtuple
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 
 
 # full_version - the full scala version to use.
-# style_version - the version of org.scalastyle.scalastyle to use.
-major_version_info = namedtuple('major_version_info', ['full_version', 'style_version'])
+major_version_info = namedtuple('major_version_info', ['full_version'])
 
 
 # Note that the compiler has two roles here: as a tool (invoked by the compile task), and as a
 # runtime library (when compiling plugins, which require the compiler library as a dependency).
 scala_build_info = {
-  '2.10':
-    major_version_info(
-      full_version='2.10.4',
-      style_version='0.3.2'),
-  '2.11':
-    major_version_info(
-      full_version='2.11.7',
-      style_version='0.8.0'),
+  '2.10': major_version_info(full_version='2.10.6'),
+  '2.11': major_version_info(full_version='2.11.11'),
+  '2.12': major_version_info(full_version='2.12.2'),
 }
 
 
+# Because scalastyle inspects only the sources, it needn't match the platform version.
+scala_style_jar = JarDependency('org.scalastyle', 'scalastyle_2.11', '0.8.0')
+
+
+# TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
 class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """A scala platform.
 
@@ -75,7 +74,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
         jline_dep = JarDependency(
             org = 'org.scala-lang',
             name = 'jline',
-            rev = scala_build_info['2.10'].full_version
+            rev = scala_build_info[version].full_version
         )
         classpath.append(jline_dep)
       cls.register_jvm_tool(register,
@@ -83,23 +82,21 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
                             classpath=classpath)
 
     def register_style_tool(version):
-      # Note: Since we can't use ScalaJarDependency without creating a import loop we need to
-      # specify the version info in the name.
-      style_version = scala_build_info[version].style_version
-      jardep = JarDependency('org.scalastyle', 'scalastyle_{}'.format(version), style_version)
       cls.register_jvm_tool(register,
                             cls._key_for_tool_version('scalastyle', version),
-                            classpath=[jardep])
+                            classpath=[scala_style_jar])
 
     super(ScalaPlatform, cls).register_options(register)
-    register('--version', advanced=True, default='2.10',
-             choices=['2.10', '2.11', 'custom'], fingerprint=True,
+    register('--version', advanced=True, default='2.12',
+             choices=['2.10', '2.11', '2.12', 'custom'], fingerprint=True,
              help='The scala platform version. If --version=custom, the targets '
                   '//:scala-library, //:scalac, //:scala-repl and //:scalastyle will be used, '
                   'and must exist.  Otherwise, defaults for the specified version will be used.')
 
     register('--suffix-version', advanced=True, default=None,
-             help='Scala suffix to be used when a custom version is specified.  For example 2.10.')
+             help='Scala suffix to be used in `scala_jar` definitions. For example, specifying '
+                  '`2.11` or `2.12.0-RC1` would cause `scala_jar` lookups for artifacts with '
+                  'those suffixes.')
 
     # Register the fixed version tools.
     register_scala_compiler_tool('2.10')
@@ -109,6 +106,10 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     register_scala_compiler_tool('2.11')
     register_scala_repl_tool('2.11')
     register_style_tool('2.11')
+
+    register_scala_compiler_tool('2.12')
+    register_scala_repl_tool('2.12')
+    register_style_tool('2.12')
 
     # Register the custom tools. We provide a dummy classpath, so that register_jvm_tool won't
     # require that a target with the given spec actually exist (not everyone will define custom
@@ -148,7 +149,7 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
       if suffix:
         return '{0}_{1}'.format(name, suffix)
       else:
-        raise RuntimeError('Suffix version must be specified if using a custom scala version.'
+        raise RuntimeError('Suffix version must be specified if using a custom scala version. '
                            'Suffix version is used for bootstrapping jars.  If a custom '
                            'scala version is not specified, then the version specified in '
                            '--scala-platform-suffix-version is used.  For example for Scala '
@@ -164,38 +165,33 @@ class ScalaPlatform(JvmToolMixin, ZincLanguageMixin, Subsystem):
     """Return the repl tool key."""
     return self._key_for_tool_version('scala-repl', self.version)
 
-  @classmethod
-  def compiler_library_target_spec(cls, buildgraph):
-    """Returns a target spec for the scala compiler library.
-
-    Synthesizes one into the buildgraph if necessary.
-
-    :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
-    :return a target spec:
-    """
-    return cls.global_instance()._library_target_spec(buildgraph, 'scalac',
-                                                      cls._create_compiler_jardep)
-
-  @classmethod
-  def runtime_library_target_spec(cls, buildgraph):
-    """Returns a target spec for the scala runtime library.
-
-    Synthesizes one into the buildgraph if necessary.
-
-    :param pants.build_graph.build_graph.BuildGraph buildgraph: buildgraph object.
-    :return a target spec:
-    """
-    return cls.global_instance()._library_target_spec(buildgraph, 'scala-library',
-                                                      cls._create_runtime_jardep)
-
-  def _library_target_spec(self, buildgraph, key, create_jardep_func):
+  def injectables(self, build_graph):
     if self.version == 'custom':
-      return '//:{}'.format(key)
-    else:
-      synthetic_address = Address.parse('//:{}-synthetic'.format(key))
-      if not buildgraph.contains_address(synthetic_address):
+      return
+
+    specs_to_create = [
+      ('scalac', self._create_compiler_jardep),
+      ('scala-library', self._create_runtime_jardep)
+    ]
+
+    for spec_key, create_jardep_func in specs_to_create:
+      spec = self.injectables_spec_for_key(spec_key)
+      target_address = Address.parse(spec)
+      if not build_graph.contains_address(target_address):
         jars = [create_jardep_func(self.version)]
-        buildgraph.inject_synthetic_target(synthetic_address, JarLibrary, jars=jars, scope='forced')
-      elif not buildgraph.get_target(synthetic_address).is_synthetic:
-        raise buildgraph.ManualSyntheticTargetError(synthetic_address)
-      return buildgraph.get_target(synthetic_address).address.spec
+        build_graph.inject_synthetic_target(target_address,
+                                           JarLibrary,
+                                           jars=jars,
+                                           scope='forced')
+      elif not build_graph.get_target(target_address).is_synthetic:
+        raise build_graph.ManualSyntheticTargetError(target_address)
+
+  @property
+  def injectables_spec_mapping(self):
+    maybe_suffix = '' if self.version == 'custom' else '-synthetic'
+    return {
+      # Target spec for the scala compiler library.
+      'scalac': ['//:scalac{}'.format(maybe_suffix)],
+      # Target spec for the scala runtime library.
+      'scala-library': ['//:scala-library{}'.format(maybe_suffix)]
+    }

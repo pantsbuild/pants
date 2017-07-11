@@ -19,6 +19,7 @@ import six
 
 from pants.util.dirutil import safe_open
 from pants.util.meta import AbstractClass
+from pants.util.strutil import strip_prefix
 
 
 class Fetcher(object):
@@ -144,19 +145,22 @@ class Fetcher(object):
       return self._checksum
 
   class ProgressListener(Listener):
-    """A Listener that logs progress to stdout."""
+    """A Listener that logs progress to a stream."""
 
-    def __init__(self, width=None, chunk_size_bytes=None):
+    def __init__(self, width=None, chunk_size_bytes=None, stream=None):
       """Creates a ProgressListener that logs progress for known size items with a progress bar of
       the given width in characters and otherwise logs a progress indicator every chunk_size.
 
       :param int width: the width of the progress bar for known size downloads, 50 by default.
       :param chunk_size_bytes: The size of data chunks to note progress for, 10 KB by default.
+      :param stream: A stream to write progress information to; `sys.stderr` by default.
+      :type stream: :class:`io.RawIOBase`
       """
       self._width = width or 50
       if not isinstance(self._width, six.integer_types):
         raise ValueError('The width must be an integer, given {}'.format(self._width))
       self._chunk_size_bytes = chunk_size_bytes or 10 * 1024
+      self._stream = stream or sys.stderr
       self._start = time.time()
 
     def status(self, code, content_length=None):
@@ -177,20 +181,20 @@ class Fetcher(object):
       if chunk_count > self.chunks:
         self.chunks = chunk_count
         if self.size:
-          sys.stdout.write('\r')
-          sys.stdout.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)))
-        sys.stdout.write('.' * self.chunks)
+          self._stream.write('\r')
+          self._stream.write('{:3}% '.format(int(self.read * 1.0 / self.size * 100)))
+        self._stream.write('.' * self.chunks)
         if self.size:
           size_width = len(str(self.download_size))
           downloaded = int(self.read / 1024)
-          sys.stdout.write('{} {} KB'.format(' ' * (self._width - self.chunks),
-                                         str(downloaded).rjust(size_width)))
-        sys.stdout.flush()
+          self._stream.write('{} {} KB'.format(' ' * (self._width - self.chunks),
+                                               str(downloaded).rjust(size_width)))
+        self._stream.flush()
 
     def finished(self):
       if self.chunks > 0:
-        sys.stdout.write(' {:.3f}s\n'.format(time.time() - self._start))
-        sys.stdout.flush()
+        self._stream.write(' {:.3f}s\n'.format(time.time() - self._start))
+        self._stream.flush()
 
   def __init__(self, root_dir, requests_api=None):
     """Creates a Fetcher that uses the given requests api object.
@@ -295,7 +299,7 @@ class Fetcher(object):
       self._fp.close()
 
   def _as_local_file_path(self, url):
-    path = re.sub(r'^//', '', url.lstrip('file:'))
+    path = re.sub(r'^//', '', strip_prefix(url, 'file:'))
     if path.startswith('/'):
       return path
     elif url.startswith('file:'):

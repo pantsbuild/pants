@@ -48,7 +48,12 @@ class BuildRoot(Singleton):
   def path(self):
     """Returns the build root for the current workspace."""
     if self._root_dir is None:
-      self._root_dir = os.path.realpath(self.find_buildroot())
+      # This env variable is for testing purpose.
+      override_buildroot = os.environ.get('PANTS_BUILDROOT_OVERRIDE', None)
+      if override_buildroot:
+        self._root_dir = override_buildroot
+      else:
+        self._root_dir = os.path.realpath(self.find_buildroot())
     return self._root_dir
 
   @path.setter

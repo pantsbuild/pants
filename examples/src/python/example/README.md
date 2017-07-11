@@ -137,9 +137,9 @@ Use `test` to run the tests. This uses `pytest`:
                          ============== test session starts ===============
                          platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
                          plugins: cov, timeout
-                         collected 1 items
+                         collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/greet.py .
+                         examples/tests/python/example_test/hello/greet/test_greet.py ..
 
                          ============ 1 passed in 0.02 seconds ============
 
@@ -310,7 +310,7 @@ parameters:
                          plugins: cov, timeout
                          collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/greet.py .
+                         examples/tests/python/example_test/hello/greet/test_greet.py .
 
                          ========= 1 tests deselected by '-kreq' ==========
                          ===== 1 passed, 1 deselected in 0.05 seconds =====
@@ -332,36 +332,23 @@ parameters:
 ### Code Coverage
 
 To get code coverage data, set the `--coverage` flag in `test.pytest` scope.
-If you haven't configured coverage data, it doesn't do much:
+
+The value of the flag is a comma-separated list of names of python packages or directories 
+containing code to measure coverage against.  It can also take the special value `auto`, which
+will cause Pants to attempt to deduce what to measure coverage against.
+
+This auto-deduction examines the `coverage` attribute on each `python_tests` 
+target, which should be a list of packages.  If a target has no `coverage` attribute, 
+Pants uses the package containing the test code.  This is of course only useful if the
+code under test lives in the same package as the code that tests it.
+
+If you do specify package or directory names with `--coverage`, this overrides any `coverage`
+attributes on `python_tests` targets.
+
+For example:
 
     :::bash
-    $ ./pants test.pytest --coverage=1 examples/tests/python/example_test/hello/greet:greet
-        ...lots of build output...
-                         ============ 2 passed in 0.23 seconds ============
-                         Name    Stmts   Miss  Cover
-                         ---------------------------
-                         No data to report.
-
-    14:30:36 00:04     [junit]
-    14:30:36 00:04     [specs]
-
-This uses the `python_tests.coverage` target attribute to determine what
-modules to measure coverage against for each `python_tests` target run.
-If the attribute is not present it's assumed the coverage should be
-measured over the same packages that house the test target's sources.
-This heuristic only works with parallel source and test package
-structures and reliance upon it is discouraged.
-
-There are 2 alternatives to specifying coverage attributes on all
-`python_tests` targets, but both override any existing coverage
-attributes in-play to form a global coverage specification for the test
-run.
-
-`--coverage=modules:[module1](,...,[moduleN])` allows specification of
-package or module names to track coverage against. For example:
-
-    :::bash
-    $ ./pants test.pytest --coverage=modules:example.hello.greet,example.hello.main examples/tests/python/example_test/hello/greet:greet
+    $ ./pants test.pytest --coverage=example.hello.greet,example.hello.main examples/tests/python/example_test/hello/greet
         ...lots of build output...
                      ============ 2 passed in 0.22 seconds ============
                      Name                                               Stmts   Miss Branch BrMiss  Cover
@@ -372,13 +359,11 @@ package or module names to track coverage against. For example:
                      TOTAL                                                  4      0      0      0   100%
 
 This measures coverage against all python code in `example.hello.greet` and `example.hello.main`.
-It ignores `python_library` `coverage=...` attributes.
 
-Similarly, a set of base paths can be specified containing the code for
-coverage to be measured over:
+Similarly, a list of directories can be specified (either absolute or relative to the build root):
 
     :::bash
-    $ ./pants test.pytest --coverage=paths:example/hello examples/tests/python/example_test/hello/greet:greet
+    $ ./pants test.pytest --coverage=example/hello examples/tests/python/example_test/hello/greet
         ...lots of build output...
                      ============ 2 passed in 0.23 seconds ============
                      Name                                               Stmts   Miss Branch BrMiss  Cover
@@ -388,9 +373,6 @@ coverage to be measured over:
                      examples/src/python/example/hello/greet/greet          4      0      0      0   100%
                      ------------------------------------------------------------------------------------
                      TOTAL                                                  4      0      0      0   100%
-
-Paths are relative to the source root housing the python code; for this example,
-`examples/src/python`.
 
 ### Interactive Debugging on Test Failure
 

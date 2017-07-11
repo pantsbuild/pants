@@ -6,104 +6,104 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import unittest
-from contextlib import contextmanager
 
-from pants.backend.jvm.jar_dependency_utils import M2Coordinate
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.subsystem.subsystem import Subsystem
+from pants_test.base_test import BaseTest
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
-class JarDependencyManagementTest(unittest.TestCase):
+class JarDependencyManagementTest(BaseTest):
 
   _coord_any = M2Coordinate('foobar', 'foobar')
   _coord_one = M2Coordinate('foobar', 'foobar', '1.1')
   _coord_two = M2Coordinate('foobar', 'foobar', '1.2')
 
-  @contextmanager
   def _jar_dependency_management(self, **flags):
+    Subsystem.reset()
     options = {
-      'jar-dependency-management': flags,
+      JarDependencyManagement.options_scope: flags,
     }
-    with subsystem_instance(JarDependencyManagement, **options) as manager:
-      yield manager
+    return global_subsystem_instance(JarDependencyManagement, options=options)
 
   def test_conflict_strategy_short_circuits(self):
-    with self._jar_dependency_management(conflict_strategy='FAIL') as manager:
-      manager.resolve_version_conflict(
-        direct_coord=self._coord_any,
-        managed_coord=self._coord_one,
-      )
-      manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_one,
-      )
+    manager = self._jar_dependency_management(conflict_strategy='FAIL')
+    manager.resolve_version_conflict(
+      direct_coord=self._coord_any,
+      managed_coord=self._coord_one,
+    )
+    manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_one,
+    )
 
   def test_conflict_strategy_fail(self):
-    with self._jar_dependency_management(conflict_strategy='FAIL') as manager:
-      with self.assertRaises(JarDependencyManagement.DirectManagedVersionConflict):
-        manager.resolve_version_conflict(
-          direct_coord=self._coord_one,
-          managed_coord=self._coord_two,
-        )
+    manager = self._jar_dependency_management(conflict_strategy='FAIL')
+    with self.assertRaises(JarDependencyManagement.DirectManagedVersionConflict):
+      manager.resolve_version_conflict(
+        direct_coord=self._coord_one,
+        managed_coord=self._coord_two,
+      )
 
   def test_conflict_strategy_use_direct(self):
-    with self._jar_dependency_management(conflict_strategy='USE_DIRECT') as manager:
-      self.assertEquals(self._coord_one, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-      ))
-    with self._jar_dependency_management(conflict_strategy='USE_DIRECT',
-                                     suppress_conflict_messages=True) as manager:
-      self.assertEquals(self._coord_one, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-      ))
+    manager = self._jar_dependency_management(conflict_strategy='USE_DIRECT')
+    self.assertEquals(self._coord_one, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+    ))
+    manager = self._jar_dependency_management(conflict_strategy='USE_DIRECT',
+                                              suppress_conflict_messages=True)
+    self.assertEquals(self._coord_one, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+    ))
 
   def test_conflict_strategy_use_managed(self):
-    with self._jar_dependency_management(conflict_strategy='USE_MANAGED') as manager:
-      self.assertEquals(self._coord_two, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-      ))
-    with self._jar_dependency_management(conflict_strategy='USE_MANAGED',
-                                     suppress_conflict_messages=True) as manager:
-      self.assertEquals(self._coord_two, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-      ))
+    manager = self._jar_dependency_management(conflict_strategy='USE_MANAGED')
+    self.assertEquals(self._coord_two, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+    ))
+    manager = self._jar_dependency_management(conflict_strategy='USE_MANAGED',
+                                              suppress_conflict_messages=True)
+    self.assertEquals(self._coord_two, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+    ))
 
   def test_conflict_strategy_use_forced(self):
-    with self._jar_dependency_management(conflict_strategy='USE_DIRECT_IF_FORCED') as manager:
-      self.assertEquals(self._coord_two, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-      ))
-      self.assertEquals(self._coord_one, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-        force=True,
-      ))
+    manager = self._jar_dependency_management(conflict_strategy='USE_DIRECT_IF_FORCED')
+    self.assertEquals(self._coord_two, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+    ))
+    self.assertEquals(self._coord_one, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+      force=True,
+    ))
 
   def test_conflict_strategy_use_newer(self):
-    with self._jar_dependency_management(conflict_strategy='USE_NEWER') as manager:
-      self.assertEquals(self._coord_two, manager.resolve_version_conflict(
-        direct_coord=self._coord_one,
-        managed_coord=self._coord_two,
-      ))
-      self.assertEquals(self._coord_two, manager.resolve_version_conflict(
-        direct_coord=self._coord_two,
-        managed_coord=self._coord_one,
-      ))
+    manager = self._jar_dependency_management(conflict_strategy='USE_NEWER')
+    self.assertEquals(self._coord_two, manager.resolve_version_conflict(
+      direct_coord=self._coord_one,
+      managed_coord=self._coord_two,
+    ))
+    self.assertEquals(self._coord_two, manager.resolve_version_conflict(
+      direct_coord=self._coord_two,
+      managed_coord=self._coord_one,
+    ))
 
   def test_conflict_resolution_input_validation(self):
-    with self._jar_dependency_management() as manager:
-      with self.assertRaises(ValueError):
-        manager.resolve_version_conflict(M2Coordinate('org', 'foo', '1.2'),
-                                         M2Coordinate('com', 'bar', '7.8'))
-      with self.assertRaises(ValueError):
-        manager.resolve_version_conflict(M2Coordinate('org', 'foo', '1.2'),
-                                         M2Coordinate('com', 'bar', '1.2'))
+    manager = self._jar_dependency_management()
+    with self.assertRaises(ValueError):
+      manager.resolve_version_conflict(M2Coordinate('org', 'foo', '1.2'),
+                                       M2Coordinate('com', 'bar', '7.8'))
+    with self.assertRaises(ValueError):
+      manager.resolve_version_conflict(M2Coordinate('org', 'foo', '1.2'),
+                                       M2Coordinate('com', 'bar', '1.2'))
 
 
 class PinnedJarArtifactSetTest(unittest.TestCase):

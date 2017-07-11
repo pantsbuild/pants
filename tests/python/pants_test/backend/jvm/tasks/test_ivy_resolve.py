@@ -13,8 +13,6 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -22,11 +20,13 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
 from pants.ivy.bootstrapper import Bootstrapper
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants.util.dirutil import safe_delete
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
@@ -51,7 +51,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
     context = self.context(target_roots=targets)
-    self.create_task(context).execute()
+    self.execute(context)
     return context.products.get_data('compile_classpath')
 
   #
@@ -62,7 +62,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
     jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
-    scala_lib = self.make_target('//:b', JavaLibrary)
+    scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
     # Confirm that the deps were added to the appropriate targets.
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
@@ -177,7 +177,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_jar_lib = self._make_junit_target()
 
-    excluding_target = self.make_target('//:b', JavaLibrary, excludes=[Exclude('junit', 'junit')])
+    excluding_target = self.make_target('//:b', JavaLibrary, sources=[],
+                                        excludes=[Exclude('junit', 'junit')])
     compile_classpath = self.resolve([junit_jar_lib, excluding_target])
 
     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
@@ -189,7 +190,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   @ensure_cached(IvyResolve, expected_num_artifacts=0)
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
-    target = self.make_target('//:a', JavaLibrary)
+    target = self.make_target('//:a', JavaLibrary, sources=[])
     self.assertTrue(self.resolve([target]))
 
   @ensure_cached(IvyResolve, expected_num_artifacts=1)
@@ -219,7 +220,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     junit_jar_lib = self._make_junit_target()
 
-    classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
+    task = self.prepare_execute(self.context())
+    classpath = task.ivy_classpath([junit_jar_lib])
 
     self.assertEquals(2, len(classpath))
 
@@ -228,11 +230,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
     with self._temp_workdir():
       # Initial resolve does a resolve and populates elements.
       initial_context = self.context(target_roots=[junit_jar_lib])
-      self.create_task(initial_context).execute()
+      self.execute(initial_context)
 
       # Second resolve should check files and do no ivy call.
       load_context = self.context(target_roots=[junit_jar_lib])
-      task = self.create_task(load_context)
+      task = self.prepare_execute(load_context)
 
       def fail(*arg, **kwargs):
         self.fail("Unexpected call to ivy.")
@@ -281,11 +283,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     # Initial resolve does a resolve and populates elements.
     context1 = self.context(target_roots=[junit_jar_lib])
-    self.create_task(context1).execute()
+    self.execute(context1)
 
     # Second resolve should check files and do no ivy call.
     context2 = self.context(target_roots=[junit_jar_lib])
-    task = self.create_task(context2)
+    task = self.prepare_execute(context2)
     task._do_resolve = self.fail
     task.execute()
 
@@ -347,8 +349,9 @@ class IvyResolveTest(JvmToolTaskTestBase):
       jar_with_url = JarDependency('org1', 'name1', rev='1234', url='file://{}'.format(jarfile))
       jar_lib = self.make_target('//:a', JarLibrary, jars=[jar_with_url])
 
-      with self._temp_workdir(), self._temp_ivy_cache_dir():
+      with self._temp_workdir() as workdir, self._temp_ivy_cache_dir():
         self.resolve([jar_lib])
+        ivy_resolve_workdir = self._find_resolve_workdir(workdir)
 
       with self._temp_workdir() as workdir, self._temp_ivy_cache_dir():
         fetch_classpath = self.resolve([jar_lib])
@@ -417,6 +420,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
     ivy_dir_subdirs = os.listdir(ivy_dir)
     ivy_dir_subdirs.remove('jars')  # Ignore the jars directory.
     self.assertEqual(1, len(ivy_dir_subdirs), 'There should only be the resolve directory.')
+    print('>>> got dir {}'.format(ivy_dir_subdirs))
     ivy_resolve_workdir = ivy_dir_subdirs[0]
     return os.path.join(ivy_dir, ivy_resolve_workdir)
 
@@ -488,11 +492,9 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def setUp(self):
     super(IvyResolveFingerprintStrategyTest, self).setUp()
-    self._subsystem_scope = subsystem_instance(JarDependencyManagement)
-    self._subsystem_scope.__enter__()
+    init_subsystem(JarDependencyManagement)
 
   def tearDown(self):
-    self._subsystem_scope.__exit__(None, None, None)
     super(IvyResolveFingerprintStrategyTest, self).tearDown()
 
   def set_artifact_set_for(self, managed_jar_target, artifact_set):
@@ -501,35 +503,15 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_target_target_is_none(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
+    strategy = IvyResolveFingerprintStrategy(confs)
 
     target = self.make_target(':just-target')
 
     self.assertIsNone(strategy.compute_fingerprint(target))
 
-  def test_options_included_in_fingerprint(self):
-    confs = ()
-    jar_library = self.make_target(':jar-library', target_type=JarLibrary,
-                                   jars=[JarDependency('org.some', 'name')])
-
-    self.set_options(a=True)
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
-    with_true_a = strategy.compute_fingerprint(jar_library)
-
-    self.set_options(a=False)
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
-
-    with_false_a = strategy.compute_fingerprint(jar_library)
-
-    self.assertNotEqual(with_true_a, with_false_a)
-
   def test_jvm_target_without_excludes_is_none(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
+    strategy = IvyResolveFingerprintStrategy(confs)
 
     target_without_excludes = self.make_target(':jvm-target', target_type=JvmTarget)
 
@@ -537,8 +519,7 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_jvm_target_with_excludes_is_hashed(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
+    strategy = IvyResolveFingerprintStrategy(confs)
 
     target_with_excludes = self.make_target(':jvm-target', target_type=JvmTarget,
                                                excludes=[Exclude('org.some')])
@@ -547,8 +528,7 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_jar_library_with_one_jar_is_hashed(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
+    strategy = IvyResolveFingerprintStrategy(confs)
 
     jar_library = self.make_target(':jar-library', target_type=JarLibrary,
                                    jars=[JarDependency('org.some', 'name')])
@@ -557,8 +537,7 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_identical_jar_libraries_with_same_jar_dep_management_artifacts_match(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
+    strategy = IvyResolveFingerprintStrategy(confs)
 
     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
                                artifacts=[JarDependency('org.some', 'name')])
@@ -578,8 +557,7 @@ class IvyResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_identical_jar_libraries_with_differing_managed_deps_differ(self):
     confs = ()
-    strategy = IvyResolveFingerprintStrategy(self.create_task(self.context()),
-                                             confs)
+    strategy = IvyResolveFingerprintStrategy(confs)
 
     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
                                artifacts=[JarDependency('org.some', 'name')])

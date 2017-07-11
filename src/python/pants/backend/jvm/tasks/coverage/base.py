@@ -32,14 +32,13 @@ class CoverageTaskSettings(object):
     self.coverage_html_file = os.path.join(self.coverage_dir, 'html', 'index.html')
 
   @classmethod
-  def from_task(cls, task):
-    return cls(
-      options=task.get_options(),
-      context=task.context,
-      workdir=task.workdir,
-      tool_classpath=task.tool_classpath,
-      confs=task.confs,
-      log=task.context.log)
+  def from_task(cls, task, workdir=None):
+    return cls(options=task.get_options(),
+               context=task.context,
+               workdir=workdir or task.workdir,
+               tool_classpath=task.tool_classpath,
+               confs=task.confs,
+               log=task.context.log)
 
 
 class Coverage(AbstractClass):
@@ -80,11 +79,11 @@ class Coverage(AbstractClass):
     self._safe_makedir = safe_md
 
   @abstractmethod
-  def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
+  def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
     pass
 
   @abstractmethod
-  def report(self, targets, tests, execute_java_for_targets, tests_failed_exception):
+  def report(self, targets, execute_java_for_targets, tests_failed_exception):
     pass
 
   @abstractproperty
@@ -101,7 +100,7 @@ class Coverage(AbstractClass):
 
   # Utility methods, called from subclasses
   def is_coverage_target(self, tgt):
-    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_codegen
+    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
   def initialize_instrument_classpath(self, targets, instrumentation_classpath):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific

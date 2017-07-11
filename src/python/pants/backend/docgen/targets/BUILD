@@ -3,8 +3,6 @@
 
 
 python_library(
-  name = 'targets',
-  sources = globs('*.py'),
   dependencies = [
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',

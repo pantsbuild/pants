@@ -26,8 +26,11 @@ python_tests(
   name = 'changed_target_integration',
   sources = ['test_changed_target_integration.py'],
   dependencies = [
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
     'tests/python/pants_test:int-test',
+    'tests/python/pants_test/testutils:git_util',
   ],
   tags = {'integration'},
 )

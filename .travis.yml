@@ -1,73 +1,8 @@
-# sudo required for jdk_switcher and bad openjdk6 removal on trusty image
-# in before_install step, and not for any other purpose.
-sudo: required
-
-dist: trusty
-
-language: python
-
-python:
-  - "2.7.11"
-
-# These are needed to run the Android SDK tools.
-addons:
-  apt:
-    packages:
-    - lib32stdc++6
-    - lib32z1
-    - lib32z1-dev
-    - oracle-java6-installer
-
-before_cache:
-  # Kill all python bytecode in our cached venvs.  Some files appear to
-  # get bytecode compiled in non-yet-understood circumstances leading to
-  # a full cache re-pack due to new bytecode files.
-  - find build-support -name "*.py[co]" -print -delete
-  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
-  # effect on resolution time is in the noise, but they are
-  # re-timestamped in internal comments and fields on each run and this
-  # leads to travis-ci cache thrash.  Kill these files before the cache
-  # check to avoid un-needed cache re-packing and re-upload (a ~100s
-  # operation).
-  - find $HOME/.ivy2/pants -type f -name "ivydata-*.properties" -print -delete
-  - rm -fv $HOME/.ivy2/pants/*.{css,properties,xml,xsl}
-  # We have several tests that do local file:// url resolves for
-  # com.example artifacts, these disrupt the cache but are fast since
-  # they're resolved from local files when omitted from the cache.
-  - rm -rf $HOME/.ivy2/pants/com.example
-  # The stats cache contains timestamped reports unused by CI but that
-  # thrash the cache.  Skip caching these.
-  - rm -rf $HOME/.cache/pants/stats
-
-cache:
-  directories:
-    - $HOME/.cache/pants
-    - $HOME/.ivy2/pants
-    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
-    # using its own isolated cache:
-    #   https://github.com/pantsbuild/pants/issues/2485
-    - $HOME/.npm
-    - $HOME/.android
-    - $ANDROID_SDK_INSTALL_LOCATION
-    - build-support/isort.venv
-    - build-support/pants_dev_deps.venv
-
-before_install:
-  # Remove bad openjdk6 from trusty image, so
-  # Pants will pick up oraclejdk6 from `packages` above.
-  - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-  - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-  - jdk_switcher use oraclejdk8
-
-install:
-  - pip --quiet install coveralls
-
 env:
   global:
-    - ANDROID_SDK_INSTALL_LOCATION="$HOME/opt/android-sdk-install"
-    - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
-    - CXX=g++
     - PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']"
+    - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
+    - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
     # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
     # These are encrypted with a public key for our repo that only
     # Travis-CI has the private key for.  We are trusting Travis-CI
@@ -75,36 +10,432 @@ env:
     #
     # See: http://docs.travis-ci.com/user/encryption-keys/
     - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
-  matrix:
-    - CI_FLAGS="-cjlpn 'Various pants self checks'"  # (fkmsr)
-    - CI_FLAGS="-fkmsrcn -u 0/2 'Unit tests for pants and pants-plugins - shard 1'"  # (jlp)
-    - CI_FLAGS="-fkmsrcn -u 1/2 'Unit tests for pants and pants-plugins - shard 2'"
-    - CI_FLAGS="-fkmsrcjlp 'Python contrib tests'"  # (n)
-    - CI_FLAGS="-fkmsrjlpn -i 0/6 'Python integration tests for pants - shard 1'"  # (c)
-    - CI_FLAGS="-fkmsrjlpn -i 1/6 'Python integration tests for pants - shard 2'"
-    - CI_FLAGS="-fkmsrjlpn -i 2/6 'Python integration tests for pants - shard 3'"
-    - CI_FLAGS="-fkmsrjlpn -i 3/6 'Python integration tests for pants - shard 4'"
-    - CI_FLAGS="-fkmsrjlpn -i 4/6 'Python integration tests for pants - shard 5'"
-    - CI_FLAGS="-fkmsrjlpn -i 5/6 'Python integration tests for pants - shard 6'"
+    # User for bintray deploys: BINTRAY_USER
+    - secure: eXGuKvbp297wi/z74jFqGyxzRDCFic9HUb0z2UYDXDmobErILZdgT0KCvqeyAx7QX/JQSp5oQAQNisE8RLrain5lXAIa2ZuswTPsh6yXGmFgwdx/X+Am7CPO27b0P5OxiJAN3kfYglN7qY+opRM1jud4anzEaTJnm7jENFfDXwk=
+    # Key for bintray deploys: BINTRAY_KEY
+    - secure: qid/ot1XIWOpNaN+RhgdJq8IEajcpHI5EFvy2ywkYHJO2hKYawyX2M4gFd0Vq8+xmeGB4MUmpPW8D8gijLi5JB+0aZ3+5JHs5r9NWkK7HVMpVnok3CywknzXBgeo+UoEQv9ugYvRr1Sm9Dj9IezAhM0tw1uS95Ap+JLbnWFB830=
 
+before_cache:
+  # Ensure permissions to do the below removals, which happen with or without caching enabled.
+  - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+  # Kill all python bytecode in our cached venvs.  Some files appear to
+  # get bytecode compiled in non-yet-understood circumstances leading to
+  # a full cache re-pack due to new bytecode files.
+  - find build-support -name "*.py[co]" -delete
+  # The `ivydata-*.properties` & root level `*.{properties,xml}` files'
+  # effect on resolution time is in the noise, but they are
+  # re-timestamped in internal comments and fields on each run and this
+  # leads to travis-ci cache thrash.  Kill these files before the cache
+  # check to avoid un-needed cache re-packing and re-upload (a ~100s
+  # operation).
+  - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
+  - rm -f ${HOME}/.ivy2/pants/*.{css,properties,xml,xsl}
+  # We have several tests that do local file:// url resolves for
+  # com.example artifacts, these disrupt the cache but are fast since
+  # they're resolved from local files when omitted from the cache.
+  - rm -rf ${HOME}/.ivy2/pants/com.example
+  # The stats cache contains timestamped reports unused by CI but that
+  # thrash the cache.  Skip caching these.
+  - rm -rf ${HOME}/.cache/pants/stats
 
-before_script:
-  - ./build-support/bin/ci-sync.sh
-  - ./build-support/bin/install-android-sdk.sh
+cache:
+  directories:
+    - ${HOME}/.cache/pants
+    - ${HOME}/.ivy2/pants
+    # TODO(John Sirois): Update this to ~/.npm/pants when pants starts
+    # using its own isolated cache:
+    #   https://github.com/pantsbuild/pants/issues/2485
+    - ${HOME}/.npm
+    - ${HOME}/.android
+    - ${ANDROID_SDK_INSTALL_LOCATION}
+    - build-support/isort.venv
+    - build-support/pants_dev_deps.venv
 
-script:
-  - uname -a
-  - java -version
-  - echo $JAVA_HOME
-  # Check if JAVA_HOME is symlinked to the real home
-  - ls -l $JAVA_HOME
-  - ./build-support/bin/ci.sh -x ${CI_FLAGS}
+# NB: There is much repetition in include elements, but there is no known current way to factor
+# this duplication up.
+matrix:
+  include:
+    - os: osx
+      language: generic
+      env:
+        - SHARD="OSX Bintray Builder"
+      script:
+        - ./build-support/bin/native/generate-bintray-manifest.sh
 
-# We accept the default travis-ci email author+comitter notification
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      # Docker runs will write files as root, so avoid caching for this shard.
+      cache: false
+      services:
+        - docker
+      language: python
+      python: "2.7.13"
+      env:
+        - SHARD="Linux Bintray Builder"
+        # Use the standard python manylinux image for ideal binary compatibility.
+        - DOCKER_IMAGE="quay.io/pypa/manylinux1_x86_64"
+      before_install:
+        # Remove any Ubuntu binary cruft before building.
+        - git clean -fdx
+        - rm -rf ~/.cache/pants
+        - docker pull $DOCKER_IMAGE
+      script:
+        # Map virtual mount paths 1:1 to simulate running in-place in travis.
+        - docker run --rm -t
+          -v "${TRAVIS_BUILD_DIR}:${TRAVIS_BUILD_DIR}"
+          -v "${HOME}:${HOME}"
+          -e "HOME=${HOME}"
+          "${DOCKER_IMAGE}"
+          sh -c "
+            export PATH=/opt/python/cp27-cp27mu/bin:/opt/rh/devtoolset-2/root/usr/bin:${PATH} ;
+            cd $TRAVIS_BUILD_DIR && ./build-support/bin/native/generate-bintray-manifest.sh
+          "
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Various pants self checks and lint"
+      script:
+        - ./build-support/bin/ci.sh -x -cjlpn 'Various pants self checks and lint'
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Unit tests for pants and pants-plugins - shard 1"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrcnt -u 0/2 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Unit tests for pants and pants-plugins - shard 2"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrcnt -u 1/2 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python contrib tests - shard 1"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrcjlpt -y 0/2 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python contrib tests - shard 2"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrcjlpt -y 1/2 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 1"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 0/7 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 2"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 1/7 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 3"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 2/7 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 4"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 3/7 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 5"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 4/7 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 6"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 5/7 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      group: deprecated-2017Q2
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 7"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 6/7 "${SHARD}"
+
+deploy:
+  # See: https://docs.travis-ci.com/user/deployment/bintray/
+  provider: bintray
+  # NB: This is generated in after_success in each shard above.
+  file: ./native-engine.bintray.json
+  user: ${BINTRAY_USER}
+  key: ${BINTRAY_KEY}
+  dry-run: false
+  on:
+    condition: -f ./native-engine.bintray.json
+    # NB: Deploys are always tagged as part of the deploy process encoded in
+    # `build-support/bin/release.sh`, so this ensures we release an appropriate native engine binary
+    # for all releases. Unfortunately, CI only runs after the release tag hits origin and so there
+    # will be a lag of roughly 30 minutes until a pypi release has its paired native engine version
+    # available on bintray for OSX and linux. This trade-off (vs releasing for all branch builds),
+    # helps us use bintray in a friendly way.
+    tags: true
+
+# We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.
 # notifications:
 #   email: ...
-
-after_success:
-  coveralls
-

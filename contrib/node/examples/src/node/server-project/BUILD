@@ -3,10 +3,10 @@
 # package.json enough to get this benefit without any duplication.
 
 node_module(
-  name='server-project',
   sources=globs('package.json', 'checkarg', 'src/*.js', 'test/*.js'),
   dependencies=[
-    'contrib/node/examples/3rdparty/node/babel',
+    'contrib/node/examples/3rdparty/node/babel-core',
+    'contrib/node/examples/3rdparty/node/babel-cli',
     'contrib/node/examples/3rdparty/node/mocha',
   ]
 )

@@ -19,7 +19,7 @@ python_tests(
   sources=['test_custom_scala.py'],
   dependencies=[
     'src/python/pants/backend/jvm/subsystems:scala_platform',
-    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm/tasks:scalastyle',
@@ -44,6 +44,7 @@ python_tests(
   sources=['test_shader_integration.py'],
   dependencies=[
     'src/python/pants/fs',
+    'src/python/pants/java/distribution',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test:int-test',
@@ -58,8 +59,10 @@ python_tests(
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
+    'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

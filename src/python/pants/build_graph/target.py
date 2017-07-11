@@ -10,21 +10,21 @@ import os
 from hashlib import sha1
 
 from six import string_types
-from twitter.common.collections import OrderedSet
+from twitter.common.collections import OrderedSet, maybe_list
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
-from pants.build_graph.address import Address, Addresses
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
-from pants.source.payload_fields import DeferredSourcesField, SourcesField
-from pants.source.wrapped_globs import Files, FilesetWithSpec
+from pants.source.payload_fields import SourcesField
+from pants.source.wrapped_globs import Files, FilesetWithSpec, Globs
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
@@ -46,6 +46,15 @@ class AbstractTarget(object):
     """
     return tuple()
 
+  @classmethod
+  def alias(cls):
+    """Subclasses should return their desired BUILD file alias.
+
+    :rtype: string
+    """
+    raise NotImplementedError()
+
+  # TODO: Kill this in 1.5.0.dev0, once this old-style resource specification is gone.
   @property
   def has_resources(self):
     """Returns True if the target has an associated set of Resources.
@@ -76,13 +85,6 @@ class AbstractTarget(object):
   def is_jvm(self):
     """Returns True if the target produces jvm bytecode."""
     return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_codegen(self):
-    """Returns True if the target is a codegen target."""
-    return self.has_label('codegen')
 
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
@@ -131,13 +133,10 @@ class Target(AbstractTarget):
   :API: public
   """
 
-
   class RecursiveDepthError(AddressLookupError):
     """Raised when there are too many recursive calls to calculate the fingerprint."""
-    pass
 
-
-  _MAX_RECURSION_DEPTH=300
+  _MAX_RECURSION_DEPTH = 250
 
   class WrongNumberOfAddresses(Exception):
     """Internal error, too many elements in Addresses
@@ -151,13 +150,13 @@ class Target(AbstractTarget):
     :API: public
     """
 
-  class UnknownArguments(Subsystem):
-    """Subsystem for validating unknown keyword arguments."""
+  class Arguments(Subsystem):
+    """Options relating to handling target arguments."""
 
-    class Error(TargetDefinitionException):
-      """Unknown keyword arguments supplied to Target."""
+    class UnknownArgumentError(TargetDefinitionException):
+      """An unknown keyword argument was supplied to Target."""
 
-    options_scope = 'unknown-arguments'
+    options_scope = 'target-arguments'
 
     @classmethod
     def register_options(cls, register):
@@ -165,6 +164,12 @@ class Target(AbstractTarget):
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')
+      register('--implicit-sources', advanced=True, default=True, type=bool,
+               removal_version='1.6.0.dev0',
+               removal_hint='Implicit sources are now the default.',
+               help='If True, Pants will infer the value of the sources argument for certain '
+                    'target types, if they do not have explicit sources specified. '
+                    'See http://www.pantsbuild.org/build_files.html#target-definitions')
 
     @classmethod
     def check(cls, target, kwargs):
@@ -187,14 +192,14 @@ class Target(AbstractTarget):
                                             for key, val in ignored_args.items())))
       if unknown_args:
         error_message = '{target_type} received unknown arguments: {args}'
-        raise self.Error(target.address.spec, error_message.format(
+        raise self.UnknownArgumentError(target.address.spec, error_message.format(
           target_type=type(target).__name__,
           args=''.join('\n  {} = {}'.format(key, value) for key, value in unknown_args.items())
         ))
 
   @classmethod
   def subsystems(cls):
-    return super(Target, cls).subsystems() + (cls.UnknownArguments,)
+    return super(Target, cls).subsystems() + (cls.Arguments,)
 
   @classmethod
   def get_addressable_type(target_cls):
@@ -370,11 +375,12 @@ class Target(AbstractTarget):
     self.labels = set()
 
     self._cached_fingerprint_map = {}
-    self._cached_transitive_fingerprint_map = {}
+    self._cached_all_transitive_fingerprint_map = {}
+    self._cached_direct_transitive_fingerprint_map = {}
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
-      self.UnknownArguments.check(self, kwargs)
+      self.Arguments.check(self, kwargs)
 
   @property
   def scope(self):
@@ -407,11 +413,11 @@ class Target(AbstractTarget):
     """
     return self._tags
 
-  def assert_list(self, maybe_list, expected_type=string_types, key_arg=None):
+  def assert_list(self, putative_list, expected_type=string_types, key_arg=None):
     """
     :API: public
     """
-    return assert_list(maybe_list, expected_type, key_arg=key_arg,
+    return assert_list(putative_list, expected_type, key_arg=key_arg,
                        raise_type=lambda msg: TargetDefinitionException(self, msg))
 
   def compute_invalidation_hash(self, fingerprint_strategy=None):
@@ -439,7 +445,6 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    pass
 
   def mark_invalidation_hash_dirty(self):
     """Invalidates memoized fingerprints for this target, including those in payloads.
@@ -449,7 +454,8 @@ class Target(AbstractTarget):
     :API: public
     """
     self._cached_fingerprint_map = {}
-    self._cached_transitive_fingerprint_map = {}
+    self._cached_all_transitive_fingerprint_map = {}
+    self._cached_direct_transitive_fingerprint_map = {}
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -470,13 +476,24 @@ class Target(AbstractTarget):
       raise self.RecursiveDepthError("Max depth of {} exceeded.".format(self._MAX_RECURSION_DEPTH))
 
     fingerprint_strategy = fingerprint_strategy or DefaultFingerprintStrategy()
-    if fingerprint_strategy not in self._cached_transitive_fingerprint_map:
+
+    direct = (depth == 0 and fingerprint_strategy.direct(self))
+    if direct:
+      fingerprint_map = self._cached_direct_transitive_fingerprint_map
+    else:
+      fingerprint_map = self._cached_all_transitive_fingerprint_map
+
+    if fingerprint_strategy not in fingerprint_map:
       hasher = sha1()
 
       def dep_hash_iter():
-        for dep in self.dependencies:
+        dep_list = fingerprint_strategy.dependencies(self) if direct else self.dependencies
+        for dep in dep_list:
           try:
-            dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
+            if direct:
+              dep_hash = dep.invalidation_hash(fingerprint_strategy)
+            else:
+              dep_hash = dep.transitive_invalidation_hash(fingerprint_strategy, depth=depth+1)
             if dep_hash is not None:
               yield dep_hash
           except self.RecursiveDepthError as e:
@@ -492,21 +509,21 @@ class Target(AbstractTarget):
       dependencies_hash = hasher.hexdigest()[:12]
       combined_hash = '{target_hash}.{deps_hash}'.format(target_hash=target_hash,
                                                          deps_hash=dependencies_hash)
-      self._cached_transitive_fingerprint_map[fingerprint_strategy] = combined_hash
-    return self._cached_transitive_fingerprint_map[fingerprint_strategy]
+      fingerprint_map[fingerprint_strategy] = combined_hash
+    return fingerprint_map[fingerprint_strategy]
 
   def mark_transitive_invalidation_hash_dirty(self):
     """
     :API: public
     """
-    self._cached_transitive_fingerprint_map = {}
+    self._cached_all_transitive_fingerprint_map = {}
+    self._cached_direct_transitive_fingerprint_map = {}
     self.mark_extra_transitive_invalidation_hash_dirty()
 
   def mark_extra_transitive_invalidation_hash_dirty(self):
     """
     :API: public
     """
-    pass
 
   def inject_dependency(self, dependency_address):
     """
@@ -560,6 +577,12 @@ class Target(AbstractTarget):
     """
     return self._sources_field.filespec
 
+  def sources_relative_to_target_base(self):
+    """
+    :API: public
+    """
+    return self.payload.sources.sources
+
   @property
   def derived_from(self):
     """Returns the target this target was derived from.
@@ -595,6 +618,7 @@ class Target(AbstractTarget):
     return self._build_graph.get_concrete_derived_from(self.address)
 
   @property
+  @deprecated('1.5.0.dev0', 'Use `Target.compute_injectable_specs()` instead.')
   def traversable_specs(self):
     """
     :API: public
@@ -605,6 +629,7 @@ class Target(AbstractTarget):
     return []
 
   @property
+  @deprecated('1.5.0.dev0', 'Use `Target.compute_dependency_specs()` instead.')
   def traversable_dependency_specs(self):
     """
     :API: public
@@ -613,10 +638,56 @@ class Target(AbstractTarget):
     graph and linked in the graph as dependencies of this target
     :rtype: list of strings
     """
-    # To support DeferredSourcesField
-    for name, payload_field in self.payload.fields:
-      if isinstance(payload_field, DeferredSourcesField) and payload_field.address:
-        yield payload_field.address.spec
+    return []
+
+  @staticmethod
+  def _validate_target_representation_args(kwargs, payload):
+    assert kwargs is not None or payload is not None, 'must provide either kwargs or payload'
+    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
+    assert not (kwargs and not isinstance(kwargs, dict)), (
+      'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
+    )
+    assert not (payload and not isinstance(payload, Payload)), (
+      'expected a `Payload` object for payload, instead found a {}'.format(type(payload))
+    )
+
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the specs
+    to inject as non-dependencies in the same vein as the prior `traversable_specs`.
+
+    :API: public
+
+    :param dict kwargs: The pre-Target.__init__() kwargs dict.
+    :param Payload payload: The post-Target.__init__() Payload object.
+    :yields: Spec strings representing dependencies of this target.
+    """
+    cls._validate_target_representation_args(kwargs, payload)
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    return
+    yield
+
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the
+    full set of dependency specs in the same vein as the prior `traversable_dependency_specs`.
+
+    N.B. This is a temporary bridge to span the gap between v2 "Fields" products vs v1 `BuildGraph`
+    `Target` object representations. See:
+
+      https://github.com/pantsbuild/pants/issues/3560
+      https://github.com/pantsbuild/pants/issues/3561
+
+    :API: public
+
+    :param dict kwargs: The pre-Target.__init__() kwargs dict.
+    :param Payload payload: The post-Target.__init__() Payload object.
+    :yields: Spec strings representing dependencies of this target.
+    """
+    cls._validate_target_representation_args(kwargs, payload)
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    return
+    yield
 
   @property
   def dependencies(self):
@@ -735,7 +806,40 @@ class Target(AbstractTarget):
     addr = self.address if hasattr(self, 'address') else 'address not yet set'
     return "{}({})".format(type(self).__name__, addr)
 
-  def create_sources_field(self, sources, sources_rel_path, address=None, key_arg=None):
+  # List of glob patterns, or a single glob pattern.
+  # Subclasses can override, typically to specify a file extension (e.g., '*.java').
+  default_sources_globs = None
+
+  # List of glob patterns, or a single glob pattern.
+  # Subclasses can override, to specify files that should be excluded from the
+  # default_sources_globs (e.g., '*Test.java').
+  default_sources_exclude_globs = None
+
+  @classmethod
+  def supports_default_sources(cls):
+    """Whether this target type can provide default sources if none were specified explicitly."""
+    return cls.default_sources_globs is not None
+
+  @classmethod
+  def default_sources(cls, sources_rel_path):
+    """Provide sources, if they weren't specified explicitly in the BUILD file.
+
+    By default this globs over self.default_sources_globs (e.g., '*.java')
+    but subclasses can override to provide more nuanced default behavior.
+    In this case, the subclasses must also override supports_default_sources().
+    """
+    if cls.default_sources_globs is not None:
+      if cls.default_sources_exclude_globs is not None:
+        exclude = [Globs.create_fileset_with_spec(sources_rel_path,
+                                                  *maybe_list(cls.default_sources_exclude_globs))]
+      else:
+        exclude = []
+      return Globs.create_fileset_with_spec(sources_rel_path,
+                                            *maybe_list(cls.default_sources_globs),
+                                            exclude=exclude)
+    return None
+
+  def create_sources_field(self, sources, sources_rel_path, key_arg=None):
     """Factory method to create a SourcesField appropriate for the type of the sources object.
 
     Note that this method is called before the call to Target.__init__ so don't expect fields to
@@ -746,25 +850,22 @@ class Target(AbstractTarget):
     :return: a payload field object representing the sources parameter
     :rtype: SourcesField
     """
-
-    if isinstance(sources, Addresses):
-      # Currently, this is only created by the result of from_target() which takes a single argument
-      if len(sources.addresses) != 1:
-        key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
-        spec_section = " to '{}'".format(address.spec) if address else ""
-        raise self.WrongNumberOfAddresses(
-          "Expected {key_arg_section}a single address to from_target() as argument{spec_section}"
-          .format(key_arg_section=key_arg_section, spec_section=spec_section))
-      referenced_address = Address.parse(sources.addresses[0], relative_to=sources.rel_path)
-      return DeferredSourcesField(ref_address=referenced_address)
-    elif sources is None:
-      sources = FilesetWithSpec.empty(sources_rel_path)
-    elif isinstance(sources, FilesetWithSpec):
-      pass
+    if sources is None:
+      # Make sure we don't apply the defaulting to uses of this method other than for
+      # creating a sources= field (e.g., we also use this for creating resources= fields).
+      # Note that the check for supports_default_sources() precedes the subsystem check.
+      # This is so that tests don't need to set up the subsystem when creating targets that
+      # legitimately do not require sources.
+      if ((key_arg is None or key_arg == 'sources') and
+          self.supports_default_sources() and
+          self.Arguments.global_instance().get_options().implicit_sources):
+        sources = self.default_sources(sources_rel_path)
+      else:
+        sources = FilesetWithSpec.empty(sources_rel_path)
     elif isinstance(sources, (set, list, tuple)):
       # Received a literal sources list: convert to a FilesetWithSpec via Files.
       sources = Files.create_fileset_with_spec(sources_rel_path, *sources)
-    else:
+    elif not isinstance(sources, FilesetWithSpec):
       key_arg_section = "'{}' to be ".format(key_arg) if key_arg else ""
       raise TargetDefinitionException(self, "Expected {}a glob, an address or a list, but was {}"
                                             .format(key_arg_section, type(sources)))

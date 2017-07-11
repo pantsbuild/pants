@@ -9,13 +9,14 @@ from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.address import Address
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
-from pants.util.memo import memoized_property
+from pants.build_graph.target_addressable import TargetAddressable
 
 
 class PythonTarget(Target):
@@ -23,6 +24,35 @@ class PythonTarget(Target):
 
   :API: public
   """
+
+  @classmethod
+  def _suffix_for_synthetic_spec(cls, spec):
+    """Given a spec, append the synthetic resources suffix to it for a consistent mapping."""
+    return '{}_synthetic_resources'.format(spec)
+
+  @classmethod
+  def create(cls, parse_context, **kwargs):
+    resources = kwargs.get('resources', None) or []
+    if resources:
+      deprecated_conditional(
+        lambda: True,
+        '1.5.0.dev0',
+        'The `resources=` Python target argument', 'Depend on resources targets instead.'
+      )
+      resources_kwargs = dict(
+        name=cls._suffix_for_synthetic_spec(kwargs.get('name', 'unknown')),
+        sources=resources,
+        type_alias=Resources.alias()
+      )
+      resource_target = parse_context.create_object(Resources.alias(), **resources_kwargs)
+      if isinstance(resource_target, TargetAddressable):
+        name = resource_target.addressed_name
+      else:
+        name = resource_target.name
+      resource_target_spec = '//{}:{}'.format(parse_context.rel_path, name)
+      kwargs['dependencies'] = kwargs.get('dependencies', []) + [resource_target_spec]
+
+    parse_context.create_object(cls, type_alias=cls.alias(), **kwargs)
 
   def __init__(self,
                address=None,
@@ -34,19 +64,24 @@ class PythonTarget(Target):
                compatibility=None,
                **kwargs):
     """
-    :param dependencies: Other targets that this target depends on.
+    :param dependencies: The addresses of targets that this target depends on.
       These dependencies may
       be ``python_library``-like targets (``python_library``,
       ``python_thrift_library``, ``python_antlr_library`` and so forth) or
       ``python_requirement_library`` targets.
-    :type dependencies: List of target specs
+    :type dependencies: list of strings
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings
     :param resources: non-Python resources, e.g. templates, keys, other data
       (it is
       recommended that your application uses the pkgutil package to access these
-      resources in a .zip-module friendly way.)
+      resources in a .zip-module friendly way.) Paths are relative to the BUILD
+      file's directory.
+    :type sources: ``Fileset`` or list of strings
+    :param resource_targets: The addresses of ``resources`` targets this target
+      depends on.
+    :type resource_targets: list of strings
     :param provides:
       The `setup_py <#setup_py>`_ to publish that represents this
       target outside the repo.
@@ -55,17 +90,20 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
+    deprecated_conditional(lambda: resources is not None, '1.5.0.dev0',
+                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
+    deprecated_conditional(lambda: resource_targets is not None, '1.5.0.dev0',
+                           'The `resource_targets=` Python target argument', 'Use `dependencies=` instead.')
     self.address = address
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'resources': self.create_sources_field(resources, address.spec_path, key_arg='resources'),
+      'resource_targets': PrimitiveField(resource_targets),
       'provides': provides,
       'compatibility': PrimitiveField(maybe_list(compatibility or ())),
     })
-    super(PythonTarget, self).__init__(address=address,
-                                       payload=payload,
-                                       **kwargs)
+    super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
     self._resource_target_specs = resource_targets
     self.add_labels('python')
 
@@ -83,24 +121,26 @@ class PythonTarget(Target):
       except ValueError as e:
         raise TargetDefinitionException(self, str(e))
 
-  @property
-  def traversable_specs(self):
-    for spec in super(PythonTarget, self).traversable_specs:
+  @classmethod
+  def compute_injectable_specs(cls, kwargs=None, payload=None):
+    for spec in super(PythonTarget, cls).compute_injectable_specs(kwargs, payload):
       yield spec
-    if self._provides:
-      for spec in self._provides._binaries.values():
-        address = Address.parse(spec, relative_to=self.address.spec_path)
-        yield address.spec
 
-  @property
-  def traversable_dependency_specs(self):
-    for spec in super(PythonTarget, self).traversable_dependency_specs:
-      yield spec
-    if self._resource_target_specs:
-      for spec in self._resource_target_specs:
+    target_representation = kwargs or payload.as_dict()
+    provides = target_representation.get('provides', None) or []
+    if provides:
+      for spec in provides._binaries.values():
         yield spec
-    if self._synthetic_resources_target:
-      yield self._synthetic_resources_target.address.spec
+
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(PythonTarget, cls).compute_dependency_specs(kwargs, payload):
+      yield spec
+
+    target_representation = kwargs or payload.as_dict()
+    specs = target_representation.get('resource_targets', None) or []
+    for spec in specs:
+      yield spec
 
   @property
   def provides(self):
@@ -121,41 +161,14 @@ class PythonTarget(Target):
 
   @property
   def resources(self):
-    resource_targets = []
-
-    if self._resource_target_specs:
-      def get_target(spec):
-        address = Address.parse(spec, relative_to=self.address.spec_path)
-        tgt = self._build_graph.get_target(address)
-        if tgt is None:
-          raise TargetDefinitionException(self, 'No such resource target: {}'.format(address))
-        return tgt
-      resource_targets.extend(get_target(spec) for spec in self._resource_target_specs)
-
-    if self._synthetic_resources_target:
-      resource_targets.append(self._synthetic_resources_target)
-
-    return resource_targets
+    # Note: Will correctly find:
+    #   - Regular dependencies on Resources targets.
+    #   - Resources targets specified via resource_targets=.
+    #   - The synthetic Resources target created from the resources= fileset.
+    # Because these are all in the dependency specs.
+    return [dep for dep in self.dependencies if isinstance(dep, Resources)]
 
   def walk(self, work, predicate=None):
     super(PythonTarget, self).walk(work, predicate)
     for binary in self.provided_binaries.values():
       binary.walk(work, predicate)
-
-  @memoized_property
-  def _synthetic_resources_target(self):
-    if not self.payload.resources.source_paths:
-      return None
-
-    # Create an address for the synthetic target.
-    spec = self.address.spec + '_synthetic_resources'
-    resource_address = Address.parse(spec=spec)
-    # For safety, ensure an address that's not used already, even though that's highly unlikely.
-    while self._build_graph.contains_address(resource_address):
-      spec += '_'
-      resource_address = Address.parse(spec=spec)
-
-    self._build_graph.inject_synthetic_target(resource_address, Resources,
-                                              sources=self.payload.resources.source_paths,
-                                              derived_from=self)
-    return self._build_graph.get_target(resource_address)

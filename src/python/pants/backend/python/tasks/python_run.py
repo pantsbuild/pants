@@ -15,9 +15,6 @@ from pants.util.strutil import safe_shlex_split
 
 
 class PythonRun(PythonTask):
-  def __init__(self, *args, **kwargs):
-    super(PythonRun, self).__init__(*args, **kwargs)
-
   @classmethod
   def register_options(cls, register):
     super(PythonRun, cls).register_options(register)

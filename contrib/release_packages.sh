@@ -93,10 +93,10 @@ PKG_PYTHON_CHECKS=(
 function pkg_python_checks_install_test() {
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
-    --explain compile | grep "python-eval" &> /dev/null && \
+    --explain lint | grep "python-eval" &> /dev/null && \
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.python.checks==$(local_version)']" \
-    --explain compile | grep "pythonstyle" &> /dev/null
+    --explain lint | grep "pythonstyle" &> /dev/null
 }
 
 PKG_FINDBUGS=(
@@ -110,6 +110,39 @@ function pkg_findbugs_install_test() {
       --explain compile | grep "findbugs" &> /dev/null
 }
 
+PKG_CPP=(
+  "pantsbuild.pants.contrib.cpp"
+  "//contrib/cpp/src/python/pants/contrib/cpp:plugin"
+  "pkg_cpp_install_test"
+)
+function pkg_cpp_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.cpp==$(local_version)']" \
+      --explain compile | grep "cpp" &> /dev/null
+}
+
+PKG_ERRORPRONE=(
+  "pantsbuild.pants.contrib.errorprone"
+  "//contrib/errorprone/src/python/pants/contrib/errorprone:plugin"
+  "pkg_errorprone_install_test"
+)
+function pkg_errorprone_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.errorprone==$(local_version)']" \
+      --explain compile | grep "errorprone" &> /dev/null
+}
+
+PKG_JAXWS=(
+  "pantsbuild.pants.contrib.jax_ws"
+  "//contrib/jax_ws/src/python/pants/contrib/jax_ws:plugin"
+  "pkg_jax_ws_install_test"
+)
+function pkg_jax_ws_install_test() {
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.jax_ws==$(local_version)']" \
+      --explain gen | grep "jax-ws" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -120,4 +153,7 @@ CONTRIB_PACKAGES=(
   PKG_PYTHON_CHECKS
   PKG_SCALAJS
   PKG_FINDBUGS
+  PKG_CPP
+  PKG_ERRORPRONE
+  PKG_JAXWS
 )

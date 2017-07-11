@@ -96,15 +96,13 @@ class JvmdocGen(JvmTask):
           'Cannot provide {} target mappings for combined output'.format(self.jvmdoc().product_type))
 
     def docable(tgt):
-      return language_predicate(tgt) and (self._include_codegen or not tgt.is_codegen)
+      return language_predicate(tgt) and (self._include_codegen or not tgt.is_synthetic)
 
     targets = self.context.targets(predicate=docable)
     if not targets:
       return
 
     with self.invalidated(targets) as invalidation_check:
-      safe_mkdir(self.workdir)
-
       def find_jvmdoc_targets():
         invalid_targets = set()
         for vt in invalidation_check.invalid_vts:

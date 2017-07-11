@@ -50,7 +50,7 @@ class BootstrapOptionsTest(unittest.TestCase):
 
     def br(path):
       # Returns the full path of the given path under the buildroot.
-      return '{}/{}'.format(buildroot, path)
+      return os.path.join(buildroot, path)
 
     self._do_test([br('.pants.d'), br('build-support'), br('dist')],
                   config=None, env={}, args=[])
@@ -134,7 +134,7 @@ class BootstrapOptionsTest(unittest.TestCase):
     self.assertEquals('/qux/baz', opts.for_scope('foo').bar)
     self.assertEquals('/pear/banana', opts.for_scope('fruit').apple)
 
-  def test_create_bootstrapped_multiple_config_override(self):
+  def do_test_create_bootstrapped_multiple_config(self, create_options_bootstrapper):
     # check with multiple config files, the latest values always get taken
     # in this case worker_count will be overwritten, while fruit stays the same
     with temporary_file() as fp:
@@ -147,16 +147,15 @@ class BootstrapOptionsTest(unittest.TestCase):
       """))
       fp.close()
 
-      args = ['--config-override={}'.format(fp.name)] + self._config_path(fp.name)
-      bootstrapper_single_config = OptionsBootstrapper(args=args)
+      bootstrapper_single_config = create_options_bootstrapper(fp.name)
 
-      opts_single_config  = bootstrapper_single_config.get_full_options(known_scope_infos=[
+      opts_single_config = bootstrapper_single_config.get_full_options(known_scope_infos=[
           ScopeInfo('', ScopeInfo.GLOBAL),
           ScopeInfo('compile.apt', ScopeInfo.TASK),
           ScopeInfo('fruit', ScopeInfo.TASK),
       ])
       # So we don't choke on these on the cmd line.
-      opts_single_config.register('', '--pants-config-files')
+      opts_single_config.register('', '--pants-config-files', type=list)
       opts_single_config.register('', '--config-override', type=list)
 
       opts_single_config.register('compile.apt', '--worker-count')
@@ -172,10 +171,7 @@ class BootstrapOptionsTest(unittest.TestCase):
         """))
         fp2.close()
 
-        args = ['--config-override={}'.format(fp.name),
-                '--config-override={}'.format(fp2.name)] + self._config_path(fp.name)
-
-        bootstrapper_double_config = OptionsBootstrapper(args=args)
+        bootstrapper_double_config = create_options_bootstrapper(fp.name, fp2.name)
 
         opts_double_config = bootstrapper_double_config.get_full_options(known_scope_infos=[
           ScopeInfo('', ScopeInfo.GLOBAL),
@@ -183,13 +179,25 @@ class BootstrapOptionsTest(unittest.TestCase):
           ScopeInfo('fruit', ScopeInfo.TASK),
         ])
         # So we don't choke on these on the cmd line.
-        opts_double_config.register('', '--pants-config-files')
+        opts_double_config.register('', '--pants-config-files', type=list)
         opts_double_config.register('', '--config-override', type=list)
         opts_double_config.register('compile.apt', '--worker-count')
         opts_double_config.register('fruit', '--apple')
 
         self.assertEquals('2', opts_double_config.for_scope('compile.apt').worker_count)
         self.assertEquals('red', opts_double_config.for_scope('fruit').apple)
+
+  def test_create_bootstrapped_multiple_config_override(self):
+    def create_options_bootstrapper(*config_paths):
+      return OptionsBootstrapper(args=['--config-override={}'.format(cp) for cp in config_paths])
+
+    self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
+
+  def test_create_bootstrapped_multiple_pants_config_files(self):
+    def create_options_bootstrapper(*config_paths):
+      return OptionsBootstrapper(args=['--pants-config-files={}'.format(cp) for cp in config_paths])
+
+    self.do_test_create_bootstrapped_multiple_config(create_options_bootstrapper)
 
   def test_full_options_caching(self):
     with temporary_file_path() as config:

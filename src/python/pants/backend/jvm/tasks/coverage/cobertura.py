@@ -10,9 +10,9 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
 from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util import desktop
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
@@ -20,7 +20,6 @@ from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
 
 class CoberturaTaskSettings(CoverageTaskSettings):
   """A class that holds task settings for cobertura coverage."""
-  pass
 
 
 class Cobertura(Coverage):
@@ -29,6 +28,7 @@ class Cobertura(Coverage):
   @classmethod
   def register_options(cls, register, register_jvm_tool):
     slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
+    slf4j_api_jar = JarDependency(org='org.slf4j', name='slf4j-api', rev='1.7.5')
 
     register('--coverage-cobertura-include-classes', advanced=True, type=list,
              help='Regex patterns passed to cobertura specifying which classes should be '
@@ -52,12 +52,12 @@ class Cobertura(Coverage):
                       ])
 
     # Instrumented code needs cobertura.jar in the classpath to run, but not most of the
-    # dependencies.
+    # dependencies; inject the SLF4J API so that Cobertura doesn't crash when it attempts to log
     register_jvm_tool(register,
                       'cobertura-run',
                       classpath=[
                         cobertura_jar(intransitive=True),
-                        slf4j_jar
+                        slf4j_api_jar
                       ])
 
     register_jvm_tool(register, 'cobertura-report', classpath=[cobertura_jar()])
@@ -72,10 +72,11 @@ class Cobertura(Coverage):
     self._exclude_classes = options.coverage_cobertura_exclude_classes
     self._nothing_to_instrument = True
 
-  def instrument(self, targets, tests, compute_junit_classpath, execute_java_for_targets):
+  def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
     # Setup an instrumentation classpath based on the existing runtime classpath.
     runtime_classpath = self._context.products.get_data('runtime_classpath')
-    instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath', runtime_classpath.copy)
+    instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath',
+                                                                        runtime_classpath.copy)
     self.initialize_instrument_classpath(targets, instrumentation_classpath)
 
     cobertura_cp = self._settings.tool_classpath('cobertura-instrument')
@@ -140,7 +141,7 @@ class Cobertura(Coverage):
   def extra_jvm_options(self):
     return ['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile]
 
-  def report(self, targets, tests, execute_java_for_targets, tests_failed_exception=None):
+  def report(self, targets, execute_java_for_targets, tests_failed_exception=None):
     if self._nothing_to_instrument:
       self._context.log.warn('Nothing found to instrument, skipping report...')
       return

@@ -19,8 +19,8 @@ from pex.installer import InstallerBase, Packager
 from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
-from pants.backend.codegen.targets.python_antlr_library import PythonAntlrLibrary
-from pants.backend.codegen.targets.python_thrift_library import PythonThriftLibrary
+from pants.backend.codegen.antlr.python.python_antlr_library import PythonAntlrLibrary
+from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.antlr_builder import PythonAntlrBuilder
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -131,11 +131,12 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     self._ancestor_iterator = TargetAncestorIterator(build_graph)
 
   @abstractmethod
-  def is_third_party(self, target):
-    """Identifies targets that are exported by third parties.
+  def requires_export(self, target):
+    """Identifies targets that need to be exported (are internal targets owning source code).
 
     :param target: The target to identify.
-    :returns: `True` if the given `target` represents a third party dependency.
+    :returns: `True` if the given `target` owns files that should be included in exported packages
+              when the target is a member of an exported target's dependency graph.
     """
 
   @abstractmethod
@@ -228,14 +229,13 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     owner_by_owned_python_target = OrderedDict()
 
     def collect_potentially_owned_python_targets(current):
-      if (current != exported_target) and not self.is_third_party(current):
-        owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
+      owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
     self._walk(exported_target, collect_potentially_owned_python_targets)
 
     for owned in owner_by_owned_python_target:
-      if not self.is_exported(owned):
+      if self.requires_export(owned) and not self.is_exported(owned):
         potential_owners = set()
         for potential_owner in self._ancestor_iterator.iter_target_siblings_and_ancestors(owned):
           if self.is_exported(potential_owner) and owned in self._closure(potential_owner):
@@ -271,7 +271,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
           reduced_dependencies.add(current)
         else:
           reduced_dependencies.add(owner)
-        return owner == exported_target
+        return owner == exported_target or not self.requires_export(current)
 
     self._walk(exported_target, collect_reduced_dependencies)
     return reduced_dependencies
@@ -301,8 +301,10 @@ class SetupPy(PythonTask):
   class DependencyCalculator(ExportedTargetDependencyCalculator):
     """Calculates reduced dependencies for exported python targets."""
 
-    def is_third_party(self, target):
-      return SetupPy.is_requirements(target)
+    def requires_export(self, target):
+      # TODO(John Sirois): Consider switching to the more general target.has_sources() once Benjy's
+      # change supporting default globs is in (that change will smooth test migration).
+      return SetupPy.is_python_target(target) or SetupPy.is_resources_target(target)
 
     def is_exported(self, target):
       return SetupPy.has_provides(target)

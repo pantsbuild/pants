@@ -16,13 +16,11 @@ from pants.backend.jvm.subsystems.shader import Shading
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.benchmark import Benchmark
 from pants.backend.jvm.targets.credentials import LiteralCredentials, NetrcCredentials
-from pants.backend.jvm.targets.exclude import Exclude
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import Bundle, DirectoryReMapper, JvmApp
 from pants.backend.jvm.targets.jvm_binary import Duplicate, JarRules, JvmBinary, Skip
 from pants.backend.jvm.targets.jvm_prep_command import JvmPrepCommand
@@ -37,8 +35,12 @@ from pants.backend.jvm.tasks.binary_create import BinaryCreate
 from pants.backend.jvm.tasks.bootstrap_jvm_tools import BootstrapJvmTools
 from pants.backend.jvm.tasks.bundle_create import BundleCreate
 from pants.backend.jvm.tasks.check_published_deps import CheckPublishedDeps
+from pants.backend.jvm.tasks.checkstyle import Checkstyle
+from pants.backend.jvm.tasks.classmap import ClassmapTask
+from pants.backend.jvm.tasks.consolidate_classpath import ConsolidateClasspath
 from pants.backend.jvm.tasks.detect_duplicates import DuplicateDetector
 from pants.backend.jvm.tasks.ivy_imports import IvyImports
+from pants.backend.jvm.tasks.ivy_outdated import IvyOutdated
 from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
 from pants.backend.jvm.tasks.jar_create import JarCreate
 from pants.backend.jvm.tasks.jar_publish import JarPublish
@@ -59,10 +61,23 @@ from pants.backend.jvm.tasks.run_jvm_prep_command import (RunBinaryJvmPrepComman
                                                           RunTestJvmPrepCommand)
 from pants.backend.jvm.tasks.scala_repl import ScalaRepl
 from pants.backend.jvm.tasks.scaladoc_gen import ScaladocGen
+from pants.backend.jvm.tasks.scalafmt import ScalaFmtCheckFormat, ScalaFmtFormat
+from pants.backend.jvm.tasks.scalastyle import Scalastyle
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
+from pants.base.deprecated import warn_or_error
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.java.jar.exclude import Exclude
+from pants.java.jar.jar_dependency import JarDependencyParseContextWrapper
+
+
+class DeprecatedJavaTests(JUnitTests):
+  def __init__(self, *args, **kwargs):
+    super(DeprecatedJavaTests, self).__init__(*args, **kwargs)
+    warn_or_error('1.4.0.dev0',
+                  'java_tests(...) target type',
+                  'Use junit_tests(...) instead for target {}.'.format(self.address.spec))
 
 
 def build_file_aliases():
@@ -75,8 +90,8 @@ def build_file_aliases():
       'java_agent': JavaAgent,
       'java_library': JavaLibrary,
       'javac_plugin': JavacPlugin,
-      'java_tests': JavaTests,
-      'junit_tests': JavaTests,
+      'java_tests': DeprecatedJavaTests,
+      'junit_tests': JUnitTests,
       'jvm_app': JvmApp,
       'jvm_binary': JvmBinary,
       'jvm_prep_command' : JvmPrepCommand,
@@ -97,7 +112,6 @@ def build_file_aliases():
       'DirectoryReMapper': DirectoryReMapper,
       'Duplicate': Duplicate,
       'exclude': Exclude,
-      'jar': JarDependency,
       'scala_jar': ScalaJarDependency,
       'jar_rules': JarRules,
       'repository': repo,
@@ -113,6 +127,7 @@ def build_file_aliases():
     },
     context_aware_object_factories={
       'bundle': Bundle,
+      'jar': JarDependencyParseContextWrapper,
       'managed_jar_libraries': ManagedJarLibraries,
     }
   )
@@ -145,6 +160,7 @@ def register_goals():
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
   task(name='ivy-imports', action=IvyImports).install('imports')
   task(name='unpack-jars', action=UnpackJars).install()
+  task(name='ivy', action=IvyOutdated).install('outdated')
 
   # Resource preparation.
   task(name='prepare', action=PrepareResources).install('resources')
@@ -155,18 +171,20 @@ def register_goals():
 
   task(name='jvm', action=JvmDependencyUsage).install('dep-usage')
 
+  task(name='classmap', action=ClassmapTask).install('classmap')
+
   # Generate documentation.
   task(name='javadoc', action=JavadocGen).install('doc')
   task(name='scaladoc', action=ScaladocGen).install('doc')
 
   # Bundling.
-  Goal.register('jar', 'Create a JAR file.')
   task(name='create', action=JarCreate).install('jar')
   detect_duplicates = task(name='dup', action=DuplicateDetector)
 
   task(name='jvm', action=BinaryCreate).install('binary')
   detect_duplicates.install('binary')
 
+  task(name='consolidate-classpath', action=ConsolidateClasspath).install('bundle')
   task(name='jvm', action=BundleCreate).install('bundle')
   detect_duplicates.install('bundle')
 
@@ -181,11 +199,17 @@ def register_goals():
   task(name='junit', action=JUnitRun).install('test')
   task(name='bench', action=BenchmarkRun).install('bench')
 
+  # Linting.
+  task(name='scalafmt', action=ScalaFmtCheckFormat, serialize=False).install('lint')
+  task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
+  task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
+
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')
   task(name='jvm-dirty', action=JvmRun, serialize=False).install('run-dirty')
   task(name='scala', action=ScalaRepl, serialize=False).install('repl')
   task(name='scala-dirty', action=ScalaRepl, serialize=False).install('repl-dirty')
+  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
   task(name='test-jvm-prep-command', action=RunTestJvmPrepCommand).install('test', first=True)
   task(name='binary-jvm-prep-command', action=RunBinaryJvmPrepCommand).install('binary', first=True)
   task(name='compile-jvm-prep-command', action=RunCompileJvmPrepCommand).install('compile', first=True)

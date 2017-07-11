@@ -154,7 +154,7 @@ class Jar(object):
 
     If called multiple times, new entry will be appended to the existing classpath.
 
-    :param list classpath: a list of paths
+    :param iterable classpath: a list of paths
     """
     self._classpath = self._classpath + maybe_list(classpath)
 
@@ -279,8 +279,8 @@ class JarTask(NailgunTask):
   """
 
   @classmethod
-  def global_subsystems(cls):
-    return super(JarTask, cls).global_subsystems() + (JarTool,)
+  def subsystem_dependencies(cls):
+    return super(JarTask, cls).subsystem_dependencies() + (JarTool,)
 
   @classmethod
   def prepare(cls, options, round_manager):

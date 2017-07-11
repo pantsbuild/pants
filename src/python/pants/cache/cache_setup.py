@@ -49,6 +49,8 @@ class CacheSetup(Subsystem):
   def register_options(cls, register):
     super(CacheSetup, cls).register_options(register)
     default_cache = [os.path.join(get_buildroot(), '.cache')]
+    register('--ignore', type=bool,
+             help='Ignore all other cache configuration and skip using the cache.')
     register('--read', type=bool, default=True,
              help='Read build artifacts from cache, if available.')
     register('--write', type=bool, default=True,
@@ -73,6 +75,8 @@ class CacheSetup(Subsystem):
                   'the resolver. When resolver is \'none\' list is used as is.')
     register('--compression-level', advanced=True, type=int, default=5,
              help='The gzip compression level (0-9) for created artifacts.')
+    register('--dereference-symlinks', type=bool, default=True, fingerprint=True,
+             help='Dereference symlinks when creating cache tarball.')
     register('--max-entries-per-target', advanced=True, type=int, default=8,
              help='Maximum number of old cache files to keep per task target pair')
     register('--pinger-timeout', advanced=True, type=float, default=0.5,
@@ -126,11 +130,15 @@ class CacheFactory(object):
     else:
       self._resolver = NoopResolver()
 
+  @property
+  def ignore(self):
+    return self._options.ignore
+
   def read_cache_available(self):
-    return self._options.read and bool(self._options.read_from) and self.get_read_cache()
+    return not self.ignore and self._options.read and self.get_read_cache()
 
   def write_cache_available(self):
-    return self._options.write and bool(self._options.write_to) and self.get_write_cache()
+    return not self.ignore and self._options.write and self.get_write_cache()
 
   def overwrite(self):
     return self._options.overwrite
@@ -247,8 +255,9 @@ class CacheFactory(object):
       - A list or tuple of two specs, local, then remote, each as described above
     """
     compression = self._options.compression_level
-    if compression not in range(10):
-      raise ValueError('compression_level must be an integer 0-9: {}'.format(compression))
+    if compression not in range(1, 10):
+      raise ValueError('compression_level must be an integer 1-9: {}'.format(compression))
+
     artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
@@ -257,7 +266,8 @@ class CacheFactory(object):
                       .format(self._stable_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
-                                permissions=self._options.write_permissions)
+                                permissions=self._options.write_permissions,
+                                dereference=self._options.dereference_symlinks)
 
     def create_remote_cache(remote_spec, local_cache):
       urls = self.get_available_urls(remote_spec.split('|'))

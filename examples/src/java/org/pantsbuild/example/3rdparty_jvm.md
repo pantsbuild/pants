@@ -37,7 +37,7 @@ statements in your Java code.
 
 For example, your `BUILD` file might have
 
-!inc[start-after=sources&end-before=src/java](../../../../../tests/java/org/pantsbuild/example/hello/greet/BUILD)
+!inc[start-after=junit_tests&end-before=src/java](../../../../../tests/java/org/pantsbuild/example/hello/greet/BUILD)
 
 And your Java code might have:
 
@@ -55,40 +55,28 @@ both the version in the repo compiled from source and an older version
 that was previously published.  In this case, you want to be sure that
 when pants always prefers the version built from source.
 
-Fortunately, the remedy for this is simple.  If you add a `provides=`
-parameter that matches the one used to publish the artifact, pants
-will always prefer the local target definition to the
-published jar.
+Fortunately, the remedy for this is simple.  If you add a `provides=` parameter
+that matches the one used to publish the artifact, pants will always prefer the
+local target definition to the published jar if it is in the context:
 
     :::python
-    jar_library(name='api',
+    java_library(name='api',
       sources = globs('*.java'),
-      provides = artifact(org='org.archie',
-                          name='api',
-                          repo=myrepo,)
-	)
+      provides = artifact(org='org.archie', name='api', repo=myrepo),
+    )
+
+    jar_library(name='bin-dep',
+      jars=[
+        jar(org='org.archie', name='consumer', rev='1.2.3'),
+      ],
+      dependencies=[
+        # Include the local, source copy of the API to cause it to be used rather than
+        # any versioned binary copy that the `consumer` lib might depend on transitively.
+        ':api',
+      ])
 
 Controlling JAR Dependency Versions
 -----------------------------------
-
-**If you notice a small number of wrong-version things,** then in a JVM
-target, you can depend on a `jar` that specifies a version and sets
-`force=True` to *force* using that version:
-
-    :::python
-    scala_library(
-      name = "loadtest",
-      dependencies = [
-        '3rdparty/bijection:bijection-scrooge',
-        # our 3rdparty/BUILD still has 6.1.4 as the default version, but
-        # finagle-[core|thrift] version 6.1.4 is superceded (evicted) by
-        # version 6.4.1
-        # Force inclusion of version 6.1.4, until we're bumped to finagle 6.4.1+
-        jar(org='com.twitter', name='iago', rev='0.6.3', force=True),
-        jar(org='com.twitter', name='finagle-core', rev='6.1.4', force=True),
-        jar(org='com.twitter', name='finagle-thrift', rev='6.1.4', force=True),
-      ],
-      sources = ["LoadTestRecordProcessor.scala"])
 
 **If you notice that one "foreign" dependency pulls in mostly wrong
 things,** tell Pants not to pull in its dependencies. In your
@@ -98,13 +86,14 @@ carefully add hand-picked versions:
     :::python
     jar_library(name="retro-naming-factory",
       jars=[
-	jar(org='retro', name='retro-factory', rev='5.0.18', intransitive=True),
+	      jar(org='retro', name='retro-factory', rev='5.0.18', intransitive=True),
       ],
       dependencies=[
         # Don't use retro's expected (old, incompatible) common-logging
         # version, yipe; use the same version we use everywhere else:
-    '3rdparty/jvm/common-logging',
-      ])
+        '3rdparty/jvm/common-logging',
+      ]
+    )
 
 **If you notice a small number of transitive dependencies to exclude**
 Rather than mark the `jar` intransitive, you can `exclude` some

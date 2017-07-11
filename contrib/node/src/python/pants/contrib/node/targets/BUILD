@@ -2,13 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='targets',
   dependencies=[
     ':node_module',
     ':node_preinstalled_module',
     ':node_remote_module',
     ':node_test',
   ]
+)
+
+python_library(
+  name='node_bundle',
+  sources=['node_bundle.py'],
+  dependencies=[
+    ':node_package',
+    'src/python/pants/base:payload',
+    'src/python/pants/fs',
+  ],
 )
 
 python_library(

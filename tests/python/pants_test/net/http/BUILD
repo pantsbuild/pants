@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'http',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:requests',

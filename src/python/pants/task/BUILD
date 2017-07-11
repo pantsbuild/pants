@@ -3,10 +3,10 @@
 
 
 python_library(
-  name = 'task',
-  sources = globs('*.py'),
   dependencies = [
+    '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:worker_pool',
@@ -19,6 +19,7 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/scm',
+    'src/python/pants/scm/subsystems:changed',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',

@@ -2,13 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  name='args4j',
-  sources=globs('*.java'),
   dependencies=[
     '3rdparty:args4j',
     '3rdparty:guava',
     '3rdparty:jsr305',
   ],
+  platform='java7',
   provides=artifact(
     org='org.pantsbuild',
     name='args4j',

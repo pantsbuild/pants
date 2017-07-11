@@ -5,10 +5,10 @@
 # can use these jar_library deps by specifying '3rdparty:[name]' in their dependencies list.
 # If you're looking at this BUILD file for inspiration organizing your own project's 3rdparty
 # directory, note that for a multi-project workspace, we suggest setting up a tree of directories,
-# as detailed at http://pantsbuild.github.io/3rdparty.html .
+# as detailed at http://pantsbuild.org/3rdparty.html .
 
 # To add dependency for a JVM-tool needed by Pants itself (e.g., Antlr),
-# see http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
+# see http://pantsbuild.org/dev_tasks.html#jvm-tool-bootstrapping
 
 ###################
 # Production libs
@@ -16,7 +16,7 @@
 
 jar_library(name='args4j',
             jars=[
-              jar('args4j', 'args4j', '2.32')
+              jar('args4j', 'args4j', '2.33')
             ])
 
 jar_library(name='guava',
@@ -32,8 +32,9 @@ jar_library(name='jansi',
 
 jar_library(name='jsr305',
             jars=[
-              jar('com.google.code.findbugs', 'jsr305', '3.0.0'),
-            ])
+              jar('com.google.code.findbugs', 'jsr305', '3.0.2'),
+            ],
+            scope='compile')
 
 jar_library(name='checkstyle',
             jars = [
@@ -55,6 +56,11 @@ jar_library(name='commons-lang',
 jar_library(name='cucumber-java',
             jars=[
               jar(org='info.cukes', name='cucumber-java', rev='1.1.7'),
+            ])
+
+jar_library(name='ivy',
+            jars=[
+              jar(org='org.apache.ivy', name='ivy', rev='2.4.0'),
             ])
 
 jar_library(name='log4j',
@@ -128,13 +134,13 @@ target(name='thrift-0.6.1',
 
 jar_library(name='easymock',
             jars=[
-              jar('org.easymock', 'easymock', '3.3.1')
+              jar('org.easymock', 'easymock', '3.4')
             ])
 
 jar_library(name='gson',
-	    jars = [
-	      jar(org='com.google.code.gson', name='gson', rev='2.3.1')
-	    ])
+            jars = [
+              jar(org='com.google.code.gson', name='gson', rev='2.3.1')
+            ])
 
 jar_library(name='guava-testlib',
             jars=[
@@ -150,7 +156,7 @@ jar_library(name='junit',
 
 jar_library(name='scalatest',
             jars=[
-              scala_jar('org.scalatest', 'scalatest', '2.2.4')
+              scala_jar('org.scalatest', 'scalatest', '3.0.0')
             ])
 
 jar_library(name='wire-runtime',

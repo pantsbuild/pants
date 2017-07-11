@@ -12,11 +12,12 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.subsystems.junit import JUnit
+from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.java_tests import JavaTests
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -29,11 +30,12 @@ from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
+from pants.java.jar.jar_dependency import JarDependency
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
 from pants.util.osutil import get_os_name, normalize_os_name
 from pants_test.backend.python.tasks.interpreter_cache_test_mixin import InterpreterCacheTestMixin
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystems
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
@@ -49,140 +51,151 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def setUp(self):
     super(ExportTest, self).setUp()
 
-    self.set_options_for_scope('jvm-platform',
-                               default_platform='java6',
-                               platforms={
-                                 'java6': {'source': '1.6', 'target': '1.6'}
-                               })
+    # We need an initialized ScalaPlatform in order to make ScalaLibrary targets below.
+    scala_options = {
+      ScalaPlatform.options_scope: {
+        'version': 'custom'
+      }
+    }
+    init_subsystems([JUnit, ScalaPlatform], scala_options)
 
-    scala_options = {'scala-platform': {'version': 'custom'}}
-    with subsystem_instance(ScalaPlatform, **scala_options):
-      self.make_target(':scala-library',
-                       JarLibrary,
-                       jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
+    self.make_target(':scala-library',
+                     JarLibrary,
+                     jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
 
-      self.make_target(
-        'project_info:first',
-        target_type=Target,
-      )
+    self.make_target(
+      'project_info:first',
+      target_type=Target,
+    )
 
-      jar_lib = self.make_target(
-        'project_info:jar_lib',
-        target_type=JarLibrary,
-        jars=[JarDependency('org.apache', 'apache-jar', '12.12.2012')],
-      )
+    jar_lib = self.make_target(
+      'project_info:jar_lib',
+      target_type=JarLibrary,
+      jars=[JarDependency('org.apache', 'apache-jar', '12.12.2012')],
+    )
 
-      self.make_target(
-        'java/project_info:java_lib',
-        target_type=JavaLibrary,
-        sources=['com/foo/Bar.java', 'com/foo/Baz.java'],
-      )
+    self.make_target(
+      'java/project_info:java_lib',
+      target_type=JavaLibrary,
+      sources=['com/foo/Bar.java', 'com/foo/Baz.java'],
+    )
 
-      self.make_target(
-        'project_info:third',
+    self.make_target(
+      'project_info:third',
+      target_type=ScalaLibrary,
+      dependencies=[jar_lib],
+      java_sources=['java/project_info:java_lib'],
+      sources=['com/foo/Bar.scala', 'com/foo/Baz.scala'],
+    )
+
+    self.make_target(
+      'project_info:globular',
+      target_type=ScalaLibrary,
+      dependencies=[jar_lib],
+      java_sources=['java/project_info:java_lib'],
+      sources=['com/foo/*.scala'],
+    )
+
+    self.make_target(
+      'project_info:jvm_app',
+      target_type=JvmApp,
+      dependencies=[jar_lib],
+    )
+
+    self.make_target(
+      'project_info:jvm_target',
+      target_type=ScalaLibrary,
+      dependencies=[jar_lib],
+      sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
+    )
+
+    test_resource = self.make_target(
+      'project_info:test_resource',
+      target_type=Resources,
+      sources=['y_resource', 'z_resource'],
+    )
+
+    self.make_target(
+      'project_info:java_test',
+      target_type=JUnitTests,
+      dependencies=[jar_lib],
+      sources=['this/is/a/test/source/FooTest.scala'],
+      resources=[test_resource.address.spec],
+    )
+
+    jvm_binary = self.make_target(
+      'project_info:jvm_binary',
+      target_type=JvmBinary,
+      dependencies=[jar_lib],
+    )
+
+    self.make_target(
+      'project_info:top_dependency',
+      target_type=Target,
+      dependencies=[jvm_binary],
+    )
+
+    src_resource = self.make_target(
+      'project_info:resource',
+      target_type=Resources,
+      sources=['a_resource', 'b_resource'],
+    )
+
+    self.make_target(
+        'project_info:target_type',
         target_type=ScalaLibrary,
-        dependencies=[jar_lib],
-        java_sources=['java/project_info:java_lib'],
-        sources=['com/foo/Bar.scala', 'com/foo/Baz.scala'],
-      )
-
-      self.make_target(
-        'project_info:globular',
-        target_type=ScalaLibrary,
-        dependencies=[jar_lib],
-        java_sources=['java/project_info:java_lib'],
-        sources=['com/foo/*.scala'],
-      )
-
-      self.make_target(
-        'project_info:jvm_app',
-        target_type=JvmApp,
-        dependencies=[jar_lib],
-      )
-
-      self.make_target(
-        'project_info:jvm_target',
-        target_type=ScalaLibrary,
-        dependencies=[jar_lib],
-        sources=['this/is/a/source/Foo.scala', 'this/is/a/source/Bar.scala'],
-      )
-
-      test_resource = self.make_target(
-        'project_info:test_resource',
-        target_type=Resources,
-        sources=['y_resource', 'z_resource'],
-      )
-
-      self.make_target(
-        'project_info:java_test',
-        target_type=JavaTests,
-        dependencies=[jar_lib],
-        sources=['this/is/a/test/source/FooTest.scala'],
-        resources=[test_resource.address.spec],
-      )
-
-      jvm_binary = self.make_target(
-        'project_info:jvm_binary',
-        target_type=JvmBinary,
-        dependencies=[jar_lib],
-      )
-
-      self.make_target(
-        'project_info:top_dependency',
-        target_type=Target,
         dependencies=[jvm_binary],
-      )
+        sources=[],
+        resources=[src_resource.address.spec],
+    )
 
-      src_resource = self.make_target(
-        'project_info:resource',
-        target_type=Resources,
-        sources=['a_resource', 'b_resource'],
-      )
+    self.make_target(
+      'project_info:unrecognized_target_type',
+      target_type=JvmTarget,
+    )
 
-      self.make_target(
-          'project_info:target_type',
-          target_type=ScalaLibrary,
-          dependencies=[jvm_binary],
-          resources=[src_resource.address.spec],
-      )
+    self.add_to_build_file('src/python/x/BUILD', """
+       python_library(name="x", sources=globs("*.py"))
+    """.strip())
 
-      self.make_target(
-        'project_info:unrecognized_target_type',
-        target_type=JvmTarget,
-      )
+    self.add_to_build_file('src/python/y/BUILD', dedent("""
+      python_library(name="y", sources=rglobs("*.py"))
+      python_library(name="y2", sources=rglobs("subdir/*.py"))
+      python_library(name="y3", sources=rglobs("Test*.py"))
+    """))
 
-      self.add_to_build_file('src/python/x/BUILD', '''
-         python_library(name="x", sources=globs("*.py"))
-      '''.strip())
+    self.add_to_build_file('src/python/z/BUILD', """
+      python_library(name="z", sources=zglobs("**/*.py"))
+    """.strip())
 
-      self.add_to_build_file('src/python/y/BUILD', dedent('''
-        python_library(name="y", sources=rglobs("*.py"))
-        python_library(name="y2", sources=rglobs("subdir/*.py"))
-        python_library(name="y3", sources=rglobs("Test*.py"))
-      '''))
+    self.add_to_build_file('src/python/exclude/BUILD', """
+      python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
+    """.strip())
 
-      self.add_to_build_file('src/python/z/BUILD', '''
-        python_library(name="z", sources=zglobs("**/*.py"))
-      '''.strip())
+    self.add_to_build_file('src/BUILD', """
+      target(name="alias")
+    """.strip())
 
-      self.add_to_build_file('src/python/exclude/BUILD', '''
-        python_library(name="exclude", sources=globs("*.py", exclude=[['foo.py']]))
-      '''.strip())
-
-      self.add_to_build_file('src/BUILD', '''
-        target(name="alias")
-      '''.strip())
-
-  def execute_export(self, *specs):
-    context = self.context(target_roots=[self.target(spec) for spec in specs])
+  def execute_export(self, *specs, **options_overrides):
+    options = {
+      JvmPlatform.options_scope: {
+        'default_platform': 'java6',
+        'platforms': {
+          'java6': {'source': '1.6', 'target': '1.6'}
+        }
+      },
+    }
+    options.update(options_overrides)
+    context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
+                           for_subsystems=[JvmPlatform])
     context.products.safe_create_data('compile_classpath',
                                       init_func=ClasspathProducts.init_func(self.pants_workdir))
     task = self.create_task(context)
     return list(task.console_output(list(task.context.targets()),
                                     context.products.get_data('compile_classpath')))
 
-  def execute_export_json(self, *specs):
-    return json.loads(''.join(self.execute_export(*specs)))
+  def execute_export_json(self, *specs, **options):
+    return json.loads(''.join(self.execute_export(*specs, **options)))
 
   def test_source_globs_py(self):
     self.set_options(globs=True)
@@ -296,7 +309,9 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_java_test(self):
     result = self.execute_export_json('project_info:java_test')
     self.assertEqual('TEST', result['targets']['project_info:java_test']['target_type'])
-    self.assertEqual(['org.apache:apache-jar:12.12.2012'],
+    # Note that the junit dep gets auto-injected via the JUnit subsystem.
+    self.assertEqual(['org.apache:apache-jar:12.12.2012',
+                      'junit:junit:{}'.format(JUnit.LIBRARY_REV)],
                      result['targets']['project_info:java_test']['libraries'])
     self.assertEqual('TEST_RESOURCE',
                      result['targets']['project_info:test_resource']['target_type'])
@@ -389,15 +404,15 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       result['targets']['src/python/z:z']['globs']
     )
 
+  # TODO: Delete this test in 1.5.0.dev0, once we remove support for resources=.
   def test_synthetic_target(self):
     # Create a BUILD file then add itself as resources
-    self.add_to_build_file('src/python/alpha/BUILD', '''
+    self.add_to_build_file('src/python/alpha/BUILD', """
         python_library(name="alpha", sources=zglobs("**/*.py"), resources=["BUILD"])
-      '''.strip())
+      """.strip())
 
     result = self.execute_export_json('src/python/alpha')
-    # The synthetic resource is synthetic
-    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources']['is_synthetic'])
+    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources'])
     # But not the origin target
     self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
 
@@ -414,26 +429,26 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       yield java_home
 
   def test_preferred_jvm_distributions(self):
-    self.set_options_for_scope('jvm-platform',
-                               default_platform='java9999',
-                               platforms={
-                                 'java9999': {'target': '9999'},
-                                 'java10000': {'target': '10000'}
-                               })
-
     with self.fake_distribution(version='9999') as strict_home:
       with self.fake_distribution(version='10000') as non_strict_home:
-        self.set_options_for_scope('jvm-distributions',
-                                   paths={
-                                     normalize_os_name(get_os_name()): [
-                                       strict_home,
-                                       non_strict_home
-                                     ]
-                                   })
-        with subsystem_instance(DistributionLocator) as locator:
-          locator._reset()  # Make sure we get a fresh read from the options set just above.
-          self.addCleanup(locator._reset)  # And make sure we we clean up the values we cache.
+        options = {
+          JvmPlatform.options_scope: {
+            'default_platform': 'java9999',
+            'platforms': {
+              'java9999': {'target': '9999'},
+              'java10000': {'target': '10000'}
+            }
+          },
+          DistributionLocator.options_scope: {
+            'paths': {
+              normalize_os_name(get_os_name()): [
+                strict_home,
+                non_strict_home
+              ]
+            }
+          }
+        }
 
-          export_json = self.execute_export_json()
-          self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
-                           export_json['preferred_jvm_distributions']['java9999'])
+        export_json = self.execute_export_json(**options)
+        self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
+                         export_json['preferred_jvm_distributions']['java9999'])

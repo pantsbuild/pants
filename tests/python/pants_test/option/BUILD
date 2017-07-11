@@ -5,13 +5,13 @@ python_tests(
   name='testing',
   sources=globs('*.py', exclude=[globs('*_integration.py')]),
   dependencies=[
-    '3rdparty/python:pytest',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
   ],
+  timeout=30,
 )
 
 python_tests(
@@ -24,4 +24,5 @@ python_tests(
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
+  timeout=90,
 )

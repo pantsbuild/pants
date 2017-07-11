@@ -3,7 +3,9 @@
 
 # Like Hello World, but built with Pants.
 
-jvm_app(name='main',
+# Note that the target has no explicit name, so it defaults to the name
+# of the directory, in this case 'main'.
+jvm_app(
   basename = 'hello-example',
   dependencies = [
     ':main-bin'
@@ -18,8 +20,6 @@ jvm_app(name='main',
 jvm_binary(name = 'main-bin',
   dependencies = [
     'examples/src/java/org/pantsbuild/example/hello/greet',
-  ],
-  resources=[
     'examples/src/resources/org/pantsbuild/example/hello',
   ],
   source = 'HelloMain.java',

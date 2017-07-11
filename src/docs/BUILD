@@ -30,6 +30,10 @@ page(
   source='committers.md',
 )
 
+page(
+  name='common_tasks',
+  source='common_tasks/index.md',
+)
 
 page(
     name='community',
@@ -68,6 +72,7 @@ page(
     ':1.0',
     ':announce_201409',
     ':build_files',
+    ':common_tasks',
     ':first_concepts',
     ':first_tutorial',
     ':install',
@@ -91,6 +96,7 @@ page(
   source='invoking.md',
   links=[
     ':first_tutorial',
+    ':options',
     ':target_addresses',
   ]
 )
@@ -289,4 +295,3 @@ page(
   name='why_use_pants',
   source='why_use_pants.md'
 )
-

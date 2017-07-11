@@ -33,11 +33,14 @@ class NodeTestIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
   def test_test_preinstalled_node_module_project(self):
-    command = ['test',
-               'contrib/node/examples/src/node/preinstalled-project:unit']
-    pants_run = self.run_pants(command=command)
-
-    self.assert_success(pants_run)
+    # Run pants twice to make sure `NodePaths` product is set correctly for valid vts
+    # as well on the second run.
+    with self.temporary_workdir() as workdir:
+      for _ in range(2):
+        command = ['test',
+                   'contrib/node/examples/src/node/preinstalled-project:unit']
+        pants_run = self.run_pants_with_workdir(command=command, workdir=workdir)
+        self.assert_success(pants_run)
 
   def test_test_passthru_args(self):
     command = ['-q',

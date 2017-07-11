@@ -2,10 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'zinc',
-  sources = globs('*.py'),
   dependencies = [
+    ':testdata',
     'src/python/pants/backend/jvm/zinc',
     'src/python/pants/util:contextutil',
   ]
+)
+
+resources(
+  name='testdata',
+  sources=rglobs('testdata/*')
 )

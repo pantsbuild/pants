@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import logging
 import os
 
@@ -13,7 +14,7 @@ from pants.backend.jvm.subsystems.jar_dependency_management import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
-from pants.base.fingerprint_strategy import TaskIdentityFingerprintStrategy
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.task.task import TaskBase
@@ -24,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 
 # TODO(nh): We could fingerprint just the ivy options and not the task options.
-class IvyResolveFingerprintStrategy(TaskIdentityFingerprintStrategy):
+class IvyResolveFingerprintStrategy(FingerprintStrategy):
 
-  def __init__(self, task, confs):
-    super(IvyResolveFingerprintStrategy, self).__init__(task)
+  def __init__(self, confs):
+    super(IvyResolveFingerprintStrategy, self).__init__()
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):
@@ -47,7 +48,8 @@ class IvyResolveFingerprintStrategy(TaskIdentityFingerprintStrategy):
     if not hash_elements_for_target:
       return None
 
-    hasher = self._build_hasher(target)
+    hasher = hashlib.sha1()
+    hasher.update(target.payload.fingerprint())
 
     for conf in self._confs:
       hasher.update(conf)
@@ -81,8 +83,8 @@ class IvyTaskMixin(TaskBase):
     """Indicates a jar dependency couldn't be mapped."""
 
   @classmethod
-  def global_subsystems(cls):
-    return super(IvyTaskMixin, cls).global_subsystems() + (IvySubsystem, JarDependencyManagement)
+  def subsystem_dependencies(cls):
+    return super(IvyTaskMixin, cls).subsystem_dependencies() + (IvySubsystem, JarDependencyManagement)
 
   @classmethod
   def register_options(cls, register):
@@ -96,7 +98,7 @@ class IvyTaskMixin(TaskBase):
 
   @classmethod
   def implementation_version(cls):
-    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 2)]
+    return super(IvyTaskMixin, cls).implementation_version() + [('IvyTaskMixin', 3)]
 
   @memoized_property
   def ivy_cache_dir(self):
@@ -214,7 +216,7 @@ class IvyTaskMixin(TaskBase):
 
     confs = confs or ('default',)
 
-    fingerprint_strategy = IvyResolveFingerprintStrategy(self, confs)
+    fingerprint_strategy = IvyResolveFingerprintStrategy(confs)
 
     with self.invalidated(targets,
                           invalidate_dependents=invalidate_dependents,

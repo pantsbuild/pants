@@ -11,7 +11,7 @@ import shutil
 from collections import defaultdict
 
 from pathspec import PathSpec
-from pathspec.gitignore import GitIgnorePattern
+from pathspec.patterns.gitwildmatch import GitWildMatchPattern
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
@@ -23,6 +23,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
+from pants.base.project_tree_factory import get_project_tree
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.resources import Resources
 from pants.util import desktop
@@ -195,7 +196,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     if self.intransitive:
       jvm_targets = set(self.context.target_roots).intersection(jvm_targets)
 
-    build_ignore_patterns = self.context.options.for_global_scope().ignore_patterns or []
+    build_ignore_patterns = self.context.options.for_global_scope().build_ignore or []
     project = Project(self.project_name,
                       self.python,
                       self.skip_java,
@@ -207,7 +208,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
                       jvm_targets,
                       not self.intransitive,
                       self.TargetUtil(self.context),
-                      PathSpec.from_lines(GitIgnorePattern, build_ignore_patterns))
+                      PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns))
 
     if self.python:
       python_source_paths = self.get_options().python_source_paths
@@ -226,15 +227,15 @@ class IdeGen(IvyTaskMixin, NailgunTask):
       All other targets only contribute their external jar dependencies and excludes to the
       classpath definition.
     """
-    def is_cp(target):
+    def is_cp(tgt):
       return (
-        target.is_codegen or
+        tgt.is_synthetic or
         # Some IDEs need annotation processors pre-compiled, others are smart enough to detect and
         # proceed in 2 compile rounds
-        isinstance(target, AnnotationProcessor) or
-        (self.skip_java and is_java(target)) or
-        (self.skip_scala and is_scala(target)) or
-        (self.intransitive and target not in self.context.target_roots)
+        isinstance(tgt, AnnotationProcessor) or
+        (self.skip_java and is_java(tgt)) or
+        (self.skip_scala and is_scala(tgt)) or
+        (self.intransitive and tgt not in self.context.target_roots)
       )
 
     jars = OrderedSet()
@@ -344,8 +345,8 @@ class IdeGen(IvyTaskMixin, NailgunTask):
 
     self._prepare_project()
 
-    if self.context.options.is_known_scope('compile.checkstyle'):
-      checkstyle_classpath = self.tool_classpath('checkstyle', scope='compile.checkstyle')
+    if self.context.options.is_known_scope('lint.checkstyle'):
+      checkstyle_classpath = self.tool_classpath('checkstyle', scope='lint.checkstyle')
     else:  # Checkstyle not enabled.
       checkstyle_classpath = []
 
@@ -605,13 +606,14 @@ class Project(object):
         if not isinstance(target.address, BuildFileAddress):
           return []  # Siblings only make sense for BUILD files.
         candidates = OrderedSet()
-        build_file = target.address.build_file
-        dir_relpath = os.path.dirname(build_file.relpath)
-        for descendant in BuildFile.scan_build_files(build_file.project_tree, dir_relpath,
+
+        dir_relpath = target.address.spec_path
+        project_tree = get_project_tree(self.context.options.for_global_scope())
+        for descendant in BuildFile.scan_build_files(project_tree, dir_relpath,
                                                      build_ignore_patterns=self.build_ignore_patterns):
           candidates.update(self.target_util.get_all_addresses(descendant))
         if not self._is_root_relpath(dir_relpath):
-          ancestors = self._collect_ancestor_build_files(build_file.project_tree, os.path.dirname(dir_relpath),
+          ancestors = self._collect_ancestor_build_files(project_tree, os.path.dirname(dir_relpath),
                                                          self.build_ignore_patterns)
           for ancestor in ancestors:
             candidates.update(self.target_util.get_all_addresses(ancestor))

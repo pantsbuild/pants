@@ -14,19 +14,19 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import open_zip
 from pants.util.dirutil import safe_delete
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class ShaderTest(unittest.TestCase):
   def setUp(self):
     self.jarjar = '/not/really/jarjar.jar'
-    with subsystem_instance(DistributionLocator):
-      executor = SubprocessExecutor(DistributionLocator.cached())
-      self.shader = Shader(jarjar_classpath=[self.jarjar], executor=executor)
+    init_subsystem(DistributionLocator)
+    executor = SubprocessExecutor(DistributionLocator.cached())
+    self.shader = Shader(jarjar_classpath=[self.jarjar], executor=executor)
     self.output_jar = '/not/really/shaded.jar'
 
   def populate_input_jar(self, *entries):
-    fd, input_jar_path = tempfile.mkstemp()
+    fd, input_jar_path = tempfile.mkstemp(suffix='.jar')
     os.close(fd)
     self.addCleanup(safe_delete, input_jar_path)
     with open_zip(input_jar_path, 'w') as jar:

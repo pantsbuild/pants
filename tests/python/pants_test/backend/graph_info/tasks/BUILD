@@ -19,8 +19,9 @@ python_tests(
   name = 'dependees',
   sources = ['test_dependees.py'],
   dependencies = [
-    'src/python/pants/backend/codegen/targets:java',
+    'src/python/pants/backend/codegen/thrift/java',
     'src/python/pants/backend/graph_info/tasks',
+    'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/python/targets:python',
@@ -108,6 +109,15 @@ python_tests(
     'src/python/pants/base:exceptions',
     'tests/python/pants_test/tasks:task_test_base',
   ]
+)
+
+python_tests(
+  name='paths_integration',
+  sources=['test_paths_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ],
+  tags = {'integration'},
 )
 
 python_tests(

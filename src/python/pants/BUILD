@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 target(
-  name='pants',
   dependencies=[
     'src/python/pants/bin:pants',
   ],
@@ -11,9 +10,13 @@ target(
 
 python_library(
   name='pants-packaged',
+  sources=[],
+  dependencies=[
+    ':version',
+  ],
   provides=pants_setup_py(
     name='pantsbuild.pants',
-    description='A bottom-up build tool.',
+    description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
   ).with_binaries(
     pants='src/python/pants/bin:pants',
@@ -28,7 +31,7 @@ python_library(
   name='version',
   sources=['version.py'],
   dependencies = [
-    "src/python/pants/base:revision"
+    "3rdparty/python:packaging",
   ]
 )
 

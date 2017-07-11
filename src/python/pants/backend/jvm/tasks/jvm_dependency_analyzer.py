@@ -20,7 +20,6 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.java.distribution.distribution import DistributionLocator
-from pants.util.contextutil import open_zip
 from pants.util.memo import memoized_method, memoized_property
 
 
@@ -80,12 +79,34 @@ class JvmDependencyAnalyzer(object):
 
     return targets_by_file
 
+  def targets_for_class(self, target, classname):
+    """Search which targets from `target`'s transitive dependencies contain `classname`."""
+    targets_with_class = set()
+    for target in target.closure():
+      if classname in self._target_classes(target):
+        targets_with_class.add(target)
+
+    return targets_with_class
+
+  @memoized_method
+  def _target_classes(self, target):
+    """Set of target's provided classes.
+
+    Call at the target level is to memoize efficiently.
+    """
+    target_classes = set()
+    contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)
+    for f in contents:
+      classname = ClasspathUtil.classname_for_rel_classfile(f)
+      if classname:
+        target_classes.add(classname)
+    return target_classes
+
   def _jar_classfiles(self, jar_file):
     """Returns an iterator over the classfiles inside jar_file."""
-    with open_zip(jar_file, 'r') as jar:
-      for cls in jar.namelist():
-        if cls.endswith(b'.class'):
-          yield cls
+    for cls in ClasspathUtil.classpath_entries_contents([jar_file]):
+      if cls.endswith(b'.class'):
+        yield cls
 
   def count_products(self, target):
     contents = ClasspathUtil.classpath_contents((target,), self.runtime_classpath)

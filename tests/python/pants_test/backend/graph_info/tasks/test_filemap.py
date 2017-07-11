@@ -52,6 +52,7 @@ class FilemapTest(ConsoleTaskTestBase):
       'common/src/py/b/two.py common/src/py/b:b',
       'common/src/py/b/three.py common/src/py/b:b',
       'common/src/py/c/four.py common/src/py/c:c',
+      targets=self.targets('::')
     )
 
   def test_one(self):

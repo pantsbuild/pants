@@ -1,10 +1,13 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+python_library(
+  name='lib'
+)
+
 python_tests(
-  name='checkstyle',
-  sources=globs('*.py'),
   dependencies=[
+    ':lib',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',

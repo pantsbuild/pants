@@ -49,15 +49,28 @@ class RemoteSources(Target):
     self._dest_args = args
     payload = payload or Payload()
     payload.add_fields({
-      'sources_target_spec': PrimitiveField(Address.parse(sources_target,
-                                                          relative_to=address.spec_path).spec),
+      'sources_target_spec': PrimitiveField(self._sources_target_to_spec(address, sources_target)),
       'dest': PrimitiveField(dest.__name__),
     })
     super(RemoteSources, self).__init__(address=address, payload=payload, **kwargs)
 
-  @property
-  def traversable_dependency_specs(self):
-    yield self.payload.sources_target_spec
+  @staticmethod
+  def _sources_target_to_spec(address, sources_target):
+    return Address.parse(sources_target, relative_to=address.spec_path).spec
+
+  @classmethod
+  def compute_dependency_specs(cls, kwargs=None, payload=None):
+    for spec in super(RemoteSources, cls).compute_dependency_specs(kwargs, payload):
+      yield spec
+
+    if kwargs:
+      address = kwargs.get('address')
+      sources_target = kwargs.get('sources_target')
+      if address and sources_target:
+        yield cls._sources_target_to_spec(address, sources_target)
+    elif payload:
+      payload_dict = payload.as_dict()
+      yield payload_dict['sources_target_spec']
 
   @property
   def sources_target(self):

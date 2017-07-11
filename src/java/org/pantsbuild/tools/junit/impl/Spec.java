@@ -3,11 +3,11 @@
 
 package org.pantsbuild.tools.junit.impl;
 
-import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.Objects;
+
+import com.google.common.collect.ImmutableSet;
+
 import org.pantsbuild.junit.annotations.TestParallel;
 import org.pantsbuild.junit.annotations.TestParallelClassesAndMethods;
 import org.pantsbuild.junit.annotations.TestParallelMethods;
@@ -18,32 +18,41 @@ import org.pantsbuild.junit.annotations.TestSerial;
  */
 class Spec {
   private final Class<?> clazz;
-  private final Set<String> methods;
+  private final ImmutableSet<String> methods;
+  private static final ImmutableSet<String> empty = ImmutableSet.of();  // To get around java7 quirk
 
-  public Spec(Class<?> clazz) {
-    Preconditions.checkNotNull(clazz);
-    this.clazz = clazz;
-    this.methods = new LinkedHashSet<String>();
+  Spec(Class<?> clazz) {
+    this(clazz, Spec.empty);
   }
 
-  public String getSpecName() {
+  private Spec(Class<?> clazz, ImmutableSet<String> methods) {
+    this.clazz = Objects.requireNonNull(clazz);
+    this.methods = Objects.requireNonNull(methods);
+  }
+
+  String getSpecName() {
     return this.clazz.getName();
   }
 
-  public Class<?> getSpecClass() {
+  Class<?> getSpecClass() {
     return this.clazz;
   }
 
-  public void addMethod(String method) {
-    Preconditions.checkNotNull(method);
-    methods.add(method);
+  /**
+   * Return a copy of this class spec, but with an additional method.
+   *
+   * @param method The method to add to the class spec.
+   * @return A new spec that includes the added method.
+   */
+  Spec withMethod(String method) {
+    return new Spec(clazz, ImmutableSet.<String>builder().addAll(methods).add(method).build());
   }
 
   /**
    * @return either the Concurrency value specified by the class annotation or the default
    * concurrency setting passed in the parameter.
    */
-  public Concurrency getConcurrency(Concurrency defaultConcurrency) {
+  Concurrency getConcurrency(Concurrency defaultConcurrency) {
     if (clazz.isAnnotationPresent(TestSerial.class)) {
       return Concurrency.SERIAL;
     } else if (clazz.isAnnotationPresent(TestParallel.class)) {
@@ -57,6 +66,6 @@ class Spec {
   }
 
   public Collection<String> getMethods() {
-    return ImmutableList.copyOf(methods);
+    return methods;
   }
 }

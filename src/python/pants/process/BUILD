@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'process',
-  sources = globs('*.py'),
   dependencies = [
     '3rdparty/python:fasteners',
     '3rdparty/python:psutil',

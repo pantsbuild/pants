@@ -31,9 +31,9 @@ from pants.util.memo import memoized_property
 
 
 class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
-  def __init__(self, task, main, custom_rules=None):
+  def __init__(self, main, custom_rules=None):
     # The bootstrapper uses no custom confs in its resolves.
-    super(ShadedToolFingerprintStrategy, self).__init__(task, confs=None)
+    super(ShadedToolFingerprintStrategy, self).__init__(confs=None)
 
     self._main = main
     self._custom_rules = custom_rules
@@ -84,11 +84,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (Shader.Factory,)
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(BootstrapJvmTools, cls).global_subsystems() + (IvySubsystem, )
+    return super(BootstrapJvmTools, cls).subsystem_dependencies() + (IvySubsystem, Shader.Factory)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -113,7 +109,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return cls.ToolResolveError(msg)
 
   @classmethod
-  def _alternate_target_roots(cls, options, address_mapper, build_graph):
+  def get_alternate_target_roots(cls, options, address_mapper, build_graph):
     processed = set()
     for jvm_tool in JvmToolMixin.get_registered_tools():
       dep_spec = jvm_tool.dep_spec(options)
@@ -122,7 +118,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
       if dep_address not in processed:
         processed.add(dep_address)
         try:
-          if build_graph.contains_address(dep_address) or address_mapper.resolve(dep_address):
+          if build_graph.resolve_address(dep_address):
             # The user has defined a tool classpath override - we let that stand.
             continue
         except AddressLookupError as e:
@@ -235,7 +231,7 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     return Shader.Factory.create(self.context)
 
   def _bootstrap_shaded_jvm_tool(self, jvm_tool, targets):
-    fingerprint_strategy = ShadedToolFingerprintStrategy(self, jvm_tool.main,
+    fingerprint_strategy = ShadedToolFingerprintStrategy(jvm_tool.main,
                                                          custom_rules=jvm_tool.custom_rules)
 
     with self.invalidated(targets,

@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-jvm_app(name='bundle',
+jvm_app(
   basename = 'bundle-example',
   binary=':bundle-bin',
   bundles=[
@@ -32,8 +32,26 @@ jvm_app(name='rel_path',
   bundles=[
     bundle(
       rel_path='testprojects/src/java/org/pantsbuild/testproject/bundle/a',
-      fileset=['b/file1.txt']
+      fileset=['b/file1.txt'],
     )
+  ]
+)
+
+jvm_app(name='directory',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(
+      fileset=['a/b'],
+    ),
+  ]
+)
+
+jvm_app(name='explicit_recursion',
+  binary=':bundle-bin',
+  bundles=[
+    bundle(
+      fileset=['a/**/*'],
+    ),
   ]
 )
 
@@ -43,11 +61,9 @@ jvm_binary(name = 'bundle-bin',
   source = 'BundleMain.java',
   main = 'org.pantsbuild.testproject.bundle.BundleMain',
   basename = 'bundle-example-bin',
-  resources = [
-    'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
-  ],
   dependencies = [
     '3rdparty:guava',
+    'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
   ]
 )
 
@@ -60,14 +76,14 @@ jvm_app(name='missing-files',
   ]
 )
 
-# Tests `resources=` ordering via integration test.
+# Tests resources ordering via integration test.
 jvm_binary(
   name='bundle-resource-ordering',
   source='BundleMain.java',
   main='org.pantsbuild.testproject.bundle.BundleMain',
-  resources=[
+  dependencies=[
+    '3rdparty:guava',
     'testprojects/src/resources/org/pantsbuild/testproject/bundleresources:resources',
     'testprojects/tests/resources/org/pantsbuild/testproject/bundleresources:resources',
-  ],
-  dependencies=['3rdparty:guava']
+  ]
 )

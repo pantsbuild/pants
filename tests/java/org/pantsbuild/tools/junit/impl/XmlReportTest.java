@@ -26,6 +26,7 @@ import org.pantsbuild.tools.junit.lib.XmlReportFailingParameterizedTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailingTestRunnerTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIngoredTest;
 import org.pantsbuild.tools.junit.lib.XmlReportIgnoredTestSuiteTest;
+import org.pantsbuild.tools.junit.lib.XmlReportMockitoStubbingTest;
 import org.pantsbuild.tools.junit.lib.XmlReportTestSuite;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -120,6 +121,35 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
     assertEquals(2, testSuite.getSkipped());
     assertEquals("0", testSuite.getTime());
     assertEquals(testClassName, testSuite.getName());
+  }
+
+  @Test
+  public void testXmlReportMockitoUnnecessaryStubbing() throws Exception {
+    String testClassName = XmlReportMockitoStubbingTest.class.getCanonicalName();
+    AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, true);
+
+    assertNotNull(testSuite);
+    assertEquals(1, testSuite.getTests());
+    assertEquals(0, testSuite.getFailures());
+    assertEquals(1, testSuite.getErrors());
+    assertEquals(0, testSuite.getSkipped());
+    assertTrue(Float.parseFloat(testSuite.getTime()) > 0);
+    assertEquals(testClassName, testSuite.getName());
+
+    List<AntJunitXmlReportListener.TestCase> testCases = testSuite.getTestCases();
+    assertEquals(2, testCases.size());
+    sortTestCasesByName(testCases);
+
+    AntJunitXmlReportListener.TestCase errorTestCase = testCases.get(1);
+    assertEquals(testClassName, errorTestCase.getClassname());
+    assertEquals("unnecessary Mockito stubbings", errorTestCase.getName());
+    assertEquals("0", errorTestCase.getTime());
+    assertNull(errorTestCase.getFailure());
+    assertThat(errorTestCase.getError().getMessage(),
+        containsString("Unnecessary stubbings detected in test class:"));
+    assertEquals("org.mockito.exceptions.misusing.UnnecessaryStubbingException",
+        errorTestCase.getError().getType());
+    assertThat(errorTestCase.getError().getStacktrace(), containsString(testClassName));
   }
 
   @Test
@@ -343,7 +373,7 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
 
   protected void sortTestCasesByName(List<AntJunitXmlReportListener.TestCase> testCases) {
     Collections.sort(testCases, new Comparator<AntJunitXmlReportListener.TestCase>() {
-      public int compare(AntJunitXmlReportListener.TestCase tc1,
+      @Override public int compare(AntJunitXmlReportListener.TestCase tc1,
           AntJunitXmlReportListener.TestCase tc2) {
         return tc1.getName().compareTo(tc2.getName());
       }

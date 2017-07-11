@@ -30,3 +30,10 @@ class NodeRunIntegrationTest(PantsRunIntegrationTest):
 
     pants_run = self.run_pants(command=command + ['correct'])
     self.assert_success(pants_run)
+
+  def test_run_yarnpkg(self):
+    command = ['run',
+               'contrib/node/examples/src/node/hello:pantsbuild-hello-node',
+               '--run-node-script-name=start']
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)

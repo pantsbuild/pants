@@ -5,16 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
-from pants.backend.jvm.targets.jar_dependency import JarDependency
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.scalastyle import Scalastyle
+from pants.java.jar.jar_dependency import JarDependency
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 class CustomScalaTest(NailgunTaskTestBase):
@@ -60,40 +59,55 @@ class CustomScalaTest(NailgunTaskTestBase):
         </scalastyle>
       """.format(rule_section_xml=rule_section_xml)))
 
-  @contextmanager
   def scala_platform_setup(self):
     options = {
-      'scala-platform': {
+      ScalaPlatform.options_scope: {
         'version': 'custom',
         'suffix_version': '2.10',
       }
     }
-    with subsystem_instance(ScalaPlatform, **options):
-      self.make_target('//:scalastyle',
-                       JarLibrary,
-                       jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')]
-      )
+    init_subsystem(ScalaPlatform, options)
 
-      self.make_target('//:scala-repl',
-                 JarLibrary,
-                 jars=[
-                   JarDependency(org = 'org.scala-lang',
-                                 name = 'jline',
-                                 rev = '2.10.5'),
-                   JarDependency(org = 'org.scala-lang',
-                                 name = 'scala-compiler',
-                                 rev = '2.10.5')])
+    self.make_target('//:scalastyle',
+                     JarLibrary,
+                     jars=[JarDependency('org.scalastyle', 'scalastyle_2.10', '0.3.2')]
+    )
 
-      self.make_target('//:scalac',
-                       JarLibrary,
-                       jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
-      yield
+    self.make_target('//:scala-repl',
+               JarLibrary,
+               jars=[
+                 JarDependency(org = 'org.scala-lang',
+                               name = 'jline',
+                               rev = '2.10.5'),
+                 JarDependency(org = 'org.scala-lang',
+                               name = 'scala-compiler',
+                               rev = '2.10.5')])
+
+    self.make_target('//:scalac',
+                     JarLibrary,
+                     jars=[JarDependency('org.scala-lang', 'scala-compiler', '2.10.5')])
 
   def test_custom_lib_spec(self):
-    with self.scala_platform_setup():
-      self.make_target('//:scala-library',
-                       JarLibrary,
-                       jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
+    self.scala_platform_setup()
+    self.make_target('//:scala-library',
+                     JarLibrary,
+                     jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
+    scala_target = self.make_target('a/scala:pass', ScalaLibrary, sources=['pass.scala'])
+
+    context = self._create_context(
+        scalastyle_config=self._create_scalastyle_config_file(),
+        target_roots=[scala_target]
+    )
+
+    self.execute(context)
+
+  def test_no_custom_target(self):
+    with self.assertRaises(ValueError):
+      # This should raise:
+      # ValueError: Tests must make targets for traversable dependency specs
+      # ahead of them being traversed, ScalaLibrary(a/scala:pass) tried to traverse
+      # //:scala-library-custom which does not exist.
+      self.scala_platform_setup()
       scala_target = self.make_target('a/scala:pass', ScalaLibrary, sources=['pass.scala'])
 
       context = self._create_context(
@@ -102,19 +116,3 @@ class CustomScalaTest(NailgunTaskTestBase):
       )
 
       self.execute(context)
-
-  def test_no_custom_target(self):
-    with self.assertRaises(ValueError):
-      # This should raise:
-      # ValueError: Tests must make targets for traversable dependency specs
-      # ahead of them being traversed, ScalaLibrary(a/scala:pass) tried to traverse
-      # //:scala-library-custom which does not exist.
-      with self.scala_platform_setup():
-        scala_target = self.make_target('a/scala:pass', ScalaLibrary, sources=['pass.scala'])
-
-        context = self._create_context(
-            scalastyle_config=self._create_scalastyle_config_file(),
-            target_roots=[scala_target]
-        )
-
-        self.execute(context)

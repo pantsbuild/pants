@@ -3,11 +3,8 @@
 
 python_library(
   name='python',
-  sources=globs('*.py'),
-  resource_targets=[
-    ':resources'
-  ],
   dependencies=[
+    ':resources',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:exceptions',

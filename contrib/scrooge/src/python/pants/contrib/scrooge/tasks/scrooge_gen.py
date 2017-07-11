@@ -10,17 +10,19 @@ import re
 import tempfile
 from collections import defaultdict, namedtuple
 
-from pants.backend.codegen.subsystems.thrift_defaults import ThriftDefaults
-from pants.backend.codegen.targets.java_thrift_library import JavaThriftLibrary
-from pants.backend.codegen.tasks.simple_codegen_task import SimpleCodegenTask
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
+from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet
 
+from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
+  JavaThriftLibraryFingerprintStrategy
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
 
 
@@ -30,7 +32,13 @@ _RPC_STYLES = frozenset(['sync', 'finagle', 'ostrich'])
 class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   DepInfo = namedtuple('DepInfo', ['service', 'structs'])
-  PartialCmd = namedtuple('PartialCmd', ['language', 'rpc_style', 'namespace_map'])
+  PartialCmd = namedtuple('PartialCmd', [
+    'language', 
+    'namespace_map', 
+    'default_java_namespace', 
+    'include_paths', 
+    'compiler_args'
+  ])
 
   @classmethod
   def register_options(cls, register):
@@ -52,8 +60,8 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     cls.register_jvm_tool(register, 'scrooge-gen')
 
   @classmethod
-  def global_subsystems(cls):
-    return super(ScroogeGen, cls).global_subsystems() + (ThriftDefaults,)
+  def subsystem_dependencies(cls):
+    return super(ScroogeGen, cls).subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def product_types(cls):
@@ -62,6 +70,10 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   @classmethod
   def implementation_version(cls):
     return super(ScroogeGen, cls).implementation_version() + [('ScroogeGen', 3)]
+
+  @classmethod
+  def get_fingerprint_strategy(cls):
+    return JavaThriftLibraryFingerprintStrategy(ThriftDefaults.global_instance())
 
   def __init__(self, *args, **kwargs):
     super(ScroogeGen, self).__init__(*args, **kwargs)
@@ -127,17 +139,41 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     self._validate_compiler_configs([target])
     self._must_have_sources(target)
 
+    def compiler_args_has_rpc_style(compiler_args):
+      return "--finagle" in compiler_args or "--ostrich" in compiler_args
+
+    def merge_rpc_style_with_compiler_args(compiler_args, rpc_style):
+      new_compiler_args = list(compiler_args)
+      # ignore rpc_style if we think compiler_args is setting it
+      if not compiler_args_has_rpc_style(compiler_args):
+        if rpc_style == 'ostrich':
+          new_compiler_args.append('--finagle')
+          new_compiler_args.append('--ostrich')
+        elif rpc_style == 'finagle':
+          new_compiler_args.append('--finagle')
+      return new_compiler_args
+
+    namespace_map = self._thrift_defaults.namespace_map(target)
+    compiler_args = merge_rpc_style_with_compiler_args(
+        self._thrift_defaults.compiler_args(target), 
+        self._validate_rpc_style(target))
+
     partial_cmd = self.PartialCmd(
         language=self._validate_language(target),
-        rpc_style=self._validate_rpc_style(target),
-        namespace_map=tuple(sorted(target.namespace_map.items()) if target.namespace_map else ()))
+        namespace_map=tuple(sorted(namespace_map.items())) if namespace_map else (),
+        default_java_namespace=self._thrift_defaults.default_java_namespace(target),
+        include_paths=target.include_paths,
+        compiler_args=compiler_args)
 
     self.gen(partial_cmd, target, target_workdir)
 
   def gen(self, partial_cmd, target, target_workdir):
     import_paths, _ = calculate_compile_sources([target], self.is_gentarget)
 
-    args = []
+    args = list(partial_cmd.compiler_args)
+
+    if partial_cmd.default_java_namespace:
+      args.extend(['--default-java-namespace', partial_cmd.default_java_namespace])
 
     for import_path in import_paths:
       args.extend(['--import-path', import_path])
@@ -147,16 +183,14 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     for lhs, rhs in partial_cmd.namespace_map:
       args.extend(['--namespace-map', '%s=%s' % (lhs, rhs)])
 
-    if partial_cmd.rpc_style == 'ostrich':
-      args.append('--finagle')
-      args.append('--ostrich')
-    elif partial_cmd.rpc_style == 'finagle':
-      args.append('--finagle')
-
     args.extend(['--dest', target_workdir])
 
     if not self.get_options().strict:
       args.append('--disable-strict')
+
+    if partial_cmd.include_paths:
+      for include_path in partial_cmd.include_paths:
+        args.extend(['--include-path', include_path])
 
     if self.get_options().verbose:
       args.append('--verbose')
@@ -264,4 +298,4 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   @property
   def _copy_target_attributes(self):
-    return ['provides']
+    return ['provides', 'strict_deps', 'fatal_warnings']

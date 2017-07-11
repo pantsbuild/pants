@@ -70,14 +70,19 @@ class NodeResolveTest(TaskTestBase):
 
   def test_resolve_simple(self):
     typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
-
+    self.create_file('src/node/util/package.json', contents=dedent("""
+      {
+        "name": "util",
+        "version": "0.0.1"
+      }
+    """))
     self.create_file('src/node/util/util.js', contents=dedent("""
       var typ = require('typ');
       console.log("type of boolean is: " + typ.BOOLEAN);
     """))
     target = self.make_target(spec='src/node/util',
                               target_type=NodeModule,
-                              sources=['util.js'],
+                              sources=['util.js', 'package.json'],
                               dependencies=[typ])
 
     context = self.context(target_roots=[target])
@@ -102,6 +107,12 @@ class NodeResolveTest(TaskTestBase):
                             package_name='typ',
                             version='0.6.1')
 
+    self.create_file('src/node/util/package.json', contents=dedent("""
+      {
+        "name": "util",
+        "version": "0.0.1"
+      }
+    """))
     self.create_file('src/node/util/typ.js', contents=dedent("""
       var typ = require('typ');
       module.exports = {
@@ -110,9 +121,15 @@ class NodeResolveTest(TaskTestBase):
     """))
     util = self.make_target(spec='src/node/util',
                             target_type=NodeModule,
-                            sources=['typ.js'],
+                            sources=['typ.js', 'package.json'],
                             dependencies=[typ1])
 
+    self.create_file('src/node/leaf/package.json', contents=dedent("""
+      {
+        "name": "leaf",
+        "version": "0.0.1"
+      }
+    """))
     self.create_file('src/node/leaf/leaf.js', contents=dedent("""
       var typ = require('typ');
       var util_typ = require('util/typ');
@@ -121,7 +138,7 @@ class NodeResolveTest(TaskTestBase):
     """))
     leaf = self.make_target(spec='src/node/leaf',
                             target_type=NodeModule,
-                            sources=['leaf.js'],
+                            sources=['leaf.js', 'package.json'],
                             dependencies=[util, typ2])
     context = self.context(target_roots=[leaf])
     task = self.create_task(context)
@@ -150,8 +167,8 @@ class NodeResolveTest(TaskTestBase):
             if 'typ' == package['name']:
               typ_packages.append(os.path.relpath(os.path.join(root, f), node_path))
               self.assertEqual(1, len(typ_packages),
-                              'Expected to find exactly 1 de-duped `typ` package, but found these:'
-                              '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
+                               'Expected to find exactly 1 de-duped `typ` package, but found these:'
+                               '\n\t{}'.format('\n\t'.join(sorted(typ_packages))))
 
     script_path = os.path.join(node_path, 'leaf.js')
     out = task.node_distribution.node_command(args=[script_path]).check_output()
@@ -160,9 +177,15 @@ class NodeResolveTest(TaskTestBase):
     self.assertIn('type of bool is: boolean', lines)
 
   def test_resolve_preserves_package_json(self):
+    self.create_file('src/node/util/package.json', contents=dedent("""
+      {
+        "name": "util",
+        "version": "0.0.1"
+      }
+    """))
     util = self.make_target(spec='src/node/util',
                             target_type=NodeModule,
-                            sources=[],
+                            sources=['package.json'],
                             dependencies=[])
 
     self.create_file('src/node/scripts_project/package.json', contents=dedent("""

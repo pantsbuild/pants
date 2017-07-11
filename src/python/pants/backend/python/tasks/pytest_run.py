@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
-import logging
 import os
 import re
 import shutil
@@ -21,11 +20,10 @@ from six import StringIO
 from six.moves import configparser
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.python_setup import PythonRepos, PythonSetup
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError, TestFailedTaskError
+from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -35,11 +33,6 @@ from pants.util.contextutil import (environment_as, temporary_dir, temporary_fil
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
-
-
-# Initialize logging, since tests do not run via pants_exe (where it is usually done).
-logging.basicConfig()
-logger = logging.getLogger(__name__)
 
 
 class PythonTestResult(object):
@@ -75,21 +68,6 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
   """
   :API: public
   """
-  _TESTING_TARGETS = [
-    # Note: the requirement restrictions on pytest and pytest-cov match those in requirements.txt,
-    # to avoid confusion when debugging pants tests.
-    # TODO: make these an option, so any pants install base can pick their pytest version.
-    PythonRequirement('pytest>=2.6,<2.7'),
-    # NB, pytest-timeout 1.0.0 introduces a conflicting pytest>=2.8.0 requirement, see:
-    #   https://github.com/pantsbuild/pants/issues/2566
-    PythonRequirement('pytest-timeout<1.0.0'),
-    PythonRequirement('pytest-cov>=1.8,<1.9'),
-    PythonRequirement('unittest2>=0.6.0,<=1.9.0'),
-  ]
-
-  @classmethod
-  def global_subsystems(cls):
-    return super(PytestRun, cls).global_subsystems() + (PythonSetup, PythonRepos)
 
   @classmethod
   def register_options(cls, register):
@@ -151,7 +129,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     if self.get_options().fast:
       result = self._do_run_tests(targets, workunit)
       if not result.success:
-        raise TestFailedTaskError(failed_targets=result.failed_targets)
+        raise ErrorWhileTesting(failed_targets=result.failed_targets)
     else:
       results = {}
       for target in targets:
@@ -160,12 +138,13 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
         if not rv.success and self.get_options().fail_fast:
           break
 
-      for target in sorted(results):
-        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
+      for target, rv in sorted(results.items()):
+        log = self.context.log.info if rv.success else self.context.log.error
+        log('{0:80}.....{1:>10}'.format(target.id, rv))
 
       failed_targets = [target for target, _rv in results.items() if not _rv.success]
       if failed_targets:
-        raise TestFailedTaskError(failed_targets=failed_targets)
+        raise ErrorWhileTesting(failed_targets=failed_targets)
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
@@ -228,6 +207,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     exclude_lines =
         def __repr__
         raise NotImplementedError
+        pragma: no cover
+        pragma: no branch
+        pragma: recursive coverage
     """)
 
   @staticmethod
@@ -383,7 +365,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
 
           # On failures or timeouts, the .coverage file won't be written.
           if not os.path.exists('.coverage'):
-            logger.warning('No .coverage file was found! Skipping coverage reporting.')
+            self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
           else:
             # Normalize .coverage.raw paths using combine and `paths` config in the rc file.
             # This swaps the /tmp pex chroot source paths for the local original source paths
@@ -416,11 +398,21 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'pytest'
 
+    # We hard-code the requirements here because they can't be upgraded without
+    # major changes to this code, and the PyTest subsystem now contains the versions
+    # for the new PytestRun task.  This one is about to be deprecated anyway.
+    testing_reqs = [PythonRequirement(s) for s in [
+      'pytest>=2.6,<2.7',
+      'pytest-timeout<1.0.0',
+      'pytest-cov>=1.8,<1.9',
+      'unittest2>=0.6.0,<=1.9.0',
+    ]]
+
     chroot = self.cached_chroot(interpreter=interpreter,
                                 pex_info=pex_info,
                                 targets=targets,
                                 platforms=('current',),
-                                extra_requirements=self._TESTING_TARGETS)
+                                extra_requirements=testing_reqs)
     pex = chroot.pex()
     with self._maybe_shard() as shard_args:
       with self._maybe_emit_junit_xml(targets) as junit_args:
@@ -446,9 +438,9 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
       with environment_as(**env):
         rc = self._spawn_and_wait(pex, workunit, args=args, setsid=True)
         return PythonTestResult.rc(rc)
-    except TestFailedTaskError:
+    except ErrorWhileTesting:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
-      # fail with a TestFailedTaskError. We can't just set PythonTestResult
+      # fail with a ErrorWhileTesting. We can't just set PythonTestResult
       # to a failure because the resultslog doesn't have all the failures
       # when tests are killed with a timeout. Therefore we need to re-raise
       # here.

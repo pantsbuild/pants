@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+from pants.util.memo import memoized_property
 
 
 class PrepCommand(Target):
@@ -28,21 +30,21 @@ class PrepCommand(Target):
   _goals=frozenset()
 
   @staticmethod
-  def add_goal(goal):
+  def add_allowed_goal(goal):
     """Add a named goal to the list of valid goals for the 'goal' parameter."""
     PrepCommand._goals = frozenset(list(PrepCommand._goals) + [goal])
 
   @classmethod
   def reset(cls):
     """Used for testing purposes to reset state."""
-    cls._goals=frozenset()
+    cls._goals = frozenset()
 
   @staticmethod
-  def goals():
+  def allowed_goals():
     return PrepCommand._goals
 
-  def __init__(self, prep_executable=None, prep_args=None, payload=None, prep_environ=False,
-               goal=None, **kwargs):
+  def __init__(self, address=None, payload=None, prep_executable=None, prep_args=None,
+               prep_environ=False, goal=None, goals=None, **kwargs):
     """
     :API: public
 
@@ -52,21 +54,44 @@ class PrepCommand(Target):
       a \\\\0-separated list of key=value pairs to insert into the environment.
       Note that this will pollute the environment for all future tests, so
       avoid it if at all possible.
-    :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
-                 runs in the 'test' goal.
+    :param goal: (deprecated) Pants goal to run this command in [test, binary or compile]. If not
+      specified, runs in the 'test' goal.
+    :param goals: One or more pants goals to run this command in [test, binary or compile]. If not
+      specified, runs in the 'test' goal.
     """
-    payload = payload or Payload()
-    goal = goal or 'test'
+    def raise_bad_target(msg):
+      raise TargetDefinitionException(address.spec, msg)
 
+    if not prep_executable:
+      raise_bad_target('prep_executable must be specified.')
+    if goal and goals:
+      raise_bad_target('Either `goal` or `goals` (preferred) should be specified, but not both.')
+
+    if goals:
+      goals = sorted(goals)
+    elif goal:
+      warn_or_error('1.5.0.dev0', 'goal', hint='Use `goals=[{!r}]` instead.'.format(goal))
+      goals = [goal]
+    else:
+      goals = ['test']
+
+    bad_goals = set(goals) - self.allowed_goals()
+    if bad_goals:
+      raise_bad_target('Got unrecognized goal{maybe_pluralize} {unrecognized}. '
+                       'Goal must be one of {allowed}.'
+                       .format(maybe_pluralize='' if len(bad_goals) == 1 else 's',
+                               unrecognized=', '.join(sorted(bad_goals)),
+                               allowed=self.allowed_goals()))
+
+    payload = payload or Payload()
     payload.add_fields({
-      'goal': PrimitiveField(goal),
+      'goals': PrimitiveField(goals),
       'prep_command_executable': PrimitiveField(prep_executable),
       'prep_command_args': PrimitiveField(prep_args or []),
       'prep_environ': PrimitiveField(prep_environ),
     })
-    super(PrepCommand, self).__init__(payload=payload, **kwargs)
-    if not prep_executable:
-      raise TargetDefinitionException(self, 'prep_executable must be specified.')
-    if goal not in self.goals():
-      raise TargetDefinitionException(self, 'Got goal "{}". Goal must be one of {}.'.format(
-          goal, self.goals()))
+    super(PrepCommand, self).__init__(address=address, payload=payload, **kwargs)
+
+  @memoized_property
+  def goals(self):
+    return frozenset(self.payload.get_field_value('goals'))

@@ -15,6 +15,7 @@ python_tests(
   name = 'artifact_cache',
   sources = ['test_artifact_cache.py'],
   dependencies = [
+    ':cache_server',
     'src/python/pants/cache',
     'src/python/pants/invalidation',
     'src/python/pants/util:contextutil',
@@ -28,6 +29,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/cache',
+    'src/python/pants/option',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/task',
@@ -45,9 +47,30 @@ python_tests(
     'src/python/pants/base:payload',
     'src/python/pants/build_graph:build_graph',
     'src/python/pants/cache:cache',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+)
+
+python_tests(
+  name = 'caching_dereference_symlinks',
+  sources = ['test_caching_tarball_deference.py'],
+  dependencies = [
+    'src/python/pants/task:task',
+    'src/python/pants/cache:cache',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/tasks:task_test_base',
   ],
+)
+
+python_library(
+  name = 'cache_server',
+  sources = ['cache_server.py'],
+  dependencies = [
+    '3rdparty/python:six',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/testutils:file_test_util',
+  ]
 )
 
 python_library(

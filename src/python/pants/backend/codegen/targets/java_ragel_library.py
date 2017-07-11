@@ -1,17 +1,14 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
+from pants.base.deprecated import deprecated_module
 
 
-class JavaRagelLibrary(JvmTarget):
-  """A Java library generated from a Ragel file."""
+deprecated_module('1.5.0.dev0', 'Use pants.backend.codegen.ragel.java instead')
 
-  def __init__(self, **kwargs):
-    super(JavaRagelLibrary, self).__init__(**kwargs)
-
-    self.add_labels('codegen')
+JavaRagelLibrary = JavaRagelLibrary

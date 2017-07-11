@@ -56,17 +56,20 @@ class PythonBinaryCreate(PythonTask):
       for vt in invalidation_check.all_vts:
         pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
         if not vt.valid:
+          self.context.log.debug('cache for {} is invalid, rebuilding'.format(vt.target))
           self.create_binary(vt.target, vt.results_dir)
+        else:
+          self.context.log.debug('using cache for {}'.format(vt.target))
 
-        python_pex_product.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
-        python_deployable_archive.add(binary, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
+        python_pex_product.add(vt.target, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
+        python_deployable_archive.add(vt.target, os.path.dirname(pex_path)).append(os.path.basename(pex_path))
         self.context.log.debug('created {}'.format(os.path.relpath(pex_path, get_buildroot())))
 
         # Create a copy for pex.
         pex_copy = os.path.join(self._distdir, os.path.basename(pex_path))
         safe_mkdir_for(pex_copy)
         atomic_copy(pex_path, pex_copy)
-        self.context.log.info('created pex copy {}'.format(os.path.relpath(pex_copy, get_buildroot())))
+        self.context.log.info('created pex {}'.format(os.path.relpath(pex_copy, get_buildroot())))
 
   def create_binary(self, binary, results_dir):
     interpreter = self.select_interpreter_for_targets(binary.closure())

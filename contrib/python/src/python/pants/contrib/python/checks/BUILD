@@ -6,6 +6,7 @@ contrib_plugin(
   dependencies=[
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
     'contrib/python/src/python/pants/contrib/python/checks/tasks:python',
+    'contrib/python/src/python/pants/contrib/python/checks/tasks2',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.python.checks',

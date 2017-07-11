@@ -48,7 +48,6 @@ Contrib plugins should generally follow 3 basic setup steps:
      ]
 
    backend_packages: [
-       "internal_backend.optional",
        "internal_backend.repositories",
        "internal_backend.sitegen",
        "internal_backend.utilities",
@@ -99,7 +98,7 @@ Contrib plugins should generally follow 3 basic setup steps:
    )
    ```
    NB: The act of releasing your contrib distribution is part of of the normal `pantsbuild.pants`
-   [release process](https://pantsbuild.org/howto_contribute.html).  You may need to request
+   [release process](https://www.pantsbuild.org/howto_contribute.html).  You may need to request
    a release from the owners if you have a change that should be fast-tracked before the next
    `pantsbuild.pants` release.  You can always test that your contrib distribution works though by
    doing a release dry run:

@@ -13,6 +13,8 @@ from twitter.common.collections import maybe_list
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 
 
 class PythonBinary(PythonTarget):
@@ -25,6 +27,10 @@ class PythonBinary(PythonTarget):
 
   :API: public
   """
+
+  @classmethod
+  def alias(cls):
+    return 'python_binary'
 
   # TODO(wickman) Consider splitting pex options out into a separate PexInfo builder that can be
   # attached to the binary target.  Ideally the PythonBinary target is agnostic about pex mechanics
@@ -67,8 +73,20 @@ class PythonBinary(PythonTarget):
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
 
+    payload = Payload()
+    payload.add_fields({
+      'entry_point': PrimitiveField(entry_point),
+      'inherit_path': PrimitiveField(bool(inherit_path)),
+      'zip_safe': PrimitiveField(bool(zip_safe)),
+      'always_write_cache': PrimitiveField(bool(always_write_cache)),
+      'repositories': PrimitiveField(maybe_list(repositories or [])),
+      'indices': PrimitiveField(maybe_list(indices or [])),
+      'ignore_errors': PrimitiveField(bool(ignore_errors)),
+      'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
+    })
+
     sources = [] if source is None else [source]
-    super(PythonBinary, self).__init__(sources=sources, **kwargs)
+    super(PythonBinary, self).__init__(sources=sources, payload=payload, **kwargs)
 
     if source is None and entry_point is None:
       raise TargetDefinitionException(self,
@@ -76,16 +94,6 @@ class PythonBinary(PythonTarget):
 
     if not isinstance(platforms, (list, tuple)) and not isinstance(platforms, string_types):
       raise TargetDefinitionException(self, 'platforms must be a list, tuple or string.')
-
-    # TODO(pl): Most if not all of these should live in payload fields
-    self._entry_point = entry_point
-    self._inherit_path = bool(inherit_path)
-    self._zip_safe = bool(zip_safe)
-    self._always_write_cache = bool(always_write_cache)
-    self._repositories = maybe_list(repositories or [])
-    self._indices = maybe_list(indices or [])
-    self._ignore_errors = bool(ignore_errors)
-    self._platforms = tuple(maybe_list(platforms or []))
 
     if source and entry_point:
       entry_point_module = entry_point.split(':', 1)[0]
@@ -98,17 +106,17 @@ class PythonBinary(PythonTarget):
 
   @property
   def platforms(self):
-    return self._platforms
+    return self.payload.platforms
 
   # TODO(wickman) These should likely be attributes on PythonLibrary targets
   # and not PythonBinary targets, or at the very worst, both.
   @property
   def repositories(self):
-    return self._repositories
+    return self.payload.repositories
 
   @property
   def indices(self):
-    return self._indices
+    return self.payload.indices
 
   def _translate_to_entry_point(self, source):
     source_base, _ = os.path.splitext(source)
@@ -116,8 +124,8 @@ class PythonBinary(PythonTarget):
 
   @property
   def entry_point(self):
-    if self._entry_point:
-      return self._entry_point
+    if self.payload.entry_point:
+      return self.payload.entry_point
     elif self.payload.sources.source_paths:
       assert len(self.payload.sources.source_paths) == 1
       entry_source = list(self.sources_relative_to_source_root())[0]
@@ -128,13 +136,13 @@ class PythonBinary(PythonTarget):
   @property
   def pexinfo(self):
     info = PexInfo.default()
-    for repo in self._repositories:
+    for repo in self.repositories:
       info.add_repository(repo)
-    for index in self._indices:
+    for index in self.indices:
       info.add_index(index)
-    info.zip_safe = self._zip_safe
-    info.always_write_cache = self._always_write_cache
-    info.inherit_path = self._inherit_path
+    info.zip_safe = self.payload.zip_safe
+    info.always_write_cache = self.payload.always_write_cache
+    info.inherit_path = self.payload.inherit_path
     info.entry_point = self.entry_point
-    info.ignore_errors = self._ignore_errors
+    info.ignore_errors = self.payload.ignore_errors
     return info

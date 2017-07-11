@@ -32,6 +32,10 @@ class Payload(object):
   def fields(self):
     return self._fields.items()
 
+  def as_dict(self):
+    """Return the Payload object as a dict."""
+    return {k: self.get_field_value(k) for k in self._fields}
+
   def freeze(self):
     """Permanently make this Payload instance immutable.
 

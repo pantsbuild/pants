@@ -12,6 +12,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
+  <property name="kythe.artifact" value="[organization]-[revision]/[artifact].[ext]"/>
 
   <!-- This dance to set ANDROID_HOME seems more complex than it need be, but an absolute path is
        needed whether or not the ANDROID_HOME env var is set and just using the following does
@@ -63,6 +64,11 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
         <ivy pattern="${m2.repo.dir}/${m2.repo.pom}"/>
         <artifact pattern="${m2.repo.dir}/${m2.repo.artifact}"/>
       </filesystem>
+
+      <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
+      <url name="benjyw/binhost">
+        <artifact pattern="https://github.com/benjyw/binhost/raw/master/[organisation]/${kythe.artifact}" />
+      </url>
     </chain>
   </resolvers>
 </ivysettings>

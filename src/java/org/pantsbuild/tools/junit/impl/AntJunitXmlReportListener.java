@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.Writer;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -36,6 +37,8 @@ import org.junit.runner.Description;
 import org.junit.runner.Result;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * A run listener that creates ant junit xml report compatible output describing a junit run.
@@ -420,9 +423,17 @@ class AntJunitXmlReportListener extends RunListener {
         // problem with initialization and we won't get a testFinished callback so
         // call finish here.
         testCase.finished();
-        suite.testCases.clear();
-        suite.testCases.add(testCase);
-        suite.finished();
+        if (suite != null) {
+          suite.testCases.clear();
+          suite.testCases.add(testCase);
+          suite.finished();
+        }
+      } else {
+        testCase.finished();
+        testCase.setError(exception);
+        if (suite != null) {
+          suite.testCases.add(testCase);
+        }
       }
     } else {
       if (isFailure) {
@@ -483,8 +494,8 @@ class AntJunitXmlReportListener extends RunListener {
       }
 
       if (suite.tests > 0) {
-        Writer xmlOut = new FileWriter(
-            new File(outdir, String.format("TEST-%s.xml", suite.getName())));
+        Writer xmlOut = Files.newBufferedWriter(
+            new File(outdir, String.format("TEST-%s.xml", suite.getName())).toPath(), UTF_8);
 
         // Only output valid XML1.0 characters - JAXB does not handle this.
         JAXB.marshal(suite, new XmlWriter(xmlOut) {

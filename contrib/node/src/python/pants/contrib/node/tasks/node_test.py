@@ -65,14 +65,32 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
     for target in targets:
       node_path = node_paths.node_path(target.dependencies[0])
 
-      args = ['run-script', target.script_name, '--'] + self.get_passthru_args()
+      self.context.log.debug(
+        'Testing node module (first dependency): {}'.format(target.dependencies[0]))
 
-      with pushd(node_path):
-        self._currently_executing_test_targets = [target]
-        result, npm_test_command = self.execute_npm(args, workunit_labels=[WorkUnitLabel.TEST])
-        if result != 0:
-          raise TaskError('npm test script failed:\n'
-                          '\t{} failed with exit code {}'.format(npm_test_command, result))
+      package_manager = self.get_package_manager_for_target(target=target.dependencies[0])
+      if package_manager == self.node_distribution.PACKAGE_MANAGER_NPM:
+        args = ['run-script', target.script_name, '--'] + self.get_passthru_args()
+
+        with pushd(node_path):
+          self._currently_executing_test_targets = [target]
+          result, npm_test_command = self.execute_npm(args,
+                                                      workunit_name=target.address.reference(),
+                                                      workunit_labels=[WorkUnitLabel.TEST])
+          if result != 0:
+            raise TaskError('npm test script failed:\n'
+                            '\t{} failed with exit code {}'.format(npm_test_command, result))
+      elif package_manager == self.node_distribution.PACKAGE_MANAGER_YARNPKG:
+        args = ['run', target.script_name, '--'] + self.get_passthru_args()
+        with pushd(node_path):
+          self._currently_executing_test_targets = [target]
+          result, npm_test_command = self.execute_yarnpkg(
+            args=args,
+            workunit_name=target.address.reference(),
+            workunit_labels=[WorkUnitLabel.TEST])
+          if result != 0:
+            raise TaskError('npm test script failed:\n'
+                            '\t{} failed with exit code {}'.format(npm_test_command, result))
 
     self._currently_executing_test_targets = []
 

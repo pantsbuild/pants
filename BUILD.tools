@@ -8,10 +8,11 @@ target(name = 'scala-js-compiler', dependencies=[
 ])
 target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
 
-
+# NB: The scrooge tools do not mix their classpaths with the sources they interact with, and
+# therefore they do not need to use the `scala-platform` via scala_jar.
 jar_library(name = 'scrooge-gen',
             jars = [
-              scala_jar(org='com.twitter', name='scrooge-generator', rev='3.20.0',
+              jar(org='com.twitter', name='scrooge-generator_2.11', rev='3.20.0',
                         excludes=[
                           # scrooge requires libthrift 0.5.0-1 which is not available on
                           # the default maven repos. Force scrooge to use thrift-0.6.1, which
@@ -25,7 +26,7 @@ jar_library(name = 'scrooge-gen',
 
 jar_library(name = 'scrooge-linter',
             jars = [
-              scala_jar(org='com.twitter', name='scrooge-linter', rev='3.20.0',
+              jar(org='com.twitter', name='scrooge-linter_2.11', rev='3.20.0',
                         excludes=[
                           exclude(org = 'org.apache.thrift', name = 'libthrift')
                         ])
@@ -34,3 +35,16 @@ jar_library(name = 'scrooge-linter',
               '3rdparty:thrift-0.6.1',
             ])
 
+
+# Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
+# (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
+# for more info.
+jar_library(
+  name='kythe-extractor',
+  jars = [jar(org='kythe', name='extractors/javac_extractor', rev='v0.0.26-snowchain3')]
+)
+
+jar_library(
+  name='kythe-indexer',
+  jars = [jar(org='kythe', name='indexers/java_indexer', rev='v0.0.26-snowchain3')]
+)

@@ -13,10 +13,11 @@ import subprocess
 from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.intermediate_target_factory import hash_target
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.subsystem.subsystem_util import subsystem_instance
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
@@ -69,8 +70,9 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       thrift_target_name = ('examples.src.thrift.org.pantsbuild.example.precipitation'
                             '.precipitation-java')
       codegen_target_regex = os.path.join(os.path.relpath(workdir, get_buildroot()),
-                                          'gen/thrift/[^/]*/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
+                                          'gen/thrift-java/[^/]*/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
       p = re.compile(codegen_target_regex)
+      print(json_data.get('targets').keys())
       self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
   def test_export_json_transitive_jar(self):
@@ -117,24 +119,24 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      with subsystem_instance(IvySubsystem) as ivy_subsystem:
-        ivy_cache_dir = ivy_subsystem.get_options().cache_dir
-        common_lang_lib_info = json_data.get('libraries').get('junit:junit:4.12')
-        self.assertIsNotNone(common_lang_lib_info)
-        self.assertEquals(
-          common_lang_lib_info.get('default'),
-          os.path.join(ivy_cache_dir, 'junit/junit/jars/junit-4.12.jar')
-        )
-        self.assertEquals(
-          common_lang_lib_info.get('javadoc'),
-          os.path.join(ivy_cache_dir,
-                       'junit/junit/javadocs/junit-4.12-javadoc.jar')
-        )
-        self.assertEquals(
-          common_lang_lib_info.get('sources'),
-          os.path.join(ivy_cache_dir,
-                       'junit/junit/sources/junit-4.12-sources.jar')
-        )
+      ivy_subsystem = global_subsystem_instance(IvySubsystem)
+      ivy_cache_dir = ivy_subsystem.get_options().cache_dir
+      common_lang_lib_info = json_data.get('libraries').get('junit:junit:4.12')
+      self.assertIsNotNone(common_lang_lib_info)
+      self.assertEquals(
+        common_lang_lib_info.get('default'),
+        os.path.join(ivy_cache_dir, 'junit/junit/jars/junit-4.12.jar')
+      )
+      self.assertEquals(
+        common_lang_lib_info.get('javadoc'),
+        os.path.join(ivy_cache_dir,
+                     'junit/junit/javadocs/junit-4.12-javadoc.jar')
+      )
+      self.assertEquals(
+        common_lang_lib_info.get('sources'),
+        os.path.join(ivy_cache_dir,
+                     'junit/junit/sources/junit-4.12-sources.jar')
+      )
 
   def test_dep_map_for_java_sources(self):
     with self.temporary_workdir() as workdir:
@@ -145,13 +147,13 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
 
   def test_sources_and_javadocs(self):
     with self.temporary_workdir() as workdir:
-      test_target = 'examples/src/scala/org/pantsbuild/example/scala_with_java_sources'
+      test_target = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      scala_lang_lib = json_data.get('libraries').get('org.scala-lang:scala-library:2.10.4')
-      self.assertIsNotNone(scala_lang_lib)
-      self.assertIsNotNone(scala_lang_lib['default'])
-      self.assertIsNotNone(scala_lang_lib['sources'])
-      self.assertIsNotNone(scala_lang_lib['javadoc'])
+      shapeless_lib = json_data.get('libraries').get('com.chuusai:shapeless_2.11:2.2.5')
+      self.assertIsNotNone(shapeless_lib)
+      self.assertIsNotNone(shapeless_lib['default'])
+      self.assertIsNotNone(shapeless_lib['sources'])
+      self.assertIsNotNone(shapeless_lib['javadoc'])
 
   # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
   # the default location.  The set cache_dir likely needs to be plumbed down
@@ -161,26 +163,26 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      with subsystem_instance(IvySubsystem) as ivy_subsystem:
-        ivy_cache_dir = ivy_subsystem.get_options().cache_dir
-        avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
-        self.assertIsNotNone(avro_lib_info)
-        self.assertEquals(
-          avro_lib_info.get('default'),
-          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
-        )
-        self.assertEquals(
-          avro_lib_info.get('tests'),
-          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
-        )
-        self.assertEquals(
-          avro_lib_info.get('javadoc'),
-          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/javadocs/avro-1.7.7-javadoc.jar')
-        )
-        self.assertEquals(
-          avro_lib_info.get('sources'),
-          os.path.join(ivy_cache_dir, 'org.apache.avro/avro/sources/avro-1.7.7-sources.jar')
-        )
+      ivy_subsystem = global_subsystem_instance(IvySubsystem)
+      ivy_cache_dir = ivy_subsystem.get_options().cache_dir
+      avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
+      self.assertIsNotNone(avro_lib_info)
+      self.assertEquals(
+        avro_lib_info.get('default'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
+      )
+      self.assertEquals(
+        avro_lib_info.get('tests'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
+      )
+      self.assertEquals(
+        avro_lib_info.get('javadoc'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/javadocs/avro-1.7.7-javadoc.jar')
+      )
+      self.assertEquals(
+        avro_lib_info.get('sources'),
+        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/sources/avro-1.7.7-sources.jar')
+      )
 
   def test_distributions_and_platforms(self):
     with self.temporary_workdir() as workdir:
@@ -223,6 +225,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEquals('java7', json_data['targets'][test_target]['platform'])
       self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
 
+  @ensure_engine
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
       exported_file = os.path.join(workdir, "export_file.json")
@@ -244,7 +247,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['binary']))
       self.assertTrue(os.path.exists(python_setup['interpreters'][default_interpreter]['chroot']))
 
-      python_target = json_data['targets']['src/python/pants/backend/python/targets:python']
+      python_target = json_data['targets']['src/python/pants/backend/python/targets:targets']
       self.assertIsNotNone(python_target)
       self.assertEquals(default_interpreter, python_target['python_interpreter'])
 
@@ -253,7 +256,8 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       test_path = 'testprojects/maven_layout/provided_patching/one/src/main/java'
       test_target = '{}:common'.format(test_path)
       json_data = self.run_export(test_target, workdir)
-      synthetic_target = '{}:shadow-unstable-intransitive-1'.format(test_path)
+      h = hash_target('{}:shadow'.format(test_path), 'provided')
+      synthetic_target = '{}:shadow-unstable-provided-{}'.format(test_path, h)
       self.assertEquals(False, json_data['targets'][synthetic_target]['transitive'])
       self.assertEquals('compile test', json_data['targets'][synthetic_target]['scope'])
 

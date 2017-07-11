@@ -170,7 +170,7 @@ certificate authorities, if that library is installed.  If you are
 using a virtualenv installation of pants, using `pip
 install certifi` to add the certify package to your pants environment
 might help.  You can also download a .pem bundle from the
-[certifi project page](http://certifi.io/en/latest/) and set
+[certifi project page](https://certifiio.readthedocs.io/en/latest/) and set
 `REQUESTS_CA_BUNDLE` as mentioned below.
 
 If you are using hosts with a self-signed certificate, your
@@ -246,7 +246,15 @@ For python repos, you need to override the following settings in pants.ini:
         "https://pantsbuild.github.io/cheeseshop/third_party/python/index.html"
       ]
 
-    indices: [
+    indexes: [
         "https://pypi.python.org/simple/"
+      ]
+
+You can also reference a local repo relative to your project's build root with this pattern:
+
+    :::ini
+    [python-repos]
+    repos: [
+        "%(buildroot)s/repo_path"
       ]
 
