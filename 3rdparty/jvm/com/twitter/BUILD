@@ -3,7 +3,7 @@
 
 jar_library(name='finagle-thrift',
   jars=[
-    scala_jar(org='com.twitter', name='finagle-thrift', rev='6.28.0',
+    scala_jar(org='com.twitter', name='finagle-thrift', rev='6.41.0',
         excludes=[
           exclude(org = 'org.apache.thrift', name = 'libthrift'),
         ]),
@@ -15,7 +15,7 @@ jar_library(name='finagle-thrift',
 
 jar_library(name='scrooge-core',
   jars=[
-    scala_jar(org='com.twitter', name='scrooge-core', rev='3.20.0',
+    scala_jar(org='com.twitter', name='scrooge-core', rev='4.13.0',
         excludes=[
           exclude(org = 'org.apache.thrift', name = 'libthrift'),
         ]),

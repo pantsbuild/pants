@@ -96,7 +96,7 @@ jar_library(name='scrooge-core',
 
 jar_library(name='shapeless',
             jars=[
-              scala_jar(org='com.chuusai', name='shapeless', rev='2.2.5'),
+              scala_jar(org='com.chuusai', name='shapeless', rev='2.3.2'),
             ])
 
 jar_library(name='slf4j-api',
