@@ -149,7 +149,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      shapeless_lib = json_data.get('libraries').get('com.chuusai:shapeless_2.11:2.2.5')
+      shapeless_lib = json_data.get('libraries').get('com.chuusai:shapeless_2.12:2.3.2')
       self.assertIsNotNone(shapeless_lib)
       self.assertIsNotNone(shapeless_lib['default'])
       self.assertIsNotNone(shapeless_lib['sources'])
