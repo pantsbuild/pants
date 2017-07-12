@@ -239,7 +239,9 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     with temporary_dir() as publish_dir:
       options = ['--local={}'.format(publish_dir),
                  '--no-dryrun',
-                 '--force']
+                 '--force',
+                 # Stabilize the scala version to avoid needing to change all artifacts for every bump.
+                 '--scala-platform-version=2.11',]
       if extra_options:
         options.extend(extra_options)
 
