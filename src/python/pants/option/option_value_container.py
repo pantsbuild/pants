@@ -69,7 +69,30 @@ class OptionValueContainer(object):
     """
     return self.get_rank(key) in (RankedValue.NONE, RankedValue.HARDCODED)
 
+  def resolve(self, key, obj, field=None):
+    """Resolves an option value from either this options collection, or a field of the given object.
+
+    Resolution precedence is CLI option > object field > pants.ini option.
+
+    :param str key: The name of the option to check.
+    :param any obj: An object to resolve an option field from if the option was not
+      explicitly flagged.
+    :param str field: The name of the field of the object to use if the option was not
+      explicitly flagged, or None to use the `key` name as the field name as well.
+
+    :API: public
+    """
+    field = field or key
+    if self.get_rank(key) >= RankedValue.FLAG:
+      return self.get(key)
+    v = getattr(obj, field, None)
+    return self.get(key) if v is None else v
+
   def get(self, key, default=None):
+    """Get the value for the given key, or its default.
+
+    :API: public
+    """
     # Support dict-like dynamic access.  See also __getitem__ below.
     if key in self._value_map:
       return self._get_underlying_value(key)

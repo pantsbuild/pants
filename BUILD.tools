@@ -12,24 +12,17 @@ target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/or
 # therefore they do not need to use the `scala-platform` via scala_jar.
 jar_library(name = 'scrooge-gen',
             jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.11', rev='4.13.0',
-                        excludes=[
-                          # scrooge requires libthrift 0.5.0-1 which is not available on
-                          # the default maven repos. Force scrooge to use thrift-0.6.1, which
-                          # is compatible, instead.
-                          exclude(org = 'org.apache.thrift', name = 'libthrift')
-                        ])
-            ],
-            dependencies = [
-              '3rdparty:thrift-0.6.1',
+              jar(org='com.twitter', name='scrooge-generator_2.11', rev='4.18.0')
             ])
 
+# TODO: scrooge-linter has significantly different behaviour after 4.x.y: should likely be
+# deprecated rather than synchronized.
 jar_library(name = 'scrooge-linter',
             jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.11', rev='4.13.0',
-                        excludes=[
-                          exclude(org = 'org.apache.thrift', name = 'libthrift')
-                        ])
+              jar(org='com.twitter', name='scrooge-linter_2.11', rev='3.20.0',
+                  excludes=[
+                    exclude(org = 'org.apache.thrift', name = 'libthrift')
+                  ])
             ],
             dependencies = [
               '3rdparty:thrift-0.6.1',

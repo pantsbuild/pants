@@ -87,20 +87,6 @@ class BundleCreate(JvmBinaryTask):
   def cache_target_dirs(self):
     return True
 
-  # TODO (Benjy): The following CLI > target > config logic
-  # should be implemented in the options system.
-  # https://github.com/pantsbuild/pants/issues/3538
-  def _resolved_option(self, target, key):
-    """Get value for option "key".
-
-    Resolution precedence is CLI option > target option > pants.ini option.
-    """
-    option_value = self.get_options().get(key)
-    if not isinstance(target, JvmApp) or self.get_options().is_flagged(key):
-      return option_value
-    v = target.payload.get_field_value(key, None)
-    return option_value if v is None else v
-
   def _store_results(self, vt, bundle_dir, archivepath, app):
     """Store a copy of the bundle and archive from the results dir in dist."""
     # TODO (from mateor) move distdir management somewhere more general purpose.
@@ -137,8 +123,8 @@ class BundleCreate(JvmBinaryTask):
 
       for vt in invalidation_check.all_vts:
         app = self.App.create_app(vt.target,
-                                  self._resolved_option(vt.target, 'deployjar'),
-                                  self._resolved_option(vt.target, 'archive'))
+                                  self.get_options().resolve('deployjar', vt.target),
+                                  self.get_options().resolve('archive', vt.target))
         archiver = archive.archiver(app.archive) if app.archive else None
 
         bundle_dir = self._get_bundle_dir(app, vt.results_dir)

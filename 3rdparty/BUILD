@@ -88,12 +88,6 @@ jar_library(name='protobuf-test-import',
               jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
             ])
 
-jar_library(name='scrooge-core',
-            jars = [
-              # used by scrooge-generator in BUILD.tools:scrooge-gen
-              scala_jar(org='com.twitter', name='scrooge-core', rev='3.20.0'),
-            ])
-
 jar_library(name='shapeless',
             jars=[
               scala_jar(org='com.chuusai', name='shapeless', rev='2.3.2'),
