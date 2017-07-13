@@ -12,5 +12,5 @@ from pants.contrib.scrooge.tasks.thrift_linter import ThriftLinter
 
 
 def register_goals():
-  task(name='thrift-linter', action=ThriftLinter).install()
+  task(name='thrift-linter', action=ThriftLinter).install('lint')
   task(name='scrooge', action=ScroogeGen).install('gen')
