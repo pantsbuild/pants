@@ -2,37 +2,31 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_thrift_library(
-  name = 'error-default',
-  sources = ['error.thrift'],
+  name = 'bad-thrift-default',
+  sources = ['bad-default.thrift'],
   # thrift_linter_strict not defined
 )
 
 java_thrift_library(
-  name = 'error-strict',
-  sources = ['error.thrift'],
+  name = 'bad-thrift-strict',
+  sources = ['bad-strict.thrift'],
   thrift_linter_strict=True,
 )
 
 java_thrift_library(
-  name = 'error2-strict',
-  sources = ['error2.thrift'],
+  name = 'bad-thrift-strict2',
+  sources = ['bad-strict2.thrift'],
   thrift_linter_strict=True,
 )
 
 java_thrift_library(
-  name = 'error-non-strict',
-  sources = ['error.thrift'],
+  name = 'bad-thrift-non-strict',
+  sources = ['bad-non-strict.thrift'],
   thrift_linter_strict=False,
 )
 
 java_thrift_library(
-  name = 'good',
+  name = 'good-thrift',
   sources = ['good.thrift'],
   thrift_linter_strict=True,
-)
-
-java_thrift_library(
-  name = 'warn',
-  sources = ['warn.thrift'],
-  thrift_linter_strict=False,
 )

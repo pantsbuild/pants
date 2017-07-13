@@ -15,9 +15,17 @@ jar_library(name = 'scrooge-gen',
               jar(org='com.twitter', name='scrooge-generator_2.11', rev='4.18.0')
             ])
 
+# TODO: scrooge-linter has significantly different behaviour after 4.x.y: should likely be
+# deprecated rather than synchronized.
 jar_library(name = 'scrooge-linter',
             jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.11', rev='4.18.0')
+              jar(org='com.twitter', name='scrooge-linter_2.11', rev='3.20.0',
+                  excludes=[
+                    exclude(org = 'org.apache.thrift', name = 'libthrift')
+                  ])
+            ],
+            dependencies = [
+              '3rdparty:thrift-0.6.1',
             ])
 
 

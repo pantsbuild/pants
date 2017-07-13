@@ -23,9 +23,6 @@ class ThriftLintError(Exception):
 class ThriftLinter(NailgunTask):
   """Print linter warnings for thrift files."""
 
-  deprecated_options_scope = 'thrift-linter'
-  deprecated_options_scope_removal_version = '1.6.0.dev0'
-
   @staticmethod
   def _is_thrift(target):
     return target.is_thrift
@@ -35,24 +32,45 @@ class ThriftLinter(NailgunTask):
     super(ThriftLinter, cls).register_options(register)
     register('--skip', type=bool, fingerprint=True, help='Skip thrift linting.')
     register('--strict', type=bool, fingerprint=True,
-             help='Fail the goal if thrift linter errors are found: if specified on the '
-                  'CLI, overrides the values specified directly on targets.')
+             help='Fail the goal if thrift linter errors are found. Overrides the '
+                  '`strict-default` option.')
     register('--strict-default', default=False, advanced=True, type=bool,
-             removal_version='1.6.0.dev0',
-             removal_hint='Use the `strict` option directly instead.',
              fingerprint=True,
              help='Sets the default strictness for targets. The `strict` option overrides '
                   'this value if it is set.')
-    register('--linter-args', default=['--warnings'], advanced=True, type=list,
-             fingerprint=True,
+    register('--linter-args', default=[], advanced=True, type=list, fingerprint=True,
              help='Additional options passed to the linter.')
     register('--worker-count', default=multiprocessing.cpu_count(), advanced=True, type=int,
              help='Maximum number of workers to use for linter parallelization.')
     cls.register_jvm_tool(register, 'scrooge-linter')
 
+  @classmethod
+  def product_types(cls):
+    # Declare the product of this goal. Gen depends on thrift-linter.
+    return ['thrift-linter']
+
   @property
   def cache_target_dirs(self):
     return True
+
+  @staticmethod
+  def _to_bool(value):
+    # Converts boolean and string values to boolean.
+    return str(value) == 'True'
+
+  def _is_strict(self, target):
+    # The strict value is read from the following, in order:
+    # 1. the option --[no-]strict, but only if explicitly set.
+    # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
+    # 3. options, --[no-]strict-default
+    options = self.get_options()
+    if options.get_rank('strict') > RankedValue.HARDCODED:
+      return self._to_bool(self.get_options().strict)
+
+    if target.thrift_linter_strict is not None:
+      return self._to_bool(target.thrift_linter_strict)
+
+    return self._to_bool(self.get_options().strict_default)
 
   def _lint(self, target, classpath):
     self.context.log.debug('Linting {0}'.format(target.address.spec))
@@ -60,8 +78,8 @@ class ThriftLinter(NailgunTask):
     config_args = []
 
     config_args.extend(self.get_options().linter_args)
-    if not self.get_options().resolve('strict', target, field='thrift_linter_strict'):
-      config_args.append('--disable-strict')
+    if not self._is_strict(target):
+      config_args.append('--ignore-errors')
 
     include_paths , paths = calculate_compile_sources([target], self._is_thrift)
     if target.include_paths:
