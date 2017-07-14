@@ -109,10 +109,14 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def scope_to_flags(self):
       return {}
 
-    def get_fingerprintable_for_scope(self, scope):
+    def get_fingerprintable_for_scope(self, scope, include_passthru=False):
+      pairs = []
+      if include_passthru and passthru_args:
+        pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
       option_values = self.for_scope(scope)
-      return [(option_type, option_values[option_name])
-              for option_name, option_type in fingerprintable[scope].items()]
+      pairs.extend((option_type, option_values[option_name])
+                   for option_name, option_type in fingerprintable[scope].items())
+      return pairs
 
     def __getitem__(self, key):
       return self.for_scope(key)
