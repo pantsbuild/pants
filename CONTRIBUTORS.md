@@ -129,7 +129,6 @@ Created by running `./build-support/bin/contributors.sh`.
 + Roger Jiang
 + Ryan Williams
 + Sameer Brenn
-+ Sameer Parekh
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
