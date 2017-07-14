@@ -446,10 +446,6 @@ class PytestTest(PytestTestBase):
     self.run_tests(targets=[self.green, self.green2, self.green3], fast=False)
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
-  def test_green(self):
-    self.run_tests(targets=[self.green])
-
-  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_out_of_band_deselect_fast_success(self):
     self.run_tests([self.green, self.red], '-kno_tests_should_match_at_all', fast=True)
 
