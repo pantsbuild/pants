@@ -21,6 +21,7 @@ from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 class PytestTestBase(PythonTaskTestBase):
@@ -152,6 +153,11 @@ class PytestTestFailedPexRun(PytestTestBase):
 class PytestTest(PytestTestBase):
   def setUp(self):
     super(PytestTest, self).setUp()
+
+    self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                               read_from=None,
+                               write_to=None)
+
     self.create_file(
         'lib/core.py',
         dedent("""
@@ -181,6 +187,28 @@ class PytestTest(PytestTestBase):
           import core
 
           class CoreGreenTest(unittest.TestCase):
+            def test_one(self):
+              self.assertEqual(1, core.one())
+        """))
+    self.create_file(
+      'tests/test_core_green2.py',
+      dedent("""
+          import unittest2 as unittest
+
+          import core
+
+          class CoreGreen2Test(unittest.TestCase):
+            def test_one(self):
+              self.assertEqual(1, core.one())
+        """))
+    self.create_file(
+      'tests/test_core_green3.py',
+      dedent("""
+          import unittest2 as unittest
+
+          import core
+
+          class CoreGreen3Test(unittest.TestCase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
@@ -253,6 +281,32 @@ class PytestTest(PytestTestBase):
             name='green',
             sources=[
               'test_core_green.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='green2',
+            sources=[
+              'test_core_green2.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='green3',
+            sources=[
+              'test_core_green3.py'
             ],
             dependencies=[
               'lib:core'
@@ -353,6 +407,8 @@ class PytestTest(PytestTestBase):
           )
         """))
     self.green = self.target('tests:green')
+    self.green2 = self.target('tests:green2')
+    self.green3 = self.target('tests:green3')
 
     self.red = self.target('tests:red')
     self.red_in_class = self.target('tests:red_in_class')
@@ -365,45 +421,71 @@ class PytestTest(PytestTestBase):
     self.all_with_coverage = self.target('tests:all-with-coverage')
     self.green_with_conftest = self.target('tests:green-with-conftest')
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_error(self):
     """Test that a test that errors rather than fails shows up in ErrorWhileTesting."""
 
     self.run_failing_tests(targets=[self.red, self.green, self.error],
                            failed_targets=[self.red, self.error])
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_error_outside_function(self):
     self.run_failing_tests(targets=[self.red, self.green, self.failure_outside_function],
                            failed_targets=[self.red, self.failure_outside_function])
 
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_green(self):
     self.run_tests(targets=[self.green])
 
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_caches_greens_fast(self):
+    self.run_tests(targets=[self.green, self.green2, self.green3], fast=True)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=3)
+  def test_cache_greens_slow(self):
+    self.run_tests(targets=[self.green, self.green2, self.green3], fast=False)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_green(self):
+    self.run_tests(targets=[self.green])
+
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_out_of_band_deselect_fast_success(self):
     self.run_tests([self.green, self.red], '-kno_tests_should_match_at_all', fast=True)
 
+  # NB: Both red and green are cached. Red because its skipped via deselect and so runs (noops)
+  # successfully. This is OK since the -k passthru is part of the task fingerprinting.
+  @ensure_cached(PytestRun, expected_num_artifacts=2)
   def test_out_of_band_deselect_no_fast_success(self):
     self.run_tests([self.green, self.red], '-ktest_core_green', fast=False)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_fail_fast_skips_second_red_test_with_single_chroot(self):
     self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red],
                            fail_fast=True, fast=False)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_fail_fast_skips_second_red_test_with_isolated_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red_in_class],
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red_in_class],
                            fail_fast=True, fast=True)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red_test_in_class(self):
     # for test in a class, the failure line is in the following format
     # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
 
-  def test_one_timeout(self):
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_none_timeout(self):
     # When we have two targets, any of them doesn't have a timeout, and we have no default,
     # then no timeout is set.
 
@@ -414,6 +496,7 @@ class PytestTest(PytestTestBase):
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (None,))
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_timeout(self):
     # Check that a failed timeout returns the right results.
 
@@ -438,6 +521,7 @@ class PytestTest(PytestTestBase):
     _, all_statements, not_run_statements, _ = coverage_data.analysis(path)
     return all_statements, not_run_statements
 
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option(self):
     simple_coverage_kwargs = {'coverage': 'auto'}
 
@@ -473,6 +557,7 @@ class PytestTest(PytestTestBase):
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_coverage_modules_dne_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
@@ -483,6 +568,7 @@ class PytestTest(PytestTestBase):
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_coverage_modules_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
@@ -491,6 +577,7 @@ class PytestTest(PytestTestBase):
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_coverage_paths_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
@@ -499,6 +586,7 @@ class PytestTest(PytestTestBase):
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_sharding(self):
     shard0_failed_targets = self.try_run_tests(targets=[self.red, self.green], test_shard='0/2')
     shard1_failed_targets = self.try_run_tests(targets=[self.red, self.green], test_shard='1/2')
@@ -507,17 +595,21 @@ class PytestTest(PytestTestBase):
     # sure how pytest will order tests, so measure this in an order-agnostic manner.
     self.assertEqual([self.red], shard0_failed_targets + shard1_failed_targets)
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_sharding_single(self):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red], test_shard='0/1')
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_sharding_invalid_shard_too_small(self):
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], test_shard='-1/1')
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_sharding_invalid_shard_too_big(self):
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], test_shard='1/1')
 
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_sharding_invalid_shard_bad_format(self):
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], test_shard='1')
