@@ -13,6 +13,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
+from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
@@ -31,9 +32,9 @@ class GoThriftGen(SimpleCodegenTask):
              help='Run thrift compiler with strict warnings.')
     register('--gen-options', advanced=True, fingerprint=True,
             help='Use these apache thrift go gen options.')
-    register('--thrift-import', advanced=True,
+    register('--thrift-import', type=str, advanced=True, fingerprint=True,
              help='Use this thrift-import gen option to thrift.')
-    register('--thrift-import-target', advanced=True,
+    register('--thrift-import-target', type=target_option, advanced=True,
              help='Use this thrift import on symbolic defs.')
 
   @classmethod

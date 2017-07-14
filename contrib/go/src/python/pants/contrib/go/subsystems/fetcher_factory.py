@@ -48,11 +48,12 @@ class FetcherFactory(Subsystem):
   def register_options(cls, register):
     super(FetcherFactory, cls).register_options(register)
     register('--disallow-cloning-fetcher', type=bool, default=False, advanced=True,
+             fingerprint=True,
              help="If True, we only fetch archives explicitly matched by --matchers."
                   "Otherwise we fall back to cloning the remote repos, using Go's standard "
                   "remote dependency resolution protocol.")
     register('--matchers', metavar='<mapping>', type=dict,
-             default=cls._DEFAULT_MATCHERS, advanced=True,
+             default=cls._DEFAULT_MATCHERS, advanced=True, fingerprint=True,
              help="A mapping from a remote import path matching regex to an UrlInfo struct "
                   "describing how to fetch and unpack an archive of that remote import path.  "
                   "The regex must match the beginning of the remote import path (no '^' anchor is "
