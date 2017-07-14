@@ -526,9 +526,20 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
     for partition in sorted(results):
       rv = results[partition]
-      for target in partition:
+      if len(partition) == 1 or rv.success:
         log = self.context.log.info if rv.success else self.context.log.error
-        log('{0:80}.....{1:>10}'.format(target.id, rv))
+        for target in partition:
+          log('{0:80}.....{1:>10}'.format(target.id, rv))
+      else:
+        # There is not much useful we can display in summary for a multi-target partition with
+        # failures without parsing those failures to link them to individual targets; ie: targets
+        # 2 and 8 failed in this partition of 10 targets.
+        # TODO(John Sirois): Punting here works since we have in practice just 2 partitionings:
+        # 1. All targets in singleton partitions
+        # 2. All targets in 1 partition
+        # If we get to the point where we have multiple partitions with multiple targets, some sort
+        # of summary for the multi-target partitions will probably be needed.
+        pass
 
     failed_targets = [target
                       for _rv in results.values() if not _rv.success
