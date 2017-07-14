@@ -1044,16 +1044,28 @@ class OptionsTest(unittest.TestCase):
                        intermediate('qux'), task('qux.quux')},
                       Options.complete_scopes({task('foo.bar.baz'), task('qux.quux')}))
 
-  def test_get_fingerprintable_for_scope(self):
+  def test_get_fingerprintable_for_scope_ignore_passthru(self):
     # Note: tests handling recursive and non-recursive options from enclosing scopes correctly.
     options = self._parse('./pants --store-true-flag --num=88 compile.scala --num=77 '
-                          '--modifycompile="blah blah blah" --modifylogs="durrrr"')
+                          '--modifycompile="blah blah blah" --modifylogs="durrrr" -- -d -v')
 
     pairs = options.get_fingerprintable_for_scope('compile.scala')
-    self.assertEquals(len(pairs), 3)
-    self.assertEquals((str, 'blah blah blah'), pairs[0])
-    self.assertEquals((bool, True), pairs[1])
-    self.assertEquals((int, 77), pairs[2])
+    self.assertEquals([(str, 'blah blah blah'),
+                       (bool, True),
+                       (int, 77)],
+                      pairs)
+
+  def test_get_fingerprintable_for_scope_include_passthru(self):
+    options = self._parse('./pants --store-true-flag --num=88 compile.scala --num=77 '
+                          '--modifycompile="blah blah blah" --modifylogs="durrrr" -- -d -v')
+
+    pairs = options.get_fingerprintable_for_scope('compile.scala', include_passthru=True)
+    self.assertEquals([(str, '-d'),
+                       (str, '-v'),
+                       (str, 'blah blah blah'),
+                       (bool, True),
+                       (int, 77)],
+                      pairs)
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
     def _do_assert_fromfile(dest, expected, contents):
