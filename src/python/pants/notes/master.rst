@@ -5,6 +5,77 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev5 (7/14/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* ScroogeGen passes through fatal_warnings argument (#4739)
+  `PR #4739 <https://github.com/pantsbuild/pants/pull/4739>`_
+
+* Bump pex version to 1.2.8. (#4735)
+  `PR #4735 <https://github.com/pantsbuild/pants/pull/4735>`_
+
+* Deprecate the `--config-override` option. (#4715)
+  `PR #4715 <https://github.com/pantsbuild/pants/pull/4715>`_
+
+Bugfixes
+~~~~~~~~
+
+* Improve pytest result summaries. (#4747)
+  `PR #4747 <https://github.com/pantsbuild/pants/pull/4747>`_
+
+* Include passthru args in task option fingerprints. (#4745)
+  `PR #4745 <https://github.com/pantsbuild/pants/pull/4745>`_
+
+* Fingerprint a bunch of go options. (#4743)
+  `PR #4743 <https://github.com/pantsbuild/pants/pull/4743>`_
+
+* Fix rpc style in compiler_args check. (#4730)
+  `PR #4730 <https://github.com/pantsbuild/pants/pull/4730>`_
+
+* Revert "Alias `--pants-config-files` to `-c`." (#4718)
+  `PR #4718 <https://github.com/pantsbuild/pants/pull/4718>`_
+
+* Ensure that invalidation works correctly when state is reverted. (#4709)
+  `PR #4709 <https://github.com/pantsbuild/pants/pull/4709>`_
+
+* Fixup `PytestRun` error handling. (#4716)
+  `PR #4716 <https://github.com/pantsbuild/pants/pull/4716>`_
+
+* Fix option bootstrapping config application order. (#4714)
+  `PR #4714 <https://github.com/pantsbuild/pants/pull/4714>`_
+
+* Ensure that target root order is preserved (#4708)
+  `PR #4708 <https://github.com/pantsbuild/pants/pull/4708>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Remove Download Stats (#4724)
+  `Issue #716 <https://github.com/badges/shields/issues/716>`_
+  `PR #4724 <https://github.com/pantsbuild/pants/pull/4724>`_
+
+* Fix roundtrip example in JVM documentation (#4706)
+  `PR #4706 <https://github.com/pantsbuild/pants/pull/4706>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Improve transitive resolve package checking in tests. (#4738)
+  `PR #4738 <https://github.com/pantsbuild/pants/pull/4738>`_
+
+* Extract a zinc subsystem to allow for more entrypoints (#4720)
+  `PR #4720 <https://github.com/pantsbuild/pants/pull/4720>`_
+
+* Format suggested deps for easy cut & paste into BUILD file (#4711)
+  `PR #4711 <https://github.com/pantsbuild/pants/pull/4711>`_
+
+* Re-enable lint checks in CI (#4704)
+  `PR #4704 <https://github.com/pantsbuild/pants/pull/4704>`_
+
+
 1.4.0.dev4 (6/23/2017)
 ----------------------
 

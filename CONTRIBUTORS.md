@@ -48,6 +48,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
++ Gary M. Josack
 + Harley Cooper
 + Hwasung Lee
 + Igor Morozov
@@ -128,6 +129,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Roger Jiang
 + Ryan Williams
 + Sameer Brenn
++ Sameer Parekh
 + Sara Solano
 + Senthil Kumaran
 + Sergey Serebryakov
