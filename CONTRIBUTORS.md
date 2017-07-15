@@ -48,6 +48,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
++ Gary M. Josack
 + Harley Cooper
 + Hwasung Lee
 + Igor Morozov
