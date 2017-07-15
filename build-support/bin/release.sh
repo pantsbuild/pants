@@ -133,7 +133,7 @@ function publish_packages() {
     targets+=($(pkg_build_target $PACKAGE))
   done
   start_travis_section "Publishing" "Publishing packages"
-  run_local_pants setup-py --run="register sdist upload --sign --identity=$(get_pgp_keyid)" \
+  run_local_pants setup-py --run="sdist upload --sign --identity=$(get_pgp_keyid)" \
     --recursive ${targets[@]} || die "Failed to publish packages!"
   end_travis_section
 }
