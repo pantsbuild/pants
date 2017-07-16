@@ -51,6 +51,19 @@ class SetupPyRunner(InstallerBase):
     self.__setup_command = setup_command.split()
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
+  def mixins(self):
+    mixins = super(SetupPyRunner, self).mixins().copy()
+    for (key, version) in self._interpreter.extras:
+      if key == 'setuptools':
+        mixins['setuptools'] = 'setuptools=={}'.format(version)
+        break
+    else:
+      # We know Pants sets up python interpreters with wheel and setuptools via the `PythonSetup`
+      # subsystem; so this should never happen
+      raise AssertionError("Expected interpreter {} to have the extra 'setuptools'"
+                           .format(self._interpreter))
+    return mixins
+
   def _setup_command(self):
     return self.__setup_command
 
@@ -455,9 +468,6 @@ class SetupPy(Task):
         if os.path.exists(os.path.join(target.target_base, src, '__init__.py')):
           chroot.copy(os.path.join(target.target_base, src, '__init__.py'),
                       os.path.join(self.SOURCE_ROOT, src, '__init__.py'))
-
-    def write_codegen_source(relpath, abspath):
-      chroot.copy(abspath, os.path.join(self.SOURCE_ROOT, relpath))
 
     def write_target(target):
       for rel_source in target.sources_relative_to_buildroot():
