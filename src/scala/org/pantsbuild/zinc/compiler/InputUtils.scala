@@ -5,14 +5,17 @@
 package org.pantsbuild.zinc.compiler
 
 import java.io.{File, IOException}
+import java.lang.{ Boolean => JBoolean }
+import java.util.function.{ Function => JFunction }
 import java.util.{ List => JList, Map => JMap }
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
+import scala.util.matching.Regex
 
 import sbt.io.IO
 import sbt.util.Logger
-import xsbti.{F1, Position, Problem, Severity, ReporterConfig, ReporterUtil}
+import xsbti.{Position, Problem, Severity, ReporterConfig, ReporterUtil}
 import xsbti.compile.{
   AnalysisStore,
   CompileOptions,
@@ -40,39 +43,35 @@ object InputUtils {
     val compilers = CompilerUtils.getOrCreate(settings, log)
 
     // TODO: Remove duplication once on Scala 2.12.x.
-    val positionMapperF1 =
-      new F1[Position, Position] {
-        override def apply(p: Position): Position = p
-      }
     val positionMapper =
-      new java.util.function.Function[Position, Position] {
+      new JFunction[Position, Position] {
         override def apply(p: Position): Position = p
       }
 
     val compileOptions =
-      new CompileOptions(
-        autoClasspath(
-          classesDirectory,
-          compilers.scalac().scalaInstance().allJars,
-          javaOnly,
-          classpath
-        ).toArray,
-        sources.toArray,
-        classesDirectory,
-        scalacOptions.toArray,
-        javacOptions.toArray,
-        Int.MaxValue,
-        positionMapperF1,
-        compileOrder
-      )
+      CompileOptions
+        .create()
+        .withClasspath(
+          autoClasspath(
+            classesDirectory,
+            compilers.scalac().scalaInstance().allJars,
+            javaOnly,
+            classpath
+          ).toArray
+        )
+        .withSources(sources.toArray)
+        .withClassesDirectory(classesDirectory)
+        .withScalacOptions(scalacOptions.toArray)
+        .withJavacOptions(scalacOptions.toArray)
+        .withOrder(compileOrder)
     val reporter =
       ReporterUtil.getDefault(
-        new ReporterConfig(
+        ReporterConfig.create(
           "",
           Int.MaxValue,
           true,
-          settings.consoleLog.msgFilters.toArray,
-          settings.consoleLog.fileFilters.toArray,
+          settings.consoleLog.msgPredicates.toArray,
+          settings.consoleLog.filePredicates.toArray,
           settings.consoleLog.javaLogLevel,
           positionMapper
         )

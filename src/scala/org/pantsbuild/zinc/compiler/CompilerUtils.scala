@@ -20,14 +20,14 @@ import sbt.io.syntax._
 import sbt.util.Logger
 import xsbti.compile.{
   ClasspathOptionsUtil,
-  CompilerBridgeProvider,
   CompilerCache,
   Compilers,
   GlobalsCache,
   Inputs,
   JavaTools,
   ScalaCompiler,
-  ScalaInstance => XScalaInstance
+  ScalaInstance => XScalaInstance,
+  ZincCompilerUtil
 }
 
 import scala.compat.java8.OptionConverters._
@@ -83,7 +83,7 @@ object CompilerUtils {
   def newScalaCompiler(instance: XScalaInstance, interfaceJar: File): AnalyzingCompiler =
     new AnalyzingCompiler(
       instance,
-      CompilerBridgeProvider.constant(interfaceJar, instance),
+      ZincCompilerUtil.constantBridgeProvider(instance, interfaceJar),
       ClasspathOptionsUtil.auto,
       _ => (),
       None

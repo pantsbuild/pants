@@ -5,11 +5,14 @@
 package org.pantsbuild.zinc.compiler
 
 import java.io.File
+import java.nio.file.Path
+import java.lang.{ Boolean => JBoolean }
+import java.util.function.{ Function => JFunction }
 import java.util.{ List => JList, logging => jlogging }
-import java.util.regex.Pattern
 
 import scala.collection.JavaConverters._
 import scala.compat.java8.OptionConverters._
+import scala.util.matching.Regex
 
 import sbt.io.Path._
 import sbt.io.syntax._
@@ -82,8 +85,8 @@ case class Settings(
 case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
   color: Boolean             = true,
-  fileFilters: Seq[Pattern]    = Seq.empty,
-  msgFilters: Seq[Pattern]     = Seq.empty
+  fileFilters: Seq[Regex]    = Seq.empty,
+  msgFilters: Seq[Regex]     = Seq.empty
 ) {
   def javaLogLevel: jlogging.Level = logLevel match {
     case Level.Info =>
@@ -97,6 +100,27 @@ case class ConsoleOptions(
     case x =>
       sys.error(s"Unsupported log level: $x")    
   }
+
+  /**
+   * Because filtering Path objects requires first converting to a String, we compose
+   * the regexes into one predicate.
+   */
+  def filePredicates: Seq[JFunction[Path, JBoolean]] =
+    Seq(
+      new JFunction[Path, JBoolean] {
+        def apply(path: Path) = {
+          val pathStr = path.toString
+          fileFilters.exists(_.findFirstIn(pathStr).isDefined)
+        }
+      }
+    )
+
+  def msgPredicates: Seq[JFunction[String, JBoolean]] =
+    msgFilters.map { regex =>
+      new JFunction[String, JBoolean] {
+        def apply(msg: String) = regex.findFirstIn(msg).isDefined
+      }
+    }
 }
 
 /**
@@ -214,9 +238,9 @@ object Settings extends OptionSet[Settings] {
     boolean(   "-no-color",                    "No color in logging to stdout",
       (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
     string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ Pattern.compile(re)))),
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
     string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
-      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ Pattern.compile(re)))),
+      (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(fileFilters = s.consoleLog.fileFilters :+ re.r))),
 
     header("Compile options:"),
     path(     ("-classpath", "-cp"), "path",   "Specify the classpath",                      (s: Settings, cp: Seq[File]) => s.copy(classpath = cp)),
