@@ -585,7 +585,6 @@ class PytestRun(TestRunnerTaskMixin, Task):
     @classmethod
     def for_targets(cls, work_dir, targets):
       root_dir = os.path.join(work_dir, Target.maybe_readable_identify(targets))
-      # safe_mkdir(root_dir, clean=True)
       safe_mkdir(root_dir, clean=False)
       return cls(root_dir=root_dir)
 
