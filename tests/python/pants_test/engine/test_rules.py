@@ -274,9 +274,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                      }""").strip(), fullgraph)
 
   def test_full_graph_for_planner_example(self):
-    symbol_table_cls = TargetTable
-    address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    rules = create_graph_rules(address_mapper, symbol_table_cls) + create_fs_rules()
+    symbol_table = TargetTable()
+    address_mapper = AddressMapper(JsonParser(symbol_table), '*.BUILD.json')
+    rules = create_graph_rules(address_mapper, symbol_table) + create_fs_rules()
 
     rule_index = RuleIndex.create(rules)
     fullgraph_str = self.create_full_graph(rule_index)

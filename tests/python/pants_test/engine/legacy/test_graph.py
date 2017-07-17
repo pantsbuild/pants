@@ -35,12 +35,11 @@ class TaggingSymbolTable(LegacySymbolTable):
   tag = 'tag_added_by_macro'
   target_cls = Target
 
-  @classmethod
-  def aliases(cls):
-    tag_macro = functools.partial(macro, cls.target_cls, cls.tag)
-    return super(TaggingSymbolTable, cls).aliases().merge(
+  def aliases(self):
+    tag_macro = functools.partial(macro, self.target_cls, self.tag)
+    return super(TaggingSymbolTable, self).aliases().merge(
         BuildFileAliases(
-          targets={'target': TargetMacro.Factory.wrap(tag_macro, cls.target_cls),}
+          targets={'target': TargetMacro.Factory.wrap(tag_macro, self.target_cls),}
         )
       )
 
@@ -55,18 +54,18 @@ class GraphTestBase(unittest.TestCase):
     return options
 
   @contextmanager
-  def graph_helper(self, symbol_table_cls=None):
+  def graph_helper(self, symbol_table=None):
     with temporary_dir() as work_dir:
       path_ignore_patterns = ['.*']
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                           work_dir,
-                                                          symbol_table_cls=symbol_table_cls,
+                                                          symbol_table=symbol_table,
                                                           native=self._native)
       yield graph_helper
 
   @contextmanager
-  def open_scheduler(self, specs, symbol_table_cls=None):
-    with self.graph_helper(symbol_table_cls) as graph_helper:
+  def open_scheduler(self, specs, symbol_table=None):
+    with self.graph_helper(symbol_table) as graph_helper:
       graph, target_roots = self.create_graph_from_specs(graph_helper, specs)
       addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
       yield graph, addresses, graph_helper.scheduler
@@ -171,7 +170,7 @@ class GraphInvalidationTest(GraphTestBase):
     spec = 'testprojects/tests/python/pants/build_parsing:'
 
     # Confirm that python_tests in a small directory are marked.
-    with self.open_scheduler([spec], symbol_table_cls=TaggingSymbolTable) as (graph, addresses, _):
+    with self.open_scheduler([spec], symbol_table=TaggingSymbolTable()) as (graph, addresses, _):
       self.assertTrue(len(addresses) > 0, 'No targets matched by {}'.format(addresses))
       for address in addresses:
         self.assertIn(TaggingSymbolTable.tag, graph.get_target(address).tags)
