@@ -483,6 +483,9 @@ class SetupPy(Task):
       elif self.is_resources_target(dependency):
         write_target(dependency)
 
+  def _setup_boilerplate(self):
+    return SETUP_BOILERPLATE
+
   def write_setup(self, root_target, reduced_dependencies, chroot):
     """Write the setup.py of a target.
 
@@ -547,7 +550,7 @@ class SetupPy(Task):
     # >>>
     #
     # For more information, see http://bugs.python.org/issue13943
-    chroot.write(SETUP_BOILERPLATE.format(
+    chroot.write(self._setup_boilerplate().format(
       setup_dict=pprint.pformat(convert(setup_keywords), indent=4),
       setup_target=repr(root_target)
     ), 'setup.py')
