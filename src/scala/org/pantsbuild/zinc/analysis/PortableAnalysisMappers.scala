@@ -8,7 +8,7 @@ package org.pantsbuild.zinc.analysis
 import java.io.File
 import java.nio.file.Path
 
-import sbt.inc.{GenericMapper, ReadMapper, ReadWriteMappers, WriteMapper}
+import xsbti.compile.analysis.{GenericMapper, ReadMapper, ReadWriteMappers, WriteMapper}
 
 import xsbti.compile.MiniSetup
 import xsbti.compile.analysis.Stamp

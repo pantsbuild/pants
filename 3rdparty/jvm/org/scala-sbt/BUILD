@@ -1,9 +1,7 @@
 jar_library(
   name='zinc',
   jars=[
-    # TODO: When this is bumped beyond -M1, the scalacenter resolver should be removed
-    # from `build-support/ivy/ivysettings.xml`.
-    scala_jar(org='org.scala-sbt', name='zinc', rev='1.0.0-X19-M1',
+    scala_jar(org='org.scala-sbt', name='zinc', rev='1.0.0-X20',
               excludes=[
                 exclude(org='org.scala-sbt', name='io_2.11'),
                 exclude(org='org.scala-sbt', name='util-logging_2.11'),
