@@ -14,4 +14,5 @@ junit_tests(
     'src/scala/org/pantsbuild/zinc/cache',
   ],
   strict_deps=True,
+  platform='java8',
 )
