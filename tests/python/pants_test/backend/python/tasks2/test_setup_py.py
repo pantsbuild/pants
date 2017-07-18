@@ -29,13 +29,13 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
-class BaeSetupPyTest(PythonTaskTestBase):
+class SetupPyTestBase(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
     return SetupPy
 
   def setUp(self):
-    super(BaeSetupPyTest, self).setUp()
+    super(SetupPyTestBase, self).setUp()
     self.distdir = os.path.join(self.build_root, 'dist')
     self.set_options(pants_distdir=self.distdir)
     init_subsystem(Target.Arguments)
@@ -49,7 +49,7 @@ class BaeSetupPyTest(PythonTaskTestBase):
     yield context.products.get_data(SetupPy.PYTHON_DISTS_PRODUCT)
 
 
-class TestSetupPyInterpreter(BaeSetupPyTest):
+class TestSetupPyInterpreter(SetupPyTestBase):
   class PythonPathInspectableSetupPy(SetupPy):
     def _setup_boilerplate(self):
       return dedent("""
@@ -126,7 +126,7 @@ class TestSetupPyInterpreter(BaeSetupPyTest):
           self.assertEqual(PythonSetup.global_instance().setuptools_version, package.raw_version)
 
 
-class TestSetupPy(BaeSetupPyTest):
+class TestSetupPy(SetupPyTestBase):
 
   def setUp(self):
     super(TestSetupPy, self).setUp()
