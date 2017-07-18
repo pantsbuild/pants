@@ -62,7 +62,7 @@ object InputUtils {
         .withSources(sources.toArray)
         .withClassesDirectory(classesDirectory)
         .withScalacOptions(scalacOptions.toArray)
-        .withJavacOptions(scalacOptions.toArray)
+        .withJavacOptions(javacOptions.toArray)
         .withOrder(compileOrder)
     val reporter =
       ReporterUtil.getDefault(
