@@ -83,6 +83,7 @@ case class Settings(
  */
 case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
+  color: Boolean             = true,
   fileFilters: Seq[Regex]    = Seq.empty,
   msgFilters: Seq[Regex]     = Seq.empty
 ) {
@@ -233,6 +234,8 @@ object Settings extends OptionSet[Settings] {
       (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.Debug))),
     string(    "-log-level", "level",          "Set log level for stdout (debug|info|warn|error)",
       (s: Settings, l: String) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.withName(l)))),
+    boolean(   "-no-color",                    "No color in logging to stdout",
+      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
     string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
     string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",
