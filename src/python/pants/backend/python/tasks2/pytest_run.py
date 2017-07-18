@@ -38,6 +38,34 @@ from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
+class _Workdirs(datatype('_Workdirs', ['root_dir'])):
+  @classmethod
+  def for_targets(cls, work_dir, targets):
+    root_dir = os.path.join(work_dir, Target.maybe_readable_identify(targets))
+    safe_mkdir(root_dir, clean=False)
+    return cls(root_dir=root_dir)
+
+  @memoized_method
+  def junitxml_path(self, *targets):
+    xml_path = os.path.join(self.root_dir, 'junitxml',
+                            'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
+    safe_mkdir_for(xml_path)
+    return xml_path
+
+  @memoized_property
+  def coverage_path(self):
+    coverage_workdir = os.path.join(self.root_dir, 'coverage')
+    safe_mkdir(coverage_workdir)
+    return coverage_workdir
+
+  def files(self):
+    def files_iter():
+      for dir_path, _, file_names in os.walk(self.root_dir):
+        for filename in file_names:
+          yield os.path.join(dir_path, filename)
+    return list(files_iter())
+
+
 class PytestResult(object):
   @staticmethod
   def exception():
@@ -103,6 +131,10 @@ class PytestResult(object):
 class PytestRun(TestRunnerTaskMixin, Task):
 
   @classmethod
+  def implementation_version(cls):
+    return super(PytestRun, cls).implementation_version() + [('PytestRun', 2)]
+
+  @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
     register('--fast', type=bool, default=True, fingerprint=True,
@@ -134,7 +166,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
     # associated generated and cached --coverage files to this directory post any interaction with
     # the cache to retrieve the coverage files. As such, this option is not part of the fingerprint.
     register('--coverage-output-dir', metavar='<DIR>', default=None,
-             help='Directory to emit coverage reports to.'
+             help='Directory to emit coverage reports to. '
              'If not specified, a default within dist is used.')
 
     register('--test-shard', fingerprint=True,
@@ -569,7 +601,8 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
   @staticmethod
   def _copy_dir(src, dst):
-    # NB: shutil.copytree requires dst not already exist, we tolerate that case.
+    # NB: shutil.copytree requires dst not already exist, we tolerate that case to afford copying a
+    # tree into a user-specified location that may contain other files we should preserve.
     safe_mkdir(dst)
     for src_path, dirnames, filenames in safe_walk(src, topdown=True):
       dst_path = os.path.join(dst, os.path.relpath(src_path, src))
@@ -580,33 +613,6 @@ class PytestRun(TestRunnerTaskMixin, Task):
         if os.path.exists(dst_filename):
           os.unlink(dst_filename)
         shutil.copy2(os.path.join(src_path, filename), dst_filename)
-
-  class Workdirs(datatype('Workdirs', ['root_dir'])):
-    @classmethod
-    def for_targets(cls, work_dir, targets):
-      root_dir = os.path.join(work_dir, Target.maybe_readable_identify(targets))
-      safe_mkdir(root_dir, clean=False)
-      return cls(root_dir=root_dir)
-
-    @memoized_method
-    def junitxml_path(self, *targets):
-      xml_path = os.path.join(self.root_dir, 'junitxml',
-                              'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
-      safe_mkdir_for(xml_path)
-      return xml_path
-
-    @memoized_property
-    def coverage_path(self):
-      coverage_workdir = os.path.join(self.root_dir, 'coverage')
-      safe_mkdir(coverage_workdir)
-      return coverage_workdir
-
-    def files(self):
-      def files_iter():
-        for dir_path, _, file_names in os.walk(self.root_dir):
-          for filename in file_names:
-            yield os.path.join(dir_path, filename)
-      return list(files_iter())
 
   # TODO(John Sirois): Its probably worth generalizing a means to mark certain options or target
   # attributes as making results un-cacheable. See: https://github.com/pantsbuild/pants/issues/4748
@@ -636,10 +642,11 @@ class PytestRun(TestRunnerTaskMixin, Task):
       # 1.) output -> workdir
       # 2.) [iff all == invalid] workdir -> cache: We do this manually for now.
       # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
-      # 4.) [iff finals] workdir -> finals: We perform this step as an unconditional post-process.
+      # 4.) [iff user-specified final locations] workdir -> final-locations: We perform this step
+      #     as an unconditional post-process.
 
       # 1.) Write all results that will be potentially cached to workdir.
-      workdirs = self.Workdirs.for_targets(self.workdir, partition)
+      workdirs = _Workdirs.for_targets(self.workdir, partition)
       result = self._run_pytest(workdirs, invalid_tgts).checked()
 
       cache_vts = self._vts_for_partition(invalidation_check)
@@ -663,28 +670,29 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
       # 4.) Pluck any results that an end user might need to interact with from the workdir to the
       # locations they expect.
-
-      external_junit_xml_dir = self.get_options().junit_xml_dir
-      if external_junit_xml_dir:
-        # Either we just ran pytest for a set of invalid targets and generated a junit xml file
-        # specific to that (sub)set or else we hit the cache for the whole partition and skipped
-        # running pytest, simply retrieving the partition's full junit xml file.
-        junitxml_path = workdirs.junitxml_path(*(invalid_tgts or partition))
-
-        safe_mkdir(external_junit_xml_dir)
-        shutil.copy2(junitxml_path, external_junit_xml_dir)
-
-      if self.get_options().coverage:
-        coverage_output_dir = self.get_options().coverage_output_dir
-        if coverage_output_dir:
-          target_dir = coverage_output_dir
-        else:
-          relpath = Target.maybe_readable_identify(partition)
-          pants_distdir = self.context.options.for_global_scope().pants_distdir
-          target_dir = os.path.join(pants_distdir, 'coverage', relpath)
-        self._copy_dir(workdirs.coverage_path, target_dir)
+      self.expose_results(invalid_tgts, partition, workdirs)
 
       return result
+
+  def expose_results(self, invalid_tgts, partition, workdirs):
+    external_junit_xml_dir = self.get_options().junit_xml_dir
+    if external_junit_xml_dir:
+      # Either we just ran pytest for a set of invalid targets and generated a junit xml file
+      # specific to that (sub)set or else we hit the cache for the whole partition and skipped
+      # running pytest, simply retrieving the partition's full junit xml file.
+      junitxml_path = workdirs.junitxml_path(*(invalid_tgts or partition))
+
+      safe_mkdir(external_junit_xml_dir)
+      shutil.copy2(junitxml_path, external_junit_xml_dir)
+    if self.get_options().coverage:
+      coverage_output_dir = self.get_options().coverage_output_dir
+      if coverage_output_dir:
+        target_dir = coverage_output_dir
+      else:
+        relpath = Target.maybe_readable_identify(partition)
+        pants_distdir = self.context.options.for_global_scope().pants_distdir
+        target_dir = os.path.join(pants_distdir, 'coverage', relpath)
+      self._copy_dir(workdirs.coverage_path, target_dir)
 
   def _run_pytest(self, workdirs, targets):
     if not targets:
