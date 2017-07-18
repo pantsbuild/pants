@@ -20,6 +20,7 @@ class AnalysisMapSpec extends WordSpec with MustMatchers {
         dc("NonExistent.class") must be(false)
       }
     }
-    // TODO: needs more testing with spoofed analysis
+    // TODO: needs more testing with spoofed analysis:
+    //   see https://github.com/pantsbuild/pants/issues/4756
   }
 }
