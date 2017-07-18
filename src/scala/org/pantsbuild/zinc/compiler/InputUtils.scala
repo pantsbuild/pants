@@ -77,7 +77,7 @@ object InputUtils {
         )
       )
     val setup =
-      new Setup(
+      Setup.create(
         analysisMap.getPCELookup,
         false,
         settings.analysis.cache,
@@ -88,7 +88,7 @@ object InputUtils {
         Array()
       )
 
-    new Inputs(
+    Inputs.create(
       compilers,
       compileOptions,
       setup,
@@ -124,7 +124,7 @@ object InputUtils {
           IO.delete(settings.classesDirectory)
           load()
       }
-    (analysisStore, new PreviousResult(previousAnalysis.asJava, previousSetup.asJava))
+    (analysisStore, PreviousResult.create(previousAnalysis.asJava, previousSetup.asJava))
   }
 
   /**

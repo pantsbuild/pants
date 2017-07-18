@@ -17,14 +17,13 @@ import scala.util.matching.Regex
 import sbt.io.Path._
 import sbt.io.syntax._
 import sbt.util.{Level, Logger}
-import xsbti.Maybe
 import xsbti.compile.{
   ClassFileManagerType,
   CompileOrder,
   IncOptionsUtil,
   TransactionalManagerType
 }
-import xsbti.compile.IncOptionsUtil.defaultIncOptions
+import xsbti.compile.{IncOptions => ZincIncOptions}
 
 import org.pantsbuild.zinc.analysis.AnalysisOptions
 import org.pantsbuild.zinc.options.OptionSet
@@ -37,7 +36,7 @@ case class Settings(
   version: Boolean                  = false,
   consoleLog: ConsoleOptions        = ConsoleOptions(),
   _sources: Seq[File]               = Seq.empty,
-  classpath: Seq[File]             = Seq.empty,
+  classpath: Seq[File]              = Seq.empty,
   _classesDirectory: Option[File]   = None,
   scala: ScalaLocation              = ScalaLocation(),
   scalacOptions: Seq[String]        = Seq.empty,
@@ -84,7 +83,6 @@ case class Settings(
  */
 case class ConsoleOptions(
   logLevel: Level.Value      = Level.Info,
-  color: Boolean             = true,
   fileFilters: Seq[Regex]    = Seq.empty,
   msgFilters: Seq[Regex]     = Seq.empty
 ) {
@@ -186,18 +184,18 @@ case class SbtJars(
  * Wrapper around incremental compiler options.
  */
 case class IncOptions(
-  transitiveStep: Int            = defaultIncOptions.transitiveStep,
-  recompileAllFraction: Double   = defaultIncOptions.recompileAllFraction,
-  relationsDebug: Boolean        = defaultIncOptions.relationsDebug,
-  apiDebug: Boolean              = defaultIncOptions.apiDebug,
-  apiDiffContextSize: Int        = defaultIncOptions.apiDiffContextSize,
-  apiDumpDirectory: Option[File] = defaultIncOptions.apiDumpDirectory.asScala,
+  transitiveStep: Int            = ZincIncOptions.defaultTransitiveStep,
+  recompileAllFraction: Double   = ZincIncOptions.defaultRecompileAllFraction,
+  relationsDebug: Boolean        = ZincIncOptions.defaultRelationsDebug,
+  apiDebug: Boolean              = ZincIncOptions.defaultApiDebug,
+  apiDiffContextSize: Int        = ZincIncOptions.defaultApiDiffContextSize,
+  apiDumpDirectory: Option[File] = ZincIncOptions.defaultApiDumpDirectory.asScala,
   transactional: Boolean         = false,
   useZincFileManager: Boolean    = true,
   backup: Option[File]           = None
 ) {
-  def options(log: Logger): xsbti.compile.IncOptions =
-    IncOptionsUtil.defaultIncOptions
+  def options(log: Logger): ZincIncOptions =
+    ZincIncOptions.create()
       .withTransitiveStep(transitiveStep)
       .withRecompileAllFraction(recompileAllFraction)
       .withRelationsDebug(relationsDebug)
@@ -209,7 +207,7 @@ case class IncOptions(
 
   def classfileManager(log: Logger): Option[ClassFileManagerType] =
     if (transactional && backup.isDefined)
-      Some(new TransactionalManagerType(backup.get, log))
+      Some(TransactionalManagerType.create(backup.get, log))
     else
       None
 }
@@ -235,8 +233,6 @@ object Settings extends OptionSet[Settings] {
       (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.Debug))),
     string(    "-log-level", "level",          "Set log level for stdout (debug|info|warn|error)",
       (s: Settings, l: String) => s.copy(consoleLog = s.consoleLog.copy(logLevel = Level.withName(l)))),
-    boolean(   "-no-color",                    "No color in logging to stdout",
-      (s: Settings) => s.copy(consoleLog = s.consoleLog.copy(color = false))),
     string(    "-msg-filter", "regex",         "Filter warning messages matching the given regex",
       (s: Settings, re: String) => s.copy(consoleLog = s.consoleLog.copy(msgFilters = s.consoleLog.msgFilters :+ re.r))),
     string(    "-file-filter", "regex",        "Filter warning messages from filenames matching the given regex",

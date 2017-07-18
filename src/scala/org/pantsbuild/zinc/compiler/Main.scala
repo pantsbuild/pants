@@ -52,11 +52,7 @@ object Main {
   def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
 
   def mkLogger(settings: Settings) = {
-    val cl =
-      ConsoleLogger(
-        ConsoleOut.systemOut,
-        useColor = ConsoleLogger.formatEnabled && settings.consoleLog.color
-      )
+    val cl = ConsoleLogger(System.out)
     cl.setLevel(settings.consoleLog.logLevel)
     cl
   }
