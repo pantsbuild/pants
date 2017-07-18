@@ -86,6 +86,8 @@ object CompilerUtils {
       ZincCompilerUtil.constantBridgeProvider(instance, interfaceJar),
       ClasspathOptionsUtil.auto,
       _ => (),
+      // TODO: Should likely use the classloader cache here:
+      //   see https://github.com/pantsbuild/pants/issues/4744
       None
     )
 
