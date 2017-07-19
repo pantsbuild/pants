@@ -130,11 +130,12 @@ class ExistingDirError(ValueError):
   """Indicates a copy operation would over-write a directory with a file."""
 
 
-def copytree(src, dst, symlinks=False, ignore=None):
+def mergetree(src, dst, symlinks=False, ignore=None):
   """Just like `shutil.copytree`, except the `dst` dir may exist.
 
   The `src` directory will be walked and its contents copied into `dst`. If `dst` already exists the
-  `src` tree will be overlayed in it.
+  `src` tree will be overlayed in it; ie: existing files in `dst` will be over-written with files
+  from `src` when they have the same subtree path.
   """
   safe_mkdir(dst)
 

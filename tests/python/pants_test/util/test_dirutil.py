@@ -17,11 +17,10 @@ import six
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_unregister_cleaner,
-                                absolute_symlink, copytree, fast_relpath, get_basedir,
-                                longest_dir_prefix, read_file, relative_symlink, relativize_paths,
-                                rm_rf, safe_concurrent_creation, safe_file_dump, safe_mkdir,
-                                safe_mkdtemp, safe_open, safe_rm_oldest_items_in_dir, safe_rmtree,
-                                touch)
+                                absolute_symlink, fast_relpath, get_basedir, longest_dir_prefix,
+                                mergetree, read_file, relative_symlink, relativize_paths, rm_rf,
+                                safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
+                                safe_open, safe_rm_oldest_items_in_dir, safe_rmtree, touch)
 from pants.util.objects import datatype
 
 
@@ -181,13 +180,13 @@ class DirutilTest(unittest.TestCase):
 
     self.assertEqual(frozenset(expected), frozenset(collect_tree()))
 
-  def test_copytree_existing(self):
+  def test_mergetree_existing(self):
     with self.tree() as (src, dst):
       # Existing empty files
       touch(os.path.join(dst, 'c', '1'))
       touch(os.path.join(dst, 'a', 'b', '1'))
 
-      copytree(src, dst)
+      mergetree(src, dst)
 
       self.assert_tree(dst,
                        self.Dir('a'),
@@ -206,23 +205,23 @@ class DirutilTest(unittest.TestCase):
                        # Existing non-overlapping file should be preserved.
                        self.File.empty('c/1'))
 
-  def test_copytree_existing_file_mismatch(self):
+  def test_mergetree_existing_file_mismatch(self):
     with self.tree() as (src, dst):
       touch(os.path.join(dst, 'a'))
       with self.assertRaises(ExistingFileError):
-        copytree(src, dst)
+        mergetree(src, dst)
 
-  def test_copytree_existing_dir_mismatch(self):
+  def test_mergetree_existing_dir_mismatch(self):
     with self.tree() as (src, dst):
       os.makedirs(os.path.join(dst, 'b', '1'))
       with self.assertRaises(ExistingDirError):
-        copytree(src, dst)
+        mergetree(src, dst)
 
-  def test_copytree_new(self):
+  def test_mergetree_new(self):
     with self.tree() as (src, dst_root):
       dst = os.path.join(dst_root, 'dst')
 
-      copytree(src, dst)
+      mergetree(src, dst)
 
       self.assert_tree(dst,
                        self.Dir('a'),
@@ -234,13 +233,13 @@ class DirutilTest(unittest.TestCase):
                        self.File('b/1', contents=b'1'),
                        self.File.empty('b/2'))
 
-  def test_copytree_ignore(self):
+  def test_mergetree_ignore(self):
     with self.tree() as (src, dst):
       def ignore(root, names):
         if root == os.path.join(src, 'a', 'b'):
           return ['1', '2']
 
-      copytree(src, dst, ignore=ignore)
+      mergetree(src, dst, ignore=ignore)
 
       self.assert_tree(dst,
                        self.Dir('a'),
@@ -250,9 +249,9 @@ class DirutilTest(unittest.TestCase):
                        self.File('b/1', contents=b'1'),
                        self.File.empty('b/2'))
 
-  def test_copytree_symlink(self):
+  def test_mergetree_symlink(self):
     with self.tree() as (src, dst):
-      copytree(src, dst, symlinks=True)
+      mergetree(src, dst, symlinks=True)
 
       self.assert_tree(dst,
                        self.Dir('a'),
