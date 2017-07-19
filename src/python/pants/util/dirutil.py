@@ -122,6 +122,72 @@ def safe_walk(path, **kwargs):
   return os.walk(ensure_text(path), **kwargs)
 
 
+class ExistingFileError(ValueError):
+  """Indicates a copy operation would over-write a file with a directory."""
+
+
+class ExistingDirError(ValueError):
+  """Indicates a copy operation would over-write a directory with a file."""
+
+
+def copytree(src, dst, symlinks=False, ignore=None):
+  """Just like `shutil.copytree`, except the `dst` dir may exist.
+
+  The `src` directory will be walked and its contents copied into `dst`. If `dst` already exists the
+  `src` tree will be overlayed in it.
+  """
+  safe_mkdir(dst)
+
+  for src_path, dirnames, filenames in safe_walk(src, topdown=True, followlinks=True):
+    ignorenames = ()
+    if ignore:
+      to_ignore = ignore(src_path, dirnames + filenames)
+      if to_ignore:
+        ignorenames = frozenset(to_ignore)
+
+    dst_path = os.path.join(dst, os.path.relpath(src_path, src))
+
+    visit_dirs = []
+    for dirname in dirnames:
+      src_dir = os.path.join(src_path, dirname)
+      dst_dir = os.path.join(dst_path, dirname)
+      if os.path.exists(dst_dir):
+        if not os.path.isdir(dst_dir):
+          raise ExistingFileError('While copying the tree at {} to {}, encountered directory {} in '
+                                  'the source tree that already exists in the destination as a '
+                                  'non-directory.'.format(src, dst, dst_dir))
+        visit_dirs.append(dirname)
+      elif symlinks and os.path.islink(src_dir):
+        link = os.readlink(src_dir)
+        os.symlink(link, dst_dir)
+        # We need to halt the walk at a symlink dir; so we do not place dirname in visit_dirs
+        # here.
+      else:
+        os.makedirs(dst_dir)
+        visit_dirs.append(dirname)
+
+    # In-place mutate dirnames to halt the walk when the dir is ignored by the caller.
+    dirnames[:] = visit_dirs
+
+    for filename in filenames:
+      if filename in ignorenames:
+        continue
+      dst_filename = os.path.join(dst_path, filename)
+      if os.path.exists(dst_filename):
+        if not os.path.isfile(dst_filename):
+          raise ExistingDirError('While copying the tree at {} to {}, encountered file {} in the '
+                                 'source tree that already exists in the destination as a non-file.'
+                                 .format(src, dst, dst_filename))
+        else:
+          os.unlink(dst_filename)
+      src_filename = os.path.join(src_path, filename)
+      if symlinks and os.path.islink(src_filename):
+        link = os.readlink(src_filename)
+        os.symlink(link, dst_filename)
+      else:
+        shutil.copy2(src_filename, dst_filename)
+
+
 _MKDTEMP_CLEANER = None
 _MKDTEMP_DIRS = defaultdict(set)
 _MKDTEMP_LOCK = threading.RLock()
