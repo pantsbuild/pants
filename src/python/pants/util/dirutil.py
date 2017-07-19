@@ -150,6 +150,9 @@ def mergetree(src, dst, symlinks=False, ignore=None):
 
     visit_dirs = []
     for dirname in dirnames:
+      if dirname in ignorenames:
+        continue
+
       src_dir = os.path.join(src_path, dirname)
       dst_dir = os.path.join(dst_path, dirname)
       if os.path.exists(dst_dir):
@@ -173,6 +176,7 @@ def mergetree(src, dst, symlinks=False, ignore=None):
     for filename in filenames:
       if filename in ignorenames:
         continue
+
       dst_filename = os.path.join(dst_path, filename)
       if os.path.exists(dst_filename):
         if not os.path.isfile(dst_filename):

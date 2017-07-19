@@ -233,7 +233,7 @@ class DirutilTest(unittest.TestCase):
                        self.File('b/1', contents=b'1'),
                        self.File.empty('b/2'))
 
-  def test_mergetree_ignore(self):
+  def test_mergetree_ignore_files(self):
     with self.tree() as (src, dst):
       def ignore(root, names):
         if root == os.path.join(src, 'a', 'b'):
@@ -245,6 +245,21 @@ class DirutilTest(unittest.TestCase):
                        self.Dir('a'),
                        self.File.empty('a/2'),
                        self.Dir('a/b'),
+                       self.Dir('b'),
+                       self.File('b/1', contents=b'1'),
+                       self.File.empty('b/2'))
+
+  def test_mergetree_ignore_dirs(self):
+    with self.tree() as (src, dst):
+      def ignore(root, names):
+        if root == os.path.join(src, 'a'):
+          return ['b']
+
+      mergetree(src, dst, ignore=ignore)
+
+      self.assert_tree(dst,
+                       self.Dir('a'),
+                       self.File.empty('a/2'),
                        self.Dir('b'),
                        self.File('b/1', contents=b'1'),
                        self.File.empty('b/2'))
