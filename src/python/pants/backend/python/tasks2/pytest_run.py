@@ -30,7 +30,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_walk
+from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
@@ -599,21 +599,6 @@ class PytestRun(TestRunnerTaskMixin, Task):
     # individually (`--no-fast`).
     return [self._vts_for_partition(invalidation_check)]
 
-  @staticmethod
-  def _copy_dir(src, dst):
-    # NB: shutil.copytree requires dst not already exist, we tolerate that case to afford copying a
-    # tree into a user-specified location that may contain other files we should preserve.
-    safe_mkdir(dst)
-    for src_path, dirnames, filenames in safe_walk(src, topdown=True):
-      dst_path = os.path.join(dst, os.path.relpath(src_path, src))
-      for dirname in dirnames:
-        safe_mkdir(os.path.join(dst_path, dirname))
-      for filename in filenames:
-        dst_filename = os.path.join(dst_path, filename)
-        if os.path.exists(dst_filename):
-          os.unlink(dst_filename)
-        shutil.copy2(os.path.join(src_path, filename), dst_filename)
-
   # TODO(John Sirois): Its probably worth generalizing a means to mark certain options or target
   # attributes as making results un-cacheable. See: https://github.com/pantsbuild/pants/issues/4748
   class NeverCacheFingerprintStrategy(DefaultFingerprintStrategy):
@@ -628,6 +613,40 @@ class PytestRun(TestRunnerTaskMixin, Task):
     else:
       return None  # Accept the default fingerprint strategy.
 
+  # Some notes on invalidation vs caching as used in `_do_run_tests` below. Here invalidation
+  # refers to executing task work in `Task.invalidated` blocks against invalid targets. Caching
+  # refers to storing the results of that work in the artifact cache using
+  # `VersionedTargetSet.results_dir`. One further bit of terminology is partition, which is the
+  # name for the set of targets passed to the `Task.invalidated` block:
+  #
+  # + Caching results for len(partition) > 1: This is trivial iff we always run all targets in
+  #   the partition, but running just invalid targets in the partition is a nicer experience (you
+  #   can whittle away at failures in a loop of `::`-style runs). Running just invalid though
+  #   requires being able to merge prior results for the partition; ie: knowing the details of
+  #   junit xml, coverage data, or using tools that do, to merge data files. The alternative is
+  #   to always run all targets in a partition if even 1 target is invalid. In this way data files
+  #   corresponding to the full partition are always generated, and so on a green partition, the
+  #   cached data files will always represent the full green run.
+  #
+  # The compromise taken here is to only cache when `all_vts == invalid_vts`; ie when the partition
+  # goes green and the run was against the full partition. A common scenario would then be:
+  #
+  # 1. Mary makes changes / adds new code and iterates `./pants test tests/python/stuff::`
+  #    gradually getting greener until finally all test targets in the `tests/python/stuff::` set
+  #    pass. She commits the green change, but there is no cached result for it since green state
+  #    for the partition was approached incrementally.
+  # 2. Jake pulls in Mary's green change and runs `./pants test tests/python/stuff::`. There is a
+  #    cache miss and he does a full local run, but since `tests/python/stuff::` is green,
+  #    `all_vts == invalid_vts` and the result is now cached for others.
+  #
+  # In this scenario, Jake will likely be a CI process, in which case human others will see a
+  # cached result from Mary's commit. It's important to note, that the CI process must run the same
+  # partition as the end user for that end user to benefit and hit the cache. This is unlikely since
+  # the only natural partitions under CI are single target ones (`--no-fast` or all targets
+  # `--fast ::`. Its unlikely an end user in a large repo will want to run `--fast ::` since `::`
+  # is probably a much wider swath of code than they're working on. As such, although `--fast`
+  # caching is supported, its unlikely to be effective. Caching is best utilized when CI and users
+  # run `--no-fast`.
   def _do_run_tests(self, partition):
     with self.invalidated(partition,
                           fingerprint_strategy=self._fingerprint_strategy(),
@@ -692,7 +711,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
         relpath = Target.maybe_readable_identify(partition)
         pants_distdir = self.context.options.for_global_scope().pants_distdir
         target_dir = os.path.join(pants_distdir, 'coverage', relpath)
-      self._copy_dir(workdirs.coverage_path, target_dir)
+      mergetree(workdirs.coverage_path, target_dir)
 
   def _run_pytest(self, workdirs, targets):
     if not targets:
