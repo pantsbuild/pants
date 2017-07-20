@@ -30,7 +30,7 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for, safe_walk
+from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
