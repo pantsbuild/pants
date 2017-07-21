@@ -93,12 +93,7 @@ class GoThriftGen(SimpleCodegenTask):
     # https://issues.apache.org/jira/browse/THRIFT-3776; first available in 0.10.0
     if self.get_options().multiple_files_per_target_override:
       return
-    try:
-      actual_revision = Revision.semver(self._thrift_binary.version)
-    except Exception as e:
-      self.context.log.warn('Assuming that unparseable thrift version `{}` '
-                            'supports more than one source.'.format(self._thrift_binary.version))
-      return
+    actual_revision = Revision.semver(self._thrift_binary.version)
     required_version = '0.10.0'
     if Revision.semver(required_version) <= actual_revision:
       return
