@@ -5,10 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.tasks.task_test_base import TaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants.binaries.thrift_binary import ThriftBinary
 from pants.base.exceptions import TaskError
+from pants.binaries.thrift_binary import ThriftBinary
+from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.go.tasks.go_thrift_gen import GoThriftGen
 
