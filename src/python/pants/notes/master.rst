@@ -5,6 +5,32 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev6 (7/21/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Conditionally support multiple thrift files for go_thrift_gen (#4759)
+  `PR #4759 <https://github.com/pantsbuild/pants/pull/4759>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Introduce `dirutil.mergetree`. (#4757)
+  `PR #4757 <https://github.com/pantsbuild/pants/pull/4757>`_
+
+* Zinc 1.0.0-X20 upgrade: JVM portion (#4728)
+  `Issue #355), <https://github.com/sbt/zinc/issues/355),>`_
+  `PR #4728 <https://github.com/pantsbuild/pants/pull/4728>`_
+
+* Ensure setuptools version when running setup.py. (#4753)
+  `PR #4753 <https://github.com/pantsbuild/pants/pull/4753>`_
+
+* Kill deprecated explicit register.
+  `Commit 5583dd1 <https://github.com/pantsbuild/pants/commit/5583dd1>`_
+
+
 1.4.0.dev5 (7/14/2017)
 ----------------------
 
