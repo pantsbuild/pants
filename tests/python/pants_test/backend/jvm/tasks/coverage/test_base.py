@@ -18,7 +18,7 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
 
-class AttrDict(dict):
+class attrdict(dict):
   """Allows entries in the dictionary to be accessed like a property, in order to spoof options.
 
   :API: public
@@ -28,7 +28,7 @@ class AttrDict(dict):
     return self.get(key)
 
 
-class FakeLog(object):
+class fake_log(object):
   """
   :API: public
   """
@@ -136,9 +136,9 @@ class TestBase(BaseTest):
     """
     :API: public
     """
-    options = AttrDict(coverage=True, coverage_jvm_options=[])
+    options = attrdict(coverage=True, coverage_jvm_options=[])
 
-    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, FakeLog())
+    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
     coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
@@ -162,9 +162,9 @@ class TestBase(BaseTest):
     """
     :API: public
     """
-    options = AttrDict(coverage=True, coverage_jvm_options=[])
+    options = attrdict(coverage=True, coverage_jvm_options=[])
 
-    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, FakeLog())
+    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
     coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
@@ -189,9 +189,9 @@ class TestBase(BaseTest):
     """
     :API: public
     """
-    options = AttrDict(coverage=True, coverage_jvm_options=[])
+    options = attrdict(coverage=True, coverage_jvm_options=[])
 
-    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, FakeLog())
+    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
     coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
