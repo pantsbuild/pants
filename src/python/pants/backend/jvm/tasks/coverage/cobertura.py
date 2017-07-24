@@ -152,7 +152,7 @@ class Cobertura(Coverage):
       else:
         return
     cobertura_cp = self._settings.tool_classpath('cobertura-report')
-    source_roots = { t.target_base for t in targets if self.is_coverage_target(t) }
+    source_roots = {t.target_base for t in targets if self.is_coverage_target(t)}
     for report_format in ['xml', 'html']:
       report_dir = os.path.join(self._settings.coverage_dir, report_format)
       safe_mkdir(report_dir, clean=True)

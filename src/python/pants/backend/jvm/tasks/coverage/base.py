@@ -99,7 +99,8 @@ class Coverage(AbstractClass):
     pass
 
   # Utility methods, called from subclasses
-  def is_coverage_target(self, tgt):
+  @staticmethod
+  def is_coverage_target(tgt):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
   def initialize_instrument_classpath(self, targets, instrumentation_classpath):

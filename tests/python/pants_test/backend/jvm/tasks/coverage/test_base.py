@@ -18,19 +18,17 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
 
-class attrdict(dict):
+class AttrDict(dict):
   """Allows entries in the dictionary to be accessed like a property, in order to spoof options.
 
   :API: public
   """
 
   def __getattr__(self, key):
-    if self.has_key(key):
-      return self[key]
-    return None
+    return self.get(key)
 
 
-class fake_log(object):
+class FakeLog(object):
   """
   :API: public
   """
@@ -39,7 +37,7 @@ class fake_log(object):
     """
     :API: public
     """
-    return
+    pass
 
 
 class CoverageEngineForTesting(Coverage):
@@ -63,8 +61,8 @@ class CoverageEngineForTesting(Coverage):
     """
     :API: public
     """
-    assert clean == True
-    self.safe_makedir_calls += dir
+    assert clean is True
+    self.safe_makedir_calls.append(dir)
 
   def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
     pass
@@ -138,9 +136,9 @@ class TestBase(BaseTest):
     """
     :API: public
     """
-    options = attrdict(coverage=True, coverage_jvm_options=[])
+    options = AttrDict(coverage=True, coverage_jvm_options=[])
 
-    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
+    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, FakeLog())
     coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
@@ -164,9 +162,9 @@ class TestBase(BaseTest):
     """
     :API: public
     """
-    options = attrdict(coverage=True, coverage_jvm_options=[])
+    options = AttrDict(coverage=True, coverage_jvm_options=[])
 
-    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
+    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, FakeLog())
     coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
@@ -191,9 +189,9 @@ class TestBase(BaseTest):
     """
     :API: public
     """
-    options = attrdict(coverage=True, coverage_jvm_options=[])
+    options = AttrDict(coverage=True, coverage_jvm_options=[])
 
-    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, fake_log())
+    settings = CoverageTaskSettings(options, None, self.pants_workdir, None, None, FakeLog())
     coverage = CoverageEngineForTesting(settings)
 
     classpath_products = ClasspathProducts(self.pants_workdir)
