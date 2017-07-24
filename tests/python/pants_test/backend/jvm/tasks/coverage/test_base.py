@@ -25,9 +25,7 @@ class attrdict(dict):
   """
 
   def __getattr__(self, key):
-    if self.has_key(key):
-      return self[key]
-    return None
+    return self.get(key)
 
 
 class fake_log(object):
@@ -39,7 +37,7 @@ class fake_log(object):
     """
     :API: public
     """
-    return
+    pass
 
 
 class CoverageEngineForTesting(Coverage):
@@ -63,8 +61,8 @@ class CoverageEngineForTesting(Coverage):
     """
     :API: public
     """
-    assert clean == True
-    self.safe_makedir_calls += dir
+    assert clean is True
+    self.safe_makedir_calls.append(dir)
 
   def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
     pass
