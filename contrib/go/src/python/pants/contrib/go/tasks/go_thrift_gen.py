@@ -131,16 +131,16 @@ class GoThriftGen(SimpleCodegenTask):
     if len(all_sources) != 1:
       self._validate_supports_more_than_one_source()
 
-    source = all_sources[0]
-    target_cmd.append(os.path.join(get_buildroot(), source))
-    with self.context.new_workunit(name=source,
-                                   labels=[WorkUnitLabel.TOOL],
-                                   cmd=' '.join(target_cmd)) as workunit:
-      result = subprocess.call(target_cmd,
-                               stdout=workunit.output('stdout'),
-                              stderr=workunit.output('stderr'))
-      if result != 0:
-        raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary.path, result))
+    for source in all_sources:
+      file_cmd = target_cmd + [os.path.join(get_buildroot(), source)]
+      with self.context.new_workunit(name=source,
+                                     labels=[WorkUnitLabel.TOOL],
+                                     cmd=' '.join(file_cmd)) as workunit:
+        result = subprocess.call(file_cmd,
+                                 stdout=workunit.output('stdout'),
+                                 stderr=workunit.output('stderr'))
+        if result != 0:
+          raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary.path, result))
 
     gen_dir = os.path.join(target_workdir, 'gen-go')
     src_dir = os.path.join(target_workdir, 'src')
