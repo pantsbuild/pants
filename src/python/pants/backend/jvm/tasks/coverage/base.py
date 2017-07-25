@@ -41,18 +41,85 @@ class CoverageTaskSettings(object):
                log=task.context.log)
 
 
-class Coverage(AbstractClass):
-  """Base class for coverage processors. Do not instantiate."""
+class CoverageInterface(AbstractClass):
+  """The interface JVM code coverage processors must support."""
+
+  @abstractmethod
+  def instrument(self):
+    """Instruments JVM bytecode for coverage tracking."""
+
+  @abstractmethod
+  def report(self, execution_failed_exception=None):
+    """Generate a report of code coverage and return the path of the report.
+
+    :param Exception execution_failed_exception: If execution of the instrumented code failed, the
+                                                 exception describing the failure.
+    """
+
+  @abstractmethod
+  def maybe_open_report(self):
+    """Open the code coverage report if requested by the end user."""
+
+  @abstractproperty
+  def classpath_prepend(self):
+    """Return an iterable of classpath elements to prepend to the JVM code execution classpath."""
+
+  @abstractproperty
+  def classpath_append(self):
+    """Return an iterable of classpath elements to append to the JVM code execution classpath."""
+
+  @abstractproperty
+  def extra_jvm_options(self):
+    """Return an list of jvm options to use executing JVM code in order to collect coverage data."""
+
+
+class NoCoverage(CoverageInterface):
+  """A JVM code coverage processor that collects no code coverage data at all."""
+
+  def instrument(self):
+    pass
+
+  def report(self, execution_failed_exception=None):
+    return None
+
+  def maybe_open_report(self):
+    pass
+
+  @property
+  def classpath_prepend(self):
+    return ()
+
+  @property
+  def classpath_append(self):
+    return ()
+
+  @property
+  def extra_jvm_options(self):
+    return []
+
+
+class BaseCoverage(CoverageInterface):
+  """Base class for JVM code coverage processors.
+
+  Do not instantiate.
+  """
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
-    register('--coverage', type=bool, help='Collect code coverage data.')
-    register('--coverage-processor', advanced=True, default='cobertura',
+    register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
+
+    # TODO(John Sirois): Fold this base class up into `Cobertura` once `--coverage-processor` is
+    # killed.
+    register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura'],
+             removal_version='1.6.0.dev0',
+             removal_hint='Only cobertura is supported for code coverage so this option can be '
+                          'omitted.',
              help='Which coverage subsystem to use.')
-    register('--coverage-jvm-options', advanced=True, type=list,
+
+    register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
-    register('--coverage-open', type=bool,
+    register('--coverage-open', type=bool, fingerprint=True,
              help='Open the generated HTML coverage report in a browser. Implies --coverage.')
     register('--coverage-force', advanced=True, type=bool,
              help='Attempt to run the reporting phase of coverage even if tests failed '
@@ -77,26 +144,6 @@ class Coverage(AbstractClass):
     self._copytree = copytree
     self._is_file = is_file
     self._safe_makedir = safe_md
-
-  @abstractmethod
-  def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
-    pass
-
-  @abstractmethod
-  def report(self, targets, execute_java_for_targets, tests_failed_exception):
-    pass
-
-  @abstractproperty
-  def classpath_prepend(self):
-    pass
-
-  @abstractproperty
-  def classpath_append(self):
-    pass
-
-  @abstractproperty
-  def extra_jvm_options(self):
-    pass
 
   # Utility methods, called from subclasses
   @staticmethod

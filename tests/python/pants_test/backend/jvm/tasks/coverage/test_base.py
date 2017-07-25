@@ -13,7 +13,7 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
-from pants.backend.jvm.tasks.coverage.base import Coverage, CoverageTaskSettings
+from pants.backend.jvm.tasks.coverage.base import BaseCoverage, CoverageTaskSettings
 from pants.java.jar.jar_dependency import JarDependency
 from pants_test.base_test import BaseTest
 
@@ -40,7 +40,7 @@ class fake_log(object):
     pass
 
 
-class CoverageEngineForTesting(Coverage):
+class CoverageEngineForTesting(BaseCoverage):
   """
   :API: public
   """
@@ -64,10 +64,13 @@ class CoverageEngineForTesting(Coverage):
     assert clean is True
     self.safe_makedir_calls.append(dir)
 
-  def instrument(self, targets, compute_junit_classpath, execute_java_for_targets):
+  def instrument(self):
     pass
 
-  def report(self, targets, execute_java_for_targets, tests_failed_exception):
+  def report(self, execution_failed_exception=None):
+    pass
+
+  def maybe_open_report(self):
     pass
 
   def classpath_prepend(self):

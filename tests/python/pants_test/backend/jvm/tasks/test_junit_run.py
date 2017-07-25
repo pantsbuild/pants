@@ -27,10 +27,10 @@ from pants.util.dirutil import safe_file_dump
 from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 class JUnitRunnerTest(JvmToolTaskTestBase):
-  """Tests for junit_run._JUnitRunner class"""
 
   @classmethod
   def task_type(cls):
@@ -45,6 +45,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       },
     ))
 
+  def setUp(self):
+    super(JUnitRunnerTest, self).setUp()
+    init_subsystem(JUnit)
+
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_success(self):
     self._execute_junit_runner(
       [('FooTest.java', dedent("""
@@ -59,10 +64,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       """))]
     )
 
-  def setUp(self):
-    super(JUnitRunnerTest, self).setUp()
-    init_subsystem(JUnit)
-
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_junit_runner_failure(self):
     with self.assertRaises(TaskError) as cm:
       self._execute_junit_runner(
@@ -80,6 +82,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_junit_runner_error(self):
     with self.assertRaises(TaskError) as cm:
       self._execute_junit_runner(
@@ -96,6 +99,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_timeout_success(self):
     """When we set a timeout and don't force failure, succeed."""
 
@@ -119,6 +123,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_junit_runner_timeout_fail(self):
     """When we set a timeout and force a failure, fail."""
 
@@ -147,7 +152,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       args, kwargs = mock_timeout.call_args
       self.assertEqual(args, (1,))
 
-  def _execute_junit_runner(self, list_of_filename_content_tuples, create_some_resources=True, **kwargs):
+  def _execute_junit_runner(self, list_of_filename_content_tuples, create_some_resources=True,
+                            target_name=None):
     # Create the temporary base test directory
     test_rel_path = 'tests/java/org/pantsbuild/foo'
     test_abs_path = self.create_dir(test_rel_path)
@@ -182,8 +188,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       [javac, '-d', test_classes_abs_path, '-cp', classpath] + test_java_file_abs_paths)
 
     # If a target_name is specified create a target with it, otherwise create a junit_tests target.
-    if 'target_name' in kwargs:
-      target = self.target(kwargs['target_name'])
+    if target_name:
+      target = self.target(target_name)
     else:
       target = self.create_library(test_rel_path, 'junit_tests', 'foo_test', ['FooTest.java'])
 
@@ -209,6 +215,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     # Finally execute the task.
     self.execute(context)
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_junit_runner_raises_no_error_on_non_junit_target(self):
     """Run pants against a `python_tests` target, but set an option for the `test.junit` task. This
     should execute without error.
@@ -221,9 +228,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         """
     ))
     self.set_options(test='#abc')
-    task = self.create_task(self.context(target_roots=[self.target('foo:hello')]))
-    task.execute()
+    self.execute(self.context(target_roots=[self.target('foo:hello')]))
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_empty_sources(self):
     self.add_to_build_file('foo', dedent("""
         junit_tests(
@@ -232,11 +239,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         )
         """
     ))
-    task = self.create_task(self.context(target_roots=[self.target('foo:empty')]))
+    task = self.prepare_execute(self.context(target_roots=[self.target('foo:empty')]))
     with self.assertRaisesRegexp(TargetDefinitionException,
                                  r'must include a non-empty set of sources'):
       task.execute()
 
+  # We should skip the execution (and caching) phase when there are no test sources.
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
   def test_allow_empty_sources(self):
     self.add_to_build_file('foo', dedent("""
         junit_tests(
@@ -248,7 +257,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.set_options(allow_empty_sources=True)
     context = self.context(target_roots=[self.target('foo:empty')])
     self.populate_runtime_classpath(context=context)
-    self.create_task(context).execute()
+    self.execute(context)
 
   def test_request_classes_by_source(self):
     """`classes_by_source` is expensive to compute: confirm that it is only computed when needed."""
@@ -263,14 +272,16 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.assertTrue(JUnitRun.request_classes_by_source([srcfile]))
     self.assertTrue(JUnitRun.request_classes_by_source(['{}#method'.format(srcfile)]))
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_extra_jvm_options(self):
     self.make_target(
-      spec='foo:foo_test',
+      spec='tests/java/org/pantsbuild/foo:foo_test',
       target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property=1'],
     )
     self._execute_junit_runner([('FooTest.java', dedent("""
+        package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -280,16 +291,18 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty != null && exampleProperty.equals("1"));
           }
         }
-      """))], target_name='foo:foo_test')
+      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_multiple_extra_jvm_options(self):
     self.make_target(
-      spec='foo:foo_test',
+      spec='tests/java/org/pantsbuild/foo:foo_test',
       target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_jvm_options=['-Dexample.property1=1','-Dexample.property2=2'],
     )
     self._execute_junit_runner([('FooTest.java', dedent("""
+        package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertTrue;
         public class FooTest {
@@ -303,11 +316,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertTrue(exampleProperty3 == null);
           }
         }
-      """))], target_name='foo:foo_test')
+      """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
 
+  # 2 runs with different targets (unique configurations), should cache twice.
+  @ensure_cached(JUnitRun, expected_num_artifacts=2)
   def test_junit_runner_extra_env_vars(self):
     self.make_target(
-      spec='foo:foo_test',
+      spec='tests/java/org/pantsbuild/foo:foo_test',
       target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_env_vars={
@@ -317,7 +332,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     )
 
     self.make_target(
-      spec='bar:bar_test',
+      spec='tests/java/org/pantsbuild/foo:bar_test',
       target_type=JUnitTests,
       sources=['FooTest.java'],
       extra_env_vars={
@@ -329,6 +344,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self._execute_junit_runner(
       [
         ('FooTest.java', dedent("""
+        package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertEquals;
         public class FooTest {
@@ -339,10 +355,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
           }
         }
       """))
-      ], target_name='foo:foo_test')
+      ], target_name='tests/java/org/pantsbuild/foo:foo_test')
 
     # Execute twice in a row to make sure the environment changes aren't sticky.
     self._execute_junit_runner([('FooTest.java', dedent("""
+        package org.pantsbuild.foo;
         import org.junit.Test;
         import static org.junit.Assert.assertEquals;
         import static org.junit.Assert.assertFalse;
@@ -354,12 +371,13 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             assertFalse(System.getenv().containsKey("THERE"));
           }
         }
-      """))], target_name='bar:bar_test', create_some_resources=False)
+      """))], target_name='tests/java/org/pantsbuild/foo:bar_test', create_some_resources=False)
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junit_runner_extra_env_vars_none(self):
     with environment_as(THIS_VARIABLE="12", THAT_VARIABLE="This is a variable."):
       self.make_target(
-        spec='foo:foo_test',
+        spec='tests/java/org/pantsbuild/foo:foo_test',
         target_type=JUnitTests,
         sources=['FooTest.java'],
         extra_env_vars={
@@ -370,6 +388,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       )
 
       self._execute_junit_runner([('FooTest.java', dedent("""
+          package org.pantsbuild.foo;
           import org.junit.Test;
           import static org.junit.Assert.assertEquals;
           import static org.junit.Assert.assertFalse;
@@ -382,8 +401,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
               assertFalse(System.getenv().containsKey("THIS_VARIABLE"));
             }
           }
-        """))], target_name='foo:foo_test')
+        """))], target_name='tests/java/org/pantsbuild/foo:foo_test')
 
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_junt_run_with_too_many_args(self):
     max_subprocess_args = 2
     num_of_classes = 5
@@ -391,7 +411,9 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     list_of_filename_content_tuples = []
     for n in range(num_of_classes):
       filename = 'FooTest{}.java'.format(n)
+
       content = dedent("""
+          package org.pantsbuild.foo;
           import org.junit.Test;
           import static org.junit.Assert.assertTrue;
           public class FooTest{}{{
@@ -403,10 +425,11 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       list_of_filename_content_tuples.append((filename, content))
 
     self.make_target(
-      spec='foo:foo_test',
+      spec='tests/java/org/pantsbuild/foo:foo_test',
       target_type=JUnitTests,
       sources=[name for name, _ in list_of_filename_content_tuples],
     )
     self.set_options(max_subprocess_args=max_subprocess_args)
 
-    self._execute_junit_runner(list_of_filename_content_tuples, target_name='foo:foo_test')
+    self._execute_junit_runner(list_of_filename_content_tuples,
+                               target_name='tests/java/org/pantsbuild/foo:foo_test')
