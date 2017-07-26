@@ -198,7 +198,7 @@ class ScmPublishMixin(object):
       if changed_files:
         raise self.DirtyWorkspaceError('Can only push from a clean branch, found : {}'
                                        .format(' '.join(changed_files)))
-    else:
+    elif self.scm:
       self.log.info('Skipping check for a clean {} branch in test mode.'
                     .format(self.scm.branch_name))
 
