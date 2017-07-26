@@ -11,7 +11,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <publications>
     <artifact/>
     <artifact m:classifier="sources"/>
-    <artifact m:classifier="CHANGELOG" ext="txt"/>
     <artifact type="pom"/>
   </publications>
 </ivy-module>

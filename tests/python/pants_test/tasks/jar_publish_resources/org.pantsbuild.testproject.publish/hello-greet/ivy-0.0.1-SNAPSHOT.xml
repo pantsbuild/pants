@@ -12,7 +12,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
     <artifact/>
     <artifact m:classifier="sources"/>
     <artifact m:classifier="javadoc"/>
-    <artifact m:classifier="CHANGELOG" ext="txt"/>
     <artifact type="pom"/>
   </publications>
 </ivy-module>
