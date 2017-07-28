@@ -65,10 +65,10 @@ class ScalaFmt(NailgunTask, AbstractClass):
       files = ",".join(sources)
 
       result = self.runjava(classpath=self.tool_classpath('scalafmt'),
-                   main=self._SCALAFMT_MAIN,
-                   args=self.get_command_args(files),
-                   workunit_name='scalafmt',
-                   jvm_options=self.get_options().jvm_options)
+                            main=self._SCALAFMT_MAIN,
+                            args=self.get_command_args(files),
+                            workunit_name='scalafmt',
+                            jvm_options=self.get_options().jvm_options)
 
       self.process_results(result)
 
