@@ -5,6 +5,30 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev7 (7/28/2017)
+----------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update to zinc 1.0.0-RC3 (#4775)
+  `Issue #355, <https://github.com/sbt/zinc/issues/355,>`_
+  `Issue #355 <https://github.com/sbt/zinc/issues/355>`_
+  `PR #4775 <https://github.com/pantsbuild/pants/pull/4775>`_
+
+* Don't require an scm for local publishes. (#4773)
+  `PR #4773 <https://github.com/pantsbuild/pants/pull/4773>`_
+
+* Simplify `argutil::ensure_arg`. (#4768)
+  `PR #4768 <https://github.com/pantsbuild/pants/pull/4768>`_
+
+* Small cleanups in the `JunitRun` codebase. (#4767)
+  `PR #4767 <https://github.com/pantsbuild/pants/pull/4767>`_
+
+* Add support for compiling thrift split across multiple files in go. (#4766)
+  `PR #4766 <https://github.com/pantsbuild/pants/pull/4766>`_
+
+
 1.4.0.dev6 (7/21/2017)
 ----------------------
 
