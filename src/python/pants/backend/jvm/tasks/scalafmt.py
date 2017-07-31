@@ -31,7 +31,7 @@ class ScalaFmt(NailgunTask, AbstractClass):
   def register_options(cls, register):
     super(ScalaFmt, cls).register_options(register)
     register('--skip', type=bool, fingerprint=False, help='Skip Scalafmt Check')
-    register('--configuration', advanced=True, type=file_option, fingerprint=False,
+    register('--configuration', advanced=True, type=file_option, fingerprint=True,
               help='Path to scalafmt config file, if not specified default scalafmt config used')
     register('--target-types',
              default=['scala_library', 'junit_tests', 'java_tests'],
