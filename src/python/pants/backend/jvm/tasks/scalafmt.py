@@ -11,6 +11,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
+from pants.process.xargs import Xargs
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
@@ -45,6 +46,10 @@ class ScalaFmt(NailgunTask, AbstractClass):
                                         rev='0.2.11')
                           ])
 
+  @classmethod
+  def implementation_version(cls):
+    return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 4)]
+
   @memoized_property
   def _formatted_target_types(self):
     aliases = set(self.get_options().target_types)
@@ -59,18 +64,24 @@ class ScalaFmt(NailgunTask, AbstractClass):
       return
 
     targets = self.get_non_synthetic_scala_targets(self.context.targets())
-    sources = self.calculate_sources(targets)
 
-    if sources:
-      files = ",".join(sources)
+    with self.invalidated(targets) as invalidation_check:
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
+      sources = self.calculate_sources(invalid_targets)
+      if not sources:
+        return
 
-      result = self.runjava(classpath=self.tool_classpath('scalafmt'),
-                            main=self._SCALAFMT_MAIN,
-                            args=self.get_command_args(files),
-                            workunit_name='scalafmt',
-                            jvm_options=self.get_options().jvm_options)
-
+      result = Xargs(self._invoke_scalafmt).execute(sources)
       self.process_results(result)
+
+  def _invoke_scalafmt(self, sources):
+    files = ",".join(sources)
+
+    return self.runjava(classpath=self.tool_classpath('scalafmt'),
+                        main=self._SCALAFMT_MAIN,
+                        args=self.get_command_args(files),
+                        workunit_name='scalafmt',
+                        jvm_options=self.get_options().jvm_options)
 
   @abstractproperty
   def get_command_args(self, files):
@@ -115,6 +126,9 @@ class ScalaFmtCheckFormat(ScalaFmt):
   """
   deprecated_options_scope = 'compile.scalafmt'
   deprecated_options_scope_removal_version = '1.5.0.dev0'
+
+  # Because this task has no sideeffects, it is safe to cache.
+  cache_target_dirs = True
 
   def get_command_args(self, files):
     # If no config file is specified use default scalafmt config.
