@@ -70,3 +70,19 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
       {'lint.scalafmt':{'skip':'False',
       'configuration':'%(pants_supportdir)s/scalafmt/config'}})
     self.assert_success(run)
+
+  def test_scalafmt_jvm_options(self):
+    target = '{}/badscalastyle'.format(TEST_DIR)
+    jvm_options = '-foobar'
+    # checking for invalid option making it to jvm output rather than mocking out jvm to verify correct args passed
+    options = {
+      'fmt.scalafmt': {
+        'jvm_options': jvm_options,
+        'use_nailgun': False,
+        'skip': False,
+      }
+    }
+    run = self.run_pants(['fmt', target], options)
+    self.assert_failure(run)
+    expected_message = "Unrecognized option: {}".format(jvm_options)
+    self.assertTrue(expected_message in run.stdout_data, "expected to find '{}' in stdout '{}' (stderr: '{}')".format(expected_message, run.stdout_data, run.stderr_data))
