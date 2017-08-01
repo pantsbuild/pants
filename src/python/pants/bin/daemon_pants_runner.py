@@ -9,11 +9,12 @@ import datetime
 import os
 import signal
 import socket
+import sys
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
 
-from pants.bin.exiter import Exiter
+from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamWriter
@@ -138,8 +139,12 @@ class DaemonPantsRunner(ProcessManager):
   def post_fork_child(self):
     """Post-fork child process callback executed via ProcessManager.daemonize()."""
     # Set the Exiter exception hook post-fork so as not to affect the pantsd processes exception
-    # hook with socket-specific behavior.
-    self._exiter.set_except_hook()
+    # hook with socket-specific behavior. Note that this intentionally points the faulthandler
+    # trace stream to sys.stderr, which at this point is still a _LoggerStream object writing to
+    # the `pantsd.log`. This ensures that in the event of e.g. a hung but detached pantsd-runner
+    # process that the stacktrace output lands deterministically in a known place vs to a stray
+    # terminal window.
+    self._exiter.set_except_hook(sys.stderr)
 
     # Set context in the process title.
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
