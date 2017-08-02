@@ -394,6 +394,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:timeout',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
+    'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )
