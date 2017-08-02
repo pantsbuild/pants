@@ -66,6 +66,16 @@ class Cobertura(BaseCoverage):
     register_jvm_tool(register, 'cobertura-report', classpath=[cobertura_jar()])
 
   def __init__(self, settings, targets, execute_java_for_targets):
+    """
+    :param settings: The options for a `Cobertura` coverage run.
+    :type settings: :class:`CoberturaTaskSettings`
+    :param list targets: A list of targets to instrument and record code coverage for.
+    :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
+                                     constraints are used to pick a JVM `Distribution`. The function
+                                     should also accept `*args` and `**kwargs` compatible with the
+                                     remaining parameters accepted by
+                                     `pants.java.util.execute_java`.
+    """
     super(Cobertura, self).__init__(settings)
     options = settings.options
     self._coverage_datafile = os.path.join(self._settings.coverage_dir, 'cobertura.ser')

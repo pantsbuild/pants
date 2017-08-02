@@ -25,7 +25,6 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, NoJunitHtmlReport
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import ErrorWhileTesting, TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
@@ -300,24 +299,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                                            executor=actual_executor,
                                            **kwargs)
 
-  @deprecated(removal_version='1.6.0.dev0',
-              hint_message='Subclasses should calculate the correct java distribution to use and '
-                           'execute `_spawn_and_wait` on their own.')
-  def execute_java_for_targets(self, targets, *args, **kwargs):
-    """Execute java for targets using the test mixin spawn and wait.
-
-    Activates timeouts and other common functionality shared among tests.
-    """
-    # NB: Unused method - see deprecation above.
-
-    distribution = self.preferred_jvm_distribution_for_targets(targets)
-    actual_executor = kwargs.get('executor') or SubprocessExecutor(distribution)
-    return self._spawn_and_wait(*args,
-                                executor=actual_executor,
-                                distribution=distribution,
-                                **kwargs)
-
-  def execute_java_for_coverage(self, targets, executor=None, *args, **kwargs):
+  def execute_java_for_coverage(self, targets, *args, **kwargs):
     """Execute java for targets directly and don't use the test mixin.
 
     This execution won't be wrapped with timeouts and other test mixin code common
@@ -325,7 +307,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     """
 
     distribution = self.preferred_jvm_distribution_for_targets(targets)
-    actual_executor = executor or SubprocessExecutor(distribution)
+    actual_executor = SubprocessExecutor(distribution)
     return distribution.execute_java(*args, executor=actual_executor, **kwargs)
 
   def _collect_test_targets(self, targets):
@@ -520,6 +502,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     # We generate artifacts, namely coverage reports, that cover the full target set.
     return [self._vts_for_partition(invalidation_check)]
 
+  @staticmethod
+  def _collect_files(directory):
+    def files_iter():
+      for dir_path, _, file_names in os.walk(directory):
+        for filename in file_names:
+          yield os.path.join(dir_path, filename)
+    return list(files_iter())
+
   def _execute(self, all_targets):
     # NB: We only run tests within junit_tests targets, but if coverage options are
     # specified, we want to instrument and report on all the original targets, not
@@ -554,11 +544,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
             if invalidation_check.all_vts == invalidation_check.invalid_vts:
               # 2.) The full partition was invalid, cache results.
               if self.artifact_cache_writes_enabled():
-                def files_iter():
-                  for dir_path, _, file_names in os.walk(output_dir):
-                    for filename in file_names:
-                      yield os.path.join(dir_path, filename)
-                self.update_artifact_cache([(cache_vts, list(files_iter()))])
+                self.update_artifact_cache([(cache_vts, self._collect_files(output_dir))])
             elif not invalidation_check.invalid_vts:
               # 3.) The full partition was valid, our results will have been staged for/by caching
               # if not already local.
