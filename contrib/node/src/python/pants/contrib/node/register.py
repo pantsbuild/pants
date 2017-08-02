@@ -17,6 +17,7 @@ from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalled
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
 from pants.contrib.node.tasks.javascript_style import JavascriptStyle
+from pants.contrib.node.tasks.javascript_style import JavascriptStyleFmt
 from pants.contrib.node.tasks.node_build import NodeBuild
 from pants.contrib.node.tasks.node_bundle import NodeBundle as NodeBundleTask
 from pants.contrib.node.tasks.node_repl import NodeRepl
@@ -46,6 +47,7 @@ def register_goals():
   task(name='node', action=NodeBundleTask).install('bundle')
   # Linting
   task(name='javascriptstyle', action=JavascriptStyle).install('lint')
+  task(name='javascriptstyle', action=JavascriptStyleFmt).install('fmt')
 
 
 def global_subsystems():

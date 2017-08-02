@@ -21,7 +21,7 @@ class NodeModule(NodePackage):
 
   def __init__(
     self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, address=None, payload=None, lint_config=None, **kwargs):
+    dev_dependency=False, address=None, payload=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
@@ -38,8 +38,6 @@ class NodeModule(NodePackage):
     :param dev_dependency: boolean value.  Default is False. If a node_module is used as parts
       of devDependencies and thus should not be included in the final bundle or JVM binaries, set
       this value to True.
-    :param lint_config: Override the default lint configuration. Any lint rules requiring a plugin
-      will need to be included in the node_modules/package.json.
     """
     # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
     # clear-cut since pants controlled builds would provide devDependencies as needed to perform
@@ -53,8 +51,7 @@ class NodeModule(NodePackage):
       'build_script': PrimitiveField(build_script),
       'package_manager': PrimitiveField(package_manager),
       'output_dir': PrimitiveField(output_dir),
-      'dev_dependency': PrimitiveField(dev_dependency),
-      'lint_config': PrimitiveField(lint_config),
+      'dev_dependency': PrimitiveField(dev_dependency)
     })
     logger.debug('NodeModule payload: %s', payload.fields)
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)

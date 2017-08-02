@@ -7,15 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.option.custom_types import file_option
-from pants.util.contextutil import pushd
-from pants.base.build_environment import get_buildroot
-
 from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.tasks.node_task import NodeTask
 from pants.contrib.node.tasks.node_paths import NodePaths
+from pants.option.custom_types import file_option
+from pants.util.contextutil import pushd
+from pants.util.memo import memoized_method
 
 
 class JavascriptStyle(NodeTask):
@@ -26,6 +26,7 @@ class JavascriptStyle(NodeTask):
 
   _JS_SOURCE_EXTENSION = '.js'
   _JSX_SOURCE_EXTENSION = '.jsx'
+  INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = 'synthetic-install-javascriptstyle-module'
 
   def __init__(self, *args, **kwargs):
     super(JavascriptStyle, self).__init__(*args, **kwargs)
@@ -33,16 +34,9 @@ class JavascriptStyle(NodeTask):
   @classmethod
   def register_options(cls, register):
     super(JavascriptStyle, cls).register_options(register)
-    register('--cmd', advanced=True, default='eslint', fingerprint=True,
-             help='Run this command to start style checker.')
-    register('--cmd-args', advanced=True, type=list, default=[], fingerprint=True,
-             help='Passthrough command line args.')
-    register('--package', advanced=True, default='eslint', fingerprint=True, help='Linter tool')
     register('--skip', type=bool, fingerprint=True, help='Skip javascriptstyle.')
-    register('--config', type=file_option, advanced=True, fingerprint=True,
-             help='Path to javascriptstyle config file.')
-    register('--linter-plugins', advanced=True, type=list, default=[], fingerprint=True,
-             help='Add these plugins to extend linter.')
+    register('--javascriptstyle-dir', advanced=True, fingerprint=True,
+             help='Package directory for lint tool.')
 
   def get_lintable_node_targets(self, targets):
     return filter(
@@ -59,36 +53,32 @@ class JavascriptStyle(NodeTask):
                        source.endswith(self._JSX_SOURCE_EXTENSION)))
     return sources
 
-  def _install_packages(self, target, packages):
-    """Install packages related to javascript style checker."""
-    for package in packages:
-      self.context.log.debug('Installing package %s.'% package)
+  @memoized_method
+  def _install_javascriptstyle(self, javascriptstyle_dir):
+    with pushd(javascriptstyle_dir):
       result, yarn_add_command = self.execute_yarnpkg(
-        args=['add', package],
-        workunit_name=target.address.reference(),
+        args=['install'],
+        workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
       if result != 0:
-        raise TaskError('Failed to install package: {}\n'
-                        '\t{} failed with exit code {}'.format(package, yarn_add_command, result))
+        raise TaskError('Failed to install javascriptstyle\n'
+                        '\t{} failed with exit code {}'.format(yarn_add_command, result))
+    javascriptstyle_bin_path = os.path.join(javascriptstyle_dir, 'bin', 'cli.js')
+    return javascriptstyle_bin_path
 
-  def _run_lint_tool(self, target, files):
-    command = self.get_options().cmd
-    command_args = self.get_options().cmd_args
-    global_config = self.get_options().config
-    config = target.payload.get_field('lint_config').value
-    # If no config file is specified use default config.
-    if not config:
-      config = global_config
-    self.context.log.info('Config: %s' % config)
-    args = ['run', command, '--', '--config', config, files]
-    args.extend(command_args)
-    result, yarn_run_command = self.execute_yarnpkg(
+  def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=False):
+    args = [javascriptstyle_bin_path]
+    if fix:
+      self.context.log.info('Autoformatting is enabled for javascriptstyle.')
+      args.extend(['--fix'])
+    args.extend(files)
+    result, node_run_command = self.execute_node(
       args=args,
       workunit_name=target.address.reference(),
       workunit_labels=[WorkUnitLabel.PREP])
     if result != 0:
-      raise TaskError('Linting failed: \n'
-                      '{} failed with exit code {}'.format(yarn_run_command, result))
+      raise TaskError('Javascript linting failed: \n'
+                      '{} failed with exit code {}'.format(node_run_command, result))
 
   def execute(self):
     if self.get_options().skip:
@@ -98,16 +88,24 @@ class JavascriptStyle(NodeTask):
     targets = self.get_lintable_node_targets(self.context.targets())
     if not targets:
       return
-    
+    javascriptstyle_dir = self.get_options().javascriptstyle_dir
+    self.context.log.info('{}'.format(javascriptstyle_dir))
+    javascriptstyle_bin_path = self._install_javascriptstyle(javascriptstyle_dir)
     for target in targets:
-      packages = [self.get_options().package]
-      sources = self.get_javascript_sources(target)
-      if sources:
-        files = ' '.join(sources)
-        node_paths = self.context.products.get_data(NodePaths)
-        node_path = node_paths.node_path(target) 
-        with pushd(node_path):
-          packages.extend(self.get_options().linter_plugins)
-          self._install_packages(target, packages)
-          self._run_lint_tool(target, files)
+      files = self.get_javascript_sources(target)
+      if files:
+        self._run_javascriptstyle(target, javascriptstyle_bin_path, files)
     return
+
+
+class JavascriptStyleFmt(JavascriptStyle):
+  """Check and fix source files to ensure they follow the style guidelines.
+
+  :API: public
+  """
+
+  def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=True):
+    super(JavascriptStyleFmt, self)._run_javascriptstyle(target,
+                                                         javascriptstyle_bin_path,
+                                                         files,
+                                                         fix=fix)
