@@ -186,7 +186,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       ini_file_name = os.path.join(workdir, 'pants.ini')
       with safe_open(ini_file_name, mode='w') as fp:
         ini.write(fp)
-      args.append('--config-override=' + ini_file_name)
+      args.append('--pants-config-files=' + ini_file_name)
 
     pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
 

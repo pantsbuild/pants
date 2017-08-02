@@ -17,17 +17,15 @@ def ensure_arg(args, arg, param=None):
   :param string param: parameter to add or update after arg in the list.
   :return: possibly modified list of args.
   """
-  found = False
   for idx, found_arg in enumerate(args):
     if found_arg == arg:
       if param is not None:
         args[idx + 1] = param
       return args
 
-  if not found:
-    args += [arg]
-    if param is not None:
-      args += [param]
+  args.append(arg)
+  if param is not None:
+    args.append(param)
   return args
 
 

@@ -35,7 +35,6 @@ class JarPublishTest(TaskTestBase):
     with temporary_dir() as publish_dir:
       self.set_options(local=publish_dir)
       task = self.create_task(self.context())
-      task.scm = Mock()
       task.execute()
 
   @property

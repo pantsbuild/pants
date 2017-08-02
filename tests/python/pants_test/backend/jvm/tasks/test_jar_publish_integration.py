@@ -84,7 +84,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                        'org.pantsbuild.testproject.publish/jvm-example-lib_2.11/publish.properties',
                        'org.pantsbuild.testproject.publish.hello/welcome_2.11/publish.properties'],
                       extra_options=['--doc-scaladoc-skip'],
-                      expected_primary_artifact_count=3,
                       assert_publish_config_contents=True)
 
   def test_java_publish(self):
@@ -109,8 +108,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
                       ['org.pantsbuild.testproject.publish.protobuf/protobuf-java/'
                        'publish.properties',
                        'org.pantsbuild.testproject.protobuf/distance/publish.properties'],
-                      extra_options=['--doc-javadoc-skip'],
-                      expected_primary_artifact_count=2)
+                      extra_options=['--doc-javadoc-skip'])
 
   def test_named_snapshot(self):
     name = "abcdef0123456789"
@@ -220,8 +218,7 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       assert_publish_config_contents=True)
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
-                   extra_env=None, expected_primary_artifact_count=1, success_expected=True,
-                   assert_publish_config_contents=False):
+                   extra_env=None, success_expected=True, assert_publish_config_contents=False):
     """Tests that publishing the given target results in the expected output.
 
     :param target: Target to test.
@@ -229,7 +226,6 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
     :param pushdb_files: list of pushdb files that would be created if this weren't a local publish
     :param extra_options: Extra command-line options to the pants run.
     :param extra_config: Extra pants.ini configuration for the pants run.
-    :param expected_primary_artifact_count: Number of artifacts we expect to be published.
     :param extra_env: Extra environment variables for the pants run.
     :param assert_publish_config_contents: Test the contents of the generated ivy and pom file.
            If set to True, compares the generated ivy.xml and pom files in

@@ -27,8 +27,9 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     '3rdparty/python:six',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:objects',
   ]
 )
 

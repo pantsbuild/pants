@@ -2,7 +2,7 @@
  * Copyright (C) 2012 Typesafe, Inc. <http://www.typesafe.com>
  */
 
-package org.pantsbuild.zinc
+package org.pantsbuild.zinc.util
 
 import java.io.File
 import sbt.io.{ Hash, IO }

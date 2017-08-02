@@ -14,10 +14,10 @@ from pants.task.scm_publish_mixin import Namedver, ScmPublishMixin
 
 class ScmPublishMixinTest(unittest.TestCase):
   class ScmPublish(ScmPublishMixin):
-    def __init__(self, restrict_push_branches=None, restrict_push_urls=None):
+    def __init__(self, restrict_push_branches=None, restrict_push_urls=None, scm_available=True):
       self._restrict_push_branches = restrict_push_branches
       self._restrict_push_urls = restrict_push_urls
-      self._scm = mock.Mock()
+      self._scm = mock.Mock() if scm_available else None
       self._log = mock.MagicMock()
 
     @property
@@ -39,6 +39,10 @@ class ScmPublishMixinTest(unittest.TestCase):
     @property
     def log(self):
       return self._log
+
+  def test_check_clean_master_no_scm(self):
+    scm_publish = self.ScmPublish(scm_available=False)
+    scm_publish.check_clean_master(commit=False)
 
   def test_check_clean_master_dry_run_bad_branch(self):
     scm_publish = self.ScmPublish(restrict_push_branches=['bob'])
@@ -77,7 +81,7 @@ class ScmPublishMixinTest(unittest.TestCase):
 
   def test_check_clean_master_bad_remote(self):
     scm_publish = self.ScmPublish(restrict_push_urls=['amy'])
-    scm_publish.scm.serveer_url = 'https://amy'
+    scm_publish.scm.server_url = 'https://amy'
     with self.assertRaises(scm_publish.InvalidRemoteError):
       scm_publish.check_clean_master(commit=True)
 

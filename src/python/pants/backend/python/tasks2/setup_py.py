@@ -51,6 +51,19 @@ class SetupPyRunner(InstallerBase):
     self.__setup_command = setup_command.split()
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
+  def mixins(self):
+    mixins = super(SetupPyRunner, self).mixins().copy()
+    for (key, version) in self._interpreter.extras:
+      if key == 'setuptools':
+        mixins['setuptools'] = 'setuptools=={}'.format(version)
+        break
+    else:
+      # We know Pants sets up python interpreters with wheel and setuptools via the `PythonSetup`
+      # subsystem; so this should never happen
+      raise AssertionError("Expected interpreter {} to have the extra 'setuptools'"
+                           .format(self._interpreter))
+    return mixins
+
   def _setup_command(self):
     return self.__setup_command
 
@@ -456,9 +469,6 @@ class SetupPy(Task):
           chroot.copy(os.path.join(target.target_base, src, '__init__.py'),
                       os.path.join(self.SOURCE_ROOT, src, '__init__.py'))
 
-    def write_codegen_source(relpath, abspath):
-      chroot.copy(abspath, os.path.join(self.SOURCE_ROOT, relpath))
-
     def write_target(target):
       for rel_source in target.sources_relative_to_buildroot():
         abs_source_path = os.path.join(get_buildroot(), rel_source)
@@ -472,6 +482,9 @@ class SetupPy(Task):
         write_target(dependency)
       elif self.is_resources_target(dependency):
         write_target(dependency)
+
+  def _setup_boilerplate(self):
+    return SETUP_BOILERPLATE
 
   def write_setup(self, root_target, reduced_dependencies, chroot):
     """Write the setup.py of a target.
@@ -537,7 +550,7 @@ class SetupPy(Task):
     # >>>
     #
     # For more information, see http://bugs.python.org/issue13943
-    chroot.write(SETUP_BOILERPLATE.format(
+    chroot.write(self._setup_boilerplate().format(
       setup_dict=pprint.pformat(convert(setup_keywords), indent=4),
       setup_target=repr(root_target)
     ), 'setup.py')
