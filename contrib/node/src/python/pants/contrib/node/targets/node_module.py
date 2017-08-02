@@ -51,7 +51,7 @@ class NodeModule(NodePackage):
       'build_script': PrimitiveField(build_script),
       'package_manager': PrimitiveField(package_manager),
       'output_dir': PrimitiveField(output_dir),
-      'dev_dependency': PrimitiveField(dev_dependency)
+      'dev_dependency': PrimitiveField(dev_dependency),
     })
     logger.debug('NodeModule payload: %s', payload.fields)
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
