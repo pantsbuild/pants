@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import hashlib
 import os
+import time
 from collections import defaultdict
 from multiprocessing import cpu_count
 
@@ -587,10 +588,12 @@ class JvmCompile(NailgunTaskBase):
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
         try:
+          start_time = time.time()
           self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
                        log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
                        self._get_plugin_map('javac', target),
                        self._get_plugin_map('scalac', target))
+          self.context.run_tracker.report_target_info(self.options_scope, target, 'compile_time', time.time() - start_time)
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
