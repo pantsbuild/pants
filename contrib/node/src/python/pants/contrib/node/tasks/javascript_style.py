@@ -35,6 +35,8 @@ class JavascriptStyle(NodeTask):
   def register_options(cls, register):
     super(JavascriptStyle, cls).register_options(register)
     register('--skip', type=bool, fingerprint=True, help='Skip javascriptstyle.')
+    register('--fail-slow', type=bool,
+             help='Check all targets and present the full list of errors.')
     register('--javascriptstyle-dir', advanced=True, fingerprint=True,
              help='Package directory for lint tool.')
 
@@ -54,7 +56,8 @@ class JavascriptStyle(NodeTask):
     return sources
 
   @memoized_method
-  def _install_javascriptstyle(self, javascriptstyle_dir):
+  def _install_javascriptstyle(self):
+    javascriptstyle_dir = self.get_options().javascriptstyle_dir
     with pushd(javascriptstyle_dir):
       result, yarn_add_command = self.execute_yarnpkg(
         args=['install'],
@@ -76,9 +79,10 @@ class JavascriptStyle(NodeTask):
       args=args,
       workunit_name=target.address.reference(),
       workunit_labels=[WorkUnitLabel.PREP])
-    if result != 0:
+    if result != 0 and not self.get_options().fail_slow:
       raise TaskError('Javascript linting failed: \n'
                       '{} failed with exit code {}'.format(node_run_command, result))
+    return result
 
   def execute(self):
     if self.get_options().skip:
@@ -88,13 +92,21 @@ class JavascriptStyle(NodeTask):
     targets = self.get_lintable_node_targets(self.context.targets())
     if not targets:
       return
-    javascriptstyle_dir = self.get_options().javascriptstyle_dir
-    self.context.log.info('{}'.format(javascriptstyle_dir))
-    javascriptstyle_bin_path = self._install_javascriptstyle(javascriptstyle_dir)
+    failed_targets = []
+
+    javascriptstyle_bin_path = self._install_javascriptstyle()
     for target in targets:
       files = self.get_javascript_sources(target)
       if files:
-        self._run_javascriptstyle(target, javascriptstyle_bin_path, files)
+        result_code = self._run_javascriptstyle(target, javascriptstyle_bin_path, files)
+        if result_code != 0:
+          failed_targets.append(target)
+
+    if failed_targets:
+      msg = 'Failed when evaluating {} targets:\n  {}'.format(
+          len(failed_targets),
+          '\n  '.join(t.address.spec for t in failed_targets))
+      raise TaskError(msg)
     return
 
 
@@ -105,7 +117,7 @@ class JavascriptStyleFmt(JavascriptStyle):
   """
 
   def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=True):
-    super(JavascriptStyleFmt, self)._run_javascriptstyle(target,
-                                                         javascriptstyle_bin_path,
-                                                         files,
-                                                         fix=fix)
+    return super(JavascriptStyleFmt, self)._run_javascriptstyle(target,
+                                                                javascriptstyle_bin_path,
+                                                                files,
+                                                                fix=fix)
