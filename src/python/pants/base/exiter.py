@@ -115,8 +115,8 @@ class Exiter(object):
 
   def _setup_faulthandler(self, trace_stream):
     faulthandler.enable(trace_stream)
-    # This permits a non-fatal `kill -29 <pants pid>` for stacktrace retrieval.
-    faulthandler.register(signal.SIGINFO, trace_stream, chain=True)
+    # This permits a non-fatal `kill -31 <pants pid>` for stacktrace retrieval.
+    faulthandler.register(signal.SIGUSR2, trace_stream, chain=True)
 
   def set_except_hook(self, trace_stream=None):
     """Sets the global exception hook."""
