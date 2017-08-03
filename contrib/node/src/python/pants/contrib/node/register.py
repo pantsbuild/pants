@@ -16,8 +16,7 @@ from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalledModule
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.targets.node_test import NodeTest as NodeTestTarget
-from pants.contrib.node.tasks.javascript_style import JavascriptStyle
-from pants.contrib.node.tasks.javascript_style import JavascriptStyleFmt
+from pants.contrib.node.tasks.javascript_style import JavascriptStyle, JavascriptStyleFmt
 from pants.contrib.node.tasks.node_build import NodeBuild
 from pants.contrib.node.tasks.node_bundle import NodeBundle as NodeBundleTask
 from pants.contrib.node.tasks.node_repl import NodeRepl
