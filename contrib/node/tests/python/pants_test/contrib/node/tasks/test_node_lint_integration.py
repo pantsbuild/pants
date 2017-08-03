@@ -16,10 +16,3 @@ class NodeRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
-
-  def test_lint_failure(self):
-    command = ['lint',
-               'contrib/node/exaamples/src/node/hello-test::']
-    pants_run = self.run_pants(command=command)
-
-    self.assert_failure(pants_run)
