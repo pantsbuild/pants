@@ -10,12 +10,13 @@ import os
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
-from pants.contrib.node.targets.node_package import NodePackage
-from pants.contrib.node.tasks.node_task import NodeTask
-from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.option.custom_types import file_option
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
+
+from pants.contrib.node.targets.node_package import NodePackage
+from pants.contrib.node.tasks.node_paths import NodePaths
+from pants.contrib.node.tasks.node_task import NodeTask
 
 
 class JavascriptStyle(NodeTask):
