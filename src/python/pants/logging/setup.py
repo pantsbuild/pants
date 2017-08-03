@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from collections import namedtuple
 import logging
 import os
 import time
+from collections import namedtuple
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 
