@@ -327,8 +327,18 @@ class Target(AbstractTarget):
     closure.update(target_roots)
     return closure
 
-  def __init__(self, name, address, build_graph, type_alias=None, payload=None, tags=None,
-               description=None, no_cache=False, scope=None, _transitive=None,
+  def __init__(self,
+               name,
+               address,
+               build_graph,
+               type_alias=None,
+               payload=None,
+               tags=None,
+               description=None,
+               no_cache=False,
+               scope=None,
+               _transitive=None,
+               sources=None,
                **kwargs):
     """
     :API: public
@@ -356,29 +366,44 @@ class Target(AbstractTarget):
     :param string scope: The scope of this target, used to determine its inclusion on the classpath
       (and possibly more things in the future). See :class:`pants.build_graph.target_scopes.Scopes`.
       A value of None, '', or 'default' results in the default scope, which is included everywhere.
+    :param sources: Files this target owns. Paths are relative to the BUILD file's directory.
+    :type sources: ``Fileset`` or list of strings
     """
     # NB: dependencies are in the pydoc above as a BUILD dictionary hack only; implementation hides
     # the dependencies via TargetAddressable.
 
-    self.payload = payload or Payload()
-    self._scope = Scope(scope)
-    self.payload.add_field('scope_string', PrimitiveField(str(scope)))
-    self.payload.add_field('transitive',
-                           PrimitiveField(True if _transitive is None else _transitive))
-    self.payload.freeze()
     self.name = name
     self.address = address
-    self._build_graph = build_graph
-    self._type_alias = type_alias
-    self._tags = set(tags or [])
     self.description = description
     self.labels = set()
+
+    self._tags = set(tags or [])
+    self._scope = Scope(scope)
+    self._build_graph = build_graph
+    self._type_alias = type_alias
 
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
+
+    self.payload = payload or Payload()
+
+    self._sources_field = self.payload.get_field('sources', None)
+    if self._sources_field is None:
+      self._sources_field = self.create_sources_field(sources,
+                                                      sources_rel_path=address.spec_path,
+                                                      key_arg='sources')
+      self.payload.add_field('sources', self._sources_field)
+
+    self.payload.add_fields({
+      'scope_string': PrimitiveField(str(scope)),
+      'transitive': PrimitiveField(True if _transitive is None else _transitive),
+    })
+    self.payload.freeze()
+
     if no_cache:
       self.add_labels('no_cache')
+
     if kwargs:
       self.Arguments.check(self, kwargs)
 
@@ -534,13 +559,6 @@ class Target(AbstractTarget):
     def invalidate_dependee(dependee):
       dependee.mark_transitive_invalidation_hash_dirty()
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
-
-  @property
-  def _sources_field(self):
-    sources_field = self.payload.get_field('sources')
-    if sources_field is not None:
-      return sources_field
-    return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
   def has_sources(self, extension=''):
     """
