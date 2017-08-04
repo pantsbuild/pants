@@ -13,11 +13,12 @@ from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
+from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
+from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
-from pants.engine.subsystem.native import Native
 from pants.goal.context import Context
 from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
@@ -94,7 +95,7 @@ class GoalRunnerFactory(object):
     if graph_helper or use_engine:
       # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
       if not graph_helper:
-        native = Native.Factory.global_instance().create()
+        native = Native.create(self._global_options)
         native.set_panic_handler()
         graph_helper = EngineInitializer.setup_legacy_graph(
           pants_ignore_patterns,
@@ -231,7 +232,7 @@ class GoalRunner(object):
       Reproducer,
       RunTracker,
       Changed.Factory,
-      Native.Factory,
+      BinaryUtil.Factory,
       PantsDaemonLauncher.Factory,
     }
 

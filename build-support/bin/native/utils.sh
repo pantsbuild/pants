@@ -15,8 +15,8 @@
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
 function get_native_engine_version() {
-  ${REPO_ROOT}/pants options --scope=native-engine --name=version --output-format=json | \
-    python -c 'import json, sys; print(json.load(sys.stdin)["native-engine.version"]["value"])'
+  ${REPO_ROOT}/pants options --scope=GLOBAL --name=native-engine-version --output-format=json | \
+    python -c 'import json, sys; print(json.load(sys.stdin)["native_engine_version"]["value"])'
 }
 
 readonly RUST_OSX_MIN_VERSION=7

@@ -24,7 +24,7 @@ source ${REPO_ROOT}/build-support/bin/native/utils.sh
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_MODULE="native_engine"
 readonly NATIVE_ENGINE_BINARY="${NATIVE_ENGINE_MODULE}.so"
-readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/subsystem/native_engine_version"
+readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/native_engine_version"
 readonly CFFI_BOOTSTRAPPER="${REPO_ROOT}/build-support/native-engine/bootstrap_cffi.py"
 
 # N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
@@ -45,7 +45,7 @@ function calculate_current_hash() {
    cd ${REPO_ROOT}
    git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
-     "${REPO_ROOT}/src/python/pants/engine/subsystem/native.py" \
+     "${REPO_ROOT}/src/python/pants/engine/native.py" \
    | git hash-object -t blob --stdin-paths | fingerprint_data
   )
 }
@@ -129,8 +129,8 @@ function bootstrap_native_code() {
     cp "${native_binary}" "${target_binary}"
 
     # NB: The resource file emitted/over-written below is used by the `Native` subsystem to default
-    # the native engine library version used by pants. More info can be read here:
-    #  src/python/pants/engine/subsystem/README.md
+    # the native engine library version used by pants. More info can be read at the end of this
+    # document:  src/python/pants/engine/README.md
     echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
 }

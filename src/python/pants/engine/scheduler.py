@@ -18,12 +18,12 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
+from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
 
@@ -319,7 +319,7 @@ class LocalScheduler(object):
     :param rules: A set of Rules which is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
-    :param native: An instance of engine.subsystem.native.Native.
+    :param native: An instance of engine.native.Native.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
