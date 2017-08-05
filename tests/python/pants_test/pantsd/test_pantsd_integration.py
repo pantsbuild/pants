@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import signal
 import time
 from contextlib import contextmanager
 
@@ -154,6 +155,30 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         run = self.run_pants_with_workdir('help | head -1', workdir, pantsd_config, shell=True)
         self.assertNotIn('broken pipe', run.stderr_data.lower())
         checker.assert_running()
+      finally:
+        # Explicitly kill pantsd (from a pantsd-launched runner).
+        self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
+
+      checker.assert_stopped()
+
+  def test_pantsd_stacktrace_dump(self):
+    config = {'watchman': {'socket_path': '/tmp/watchman.{}.sock'.format(os.getpid())}}
+    with self.pantsd_test_context(config) as (workdir, pantsd_config, checker):
+      print('log: {}/pantsd/pantsd.log'.format(workdir))
+      # Explicitly kill any running pantsd instances for the current buildroot.
+      self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
+      try:
+        # Start pantsd implicitly via a throwaway invocation.
+        self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
+        checker.await_pantsd(3)
+
+        os.kill(checker.pid, signal.SIGUSR2)
+        checker.assert_running()
+
+        # Wait for log flush.
+        time.sleep(2)
+
+        self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
       finally:
         # Explicitly kill pantsd (from a pantsd-launched runner).
         self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))

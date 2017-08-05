@@ -110,3 +110,6 @@ class NailgunStreamWriter(object):
 
   def isatty(self):
     return self._isatty
+
+  def fileno(self):
+    return self._socket.fileno()
