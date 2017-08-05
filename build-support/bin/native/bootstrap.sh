@@ -128,7 +128,7 @@ function bootstrap_native_code() {
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" "${target_binary}"
 
-    # NB: The resource file emitted/over-written below is used by the `Native` subsystem to default
+    # NB: The resource file emitted/over-written below is used by the `Native` class to default
     # the native engine library version used by pants. More info can be read at the end of this
     # document:  src/python/pants/engine/README.md
     echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}

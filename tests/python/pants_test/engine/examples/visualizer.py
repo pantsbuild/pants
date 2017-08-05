@@ -18,8 +18,7 @@ from pants_test.engine.examples.planners import setup_json_scheduler
 from pants_test.engine.util import init_native
 
 
-# TODO: These aren't tests, so they should be under examples/.
-# Should they use
+# TODO: These aren't tests themselves, so they should be under examples/.
 
 def visualize_execution_graph(scheduler):
   with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
