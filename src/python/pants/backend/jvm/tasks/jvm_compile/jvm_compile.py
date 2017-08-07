@@ -593,13 +593,27 @@ class JvmCompile(NailgunTaskBase):
                        log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
                        self._get_plugin_map('javac', target),
                        self._get_plugin_map('scalac', target))
-          self.context.run_tracker.report_target_info(self.options_scope, target, 'compile_time', time.time() - start_time)
+          self._record_target_stats(target, len(classpath), len(sources), time.time() - start_time)
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
             if logs:
               self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
           raise
+
+  def _record_target_stats(self, target, classpath_len, sources_len, compiletime):
+    self.context.run_tracker.report_target_info(self.options_scope,
+                                                target,
+                                                ['compile', 'time'],
+                                                compiletime)
+    self.context.run_tracker.report_target_info(self.options_scope,
+                                                target,
+                                                ['compile', 'classpath_len'],
+                                                classpath_len)
+    self.context.run_tracker.report_target_info(self.options_scope,
+                                                target,
+                                                ['compile', 'sources_len'],
+                                                sources_len)
 
   def _get_plugin_map(self, compiler, target):
     """Returns a map of plugin to args, for the given compiler.

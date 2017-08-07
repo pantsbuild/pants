@@ -91,10 +91,9 @@ class TestRunnerTaskMixin(object):
     :param primitive test_info: The information being stored.
     """
     if target and scope:
-      address = target.address.spec
       target_type = target.type_alias
-      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
-      self.context.run_tracker.report_target_info(scope, address, keys, test_info)
+      self.context.run_tracker.report_target_info('GLOBAL', target, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info(scope, target, keys, test_info)
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
