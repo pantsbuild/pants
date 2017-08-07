@@ -17,6 +17,7 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.task.task import Task
 from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 
@@ -194,7 +195,7 @@ class SimpleCodegenTask(Task):
               self._handle_duplicate_sources(vt.target, vt.results_dir)
             vt.update()
           # And inject a synthetic target to represent it.
-          self._inject_synthetic_target(vt.target, vt.results_dir)
+          self._inject_synthetic_target(vt.target, vt.results_dir, vt.cache_key)
 
   @property
   def _copy_target_attributes(self):
@@ -210,23 +211,45 @@ class SimpleCodegenTask(Task):
     """
     return target_workdir
 
-  def _inject_synthetic_target(self, target, target_workdir):
+  def _create_sources_with_fingerprint(self, target_workdir, fingerprint, files):
+    """Create an EagerFilesetWithSpec to pass to the sources argument for synthetic target injection.
+
+    We are creating and passing an EagerFilesetWithSpec to the synthetic target injection in the
+    hopes that it will save the time of having to refingerprint the sources.
+
+    :param target_workdir: The directory containing the generated code for the target.
+    :param fingerprint: the fingerprint of the VersionedTarget with which the EagerFilesetWithSpec
+           will be created.
+    :param files: a list of exact paths to generated sources.
+    """
+    results_dir_relpath = os.path.relpath(target_workdir, get_buildroot())
+    filespec = FilesetRelPathWrapper.to_filespec(
+      [os.path.join(results_dir_relpath, file) for file in files])
+    return EagerFilesetWithSpec(results_dir_relpath, filespec=filespec,
+      files=files, files_hash='{}.{}'.format(fingerprint.id, fingerprint.hash))
+
+
+  def _inject_synthetic_target(self, target, target_workdir, fingerprint=None):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
     :param target_workdir: The work directory containing the generated code for the target.
+    :param fingerprint: The fingerprint to create the synthetic target
+           with to avoid re-fingerprinting
     """
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)
 
-    target_workdir = self.synthetic_target_dir(target, target_workdir)
+    sources = list(self.find_sources(target, target_workdir))
+    if fingerprint:
+      sources = self._create_sources_with_fingerprint(target_workdir, fingerprint, sources)
 
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
       target_type=self.synthetic_target_type(target),
       dependencies=self.synthetic_target_extra_dependencies(target, target_workdir),
-      sources=list(self.find_sources(target, target_workdir)),
+      sources=sources,
       derived_from=target,
       **copied_attributes
     )
