@@ -642,19 +642,18 @@ class Target(AbstractTarget):
 
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
-    assert kwargs is not None or payload is not None, 'must provide either kwargs or payload'
-    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
-    assert not (kwargs and not isinstance(kwargs, dict)), (
+    assert (kwargs is None) ^ (payload is None), 'must provide either kwargs or payload'
+    assert (kwargs is None) or isinstance(kwargs, dict), (
       'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
     )
-    assert not (payload and not isinstance(payload, Payload)), (
+    assert (payload is None) or isinstance(payload, Payload), (
       'expected a `Payload` object for payload, instead found a {}'.format(type(payload))
     )
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
-    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the specs
-    to inject as non-dependencies in the same vein as the prior `traversable_specs`.
+    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the
+    specs to inject as non-dependencies in the same vein as the prior `traversable_specs`.
 
     :API: public
 
@@ -663,7 +662,8 @@ class Target(AbstractTarget):
     :yields: Spec strings representing dependencies of this target.
     """
     cls._validate_target_representation_args(kwargs, payload)
-    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
+    # subclassing.
     return
     yield
 
@@ -685,7 +685,8 @@ class Target(AbstractTarget):
     :yields: Spec strings representing dependencies of this target.
     """
     cls._validate_target_representation_args(kwargs, payload)
-    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
+    # subclassing.
     return
     yield
 

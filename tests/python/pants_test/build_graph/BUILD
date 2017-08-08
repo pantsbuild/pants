@@ -121,6 +121,7 @@ python_tests(
   dependencies = [
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:payload',
     'src/python/pants/build_graph',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
