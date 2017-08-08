@@ -64,13 +64,6 @@ class SourcesField(PayloadField):
     """Returns the address this sources field refers to (used by some derived classes)"""
     return self._ref_address
 
-  def has_sources(self, extension=None):
-    if not self.source_paths:
-      return False
-    if not extension:
-      return True
-    return any(source.endswith(extension) for source in self.source_paths)
-
   def relative_to_buildroot(self):
     """All sources joined with their relative paths."""
     return list(self.sources.paths_from_buildroot_iter())

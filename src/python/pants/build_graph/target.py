@@ -535,7 +535,7 @@ class Target(AbstractTarget):
       dependee.mark_transitive_invalidation_hash_dirty()
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
 
-  @property
+  @memoized_property
   def _sources_field(self):
     sources_field = self.payload.get_field('sources')
     if sources_field is not None:
@@ -551,14 +551,19 @@ class Target(AbstractTarget):
     :return: `True` if the target contains sources that match the optional extension suffix.
     :rtype: bool
     """
-    return self._sources_field.has_sources(extension)
+    source_paths = self._sources_field.source_paths
+    if not source_paths:
+      return False
+    if not extension:
+      return True
+    return any(source.endswith(extension) for source in source_paths)
 
   def sources_relative_to_buildroot(self):
     """
     :API: public
     """
     if self.has_sources():
-      return self.payload.sources.relative_to_buildroot()
+      return self._sources_field.relative_to_buildroot()
     else:
       return []
 
@@ -582,7 +587,7 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    return self.payload.sources.sources
+    return self._sources_field.sources
 
   @property
   def derived_from(self):
