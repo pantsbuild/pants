@@ -10,6 +10,7 @@ from hashlib import sha1
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
+from pants.base.payload import Payload
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants_test.base_test import BaseTest
@@ -58,6 +59,24 @@ class TargetTest(BaseTest):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([], list(target.compute_dependency_specs(payload=target.payload)))
+
+  def test_validate_target_representation_args_invalid_exactly_one(self):
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args(None, None)
+
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args({}, Payload())
+
+  def test_validate_target_representation_args_invalid_type(self):
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args(kwargs=Payload(), payload=None)
+
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args(kwargs=None, payload={})
+
+  def test_validate_target_representation_args_valid(self):
+    Target._validate_target_representation_args(kwargs={}, payload=None)
+    Target._validate_target_representation_args(kwargs=None, payload=Payload())
 
   def test_illegal_kwargs(self):
     init_subsystem(Target.Arguments)
