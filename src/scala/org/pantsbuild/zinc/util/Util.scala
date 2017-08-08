@@ -118,6 +118,14 @@ object Util {
   // Properties
   //
 
+  def setProperty(name: String, value: String): Unit = {
+    System.setProperty(name, value)
+  }
+
+  def isSetProperty(name: String): Boolean = {
+    System.getProperty(name) ne null
+  }
+
   /**
    * Create int from system property.
    */
