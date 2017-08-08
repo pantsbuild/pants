@@ -57,7 +57,6 @@ class PythonTarget(Target):
   def __init__(self,
                address=None,
                payload=None,
-               sources=None,
                resources=None,  # Old-style resources (file list, Fileset).
                resource_targets=None,  # New-style resources (Resources target specs).
                provides=None,
@@ -70,9 +69,6 @@ class PythonTarget(Target):
       ``python_thrift_library``, ``python_antlr_library`` and so forth) or
       ``python_requirement_library`` targets.
     :type dependencies: list of strings
-    :param sources: Files to "include". Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
     :param resources: non-Python resources, e.g. templates, keys, other data
       (it is
       recommended that your application uses the pkgutil package to access these
@@ -90,14 +86,17 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
-    deprecated_conditional(lambda: resources is not None, '1.5.0.dev0',
-                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
-    deprecated_conditional(lambda: resource_targets is not None, '1.5.0.dev0',
-                           'The `resource_targets=` Python target argument', 'Use `dependencies=` instead.')
+    deprecated_conditional(lambda: resources is not None,
+                           removal_version='1.5.0.dev0',
+                           entity_description='The `resources=` Python target argument',
+                           hint_message='Depend on resources targets instead.')
+    deprecated_conditional(lambda: resource_targets is not None,
+                           removal_version='1.5.0.dev0',
+                           entity_description='The `resource_targets=` Python target argument',
+                           hint_message='Use `dependencies=` instead.')
     self.address = address
     payload = payload or Payload()
     payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'resources': self.create_sources_field(resources, address.spec_path, key_arg='resources'),
       'resource_targets': PrimitiveField(resource_targets),
       'provides': provides,

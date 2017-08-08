@@ -33,7 +33,6 @@ class JvmTarget(Target, Jarable):
   def __init__(self,
                address=None,
                payload=None,
-               sources=None,
                provides=None,
                excludes=None,
                resources=None,
@@ -101,7 +100,6 @@ class JvmTarget(Target, Jarable):
     payload = payload or Payload()
     excludes = ExcludesField(self.assert_list(excludes, expected_type=Exclude, key_arg='excludes'))
     payload.add_fields({
-      'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
       'excludes': excludes,
       'resources': PrimitiveField(self.assert_list(resources, key_arg='resources')),

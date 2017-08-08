@@ -19,14 +19,14 @@ logger = logging.getLogger(__name__)
 class NodeModule(NodePackage):
   """A Node module."""
 
-  def __init__(
-    self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, address=None, payload=None, **kwargs):
+  def __init__(self,
+               package_manager=None,
+               build_script=None,
+               output_dir='dist',
+               dev_dependency=False,
+               payload=None,
+               **kwargs):
     """
-    :param sources: Javascript and other source code files that make up this module; paths are
-                    relative to the BUILD file's directory.
-    :type sources: `globs`, `rglobs` or a list of strings
-
     :param package_manager: choose among supported package managers (npm or yarn).
     :param build_script: build script name as defined in package.json.  All files that are needed
       for the build script must be included in sources.  The script should output build results
@@ -46,12 +46,10 @@ class NodeModule(NodePackage):
     # of pre-existing package.json files as node_module targets will require this.
     payload = payload or Payload()
     payload.add_fields({
-      'sources': self.create_sources_field(
-        sources=sources, sources_rel_path=address.spec_path, key_arg='sources'),
       'build_script': PrimitiveField(build_script),
       'package_manager': PrimitiveField(package_manager),
       'output_dir': PrimitiveField(output_dir),
       'dev_dependency': PrimitiveField(dev_dependency),
     })
     logger.debug('NodeModule payload: %s', payload.fields)
-    super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
+    super(NodeModule, self).__init__(payload=payload, **kwargs)
