@@ -1,6 +1,7 @@
 python_library(
   dependencies=[
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:parse_context',
     'src/python/pants/base:payload',
