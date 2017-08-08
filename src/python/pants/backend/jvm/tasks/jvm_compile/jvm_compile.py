@@ -588,32 +588,16 @@ class JvmCompile(NailgunTaskBase):
           self._record_compile_classpath(classpath, vts.targets, outdir)
 
         try:
-          start_time = time.time()
           self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
                        log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
                        self._get_plugin_map('javac', target),
                        self._get_plugin_map('scalac', target))
-          self._record_target_stats(target, len(classpath), len(sources), time.time() - start_time)
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
             if logs:
               self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
           raise
-
-  def _record_target_stats(self, target, classpath_len, sources_len, compiletime):
-    self.context.run_tracker.report_target_info(self.options_scope,
-                                                target,
-                                                ['compile', 'time'],
-                                                compiletime)
-    self.context.run_tracker.report_target_info(self.options_scope,
-                                                target,
-                                                ['compile', 'classpath_len'],
-                                                classpath_len)
-    self.context.run_tracker.report_target_info(self.options_scope,
-                                                target,
-                                                ['compile', 'sources_len'],
-                                                sources_len)
 
   def _get_plugin_map(self, compiler, target):
     """Returns a map of plugin to args, for the given compiler.
@@ -898,7 +882,8 @@ class JvmCompile(NailgunTaskBase):
                                                           self._confs))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
-        if not should_compile_incrementally(vts, ctx):
+        is_incremental = should_compile_incrementally(vts, ctx)
+        if not is_incremental:
           # Purge existing analysis file in non-incremental mode.
           safe_delete(ctx.analysis_file)
           # Work around https://github.com/pantsbuild/pants/issues/3670
@@ -907,6 +892,7 @@ class JvmCompile(NailgunTaskBase):
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
+        start_time = time.time()
         self._compile_vts(vts,
                           ctx.target,
                           ctx.sources,
@@ -921,6 +907,11 @@ class JvmCompile(NailgunTaskBase):
                           fatal_warnings,
                           zinc_file_manager,
                           counter)
+        self._record_target_stats(tgt,
+                                  len(cp_entries),
+                                  len(ctx.sources),
+                                  time.time() - start_time,
+                                  is_incremental)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
@@ -954,6 +945,14 @@ class JvmCompile(NailgunTaskBase):
                       on_success=ivts.update,
                       on_failure=ivts.force_invalidate))
     return jobs
+
+  def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental):
+    def record(k, v):
+      self.context.run_tracker.report_target_info(self.options_scope, target, ['compile', k], v)
+    record('time', compiletime)
+    record('classpath_len', classpath_len)
+    record('sources_len', sources_len)
+    record('incremental', is_incremental)
 
   def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
     # Collects all invalid dependencies that are not dependencies of other invalid dependencies
