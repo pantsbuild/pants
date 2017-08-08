@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class NodeRunIntegrationTest(PantsRunIntegrationTest):
+class NodeLintIntegrationTest(PantsRunIntegrationTest):
 
   def test_lint_success(self):
     command = ['lint',
