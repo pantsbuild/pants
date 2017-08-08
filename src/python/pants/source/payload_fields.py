@@ -17,6 +17,13 @@ from pants.util.memo import memoized_property
 class SourcesField(PayloadField):
   """A PayloadField encapsulating specified sources."""
 
+  @staticmethod
+  def _validate_sources(sources):
+    if not isinstance(sources, FilesetWithSpec):
+      raise ValueError('Expected a FilesetWithSpec. `sources` should be '
+                       'instantiated via `create_sources_field`.')
+    return sources
+
   def __init__(self, sources, ref_address=None):
     """
     :param sources: FilesetWithSpec representing the underlying sources.
@@ -54,12 +61,14 @@ class SourcesField(PayloadField):
 
   @property
   def address(self):
-    """Returns the address this sources field refers to (used by some derived classses)"""
+    """Returns the address this sources field refers to (used by some derived classes)"""
     return self._ref_address
 
   def has_sources(self, extension=None):
     if not self.source_paths:
       return False
+    if not extension:
+      return True
     return any(source.endswith(extension) for source in self.source_paths)
 
   def relative_to_buildroot(self):
@@ -71,9 +80,3 @@ class SourcesField(PayloadField):
     hasher.update(self.rel_path)
     hasher.update(self.sources.files_hash)
     return hasher.hexdigest()
-
-  def _validate_sources(self, sources):
-    if not isinstance(sources, FilesetWithSpec):
-      raise ValueError('Expected a FilesetWithSpec. `sources` should be '
-                       'instantiated via `create_sources_field`.')
-    return sources

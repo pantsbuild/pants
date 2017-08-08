@@ -28,9 +28,8 @@ class Resources(Target):
     """
     :API: public
 
-    :param sources: Files to "include". Paths are relative to the
-      BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
+    :param sources: Files to "include". Paths are relative to the BUILD file's directory.
+    :type sources: :class:`pants.source.wrapped_globs.FilesetWithSpec` or list of strings
     """
     payload = payload or Payload()
     payload.add_fields({
@@ -40,10 +39,21 @@ class Resources(Target):
     super(Resources, self).__init__(address=address, payload=payload, **kwargs)
 
   def has_sources(self, extension=None):
-    """``Resources`` never own sources of any particular native type, like for example
-    ``JavaLibrary``.
+    """`Resources` targets never logically "own" sources of any particular type (extension).
+
+    `JavaLibrary` targets, in contrast, logically "own" `.java` files and so target consumers
+    (tasks) may collect targets to operate on by checking `has_sources('.java')` instead of
+    performing a target type test.
+
+    A `Resources` target may have `.java` sources - for example, a java compiler test might use
+    loose `.java` source files in the test tree as compiler inputs - but it does not logically
+    "own" `.java` sources like `JavaLibrary` and so any query of `has_sources` with an `extension`
+    will return `False` to prevent standard compilation by a `javac` task in this example.
 
     :API: public
+
+    :param string extension: Suffix of filenames to test for.
+    :return: `True` if this target owns at least one source file and `extension` is `None`.
+    :rtype: bool
     """
-    # TODO(John Sirois): track down the reason for this hack and kill or explain better.
-    return extension is None
+    return extension is None and super(Resources, self).has_sources()

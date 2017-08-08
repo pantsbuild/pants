@@ -542,12 +542,13 @@ class Target(AbstractTarget):
       return sources_field
     return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
-  def has_sources(self, extension=''):
-    """
+  def has_sources(self, extension=None):
+    """Return `True` if this target owns sources; optionally of the given `extension`.
+
     :API: public
 
-    :param string extension: suffix of filenames to test for
-    :return: True if the target contains sources that match the optional extension suffix
+    :param string extension: Optional suffix of filenames to test for.
+    :return: `True` if the target contains sources that match the optional extension suffix.
     :rtype: bool
     """
     return self._sources_field.has_sources(extension)

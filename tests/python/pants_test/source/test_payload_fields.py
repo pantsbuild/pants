@@ -82,3 +82,16 @@ class PayloadTest(BaseTest):
     self.assertIs(fileset, sf.sources)
     self.assertEqual(['foo/a.txt'], list(sf.source_paths))
     self.assertEqual(['foo/foo/a.txt'], list(sf.relative_to_buildroot()))
+
+  def test_has_sources(self):
+    self.create_file('foo/bar/a.txt', 'a_contents')
+
+    txt_sources = SourcesField(sources=self.sources('foo/bar', 'a.txt'))
+    self.assertTrue(txt_sources.has_sources())
+    self.assertTrue(txt_sources.has_sources('.txt'))
+    self.assertFalse(txt_sources.has_sources('.rs'))
+
+    no_sources = SourcesField(sources=self.sources('foo/bar', '*.rs'))
+    self.assertFalse(no_sources.has_sources())
+    self.assertFalse(no_sources.has_sources('.txt'))
+    self.assertFalse(no_sources.has_sources('.rs'))
