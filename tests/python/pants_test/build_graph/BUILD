@@ -130,8 +130,8 @@ python_tests(
 )
 
 python_tests(
-  name = 'resources',
-  sources = ['test_resources.py'],
+  name = 'files',
+  sources = ['test_files.py'],
   dependencies = [
     'src/python/pants/build_graph',
     'src/python/pants/source',
