@@ -14,7 +14,6 @@ from pants.base.payload import Payload
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.source.wrapped_globs import Globs
-
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
 
