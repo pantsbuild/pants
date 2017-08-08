@@ -228,8 +228,7 @@ class SimpleCodegenTask(Task):
     return EagerFilesetWithSpec(results_dir_relpath, filespec=filespec,
       files=files, files_hash='{}.{}'.format(fingerprint.id, fingerprint.hash))
 
-
-  def _inject_synthetic_target(self, target, target_workdir, fingerprint=None):
+  def _inject_synthetic_target(self, target, target_workdir, fingerprint):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
