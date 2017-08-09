@@ -12,6 +12,7 @@ from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
+from pants.invalidation.build_invalidator import CacheKey
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
@@ -213,7 +214,8 @@ class SimpleCodegenTaskTest(TaskTestBase):
         target_workdir = target_workdirs[target]
         task.execute_codegen(target, target_workdir)
         task._handle_duplicate_sources(target, target_workdir)
-        syn_targets.append(task._inject_synthetic_target(target, target_workdir))
+        fingerprint = CacheKey("test", target.invalidation_hash())
+        syn_targets.append(task._inject_synthetic_target(target, target_workdir, fingerprint))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.
