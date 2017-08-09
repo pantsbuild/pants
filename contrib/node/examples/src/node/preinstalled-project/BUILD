@@ -3,9 +3,6 @@
 
 node_preinstalled_module(
   sources=globs('package.json', 'src/*.js', 'test/*.js'),
-  # TODO(John Sirois): Update https://github.com/pantsbuild/node-preinstalled-modules to have a
-  # `sync-s3.sh` in place of the current `sync-bintray.sh`.
-  # See: https://github.com/pantsbuild/pants/issues/4800
   dependencies_archive_url=
     'https://s3.amazonaws.com/node-preinstalled-modules.pantsbuild.org/node_modules.tar.gz'
 )
