@@ -105,3 +105,9 @@ cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
   ]
 }
 __EOF__
+
+# Prepare a chroot for s3 deploy of the artifacts created above.
+S3_UPLOAD_ROOT=${REPO_ROOT}/build-support/bin/native/s3-upload
+rm -rf ${S3_UPLOAD_ROOT}
+mkdir -p ${S3_UPLOAD_ROOT}/bin
+ln -s ${CACHE_ROOT}/bin/native-engine ${S3_UPLOAD_ROOT}/bin/native-engine
