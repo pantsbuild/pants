@@ -40,6 +40,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
                                 safe_walk)
 from pants.util.fileutil import create_size_estimators
@@ -881,7 +882,8 @@ class JvmCompile(NailgunTaskBase):
                                                           self._confs))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
-        if not should_compile_incrementally(vts, ctx):
+        is_incremental = should_compile_incrementally(vts, ctx)
+        if not is_incremental:
           # Purge existing analysis file in non-incremental mode.
           safe_delete(ctx.analysis_file)
           # Work around https://github.com/pantsbuild/pants/issues/3670
@@ -890,20 +892,26 @@ class JvmCompile(NailgunTaskBase):
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
-        self._compile_vts(vts,
-                          ctx.target,
-                          ctx.sources,
-                          ctx.analysis_file,
-                          upstream_analysis,
-                          cp_entries,
-                          ctx.classes_dir,
-                          log_file,
-                          ctx.zinc_args_file,
-                          progress_message,
-                          tgt.platform,
-                          fatal_warnings,
-                          zinc_file_manager,
-                          counter)
+        with Timer() as timer:
+          self._compile_vts(vts,
+                            ctx.target,
+                            ctx.sources,
+                            ctx.analysis_file,
+                            upstream_analysis,
+                            cp_entries,
+                            ctx.classes_dir,
+                            log_file,
+                            ctx.zinc_args_file,
+                            progress_message,
+                            tgt.platform,
+                            fatal_warnings,
+                            zinc_file_manager,
+                            counter)
+        self._record_target_stats(tgt,
+                                  len(cp_entries),
+                                  len(ctx.sources),
+                                  timer.elapsed,
+                                  is_incremental)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
@@ -937,6 +945,14 @@ class JvmCompile(NailgunTaskBase):
                       on_success=ivts.update,
                       on_failure=ivts.force_invalidate))
     return jobs
+
+  def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental):
+    def record(k, v):
+      self.context.run_tracker.report_target_info(self.options_scope, target, ['compile', k], v)
+    record('time', compiletime)
+    record('classpath_len', classpath_len)
+    record('sources_len', sources_len)
+    record('incremental', is_incremental)
 
   def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
     # Collects all invalid dependencies that are not dependencies of other invalid dependencies
