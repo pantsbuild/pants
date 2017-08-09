@@ -218,3 +218,13 @@ python_tests(
     'src/python/pants/base:validation',
   ]
 )
+
+python_tests(
+  name = 'exiter',
+  sources = ['test_exiter.py'],
+  dependencies = [
+    'src/python/pants/bin',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test/option:testing',
+  ],
+)

@@ -14,13 +14,10 @@ import threading
 import traceback
 
 import cffi
-import pkg_resources
 import six
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.engine.storage import Storage
-from pants.option.custom_types import dir_option
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
@@ -258,7 +255,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
   print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
-    f.write('export CFLAGS="{}"\n'.format(get_build_cflags()))
+    f.write(b'export CFLAGS="{}"\n'.format(get_build_cflags()))
 
 
 def _initialize_externs(ffi):
@@ -553,35 +550,16 @@ class ExternContext(object):
 
 
 class Native(object):
-  """Encapsulates fetching a platform specific version of the native portion of the engine.
-  """
+  """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
-  class Factory(Subsystem):
-    options_scope = 'native-engine'
-
-    @classmethod
-    def subsystem_dependencies(cls):
-      return (BinaryUtil.Factory,)
-
-    @staticmethod
-    def _default_native_engine_version():
-      return pkg_resources.resource_string(__name__, 'native_engine_version').strip()
-
-    @classmethod
-    def register_options(cls, register):
-      register('--version', advanced=True, default=cls._default_native_engine_version(),
-               help='Native engine version.')
-      register('--supportdir', advanced=True, default='bin/native-engine',
-               help='Find native engine binaries under this dir. Used as part of the path to '
-                    'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
-      register('--visualize-to', default=None, type=dir_option,
-               help='A directory to write execution and rule graphs to as `dot` files. The contents '
-                    'of the directory will be overwritten if any filenames collide.')
-
-    def create(self):
-      binary_util = BinaryUtil.Factory.create()
-      options = self.get_options()
-      return Native(binary_util, options.version, options.supportdir, options.visualize_to)
+  @staticmethod
+  def create(options):
+    """:param options: Any object that provides access to bootstrap option values."""
+    binary_util = BinaryUtil.Factory.create()
+    return Native(binary_util,
+                  options.native_engine_version,
+                  options.native_engine_supportdir,
+                  options.native_engine_visualize_to)
 
   def __init__(self, binary_util, version, supportdir, visualize_to_dir):
     """

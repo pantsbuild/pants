@@ -295,14 +295,15 @@ python_tests(
   name = 'ivy_utils',
   sources = ['test_ivy_utils.py'],
   dependencies = [
+    'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm:ivy_utils',
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm:plugin',
     'src/python/pants/build_graph',
     'src/python/pants/ivy',
+    'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
+    'tests/python/pants_test/backend/jvm/tasks/ivy_utils_resources',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]

@@ -9,7 +9,7 @@ import logging
 
 import mock
 
-from pants.pantsd.pants_daemon import PantsDaemon, _StreamLogger
+from pants.pantsd.pants_daemon import PantsDaemon, _LoggerStream
 from pants.pantsd.service.pants_service import PantsService
 from pants.util.contextutil import stdio_as
 from pants_test.base_test import BaseTest
@@ -18,18 +18,18 @@ from pants_test.base_test import BaseTest
 PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
-class StreamLoggerTest(BaseTest):
+class LoggerStreamTest(BaseTest):
 
   TEST_LOG_LEVEL = logging.INFO
 
   def test_write(self):
     mock_logger = mock.Mock()
-    _StreamLogger(mock_logger, self.TEST_LOG_LEVEL).write('testing 1 2 3')
+    _LoggerStream(mock_logger, self.TEST_LOG_LEVEL, None).write('testing 1 2 3')
     mock_logger.log.assert_called_once_with(self.TEST_LOG_LEVEL, 'testing 1 2 3')
 
   def test_write_multiline(self):
     mock_logger = mock.Mock()
-    _StreamLogger(mock_logger, self.TEST_LOG_LEVEL).write('testing\n1\n2\n3\n\n')
+    _LoggerStream(mock_logger, self.TEST_LOG_LEVEL, None).write('testing\n1\n2\n3\n\n')
     mock_logger.log.assert_has_calls([
       mock.call(self.TEST_LOG_LEVEL, 'testing'),
       mock.call(self.TEST_LOG_LEVEL, '1'),
@@ -38,7 +38,7 @@ class StreamLoggerTest(BaseTest):
     ])
 
   def test_flush(self):
-    _StreamLogger(mock.Mock(), self.TEST_LOG_LEVEL).flush()
+    _LoggerStream(mock.Mock(), self.TEST_LOG_LEVEL, None).flush()
 
 
 class PantsDaemonTest(BaseTest):
