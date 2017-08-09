@@ -240,6 +240,8 @@ class SimpleCodegenTask(Task):
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)
 
+    target_workdir = self.synthetic_target_dir(target, target_workdir)
+
     sources = list(self.find_sources(target, target_workdir))
     if fingerprint:
       sources = self._create_sources_with_fingerprint(target_workdir, fingerprint, sources)
