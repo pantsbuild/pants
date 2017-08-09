@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import hashlib
 import os
-import time
 from collections import defaultdict
 from multiprocessing import cpu_count
 
@@ -41,6 +40,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
                                 safe_walk)
 from pants.util.fileutil import create_size_estimators
@@ -892,25 +892,25 @@ class JvmCompile(NailgunTaskBase):
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
-        start_time = time.time()
-        self._compile_vts(vts,
-                          ctx.target,
-                          ctx.sources,
-                          ctx.analysis_file,
-                          upstream_analysis,
-                          cp_entries,
-                          ctx.classes_dir,
-                          log_file,
-                          ctx.zinc_args_file,
-                          progress_message,
-                          tgt.platform,
-                          fatal_warnings,
-                          zinc_file_manager,
-                          counter)
+        with Timer() as timer:
+          self._compile_vts(vts,
+                            ctx.target,
+                            ctx.sources,
+                            ctx.analysis_file,
+                            upstream_analysis,
+                            cp_entries,
+                            ctx.classes_dir,
+                            log_file,
+                            ctx.zinc_args_file,
+                            progress_message,
+                            tgt.platform,
+                            fatal_warnings,
+                            zinc_file_manager,
+                            counter)
         self._record_target_stats(tgt,
                                   len(cp_entries),
                                   len(ctx.sources),
-                                  time.time() - start_time,
+                                  timer.elapsed,
                                   is_incremental)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
