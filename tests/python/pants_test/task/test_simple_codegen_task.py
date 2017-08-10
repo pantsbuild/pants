@@ -12,6 +12,7 @@ from pants.base.payload import Payload
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.target import Target
+from pants.invalidation.build_invalidator import CacheKey
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdtemp
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
@@ -213,7 +214,8 @@ class SimpleCodegenTaskTest(TaskTestBase):
         target_workdir = target_workdirs[target]
         task.execute_codegen(target, target_workdir)
         task._handle_duplicate_sources(target, target_workdir)
-        syn_targets.append(task._inject_synthetic_target(target, target_workdir))
+        fingerprint = CacheKey("test", target.invalidation_hash())
+        syn_targets.append(task._inject_synthetic_target(target, target_workdir, fingerprint))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.
@@ -266,3 +268,37 @@ class SimpleCodegenTaskTest(TaskTestBase):
     task = self._create_dummy_task(target_roots=targets, strategy='isolated')
     task.execute()
     self.assertEqual('copythis', task.codegen_targets()[0].copied)
+
+  def test_invalidation_of_generated_sources(self):
+    self.create_file('src/thrift/com/foo/one.thrift', 'initial state')
+
+    t1 = self.make_target(spec='src/thrift/com/foo:one',
+                          target_type=DummyLibrary,
+                          sources=['one.thrift'])
+
+    task1 = self._create_dummy_task(target_roots=t1, strategy='isolated')
+    task1.execute()
+
+    gen_targets = [self.build_graph.get_target(syn_addr)
+                   for syn_addr in self.build_graph.synthetic_addresses]
+    syn_targets_for_t1 = [target for target in gen_targets if target.derived_from == t1]
+
+    t1_hash = syn_targets_for_t1[0].invalidation_hash()
+
+    self.reset_build_graph()
+
+    self.create_file('src/thrift/com/foo/one.thrift', 'changed state')
+
+    t2 = self.make_target(spec='src/thrift/com/foo:one',
+                          target_type=DummyLibrary,
+                          sources=['one.thrift'])
+
+    task2 = self._create_dummy_task(target_roots=t2, strategy='isolated')
+    task2.execute()
+
+    gen_targets = [self.build_graph.get_target(syn_addr)
+                   for syn_addr in self.build_graph.synthetic_addresses]
+    syn_targets_for_t2 = [target for target in gen_targets if target.derived_from == t2]
+
+    t2_hash = syn_targets_for_t2[0].invalidation_hash()
+    self.assertNotEqual(t1_hash, t2_hash)
