@@ -10,8 +10,10 @@ from hashlib import sha1
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
+from pants.base.payload import Payload
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.source.wrapped_globs import Globs
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -58,6 +60,24 @@ class TargetTest(BaseTest):
     target = self.make_target(':foo', Target)
     self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([], list(target.compute_dependency_specs(payload=target.payload)))
+
+  def test_validate_target_representation_args_invalid_exactly_one(self):
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args(None, None)
+
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args({}, Payload())
+
+  def test_validate_target_representation_args_invalid_type(self):
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args(kwargs=Payload(), payload=None)
+
+    with self.assertRaises(AssertionError):
+      Target._validate_target_representation_args(kwargs=None, payload={})
+
+  def test_validate_target_representation_args_valid(self):
+    Target._validate_target_representation_args(kwargs={}, payload=None)
+    Target._validate_target_representation_args(kwargs=None, payload=Payload())
 
   def test_illegal_kwargs(self):
     init_subsystem(Target.Arguments)
@@ -183,3 +203,31 @@ class TargetTest(BaseTest):
     target_hash = target_c.invalidation_hash(fingerprint_strategy=fingerprint_strategy)
     hash_value = '{}.{}'.format(target_hash, dep_hash)
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash(fingerprint_strategy=fingerprint_strategy))
+
+  def test_has_sources(self):
+    class SourcesTarget(Target):
+      def __init__(me, sources, address=None, **kwargs):
+        payload = Payload()
+        payload.add_field('sources', me.create_sources_field(sources,
+                                                             sources_rel_path=address.spec_path,
+                                                             key_arg='sources'))
+        super(SourcesTarget, me).__init__(address=address, payload=payload, **kwargs)
+
+    def sources(rel_path, *args):
+      return Globs.create_fileset_with_spec(rel_path, *args)
+
+    self.create_file('foo/bar/a.txt', 'a_contents')
+
+    txt_sources = self.make_target('foo/bar:txt',
+                                   SourcesTarget,
+                                   sources=sources('foo/bar', '*.txt'))
+    self.assertTrue(txt_sources.has_sources())
+    self.assertTrue(txt_sources.has_sources('.txt'))
+    self.assertFalse(txt_sources.has_sources('.rs'))
+
+    no_sources = self.make_target('foo/bar:none',
+                                  SourcesTarget,
+                                  sources=sources('foo/bar', '*.rs'))
+    self.assertFalse(no_sources.has_sources())
+    self.assertFalse(no_sources.has_sources('.txt'))
+    self.assertFalse(no_sources.has_sources('.rs'))

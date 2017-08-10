@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from pants.engine.subsystem.native import bootstrap_c_source
+from pants.engine.native import bootstrap_c_source
 
 
 if __name__ == '__main__':

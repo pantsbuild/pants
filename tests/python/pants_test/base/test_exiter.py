@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import unittest
 
-from pants.bin.exiter import Exiter
+from pants.base.exiter import Exiter
 from pants.util.contextutil import temporary_dir
 from pants_test.option.util.fakes import create_options
 
