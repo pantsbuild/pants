@@ -54,9 +54,25 @@ class JavascriptStyle(NodeTask):
                        source.endswith(self._JSX_SOURCE_EXTENSION)))
     return sources
 
+  def _is_javascriptstyle_dir_valid(self, javascriptstyle_dir):
+    dir_exists = os.path.isdir(javascriptstyle_dir)
+    if not dir_exists:
+      raise TaskError(
+        'javascriptstyle package does not exist: {}.'.format(javascriptstyle_dir))
+      return False
+    else:
+      lock_file = os.path.join(javascriptstyle_dir, 'yarn.lock')
+      package_json = os.path.join(javascriptstyle_dir, 'package.json')
+      files_exist = os.path.isfile(lock_file) and os.path.isfile(package_json)
+      if not files_exist:
+        raise TaskError(
+          'javascriptstyle cannot be installed because yarn.lock '
+          'or package.json does not exist.')
+        return False
+    return True
+
   @memoized_method
-  def _install_javascriptstyle(self):
-    javascriptstyle_dir = self.get_options().javascriptstyle_dir
+  def _install_javascriptstyle(self, javascriptstyle_dir):
     with pushd(javascriptstyle_dir):
       result, yarn_add_command = self.execute_yarnpkg(
         args=['install'],
@@ -93,7 +109,14 @@ class JavascriptStyle(NodeTask):
       return
     failed_targets = []
 
-    javascriptstyle_bin_path = self._install_javascriptstyle()
+    # TODO: If javascriptstyle is not configured, pants should use a default installtion.
+    javascriptstyle_dir = self.get_options().javascriptstyle_dir
+    if not (javascriptstyle_dir and self._is_javascriptstyle_dir_valid(javascriptstyle_dir)):
+      self.context.log.warn('javascriptstyle is not configured, skipping javascript style check.')
+      self.context.log.warn('See https://github.com/pantsbuild/pants/tree/master/build-support/javascriptstyle/README.md')
+      return
+
+    javascriptstyle_bin_path = self._install_javascriptstyle(javascriptstyle_dir)
     for target in targets:
       files = self.get_javascript_sources(target)
       if files:
