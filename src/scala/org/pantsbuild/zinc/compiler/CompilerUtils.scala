@@ -61,7 +61,7 @@ object CompilerUtils {
   }
 
   /**
-   * Cache of classloaders.
+   * Cache of classloaders: see https://github.com/pantsbuild/pants/issues/4744
    */
   private val classLoaderCache: Option[ClassLoaderCache] =
     Some(new ClassLoaderCache(new URLClassLoader(Array())))
