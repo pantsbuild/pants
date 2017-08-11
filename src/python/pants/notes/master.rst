@@ -4,6 +4,81 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev8 (8/11/2017)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for junit (successful) test caching. (#4771)
+  `PR #4771 <https://github.com/pantsbuild/pants/pull/4771>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Kill custom binaries.baseurls. (#4809)
+  `PR #4809 <https://github.com/pantsbuild/pants/pull/4809>`_
+
+* Partition and pass JVM options to scalafmt (#4774)
+  `PR #4774 <https://github.com/pantsbuild/pants/pull/4774>`_
+
+Bugfixes
+~~~~~~~~
+
+* [python-repl] pass env through to repl (#4808)
+  `PR #4808 <https://github.com/pantsbuild/pants/pull/4808>`_
+
+* Switch default binary-baseurls to s3 (#4806)
+  `PR #4806 <https://github.com/pantsbuild/pants/pull/4806>`_
+
+* Work around bintray outage. (#4801)
+  `PR #4801 <https://github.com/pantsbuild/pants/pull/4801>`_
+
+* Fix has_sources. (#4792)
+  `PR #4792 <https://github.com/pantsbuild/pants/pull/4792>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Zinc 1.0.0-RC3 memory and output improvements (#4807)
+  `PR #4807 <https://github.com/pantsbuild/pants/pull/4807>`_
+
+* Improve performance by not re-fingerprinting codegen'd sources. (#4789)
+  `PR #4789 <https://github.com/pantsbuild/pants/pull/4789>`_
+
+* Add per-target zinc compile stats (#4790)
+  `PR #4790 <https://github.com/pantsbuild/pants/pull/4790>`_
+
+* Add support for publishing native-engine to s3. (#4804)
+  `PR #4804 <https://github.com/pantsbuild/pants/pull/4804>`_
+
+* Introduce a loose `Files` target. (#4798)
+  `PR #4798 <https://github.com/pantsbuild/pants/pull/4798>`_
+
+* Upgrade default go to 1.8.3. (#4799)
+  `PR #4799 <https://github.com/pantsbuild/pants/pull/4799>`_
+
+* Deprecate unused `go_thrift_library.import_path`. (#4794)
+  `PR #4794 <https://github.com/pantsbuild/pants/pull/4794>`_
+
+* Cleanup cpp targets. (#4793)
+  `PR #4793 <https://github.com/pantsbuild/pants/pull/4793>`_
+
+* Simplify `_validate_target_representation_args`. (#4791)
+  `PR #4791 <https://github.com/pantsbuild/pants/pull/4791>`_
+
+* Init the native engine from bootstrap options. (#4787)
+  `PR #4787 <https://github.com/pantsbuild/pants/pull/4787>`_
+
+* [pantsd] Add faulthandler support for stacktrace dumps. (#4784)
+  `PR #4784 <https://github.com/pantsbuild/pants/pull/4784>`_
+
+* Cleanup CI deprecation warnings. (#4781)
+  `PR #4781 <https://github.com/pantsbuild/pants/pull/4781>`_
+
+* Kill `-XX:-UseSplitVerifier`. (#4777)
+  `PR #4777 <https://github.com/pantsbuild/pants/pull/4777>`_
+
 
 1.4.0.dev7 (7/28/2017)
 ----------------------
