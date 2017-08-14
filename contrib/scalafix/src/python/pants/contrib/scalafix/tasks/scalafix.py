@@ -32,7 +32,7 @@ class ScalaFix(NailgunTask, AbstractClass):
     super(ScalaFix, cls).register_options(register)
     register('--skip', type=bool, fingerprint=True,
              help='Skip running scalafix.')
-    register('--config', type=file_option, default=None, fingerprint=True,
+    register('--configuration', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
     register('--rewrites', default=None, fingerprint=True,
              help='The `rewrites` arg to scalafix: generally a name like `ProcedureSyntax`.')
@@ -79,8 +79,8 @@ class ScalaFix(NailgunTask, AbstractClass):
     args = ['--in-place']
     args.append('--sourceroot={}'.format(results_dir))
     args.append('--classpath={}'.format(':'.join(classpath)))
-    if self.get_options().config:
-      args.append('--config={}'.format(self.get_options().config))
+    if self.get_options().configuration:
+      args.append('--config={}'.format(self.get_options().configuration))
     if self.get_options().rewrites:
       args.append('--rewrites={}'.format(self.get_options().rewrites))
     if self.get_options().level == 'debug':
