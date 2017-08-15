@@ -6,7 +6,7 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
 # Indirectly defines:
 # + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
-# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12
+# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12.
 # + LIB_EXTENSION: The extension of native libraries.
 # + KERNEL: The lower-cased name of the kernel as reported by uname.
 # + OS_NAME: The name of the OS as seen by pants.
@@ -14,100 +14,54 @@ REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 # Indirectly exposes:
 # + get_native_engine_version: Echoes the current native engine version.
 # + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
+# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
 # + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
 # Defines:
-# + CACHE_TARGET_DIR: The directory containing all versions of the native engine for the current OS.
+# + CACHE_ROOT: The pants cache root dir.
+# + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
+# + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
+#                                   the current OS.
+# + NATIVE_ENGINE_BINARY: The basename of the native engine binary for the current OS.
+# + NATIVE_ENGINE_VERSION_RESOURCE: The path of the resource file containing the native engine
+#                                   version hash.
 # Exposes:
-# + build_native_code: Builds target-specific native engine binaries.
-source ${REPO_ROOT}/build-support/bin/native/bootstrap.sh
+# + calculate_current_hash: Calculates the current native engine version hash and echoes it to
+#                           stdout.
+# + bootstrap_native_code: Builds target-specific native engine binaries.
+source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
 
 readonly native_engine_version=$(get_native_engine_version)
+readonly cached_bin_path="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
 
-cat << __EOF__ > ${REPO_ROOT}/native-engine.bintray.json
-{
-  "package": {
-    "subject": "pantsbuild",
-    "repo": "bin",
-    "name": "native-engine",
-    "desc": "The pants native engine library.",
-    "website_url": "http://www.pantsbuild.org",
-    "issue_tracker_url": "https://github.com/pantsbuild/pants/issues",
-    "vcs_url": "https://github.com/pantsbuild/pants.git",
-    "licenses": ["Apache-2.0"],
-    "public_download_numbers": true,
-    "public_stats": true,
-    "github_use_tag_release_notes": false,
-    "attributes": [],
-    "labels": []
-  },
+readonly s3_upload_root="${REPO_ROOT}/build-support/bin/native/s3-upload"
+readonly s3_native_engine_dir="${s3_upload_root}/bin/native-engine"
 
-  "version": {
-    "name": "${native_engine_version}",
-    "desc": "The native engine at sha1: ${native_engine_version}",
-    "released": "$(date +'%Y-%m-%d')",
-    "vcs_tag": "$(git rev-parse HEAD)",
-    "attributes": [],
-    "gpgSign": false
-  },
+function prepare_chroot() {
+  rm -rf "${s3_upload_root}"
+  mkdir -p "$(dirname ${s3_native_engine_dir})"
+  cp -vpr "${NATIVE_ENGINE_CACHE_DIR}" "${s3_native_engine_dir}"
+}
 
-  "publish": true,
-
-  "files": [
-__EOF__
-
-function emit_osx_files() {
-  local readonly cached_bin_path="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-  ensure_file_exists "${cached_bin_path}"
-
-  # Rust targets OSX 10.7+ as noted here: https://doc.rust-lang.org/book/getting-started.html#tier-1
-  for version in $(get_rust_osx_versions)
+function prepare_osx_versions() {
+  for os_id in $(get_rust_osx_ids)
   do
-    local cached_link_path="${cached_bin_path}.10.${version}"
-
-    if (( ${version} < ${OSX_MAX_VERSION} ))
+    if [ "${OS_ID}" != "${os_id}" ]
     then
-      local sep=","
-    else
-      local sep=""
+      local target="${s3_native_engine_dir}/${os_id}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+      mkdir -p "$(dirname ${target})"
+      cp -vp "${cached_bin_path}" "${target}"
     fi
-    # It appears to be the case that upload de-dupes on includePattern keys; so we make a unique
-    # includePattern per uploadPattern via a symlink here per OSX version.
-    ln -fs "${cached_bin_path}" "${cached_link_path}"
-    cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
-    {
-      "includePattern": "${cached_link_path}",
-      "uploadPattern": "build-support/bin/native-engine/mac/10.${version}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-    }${sep}
-__EOF__
   done
 }
 
-function emit_linux_files() {
-  local readonly cached_bin_path="${CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-  ensure_file_exists "${cached_bin_path}"
+# Sanity check the locally built native engine binary exists in the first place.
+ensure_file_exists "${cached_bin_path}"
 
-  cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
-    {
-      "includePattern": "${cached_bin_path}",
-      "uploadPattern": "build-support/bin/native-engine/linux/x86_64/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-    }
-__EOF__
-}
+# Prepare a chroot for s3 deploy of the binary(ies).
+prepare_chroot
 
+# Maybe add copies of the mac native engine binary for the other supported OSX versions.
 if [ "${OS_NAME}" == "mac" ]
 then
-  emit_osx_files
-else
-  emit_linux_files
+  prepare_osx_versions
 fi
-
-cat << __EOF__ >> ${REPO_ROOT}/native-engine.bintray.json
-  ]
-}
-__EOF__
-
-# Prepare a chroot for s3 deploy of the artifacts created above.
-S3_UPLOAD_ROOT=${REPO_ROOT}/build-support/bin/native/s3-upload
-rm -rf ${S3_UPLOAD_ROOT}
-mkdir -p ${S3_UPLOAD_ROOT}/bin
-ln -s ${CACHE_ROOT}/bin/native-engine ${S3_UPLOAD_ROOT}/bin/native-engine
