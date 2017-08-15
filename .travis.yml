@@ -48,6 +48,7 @@ matrix:
       language: generic
       env:
         - SHARD="OSX Native Engine Binary Builder"
+        - NATIVE_ENGINE_DEPLOY=1
       script:
         - ./build-support/bin/native/prepare-binary-deploy.sh
 
@@ -63,6 +64,7 @@ matrix:
       python: "2.7.13"
       env:
         - SHARD="Linux Native Engine Binary Builder"
+        - NATIVE_ENGINE_DEPLOY=1
         # Use the standard python manylinux image for ideal binary compatibility.
         - DOCKER_IMAGE="quay.io/pypa/manylinux1_x86_64"
       before_install:
@@ -418,6 +420,7 @@ deploy:
   skip_cleanup: true
   acl: public_read
   on:
+    condition: $NATIVE_ENGINE_DEPLOY = 1
     branch: master
     repo: pantsbuild/pants
 
