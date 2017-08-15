@@ -9,15 +9,15 @@
 
 ## Configuring pants.ini
 
-[lint.javascriptstyle]
-javascriptstyle_dir: %(pants_supportdir)s/javascriptstyle
-skip: False
-fail_slow: False
+	[lint.javascriptstyle]
+	javascriptstyle_dir: %(pants_supportdir)s/javascriptstyle
+	skip: False
+	fail_slow: False
 
-[fmt.javascriptstyle]
-javascriptstyle_dir: %(pants_supportdir)s/javascriptstyle
-skip: False
-fail_slow: Falsertdir)s/javascriptstyle
+	[fmt.javascriptstyle]
+	javascriptstyle_dir: %(pants_supportdir)s/javascriptstyle
+	skip: False
+	fail_slow: Falsertdir)s/javascriptstyle
 
 
 ## Adding new rules
@@ -49,8 +49,14 @@ To add react plugin to .eslintrc:
 
 You can blacklist files to be excluded from the style checker by listing them in exclude.js.
 
-The blacklist supports glob/rglob through the use of */** syntax. See default.
+The blacklist supports glob/rglob through the use of \*/\*\* syntax. See default.
 
-By default the paths node_modules/**, *.min.js, bundle.js, coverage/**,
-hidden files/folders (beginning with .), and all patterns in a
-project's root .gitignore file are automatically ignored.
+By default the paths:
+
+- node_modules/\*\*
+- *\.min.js
+- bundle.js
+- coverage/\*\*
+- hidden files/folders (beginning with .)
+
+and all patterns in a project's root .gitignore file are automatically ignored.
