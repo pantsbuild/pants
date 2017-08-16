@@ -240,7 +240,7 @@ class LegacyBuildGraph(BuildGraph):
                                                          subjects)
     except ResolveError as e:
       # NB: ResolveError means that a target was not found, which is a common user facing error.
-      raise AddressLookupError(str(e.exc))
+      raise AddressLookupError(str(e))
     except Exception as e:
       raise AddressLookupError(
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
