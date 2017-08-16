@@ -47,21 +47,26 @@ setup(**
 
 
 class SetupPyRunner(InstallerBase):
+  _EXTRAS = ('setuptools', 'wheel')
+
   def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command.split()
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
     mixins = super(SetupPyRunner, self).mixins().copy()
+    extras = set(self._EXTRAS)
     for (key, version) in self._interpreter.extras:
-      if key == 'setuptools':
-        mixins['setuptools'] = 'setuptools=={}'.format(version)
-        break
+      if key in extras:
+        mixins[key] = '{}=={}'.format(key, version)
+        extras.remove(key)
+        if not extras:
+          break
     else:
-      # We know Pants sets up python interpreters with wheel and setuptools via the `PythonSetup`
+      # We know Pants sets up python interpreters with setuptools and wheel via the `PythonSetup`
       # subsystem; so this should never happen
-      raise AssertionError("Expected interpreter {} to have the extra 'setuptools'"
-                           .format(self._interpreter))
+      raise AssertionError("Expected interpreter {} to have the extras {}"
+                           .format(self._interpreter, self._EXTRAS))
     return mixins
 
   def _setup_command(self):

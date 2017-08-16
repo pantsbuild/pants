@@ -117,13 +117,18 @@ class TestSetupPyInterpreter(SetupPyTestBase):
     with environment_as(PYTHONPATH=sdist_srcdir):
       with self.run_execute(foo):
         with open(os.path.join(sdist_srcdir, 'foo', 'commands', 'sys_path.txt')) as fp:
-          # The 1st element of the sys.path should be our custom SetupPyRunner Installer's
-          # setuptools mixin, which should match the setuptools version specified by the
-          # PythonSetup subsystem.
-          package = Package.from_href(fp.readline().strip())
-          self.assertEqual('setuptools', package.name)
+          def assert_extra(name, expected_version):
+            package = Package.from_href(fp.readline().strip())
+            self.assertEqual(name, package.name)
+            self.assertEqual(expected_version, package.raw_version)
+
+          # The 1st two elements of the sys.path should be our custom SetupPyRunner Installer's
+          # setuptools and wheel mixins, which should match the setuptools and wheel versions
+          # specified by the PythonSetup subsystem.
           init_subsystem(PythonSetup)
-          self.assertEqual(PythonSetup.global_instance().setuptools_version, package.raw_version)
+          python_setup = PythonSetup.global_instance()
+          assert_extra('setuptools', python_setup.setuptools_version)
+          assert_extra('wheel', python_setup.wheel_version)
 
 
 class TestSetupPy(SetupPyTestBase):
