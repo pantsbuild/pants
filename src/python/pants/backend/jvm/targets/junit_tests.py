@@ -55,7 +55,8 @@ class JUnitTests(DeprecatedJavaTestsAlias):
                threads=None, **kwargs):
     """
     :param str cwd: working directory (relative to the build root) for the tests under this
-      target. If unspecified (None), the working directory will be controlled by junit_run's --cwd.
+      target. If unspecified (None), the working directory will be controlled by junit_run's --cwd
+      and --chroot options.
     :param str test_platform: The name of the platform (defined under the jvm-platform subsystem) to
       use for running tests (that is, a key into the --jvm-platform-platforms dictionary). If
       unspecified, the platform will default to the same one used for compilation.
