@@ -163,11 +163,12 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                   'All tests output also redirected to files in .pants.d/test/junit.')
     register('--cwd', advanced=True, fingerprint=True,
              help='Set the working directory. If no argument is passed, use the build root. '
-                  'If cwd is set on a target, it will supersede this argument.')
+                  'If cwd is set on a target, it will supersede this argument. It is an error to '
+                  'use this option in combination with `--chroot`')
     register('--chroot', advanced=True, fingerprint=True, type=bool, default=False,
              help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '
                   'will be copied to the chroot. It is an error to use this option in combination '
-                  'with `--cwd`')
+                  'with `--cwd`'.format(Files.alias()))
     register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
