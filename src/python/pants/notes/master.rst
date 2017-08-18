@@ -4,6 +4,33 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev9 (8/18/2017)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Ensure setup-py runs with all interpreter extras. (#4822)
+  `PR #4822 <https://github.com/pantsbuild/pants/pull/4822>`_
+
+* Fixup erroneous `exc` attribute access. (#4818)
+  `PR #4818 <https://github.com/pantsbuild/pants/pull/4818>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Turn on pytest successful test caching in CI. (#4819)
+  `PR #4819 <https://github.com/pantsbuild/pants/pull/4819>`_
+
+* Only attempt deploys on appropriate shards. (#4816)
+  `PR #4816 <https://github.com/pantsbuild/pants/pull/4816>`_
+
+* Fix s3 deploy to use copies instead of a symlink. (#4814)
+  `PR #4814 <https://github.com/pantsbuild/pants/pull/4814>`_
+
+* Fix the S3 upload in the travis deploy. (#4813)
+  `PR #4813 <https://github.com/pantsbuild/pants/pull/4813>`_
+
 1.4.0.dev8 (8/11/2017)
 ----------------------
 
