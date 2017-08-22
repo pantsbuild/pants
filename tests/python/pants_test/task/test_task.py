@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.base.exceptions import TaskError
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
 from pants.cache.cache_setup import CacheSetup
@@ -29,6 +30,7 @@ class DummyTask(Task):
   """A task that appends the content of a DummyLibrary's source into its results_dir."""
 
   _implementation_version = 0
+  _force_fail = False
 
   @property
   def incremental(self):
@@ -56,6 +58,8 @@ class DummyTask(Task):
           outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
           with open(outfile_name, 'a') as outfile:
             outfile.write(infile.read())
+        if self._force_fail:
+          raise TaskError('Task forced to fail before updating vt state.')
         vt.update()
       return vt, was_valid
 
@@ -84,18 +88,18 @@ class TaskTest(TaskTestBase):
       read=enable_artifact_cache,
     )
 
-  def _fixture(self, incremental):
+  def _fixture(self, incremental, options=None):
     target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
-    context = self.context(target_roots=[target])
+    context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
     return task, target
 
-  def _run_fixture(self, content=None, incremental=False, artifact_cache=False):
+  def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
     content = content or self._file_contents
     self._toggle_cache(artifact_cache)
 
-    task, target = self._fixture(incremental=incremental)
+    task, target = self._fixture(incremental=incremental, options=options)
     self._create_clean_file(target, content)
     vtA, was_valid = task.execute()
     return task, vtA, was_valid
@@ -103,6 +107,38 @@ class TaskTest(TaskTestBase):
   def _create_clean_file(self, target, content):
     self.create_file(self._filename, content)
     target.mark_invalidation_hash_dirty()
+
+  def test_revert_after_failure(self):
+    # Regression test to catch the following scenario:
+    #
+    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 2) In state B: Task fails, but writes some output.  Key is not recorded.
+    # 3) After reverting back to state A: The current key is the same as the one recorded at the
+    #    end of step 1), so it looks like no work needs to be done, but actually the task
+    #    must re-run, to overwrite the output written in step 2.
+
+    good_content = "good_content"
+    bad_content = "bad_content"
+    task, target = self._fixture(incremental=False)
+
+    # Clean run succeeds.
+    self._create_clean_file(target, good_content)
+    vt, was_valid = task.execute()
+    self.assertFalse(was_valid)
+    self.assertContent(vt, good_content)
+
+    # Change causes the task to fail.
+    self._create_clean_file(target, bad_content)
+    task._force_fail = True
+    self.assertRaises(TaskError, task.execute)
+    task._force_fail = False
+
+    # Reverting to the previous content should invalidate, so the task
+    # can reset any state created by the failed run.
+    self._create_clean_file(target, good_content)
+    vt, was_valid = task.execute()
+    self.assertFalse(was_valid)
+    self.assertContent(vt, good_content)
 
   def test_incremental(self):
     """Run three times with two unique fingerprints."""
@@ -137,8 +173,9 @@ class TaskTest(TaskTestBase):
     # Again create a clean file but this time reuse an old cache key - in this case vtB.
     self._create_clean_file(target, two)
 
-    # This VT will be invalid, since there is no cache hit and it doesn't match the immediately previous run.
-    # It will wipe the invalid vtB.current_results_dir and followup by copying in the most recent results_dir, from vtC.
+    # This VT will be invalid, since there is no cache hit and it doesn't match the immediately
+    # previous run. It will wipe the invalid vtB.current_results_dir and followup by copying in the
+    # most recent results_dir, from vtC.
     vtD, was_D_valid = task.execute()
     self.assertFalse(was_D_valid)
     self.assertTrue(vtD.has_previous_results_dir)
@@ -197,11 +234,12 @@ class TaskTest(TaskTestBase):
 
   def test_execute_cleans_invalid_result_dirs(self):
     # Regression test to protect task.execute() from returning invalid dirs.
-    task, vt,  _ = self._run_fixture()
+    task, vt, _ = self._run_fixture()
     self.assertNotEqual(os.listdir(vt.results_dir), [])
     self.assertTrue(os.path.islink(vt.results_dir))
 
-    # Mimic the failure case, where an invalid task is run twice, due to failed download or something.
+    # Mimic the failure case, where an invalid task is run twice, due to failed download or
+    # something.
     vt.force_invalidate()
 
     # But if this VT is invalid for a second run, the next invalidation deletes and recreates.
@@ -209,13 +247,15 @@ class TaskTest(TaskTestBase):
     self.assertTrue(os.path.isdir(vt.current_results_dir))
 
   def test_cache_hit_short_circuits_incremental_copy(self):
-    # Tasks should only copy over previous results if there is no cache hit, otherwise the copy is wasted.
+    # Tasks should only copy over previous results if there is no cache hit, otherwise the copy is
+    # wasted.
     first_contents = 'staid country photo'
     second_contents = 'shocking tabloid secret'
 
     self.assertFalse(self.buildroot_files(self._cachedir))
     # Initial run will have been invalid no cache hit, and with no previous_results_dir.
-    task, vtA, was_A_valid = self._run_fixture(content=first_contents, incremental=True, artifact_cache=True)
+    task, vtA, was_A_valid = self._run_fixture(content=first_contents, incremental=True,
+                                               artifact_cache=True)
 
     self.assertTrue(self.buildroot_files(self._cachedir))
     self.assertTrue(task.incremental)
@@ -230,7 +270,8 @@ class TaskTest(TaskTestBase):
     self.assertFalse(vtB.has_previous_results_dir)
 
     # Change the cache_key and disable the cache_reads.
-    # This results in an invalid vt, with no cache hit. It will then copy the vtB.previous_results into vtC.results_dir.
+    # This results in an invalid vt, with no cache hit. It will then copy the vtB.previous_results
+    # into vtC.results_dir.
     self._toggle_cache(False)
     self._create_clean_file(vtB.target, second_contents)
 
@@ -242,11 +283,13 @@ class TaskTest(TaskTestBase):
     self.assertTrue(vtC.has_previous_results_dir)
     self.assertEqual(vtB.current_results_dir, vtC.previous_results_dir)
 
-    # Verify the content. The task was invalid twice - the initial run and the run with the changed source file.
-    # Only vtC (previous sucessful runs + cache miss) resulted in copying the previous_results.
+    # Verify the content. The task was invalid twice - the initial run and the run with the changed
+    # source file. Only vtC (previous sucessful runs + cache miss) resulted in copying the
+    # previous_results.
     self.assertContent(vtC, first_contents + second_contents)
 
-  # live_dirs() is in cache_manager, but like all of these tests, only makes sense to test as a sequence of task runs.
+  # live_dirs() is in cache_manager, but like all of these tests, only makes sense to test as a
+  # sequence of task runs.
   def test_live_dirs(self):
     task, vtA, _ = self._run_fixture(incremental=True)
 
@@ -265,7 +308,8 @@ class TaskTest(TaskTestBase):
     self.assertIn(vtA.current_results_dir, vtB_live)
     self.assertEqual(len(vtB_live), 3)
 
-    # Delete vtB results_dir. live_dirs() should only return existing dirs, even if it knows the previous_cache_key.
+    # Delete vtB results_dir. live_dirs() should only return existing dirs, even if it knows the
+    # previous_cache_key.
     safe_rmtree(vtB.current_results_dir)
 
     self._create_clean_file(vtB.target, 'baz')
@@ -273,3 +317,28 @@ class TaskTest(TaskTestBase):
     vtC_live = list(vtC.live_dirs())
     self.assertNotIn(vtB.current_results_dir, vtC_live)
     self.assertEqual(len(vtC_live), 2)
+
+  def test_ignore_global(self):
+    _, _, was_valid = self._run_fixture()
+    self.assertFalse(was_valid)
+
+    self.reset_build_graph()
+    _, _, was_valid = self._run_fixture()
+    self.assertTrue(was_valid)
+
+    self.reset_build_graph()
+    _, _, was_valid = self._run_fixture(options={'cache': {'ignore': True}})
+    self.assertFalse(was_valid)
+
+  def test_ignore(self):
+    _, _, was_valid = self._run_fixture()
+    self.assertFalse(was_valid)
+
+    self.reset_build_graph()
+    _, _, was_valid = self._run_fixture()
+    self.assertTrue(was_valid)
+
+    self.reset_build_graph()
+    _, _, was_valid = self._run_fixture(options={'cache.{}'.format(self.options_scope):
+                                                   {'ignore': True}})
+    self.assertFalse(was_valid)

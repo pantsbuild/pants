@@ -20,6 +20,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
+from pants_test.option.util.fakes import create_options
 from pants_test.testutils.mock_logger import MockLogger
 
 
@@ -70,75 +71,94 @@ class TestCacheSetup(BaseTest):
     self.resolver.resolve = Mock(return_value=[self.REMOTE_URI_1, self.REMOTE_URI_2])
     self.log = MockLogger()
     self.pinger = MockPinger({'host1': 5, 'host2:666': 3, 'host3': 7})
-    options = Mock()
-    options.pinger_timeout = .5
-    options.pinger_tries = 2
-    options.read_from = [self.EMPTY_URI]
-    options.write_to = [self.EMPTY_URI]
-    options.compression_level = 1
-    self.cache_factory = CacheFactory(options=options, log=MockLogger(),
-                                 stable_name='test', resolver=self.resolver)
+
+  def cache_factory(self, **options):
+    cache_options = {
+      'pinger_timeout': .5,
+      'pinger_tries': 2,
+      'ignore': False,
+      'read': False,
+      'read_from': [self.EMPTY_URI],
+      'write_to': [self.EMPTY_URI],
+      'write': False,
+      'compression_level': 1,
+      'max_entries_per_target': 1,
+      'write_permissions': None,
+      'dereference_symlinks': True,
+      # Usually read from global scope.
+      'pants_workdir': self.pants_workdir
+    }
+    cache_options.update(**options)
+    return CacheFactory(options=create_options(options={'test': cache_options}).for_scope('test'),
+                        log=MockLogger(),
+                        stable_name='test',
+                        resolver=self.resolver)
 
   def test_sanitize_cache_spec(self):
+    cache_factory = self.cache_factory()
+
     self.assertEquals(self.CACHE_SPEC_LOCAL_ONLY,
-                      self.cache_factory._sanitize_cache_spec([self.LOCAL_URI]))
+                      cache_factory._sanitize_cache_spec([self.LOCAL_URI]))
 
     self.assertEquals(self.CACHE_SPEC_REMOTE_ONLY,
-                      self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1]))
+                      cache_factory._sanitize_cache_spec([self.REMOTE_URI_1]))
 
     # (local, remote) and (remote, local) are equivalent as long as they are valid
     self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
-                      self.cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.REMOTE_URI_1]))
+                      cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.REMOTE_URI_1]))
     self.assertEquals(self.CACHE_SPEC_LOCAL_REMOTE,
-                      self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.LOCAL_URI]))
+                      cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.LOCAL_URI]))
 
     with self.assertRaises(InvalidCacheSpecError):
-      self.cache_factory._sanitize_cache_spec('not a list')
+      cache_factory._sanitize_cache_spec('not a list')
 
     with self.assertRaises(EmptyCacheSpecError):
-      self.cache_factory._sanitize_cache_spec([])
+      cache_factory._sanitize_cache_spec([])
 
     with self.assertRaises(CacheSpecFormatError):
-      self.cache_factory._sanitize_cache_spec([self.INVALID_LOCAL_URI])
+      cache_factory._sanitize_cache_spec([self.INVALID_LOCAL_URI])
     with self.assertRaises(CacheSpecFormatError):
-      self.cache_factory._sanitize_cache_spec(['ftp://not_a_valid_remote_cache'])
+      cache_factory._sanitize_cache_spec(['ftp://not_a_valid_remote_cache'])
 
     with self.assertRaises(LocalCacheSpecRequiredError):
-      self.cache_factory._sanitize_cache_spec([self.INVALID_LOCAL_URI, self.REMOTE_URI_1])
+      cache_factory._sanitize_cache_spec([self.INVALID_LOCAL_URI, self.REMOTE_URI_1])
     with self.assertRaises(LocalCacheSpecRequiredError):
-      self.cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.REMOTE_URI_2])
+      cache_factory._sanitize_cache_spec([self.REMOTE_URI_1, self.REMOTE_URI_2])
     with self.assertRaises(RemoteCacheSpecRequiredError):
-      self.cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.INVALID_LOCAL_URI])
+      cache_factory._sanitize_cache_spec([self.LOCAL_URI, self.INVALID_LOCAL_URI])
 
     with self.assertRaises(TooManyCacheSpecsError):
-      self.cache_factory._sanitize_cache_spec([self.LOCAL_URI,
-                                               self.REMOTE_URI_1, self.REMOTE_URI_2])
+      cache_factory._sanitize_cache_spec([self.LOCAL_URI,
+                                    self.REMOTE_URI_1, self.REMOTE_URI_2])
 
   def test_resolve(self):
+    cache_factory = self.cache_factory()
+
     self.assertEquals(CacheSpec(local=None,
                                 remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
-                      self.cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
+                      cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
 
     self.assertEquals(CacheSpec(local=self.LOCAL_URI,
                                 remote='{}|{}'.format(self.REMOTE_URI_1, self.REMOTE_URI_2)),
-                      self.cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
+                      cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
     self.resolver.resolve.side_effect = Resolver.ResolverError()
     # still have local cache if resolver fails
     self.assertEquals(CacheSpec(local=self.LOCAL_URI, remote=None),
-                      self.cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
+                      cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
     # no cache created if resolver fails and no local cache
-    self.assertFalse(self.cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
+    self.assertFalse(cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
 
   def test_noop_resolve(self):
     self.resolver.resolve = Mock(return_value=[])
+    cache_factory = self.cache_factory()
 
     self.assertEquals(self.CACHE_SPEC_LOCAL_ONLY,
-                      self.cache_factory._resolve(self.CACHE_SPEC_LOCAL_ONLY))
+                      cache_factory._resolve(self.CACHE_SPEC_LOCAL_ONLY))
     self.assertEquals(self.CACHE_SPEC_RESOLVE_ONLY,
-                      self.cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
+                      cache_factory._resolve(self.CACHE_SPEC_RESOLVE_ONLY))
     self.assertEquals(self.CACHE_SPEC_LOCAL_RESOLVE,
-                      self.cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
+                      cache_factory._resolve(self.CACHE_SPEC_LOCAL_RESOLVE))
 
   def test_cache_spec_parsing(self):
     def mk_cache(spec, resolver=None):
@@ -180,7 +200,21 @@ class TestCacheSetup(BaseTest):
         mk_cache([tmpdir, self.REMOTE_URI_1, self.REMOTE_URI_2])
 
   def test_read_cache_available(self):
-    self.assertEquals(None, self.cache_factory.read_cache_available())
+    self.assertFalse(self.cache_factory(ignore=True, read=True, read_from=[self.EMPTY_URI])
+                     .read_cache_available())
+    self.assertFalse(self.cache_factory(ignore=False, read=False, read_from=[self.EMPTY_URI])
+                     .read_cache_available())
+    self.assertFalse(self.cache_factory(ignore=False, read=True, read_from=[])
+                     .read_cache_available())
+    self.assertIsNone(self.cache_factory(ignore=False, read=True, read_from=[self.EMPTY_URI])
+                      .read_cache_available())
 
   def test_write_cache_available(self):
-    self.assertEquals(None, self.cache_factory.write_cache_available())
+    self.assertFalse(self.cache_factory(ignore=True, write=True, write_to=[self.EMPTY_URI])
+                     .write_cache_available())
+    self.assertFalse(self.cache_factory(ignore=False, write=False, write_to=[self.EMPTY_URI])
+                     .write_cache_available())
+    self.assertFalse(self.cache_factory(ignore=False, write=True, write_to=[])
+                     .write_cache_available())
+    self.assertIsNone(self.cache_factory(ignore=False, write=True, write_to=[self.EMPTY_URI])
+                      .write_cache_available())

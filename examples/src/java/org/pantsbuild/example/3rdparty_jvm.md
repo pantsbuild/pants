@@ -55,18 +55,25 @@ both the version in the repo compiled from source and an older version
 that was previously published.  In this case, you want to be sure that
 when pants always prefers the version built from source.
 
-Fortunately, the remedy for this is simple.  If you add a `provides=`
-parameter that matches the one used to publish the artifact, pants
-will always prefer the local target definition to the
-published jar.
+Fortunately, the remedy for this is simple.  If you add a `provides=` parameter
+that matches the one used to publish the artifact, pants will always prefer the
+local target definition to the published jar if it is in the context:
 
     :::python
-    jar_library(name='api',
+    java_library(name='api',
       sources = globs('*.java'),
-      provides = artifact(org='org.archie',
-                          name='api',
-                          repo=myrepo,)
+      provides = artifact(org='org.archie', name='api', repo=myrepo),
     )
+
+    jar_library(name='bin-dep',
+      jars=[
+        jar(org='org.archie', name='consumer', rev='1.2.3'),
+      ],
+      dependencies=[
+        # Include the local, source copy of the API to cause it to be used rather than
+        # any versioned binary copy that the `consumer` lib might depend on transitively.
+        ':api',
+      ])
 
 Controlling JAR Dependency Versions
 -----------------------------------

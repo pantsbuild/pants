@@ -51,7 +51,7 @@ class IvyResolveTest(JvmToolTaskTestBase):
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
     context = self.context(target_roots=targets)
-    self.create_task(context).execute()
+    self.execute(context)
     return context.products.get_data('compile_classpath')
 
   #
@@ -220,7 +220,8 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     junit_jar_lib = self._make_junit_target()
 
-    classpath = self.create_task(self.context()).ivy_classpath([junit_jar_lib])
+    task = self.prepare_execute(self.context())
+    classpath = task.ivy_classpath([junit_jar_lib])
 
     self.assertEquals(2, len(classpath))
 
@@ -229,11 +230,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
     with self._temp_workdir():
       # Initial resolve does a resolve and populates elements.
       initial_context = self.context(target_roots=[junit_jar_lib])
-      self.create_task(initial_context).execute()
+      self.execute(initial_context)
 
       # Second resolve should check files and do no ivy call.
       load_context = self.context(target_roots=[junit_jar_lib])
-      task = self.create_task(load_context)
+      task = self.prepare_execute(load_context)
 
       def fail(*arg, **kwargs):
         self.fail("Unexpected call to ivy.")
@@ -282,11 +283,11 @@ class IvyResolveTest(JvmToolTaskTestBase):
 
     # Initial resolve does a resolve and populates elements.
     context1 = self.context(target_roots=[junit_jar_lib])
-    self.create_task(context1).execute()
+    self.execute(context1)
 
     # Second resolve should check files and do no ivy call.
     context2 = self.context(target_roots=[junit_jar_lib])
-    task = self.create_task(context2)
+    task = self.prepare_execute(context2)
     task._do_resolve = self.fail
     task.execute()
 

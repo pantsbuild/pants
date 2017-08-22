@@ -96,6 +96,7 @@ page(
   source='invoking.md',
   links=[
     ':first_tutorial',
+    ':options',
     ':target_addresses',
   ]
 )

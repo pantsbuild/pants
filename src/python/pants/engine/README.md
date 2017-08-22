@@ -148,3 +148,14 @@ $ ./pants --native-engine-visualize-to=viz list some/example/directory:
 $ ls viz
 run.0.dot
 ```
+
+## Native Engine
+
+The native engine is integrated into the pants codebase via `native.py` in
+this directory along with `build-support/bin/native/bootstrap.sh` which ensures a
+pants native engine library is built and available for linking. The glue is the
+sha1 hash of the native engine source code used as its version by the `Native`
+class. This hash is maintained by `build-support/bin/native/bootstrap.sh` and
+output to the `native_engine_version` file in this directory. Any modification
+to this resource file's location will need adjustments in
+`build-support/bin/native/bootstrap.sh` to ensure the linking continues to work.

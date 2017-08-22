@@ -15,32 +15,27 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
-from pants.util.dirutil import safe_rmtree
-from pants_test.tasks.task_test_base import TaskTestBase
+from pants.source.wrapped_globs import EagerFilesetWithSpec
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen
 
 
-# TODO (tdesai) Issue-240: Use JvmToolTaskTestBase for ScroogeGenTest
-class ScroogeGenTest(TaskTestBase):
+GEN_ADAPT = '--gen-adapt'
+
+
+class ScroogeGenTest(NailgunTaskTestBase):
   @classmethod
   def task_type(cls):
     return ScroogeGen
 
   @property
   def alias_groups(self):
-    return BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary,
-                                     'java_library': JavaLibrary,
-                                     'scala_library': ScalaLibrary})
-
-  def setUp(self):
-    super(ScroogeGenTest, self).setUp()
-    self.task_outdir = os.path.join(self.build_root, 'scrooge', 'gen-java')
-
-  def tearDown(self):
-    super(ScroogeGenTest, self).tearDown()
-    safe_rmtree(self.task_outdir)
+    return super(ScroogeGenTest, self).alias_groups.merge(
+      BuildFileAliases(targets={'java_thrift_library': JavaThriftLibrary,
+                                'java_library': JavaLibrary,
+                                'scala_library': ScalaLibrary}))
 
   def test_validate_compiler_configs(self):
     # Set synthetic defaults for the global scope.
@@ -73,7 +68,7 @@ class ScroogeGenTest(TaskTestBase):
 
     target = self.target('test_validate:one')
     context = self.context(target_roots=[target])
-    task = self.create_task(context)
+    task = self.prepare_execute(context)
     task._validate_compiler_configs([self.target('test_validate:one')])
     task._validate_compiler_configs([self.target('test_validate:two')])
 
@@ -81,22 +76,63 @@ class ScroogeGenTest(TaskTestBase):
       task._validate_compiler_configs([self.target('test_validate:three')])
 
   def test_scala(self):
-    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/example/Example.scala')]
-    self._test_help('scala', 'finagle', ScalaLibrary, sources)
+    sources = [os.path.join(self.test_workdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help('scala', ScalaLibrary, [GEN_ADAPT], sources, 'finagle')
+
+  def test_compiler_args_no_rpc_style(self):
+    sources = [os.path.join(self.test_workdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help('scala', ScalaLibrary, [GEN_ADAPT], sources)
 
   def test_android(self):
-    sources = [os.path.join(self.task_outdir, 'org/pantsbuild/android_example/Example.java')]
-    self._test_help('android', 'finagle', JavaLibrary, sources)
+    sources = [os.path.join(self.test_workdir, 'org/pantsbuild/android_example/Example.java')]
+    self._test_help('android', JavaLibrary, [GEN_ADAPT], sources, 'finagle')
 
   def test_invalid_lang(self):
     with self.assertRaises(TargetDefinitionException):
-      self._test_help('not-a-lang', 'finagle', JavaLibrary, [])
+      self._test_help('not-a-lang', JavaLibrary, [GEN_ADAPT], [], 'finagle')
 
   def test_invalid_style(self):
     with self.assertRaises(TargetDefinitionException):
-      self._test_help('scala', 'not-a-style', JavaLibrary, [])
+      self._test_help('scala', JavaLibrary, [GEN_ADAPT], [], 'not-a-style')
 
-  def _test_help(self, language, rpc_style, library_type, sources):
+  def test_empty_compiler_args(self):
+    sources = [os.path.join(self.test_workdir, 'org/pantsbuild/example/Example.scala')]
+    self._test_help('scala', ScalaLibrary, [], sources, 'finagle')
+
+  def compiler_args_to_string(self, compiler_args):
+    quoted = map(lambda x: "'{}'".format(x), compiler_args)
+    comma_separated = ', '.join(quoted)
+    return '[{}]'.format(comma_separated)
+
+  def _test_create_build_str(self, language, compiler_args, rpc_style=None):
+    compiler_args_str = self.compiler_args_to_string(compiler_args)
+    if rpc_style is None:
+      return dedent('''
+        java_thrift_library(name='a',
+          sources=['a.thrift'],
+          dependencies=[],
+          compiler='scrooge',
+          language='{language}',
+          compiler_args={compiler_args},
+          strict_deps=True,
+          fatal_warnings=False,
+        )
+      '''.format(language=language, compiler_args=compiler_args_str))
+    else:
+      return dedent('''
+        java_thrift_library(name='a',
+          sources=['a.thrift'],
+          dependencies=[],
+          compiler='scrooge',
+          language='{language}',
+          rpc_style='{rpc_style}',
+          compiler_args={compiler_args},
+          strict_deps=True,
+          fatal_warnings=False,
+        )
+      '''.format(language=language, rpc_style=rpc_style, compiler_args=compiler_args_str))
+
+  def _test_help(self, language, library_type, compiler_args, sources, rpc_style = None):
     contents = dedent('''#@namespace android org.pantsbuild.android_example
       namespace java org.pantsbuild.example
       struct Example {
@@ -104,27 +140,15 @@ class ScroogeGenTest(TaskTestBase):
       }
     ''')
 
-    build_string = dedent('''
-      java_thrift_library(name='a',
-        sources=['a.thrift'],
-        dependencies=[],
-        compiler='scrooge',
-        language='{language}',
-        rpc_style='{rpc_style}',
-        strict_deps=True,
-      )
-    '''.format(language=language, rpc_style=rpc_style))
-
     self.create_file(relpath='test_smoke/a.thrift', contents=contents)
+    build_string = self._test_create_build_str(language, compiler_args, rpc_style)
     self.add_to_build_file('test_smoke', build_string)
 
     target = self.target('test_smoke:a')
     context = self.context(target_roots=[target])
-    task = self.create_task(context)
+    task = self.prepare_execute(context)
 
     task._declares_service = lambda source: False
-    task._outdir = MagicMock()
-    task._outdir.return_value = self.task_outdir
 
     task.gen = MagicMock()
     task.gen.return_value = {'test_smoke/a.thrift': sources}
@@ -140,9 +164,15 @@ class ScroogeGenTest(TaskTestBase):
       self.assertEquals(call_kwargs['target_type'], library_type)
       self.assertEquals(call_kwargs['dependencies'], OrderedSet())
       self.assertEquals(call_kwargs['provides'], None)
-      self.assertEquals(call_kwargs['sources'], [])
       self.assertEquals(call_kwargs['derived_from'], target)
       self.assertEquals(call_kwargs['strict_deps'], True)
+      self.assertEquals(call_kwargs['fatal_warnings'], False)
+
+      sources = call_kwargs['sources']
+      if isinstance(sources, EagerFilesetWithSpec):
+        self.assertEquals(sources.files, [])
+      else:
+        self.assertEquals(sources, [])
 
     finally:
       Context.add_new_target = saved_add_new_target

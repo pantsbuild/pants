@@ -13,6 +13,7 @@ from collections import namedtuple
 from pants.base.hash_utils import hash_all
 from pants.build_graph.target import Target
 from pants.fs.fs import safe_filename
+from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 
 
@@ -20,8 +21,6 @@ from pants.util.dirutil import safe_mkdir
 #  - id identifies the set of targets.
 #  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
 #    determines a given version of the artifacts created when building the target set.
-#    to the chunking algorithm.  Right now this is used to count the number of source files
-#    in a scala target set for breaking up zinc invocations.
 
 CacheKey = namedtuple('CacheKey', ['id', 'hash'])
 
@@ -95,8 +94,30 @@ class CacheKeyGenerator(object):
 class BuildInvalidator(object):
   """Invalidates build targets based on the SHA1 hash of source files and other inputs."""
 
-  def __init__(self, root):
-    self._root = os.path.join(root, GLOBAL_CACHE_KEY_GEN_VERSION)
+  class Factory(Subsystem):
+    options_scope = 'build-invalidator'
+
+    @classmethod
+    def create(cls, build_task=None):
+      """Creates a build invalidator optionally scoped to a task.
+
+      :param str build_task: An optional task name to scope the build invalidator to. If not
+                             supplied the build invalidator will act globally across all build
+                             tasks.
+      """
+      root = os.path.join(cls.global_instance().get_options().pants_workdir, 'build_invalidator')
+      return BuildInvalidator(root, scope=build_task)
+
+  def __init__(self, root, scope=None):
+    """Create a build invalidator using the given root fingerprint database directory.
+
+    :param str root: The root directory to use for storing build invalidation fingerprints.
+    :param str scope: The scope of this invalidator; if `None` then this invalidator will be global.
+    """
+    root = os.path.join(root, GLOBAL_CACHE_KEY_GEN_VERSION)
+    if scope:
+      root = os.path.join(root, scope)
+    self._root = root
     safe_mkdir(self._root)
 
   def previous_key(self, cache_key):

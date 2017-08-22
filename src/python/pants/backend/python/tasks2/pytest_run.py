@@ -10,41 +10,95 @@ import os
 import shutil
 import time
 import traceback
+import uuid
 from contextlib import contextmanager
 from textwrap import dedent
 
-from pex.pex_info import PexInfo
 from six import StringIO
 from six.moves import configparser
 
-from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
+from pants.backend.python.tasks2.pytest_prep import PytestPrep
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TaskError
+from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
+from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.task.task import Task
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for
+from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
+from pants.util.memo import memoized_method, memoized_property
+from pants.util.objects import datatype
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
-class PythonTestResult(object):
+class _Workdirs(datatype('_Workdirs', ['root_dir'])):
+  @classmethod
+  def for_targets(cls, work_dir, targets):
+    root_dir = os.path.join(work_dir, Target.maybe_readable_identify(targets))
+    safe_mkdir(root_dir, clean=False)
+    return cls(root_dir=root_dir)
+
+  @memoized_method
+  def junitxml_path(self, *targets):
+    xml_path = os.path.join(self.root_dir, 'junitxml',
+                            'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
+    safe_mkdir_for(xml_path)
+    return xml_path
+
+  @memoized_property
+  def coverage_path(self):
+    coverage_workdir = os.path.join(self.root_dir, 'coverage')
+    safe_mkdir(coverage_workdir)
+    return coverage_workdir
+
+  def files(self):
+    def files_iter():
+      for dir_path, _, file_names in os.walk(self.root_dir):
+        for filename in file_names:
+          yield os.path.join(dir_path, filename)
+    return list(files_iter())
+
+
+class PytestResult(object):
   @staticmethod
   def exception():
-    return PythonTestResult('EXCEPTION')
+    return PytestResult('EXCEPTION')
 
-  @staticmethod
-  def rc(value):
-    return PythonTestResult('SUCCESS' if value == 0 else 'FAILURE', rc=value)
+  _SUCCESS_EXIT_CODES = (
+    0,
+
+    # This is returned by pytest when no tests are collected (EXIT_NOTESTSCOLLECTED).
+    # We already short-circuit test runs with no test _targets_ to return 0 emulated exit codes and
+    # we should do the same for cases when there are test targets but tests themselves have been
+    # de-selected out of band via `py.test -k`.
+    5
+  )
+
+  @classmethod
+  def _map_exit_code(cls, value):
+    return 0 if value in cls._SUCCESS_EXIT_CODES else value
+
+  @classmethod
+  def rc(cls, value):
+    exit_code = cls._map_exit_code(value)
+    return PytestResult('SUCCESS' if exit_code == 0 else 'FAILURE', rc=exit_code)
+
+  @classmethod
+  def from_error(cls, error):
+    if not isinstance(error, TaskError):
+      raise AssertionError('Can only synthesize a {} from a TaskError, given a {}'
+                           .format(cls.__name__, type(error).__name__))
+    return cls.rc(error.exit_code).with_failed_targets(error.failed_targets)
 
   def with_failed_targets(self, failed_targets):
-    return PythonTestResult(self._msg, self._rc, failed_targets)
+    return PytestResult(self._msg, self._rc, failed_targets)
 
   def __init__(self, msg, rc=None, failed_targets=None):
     self._rc = rc
@@ -62,37 +116,60 @@ class PythonTestResult(object):
   def failed_targets(self):
     return self._failed_targets
 
+  def checked(self):
+    """Raise if this result was unsuccessful and otherwise return this result unchanged.
 
-class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
+    :returns: this instance if successful
+    :rtype: :class:`PytestResult`
+    :raises: :class:`ErrorWhileTesting` if this result represents a failure
+    """
+    if not self.success:
+      raise ErrorWhileTesting(exit_code=self._rc, failed_targets=self._failed_targets)
+    return self
+
+
+class PytestRun(TestRunnerTaskMixin, Task):
 
   @classmethod
-  def subsystem_dependencies(cls):
-    return super(PytestRun, cls).subsystem_dependencies() + (PyTest,)
+  def implementation_version(cls):
+    return super(PytestRun, cls).implementation_version() + [('PytestRun', 2)]
 
   @classmethod
   def register_options(cls, register):
     super(PytestRun, cls).register_options(register)
-    register('--fast', type=bool, default=True,
+    register('--fast', type=bool, default=True, fingerprint=True,
              help='Run all tests in a single pytest invocation. If turned off, each test target '
                   'will run in its own pytest invocation, which will be slower, but isolates '
                   'tests from process-wide state created by tests in other targets.')
+
+    # NB: We always produce junit xml privately, and if this option is specified, we then copy
+    # it to the user-specified directory, post any interaction with the cache to retrieve the
+    # privately generated and cached xml files. As such, this option is not part of the
+    # fingerprint.
     register('--junit-xml-dir', metavar='<DIR>',
              help='Specifying a directory causes junit xml results files to be emitted under '
                   'that dir for each test run.')
-    register('--profile', metavar='<FILE>',
+
+    register('--profile', metavar='<FILE>', fingerprint=True,
              help="Specifying a file path causes tests to be profiled with the profiling data "
                   "emitted to that file (prefix). Note that tests may run in a different cwd, so "
                   "it's best to use an absolute path to make it easy to find the subprocess "
                   "profiles later.")
-    register('--options', type=list, help='Pass these options to pytest.')
-    register('--coverage',
-             help='Emit coverage information for specified packages or directories (absolute or'
+
+    register('--options', type=list, fingerprint=True, help='Pass these options to pytest.')
+
+    register('--coverage', fingerprint=True,
+             help='Emit coverage information for specified packages or directories (absolute or '
                   'relative to the build root).  The special value "auto" indicates that Pants '
                   'should attempt to deduce which packages to emit coverage for.')
+    # For a given --coverage specification (which is fingerprinted), we will always copy the
+    # associated generated and cached --coverage files to this directory post any interaction with
+    # the cache to retrieve the coverage files. As such, this option is not part of the fingerprint.
     register('--coverage-output-dir', metavar='<DIR>', default=None,
-             help='Directory to emit coverage reports to.'
+             help='Directory to emit coverage reports to. '
              'If not specified, a default within dist is used.')
-    register('--test-shard',
+
+    register('--test-shard', fingerprint=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
                   'run tests number 2, 5, 8, 11, ...')
 
@@ -100,11 +177,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
   def supports_passthru_args(cls):
     return True
 
-  def __init__(self, *args, **kwargs):
-    super(PytestRun, self).__init__(*args, **kwargs)
-
-  def extra_requirements(self):
-    return PyTest.global_instance().get_requirement_strings()
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(PytestRun, cls).prepare(options, round_manager)
+    round_manager.require_data(PytestPrep.PYTEST_BINARY)
 
   def _test_target_filter(self):
     def target_filter(target):
@@ -123,12 +199,6 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
-
-  def _get_junit_xml_path(self, targets):
-    xml_path = os.path.join(self.workdir, 'junitxml',
-                            'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
-    safe_mkdir_for(xml_path)
-    return xml_path
 
   DEFAULT_COVERAGE_CONFIG = dedent(b"""
     [run]
@@ -193,12 +263,12 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     return cp
 
   @contextmanager
-  def _cov_setup(self, source_mappings, coverage_sources=None):
+  def _cov_setup(self, workdirs, source_mappings, coverage_sources=None):
     cp = self._generate_coverage_config(source_mappings=source_mappings)
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
-    with temporary_file(root_dir=self.workdir) as fp:
+    with temporary_file(root_dir=workdirs.root_dir) as fp:
       cp.write(fp)
       fp.close()
       coverage_rc = fp.name
@@ -210,7 +280,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       yield args, coverage_rc
 
   @contextmanager
-  def _maybe_emit_coverage_data(self, targets, pex):
+  def _maybe_emit_coverage_data(self, workdirs, targets, pex):
     coverage = self.get_options().coverage
     if coverage is None:
       yield []
@@ -270,7 +340,8 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
           # The source is to be interpreted as a package name.
           coverage_sources.append(source)
 
-    with self._cov_setup(source_mappings,
+    with self._cov_setup(workdirs,
+                         source_mappings,
                          coverage_sources=coverage_sources) as (args, coverage_rc):
       try:
         yield args
@@ -291,15 +362,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
           shutil.move('.coverage', '.coverage.raw')
           pex_run(['combine', '--rcfile', coverage_rc])
           pex_run(['report', '-i', '--rcfile', coverage_rc])
-          if self.get_options().coverage_output_dir:
-            target_dir = self.get_options().coverage_output_dir
-          else:
-            relpath = Target.maybe_readable_identify(targets)
-            pants_distdir = self.context.options.for_global_scope().pants_distdir
-            target_dir = os.path.join(pants_distdir, 'coverage', relpath)
-          safe_mkdir(target_dir)
-          pex_run(['html', '-i', '--rcfile', coverage_rc, '-d', target_dir])
-          coverage_xml = os.path.join(target_dir, 'coverage.xml')
+
+          coverage_workdir = workdirs.coverage_path
+          pex_run(['html', '-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
+          coverage_xml = os.path.join(coverage_workdir, 'coverage.xml')
           pex_run(['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml])
 
   def _get_shard_conftest_content(self):
@@ -390,13 +456,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       yield conftest
 
   @contextmanager
-  def _test_runner(self, targets, sources_map):
-    pex_info = PexInfo.default()
-    pex_info.entry_point = 'pytest'
-    pex = self.create_pex(pex_info)
-
+  def _test_runner(self, workdirs, targets, sources_map):
+    pex = self.context.products.get_data(PytestPrep.PYTEST_BINARY)
     with self._conftest(sources_map) as conftest:
-      with self._maybe_emit_coverage_data(targets, pex) as coverage_args:
+      with self._maybe_emit_coverage_data(workdirs, targets, pex) as coverage_args:
         yield pex, [conftest] + coverage_args
 
   def _do_run_tests_with_args(self, pex, args):
@@ -420,9 +483,10 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         env['PEX_PROFILE_FILENAME'] = '{0}.subprocess.{1:.6f}'.format(profile, time.time())
 
       with self.context.new_workunit(name='run',
+                                     cmd=pex.cmdline(args),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
         rc = self._spawn_and_wait(pex, workunit=workunit, args=args, setsid=True, env=env)
-        return PythonTestResult.rc(rc)
+        return PytestResult.rc(rc)
     except ErrorWhileTesting:
       # _spawn_and_wait wraps the test runner in a timeout, so it could
       # fail with a ErrorWhileTesting. We can't just set PythonTestResult
@@ -433,7 +497,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     except Exception:
       self.context.log.error('Failed to run test!')
       self.context.log.info(traceback.format_exc())
-      return PythonTestResult.exception()
+      return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
     pex_src_root = os.path.relpath(
@@ -475,27 +539,183 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
     file_info = test_info['file']
     return relsrc_to_target.get(file_info)
 
-  def _run_tests(self, targets):
+  def _partition(self, targets):
+    # TODO(John Sirois): Consume `py.test` pexes matched to the partitioning in effect after
+    # https://github.com/pantsbuild/pants/pull/4638 lands.
     if self.get_options().fast:
-      result = self._do_run_tests(targets)
-      if not result.success:
-        raise ErrorWhileTesting(failed_targets=result.failed_targets)
+      return tuple(targets),
     else:
-      results = {}
-      for target in targets:
-        rv = self._do_run_tests([target])
-        results[target] = rv
-        if not rv.success and self.get_options().fail_fast:
-          break
-      for target in sorted(results):
-        self.context.log.info('{0:80}.....{1:>10}'.format(target.id, str(results[target])))
-      failed_targets = [target for target, _rv in results.items() if not _rv.success]
-      if failed_targets:
-        raise ErrorWhileTesting(failed_targets=failed_targets)
+      return tuple((target,) for target in targets)
 
-  def _do_run_tests(self, targets):
+  def _run_tests(self, targets):
+    partitions = self._partition(targets)
+
+    results = {}
+    failure = False
+    for partition in partitions:
+      try:
+        rv = self._do_run_tests(partition)
+      except ErrorWhileTesting as e:
+        rv = PytestResult.from_error(e)
+      results[partition] = rv
+      if not rv.success:
+        failure = True
+        if self.get_options().fail_fast:
+          break
+
+    for partition in sorted(results):
+      rv = results[partition]
+      if len(partition) == 1 or rv.success:
+        log = self.context.log.info if rv.success else self.context.log.error
+        for target in partition:
+          log('{0:80}.....{1:>10}'.format(target.id, rv))
+      else:
+        # There is not much useful we can display in summary for a multi-target partition with
+        # failures without parsing those failures to link them to individual targets; ie: targets
+        # 2 and 8 failed in this partition of 10 targets.
+        # TODO(John Sirois): Punting here works since we have in practice just 2 partitionings:
+        # 1. All targets in singleton partitions
+        # 2. All targets in 1 partition
+        # If we get to the point where we have multiple partitions with multiple targets, some sort
+        # of summary for the multi-target partitions will probably be needed.
+        pass
+
+    failed_targets = [target
+                      for _rv in results.values() if not _rv.success
+                      for target in _rv.failed_targets]
+    if failed_targets:
+      raise ErrorWhileTesting(failed_targets=failed_targets)
+    elif failure:
+      # A low-level test execution failure occurred before tests were run.
+      raise TaskError()
+
+  @staticmethod
+  def _vts_for_partition(invalidation_check):
+    return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+
+  def check_artifact_cache_for(self, invalidation_check):
+    # We generate artifacts, namely junit.xml and coverage reports, that cover the full target set
+    # whether that is all targets in the context (`--fast`) or each target
+    # individually (`--no-fast`).
+    return [self._vts_for_partition(invalidation_check)]
+
+  # TODO(John Sirois): Its probably worth generalizing a means to mark certain options or target
+  # attributes as making results un-cacheable. See: https://github.com/pantsbuild/pants/issues/4748
+  class NeverCacheFingerprintStrategy(DefaultFingerprintStrategy):
+    def compute_fingerprint(self, target):
+      return uuid.uuid4()
+
+  def _fingerprint_strategy(self):
+    if self.get_options().profile:
+      # A profile is machine-specific and we assume anyone wanting a profile wants to run it here
+      # and now and not accept some old result, even if on the same inputs.
+      return self.NeverCacheFingerprintStrategy()
+    else:
+      return None  # Accept the default fingerprint strategy.
+
+  # Some notes on invalidation vs caching as used in `_do_run_tests` below. Here invalidation
+  # refers to executing task work in `Task.invalidated` blocks against invalid targets. Caching
+  # refers to storing the results of that work in the artifact cache using
+  # `VersionedTargetSet.results_dir`. One further bit of terminology is partition, which is the
+  # name for the set of targets passed to the `Task.invalidated` block:
+  #
+  # + Caching results for len(partition) > 1: This is trivial iff we always run all targets in
+  #   the partition, but running just invalid targets in the partition is a nicer experience (you
+  #   can whittle away at failures in a loop of `::`-style runs). Running just invalid though
+  #   requires being able to merge prior results for the partition; ie: knowing the details of
+  #   junit xml, coverage data, or using tools that do, to merge data files. The alternative is
+  #   to always run all targets in a partition if even 1 target is invalid. In this way data files
+  #   corresponding to the full partition are always generated, and so on a green partition, the
+  #   cached data files will always represent the full green run.
+  #
+  # The compromise taken here is to only cache when `all_vts == invalid_vts`; ie when the partition
+  # goes green and the run was against the full partition. A common scenario would then be:
+  #
+  # 1. Mary makes changes / adds new code and iterates `./pants test tests/python/stuff::`
+  #    gradually getting greener until finally all test targets in the `tests/python/stuff::` set
+  #    pass. She commits the green change, but there is no cached result for it since green state
+  #    for the partition was approached incrementally.
+  # 2. Jake pulls in Mary's green change and runs `./pants test tests/python/stuff::`. There is a
+  #    cache miss and he does a full local run, but since `tests/python/stuff::` is green,
+  #    `all_vts == invalid_vts` and the result is now cached for others.
+  #
+  # In this scenario, Jake will likely be a CI process, in which case human others will see a
+  # cached result from Mary's commit. It's important to note, that the CI process must run the same
+  # partition as the end user for that end user to benefit and hit the cache. This is unlikely since
+  # the only natural partitions under CI are single target ones (`--no-fast` or all targets
+  # `--fast ::`. Its unlikely an end user in a large repo will want to run `--fast ::` since `::`
+  # is probably a much wider swath of code than they're working on. As such, although `--fast`
+  # caching is supported, its unlikely to be effective. Caching is best utilized when CI and users
+  # run `--no-fast`.
+  def _do_run_tests(self, partition):
+    with self.invalidated(partition,
+                          fingerprint_strategy=self._fingerprint_strategy(),
+                          # Re-run tests when the code they test (and depend on) changes.
+                          invalidate_dependents=True) as invalidation_check:
+
+      invalid_tgts = [invalid_tgt
+                      for vts in invalidation_check.invalid_vts
+                      for invalid_tgt in vts.targets]
+
+      # Processing proceeds through:
+      # 1.) output -> workdir
+      # 2.) [iff all == invalid] workdir -> cache: We do this manually for now.
+      # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
+      # 4.) [iff user-specified final locations] workdir -> final-locations: We perform this step
+      #     as an unconditional post-process.
+
+      # 1.) Write all results that will be potentially cached to workdir.
+      workdirs = _Workdirs.for_targets(self.workdir, partition)
+      result = self._run_pytest(workdirs, invalid_tgts).checked()
+
+      cache_vts = self._vts_for_partition(invalidation_check)
+      if invalidation_check.all_vts == invalidation_check.invalid_vts:
+        # 2.) The full partition was invalid, cache results.
+        if result.success and self.artifact_cache_writes_enabled():
+          self.update_artifact_cache([(cache_vts, workdirs.files())])
+      elif not invalidation_check.invalid_vts:
+        # 3.) The full partition was valid, our results will have been staged for/by caching if not
+        # already local.
+        pass
+      else:
+        # The partition was partially invalid.
+
+        # We don't cache results; so others will need to re-run this partition.
+        # NB: We will presumably commit this change now though and so others will get this
+        # partition in a state that executes successfully; so when the 1st of the others
+        # executes against this partition; they will hit `all_vts == invalid_vts` and
+        # cache the results. That 1st of others is hopefully CI!
+        cache_vts.force_invalidate()
+
+      # 4.) Pluck any results that an end user might need to interact with from the workdir to the
+      # locations they expect.
+      self.expose_results(invalid_tgts, partition, workdirs)
+
+      return result
+
+  def expose_results(self, invalid_tgts, partition, workdirs):
+    external_junit_xml_dir = self.get_options().junit_xml_dir
+    if external_junit_xml_dir:
+      # Either we just ran pytest for a set of invalid targets and generated a junit xml file
+      # specific to that (sub)set or else we hit the cache for the whole partition and skipped
+      # running pytest, simply retrieving the partition's full junit xml file.
+      junitxml_path = workdirs.junitxml_path(*(invalid_tgts or partition))
+
+      safe_mkdir(external_junit_xml_dir)
+      shutil.copy2(junitxml_path, external_junit_xml_dir)
+    if self.get_options().coverage:
+      coverage_output_dir = self.get_options().coverage_output_dir
+      if coverage_output_dir:
+        target_dir = coverage_output_dir
+      else:
+        relpath = Target.maybe_readable_identify(partition)
+        pants_distdir = self.context.options.for_global_scope().pants_distdir
+        target_dir = os.path.join(pants_distdir, 'coverage', relpath)
+      mergetree(workdirs.coverage_path, target_dir)
+
+  def _run_pytest(self, workdirs, targets):
     if not targets:
-      return PythonTestResult.rc(0)
+      return PytestResult.rc(0)
 
     buildroot = get_buildroot()
     source_chroot = os.path.relpath(
@@ -506,16 +726,17 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
         sources_map[os.path.join(source_chroot, p)] = os.path.join(t.target_base, p)
 
     if not sources_map:
-      return PythonTestResult.rc(0)
+      return PytestResult.rc(0)
 
-    with self._test_runner(targets, sources_map) as (pex, test_args):
+    with self._test_runner(workdirs, targets, sources_map) as (pex, test_args):
       # Validate that the user didn't provide any passthru args that conflict
       # with those we must set ourselves.
       for arg in self.get_passthru_args():
         if arg.startswith('--junitxml') or arg.startswith('--confcutdir'):
           raise TaskError('Cannot pass this arg through to pytest: {}'.format(arg))
 
-      junitxml_path = self._get_junit_xml_path(targets)
+      junitxml_path = workdirs.junitxml_path(*targets)
+
       # N.B. the `--confcutdir` here instructs pytest to stop scanning for conftest.py files at the
       # top of the buildroot. This prevents conftest.py files from outside (e.g. in users home dirs)
       # from leaking into pants test runs. See: https://github.com/pantsbuild/pants/issues/2726
@@ -532,19 +753,27 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
       args.extend(test_args)
       args.extend(sources_map.keys())
 
+      # We want to ensure our reporting based off junit xml is from this run so kill results from
+      # prior runs.
+      if os.path.exists(junitxml_path):
+        os.unlink(junitxml_path)
+
       result = self._do_run_tests_with_args(pex, args)
-      external_junit_xml_dir = self.get_options().junit_xml_dir
-      if external_junit_xml_dir:
-        safe_mkdir(external_junit_xml_dir)
-        shutil.copy(junitxml_path, external_junit_xml_dir)
+
+      # There was a problem prior to test execution preventing junit xml file creation so just let
+      # the failure result bubble.
+      if not os.path.exists(junitxml_path):
+        return result
+
       failed_targets = self._get_failed_targets_from_junitxml(junitxml_path, targets)
 
       def parse_error_handler(parse_error):
         # Simple error handler to pass to xml parsing function.
         raise TaskError('Error parsing xml file at {}: {}'
-          .format(parse_error.xml_path, parse_error.cause))
+                        .format(parse_error.xml_path, parse_error.cause))
 
-      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler, ['file', 'name'])
+      all_tests_info = self.parse_test_info(junitxml_path, parse_error_handler,
+                                            ['file', 'name', 'classname'])
       for test_name, test_info in all_tests_info.items():
         test_target = self._get_target_from_test(test_info, targets)
         self.report_all_info_for_single_test(self.options_scope, test_target, test_name, test_info)
@@ -553,6 +782,7 @@ class PytestRun(TestRunnerTaskMixin, PythonExecutionTaskBase):
 
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
+                                   cmd=pex.cmdline(args),
                                    labels=[WorkUnitLabel.TOOL, WorkUnitLabel.TEST]) as workunit:
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()

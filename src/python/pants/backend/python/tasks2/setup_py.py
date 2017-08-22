@@ -47,9 +47,27 @@ setup(**
 
 
 class SetupPyRunner(InstallerBase):
+  _EXTRAS = ('setuptools', 'wheel')
+
   def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command.split()
     super(SetupPyRunner, self).__init__(source_dir, **kw)
+
+  def mixins(self):
+    mixins = super(SetupPyRunner, self).mixins().copy()
+    extras = set(self._EXTRAS)
+    for (key, version) in self._interpreter.extras:
+      if key in extras:
+        mixins[key] = '{}=={}'.format(key, version)
+        extras.remove(key)
+        if not extras:
+          break
+    else:
+      # We know Pants sets up python interpreters with setuptools and wheel via the `PythonSetup`
+      # subsystem; so this should never happen
+      raise AssertionError("Expected interpreter {} to have the extras {}"
+                           .format(self._interpreter, self._EXTRAS))
+    return mixins
 
   def _setup_command(self):
     return self.__setup_command
@@ -456,9 +474,6 @@ class SetupPy(Task):
           chroot.copy(os.path.join(target.target_base, src, '__init__.py'),
                       os.path.join(self.SOURCE_ROOT, src, '__init__.py'))
 
-    def write_codegen_source(relpath, abspath):
-      chroot.copy(abspath, os.path.join(self.SOURCE_ROOT, relpath))
-
     def write_target(target):
       for rel_source in target.sources_relative_to_buildroot():
         abs_source_path = os.path.join(get_buildroot(), rel_source)
@@ -472,6 +487,9 @@ class SetupPy(Task):
         write_target(dependency)
       elif self.is_resources_target(dependency):
         write_target(dependency)
+
+  def _setup_boilerplate(self):
+    return SETUP_BOILERPLATE
 
   def write_setup(self, root_target, reduced_dependencies, chroot):
     """Write the setup.py of a target.
@@ -537,7 +555,7 @@ class SetupPy(Task):
     # >>>
     #
     # For more information, see http://bugs.python.org/issue13943
-    chroot.write(SETUP_BOILERPLATE.format(
+    chroot.write(self._setup_boilerplate().format(
       setup_dict=pprint.pformat(convert(setup_keywords), indent=4),
       setup_target=repr(root_target)
     ), 'setup.py')
@@ -601,7 +619,7 @@ class SetupPy(Task):
       create(target)
 
     interpreter = self.context.products.get_data(PythonInterpreter)
-    python_dists = self.context.products.get_data(self.PYTHON_DISTS_PRODUCT, lambda: {})
+    python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})
     for target in reversed(sort_targets(created.keys())):
       setup_dir = created.get(target)
       if setup_dir:

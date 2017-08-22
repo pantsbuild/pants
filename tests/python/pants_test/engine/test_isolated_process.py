@@ -9,8 +9,7 @@ import os
 import tarfile
 import unittest
 
-from pants.engine.engine import LocalSerialEngine
-from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import SingletonRule
@@ -119,9 +118,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    LocalSerialEngine(scheduler).reduce(request)
 
-    root_entries = scheduler.root_entries(request).items()
+    root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     concatted = state.value
@@ -144,9 +142,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     request = scheduler.execution_request(
       [ClasspathEntry],
       [sources])
-    LocalSerialEngine(scheduler).reduce(request)
+    root_entries = scheduler.execute(request).root_products
 
-    root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     classpath_entry = state.value
@@ -166,9 +163,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    LocalSerialEngine(scheduler).reduce(request)
+    root_entries = scheduler.execute(request).root_products
 
-    root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Running ShellFailCommand failed with non-zero exit code: 1')
@@ -186,9 +182,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     request = scheduler.execution_request([Concatted],
                                           [PathGlobs.create('', include=['fs_test/a/b/*'])])
-    LocalSerialEngine(scheduler).reduce(request)
+    root_entries = scheduler.execute(request).root_products
 
-    root_entries = scheduler.root_entries(request).items()
     self.assertEquals(1, len(root_entries))
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Failed in output conversion!')
@@ -213,7 +208,8 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    return self.mk_scheduler(tasks=rules, project_tree=self.mk_example_fs_tree())
+    rules = list(rules) + create_fs_rules()
+    return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())
 
   def assertReturn(self, state, scheduler):
     is_return = isinstance(state, Return)

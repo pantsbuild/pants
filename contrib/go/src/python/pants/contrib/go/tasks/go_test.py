@@ -26,6 +26,7 @@ class GoTest(GoWorkspaceTask):
   def register_options(cls, register):
     super(GoTest, cls).register_options(register)
     register('--build-and-test-flags', default='',
+             fingerprint=True,
              help='Flags to pass in to `go test` tool.')
 
   @classmethod

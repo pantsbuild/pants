@@ -213,5 +213,5 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         self.assertTrue("Compiling" in third_run.stdout_data)
 
 
-class JavaCompileIntegrationTestWithoutZjar(JavaCompileIntegrationTest):
-  _EXTRA_TASK_ARGS = ['--no-compile-zinc-use-classpath-jars']
+class JavaCompileIntegrationTestWithZjar(JavaCompileIntegrationTest):
+  _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']

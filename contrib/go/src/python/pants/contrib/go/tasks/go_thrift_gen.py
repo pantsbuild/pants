@@ -11,11 +11,13 @@ import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.thrift_binary import ThriftBinary
+from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_method, memoized_property
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.go.targets.go_thrift_library import GoThriftGenLibrary, GoThriftLibrary
@@ -31,10 +33,14 @@ class GoThriftGen(SimpleCodegenTask):
              help='Run thrift compiler with strict warnings.')
     register('--gen-options', advanced=True, fingerprint=True,
             help='Use these apache thrift go gen options.')
-    register('--thrift-import', advanced=True,
+    register('--thrift-import', type=str, advanced=True, fingerprint=True,
              help='Use this thrift-import gen option to thrift.')
-    register('--thrift-import-target', advanced=True,
+    register('--thrift-import-target', type=target_option, advanced=True,
              help='Use this thrift import on symbolic defs.')
+    register('--multiple-files-per-target-override', advanced=True, fingerprint=True,
+             help='If set, multiple thrift files will be allowed per target, regardless of '
+                  'thrift version. Otherwise, only versions greater than 0.10.0 will be assumed to '
+                  'support multiple files.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -42,8 +48,7 @@ class GoThriftGen(SimpleCodegenTask):
 
   @memoized_property
   def _thrift_binary(self):
-    thrift_binary = ThriftBinary.Factory.scoped_instance(self).create()
-    return thrift_binary.path
+    return ThriftBinary.Factory.scoped_instance(self).create()
 
   @memoized_property
   def _deps(self):
@@ -82,9 +87,23 @@ class GoThriftGen(SimpleCodegenTask):
   def is_gentarget(self, target):
     return isinstance(target, GoThriftLibrary)
 
+  @memoized_method
+  def _validate_supports_more_than_one_source(self):
+    # Support for doing the right thing with multiple files landed in
+    # https://issues.apache.org/jira/browse/THRIFT-3776; first available in 0.10.0
+    if self.get_options().multiple_files_per_target_override:
+      return
+    actual_revision = Revision.semver(self._thrift_binary.version)
+    required_version = '0.10.0'
+    if Revision.semver(required_version) <= actual_revision:
+      return
+    raise TaskError('A single .thrift source file is supported per go_thrift_library with thrift '
+                    'version `{}`: upgrade to at least `{}` to support multiple files.'.format(
+                      self._thrift_binary.version, required_version))
+
   @memoized_property
   def _thrift_cmd(self):
-    cmd = [self._thrift_binary]
+    cmd = [self._thrift_binary.path]
     thrift_import = 'thrift_import={}'.format(self.get_options().thrift_import)
     gen_options = self.get_options().gen_options
     if gen_options:
@@ -110,18 +129,18 @@ class GoThriftGen(SimpleCodegenTask):
 
     all_sources = list(target.sources_relative_to_buildroot())
     if len(all_sources) != 1:
-      raise TaskError('go_thrift_library only supports a single .thrift source file for {}.', target)
+      self._validate_supports_more_than_one_source()
 
-    source = all_sources[0]
-    target_cmd.append(os.path.join(get_buildroot(), source))
-    with self.context.new_workunit(name=source,
-                                   labels=[WorkUnitLabel.TOOL],
-                                   cmd=' '.join(target_cmd)) as workunit:
-      result = subprocess.call(target_cmd,
-                               stdout=workunit.output('stdout'),
-                              stderr=workunit.output('stderr'))
-      if result != 0:
-        raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
+    for source in all_sources:
+      file_cmd = target_cmd + [os.path.join(get_buildroot(), source)]
+      with self.context.new_workunit(name=source,
+                                     labels=[WorkUnitLabel.TOOL],
+                                     cmd=' '.join(file_cmd)) as workunit:
+        result = subprocess.call(file_cmd,
+                                 stdout=workunit.output('stdout'),
+                                 stderr=workunit.output('stderr'))
+        if result != 0:
+          raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary.path, result))
 
     gen_dir = os.path.join(target_workdir, 'gen-go')
     src_dir = os.path.join(target_workdir, 'src')

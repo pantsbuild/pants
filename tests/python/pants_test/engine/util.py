@@ -7,26 +7,29 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
+from pants.binaries.binary_util import BinaryUtil
 from pants.engine.addressable import SubclassesOf, addressable_list
+from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import RuleIndex
 from pants.engine.scheduler import WrappedNativeScheduler
 from pants.engine.struct import HasProducts, Struct
-from pants.engine.subsystem.native import Native
+from pants_test.option.util.fakes import create_options_for_optionables
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
 def init_native():
-  """Initialize and return the `Native` subsystem."""
-  init_subsystem(Native.Factory)
-  return Native.Factory.global_instance().create()
+  """Initialize and return a `Native` instance."""
+  init_subsystem(BinaryUtil.Factory)
+  opts = create_options_for_optionables([])
+  return Native.create(opts.for_global_scope())
 
 
-def create_native_scheduler(root_subject_types, rules):
+def create_native_scheduler(rules):
   """Create a WrappedNativeScheduler, with an initialized native instance."""
   rule_index = RuleIndex.create(rules)
   native = init_native()
-  scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index, root_subject_types)
+  scheduler = WrappedNativeScheduler(native, '.', './.pants.d', [], rule_index)
   return scheduler
 
 

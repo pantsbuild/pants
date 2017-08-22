@@ -23,7 +23,7 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
-from pants.util.dirutil import safe_rm_oldest_items_in_dir
+from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass
 
@@ -86,7 +86,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),)
+    return super(TaskBase, cls).subsystem_dependencies() + (CacheSetup.scoped(cls),
+                                                            BuildInvalidator.Factory)
 
   @classmethod
   def product_types(cls):
@@ -175,15 +176,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._workdir = workdir
 
     self._cache_key_errors = set()
-
-    self._build_invalidator_dir = os.path.join(
-      self.context.options.for_global_scope().pants_workdir,
-      'build_invalidator',
-      self.stable_name())
-
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
-
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
+    self._force_invalidated = False
+
+  @memoized_method
+  def _build_invalidator(self, root=False):
+    build_task = None if root else self.stable_name()
+    return BuildInvalidator.Factory.create(build_task=build_task)
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -201,19 +201,23 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
 
-  @property
+  @memoized_property
   def workdir(self):
     """A scratch-space for this task that will be deleted by `clean-all`.
 
-    It's not guaranteed that the workdir exists, just that no other task has been given this
-    workdir path to use.
+    It's guaranteed that no other task has been given this workdir path to use and that the workdir
+    exists.
 
     :API: public
     """
+    safe_mkdir(self._workdir)
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+    pairs = self.context.options.get_fingerprintable_for_scope(
+      scope,
+      include_passthru=self.supports_passthru_args()
+    )
     hasher = sha1()
     for (option_type, option_val) in pairs:
       fp = self._options_fingerprinter.fingerprint(option_type, option_val)
@@ -247,7 +251,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   def invalidate(self):
     """Invalidates all targets for this task."""
-    BuildInvalidator(self._build_invalidator_dir).force_invalidate_all()
+    self._build_invalidator().force_invalidate_all()
 
   @property
   def create_target_dirs(self):
@@ -332,13 +336,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       self.fingerprint)
     cache_manager = InvalidationCacheManager(self.workdir,
                                              cache_key_generator,
-                                             self._build_invalidator_dir,
+                                             self._build_invalidator(),
                                              invalidate_dependents,
                                              fingerprint_strategy=fingerprint_strategy,
                                              invalidation_report=self.context.invalidation_report,
                                              task_name=type(self).__name__,
                                              task_version=self.implementation_version_str(),
                                              artifact_write_callback=self.maybe_write_artifact)
+
+    # If this Task's execution has been forced, invalidate all our target fingerprints.
+    if self._cache_factory.ignore and not self._force_invalidated:
+      self.invalidate()
+      self._force_invalidated = True
 
     invalidation_check = cache_manager.check(targets, topological_order=topological_order)
 
@@ -384,9 +393,25 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     # Cache has been checked to create the full list of invalid VTs.
     # Only copy previous_results for this subset of VTs.
+    if self.incremental:
+      for vts in invalidation_check.invalid_vts:
+        vts.copy_previous_results()
+
+    # This may seem odd: why would we need to invalidate a VersionedTargetSet that is already
+    # invalid?  But the name force_invalidate() is slightly misleading in this context - what it
+    # actually does is delete the key file created at the end of the last successful task run.
+    # This is necessary to avoid the following scenario:
+    #
+    # 1) In state A: Task suceeds and writes some output.  Key is recorded by the invalidator.
+    # 2) In state B: Task fails, but writes some output.  Key is not recorded.
+    # 3) After reverting back to state A: The current key is the same as the one recorded at the
+    #    end of step 1), so it looks like no work needs to be done, but actually the task
+    #   must re-run, to overwrite the output written in step 2.
+    #
+    # Deleting the file ensures that if a task fails, there is no key for which we might think
+    # we're in a valid state.
     for vts in invalidation_check.invalid_vts:
-      if self.incremental:
-        vts.copy_previous_results(self.workdir)
+      vts.force_invalidate()
 
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check

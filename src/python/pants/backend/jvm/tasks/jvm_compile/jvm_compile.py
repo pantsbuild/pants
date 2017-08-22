@@ -40,6 +40,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target_scopes import Scopes
 from pants.goal.products import MultipleRootedProducts
 from pants.reporting.reporting_utils import items_to_report_element
+from pants.util.contextutil import Timer
 from pants.util.dirutil import (fast_relpath, read_file, safe_delete, safe_mkdir, safe_rmtree,
                                 safe_walk)
 from pants.util.fileutil import create_size_estimators
@@ -193,12 +194,9 @@ class JvmCompile(NailgunTaskBase):
              help='List of regular expression patterns that extract class not found '
                   'compile errors.')
 
-    register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True, default=True,
-             removal_hint='Since zinc 1.0.0-X was incorporated using classpath jars is faster '
-                          'for all usecases, including incremental compile. It is now enabled '
-                          'by default.',
-             removal_version='1.5.0.dev0',
-             help='Use jar files on the compile_classpath.')
+    register('--use-classpath-jars', advanced=True, type=bool, fingerprint=True,
+             help='Use jar files on the compile_classpath. Note: Using this option degrades '
+                  'incremental compile between targets.')
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -553,21 +551,23 @@ class JvmCompile(NailgunTaskBase):
       with open(path, 'w') as f:
         f.write(text.encode('utf-8'))
 
-  def _compile_vts(self, vts, ctx, upstream_analysis, classpath,
-                   log_file, progress_message, settings, fatal_warnings,
+  def _compile_vts(self, vts, target, sources, analysis_file, upstream_analysis, classpath, outdir,
+                   log_file, zinc_args_file, progress_message, settings, fatal_warnings,
                    zinc_file_manager, counter):
     """Compiles sources for the given vts into the given output dir.
 
     vts - versioned target set
-    ctx - CompileContext for the target
+    sources - sources for this target set
+    analysis_file - the analysis file to manipulate
     classpath - a list of classpath entries
+    outdir - the output dir to send classes to
 
     May be invoked concurrently on independent target sets.
 
     Postcondition: The individual targets in vts are up-to-date, as if each were
                    compiled individually.
     """
-    if not ctx.sources:
+    if not sources:
       self.context.log.warn('Skipping {} compile for targets with no sources:\n  {}'
                             .format(self.name(), vts.targets))
     else:
@@ -577,30 +577,26 @@ class JvmCompile(NailgunTaskBase):
       self.context.log.info(
         counter_str,
         'Compiling ',
-        items_to_report_element(ctx.sources, '{} source'.format(self.name())),
+        items_to_report_element(sources, '{} source'.format(self.name())),
         ' in ',
         items_to_report_element([t.address.reference() for t in vts.targets], 'target'),
         ' (',
         progress_message,
         ').')
       with self.context.new_workunit('compile', labels=[WorkUnitLabel.COMPILER]) as compile_workunit:
-        # The compiler may delete classfiles, then later exit on a compilation error. Then if the
-        # change triggering the error is reverted, we won't rebuild to restore the missing
-        # classfiles. So we force-invalidate here, to be on the safe side.
-        vts.force_invalidate()
         if self.get_options().capture_classpath:
-          self._record_compile_classpath(classpath, vts.targets, ctx.classes_dir)
+          self._record_compile_classpath(classpath, vts.targets, outdir)
 
         try:
-          self.compile(self._args, classpath, ctx, upstream_analysis,
-                       log_file, settings, fatal_warnings, zinc_file_manager,
-                       self._get_plugin_map('javac', ctx.target),
-                       self._get_plugin_map('scalac', ctx.target))
+          self.compile(self._args, classpath, sources, outdir, upstream_analysis, analysis_file,
+                       log_file, zinc_args_file, settings, fatal_warnings, zinc_file_manager,
+                       self._get_plugin_map('javac', target),
+                       self._get_plugin_map('scalac', target))
         except TaskError:
           if self.get_options().suggest_missing_deps:
             logs = self._find_failed_compile_logs(compile_workunit)
             if logs:
-              self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), ctx.target)
+              self._find_missing_deps('\n'.join([read_file(log).decode('utf-8') for log in logs]), target)
           raise
 
   def _get_plugin_map(self, compiler, target):
@@ -788,10 +784,14 @@ class JvmCompile(NailgunTaskBase):
         for classname, candidates in missing_dep_suggestions.items():
           suggested_deps.add(list(candidates)[0])
           self.context.log.info('  {}: {}'.format(classname, ', '.join(candidates)))
+
+        # We format the suggested deps with single quotes and commas so that
+        # they can be easily cut/pasted into a BUILD file.
+        formatted_suggested_deps = ["'%s'," % dep for dep in suggested_deps]
         suggestion_msg = (
           '\nIf the above information is correct, '
           'please add the following to the dependencies of ({}):\n  {}\n'
-            .format(target.address.spec, '\n  '.join(sorted(list(suggested_deps))))
+            .format(target.address.spec, '\n  '.join(sorted(list(formatted_suggested_deps))))
         )
         self.context.log.info(suggestion_msg)
 
@@ -882,7 +882,8 @@ class JvmCompile(NailgunTaskBase):
                                                           self._confs))
         upstream_analysis = dict(self._upstream_analysis(compile_contexts, cp_entries))
 
-        if not should_compile_incrementally(vts, ctx):
+        is_incremental = should_compile_incrementally(vts, ctx)
+        if not is_incremental:
           # Purge existing analysis file in non-incremental mode.
           safe_delete(ctx.analysis_file)
           # Work around https://github.com/pantsbuild/pants/issues/3670
@@ -891,16 +892,26 @@ class JvmCompile(NailgunTaskBase):
         tgt, = vts.targets
         fatal_warnings = self._compute_language_property(tgt, lambda x: x.fatal_warnings)
         zinc_file_manager = self._compute_language_property(tgt, lambda x: x.zinc_file_manager)
-        self._compile_vts(vts,
-                          ctx,
-                          upstream_analysis,
-                          cp_entries,
-                          log_file,
-                          progress_message,
-                          tgt.platform,
-                          fatal_warnings,
-                          zinc_file_manager,
-                          counter)
+        with Timer() as timer:
+          self._compile_vts(vts,
+                            ctx.target,
+                            ctx.sources,
+                            ctx.analysis_file,
+                            upstream_analysis,
+                            cp_entries,
+                            ctx.classes_dir,
+                            log_file,
+                            ctx.zinc_args_file,
+                            progress_message,
+                            tgt.platform,
+                            fatal_warnings,
+                            zinc_file_manager,
+                            counter)
+        self._record_target_stats(tgt,
+                                  len(cp_entries),
+                                  len(ctx.sources),
+                                  timer.elapsed,
+                                  is_incremental)
         self._analysis_tools.relativize(ctx.analysis_file, ctx.portable_analysis_file)
 
         # Write any additional resources for this target to the target workdir.
@@ -934,6 +945,14 @@ class JvmCompile(NailgunTaskBase):
                       on_success=ivts.update,
                       on_failure=ivts.force_invalidate))
     return jobs
+
+  def _record_target_stats(self, target, classpath_len, sources_len, compiletime, is_incremental):
+    def record(k, v):
+      self.context.run_tracker.report_target_info(self.options_scope, target, ['compile', k], v)
+    record('time', compiletime)
+    record('classpath_len', classpath_len)
+    record('sources_len', sources_len)
+    record('incremental', is_incremental)
 
   def _collect_invalid_compile_dependencies(self, compile_target, invalid_target_set):
     # Collects all invalid dependencies that are not dependencies of other invalid dependencies

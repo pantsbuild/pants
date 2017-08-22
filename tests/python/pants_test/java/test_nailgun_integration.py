@@ -20,7 +20,7 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
         'import org.pantsbuild.example.hello.welcome.WelcomeEverybody\n'
         'println(WelcomeEverybody("World" :: Nil).head)\n'
       ),
-      # Override the PANTS_CONFIG_OVERRIDE="['pants.travis-ci.ini']" used within TravisCI to enable
+      # Override the PANTS_CONFIG_FILES="pants.travis-ci.ini" used within TravisCI to enable
       # nailgun usage for the purpose of exercising that stack in the integration test.
       config={'DEFAULT': {'use_nailgun': True}}
     )

@@ -30,7 +30,6 @@ class SchedulerService(PantsService):
     self._fs_event_service = fs_event_service
     self._graph_helper = legacy_graph_helper
     self._scheduler = legacy_graph_helper.scheduler
-    self._engine = legacy_graph_helper.engine
 
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)

@@ -37,7 +37,8 @@ class IndexJava(NailgunTask):
   def register_options(cls, register):
     super(IndexJava, cls).register_options(register)
     register('--force', type=bool, fingerprint=True,
-             help='Re-index all targets, even if they are valid.')
+             help='Re-index all targets, even if they are valid.',
+             removal_version='1.6.0.dev0', removal_hint='Use --cache-ignore instead.')
     cls.register_jvm_tool(register,
                           'kythe-indexer',
                           main=cls._KYTHE_INDEXER_MAIN)
@@ -50,6 +51,8 @@ class IndexJava(NailgunTask):
 
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
       kindex_files = self.context.products.get_data('kindex_files')
+      # TODO(John Sirois): `vts_to_index` should be inlined to `invalidation_check.invalid_vts`
+      # when the deprecation cycle for `--force` is completed.
       vts_to_index = (invalidation_check.all_vts if self.get_options().force
                       else invalidation_check.invalid_vts)
 

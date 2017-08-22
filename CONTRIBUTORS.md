@@ -33,6 +33,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Derek Young
 + Divij Rajkumar
 + Dominic Hamon
++ Dorothy Ordogh
 + Drew Rothstein
 + Dumitru Daniliuc
 + Ebube Chuba
@@ -47,6 +48,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
++ Gary M. Josack
 + Harley Cooper
 + Hwasung Lee
 + Igor Morozov
@@ -56,6 +58,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jackson Davis
 + Jake Donham
 + James Bench
++ James Koch
 + James Mouradian
 + Jason Jackson
 + Jason Song
@@ -117,6 +120,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Nitay Joffe
 + Ny Saechao
 + Oliver Gould
++ Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas
 + Peiyu Wang

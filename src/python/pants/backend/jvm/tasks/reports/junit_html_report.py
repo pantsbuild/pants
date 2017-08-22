@@ -8,10 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import glob
 import os
 import xml.etree.ElementTree as ET
+from abc import abstractmethod
 from functools import total_ordering
 
 from pants.base.mustache import MustacheRenderer
-from pants.util.dirutil import safe_mkdir
+from pants.util import desktop
+from pants.util.dirutil import safe_mkdir_for
 from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_binary
 
@@ -40,7 +42,8 @@ class ReportTestSuite(object):
   @staticmethod
   def success_rate(test_count, error_count, failure_count, skipped_count):
     if test_count:
-      return '{:.2f}%'.format((test_count - (error_count + failure_count + skipped_count)) * 100.0 / test_count)
+      unsuccessful_count = error_count + failure_count + skipped_count
+      return '{:.2f}%'.format((test_count - unsuccessful_count) * 100.0 / test_count)
     return '0.00%'
 
   @staticmethod
@@ -56,8 +59,10 @@ class ReportTestSuite(object):
 
   def as_dict(self):
     d = self.__dict__
-    d['success'] = ReportTestSuite.success_rate(self.tests, self.errors, self.failures, self.skipped)
-    d['icon_class'] = ReportTestSuite.icon_class(self.tests, self.errors, self.failures, self.skipped)
+    d['success'] = ReportTestSuite.success_rate(self.tests, self.errors, self.failures,
+                                                self.skipped)
+    d['icon_class'] = ReportTestSuite.icon_class(self.tests, self.errors, self.failures,
+                                                 self.skipped)
     d['testcases'] = map(lambda tc: tc.as_dict(), self.testcases)
     return d
 
@@ -83,10 +88,11 @@ class ReportTestCase(object):
     return icon_class
 
   def as_dict(self):
-    d = {}
-    d['name'] = self.name
-    d['time'] = self.time
-    d['icon_class'] = self.icon_class()
+    d = {
+      'name': self.name,
+      'time': self.time,
+      'icon_class': self.icon_class()
+    }
     if self.error:
       d['message'] = self.error['message']
     elif self.failure:
@@ -94,25 +100,62 @@ class ReportTestCase(object):
     return d
 
 
-class JUnitHtmlReport(AbstractClass):
+class JUnitHtmlReportInterface(AbstractClass):
+  """The interface JUnit html reporters must support."""
+
+  @abstractmethod
+  def report(self):
+    """Generate the junit test result report and return its path."""
+
+  @abstractmethod
+  def maybe_open_report(self):
+    """Open the junit test result report if requested by the end user."""
+
+
+class NoJunitHtmlReport(JUnitHtmlReportInterface):
+  """JUnit html reporter that never produces a report."""
+
+  def report(self):
+    return None
+
+  def maybe_open_report(self):
+    pass
+
+
+class JUnitHtmlReport(JUnitHtmlReportInterface):
   """Generates an HTML report from JUnit TEST-*.xml files"""
 
-  def report(self, xml_dir, report_dir):
-    testsuites = self.parse_xml_files(xml_dir)
-    safe_mkdir(report_dir)
-    report_file_path = os.path.join(report_dir, 'junit-report.html')
-    with open(report_file_path, 'w') as fp:
-      fp.write(ensure_binary(self.generate_html(testsuites)))
-    return report_file_path
+  @classmethod
+  def create(cls, xml_dir, logger):
+    return cls(xml_dir=xml_dir, report_dir=os.path.join(xml_dir, 'reports'), logger=logger)
 
-  def parse_xml_files(self, xml_dir):
+  def __init__(self, xml_dir, report_dir, logger):
+    self._xml_dir = xml_dir
+    self._report_file_path = os.path.join(report_dir, 'junit-report.html')
+    self._logger = logger
+
+  def report(self):
+    self._logger.debug('Generating JUnit HTML report...')
+    testsuites = self._parse_xml_files(self._xml_dir)
+    safe_mkdir_for(self._report_file_path)
+    with open(self._report_file_path, 'wb') as fp:
+      fp.write(ensure_binary(self._generate_html(testsuites)))
+    self._logger.debug('JUnit HTML report generated to {}'.format(self._report_file_path))
+    return self._report_file_path
+
+  def maybe_open_report(self):
+    desktop.ui_open(self._report_file_path)
+
+  @classmethod
+  def _parse_xml_files(cls, xml_dir):
     testsuites = []
     for xml_file in glob.glob(os.path.join(xml_dir, 'TEST-*.xml')):
-      testsuites += self.parse_xml_file(xml_file)
+      testsuites += cls._parse_xml_file(xml_file)
     testsuites.sort()
     return testsuites
 
-  def parse_xml_file(self, xml_file):
+  @staticmethod
+  def _parse_xml_file(xml_file):
     testsuites = []
     root = ET.parse(xml_file).getroot()
 
@@ -154,7 +197,8 @@ class JUnitHtmlReport(AbstractClass):
       ))
     return testsuites
 
-  def generate_html(self, testsuites):
+  @staticmethod
+  def _generate_html(testsuites):
     values = {
       'total_tests': 0,
       'total_errors': 0,

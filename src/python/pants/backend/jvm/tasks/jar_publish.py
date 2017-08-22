@@ -367,7 +367,6 @@ class JarPublish(ScmPublishMixin, JarTask):
 
     self._jvm_options = self.get_options().jvm_options
 
-    self.scm = get_scm()
     self.log = self.context.log
 
     if self.get_options().local:
@@ -400,6 +399,8 @@ class JarPublish(ScmPublishMixin, JarTask):
       self.push_postscript = self.get_options().push_postscript or ''
       self.local_snapshot = False
 
+    self.scm = get_scm() if self.commit else None
+
     self.named_snapshot = self.get_options().named_snapshot
     if self.named_snapshot:
       self.named_snapshot = Namedver.parse(self.named_snapshot)
@@ -407,7 +408,7 @@ class JarPublish(ScmPublishMixin, JarTask):
     self.dryrun = self.get_options().dryrun
     self.transitive = self.get_options().transitive
     self.force = self.get_options().force
-    self.publish_changelog = self.get_options().changelog
+    self.publish_changelog = self.get_options().changelog and self.scm
 
     def parse_jarcoordinate(coordinate):
       components = coordinate.split('#', 1)
@@ -674,7 +675,7 @@ class JarPublish(ScmPublishMixin, JarTask):
       for (org, name), rev in self.overrides.items():
         print('{0}={1}'.format(coordinate(org, name), rev))
 
-    head_sha = self.scm.commit_id
+    head_sha = self.scm.commit_id if self.scm else None
 
     safe_rmtree(self.workdir)
     published = []

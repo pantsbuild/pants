@@ -10,6 +10,7 @@ import json
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
@@ -26,7 +27,7 @@ class ExplainOptionsTask(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(ExplainOptionsTask, cls).register_options(register)
-    register('--scope', help='Only show options in this scope.')
+    register('--scope', help='Only show options in this scope. Use GLOBAL for global scope.')
     register('--name', help='Only show options with this name.')
     register('--rank', choices=RankedValue.get_names(),
              help='Only show options with at least this importance.')
@@ -41,7 +42,8 @@ class ExplainOptionsTask(ConsoleTask):
 
   def _scope_filter(self, scope):
     pattern = self.get_options().scope
-    return not pattern or scope.startswith(pattern)
+    return (not pattern or scope.startswith(pattern) or
+            (pattern == 'GLOBAL' and scope == GLOBAL_SCOPE))
 
   def _option_filter(self, option):
     pattern = self.get_options().name
@@ -80,18 +82,18 @@ class ExplainOptionsTask(ConsoleTask):
     )
 
   def _format_record(self, record):
-    value_color = green if self.get_options().colors else lambda x: x
-    rank_color = self._rank_color(record.rank)
-    simple_value = str(record.value)
-    formatted_value = value_color(simple_value)
     simple_rank = RankedValue.get_rank_name(record.rank)
-    formatted_rank = '(from {rank}{details})'.format(
-      rank=simple_rank,
-      details=rank_color(' {}'.format(record.details)) if record.details else '',
-    )
     if self.is_json():
-      return simple_value.replace('\n', ''), simple_rank
+      return record.value, simple_rank
     elif self.is_text():
+      simple_value = str(record.value)
+      value_color = green if self.get_options().colors else lambda x: x
+      formatted_value = value_color(simple_value)
+      rank_color = self._rank_color(record.rank)
+      formatted_rank = '(from {rank}{details})'.format(
+        rank=simple_rank,
+        details=rank_color(' {}'.format(record.details)) if record.details else '',
+      )
       return '{value} {rank}'.format(
         value=formatted_value,
         rank=formatted_rank,
@@ -148,9 +150,16 @@ class ExplainOptionsTask(ConsoleTask):
           if parent_scope is not None and parent_value == history.latest.value:
             continue
         if self.is_json():
-          opt_vals = self._format_record(history.latest)
+          value, rank_name = self._format_record(history.latest)
           scope_key = self._format_scope(scope, option, True)
-          inner_map = dict(value=opt_vals[0], source=opt_vals[1])
+          # We rely on the fact that option values are restricted to a set of types compatible with
+          # json. In particular, we expect dict, list, str, bool, int and float, and so do no
+          # processing here.
+          # TODO(John Sirois): The option parsing system currently lets options of unexpected types
+          # slide by, which can lead to un-overridable values and which would also blow up below in
+          # json encoding, fix options to restrict the allowed `type`s:
+          #   https://github.com/pantsbuild/pants/issues/4695
+          inner_map = dict(value=value, source=rank_name)
           output_map[scope_key] = inner_map
         elif self.is_text():
           yield '{} = {}'.format(self._format_scope(scope, option),

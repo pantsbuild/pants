@@ -28,6 +28,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.thrift_builder import PythonThriftBuilder
 from pants.base.build_environment import get_buildroot
+from pants.build_graph.files import Files
 from pants.build_graph.prep_command import PrepCommand
 from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
@@ -40,6 +41,7 @@ logger = logging.getLogger(__name__)
 
 class PythonChroot(object):
   _VALID_DEPENDENCIES = {
+    Files: 'files',
     PrepCommand: 'prep',
     PythonLibrary: 'libraries',
     PythonRequirementLibrary: 'reqs',

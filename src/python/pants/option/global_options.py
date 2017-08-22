@@ -9,9 +9,12 @@ import logging
 import os
 import sys
 
+import pkg_resources
+
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 
@@ -96,12 +99,11 @@ class GlobalOptionsRegistrar(Optionable):
                   'subprocesses that outlive the workdir data (e.g. `./pants server`).')
     register('--pants-config-files', advanced=True, type=list,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
-    # TODO: Deprecate --config-override in favor of --pants-config-files.
-    # But only once we're able to both append and override list-valued options, as there are
-    # use-cases for both here.
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
     register('--config-override', advanced=True, type=list, metavar='<path>',
+             removal_version='1.6.0.dev0',
+             removal_hint='Use --pants-config-files=<second config file path> instead.',
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, type=bool, default=True,
              help='Use pantsrc files.')
@@ -131,6 +133,17 @@ class GlobalOptionsRegistrar(Optionable):
     # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
     register('--enable-v2-engine', advanced=True, type=bool, default=True,
              help='Enables use of the v2 engine.')
+
+    # These facilitate configuring the native engine.
+    register('--native-engine-version', advanced=True,
+             default=pkg_resources.resource_string('pants.engine', 'native_engine_version').strip(),
+             help='Native engine version.')
+    register('--native-engine-supportdir', advanced=True, default='bin/native-engine',
+             help='Find native engine binaries under this dir. Used as part of the path to '
+                  'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+    register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option,
+             help='A directory to write execution and rule graphs to as `dot` files. The contents '
+                  'of the directory will be overwritten if any filenames collide.')
 
   @classmethod
   def register_options(cls, register):

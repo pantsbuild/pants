@@ -47,6 +47,7 @@ python_library(
   sources = ['pants_daemon.py'],
   dependencies = [
     '3rdparty/python:setproctitle',
+    'src/python/pants/base:exiter',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/logging',
     ':process_manager',

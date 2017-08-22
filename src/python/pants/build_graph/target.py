@@ -164,9 +164,12 @@ class Target(AbstractTarget):
                help='Map of target name to a list of keyword arguments that should be ignored if a '
                     'target receives them unexpectedly. Typically used to allow usage of arguments '
                     'in BUILD files that are not yet available in the current version of pants.')
-      register('--implicit-sources', advanced=True, type=bool,
+      register('--implicit-sources', advanced=True, default=True, type=bool,
+               removal_version='1.6.0.dev0',
+               removal_hint='Implicit sources are now the default.',
                help='If True, Pants will infer the value of the sources argument for certain '
-                    'target types, if they do not have explicit sources specified.')
+                    'target types, if they do not have explicit sources specified. '
+                    'See http://www.pantsbuild.org/build_files.html#target-definitions')
 
     @classmethod
     def check(cls, target, kwargs):
@@ -532,29 +535,35 @@ class Target(AbstractTarget):
       dependee.mark_transitive_invalidation_hash_dirty()
     self._build_graph.walk_transitive_dependee_graph([self.address], work=invalidate_dependee)
 
-  @property
+  @memoized_property
   def _sources_field(self):
     sources_field = self.payload.get_field('sources')
     if sources_field is not None:
       return sources_field
     return SourcesField(sources=FilesetWithSpec.empty(self.address.spec_path))
 
-  def has_sources(self, extension=''):
-    """
+  def has_sources(self, extension=None):
+    """Return `True` if this target owns sources; optionally of the given `extension`.
+
     :API: public
 
-    :param string extension: suffix of filenames to test for
-    :return: True if the target contains sources that match the optional extension suffix
+    :param string extension: Optional suffix of filenames to test for.
+    :return: `True` if the target contains sources that match the optional extension suffix.
     :rtype: bool
     """
-    return self._sources_field.has_sources(extension)
+    source_paths = self._sources_field.source_paths
+    if not source_paths:
+      return False
+    if not extension:
+      return True
+    return any(source.endswith(extension) for source in source_paths)
 
   def sources_relative_to_buildroot(self):
     """
     :API: public
     """
     if self.has_sources():
-      return self.payload.sources.relative_to_buildroot()
+      return self._sources_field.relative_to_buildroot()
     else:
       return []
 
@@ -578,7 +587,7 @@ class Target(AbstractTarget):
     """
     :API: public
     """
-    return self.payload.sources.sources
+    return self._sources_field.sources
 
   @property
   def derived_from(self):
@@ -639,19 +648,18 @@ class Target(AbstractTarget):
 
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
-    assert kwargs is None or payload is None, 'must provide either kwargs or payload'
-    assert not (kwargs is not None and payload is not None), 'may not provide both kwargs and payload'
-    assert not (kwargs and not isinstance(kwargs, dict)), (
+    assert (kwargs is None) ^ (payload is None), 'must provide either kwargs or payload'
+    assert (kwargs is None) or isinstance(kwargs, dict), (
       'expected a `dict` object for kwargs, instead found a {}'.format(type(kwargs))
     )
-    assert not (payload and not isinstance(payload, Payload)), (
+    assert (payload is None) or isinstance(payload, Payload), (
       'expected a `Payload` object for payload, instead found a {}'.format(type(payload))
     )
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):
-    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the specs
-    to inject as non-dependencies in the same vein as the prior `traversable_specs`.
+    """Given either pre-Target.__init__() kwargs or a post-Target.__init__() payload, compute the
+    specs to inject as non-dependencies in the same vein as the prior `traversable_specs`.
 
     :API: public
 
@@ -660,7 +668,8 @@ class Target(AbstractTarget):
     :yields: Spec strings representing dependencies of this target.
     """
     cls._validate_target_representation_args(kwargs, payload)
-    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
+    # subclassing.
     return
     yield
 
@@ -682,7 +691,8 @@ class Target(AbstractTarget):
     :yields: Spec strings representing dependencies of this target.
     """
     cls._validate_target_representation_args(kwargs, payload)
-    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for subclassing.
+    # N.B. This pattern turns this method into a non-yielding generator, which is helpful for
+    # subclassing.
     return
     yield
 

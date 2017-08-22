@@ -5,15 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
+from pants.base.deprecated import deprecated
 from pants.task.task import Task
-from pants.util.dirutil import safe_rmtree
 
 
 class Invalidate(Task):
   """Invalidate the entire build."""
 
+  @deprecated(removal_version='1.6.0.dev0',
+              hint_message='Use `./pants --cache-ignore ...` instead.')
   def execute(self):
-    build_invalidator_dir = os.path.join(self.get_options().pants_workdir, 'build_invalidator')
-    safe_rmtree(build_invalidator_dir)
+    # TODO(John Sirois): Remove the `root` argument `_build_invalidator` once this deprecation cycle
+    # is complete. This is the only caller using the argument:
+    #   https://github.com/pantsbuild/pants/issues/4697
+    self._build_invalidator(root=True).force_invalidate_all()

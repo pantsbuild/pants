@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -49,5 +51,6 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
 
   # NB: **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
-    po = pex.run(blocking=False, **pex_run_kwargs)
+    env = pex_run_kwargs.pop('env', os.environ).copy()
+    po = pex.run(blocking=False, env=env, **pex_run_kwargs)
     po.wait()

@@ -9,17 +9,19 @@ import errno
 import os
 import time
 import unittest
+from contextlib import contextmanager
 
 import mock
 import six
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import (_mkdtemp_unregister_cleaner, absolute_symlink, fast_relpath,
-                                get_basedir, longest_dir_prefix, read_file, relative_symlink,
-                                relativize_paths, rm_rf, safe_concurrent_creation, safe_file_dump,
-                                safe_mkdir, safe_mkdtemp, safe_rm_oldest_items_in_dir, safe_rmtree,
-                                touch)
+from pants.util.dirutil import (ExistingDirError, ExistingFileError, _mkdtemp_unregister_cleaner,
+                                absolute_symlink, fast_relpath, get_basedir, longest_dir_prefix,
+                                mergetree, read_file, relative_symlink, relativize_paths, rm_rf,
+                                safe_concurrent_creation, safe_file_dump, safe_mkdir, safe_mkdtemp,
+                                safe_open, safe_rm_oldest_items_in_dir, safe_rmtree, touch)
+from pants.util.objects import datatype
 
 
 def strict_patch(target, **kwargs):
@@ -122,6 +124,160 @@ class DirutilTest(unittest.TestCase):
         tmpdir = tmpdir.encode('utf-8')
       for _, dirs, _ in dirutil.safe_walk(tmpdir):
         self.assertTrue(all(isinstance(dirname, six.text_type) for dirname in dirs))
+
+  @contextmanager
+  def tree(self):
+    # root/
+    #   a/
+    #     b/
+    #       1
+    #       2
+    #     2 -> root/a/b/2
+    #   b -> root/a/b
+    with temporary_dir() as root:
+      with safe_open(os.path.join(root, 'a', 'b', '1'), 'wb') as fp:
+        fp.write(b'1')
+      touch(os.path.join(root, 'a', 'b', '2'))
+      os.symlink(os.path.join(root, 'a', 'b', '2'), os.path.join(root, 'a', '2'))
+      os.symlink(os.path.join(root, 'a', 'b'), os.path.join(root, 'b'))
+      with temporary_dir() as dst:
+        yield root, dst
+
+  class Dir(datatype('Dir', ['path'])):
+    pass
+
+  class File(datatype('File', ['path', 'contents'])):
+    @classmethod
+    def empty(cls, path):
+      return cls(path, contents=b'')
+
+    @classmethod
+    def read(cls, root, relpath):
+      with open(os.path.join(root, relpath)) as fp:
+        return cls(relpath, fp.read())
+
+  class Symlink(datatype('Symlink', ['path'])):
+    pass
+
+  def assert_tree(self, root, *expected):
+    def collect_tree():
+      for path, dirnames, filenames in os.walk(root, followlinks=False):
+        relpath = os.path.relpath(path, root)
+        if relpath == os.curdir:
+          relpath = ''
+        for dirname in dirnames:
+          dirpath = os.path.join(relpath, dirname)
+          if os.path.islink(os.path.join(path, dirname)):
+            yield self.Symlink(dirpath)
+          else:
+            yield self.Dir(dirpath)
+        for filename in filenames:
+          filepath = os.path.join(relpath, filename)
+          if os.path.islink(os.path.join(path, filename)):
+            yield self.Symlink(filepath)
+          else:
+            yield self.File.read(root, filepath)
+
+    self.assertEqual(frozenset(expected), frozenset(collect_tree()))
+
+  def test_mergetree_existing(self):
+    with self.tree() as (src, dst):
+      # Existing empty files
+      touch(os.path.join(dst, 'c', '1'))
+      touch(os.path.join(dst, 'a', 'b', '1'))
+
+      mergetree(src, dst)
+
+      self.assert_tree(dst,
+                       self.Dir('a'),
+                       self.File.empty('a/2'),
+                       self.Dir('a/b'),
+
+                       # Existing overlapping file should be overlayed.
+                       self.File('a/b/1', contents=b'1'),
+
+                       self.File.empty('a/b/2'),
+                       self.Dir('b'),
+                       self.File('b/1', contents=b'1'),
+                       self.File.empty('b/2'),
+                       self.Dir('c'),
+
+                       # Existing non-overlapping file should be preserved.
+                       self.File.empty('c/1'))
+
+  def test_mergetree_existing_file_mismatch(self):
+    with self.tree() as (src, dst):
+      touch(os.path.join(dst, 'a'))
+      with self.assertRaises(ExistingFileError):
+        mergetree(src, dst)
+
+  def test_mergetree_existing_dir_mismatch(self):
+    with self.tree() as (src, dst):
+      os.makedirs(os.path.join(dst, 'b', '1'))
+      with self.assertRaises(ExistingDirError):
+        mergetree(src, dst)
+
+  def test_mergetree_new(self):
+    with self.tree() as (src, dst_root):
+      dst = os.path.join(dst_root, 'dst')
+
+      mergetree(src, dst)
+
+      self.assert_tree(dst,
+                       self.Dir('a'),
+                       self.File.empty('a/2'),
+                       self.Dir('a/b'),
+                       self.File('a/b/1', contents=b'1'),
+                       self.File.empty('a/b/2'),
+                       self.Dir('b'),
+                       self.File('b/1', contents=b'1'),
+                       self.File.empty('b/2'))
+
+  def test_mergetree_ignore_files(self):
+    with self.tree() as (src, dst):
+      def ignore(root, names):
+        if root == os.path.join(src, 'a', 'b'):
+          return ['1', '2']
+
+      mergetree(src, dst, ignore=ignore)
+
+      self.assert_tree(dst,
+                       self.Dir('a'),
+                       self.File.empty('a/2'),
+                       self.Dir('a/b'),
+                       self.Dir('b'),
+                       self.File('b/1', contents=b'1'),
+                       self.File.empty('b/2'))
+
+  def test_mergetree_ignore_dirs(self):
+    with self.tree() as (src, dst):
+      def ignore(root, names):
+        if root == os.path.join(src, 'a'):
+          return ['b']
+
+      mergetree(src, dst, ignore=ignore)
+
+      self.assert_tree(dst,
+                       self.Dir('a'),
+                       self.File.empty('a/2'),
+                       self.Dir('b'),
+                       self.File('b/1', contents=b'1'),
+                       self.File.empty('b/2'))
+
+  def test_mergetree_symlink(self):
+    with self.tree() as (src, dst):
+      mergetree(src, dst, symlinks=True)
+
+      self.assert_tree(dst,
+                       self.Dir('a'),
+                       self.Symlink('a/2'),
+                       self.Dir('a/b'),
+                       self.File('a/b/1', contents=b'1'),
+                       self.File.empty('a/b/2'),
+
+                       # NB: assert_tree does not follow symlinks and so does not descend into the
+                       # symlinked b/ dir to find b/1 and b/2
+                       self.Symlink('b'))
 
   def test_relativize_paths(self):
     build_root = '/build-root'
@@ -264,7 +420,7 @@ class DirutilTest(unittest.TestCase):
       self.assertFalse(os.path.exists(expected_file))
       self.assertTrue(os.path.exists(os.path.dirname(expected_file)))
 
-  def test_safe_concurrent_creation_exception_still_renames(self):
+  def test_safe_concurrent_creation_exception_handling(self):
     with temporary_dir() as td:
       expected_file = os.path.join(td, 'expected_file')
 
@@ -275,7 +431,7 @@ class DirutilTest(unittest.TestCase):
           raise ZeroDivisionError('zomg')
 
       self.assertFalse(os.path.exists(safe_path))
-      self.assertTrue(os.path.exists(expected_file))
+      self.assertFalse(os.path.exists(expected_file))
 
   def test_safe_rm_oldest_items_in_dir(self):
     with temporary_dir() as td:

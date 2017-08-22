@@ -13,13 +13,13 @@ import six
 from pants.base.project_tree import Dir
 from pants.base.specs import (AscendantAddresses, DescendantAddresses, SiblingAddresses,
                               SingleAddress)
-from pants.build_graph.address import Address
+from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.addressable import (AddressableDescriptor, BuildFileAddresses, Collection,
                                       Exactly, TypeConstraintError)
 from pants.engine.fs import FilesContent, PathGlobs, Snapshot
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper, ResolveError
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.rules import SingletonRule, TaskRule, rule
+from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.struct import Struct
 from pants.util.objects import datatype
@@ -348,4 +348,11 @@ def create_graph_rules(address_mapper, symbol_table_cls):
     addresses_from_address_families,
     filter_build_dirs,
     spec_to_globs,
+    # Root rules representing parameters that might be provided via root subjects.
+    RootRule(Address),
+    RootRule(BuildFileAddress),
+    RootRule(AscendantAddresses),
+    RootRule(DescendantAddresses),
+    RootRule(SiblingAddresses),
+    RootRule(SingleAddress),
   ]

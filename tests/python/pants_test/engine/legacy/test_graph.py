@@ -150,13 +150,18 @@ class GraphInvalidationTest(GraphTestBase):
         node_count, last_node_count = scheduler.node_count(), node_count
         self.assertLess(node_count, last_node_count)
 
-  def test_sources_ordering(self):
-    spec = 'testprojects/src/resources/org/pantsbuild/testproject/ordering'
+  def _ordering_test(self, spec, expected_sources=None):
+    expected_sources = expected_sources or ['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd']
     with self.open_scheduler([spec]) as (graph, _, _):
       target = graph.get_target(Address.parse(spec))
       sources = [os.path.basename(s) for s in target.sources_relative_to_buildroot()]
-      self.assertEquals(['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd'],
-                        sources)
+      self.assertEquals(expected_sources, sources)
+
+  def test_sources_ordering_literal(self):
+    self._ordering_test('testprojects/src/resources/org/pantsbuild/testproject/ordering:literal')
+
+  def test_sources_ordering_glob(self):
+    self._ordering_test('testprojects/src/resources/org/pantsbuild/testproject/ordering:globs')
 
   def test_target_macro_override(self):
     """Tests that we can "wrap" an existing target type with additional functionality.

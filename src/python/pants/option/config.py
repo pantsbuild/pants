@@ -218,7 +218,8 @@ class _ChainedConfig(Config):
     return self._configs
 
   def sources(self):
-    return list(itertools.chain.from_iterable(cfg.sources() for cfg in self._configs))
+    # NB: Present the sources in the order we were given them.
+    return list(itertools.chain.from_iterable(cfg.sources() for cfg in reversed(self._configs)))
 
   def sections(self):
     ret = OrderedSet()

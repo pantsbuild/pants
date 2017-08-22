@@ -22,15 +22,15 @@ following criteria:
 
 1. Decide whether to create a _new_ `stable` branch:
     * If it has been approximately [[three months|pants('src/docs:deprecation_policy')]] since the
-previous `stable` branch, the release manager should inspect changes that have landed in master
-since the previous `stable` branch was created, and decide whether the changes justify a new
-`stable` branch (this is intentionally left open for discussion). If a new `stable` branch is
-justified, it will be either a `major` or `minor` branch (described below).
+previous `stable` branch, the release manager should inspect the changes in the current
+[release milestone](https://github.com/pantsbuild/pants/milestones), and decide whether the changes
+justify a new `stable` release (this is intentionally left open for discussion). If a new `stable`
+release is justified, it will be made from either a `major` or `minor` stable branch (described below).
     * If a new `stable` branch is _not_ created (because of insufficient time/change to justify the
 stable vetting process), the release manager must cut a `dev` release from master instead.
 2. In addition to any `dev` release or newly-created `stable` branches, the release manager should
 determine whether any existing `stable` branches need new release candidates by looking for 
-[changes labelled needs-rc-cherrypick](https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-rc-cherrypick).
+[changes labelled needs-cherrypick][needs-cherrypick].
 If there are requests "sufficient" to justify `patch` releases for existing `stable` branches, the
 release manager should cut release candidates for those branches.
 
@@ -46,11 +46,11 @@ is applied to `stable` releases. They help to ensure a steady release cadence fr
 in the gaps between the (generally more time consuming) `stable` releases.
 
 ### `stable` releases
-`stable` release candidates generally happen every two weeks, provided that there are enough user
-facing changes to warrant a new `stable` release. Of those two weeks, five business days are allocated
-to bugfixing and testing by pants contributors on a release candidate announcement thread (described
-below).  If any changes are needed to the stable release based on feedback a new `rc` release will
-be created for the stable branch.
+`stable` release cycles generally happen every few months, provided that there are enough user
+facing changes to warrant a new `stable` release. For each release candidate for a `stable` release,
+five business days should be allocated to bugfixing and testing by pants contributors on a release
+candidate announcement thread (described below).  If any changes are needed to the stable release
+based on feedback a new `rc` release will be created from the stable branch.
 
 #### `major` and `minor` stable branches
 The decision to create a `major` or a `minor` stable branch is based on consensus on
@@ -62,9 +62,8 @@ you should be able to continue using that feature at least through version `1.4.
 #### `patch` stable Releases
 In order to allow us to react quickly to bugs, `patch` fixes are released for `stable` branches as
 needed and should always consist of fixes or small backwards-compatible features backported from
-master. These releases update the patch version number, (ie, from `1.0.x` to `1.0.y`) and should
-only include commits from the Pants Backport Proposals that are deemed to be
-[[backwards compatible|pants('src/docs:deprecation_policy')]].
+master using the [needs-cherrypick][needs-cherrypick] label. These releases update the patch version number, (ie, from `1.0.x` to `1.0.y`) and should
+only include commits that are deemed to be [[backwards compatible|pants('src/docs:deprecation_policy')]].
 
 ## Naming conventions
 
@@ -106,3 +105,5 @@ for contributors to raise concerns on the release candidate announcement thread.
 days the release manager might need to perform multiple release candidates, until finally, when no
 more blockers are raised against a particular release candidate, the final version of that release
 can be cut.
+
+[needs-cherrypick]: https://github.com/pantsbuild/pants/pulls?q=is%3Apr+label%3Aneeds-cherrypick

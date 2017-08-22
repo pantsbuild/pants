@@ -69,7 +69,7 @@ class MutableBuildGraph(BuildGraph):
       for dep_address in dep_addresses:
         if dep_address in deps_seen:
           raise self.DuplicateAddressError(
-            'Addresses in dependencies must be unique. \'{spec}\' is referenced more than once.'
+            "Addresses in dependencies must be unique. '{spec}' is referenced more than once."
             .format(spec=dep_address.spec))
         deps_seen.add(dep_address)
         self.inject_address_closure(dep_address)

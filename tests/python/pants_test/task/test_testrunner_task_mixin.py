@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import collections
 import os
 from unittest import TestCase
+from xml.etree.ElementTree import ParseError
 
 from mock import patch
 
@@ -18,7 +19,6 @@ from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
 from pants.util.process_handler import ProcessHandler
 from pants.util.timeout import TimeoutReached
-from pants.util.xml_parser import XmlParser
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -433,6 +433,38 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
           }
         }, tests_info)
 
+  def test_parse_test_info_with_missing_attributes(self):
+    with temporary_dir() as xml_dir:
+      with open(os.path.join(xml_dir, 'TEST-a.xml'), 'w') as fp:
+        fp.write("""
+        <testsuite failures="1">
+          <testcase classname="org.pantsbuild.Green" name="testOK"/>
+          <testcase classname="org.pantsbuild.Failure" time="0.27">
+            <failure/>
+          </testcase>
+          <testcase classname="org.pantsbuild.Skipped" name="testSkipped" time="0.1" extra="">
+            <skipped/>
+          </testcase>
+        </testsuite>
+        """)
+
+      tests_info = self.parse_test_info(xml_dir, self._raise_handler)
+      self.assertEqual(
+        {
+          'testOK': {
+            'result_code': 'success',
+            'time': None
+          },
+          '': {
+            'result_code': 'failure',
+            'time': 0.27
+          },
+          'testSkipped': {
+            'result_code': 'skipped',
+            'time': 0.1
+          }
+        }, tests_info)
+
   def test_parse_test_info_invalid_file_name(self):
     with temporary_dir() as xml_dir:
       with open(os.path.join(xml_dir, 'random.xml'), 'w') as fp:
@@ -457,19 +489,13 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
       with self.assertRaises(Exception) as exc:
         self.parse_test_info(xml_dir, self._raise_handler)
       self.assertEqual(xml_file, exc.exception.xml_path)
-      self.assertIsInstance(exc.exception.cause, XmlParser.XmlError)
+      self.assertIsInstance(exc.exception.cause, ParseError)
 
   def test_parse_test_info_error_continue(self):
     with temporary_dir() as xml_dir:
       bad_file1 = os.path.join(xml_dir, 'TEST-bad1.xml')
       with open(bad_file1, 'w') as fp:
-        fp.write("""
-        <testsuite failures="0" errors="1">
-          <testcase classname="org.pantsbuild.Error" name="testError" time="zero">
-            <error/>
-          </testcase>
-        </testsuite>
-        """)
+        fp.write('<invalid></xml>')
       with open(os.path.join(xml_dir, 'TEST-good.xml'), 'w') as fp:
         fp.write("""
         <testsuite failures="0" errors="1">
@@ -478,14 +504,11 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
           </testcase>
         </testsuite>
         """)
-      bad_file2 = os.path.join(xml_dir, 'TEST-bad2.xml')
-      with open(bad_file2, 'w') as fp:
-        fp.write('<invalid></xml>')
 
       collect_handler = self.CollectHandler()
       tests_info = self.parse_test_info(xml_dir, collect_handler)
-      self.assertEqual(2, len(collect_handler.errors))
-      self.assertEqual({bad_file1, bad_file2}, {e.xml_path for e in collect_handler.errors})
+      self.assertEqual(1, len(collect_handler.errors))
+      self.assertEqual({bad_file1}, {e.xml_path for e in collect_handler.errors})
 
       self.assertEqual(
         {'testError':
@@ -500,7 +523,11 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
       with open(os.path.join(xml_dir, 'TEST-a.xml'), 'w') as fp:
         fp.write("""
         <testsuite errors="1">
-          <testcase classname="org.pantsbuild.Green" name="testOK" time="1.290" file="file.py"/>
+          <testcase classname="org.pantsbuild.Green" name="testOK1" time="1.290" file="file.py"/>
+          <testcase classname="org.pantsbuild.Green" name="testOK2" time="1.12"/>
+          <testcase classname="org.pantsbuild.Green" name="testOK3" file="file.py"/>
+          <testcase name="testOK4" time="1.79" file="file.py"/>
+          <testcase name="testOK5" time="0.832"/>
           <testcase classname="org.pantsbuild.Error" name="testError" time="0.27" file="file.py">
             <error/>
           </testcase>
@@ -510,11 +537,35 @@ class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):
       tests_info = self.parse_test_info(xml_dir, self._raise_handler, ['file', 'classname'])
       self.assertEqual(
         {
-          'testOK': {
+          'testOK1': {
             'file': 'file.py',
             'classname': 'org.pantsbuild.Green',
             'result_code': 'success',
             'time': 1.290
+          },
+          'testOK2': {
+            'file': None,
+            'classname': 'org.pantsbuild.Green',
+            'result_code': 'success',
+            'time': 1.12
+          },
+          'testOK3': {
+            'file': 'file.py',
+            'classname': 'org.pantsbuild.Green',
+            'result_code': 'success',
+            'time': None
+          },
+          'testOK4': {
+            'file': 'file.py',
+            'classname': None,
+            'result_code': 'success',
+            'time': 1.79
+          },
+          'testOK5': {
+            'file': None,
+            'classname': None,
+            'result_code': 'success',
+            'time': 0.832
           },
           'testError': {
             'file': 'file.py',

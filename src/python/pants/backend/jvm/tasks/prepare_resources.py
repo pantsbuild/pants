@@ -53,5 +53,7 @@ class PrepareResources(ResourcesTask):
       safe_mkdir(destdir)
 
       # TODO(Benjy Weinberger): Symlink instead?
-      shutil.copy(os.path.join(self._buildroot, target.target_base, resource_file_from_source_root),
-                  os.path.join(chroot, resource_file_from_source_root))
+      src = os.path.join(self._buildroot, target.target_base, resource_file_from_source_root)
+      dst = os.path.join(chroot, resource_file_from_source_root)
+      self.context.log.debug('Copying resource from {} to {}'.format(src, dst))
+      shutil.copy(src, dst)

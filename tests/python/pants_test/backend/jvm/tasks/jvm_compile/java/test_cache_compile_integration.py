@@ -219,5 +219,5 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         self.assertEquals(c.artifact_count, len(os.listdir(artifact_dir)))
 
 
-class CacheCompileIntegrationWithoutZjarsTest(CacheCompileIntegrationTest):
-  _EXTRA_TASK_ARGS = ['--no-compile-zinc-use-classpath-jars']
+class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
+  _EXTRA_TASK_ARGS = ['--compile-zinc-use-classpath-jars']

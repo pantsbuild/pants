@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
+import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from threading import Timer
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.util.timeout import Timeout, TimeoutReached
-from pants.util.xml_parser import XmlParser
 
 
 class TestRunnerTaskMixin(object):
@@ -91,19 +91,21 @@ class TestRunnerTaskMixin(object):
     :param primitive test_info: The information being stored.
     """
     if target and scope:
-      address = target.address.spec
       target_type = target.type_alias
-      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
-      self.context.run_tracker.report_target_info(scope, address, keys, test_info)
+      self.context.run_tracker.report_target_info('GLOBAL', target, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info(scope, target, keys, test_info)
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
     """Parses the junit file for information needed about each test.
 
     Will include:
-      - test result
-      - test run time duration
       - test name
+      - test result
+      - test run time duration or None if not a parsable float
+
+    If additional test case attributes are defined, then it will include those as well.
+
     :param string xml_path: The path of the xml file to be parsed.
     :param function error_handler: The error handler function.
     :param list of string additional_testcase_attributes: A list of additional attributes belonging
@@ -129,31 +131,33 @@ class TestRunnerTaskMixin(object):
         self.xml_path = xml_path
         self.cause = cause
 
-    def parse_xml_file(path):
+    def parse_xml_file(xml_file_path):
       try:
-        xml = XmlParser.from_file(path)
-        for testcase in xml.parsed.getElementsByTagName('testcase'):
-          test_info = {'time': float(testcase.getAttribute('time'))}
+        root = ET.parse(xml_file_path).getroot()
+        for testcase in root.iter('testcase'):
+          test_info = {}
+
+          try:
+            test_info.update({'time': float(testcase.attrib.get('time'))})
+          except (TypeError, ValueError):
+            test_info.update({'time': None})
+
           for attribute in testcase_attributes:
-            test_info[attribute] = testcase.getAttribute(attribute)
+            test_info[attribute] = testcase.attrib.get(attribute)
 
-          test_error = testcase.getElementsByTagName('error')
-          test_fail = testcase.getElementsByTagName('failure')
-          test_skip = testcase.getElementsByTagName('skipped')
+          result = SUCCESS
+          if next(testcase.iter('error'), None) is not None:
+            result = ERROR
+          elif next(testcase.iter('failure'), None) is not None:
+            result = FAILURE
+          elif next(testcase.iter('skipped'), None) is not None:
+            result = SKIPPED
+          test_info.update({'result_code': result})
 
-          if test_fail:
-            test_info.update({'result_code': FAILURE})
-          elif test_error:
-            test_info.update({'result_code': ERROR})
-          elif test_skip:
-            test_info.update({'result_code': SKIPPED})
-          else:
-            test_info.update({'result_code': SUCCESS})
+          tests_in_path.update({testcase.attrib.get('name', ''): test_info})
 
-          tests_in_path.update({testcase.getAttribute('name'): test_info})
-
-      except (XmlParser.XmlError, ValueError) as e:
-        error_handler(ParseError(path, e))
+      except (ET.ParseError, ValueError) as e:
+        error_handler(ParseError(xml_file_path, e))
 
     if os.path.isdir(xml_path):
       for name in os.listdir(xml_path):

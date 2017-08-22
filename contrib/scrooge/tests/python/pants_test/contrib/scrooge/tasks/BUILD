@@ -24,7 +24,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/goal:context',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
+    'tests/python/pants_test/jvm:nailgun_task_test_base'
   ],
 )
 

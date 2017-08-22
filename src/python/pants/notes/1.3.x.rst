@@ -3,6 +3,115 @@
 
 This document describes releases leading up to the ``1.3.x`` ``stable`` series.
 
+1.3.0 (06/06/2017)
+------------------
+
+The ``1.3.0`` stable release, with no addition changes since the rc4 release!
+
+A quick summary of exciting changes since the ``1.2.x`` branch:
+
+* Pants' python backend has been overhauled and modernized to support caching, and to lower the
+  latency of re-running tests after a code edit.
+* Pants now uses a `native code 'engine' <https://docs.google.com/document/d/1C64MreDeVoZAl3HrqtWUVE-qnj3MyWW0NQ52xejjaWw/edit?usp=sharing>`_
+  implemented in rust, which unlocks significant performance improvements in the future.
+* A daemon that caches BUILD file parsing and file fingerprinting (and more to follow!) is now `ready
+  for alpha testing <https://github.com/pantsbuild/pants/blob/b5eaf05ef533df4c5f93a3728107a27f25726941/pants.daemon.ini>`_
+  (with `two significant caveats <http://www.pantsbuild.org/invoking.html#the-pants-daemon>`_).
+* A default set of `implicit_sources <https://rbcommons.com/s/twitter/r/4300>`_ can now be
+  manually enabled to further reduce BUILD file boilerplate. This option should become the
+  default in the next stable release.
+* The Zinc incremental scala compiler is now at 1.0.0, with improved incremental behaviour.
+* Style-related tasks that used to be in the `compile` goal have moved to a new `lint` goal.
+* The `fmt` goal was added, with support for scalafmt, `gofmt`, and python `isort` to start.
+* `Support for yarnpkg <https://github.com/pantsbuild/pants/pull/4255>`_ in the node contrib module.
+* Support for `relative 'jar' declarations <https://github.com/pantsbuild/pants/pull/4279>`_, to
+  allow for committing jars in your repo (if that's your bag!)
+* A contrib module for `errorprone <https://github.com/pantsbuild/pants/pull/4163>`_ was added.
+* Direct support for `scalatest` tests in the pants JVM test runner.
+
+See the rest of this page for the complete list of changes.
+
+1.3.0rc4 (05/27/2017)
+---------------------
+
+The fifth release candidate for 1.3.0, with fixes for two more user reported issues.
+
+Bugfixes
+~~~~~~~~
+
+* Temporarily restore recursive behaviour for bundle filesets (#4630)
+  `PR #4630 <https://github.com/pantsbuild/pants/pull/4630>`_
+  `PR #4624 <https://github.com/pantsbuild/pants/pull/4624>`_
+  `PR #4624 <https://github.com/pantsbuild/pants/pull/4624>`_
+
+* Check that test case attribute exists in junit xml file before converting it (#4623)
+  `Issue #4619 <https://github.com/pantsbuild/pants/issues/4619>`_
+  `PR #4623 <https://github.com/pantsbuild/pants/pull/4623>`_
+
+
+1.3.0rc3 (05/23/2017)
+---------------------
+
+The fourth release candidate for 1.3.0, which fixes an issue that caused spurious cache misses
+cross platform in the v2 engine.
+
+Bugfixes
+~~~~~~~~
+
+* [engine] Check for duplicate deps in v2 graph construction. (#4616)
+  `PR #4616 <https://github.com/pantsbuild/pants/pull/4616>`_
+
+* Improve Snapshot determinism (#4614)
+  `PR #4614 <https://github.com/pantsbuild/pants/pull/4614>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove Oracle Java6, which is now 404ing in Travis. (#4615)
+  `PR #4615 <https://github.com/pantsbuild/pants/pull/4615>`_
+
+1.3.0rc2 (05/19/2017)
+---------------------
+
+The third release candidate for 1.3.0. This fixes a few more issues discovered during very
+thorough testing by the community. Thank you everyone!
+
+API Changes
+~~~~~~~~~~~
+
+* Change method of reporting target data (#4593)
+  `PR #4593 <https://github.com/pantsbuild/pants/pull/4593>`_
+
+* Include API that will store target info in run_tracker (#4561)
+  `PR #4561 <https://github.com/pantsbuild/pants/pull/4561>`_
+
+* Switch to a conditional deprecation for the list-targets behaviour change. (#4600)
+  `PR #4600 <https://github.com/pantsbuild/pants/pull/4600>`_
+
+Bugfixes
+~~~~~~~~
+
+* Revert "Enable --compile-zinc-use-classpath-jars by default" (#4607)
+  `PR #4607 <https://github.com/pantsbuild/pants/pull/4607>`_
+
+* Pass env vars through in ./pants run for python (#4606)
+  `PR #4606 <https://github.com/pantsbuild/pants/pull/4606>`_
+
+* Fix broken export-classpath (#4603)
+  `PR #4603 <https://github.com/pantsbuild/pants/pull/4603>`_
+
+* Fix export-classpaths exclude behavior (#4592)
+  `PR #4592 <https://github.com/pantsbuild/pants/pull/4592>`_
+
+* Fix splitting of the build_flags for golang. (#4580)
+  `PR #4580 <https://github.com/pantsbuild/pants/pull/4580>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Don't register newpython tasks in the oldpython backend (#4602)
+  `PR #4602 <https://github.com/pantsbuild/pants/pull/4602>`_
+
 1.3.0rc1 (05/12/2017)
 ---------------------
 

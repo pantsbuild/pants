@@ -84,7 +84,7 @@ You'll need to setup some files one-time in your own repo:
 
     python_binary(
       name='pants',
-      entry_point='pants.bin.pants_exe:main',
+      entry_point='pants.bin.pants_loader:main',
       # You may want to tweak the list of supported platforms to match your environment.
       platforms=[
         'current',
@@ -122,7 +122,7 @@ To (re-)generate a `pants.pex` you then run these 2 commands:
 2. In your own repo the following command will create a locally built `pants.pex` for all platforms:
 
         :::bash
-        $ /tmp/pantsbuild/pants --config-override=pants-production.ini clean-all binary //:pants
+        $ /tmp/pantsbuild/pants --pants-config-files=pants-production.ini clean-all binary //:pants
 
 The resulting `pants.pex` will be in the `dist/` directory:
 

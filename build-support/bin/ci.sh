@@ -12,7 +12,7 @@ source build-support/common.sh
 function usage() {
   echo "Runs commons tests for local or hosted CI."
   echo
-  echo "Usage: $0 (-h|-fxbkmsrjlpuncia)"
+  echo "Usage: $0 (-h|-fxbkmsrjlpuyncia)"
   echo " -h           print out this help message"
   echo " -f           skip python code formatting checks"
   echo " -x           skip bootstrap clean-all (assume bootstrapping from a"
@@ -32,6 +32,10 @@ function usage() {
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
+  echo " -y SHARD_NUMBER/TOTAL_SHARDS"
+  echo "              if running contrib python tests, divide them into"
+  echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
+  echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -c           skip pants integration tests (includes examples and testprojects)"
   echo " -i SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running integration tests, divide them into"
@@ -45,15 +49,16 @@ function usage() {
 }
 
 bootstrap_compile_args=(
-  compile.python-eval
+  lint.python-eval
   --closure
 )
 
 # No python test sharding (1 shard) by default.
 python_unit_shard="0/1"
+python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:nci:a" opt; do
+while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -67,11 +72,12 @@ while getopts "hfxbkmsrjlpu:nci:a" opt; do
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     n) skip_contrib="true" ;;
+    y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
     a) skip_android="true" ;;
+    t) skip_lint="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -153,6 +159,14 @@ if [[ "${skip_sanity_checks:-false}" == "false" ]]; then
   end_travis_section
 fi
 
+if [[ "${skip_lint:-false}" == "false" ]]; then
+  start_travis_section "Lint" "Running lint checks"
+  (
+    ./pants.pex ${PANTS_ARGS[@]} lint contrib:: examples:: src:: tests:: zinc::
+  ) || die "Lint check failure"
+  end_travis_section
+fi
+
 if [[ "${skip_distribution:-false}" == "false" ]]; then
   # N.B. Defer start_travis_section to those within release.sh, since we can't nest.
   banner "Running pants distribution tests"
@@ -178,7 +192,7 @@ fi
 if [[ "${skip_internal_backends:-false}" == "false" ]]; then
   start_travis_section "BackendTests" "Running internal backend python tests"
   (
-    ./pants.pex ${PANTS_ARGS[@]} test.pytest --compile-python-eval-skip \
+    ./pants.pex ${PANTS_ARGS[@]} test.pytest \
     pants-plugins/tests/python::
   ) || die "Internal backend python test failure"
   end_travis_section
@@ -191,24 +205,21 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
     ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
-      --coverage=pants \
       --test-pytest-test-shard=${python_unit_shard} \
-      --compile-python-eval-skip \
       tests/python::
   ) || die "Core python test failure"
   end_travis_section
 fi
 
 if [[ "${skip_contrib:-false}" == "false" ]]; then
-  start_travis_section "ContribTests" "Running contrib python tests"
+  if [[ "0/1" != "${python_contrib_shard}" ]]; then
+    shard_desc=" [shard ${python_contrib_shard}]"
+  fi
+  start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    # We run python tests using --no-fast - aka test chroot per target - to work around issues with
-    # test (ie: pants_test.contrib) namespace packages.
-    # TODO(John Sirois): Get to the bottom of the issue and kill --no-fast, see:
-    #  https://github.com/pantsbuild/pants/issues/1149
     ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
     --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
-    --compile-python-eval-skip \
+    --test-pytest-test-shard=${python_contrib_shard} \
     contrib:: \
   ) || die "Contrib python test failure"
   end_travis_section
@@ -221,7 +232,6 @@ if [[ "${skip_integration:-false}" == "false" ]]; then
   start_travis_section "IntegrationTests" "Running Pants Integration tests${shard_desc}"
   (
     ./pants.pex ${PANTS_ARGS[@]} --tag='+integration' test.pytest \
-      --compile-python-eval-skip \
       --test-pytest-test-shard=${python_intg_shard} \
       tests/python::
   ) || die "Pants Integration test failure"

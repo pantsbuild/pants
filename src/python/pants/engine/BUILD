@@ -6,6 +6,9 @@ page(
   source='README.md',
 )
 
+# TODO: Get rid of all these microtargets. The entire package should be one target,
+# or be split into multiple packages.
+
 python_library(
   name = 'legacy_engine',
   sources = ['legacy_engine.py', 'round_engine.py', 'round_manager.py'],
@@ -37,17 +40,6 @@ python_library(
   dependencies=[
     ':addressable',
     ':objects',
-  ]
-)
-
-python_library(
-  sources=['engine.py'],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':objects',
-    ':storage',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:meta',
   ]
 )
 
@@ -173,11 +165,12 @@ python_library(
     ':addressable',
     ':fs',
     ':isolated_process',
+    ':native',
     ':nodes',
     ':rules',
+    'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
-    'src/python/pants/engine/subsystem:native',
     'src/python/pants/util:objects',
   ]
 )
@@ -191,4 +184,24 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
   ]
+)
+
+python_library(
+  name='native',
+  sources=['native.py'],
+  dependencies=[
+    ':native_engine_version',
+    '3rdparty/python:cffi',
+    '3rdparty/python:setuptools',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/engine:storage',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:objects'
+  ],
+)
+
+resources(
+  name='native_engine_version',
+  sources=['native_engine_version']
 )

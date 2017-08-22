@@ -23,7 +23,6 @@ from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesField, TargetAdaptor
 from pants.engine.mapper import ResolveError
-from pants.engine.nodes import Return
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
@@ -51,27 +50,24 @@ class LegacyBuildGraph(BuildGraph):
     """Raised when command line spec is not a valid directory"""
 
   @classmethod
-  def create(cls, scheduler, engine, symbol_table_cls, include_trace_on_error=True):
+  def create(cls, scheduler, symbol_table_cls):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, engine, cls._get_target_types(symbol_table_cls), include_trace_on_error=include_trace_on_error)
+    return cls(scheduler, cls._get_target_types(symbol_table_cls))
 
-  def __init__(self, scheduler, engine, target_types, include_trace_on_error=True):
+  def __init__(self, scheduler, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
     :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
-    :param engine: An Engine subclass to execute calls to `inject`.
     :param symbol_table_cls: A SymbolTable class used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
-    self._include_trace_on_error = include_trace_on_error
     self._scheduler = scheduler
-    self._engine = engine
     self._target_types = target_types
     super(LegacyBuildGraph, self).__init__()
 
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
-    return LegacyBuildGraph(self._scheduler, self._engine, self._target_types)
+    return LegacyBuildGraph(self._scheduler, self._target_types)
 
   @staticmethod
   def _get_target_types(symbol_table_cls):
@@ -91,11 +87,9 @@ class LegacyBuildGraph(BuildGraph):
     new_targets = list()
 
     # Index the ProductGraph.
-    for node, state in roots.items():
-      self._assert_type_is_return(node, state)
-      self._assert_correct_value_type(state, HydratedTargets)
+    for product in roots:
       # We have a successful HydratedTargets value (for a particular input Spec).
-      for hydrated_target in state.value.dependencies:
+      for hydrated_target in product.dependencies:
         target_adaptor = hydrated_target.adaptor
         address = target_adaptor.address
         all_addresses.add(address)
@@ -144,9 +138,15 @@ class LegacyBuildGraph(BuildGraph):
     target = self._instantiate_target(target_adaptor)
     self._target_by_address[address] = target
 
-    # Link its declared dependencies, which will be indexed independently.
-    self._target_dependencies_by_address[address].update(target_adaptor.dependencies)
     for dependency in target_adaptor.dependencies:
+      if dependency in self._target_dependencies_by_address[address]:
+        raise self.DuplicateAddressError(
+          'Addresses in dependencies must be unique. '
+          "'{spec}' is referenced more than once by target '{target}'."
+          .format(spec=dependency.spec, target=address.spec)
+        )
+      # Link its declared dependencies, which will be indexed independently.
+      self._target_dependencies_by_address[address].add(dependency)
       self._target_dependees_by_address[dependency].add(address)
     return target
 
@@ -235,60 +235,29 @@ class LegacyBuildGraph(BuildGraph):
   def _inject(self, subjects):
     """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
     logger.debug('Injecting to %s: %s', self, subjects)
-    request = self._scheduler.execution_request([HydratedTargets, BuildFileAddresses], subjects)
+    try:
+      product_results = self._scheduler.products_request([HydratedTargets, BuildFileAddresses],
+                                                         subjects)
+    except ResolveError as e:
+      # NB: ResolveError means that a target was not found, which is a common user facing error.
+      raise AddressLookupError(str(e))
+    except Exception as e:
+      raise AddressLookupError(
+        'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
+      )
 
-    result = self._engine.execute(request)
-    if result.error:
-      raise result.error
     # Update the base class indexes for this request.
-    root_entries = result.root_products
-    address_entries = {k: v for k, v in root_entries.items() if k[1].product is BuildFileAddresses}
-    target_entries = {k: v for k, v in root_entries.items() if k[1].product is HydratedTargets}
-    self._index(target_entries)
+    self._index(product_results[HydratedTargets])
 
     yielded_addresses = set()
-    for (subject, _), state in address_entries.items():
-      self._assert_type_is_return(subject, state)
-      self._assert_correct_value_type(state, BuildFileAddresses)
-
-      if not state.value.dependencies:
+    for subject, product in zip(subjects, product_results[BuildFileAddresses]):
+      if not product.dependencies:
         raise self.InvalidCommandLineSpecError(
           'Spec {} does not match any targets.'.format(subject))
-      for address in state.value.dependencies:
+      for address in product.dependencies:
         if address not in yielded_addresses:
           yielded_addresses.add(address)
           yield address
-
-  def _assert_type_is_return(self, node, state):
-    # TODO Verifying the type is return should be handled in a more central way.
-    #      It's related to the clean up tracked via https://github.com/pantsbuild/pants/issues/4229
-    if type(state) is Return:
-      return
-
-    # NB: ResolveError means that a target was not found, which is a common user facing error.
-    # TODO Come up with a better error reporting mechanism so that we don't need this as a special case.
-    #      Possibly as part of https://github.com/pantsbuild/pants/issues/4446
-    if isinstance(state.exc, ResolveError):
-      raise AddressLookupError(str(state.exc))
-    else:
-      if self._include_trace_on_error:
-        trace = '\n'.join(self._scheduler.trace())
-        raise AddressLookupError(
-          'Build graph construction failed for {}:\n{}'.format(node, trace))
-      else:
-        raise AddressLookupError(
-          'Build graph construction failed for {}: {} {}'
-            .format(node,
-                    type(state.exc).__name__,
-                    str(state.exc))
-        )
-
-  def _assert_correct_value_type(self, state, expected_type):
-    # TODO This is a pretty general assertion, and it should live closer to where the result is generated.
-    #      It's related to the clean up tracked via https://github.com/pantsbuild/pants/issues/4229
-    if type(state.value) is not expected_type:
-      raise TypeError('Expected roots to hold {}; got: {}'.format(
-        expected_type, type(state.value)))
 
 
 class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
@@ -338,16 +307,15 @@ def hydrate_target(target_adaptor, hydrated_fields):
                         tuple(target_adaptor.dependencies))
 
 
-def _eager_fileset_with_spec(spec_path, filespec, snapshot):
-  files = tuple(fast_relpath(fd.path, spec_path) for fd in snapshot.files)
+def _eager_fileset_with_spec(spec_path, filespec, snapshot, include_dirs=False):
+  fds = snapshot.path_stats if include_dirs else snapshot.files
+  files = tuple(fast_relpath(fd.path, spec_path) for fd in fds)
 
   relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(filespec['globs'], spec_path)
   if filespec.has_key('exclude'):
     relpath_adjusted_filespec['exclude'] = [FilesetRelPathWrapper.to_filespec(e['globs'], spec_path)
                                             for e in filespec['exclude']]
 
-  # NB: In order to preserve declared ordering, we record a list of matched files
-  # independent of the file hash dict.
   return EagerFilesetWithSpec(spec_path,
                               relpath_adjusted_filespec,
                               files=files,
@@ -377,9 +345,13 @@ def hydrate_bundles(bundles_field, snapshot_list):
   for bundle, filespecs, snapshot in zipped:
     spec_path = bundles_field.address.spec_path
     kwargs = bundle.kwargs()
+    # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
+    # to trigger a (deprecated) default inclusion of their recursive contents. See the related
+    # deprecation in `pants.backend.jvm.tasks.bundle_create`.
     kwargs['fileset'] = _eager_fileset_with_spec(getattr(bundle, 'rel_path', spec_path),
                                                  filespecs,
-                                                 snapshot)
+                                                 snapshot,
+                                                 include_dirs=True)
     bundles.append(BundleAdaptor(**kwargs))
   return HydratedField('bundles', bundles)
 

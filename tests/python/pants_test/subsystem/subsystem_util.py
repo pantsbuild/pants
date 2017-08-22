@@ -50,7 +50,7 @@ def init_subsystems(subsystem_types, options=None):
   if options:
     allowed_scopes = {o.options_scope for o in optionables}
     for scope in options.keys():
-      if scope not in allowed_scopes:
+      if scope != '' and scope not in allowed_scopes:
         raise ValueError('`{}` is not the scope of any of these subsystems: {}'.format(
           scope, optionables))
   # Don't trample existing subsystem options, in case a test has set up some

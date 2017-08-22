@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import re
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
@@ -15,13 +14,13 @@ from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddres
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses, Collection
 from pants.engine.build_files import UnhydratedStruct, create_graph_rules
-from pants.engine.engine import LocalSerialEngine
+from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
 from pants.engine.nodes import Throw
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import TaskRule
-from pants.engine.selectors import Select, SelectDependencies
+from pants.engine.selectors import SelectDependencies
 from pants.engine.struct import Struct
 from pants.util.dirutil import safe_open
 from pants_test.engine.examples.parsers import JsonParser
@@ -148,11 +147,11 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
     address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
                                    parser_cls=JsonParser,
                                    build_patterns=('*.BUILD.json',))
-    tasks = create_graph_rules(address_mapper, symbol_table_cls)
+    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table_cls)
     # TODO handle updating the rule graph when passed unexpected root selectors.
     # Adding the following task allows us to get around the fact that SelectDependencies
     # requests are not currently supported.
-    tasks.append(TaskRule(UnhydratedStructs,
+    rules.append(TaskRule(UnhydratedStructs,
                           [SelectDependencies(UnhydratedStruct,
                                               BuildFileAddresses,
                                               field_types=(Address,),
@@ -161,7 +160,7 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
 
     project_tree = self.mk_fs_tree(os.path.join(os.path.dirname(__file__), 'examples/mapper_test'))
     self.build_root = project_tree.build_root
-    self.scheduler = self.mk_scheduler(tasks=tasks, project_tree=project_tree)
+    self.scheduler = self.mk_scheduler(rules=rules, project_tree=project_tree)
 
     self.a_b = Address.parse('a/b')
     self.a_b_target = Target(name='b',
@@ -170,15 +169,15 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    # TODO reenable using SelectDependencies
-    select = Select(UnhydratedStructs)
-    request = self.scheduler.selection_request([(select, spec)])
-    result = LocalSerialEngine(self.scheduler).execute(request)
+    request = self.scheduler.execution_request([UnhydratedStructs], [spec])
+    result = self.scheduler.execute(request)
     if result.error:
       raise result.error
 
     # Expect a single root.
-    state, = result.root_products.values()
+    if len(result.root_products) != 1:
+      raise Exception('Wrong number of result products: {}'.format(result.root_products))
+    state = result.root_products[0][1]
     if type(state) is Throw:
       raise Exception(state.exc)
     return state.value.dependencies
