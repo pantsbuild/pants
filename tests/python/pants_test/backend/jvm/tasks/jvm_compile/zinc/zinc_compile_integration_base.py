@@ -201,7 +201,6 @@ class BaseZincCompileIntegrationTest(object):
 
       config = {
         'cache.compile.zinc': {'write_to': [cache_dir], 'read_from': [cache_dir]},
-        'compile.zinc': {'incremental_caching': True },
       }
 
       srcfile = os.path.join(src_dir, 'org', 'pantsbuild', 'cachetest', 'A.scala')
