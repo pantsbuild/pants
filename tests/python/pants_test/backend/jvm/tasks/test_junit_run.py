@@ -23,8 +23,8 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_file_dump
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import safe_file_dump, touch
 from pants.util.timeout import TimeoutReached
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
@@ -467,3 +467,83 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     self.set_options(chroot=True)
     self._execute_junit_runner([('FooTest.java', content)],
                                target_name='tests/java/org/pantsbuild/foo:foo_test')
+
+  @ensure_cached(JUnitRun, expected_num_artifacts=0)
+  def test_junit_run_chroot_cwd_mutex(self):
+    with temporary_dir() as chroot:
+      self.set_options(chroot=True, cwd=chroot)
+      with self.assertRaises(JUnitRun.OptionError):
+        self.execute(self.context())
+
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
+  def test_junit_run_target_cwd_trumps_chroot(self):
+    with temporary_dir() as target_cwd:
+      self.create_files('config/org/pantsbuild/foo', ['files_dep_sentinel'])
+      files = self.make_target(
+        spec='config/org/pantsbuild/foo:sentinel',
+        target_type=Files,
+        sources=['files_dep_sentinel']
+      )
+      self.make_target(
+        spec='tests/java/org/pantsbuild/foo:foo_test',
+        target_type=JUnitTests,
+        sources=['FooTest.java'],
+        dependencies=[files],
+        cwd=target_cwd
+      )
+      content = dedent("""
+        package org.pantsbuild.foo;
+        import java.io.File;
+        import org.junit.Test;
+        import static org.junit.Assert.assertFalse;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {{
+          @Test
+          public void testFoo() {{
+            assertTrue(new File("target_cwd_sentinel").exists());
+
+            // We declare a Files dependency on this file, but since we run in a CWD not in a
+            // chroot and not in the build root, we can't find it at the expected relative path.
+            assertFalse(new File("config/org/pantsbuild/foo/files_dep_sentinel").exists());
+
+            // As a sanity check, it is at the the expected absolute path though.
+            File buildRoot = new File("{}");
+            assertTrue(new File(buildRoot,
+                                "config/org/pantsbuild/foo/files_dep_sentinel").exists());
+          }}
+        }}
+      """.format(self.build_root))
+      touch(os.path.join(target_cwd, 'target_cwd_sentinel'))
+      self.set_options(chroot=True)
+      self._execute_junit_runner([('FooTest.java', content)],
+                                 target_name='tests/java/org/pantsbuild/foo:foo_test')
+
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
+  def test_junit_run_target_cwd_trumps_cwd_option(self):
+    with temporary_dir() as target_cwd:
+      self.make_target(
+        spec='tests/java/org/pantsbuild/foo:foo_test',
+        target_type=JUnitTests,
+        sources=['FooTest.java'],
+        cwd=target_cwd
+      )
+      content = dedent("""
+        package org.pantsbuild.foo;
+        import java.io.File;
+        import org.junit.Test;
+        import static org.junit.Assert.assertFalse;
+        import static org.junit.Assert.assertTrue;
+        public class FooTest {
+          @Test
+          public void testFoo() {
+            assertTrue(new File("target_cwd_sentinel").exists());
+            assertFalse(new File("option_cwd_sentinel").exists());
+          }
+        }
+      """)
+      touch(os.path.join(target_cwd, 'target_cwd_sentinel'))
+      with temporary_dir() as option_cwd:
+        touch(os.path.join(option_cwd, 'option_cwd_sentinel'))
+        self.set_options(cwd=option_cwd)
+        self._execute_junit_runner([('FooTest.java', content)],
+                                   target_name='tests/java/org/pantsbuild/foo:foo_test')
