@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
+import shutil
 import sys
 from abc import abstractmethod
 from contextlib import contextmanager
@@ -27,6 +29,7 @@ from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, N
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import ErrorWhileTesting, TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scopes
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -36,8 +39,8 @@ from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_faile
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.argutil import ensure_arg, remove_arg
-from pants.util.contextutil import environment_as
-from pants.util.dirutil import safe_mkdir, safe_rmtree
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_rmtree
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
@@ -160,7 +163,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                   'All tests output also redirected to files in .pants.d/test/junit.')
     register('--cwd', advanced=True, fingerprint=True,
              help='Set the working directory. If no argument is passed, use the build root. '
-                  'If cwd is set on a target, it will supersede this argument.')
+                  'If cwd is set on a target, it will supersede this option. It is an error to '
+                  'use this option in combination with `--chroot`')
+    register('--chroot', advanced=True, fingerprint=True, type=bool, default=False,
+             help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '
+                  'will be copied to the chroot. If cwd is set on a target, it will supersede this'
+                  'option. It is an error to use this option in combination with `--cwd`'
+                  .format(Files.alias()))
     register('--strict-jvm-version', type=bool, advanced=True, fingerprint=True,
              help='If true, will strictly require running junits with the same version of java as '
                   'the platform -target level. Otherwise, the platform -target level will be '
@@ -205,6 +214,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     if cls.request_classes_by_source(options.test or ()):
       round_manager.require_data('classes_by_source')
 
+  class OptionError(TaskError):
+    """Indicates an invalid combination of options for this task."""
+
   def __init__(self, *args, **kwargs):
     super(JUnitRun, self).__init__(*args, **kwargs)
 
@@ -212,7 +224,16 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self._tests_to_run = options.test
     self._batch_size = options.batch_size
     self._fail_fast = options.fail_fast
-    self._working_dir = options.cwd or get_buildroot()
+
+    if options.cwd and options.chroot:
+      raise self.OptionError('Cannot set both `cwd` ({}) and ask for a `chroot` at the same time.'
+                             .format(options.cwd))
+
+    if options.chroot:
+      self._working_dir = None
+    else:
+      self._working_dir = options.cwd or get_buildroot()
+
     self._strict_jvm_version = options.strict_jvm_version
     self._failure_summary = options.failure_summary
     self._open = options.open
@@ -342,6 +363,29 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     else:
       return test_registry
 
+  @staticmethod
+  def _copy_files(dest_dir, target):
+    if isinstance(target, Files):
+      for source in target.sources_relative_to_buildroot():
+        src = os.path.join(get_buildroot(), source)
+        dest = os.path.join(dest_dir, source)
+        safe_mkdir_for(dest)
+        shutil.copy(src, dest)
+
+  @contextmanager
+  def _chroot(self, targets, workdir):
+    if workdir is not None:
+      yield workdir
+    else:
+      root_dir = os.path.join(self.workdir, '_chroots')
+      safe_mkdir(root_dir)
+      with temporary_dir(root_dir=root_dir) as chroot:
+        self.context.build_graph.walk_transitive_dependency_graph(
+          addresses=[t.address for t in targets],
+          work=functools.partial(self._copy_files, chroot)
+        )
+        yield chroot
+
   def _run_tests(self, test_registry, output_dir, coverage):
     coverage.instrument()
 
@@ -400,26 +444,27 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
         batch_test_specs = [test.render_test_spec() for test in batch]
         with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
-          self.context.log.debug('CWD = {}'.format(workdir))
-          self.context.log.debug('platform = {}'.format(platform))
-          with environment_as(**dict(target_env_vars)):
-            subprocess_result = self._spawn_and_wait(
-              executor=SubprocessExecutor(distribution),
-              distribution=distribution,
-              classpath=complete_classpath,
-              main=JUnit.RUNNER_MAIN,
-              jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
-              args=args + batch_tests,
-              workunit_factory=self.context.new_workunit,
-              workunit_name='run',
-              workunit_labels=[WorkUnitLabel.TEST],
-              cwd=workdir,
-              synthetic_jar_dir=output_dir,
-              create_synthetic_jar=self.synthetic_classpath,
-            )
-            self.context.log.debug('JUnit subprocess exited with result ({})'
-                                   .format(subprocess_result))
-            result += abs(subprocess_result)
+          with self._chroot(relevant_targets, workdir) as chroot:
+            self.context.log.debug('CWD = {}'.format(chroot))
+            self.context.log.debug('platform = {}'.format(platform))
+            with environment_as(**dict(target_env_vars)):
+              subprocess_result = self._spawn_and_wait(
+                executor=SubprocessExecutor(distribution),
+                distribution=distribution,
+                classpath=complete_classpath,
+                main=JUnit.RUNNER_MAIN,
+                jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
+                args=args + batch_tests,
+                workunit_factory=self.context.new_workunit,
+                workunit_name='run',
+                workunit_labels=[WorkUnitLabel.TEST],
+                cwd=chroot,
+                synthetic_jar_dir=output_dir,
+                create_synthetic_jar=self.synthetic_classpath,
+              )
+              self.context.log.debug('JUnit subprocess exited with result ({})'
+                                     .format(subprocess_result))
+              result += abs(subprocess_result)
 
           tests_info = self.parse_test_info(output_dir, parse_error_handler, ['classname'])
           for test_name, test_info in tests_info.items():
