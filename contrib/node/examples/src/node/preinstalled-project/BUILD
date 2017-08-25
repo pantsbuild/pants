@@ -4,7 +4,7 @@
 node_preinstalled_module(
   sources=globs('package.json', 'src/*.js', 'test/*.js'),
   dependencies_archive_url=
-    'https://s3.amazonaws.com/node-preinstalled-modules.pantsbuild.org/node_modules.tar.gz'
+    'https://node-preinstalled-modules.pantsbuild.org/node_modules.tar.gz'
 )
 
 node_test(
