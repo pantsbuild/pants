@@ -448,7 +448,7 @@ EOM
 # + bootstrap_native_code: Builds target-specific native engine binaries.
 source ${ROOT}/build-support/bin/native/bootstrap.sh
 
-readonly BINARY_BASE_URL=https://s3.amazonaws.com/binaries.pantsbuild.org
+readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 readonly NATIVE_ENGINE_BASE_URL=${BINARY_BASE_URL}/bin/native-engine
 
 function check_native_engine() {

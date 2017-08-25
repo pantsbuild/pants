@@ -55,7 +55,7 @@ class BinaryUtil(object):
     @classmethod
     def register_options(cls, register):
       register('--baseurls', type=list, advanced=True,
-               default=['https://s3.amazonaws.com/binaries.pantsbuild.org'],
+               default=['https://binaries.pantsbuild.org'],
                help='List of urls from which binary tools are downloaded.  Urls are searched in '
                     'order until the requested path is found.')
       register('--fetch-timeout-secs', type=int, default=30, advanced=True,
