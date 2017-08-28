@@ -111,7 +111,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           only_overridden: True
           show_history: True
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), 'options'])
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path), 'options'])
       self.assert_success(pants_run)
       self.assertIn('options.only_overridden = True', pants_run.stdout_data)
       self.assertIn('(from CONFIG in {})'.format(config_path), pants_run.stdout_data)
@@ -135,7 +135,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [options]
           colors: False
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path), 'options'])
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path), 'options'])
       self.assert_success(pants_run)
 
 
@@ -161,7 +161,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           colors: False
           scope: options
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn('ERROR] Invalid scope [invalid_scope]', pants_run.stderr_data)
@@ -180,7 +180,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           fail_fast: True
           invalid_option: True
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_option' under [test.junit]",
@@ -207,7 +207,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [test.junit]
           fail_fast: True
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr_data)
@@ -232,16 +232,16 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
       # Run with invalid config and invalid command line option.
       # Should error out with invalid command line option only.
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   '--test-junit-invalid=ALL',
                                   'goals'])
       self.assert_failure(pants_run)
-      self.assertIn("Exception message: Unrecognized command line flags on scope 'test.junit': --invalid",
-                    pants_run.stderr_data)
+      self.assertIn("Exception message: Unrecognized command line flags on scope 'test.junit': "
+                    "--invalid", pants_run.stderr_data)
 
       # Run with invalid config only.
       # Should error out with `bad_option` and `invalid_scope` in config.
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   'goals'])
       self.assert_failure(pants_run)
       self.assertIn("ERROR] Invalid option 'bad_option' under [test.junit]", pants_run.stderr_data)
@@ -284,11 +284,12 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           [GLOBAL]
           pants_ignore: +['some/random/dir']
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   '--no-colors',
                                   'options'])
       self.assert_success(pants_run)
-      self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG)",
+      self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {})"
+                    .format(config_path),
                     pants_run.stdout_data)
 
   @ensure_engine
@@ -301,9 +302,10 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
           pants_ignore: +['some/random/dir']
           pants_distdir: some/other/dist/dir
         """))
-      pants_run = self.run_pants(['--config-override={}'.format(config_path),
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
                                   '--no-colors',
                                   'options'])
       self.assert_success(pants_run)
-      self.assertIn("pants_ignore = ['.*/', '/some/other/dist/dir/', 'some/random/dir'] (from CONFIG)",
+      self.assertIn("pants_ignore = ['.*/', '/some/other/dist/dir/', 'some/random/dir'] "
+                    "(from CONFIG in {})".format(config_path),
                     pants_run.stdout_data)
