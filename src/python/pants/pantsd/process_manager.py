@@ -433,16 +433,16 @@ class ProcessManager(ProcessMetadataManager):
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
       else:
         try:
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
     else:
       # This prevents un-reaped, throw-away parent processes from lingering in the process table.
       os.waitpid(pid, 0)
@@ -465,8 +465,8 @@ class ProcessManager(ProcessMetadataManager):
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logger.critical(traceback.format_exc())
-
-      os._exit(0)
+      finally:
+        os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})
