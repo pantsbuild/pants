@@ -4,6 +4,21 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev11 (9/1/2017)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Centralize options tracking in the Parser. (#4832)
+  `PR #4832 <https://github.com/pantsbuild/pants/pull/4832>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump petgraph to 0.4.5 (#4836)
+  `PR #4836 <https://github.com/pantsbuild/pants/pull/4836>`_
+
 1.4.0.dev10 (8/25/2017)
 -----------------------
 
