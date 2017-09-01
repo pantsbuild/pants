@@ -27,3 +27,13 @@ python_library(
     'src/python/pants/util:contextutil',
   ],
 )
+
+python_library(
+  name = 'process_test_util',
+  sources = [
+    'process_test_util.py',
+  ],
+  dependencies = [
+    '3rdparty/python:psutil',
+  ],
+)

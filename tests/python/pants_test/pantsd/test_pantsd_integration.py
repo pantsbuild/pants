@@ -10,10 +10,9 @@ import signal
 import time
 from contextlib import contextmanager
 
-import psutil
-
 from pants.pantsd.process_manager import ProcessManager
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.process_test_util import check_process_exists_by_command
 
 
 class PantsDaemonMonitor(ProcessManager):
@@ -204,12 +203,10 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         )
 
         # Check for no stray pantsd-runner prcesses.
-        for proc in psutil.process_iter():
-          try:
-            pinfo = proc.cmdline()
-            self.assertFalse('pantsd-runner' in str(pinfo))
-          except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
+        self.assertFalse(check_process_exists_by_command('pantsd-runner'))
+        
+        # Assert pantsd is in a good functional state.
+        self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
 
       finally:
         # Explicitly kill pantsd (from a pantsd-launched runner).
