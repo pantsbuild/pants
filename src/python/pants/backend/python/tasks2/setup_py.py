@@ -312,7 +312,7 @@ class SetupPy(Task):
 
   @classmethod
   def has_provides(cls, target):
-    return cls.is_python_target(target) and target.provides
+    return cls.is_python_target(target) and target.provides is not None
 
   @classmethod
   def product_types(cls):
