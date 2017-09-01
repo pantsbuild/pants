@@ -8,8 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import signal
 import time
-import psutil
 from contextlib import contextmanager
+
+import psutil
 
 from pants.pantsd.process_manager import ProcessManager
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
