@@ -104,7 +104,7 @@ class PluginResolverTest(unittest.TestCase):
 
       self.assertEqual(2, len(working_set.entries))
 
-      # Kill the the repo source dir and re-resolve.  If the PluginResolver truly detects exact
+      # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
       # requirements it should skip any resolves and load directly from the still in-tact cache.
       safe_rmtree(repo_dir)
 

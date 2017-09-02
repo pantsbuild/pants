@@ -951,7 +951,7 @@ public class JarBuilder implements Closeable {
    *     excluded.
    * @return The jar file that was written.
    * @throws IOException if there was a problem writing the jar file.
-   * @throws DuplicateEntryException if the the policy in effect for an entry is
+   * @throws DuplicateEntryException if the policy in effect for an entry is
    *     {@link DuplicateAction#THROW} and that entry is a duplicate.
    */
   public File write(
@@ -981,7 +981,7 @@ public class JarBuilder implements Closeable {
    *     excluded.
    * @return The jar file that was written.
    * @throws IOException if there was a problem writing the jar file.
-   * @throws DuplicateEntryException if the the policy in effect for an entry is
+   * @throws DuplicateEntryException if the policy in effect for an entry is
    *     {@link DuplicateAction#THROW} and that entry is a duplicate.
    */
   public File write(

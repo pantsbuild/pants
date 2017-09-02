@@ -506,7 +506,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
             // chroot and not in the build root, we can't find it at the expected relative path.
             assertFalse(new File("config/org/pantsbuild/foo/files_dep_sentinel").exists());
 
-            // As a sanity check, it is at the the expected absolute path though.
+            // As a sanity check, it is at the expected absolute path though.
             File buildRoot = new File("{}");
             assertTrue(new File(buildRoot,
                                 "config/org/pantsbuild/foo/files_dep_sentinel").exists());
