@@ -9,10 +9,10 @@ import psutil
 
 
 def check_process_exists_by_command(name):
-  result = False
   for proc in psutil.process_iter():
     try:
-      result |= name in ''.join(proc.cmdline())
+      if name in ''.join(proc.cmdline()):
+        return True
     except (psutil.NoSuchProcess, psutil.AccessDenied):
       pass
-  return result
+  return False
