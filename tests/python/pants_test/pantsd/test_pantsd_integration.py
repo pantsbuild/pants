@@ -12,6 +12,7 @@ from contextlib import contextmanager
 
 from pants.pantsd.process_manager import ProcessManager
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.process_test_util import check_process_exists_by_command
 
 
 class PantsDaemonMonitor(ProcessManager):
@@ -179,6 +180,34 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         time.sleep(2)
 
         self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
+      finally:
+        # Explicitly kill pantsd (from a pantsd-launched runner).
+        self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
+
+      checker.assert_stopped()
+
+  def test_pantsd_runner_dies_after_failed_run(self):
+    with self.pantsd_test_context() as (workdir, pantsd_config, checker):
+      self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
+      try:
+        # Start pantsd implicitly via a throwaway invocation.
+        self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
+        checker.await_pantsd()
+
+        # Run target that throws an exception in pants.
+        self.assert_failure(
+          self.run_pants_with_workdir(
+            ['bundle', 'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'],
+            workdir,
+            pantsd_config)
+        )
+
+        # Check for no stray pantsd-runner prcesses.
+        self.assertFalse(check_process_exists_by_command('pantsd-runner'))
+        
+        # Assert pantsd is in a good functional state.
+        self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
+
       finally:
         # Explicitly kill pantsd (from a pantsd-launched runner).
         self.assert_success(self.run_pants_with_workdir(['kill-pantsd'], workdir, pantsd_config))
