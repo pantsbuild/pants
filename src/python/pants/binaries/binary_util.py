@@ -50,6 +50,9 @@ class BinaryUtil(object):
     """
     :API: public
     """
+    # N.B. `BinaryUtil` sources all of its options from bootstrap options, so that
+    # `BinaryUtil` instances can be created prior to `Subsystem` bootstrapping. So
+    # this options scope is unused, but required to remain a `Subsystem`.
     options_scope = 'binaries'
 
     @classmethod
