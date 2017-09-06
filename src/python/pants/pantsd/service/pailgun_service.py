@@ -79,14 +79,7 @@ class PailgunService(PantsService):
 
     @contextmanager
     def context_lock():
-      """This lock is used to safeguard Pailgun request handling against a fork() with the
-      scheduler lock held by another thread (e.g. the FSEventService thread), which can
-      lead to a pailgun deadlock.
-      """
-      if self._scheduler_service:
-        with self._scheduler_service.locked():
-          yield
-      else:
+      with self.lock:
         yield
 
     return PailgunServer(self._bind_addr, runner_factory, context_lock)

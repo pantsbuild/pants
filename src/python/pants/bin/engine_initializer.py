@@ -94,7 +94,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table_cls)
     logger.debug('build_graph is: %s', graph)
-    with self.scheduler.locked():
+    with self.scheduler.lock:
       # Ensure the entire generator is unrolled.
       for _ in graph.inject_specs_closure(target_roots.as_specs()):
         pass

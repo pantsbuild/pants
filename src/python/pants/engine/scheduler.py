@@ -10,7 +10,6 @@ import os
 import threading
 import time
 from collections import defaultdict
-from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
@@ -86,30 +85,30 @@ class WrappedNativeScheduler(object):
     self._register_rules(rule_index)
 
     self._scheduler = native.new_scheduler(
-        self._tasks,
-        self._root_subject_types,
-        build_root,
-        work_dir,
-        ignore_patterns,
-        Snapshot,
-        _Snapshots,
-        FileContent,
-        FilesContent,
-        Path,
-        Dir,
-        File,
-        Link,
-        has_products_constraint,
-        constraint_for(Address),
-        constraint_for(Variants),
-        constraint_for(PathGlobs),
-        constraint_for(Snapshot),
-        constraint_for(_Snapshots),
-        constraint_for(FilesContent),
-        constraint_for(Dir),
-        constraint_for(File),
-        constraint_for(Link),
-      )
+      self._tasks,
+      self._root_subject_types,
+      build_root,
+      work_dir,
+      ignore_patterns,
+      Snapshot,
+      _Snapshots,
+      FileContent,
+      FilesContent,
+      Path,
+      Dir,
+      File,
+      Link,
+      has_products_constraint,
+      constraint_for(Address),
+      constraint_for(Variants),
+      constraint_for(PathGlobs),
+      constraint_for(Snapshot),
+      constraint_for(_Snapshots),
+      constraint_for(FilesContent),
+      constraint_for(Dir),
+      constraint_for(File),
+      constraint_for(Link),
+    )
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
@@ -350,6 +349,10 @@ class LocalScheduler(object):
 
     self._scheduler.assert_ruleset_valid()
 
+  @property
+  def lock(self):
+    return self._product_graph_lock
+
   def trace(self):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
     with self._product_graph_lock:
@@ -399,11 +402,6 @@ class LocalScheduler(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
     return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
-
-  @contextmanager
-  def locked(self):
-    with self._product_graph_lock:
-      yield
 
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a list of tuples of:
