@@ -9,6 +9,7 @@ import logging
 import select
 import sys
 import traceback
+from contextlib import contextmanager
 
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
@@ -76,7 +77,12 @@ class PailgunService(PantsService):
 
       return self._runner_class(sock, exiter, arguments, environment, graph_helper, deferred_exc)
 
-    return PailgunServer(self._bind_addr, runner_factory, self.locked)
+    @contextmanager
+    def context_lock():
+      with self.lock:
+        yield
+
+    return PailgunServer(self._bind_addr, runner_factory, context_lock)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

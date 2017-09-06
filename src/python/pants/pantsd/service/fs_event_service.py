@@ -97,8 +97,7 @@ class FSEventService(PantsService):
 
   def fire_callback(self, handler_name, event_data):
     """Fire an event callback for a given handler."""
-    with self.lock:
-      return self._handlers[handler_name].callback(event_data)
+    return self._handlers[handler_name].callback(event_data)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

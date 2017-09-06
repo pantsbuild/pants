@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import threading
 from abc import abstractmethod
-from contextlib import contextmanager
 
 from pants.util.meta import AbstractClass
 

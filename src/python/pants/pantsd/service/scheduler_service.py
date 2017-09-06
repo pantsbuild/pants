@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import Queue
+import threading
 
 from pants.pantsd.service.pants_service import PantsService
 
@@ -33,6 +34,7 @@ class SchedulerService(PantsService):
 
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=64)
+    self._ready = threading.Event()
 
   @property
   def change_calculator(self):
@@ -57,10 +59,6 @@ class SchedulerService(PantsService):
 
   def _handle_batch_event(self, files):
     self._logger.debug('handling change event for: %s', files)
-    if not self._scheduler:
-      self._logger.debug('no scheduler. ignoring event.')
-      return
-
     self._scheduler.invalidate_files(files)
 
   def _process_event_queue(self):
@@ -70,19 +68,25 @@ class SchedulerService(PantsService):
     except Queue.Empty:
       return
 
-    try:
-      subscription, is_initial_event, files = (event['subscription'],
-                                               event['is_fresh_instance'],
-                                               [f.decode('utf-8') for f in event['files']])
-    except (KeyError, UnicodeDecodeError) as e:
-      self._logger.warn('%r raised by invalid watchman event: %s', e, event)
-      return
+    with self.lock:
+      try:
+        subscription, is_initial_event, files = (event['subscription'],
+                                                 event['is_fresh_instance'],
+                                                 [f.decode('utf-8') for f in event['files']])
+      except (KeyError, UnicodeDecodeError) as e:
+        self._logger.warn('%r raised by invalid watchman event: %s', e, event)
+        return
 
-    self._logger.debug('processing {} files for subscription {} (first_event={})'
-                       .format(len(files), subscription, is_initial_event))
+      self._logger.debug('processing {} files for subscription {} (first_event={})'
+                         .format(len(files), subscription, is_initial_event))
 
-    if not is_initial_event:  # Ignore the initial all files event from watchman.
-      self._handle_batch_event(files)
+      if is_initial_event:
+        # Once we've seen the initial watchman event, set the internal `Event`.
+        self._ready.set()
+      else:
+        # The first watchman event is a listing of all files - ignore it.
+        self._handle_batch_event(files)
+
     self._event_queue.task_done()
 
   def warm_product_graph(self, spec_roots):
@@ -90,8 +94,12 @@ class SchedulerService(PantsService):
 
     :returns: A `LegacyGraphHelper` instance for graph construction.
     """
-    self._graph_helper.warm_product_graph(spec_roots)
-    return self._graph_helper
+    # Block warming until the initial watchman filesystem event is seen.
+    self._ready.wait()
+
+    with self.lock:
+      self._graph_helper.warm_product_graph(spec_roots)
+      return self._graph_helper
 
   def run(self):
     """Main service entrypoint."""
