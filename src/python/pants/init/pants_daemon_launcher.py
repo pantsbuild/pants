@@ -97,8 +97,14 @@ class PantsDaemonLauncher(object):
 
   @testable_memoized_property
   def pantsd(self):
-    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._native,
-                       self._log_dir, reset_func=clean_global_runtime_state)
+    return PantsDaemon(
+      self._build_root,
+      self._pants_workdir,
+      self._log_level,
+      self._native,
+      self._log_dir,
+      reset_func=clean_global_runtime_state
+    )
 
   @testable_memoized_property
   def watchman_launcher(self):
@@ -134,10 +140,11 @@ class PantsDaemonLauncher(object):
     )
 
     return (
+      # Use the schedulers reentrant lock as the daemon's global lock.
+      legacy_graph_helper.scheduler.lock,
+      # Services.
       (fs_event_service, scheduler_service, pailgun_service),
-      # This is a mapping of named ports used by the daemon's services. In the default case these
-      # can be randomly assigned by the underlying implementation, so referencing them via options
-      # won't work.
+      # Port map.
       dict(pailgun=pailgun_service.pailgun_port)
     )
 
@@ -146,9 +153,10 @@ class PantsDaemonLauncher(object):
     watchman = self.watchman_launcher.maybe_launch()
 
     # Initialize pantsd services.
-    services, port_map = self._setup_services(watchman)
+    lock, services, port_map = self._setup_services(watchman)
 
     # Setup and fork pantsd.
+    self.pantsd.set_lock(lock)
     self.pantsd.set_services(services)
     self.pantsd.set_socket_map(port_map)
     self.pantsd.daemonize()

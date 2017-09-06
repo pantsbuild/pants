@@ -79,10 +79,15 @@ class PantsDaemon(ProcessManager):
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
     self._exiter = Exiter()
+    # Placeholder for a daemon-global lock for service<->service locking.
+    self._lock = None
 
   @property
   def is_killed(self):
     return self._kill_switch.is_set()
+
+  def set_lock(self, lock):
+    self._lock = lock
 
   def set_services(self, services):
     self._services = services
@@ -137,9 +142,10 @@ class PantsDaemon(ProcessManager):
     return result.log_stream
 
   def _setup_services(self, services):
+    assert self._lock is not None, 'PantsDaemon lock has not been set!'
     for service in services:
       self._logger.info('setting up service {}'.format(service))
-      service.setup()
+      service.setup(self._lock)
 
   def _run_services(self, services):
     """Service runner main loop."""

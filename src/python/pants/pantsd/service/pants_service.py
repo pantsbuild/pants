@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import threading
 from abc import abstractmethod
+from contextlib import contextmanager
 
 from pants.util.meta import AbstractClass
 
@@ -20,6 +21,7 @@ class PantsService(AbstractClass):
     super(PantsService, self).__init__()
     self.name = self.__class__.__name__
     self._kill_switch = threading.Event()
+    self._lock = None
 
   @property
   def is_killed(self):
@@ -34,8 +36,12 @@ class PantsService(AbstractClass):
   def pre_fork(self):
     """Called pre-fork, before `run` to allow for service->service or other side-effecting setup."""
 
-  def setup(self):
-    """Called before `run` to allow for service->service or other side-effecting setup."""
+  def setup(self, lock):
+    """Called before `run` to allow for service->service or other side-effecting setup.
+
+    :param threading.Lock lock: A global service<->service lock for guarding critical work.
+    """
+    self._lock = lock
 
   @abstractmethod
   def run(self):
@@ -44,3 +50,9 @@ class PantsService(AbstractClass):
   def terminate(self):
     """Called upon service teardown."""
     self._kill_switch.set()
+
+  @contextmanager
+  def locked(self):
+    """A contextmanager for executing critical sections in the daemon."""
+    with self._lock:
+      yield

@@ -35,11 +35,6 @@ class SchedulerService(PantsService):
     self._event_queue = Queue.Queue(maxsize=64)
 
   @property
-  def locked(self):
-    """Surfaces the scheduler's `locked` method as part of the service's public API."""
-    return self._scheduler.locked
-
-  @property
   def change_calculator(self):
     """Surfaces the change calculator."""
     return self._graph_helper.change_calculator
@@ -48,8 +43,9 @@ class SchedulerService(PantsService):
     """Pre-fork controls."""
     self._scheduler.pre_fork()
 
-  def setup(self):
+  def setup(self, lock):
     """Service setup."""
+    super(SchedulerService, self).setup(lock)
     # Register filesystem event handlers on an FSEventService instance.
     self._fs_event_service.register_all_files_handler(self._enqueue_fs_event)
 
