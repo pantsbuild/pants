@@ -114,10 +114,6 @@ class PantsDaemonLauncher(object):
     # ultimately import the pantsd services in order to itself launch pantsd.
     from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 
-    services = []
-
-    fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
-
     legacy_graph_helper = self._engine_initializer.setup_legacy_graph(
       self._pants_ignore_patterns,
       self._pants_workdir,
@@ -126,21 +122,24 @@ class PantsDaemonLauncher(object):
       exclude_target_regexps=self._exclude_target_regexp,
       subproject_roots=self._subproject_roots,
     )
+
+    fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
     scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
-    services.extend((fs_event_service, scheduler_service))
+    pailgun_service = PailgunService(
+      bind_addr=(self._pailgun_host, self._pailgun_port),
+      exiter_class=DaemonExiter,
+      runner_class=DaemonPantsRunner,
+      target_roots_class=TargetRoots,
+      scheduler_service=scheduler_service
+    )
 
-    pailgun_service = PailgunService(bind_addr=(self._pailgun_host, self._pailgun_port),
-                                     exiter_class=DaemonExiter,
-                                     runner_class=DaemonPantsRunner,
-                                     target_roots_class=TargetRoots,
-                                     scheduler_service=scheduler_service)
-    services.append(pailgun_service)
-
-    # Construct a mapping of named ports used by the daemon's services. In the default case these
-    # will be randomly assigned by the underlying implementation so we can't reference via options.
-    port_map = dict(pailgun=pailgun_service.pailgun_port)
-
-    return tuple(services), port_map
+    return (
+      (fs_event_service, scheduler_service, pailgun_service),
+      # This is a mapping of named ports used by the daemon's services. In the default case these
+      # can be randomly assigned by the underlying implementation, so referencing them via options
+      # won't work.
+      dict(pailgun=pailgun_service.pailgun_port)
+    )
 
   def _launch_pantsd(self):
     # Launch Watchman (if so configured).
