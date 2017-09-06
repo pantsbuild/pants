@@ -10,7 +10,6 @@ import os
 import threading
 import time
 from collections import defaultdict
-from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link

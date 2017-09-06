@@ -21,7 +21,6 @@ class PantsService(AbstractClass):
     super(PantsService, self).__init__()
     self.name = self.__class__.__name__
     self._kill_switch = threading.Event()
-    self._lock = None
 
   @property
   def is_killed(self):
@@ -41,7 +40,7 @@ class PantsService(AbstractClass):
 
     :param threading.Lock lock: A global service<->service lock for guarding critical work.
     """
-    self._lock = lock
+    self.lock = lock
 
   @abstractmethod
   def run(self):
@@ -50,9 +49,3 @@ class PantsService(AbstractClass):
   def terminate(self):
     """Called upon service teardown."""
     self._kill_switch.set()
-
-  @contextmanager
-  def locked(self):
-    """A contextmanager for executing critical sections in the daemon."""
-    with self._lock:
-      yield
