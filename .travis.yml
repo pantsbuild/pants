@@ -54,7 +54,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       # Docker runs will write files as root, so avoid caching for this shard.
       cache: false
@@ -86,7 +85,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -96,6 +94,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -113,7 +113,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -123,6 +122,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -140,7 +141,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -150,6 +150,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -167,7 +169,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -177,6 +178,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -194,7 +197,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -204,6 +206,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -221,7 +225,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -231,6 +234,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -248,7 +253,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -258,6 +262,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -275,7 +281,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -285,6 +290,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -302,7 +309,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -312,6 +318,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -329,7 +337,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -339,6 +346,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -356,7 +365,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -366,6 +374,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -383,7 +393,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -393,6 +402,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - openssl-dev
       language: python
       python: "2.7.13"
       before_install:
