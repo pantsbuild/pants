@@ -147,14 +147,6 @@ python_tests(
   ]
 )
 
-python_tests(
-  name = 'timeout',
-  sources = ['test_timeout.py'],
-  dependencies = [
-    'src/python/pants/util:timeout',
-  ]
-)
-
 python_library(
   name='xml_test_base',
   sources = ['xml_test_base.py'],

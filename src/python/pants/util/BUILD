@@ -124,11 +124,6 @@ python_library(
 )
 
 python_library(
-  name = 'timeout',
-  sources = ['timeout.py'],
-)
-
-python_library(
   name = 'xml_parser',
   sources = ['xml_parser.py'],
 )

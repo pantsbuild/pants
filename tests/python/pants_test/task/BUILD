@@ -65,7 +65,6 @@ python_tests(
     '3rdparty/python:mock',
     'src/python/pants/task',
     'src/python/pants/util:process_handler',
-    'src/python/pants/util:timeout',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
