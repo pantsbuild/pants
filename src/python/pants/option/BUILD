@@ -9,6 +9,7 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
+    'src/python/pants/util:dirutil',
     'src/python/pants/util:eval',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

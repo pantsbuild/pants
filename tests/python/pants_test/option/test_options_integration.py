@@ -291,21 +291,3 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {})"
                     .format(config_path),
                     pants_run.stdout_data)
-
-  @ensure_engine
-  def test_pants_ignore_option_non_default_dist_dir(self):
-    with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
-      config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
-      with open(config_path, 'w+') as f:
-        f.write(dedent("""
-          [GLOBAL]
-          pants_ignore: +['some/random/dir']
-          pants_distdir: some/other/dist/dir
-        """))
-      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path),
-                                  '--no-colors',
-                                  'options'])
-      self.assert_success(pants_run)
-      self.assertIn("pants_ignore = ['.*/', '/some/other/dist/dir/', 'some/random/dir'] "
-                    "(from CONFIG in {})".format(config_path),
-                    pants_run.stdout_data)

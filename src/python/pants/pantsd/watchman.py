@@ -20,6 +20,9 @@ from pants.util.retry import retry_on_exception
 class Watchman(ProcessManager):
   """Watchman process manager and helper class."""
 
+  class WatchmanCrash(Exception):
+    """Raised when Watchman crashes."""
+
   STARTUP_TIMEOUT_SECONDS = 30.0
   SOCKET_TIMEOUT_SECONDS = 5.0
 
@@ -77,7 +80,6 @@ class Watchman(ProcessManager):
     return os.path.abspath(watchman_path)
 
   def _maybe_init_metadata(self):
-    self._logger.debug('ensuring creation of directory: {}'.format(self._watchman_work_dir))
     safe_mkdir(self._watchman_work_dir)
     # Initialize watchman with an empty, but valid statefile so it doesn't complain on startup.
     safe_file_dump(self._state_file, '{}')
@@ -147,8 +149,12 @@ class Watchman(ProcessManager):
     try:
       return self.client.query('watch-project', os.path.realpath(path))
     finally:
-      self.client.setTimeout(self._timeout)
-      self._logger.debug('setting post-startup watchman timeout to %s', self._timeout)
+      try:
+        self.client.setTimeout(self._timeout)
+      except Exception:
+        self._logger.debug('failed to set post-startup watchman timeout to %s', self._timeout)
+      else:
+        self._logger.debug('set post-startup watchman timeout to %s', self._timeout)
 
   def subscribed(self, build_root, handlers):
     """Bulk subscribe generator for StreamableWatchmanClient.
@@ -164,13 +170,16 @@ class Watchman(ProcessManager):
 
     self._logger.debug('watchman command_list is: {}'.format(command_list))
 
-    for event in self.client.stream_query(command_list):
-      if event is None:
-        yield None, None
-      elif 'subscribe' in event:
-        self._logger.info('confirmed watchman subscription: {}'.format(event))
-        yield None, None
-      elif 'subscription' in event:
-        yield event.get('subscription'), event
-      else:
-        self._logger.warning('encountered non-subscription event: {}'.format(event))
+    try:
+      for event in self.client.stream_query(command_list):
+        if event is None:
+          yield None, None
+        elif 'subscribe' in event:
+          self._logger.info('confirmed watchman subscription: {}'.format(event))
+          yield None, None
+        elif 'subscription' in event:
+          yield event.get('subscription'), event
+        else:
+          self._logger.warning('encountered non-subscription event: {}'.format(event))
+    except self.client.WatchmanError as e:
+      raise self.WatchmanCrash(e)
