@@ -95,7 +95,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -123,7 +123,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -151,7 +151,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -179,7 +179,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -207,7 +207,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -235,7 +235,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -263,7 +263,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -291,7 +291,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -319,7 +319,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -347,7 +347,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -375,7 +375,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -403,7 +403,7 @@ matrix:
             - gcc-multilib
             - python-dev
             - openssl
-            - openssl-dev
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
