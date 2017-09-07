@@ -7,11 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import subprocess
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.dirutil import safe_mkdir
+from pants.util.process_handler import subprocess
 
 from pants.contrib.android.targets.android_binary import AndroidBinary
 from pants.contrib.android.tasks.android_task import AndroidTask

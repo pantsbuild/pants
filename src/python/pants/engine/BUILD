@@ -96,6 +96,7 @@ python_library(
     ':struct',
     'src/python/pants/build_graph',
     'src/python/pants/util:objects',
+    'src/python/pants/util:process_handler',
   ]
 )
 

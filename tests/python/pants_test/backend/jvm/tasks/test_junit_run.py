@@ -6,10 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from textwrap import dedent
-
-from mock import patch
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.junit_tests import JUnitTests
@@ -25,7 +22,7 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_file_dump, touch
-from pants.util.timeout import TimeoutReached
+from pants.util.process_handler import subprocess
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import global_subsystem_instance, init_subsystem
 from pants_test.tasks.task_test_base import ensure_cached
@@ -100,59 +97,6 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
       )
 
     self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
-
-  @ensure_cached(JUnitRun, expected_num_artifacts=1)
-  def test_junit_runner_timeout_success(self):
-    """When we set a timeout and don't force failure, succeed."""
-
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      self.set_options(timeout_default=1)
-      self.set_options(timeouts=True)
-      self._execute_junit_runner(
-        [('FooTest.java', dedent("""
-          import org.junit.Test;
-          import static org.junit.Assert.assertTrue;
-          public class FooTest {
-            @Test
-            public void testFoo() {
-              assertTrue(5 > 3);
-            }
-          }
-        """))]
-      )
-
-      # Ensures that Timeout is instantiated with a 1 second timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (1,))
-
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
-  def test_junit_runner_timeout_fail(self):
-    """When we set a timeout and force a failure, fail."""
-
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__.side_effect = TimeoutReached(1)
-
-      self.set_options(timeout_default=1)
-      self.set_options(timeouts=True)
-      with self.assertRaises(TaskError) as cm:
-        self._execute_junit_runner(
-          [('FooTest.java', dedent("""
-            import org.junit.Test;
-            import static org.junit.Assert.assertTrue;
-            public class FooTest {
-              @Test
-              public void testFoo() {
-                assertTrue(5 > 3);
-              }
-            }
-          """))]
-        )
-
-      self.assertEqual([t.name for t in cm.exception.failed_targets], ['foo_test'])
-
-      # Ensures that Timeout is instantiated with a 1 second timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (1,))
 
   def _execute_junit_runner(self, list_of_filename_content_tuples, create_some_resources=True,
                             target_name=None):

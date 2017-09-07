@@ -14,12 +14,13 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:thrift_util',
     'src/python/pants/build_graph',
+    'src/python/pants/option',
     'src/python/pants/process',
     'src/python/pants/source',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-    'src/python/pants/option',
+    'src/python/pants/util:process_handler',
   ]
 )

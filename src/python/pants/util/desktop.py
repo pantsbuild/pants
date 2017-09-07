@@ -5,9 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import subprocess
-
 from pants.util.osutil import get_os_name
+from pants.util.process_handler import subprocess
 
 
 class OpenError(Exception):

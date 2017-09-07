@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 import shutil
-import subprocess
 
 from twitter.common.collections import OrderedSet
 
@@ -19,6 +18,7 @@ from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class ApacheThriftGenBase(SimpleCodegenTask):

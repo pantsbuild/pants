@@ -62,9 +62,10 @@ python_tests(
   name='testrunner_task_mixin',
   sources=['test_testrunner_task_mixin.py'],
   dependencies=[
+    '3rdparty/python:mock',
     'src/python/pants/task',
+    'src/python/pants/util:process_handler',
     'src/python/pants/util:timeout',
     'tests/python/pants_test/tasks:task_test_base',
-    '3rdparty/python:mock',
   ]
 )

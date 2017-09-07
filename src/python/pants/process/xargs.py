@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
-import subprocess
+
+from pants.util.process_handler import subprocess
 
 
 class Xargs(object):

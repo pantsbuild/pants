@@ -5,11 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import subprocess
 import unittest
 
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.scm.git import Git
+from pants.util.process_handler import subprocess
 from pants_test.base.pants_ignore_test_base import PantsIgnoreTestBase
 
 

@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import pstats
 import shutil
-import subprocess
 import sys
 import unittest
 import zipfile
@@ -18,6 +17,7 @@ import mock
 from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as,
                                     exception_logging, hard_exit_handler, maybe_profiled, open_zip,
                                     pushd, stdio_as, temporary_dir, temporary_file)
+from pants.util.process_handler import subprocess
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)

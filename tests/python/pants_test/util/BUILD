@@ -17,6 +17,7 @@ python_tests(
   dependencies = [
     '3rdparty/python:mock',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -106,7 +107,7 @@ python_tests(
   name = 'process_handler',
   sources = ['test_process_handler.py'],
   dependencies = [
-    'src/python/pants/util:process_handler'
+    'src/python/pants/util:process_handler',
   ]
 )
 

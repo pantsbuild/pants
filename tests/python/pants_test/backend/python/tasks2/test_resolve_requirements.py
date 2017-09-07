@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 
 from pex.interpreter import PythonInterpreter
 
@@ -18,6 +17,7 @@ from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file
+from pants.util.process_handler import subprocess
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
