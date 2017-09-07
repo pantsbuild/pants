@@ -50,20 +50,10 @@ class BinaryUtil(object):
     """
     :API: public
     """
+    # N.B. `BinaryUtil` sources all of its options from bootstrap options, so that
+    # `BinaryUtil` instances can be created prior to `Subsystem` bootstrapping. So
+    # this options scope is unused, but required to remain a `Subsystem`.
     options_scope = 'binaries'
-
-    @classmethod
-    def register_options(cls, register):
-      register('--baseurls', type=list, advanced=True,
-               default=['https://binaries.pantsbuild.org'],
-               help='List of urls from which binary tools are downloaded.  Urls are searched in '
-                    'order until the requested path is found.')
-      register('--fetch-timeout-secs', type=int, default=30, advanced=True,
-               help='Timeout in seconds for url reads when fetching binary tools from the '
-                    'repos specified by --baseurls')
-      register('--path-by-id', type=dict, advanced=True,
-               help='Maps output of uname for a machine to a binary search path.  e.g. '
-               '{ ("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"] }')
 
     @classmethod
     def create(cls):
@@ -72,8 +62,12 @@ class BinaryUtil(object):
       """
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
-      return BinaryUtil(options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir,
-                        options.path_by_id)
+      return BinaryUtil(
+        options.binaries_baseurls,
+        options.binaries_fetch_timeout_secs,
+        options.pants_bootstrapdir,
+        options.binaries_path_by_id
+      )
 
   class MissingMachineInfo(TaskError):
     """Indicates that pants was unable to map this machine's OS to a binary path prefix."""

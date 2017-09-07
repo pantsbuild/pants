@@ -145,6 +145,18 @@ class GlobalOptionsRegistrar(Optionable):
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
 
+    # BinaryUtil options.
+    register('--binaries-baseurls', type=list, advanced=True,
+             default=['https://binaries.pantsbuild.org'],
+             help='List of URLs from which binary tools are downloaded. URLs are searched in '
+                  'order until the requested path is found.')
+    register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True,
+             help='Timeout in seconds for URL reads when fetching binary tools from the '
+                  'repos specified by --baseurls.')
+    register('--binaries-path-by-id', type=dict, advanced=True,
+             help=('Maps output of uname for a machine to a binary search path. e.g. '
+             '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"]}'))
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""
