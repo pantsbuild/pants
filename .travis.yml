@@ -249,7 +249,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 0/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 0/8 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -277,7 +277,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 1/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 1/8 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -305,7 +305,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 2/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 2/8 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -333,7 +333,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 3/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 3/8 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -361,7 +361,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 4/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 4/8 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -389,7 +389,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 5/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 5/8 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -417,7 +417,35 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 6/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 6/8 "${SHARD}"
+
+    - os: linux
+      dist: trusty
+      sudo: required
+      addons:
+        apt:
+          packages:
+            - lib32stdc++6
+            - lib32z1
+            - lib32z1-dev
+            - gcc-multilib
+            - python-dev
+            - openssl
+            - libssl-dev
+      language: python
+      python: "2.7.13"
+      before_install:
+        # Remove bad openjdk6 from trusty image, so
+        # Pants will pick up oraclejdk6 from `packages` above.
+        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
+        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
+        - jdk_switcher use oraclejdk8
+      before_script:
+        - ./build-support/bin/install-android-sdk.sh
+      env:
+        - SHARD="Python integration tests for pants - shard 8"
+      script:
+        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 7/8 "${SHARD}"
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
