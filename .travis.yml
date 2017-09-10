@@ -81,7 +81,6 @@ matrix:
           -e "HOME=${HOME}"
           "${DOCKER_IMAGE}"
           sh -c "
-            export PATH=/opt/python/cp27-cp27mu/bin:/opt/rh/devtoolset-2/root/usr/bin:${PATH} ;
             cd $TRAVIS_BUILD_DIR && ./build-support/bin/native/prepare-binary-deploy.sh
           "
 
