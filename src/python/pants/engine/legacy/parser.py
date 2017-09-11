@@ -50,11 +50,12 @@ class _Registrar(BuildFileTargetFactory):
 
 
 class _GlobWrapper(object):
-  def __init__(self, glob_type):
+  def __init__(self, parse_context, glob_type):
+    self._parse_context = parse_context
     self._glob_type = glob_type
 
-  def __call__(*args, **kwargs):
-    return glob_type(*args, spec_path=parse_context.rel_path, **kwargs)
+  def __call__(self, *args, **kwargs):
+    return self._glob_type(*args, spec_path=self._parse_context.rel_path, **kwargs)
 
 
 class LegacyPythonCallbacksParser(Parser):
@@ -105,9 +106,9 @@ class LegacyPythonCallbacksParser(Parser):
     # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
     # The strategy for https://github.com/pantsbuild/pants/issues/3560 should account for
     # migrating these additional captured arguments to typed Sources.
-    symbols['globs'] = _GlobWrapper(Globs)
-    symbols['rglobs'] = _GlobWrapper(RGlobs)
-    symbols['zglobs'] = _GlobWrapper(ZGlobs)
+    symbols['globs'] = _GlobWrapper(parse_context, Globs)
+    symbols['rglobs'] = _GlobWrapper(parse_context, RGlobs)
+    symbols['zglobs'] = _GlobWrapper(parse_context, ZGlobs)
 
     symbols['bundle'] = BundleAdaptor
 
