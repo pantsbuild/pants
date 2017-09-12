@@ -38,6 +38,9 @@ def _import(typename):
 
 
 class JsonParser(Parser):
+  def __init__(self, symbol_table):
+    super(JsonParser, self).__init__()
+    self.symbol_table = symbol_table
 
   def _as_type(self, type_or_name):
     return _import(type_or_name) if isinstance(type_or_name, six.string_types) else type_or_name
@@ -198,6 +201,10 @@ class PythonAssignmentsParser(Parser):
   objects will be addressable via their top-level variable names in the parsed namespace.
   """
 
+  def __init__(self, symbol_table):
+    super(PythonAssignmentsParser, self).__init__()
+    self.symbol_table = symbol_table
+
   @memoized_property
   def _globals(self):
     def aliased(type_alias, object_type, **kwargs):
@@ -244,8 +251,9 @@ class PythonCallbacksParser(Parser):
   addressable via their name in the parsed namespace.
   """
 
-  def __init__(self, *args, **kwargs):
-    super(PythonCallbacksParser, self).__init__(*args, **kwargs)
+  def __init__(self, symbol_table):
+    super(PythonCallbacksParser, self).__init__()
+    self.symbol_table = symbol_table
     self._lock = threading.Lock()
 
   @memoized_property

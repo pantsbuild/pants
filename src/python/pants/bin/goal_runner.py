@@ -101,6 +101,7 @@ class GoalRunnerFactory(object):
           pants_ignore_patterns,
           workdir,
           native=native,
+          build_file_aliases=self._build_config.registered_aliases(),
           build_ignore_patterns=build_ignore_patterns,
           exclude_target_regexps=exclude_target_regexps,
           subproject_roots=subproject_build_roots,

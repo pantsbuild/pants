@@ -68,11 +68,17 @@ class LegacyPythonCallbacksParser(Parser):
   macros and target factories.
   """
 
-  def __init__(self, symbol_table):
-    super(LegacyPythonCallbacksParser, self).__init__(symbol_table)
-    # TODO: Nasty escape hatch: see https://github.com/pantsbuild/pants/issues/3561
-    self._symbols = LegacyPythonCallbacksParser._generate_symbols(self.symbol_table.table(),
-                                                                  self.symbol_table.aliases())
+  def __init__(self, symbol_table, aliases):
+    """
+    :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
+      additional aliases.
+    :type symbol_table: :class:`pants.engine.parser.SymbolTable`
+    :param aliases: Additional BuildFileAliases to register.
+    :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    """
+    super(LegacyPythonCallbacksParser, self).__init__()
+    self._symbols, self._parse_context = LegacyPythonCallbacksParser._generate_symbols(
+        symbol_table, aliases)
 
   @staticmethod
   def _generate_symbols(symbol_table, aliases):
@@ -80,13 +86,12 @@ class LegacyPythonCallbacksParser(Parser):
 
     # Compute "per path" symbols.  For performance, we use the same ParseContext, which we
     # mutate (in a critical section) to set the rel_path appropriately before it's actually used.
-    # This allows this memoized method to depend only on the symbol_table, thus reusing
-    # the same symbols for all parses.  Meanwhile we set the rel_path to None, so that we get
-    # a loud error if anything tries to use it before it's set.
+    # This allows this method to reuse the same symbols for all parses.  Meanwhile we set the
+    # rel_path to None, so that we get a loud error if anything tries to use it before it's set.
     # TODO: See https://github.com/pantsbuild/pants/issues/3561
     parse_context = ParseContext(rel_path=None, type_aliases=symbols)
 
-    for alias, symbol in symbol_table.items():
+    for alias, symbol in symbol_table.table().items():
       registrar = _Registrar(parse_context, alias, symbol)
       symbols[alias] = registrar
       symbols[symbol] = registrar
@@ -115,10 +120,9 @@ class LegacyPythonCallbacksParser(Parser):
     return symbols, parse_context
 
   def parse(self, filepath, filecontent):
-    symbols, parse_context = self._symbols
     python = filecontent
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.
-    parse_context._storage.clear(os.path.dirname(filepath))
-    six.exec_(python, symbols)
-    return list(parse_context._storage.objects)
+    self._parse_context._storage.clear(os.path.dirname(filepath))
+    six.exec_(python, self._symbols)
+    return list(self._parse_context._storage.objects)
