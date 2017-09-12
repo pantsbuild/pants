@@ -106,7 +106,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
   def _populate(self, scheduler, address):
     """Perform an ExecutionRequest to parse the given Address into a Struct."""
-    request = scheduler.execution_request([TestTable.constraint()], [address])
+    request = scheduler.execution_request([TestTable().constraint()], [address])
     root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
     return root_entries[0]
