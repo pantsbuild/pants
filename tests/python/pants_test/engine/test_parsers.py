@@ -229,7 +229,7 @@ class JsonParserTest(unittest.TestCase):
     """).strip()
     filepath = '/dev/null'
     with self.assertRaises(parser.ParseError) as exc:
-      parsers.JsonParser.parse(filepath, document, symbol_table=EmptyTable())
+      parsers.JsonParser(EmptyTable()).parse(filepath, document)
 
     # Strip trailing whitespace from the message since our expected literal below will have
     # trailing ws stripped via editors and code reviews calling for it.
@@ -327,7 +327,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser, document, symbol_table=EmptyTable())
+    results = parse(parsers.PythonAssignmentsParser(EmptyTable()), document)
     self.assertEqual([Bob(name='nancy', hobbies=[1, 2, 3])], results)
 
     # No symbol table was used so no `type_alias` plumbing can be expected.
@@ -339,7 +339,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser, document, symbol_table=TestTable2())
+    results = parse(parsers.PythonAssignmentsParser(TestTable2()), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])
 
@@ -352,6 +352,6 @@ class PythonCallbacksParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonCallbacksParser, document, symbol_table=TestTable2())
+    results = parse(parsers.PythonCallbacksParser(TestTable2()), document)
     self.assertEqual([Bob(name='bill', hobbies=[1, 2, 3])], results)
     self.assertEqual('nancy', results[0]._asdict()['type_alias'])
