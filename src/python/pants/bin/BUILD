@@ -25,7 +25,6 @@ python_library(
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
-    'src/python/pants/engine:storage',
     'src/python/pants/goal',
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',

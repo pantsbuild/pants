@@ -10,7 +10,6 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/engine:fs',
-    'src/python/pants/engine:storage',
     'src/python/pants/subsystem:subsystem',
   ],
 )

@@ -18,7 +18,6 @@ import pkg_resources
 import six
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.engine.storage import Storage
 from pants.option.custom_types import dir_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
@@ -449,28 +448,25 @@ class ObjectIdMap(object):
   """
 
   def __init__(self):
-    # Objects indexed by their keys, i.e, content digests
-    self._objects = Storage.create()
     # Memoized object Ids.
-    self._id_to_key = dict()
-    self._key_to_id = dict()
+    self._id_to_obj = dict()
+    self._obj_to_id = dict()
     self._next_id = 0
 
   def put(self, obj):
-    key = self._objects.put(obj)
     new_id = self._next_id
-    oid = self._key_to_id.setdefault(key, new_id)
+    oid = self._obj_to_id.setdefault(obj, new_id)
     if oid is not new_id:
       # Object already existed.
       return oid
 
     # Object is new/unique.
-    self._id_to_key[oid] = key
+    self._id_to_obj[oid] = obj
     self._next_id += 1
     return oid
 
   def get(self, oid):
-    return self._objects.get(self._id_to_key[oid])
+    return self._id_to_obj[oid]
 
 
 class ExternContext(object):
@@ -511,9 +507,9 @@ class ExternContext(object):
     buf_buf = self._ffi.new('Buffer[]', bufs)
     return (buf_buf, len(bufs), self.to_value(buf_buf))
 
-  def vals_buf(self, keys):
-    buf = self._ffi.new('Value[]', keys)
-    return (buf, len(keys), self.to_value(buf))
+  def vals_buf(self, vals):
+    buf = self._ffi.new('Value[]', vals)
+    return (buf, len(vals), self.to_value(buf))
 
   def type_ids_buf(self, types):
     buf = self._ffi.new('TypeId[]', types)

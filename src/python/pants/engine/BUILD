@@ -171,14 +171,3 @@ python_library(
     'src/python/pants/util:objects',
   ]
 )
-
-python_library(
-  name='storage',
-  sources=['storage.py'],
-  dependencies=[
-    ':nodes',
-    ':objects',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
-  ]
-)
