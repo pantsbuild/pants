@@ -21,9 +21,9 @@ from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, Ju
                                          PythonTestsAdaptor, RemoteSourcesAdaptor,
                                          ScalaLibraryAdaptor, TargetAdaptor)
 from pants.engine.mapper import AddressMapper
+from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
-from pants.engine.subsystem.native import Native
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.memo import memoized_method
@@ -92,7 +92,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
-    with self.scheduler.locked():
+    with self.scheduler.lock:
       # Ensure the entire generator is unrolled.
       for _ in graph.inject_specs_closure(target_roots.as_specs()):
         pass
@@ -129,7 +129,8 @@ class EngineInitializer(object):
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
-    :param bool include_trace_on_error: If True, when an error occurs, the error message will include the graph trace.
+    :param bool include_trace_on_error: If True, when an error occurs, the error message will
+                include the graph trace.
     :returns: A tuple of (scheduler, engine, symbol_table, build_graph_cls).
     """
 
@@ -147,7 +148,7 @@ class EngineInitializer(object):
                                    subproject_roots=subproject_roots)
 
     # Load the native backend.
-    native = native or Native.Factory.global_instance().create()
+    native = native or Native.create()
 
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.

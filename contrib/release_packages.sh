@@ -82,7 +82,7 @@ PKG_SCALAJS=(
 function pkg_scalajs_install_test() {
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.scalajs==$(local_version)']" \
-      test contrib/scalajs::
+      test.pytest --no-timeouts contrib/scalajs::
 }
 
 PKG_PYTHON_CHECKS=(

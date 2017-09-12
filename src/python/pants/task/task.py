@@ -214,7 +214,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    pairs = self.context.options.get_fingerprintable_for_scope(scope)
+    pairs = self.context.options.get_fingerprintable_for_scope(
+      scope,
+      include_passthru=self.supports_passthru_args()
+    )
     hasher = sha1()
     for (option_type, option_val) in pairs:
       fp = self._options_fingerprinter.fingerprint(option_type, option_val)

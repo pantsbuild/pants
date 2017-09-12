@@ -1,9 +1,10 @@
 ansicolors==1.0.2
 beautifulsoup4>=4.3.2,<4.4
-cffi==1.7.0
+cffi==1.10.0
 coverage>=4.3.4,<4.4
 docutils>=0.12,<0.13
 fasteners==0.14.1
+faulthandler==2.6
 futures==3.0.5
 isort==4.2.5
 Markdown==2.1.1
@@ -11,7 +12,7 @@ mock==2.0.0
 packaging==16.8
 pathspec==0.5.0
 pep8==1.6.2
-pex==1.2.8
+pex==1.2.11
 psutil==4.3.0
 pyflakes==1.1.0
 Pygments==1.4
@@ -19,7 +20,7 @@ pystache==0.5.3
 pytest-cov>=2.4,<2.5
 pytest>=3.0.7,<4.0
 pywatchman==1.3.0
-requests>=2.5.0,<2.6
+requests==2.5.0,<2.19
 scandir==1.2
 setproctitle==1.1.10
 setuptools==30.0.0

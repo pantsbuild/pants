@@ -37,6 +37,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Drew Rothstein
 + Dumitru Daniliuc
 + Ebube Chuba
++ Eitan Adler
 + Emily Caveness
 + Eric Ayers
 + Eric Danielson
@@ -48,6 +49,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Florian Leibert
 + Gabriel Gonzalez
 + Garrett Malmquist
++ Gary M. Josack
 + Harley Cooper
 + Hwasung Lee
 + Igor Morozov

@@ -2,6 +2,22 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'util',
+  sources = ['util.py'],
+  dependencies = [
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/engine:addressable',
+    'src/python/pants/engine:native',
+    'src/python/pants/engine:parser',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:scheduler',
+    'src/python/pants/engine:struct',
+    'tests/python/pants_test/option/util',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+  ],
+)
+
+python_library(
   name = 'engine_test_base',
   sources = ['base_engine_test.py'],
   dependencies = [
@@ -19,15 +35,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:legacy_engine',
     'tests/python/pants_test/base:context_utils',
-  ],
-)
-
-python_tests(
-  name = 'util',
-  sources = ['util.py'],
-  dependencies = [
-    'src/python/pants/engine/subsystem:native',
-    'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
 
@@ -169,7 +176,6 @@ python_tests(
     '3rdparty/python/twitter/commons:twitter.common.collections',
     ':util',
     ':scheduler_test_base',
-    'src/python/pants/engine/subsystem:native',
     'src/python/pants/engine:build_files',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',

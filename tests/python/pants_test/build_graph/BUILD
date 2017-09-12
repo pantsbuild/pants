@@ -121,8 +121,20 @@ python_tests(
   dependencies = [
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:payload',
     'src/python/pants/build_graph',
+    'src/python/pants/source',
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
+  ]
+)
+
+python_tests(
+  name = 'files',
+  sources = ['test_files.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
+    'src/python/pants/source',
+    'tests/python/pants_test:base_test',
   ]
 )

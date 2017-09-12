@@ -307,24 +307,30 @@ class Options(object):
         # This makes the code a bit neater.
         values.update(self.for_scope(deprecated_scope))
 
-    # Record the value derivation.
-    for option in values:
-      self._option_tracker.record_option(scope=scope, option=option, value=values[option],
-                                         rank=values.get_rank(option))
-
     # Cache the values.
     self._values_by_scope[scope] = values
 
     return values
 
-  def get_fingerprintable_for_scope(self, scope):
+  def get_fingerprintable_for_scope(self, scope, include_passthru=False):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg.
 
+    :param str scope: The scope to gather fingerprintable options for.
+    :param bool include_passthru: Whether to include passthru args captured by `scope` in the
+                                  fingerprintable options.
+
     :API: public
     """
     pairs = []
+
+    if include_passthru:
+      # Passthru args can only be sent to outermost scopes so we gather them once here up-front.
+      passthru_args = self.passthru_args_for_scope(scope)
+      # NB: We can't sort passthru args, the underlying consumer may be order-sensitive.
+      pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
+
     # Note that we iterate over options registered at `scope` and at all enclosing scopes, since
     # option-using code can read those values indirectly via its own OptionValueContainer, so
     # they can affect that code's output.

@@ -15,11 +15,12 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.context import Context
-
+from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.scrooge.tasks.scrooge_gen import ScroogeGen
+
 
 GEN_ADAPT = '--gen-adapt'
 
@@ -163,10 +164,15 @@ class ScroogeGenTest(NailgunTaskTestBase):
       self.assertEquals(call_kwargs['target_type'], library_type)
       self.assertEquals(call_kwargs['dependencies'], OrderedSet())
       self.assertEquals(call_kwargs['provides'], None)
-      self.assertEquals(call_kwargs['sources'], [])
       self.assertEquals(call_kwargs['derived_from'], target)
       self.assertEquals(call_kwargs['strict_deps'], True)
       self.assertEquals(call_kwargs['fatal_warnings'], False)
+
+      sources = call_kwargs['sources']
+      if isinstance(sources, EagerFilesetWithSpec):
+        self.assertEquals(sources.files, [])
+      else:
+        self.assertEquals(sources, [])
 
     finally:
       Context.add_new_target = saved_add_new_target

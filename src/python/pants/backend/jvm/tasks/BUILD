@@ -345,6 +345,7 @@ python_library(
   sources = globs('reports/*.py'),
   dependencies = [
     'src/python/pants/base:mustache',
+    'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:strutil',
@@ -376,6 +377,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
     'src/python/pants/build_graph',
+    'src/python/pants/invalidation',
     'src/python/pants/java/distribution',
     'src/python/pants/java/junit',
     'src/python/pants/java:executor',
@@ -383,7 +385,6 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:argutil',
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

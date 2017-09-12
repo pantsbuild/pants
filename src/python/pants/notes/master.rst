@@ -5,6 +5,296 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev12 (9/8/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Migrate BinaryUtil options to bootstrap options. (#4846)
+  `PR #4846 <https://github.com/pantsbuild/pants/pull/4846>`_
+
+Bugfixes
+~~~~~~~~
+
+* Clean up stray pantsd-runner processes (#4835)
+  `PR #4835 <https://github.com/pantsbuild/pants/pull/4835>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Repair `BinaryNotFound` due to `sslv3 alert handshake failure`. (#4853)
+  `PR #4853 <https://github.com/pantsbuild/pants/pull/4853>`_
+
+* [pantsd] Improve locking. (#4847)
+  `PR #4847 <https://github.com/pantsbuild/pants/pull/4847>`_
+
+* Upgrade pex to latest. (#4843)
+  `PR #4843 <https://github.com/pantsbuild/pants/pull/4843>`_
+
+1.4.0.dev11 (9/1/2017)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Centralize options tracking in the Parser. (#4832)
+  `PR #4832 <https://github.com/pantsbuild/pants/pull/4832>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump petgraph to 0.4.5 (#4836)
+  `PR #4836 <https://github.com/pantsbuild/pants/pull/4836>`_
+
+1.4.0.dev10 (8/25/2017)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add optional chrooting for junit tests. (#4823)
+  `PR #4823 <https://github.com/pantsbuild/pants/pull/4823>`_
+
+Bugfixes
+~~~~~~~~
+
+* Always return a bool from SetupPy.has_provides().
+  `PR #4826 <https://github.com/pantsbuild/pants/pull/4826>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Point binary URLs off to CNAMES we own. (#4829)
+  `PR #4829 <https://github.com/pantsbuild/pants/pull/4829>`_
+
+* Stop dual-publishing the docsite. (#4828)
+  `PR #4828 <https://github.com/pantsbuild/pants/pull/4828>`_
+
+1.4.0.dev9 (8/18/2017)
+----------------------
+
+Bugfixes
+~~~~~~~~
+
+* Ensure setup-py runs with all interpreter extras. (#4822)
+  `PR #4822 <https://github.com/pantsbuild/pants/pull/4822>`_
+
+* Fixup erroneous `exc` attribute access. (#4818)
+  `PR #4818 <https://github.com/pantsbuild/pants/pull/4818>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Turn on pytest successful test caching in CI. (#4819)
+  `PR #4819 <https://github.com/pantsbuild/pants/pull/4819>`_
+
+* Only attempt deploys on appropriate shards. (#4816)
+  `PR #4816 <https://github.com/pantsbuild/pants/pull/4816>`_
+
+* Fix s3 deploy to use copies instead of a symlink. (#4814)
+  `PR #4814 <https://github.com/pantsbuild/pants/pull/4814>`_
+
+* Fix the S3 upload in the travis deploy. (#4813)
+  `PR #4813 <https://github.com/pantsbuild/pants/pull/4813>`_
+
+1.4.0.dev8 (8/11/2017)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for junit (successful) test caching. (#4771)
+  `PR #4771 <https://github.com/pantsbuild/pants/pull/4771>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Kill custom binaries.baseurls. (#4809)
+  `PR #4809 <https://github.com/pantsbuild/pants/pull/4809>`_
+
+* Partition and pass JVM options to scalafmt (#4774)
+  `PR #4774 <https://github.com/pantsbuild/pants/pull/4774>`_
+
+Bugfixes
+~~~~~~~~
+
+* [python-repl] pass env through to repl (#4808)
+  `PR #4808 <https://github.com/pantsbuild/pants/pull/4808>`_
+
+* Switch default binary-baseurls to s3 (#4806)
+  `PR #4806 <https://github.com/pantsbuild/pants/pull/4806>`_
+
+* Work around bintray outage. (#4801)
+  `PR #4801 <https://github.com/pantsbuild/pants/pull/4801>`_
+
+* Fix has_sources. (#4792)
+  `PR #4792 <https://github.com/pantsbuild/pants/pull/4792>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Zinc 1.0.0-RC3 memory and output improvements (#4807)
+  `PR #4807 <https://github.com/pantsbuild/pants/pull/4807>`_
+
+* Improve performance by not re-fingerprinting codegen'd sources. (#4789)
+  `PR #4789 <https://github.com/pantsbuild/pants/pull/4789>`_
+
+* Add per-target zinc compile stats (#4790)
+  `PR #4790 <https://github.com/pantsbuild/pants/pull/4790>`_
+
+* Add support for publishing native-engine to s3. (#4804)
+  `PR #4804 <https://github.com/pantsbuild/pants/pull/4804>`_
+
+* Introduce a loose `Files` target. (#4798)
+  `PR #4798 <https://github.com/pantsbuild/pants/pull/4798>`_
+
+* Upgrade default go to 1.8.3. (#4799)
+  `PR #4799 <https://github.com/pantsbuild/pants/pull/4799>`_
+
+* Deprecate unused `go_thrift_library.import_path`. (#4794)
+  `PR #4794 <https://github.com/pantsbuild/pants/pull/4794>`_
+
+* Cleanup cpp targets. (#4793)
+  `PR #4793 <https://github.com/pantsbuild/pants/pull/4793>`_
+
+* Simplify `_validate_target_representation_args`. (#4791)
+  `PR #4791 <https://github.com/pantsbuild/pants/pull/4791>`_
+
+* Init the native engine from bootstrap options. (#4787)
+  `PR #4787 <https://github.com/pantsbuild/pants/pull/4787>`_
+
+* [pantsd] Add faulthandler support for stacktrace dumps. (#4784)
+  `PR #4784 <https://github.com/pantsbuild/pants/pull/4784>`_
+
+* Cleanup CI deprecation warnings. (#4781)
+  `PR #4781 <https://github.com/pantsbuild/pants/pull/4781>`_
+
+* Kill `-XX:-UseSplitVerifier`. (#4777)
+  `PR #4777 <https://github.com/pantsbuild/pants/pull/4777>`_
+
+
+1.4.0.dev7 (7/28/2017)
+----------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Update to zinc 1.0.0-RC3 (#4775)
+  `Issue #355, <https://github.com/sbt/zinc/issues/355,>`_
+  `Issue #355 <https://github.com/sbt/zinc/issues/355>`_
+  `PR #4775 <https://github.com/pantsbuild/pants/pull/4775>`_
+
+* Don't require an scm for local publishes. (#4773)
+  `PR #4773 <https://github.com/pantsbuild/pants/pull/4773>`_
+
+* Simplify `argutil::ensure_arg`. (#4768)
+  `PR #4768 <https://github.com/pantsbuild/pants/pull/4768>`_
+
+* Small cleanups in the `JunitRun` codebase. (#4767)
+  `PR #4767 <https://github.com/pantsbuild/pants/pull/4767>`_
+
+* Add support for compiling thrift split across multiple files in go. (#4766)
+  `PR #4766 <https://github.com/pantsbuild/pants/pull/4766>`_
+
+
+1.4.0.dev6 (7/21/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Conditionally support multiple thrift files for go_thrift_gen (#4759)
+  `PR #4759 <https://github.com/pantsbuild/pants/pull/4759>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Introduce `dirutil.mergetree`. (#4757)
+  `PR #4757 <https://github.com/pantsbuild/pants/pull/4757>`_
+
+* Zinc 1.0.0-X20 upgrade: JVM portion (#4728)
+  `Issue #355), <https://github.com/sbt/zinc/issues/355),>`_
+  `PR #4728 <https://github.com/pantsbuild/pants/pull/4728>`_
+
+* Ensure setuptools version when running setup.py. (#4753)
+  `PR #4753 <https://github.com/pantsbuild/pants/pull/4753>`_
+
+* Kill deprecated explicit register.
+  `Commit 5583dd1 <https://github.com/pantsbuild/pants/commit/5583dd1>`_
+
+
+1.4.0.dev5 (7/14/2017)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* ScroogeGen passes through fatal_warnings argument (#4739)
+  `PR #4739 <https://github.com/pantsbuild/pants/pull/4739>`_
+
+* Bump pex version to 1.2.8. (#4735)
+  `PR #4735 <https://github.com/pantsbuild/pants/pull/4735>`_
+
+* Deprecate the `--config-override` option. (#4715)
+  `PR #4715 <https://github.com/pantsbuild/pants/pull/4715>`_
+
+Bugfixes
+~~~~~~~~
+
+* Improve pytest result summaries. (#4747)
+  `PR #4747 <https://github.com/pantsbuild/pants/pull/4747>`_
+
+* Include passthru args in task option fingerprints. (#4745)
+  `PR #4745 <https://github.com/pantsbuild/pants/pull/4745>`_
+
+* Fingerprint a bunch of go options. (#4743)
+  `PR #4743 <https://github.com/pantsbuild/pants/pull/4743>`_
+
+* Fix rpc style in compiler_args check. (#4730)
+  `PR #4730 <https://github.com/pantsbuild/pants/pull/4730>`_
+
+* Revert "Alias `--pants-config-files` to `-c`." (#4718)
+  `PR #4718 <https://github.com/pantsbuild/pants/pull/4718>`_
+
+* Ensure that invalidation works correctly when state is reverted. (#4709)
+  `PR #4709 <https://github.com/pantsbuild/pants/pull/4709>`_
+
+* Fixup `PytestRun` error handling. (#4716)
+  `PR #4716 <https://github.com/pantsbuild/pants/pull/4716>`_
+
+* Fix option bootstrapping config application order. (#4714)
+  `PR #4714 <https://github.com/pantsbuild/pants/pull/4714>`_
+
+* Ensure that target root order is preserved (#4708)
+  `PR #4708 <https://github.com/pantsbuild/pants/pull/4708>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Remove Download Stats (#4724)
+  `Issue #716 <https://github.com/badges/shields/issues/716>`_
+  `PR #4724 <https://github.com/pantsbuild/pants/pull/4724>`_
+
+* Fix roundtrip example in JVM documentation (#4706)
+  `PR #4706 <https://github.com/pantsbuild/pants/pull/4706>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Improve transitive resolve package checking in tests. (#4738)
+  `PR #4738 <https://github.com/pantsbuild/pants/pull/4738>`_
+
+* Extract a zinc subsystem to allow for more entrypoints (#4720)
+  `PR #4720 <https://github.com/pantsbuild/pants/pull/4720>`_
+
+* Format suggested deps for easy cut & paste into BUILD file (#4711)
+  `PR #4711 <https://github.com/pantsbuild/pants/pull/4711>`_
+
+* Re-enable lint checks in CI (#4704)
+  `PR #4704 <https://github.com/pantsbuild/pants/pull/4704>`_
+
+
 1.4.0.dev4 (6/23/2017)
 ----------------------
 

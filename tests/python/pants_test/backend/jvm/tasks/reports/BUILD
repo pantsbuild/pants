@@ -4,6 +4,7 @@
 python_tests(
   sources = ['test_junit_html_report.py'],
   dependencies = [
+    '3rdparty/python:mock',
     'src/python/pants/backend/jvm/tasks:reports',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:strutil',

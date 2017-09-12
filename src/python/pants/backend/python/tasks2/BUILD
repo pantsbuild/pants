@@ -11,6 +11,7 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:fingerprint_strategy',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/invalidation',
@@ -21,6 +22,7 @@ python_library(
     'src/python/pants/util:fileutil',
     'src/python/pants/util:meta',
     'src/python/pants/util:memo',
+    'src/python/pants/util:objects',
     'src/python/pants/util:process_handler',
     'src/python/pants/util:xml_parser',
   ]

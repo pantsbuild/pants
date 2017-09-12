@@ -31,7 +31,7 @@ class SetupTest(unittest.TestCase):
     with closing(six.StringIO()) as stream:
       with self.log_dir(file_logging) as log_dir:
         log_file = setup_logging(level, console_stream=stream, log_dir=log_dir, scope=logger.name)
-        yield logger, stream, log_file
+        yield logger, stream, log_file.log_filename
 
   def assertWarnInfoOutput(self, lines):
     """Check to see that only warn and info output appears in the stream.
