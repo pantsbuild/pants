@@ -17,8 +17,6 @@ import cffi
 import six
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.option.custom_types import dir_option
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
