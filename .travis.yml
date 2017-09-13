@@ -54,6 +54,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       # Docker runs will write files as root, so avoid caching for this shard.
       cache: false
@@ -85,6 +86,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -113,6 +115,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -141,6 +144,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -169,6 +173,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -197,6 +202,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -225,6 +231,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -253,6 +260,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -281,6 +289,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -309,6 +318,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -337,6 +347,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -365,6 +376,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -393,6 +405,7 @@ matrix:
 
     - os: linux
       dist: trusty
+      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
