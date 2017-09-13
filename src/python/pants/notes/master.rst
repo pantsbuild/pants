@@ -5,7 +5,7 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
-1.4.0.dev12 (9/12/2017)
+1.4.0.dev12 (9/13/2017)
 ----------------------
 
 API Changes
@@ -23,8 +23,8 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Downgrade to vanilla requests. (#4858)
-  `PR #4858 <https://github.com/pantsbuild/pants/pull/4858>`_
+* Re-add requests[security] and pin pyOpenSSL==17.1.0 to avoid deprecation warning. (#4865)
+  `PR #4865 <https://github.com/pantsbuild/pants/pull/4865>`_
 
 * Repair `BinaryNotFound` due to `sslv3 alert handshake failure`. (#4853)
   `PR #4853 <https://github.com/pantsbuild/pants/pull/4853>`_
