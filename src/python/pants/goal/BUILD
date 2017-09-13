@@ -77,6 +77,7 @@ python_library(
     ':aggregated_timings',
     ':artifact_cache_stats',
     '3rdparty/python:requests',
+    '3rdparty/python:pyopenssl',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:run_info',
     'src/python/pants/base:worker_pool',
