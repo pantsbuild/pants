@@ -18,46 +18,6 @@ from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
 
 
-class _Registrar(BuildFileTargetFactory):
-  def __init__(self, parse_context, type_alias, object_type):
-    self._parse_context = parse_context
-    self._type_alias = type_alias
-    self._object_type = object_type
-    self._serializable = Serializable.is_serializable_type(self._object_type)
-
-  @memoized_property
-  def target_types(self):
-    return [self._object_type]
-
-  def __call__(self, *args, **kwargs):
-    # Target names default to the name of the directory their BUILD file is in
-    # (as long as it's not the root directory).
-    if 'name' not in kwargs and issubclass(self._object_type, TargetAdaptor):
-      dirname = os.path.basename(self._parse_context.rel_path)
-      if dirname:
-        kwargs['name'] = dirname
-      else:
-        raise UnaddressableObjectError(
-            'Targets in root-level BUILD files must be named explicitly.')
-    name = kwargs.get('name')
-    if name and self._serializable:
-      kwargs.setdefault('type_alias', self._type_alias)
-      obj = self._object_type(**kwargs)
-      self._parse_context._storage.add(obj)
-      return obj
-    else:
-      return self._object_type(*args, **kwargs)
-
-
-class _GlobWrapper(object):
-  def __init__(self, parse_context, glob_type):
-    self._parse_context = parse_context
-    self._glob_type = glob_type
-
-  def __call__(self, *args, **kwargs):
-    return self._glob_type(*args, spec_path=self._parse_context.rel_path, **kwargs)
-
-
 class LegacyPythonCallbacksParser(Parser):
   """A parser that parses the given python code into a list of top-level objects.
 
@@ -91,8 +51,38 @@ class LegacyPythonCallbacksParser(Parser):
     # TODO: See https://github.com/pantsbuild/pants/issues/3561
     parse_context = ParseContext(rel_path=None, type_aliases=symbols)
 
+    class Registrar(BuildFileTargetFactory):
+      def __init__(self, parse_context, type_alias, object_type):
+        self._parse_context = parse_context
+        self._type_alias = type_alias
+        self._object_type = object_type
+        self._serializable = Serializable.is_serializable_type(self._object_type)
+
+      @memoized_property
+      def target_types(self):
+        return [self._object_type]
+
+      def __call__(self, *args, **kwargs):
+        # Target names default to the name of the directory their BUILD file is in
+        # (as long as it's not the root directory).
+        if 'name' not in kwargs and issubclass(self._object_type, TargetAdaptor):
+          dirname = os.path.basename(self._parse_context.rel_path)
+          if dirname:
+            kwargs['name'] = dirname
+          else:
+            raise UnaddressableObjectError(
+                'Targets in root-level BUILD files must be named explicitly.')
+        name = kwargs.get('name')
+        if name and self._serializable:
+          kwargs.setdefault('type_alias', self._type_alias)
+          obj = self._object_type(**kwargs)
+          self._parse_context._storage.add(obj)
+          return obj
+        else:
+          return self._object_type(*args, **kwargs)
+
     for alias, symbol in symbol_table.table().items():
-      registrar = _Registrar(parse_context, alias, symbol)
+      registrar = Registrar(parse_context, alias, symbol)
       symbols[alias] = registrar
       symbols[symbol] = registrar
 
@@ -106,14 +96,22 @@ class LegacyPythonCallbacksParser(Parser):
       underlying_symbol = symbols.get(alias, TargetAdaptor)
       symbols[alias] = target_macro_factory.target_macro(parse_context)
       for target_type in target_macro_factory.target_types:
-        symbols[target_type] = _Registrar(parse_context, alias, underlying_symbol)
+        symbols[target_type] = Registrar(parse_context, alias, underlying_symbol)
 
     # TODO: Replace builtins for paths with objects that will create wrapped PathGlobs objects.
     # The strategy for https://github.com/pantsbuild/pants/issues/3560 should account for
     # migrating these additional captured arguments to typed Sources.
-    symbols['globs'] = _GlobWrapper(parse_context, Globs)
-    symbols['rglobs'] = _GlobWrapper(parse_context, RGlobs)
-    symbols['zglobs'] = _GlobWrapper(parse_context, ZGlobs)
+    class GlobWrapper(object):
+      def __init__(self, parse_context, glob_type):
+        self._parse_context = parse_context
+        self._glob_type = glob_type
+
+      def __call__(self, *args, **kwargs):
+        return self._glob_type(*args, spec_path=self._parse_context.rel_path, **kwargs)
+
+    symbols['globs'] = GlobWrapper(parse_context, Globs)
+    symbols['rglobs'] = GlobWrapper(parse_context, RGlobs)
+    symbols['zglobs'] = GlobWrapper(parse_context, ZGlobs)
 
     symbols['bundle'] = BundleAdaptor
 
