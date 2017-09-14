@@ -6,7 +6,7 @@ not undergo the vetting associated with ``stable`` releases.
 
 
 1.4.0.dev12 (9/13/2017)
-----------------------
+-----------------------
 
 API Changes
 ~~~~~~~~~~~
