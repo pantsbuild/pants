@@ -37,8 +37,7 @@ class LegacyPythonCallbacksParser(Parser):
     :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     """
     super(LegacyPythonCallbacksParser, self).__init__()
-    self._symbols, self._parse_context = LegacyPythonCallbacksParser._generate_symbols(
-        symbol_table, aliases)
+    self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
 
   @staticmethod
   def _generate_symbols(symbol_table, aliases):

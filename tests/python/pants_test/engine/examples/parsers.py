@@ -45,7 +45,8 @@ class JsonParser(Parser):
   def _as_type(self, type_or_name):
     return _import(type_or_name) if isinstance(type_or_name, six.string_types) else type_or_name
 
-  def _object_decoder(self, obj, symbol_table):
+  @staticmethod
+  def _object_decoder(obj, symbol_table):
     # A magic field will indicate type and this can be used to wrap the object in a type.
     type_alias = obj.get('type_alias', None)
     if not type_alias:
