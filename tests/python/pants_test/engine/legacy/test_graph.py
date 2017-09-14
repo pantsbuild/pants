@@ -12,7 +12,7 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.bin.engine_initializer import EngineInitializer, LegacySymbolTable
+from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
