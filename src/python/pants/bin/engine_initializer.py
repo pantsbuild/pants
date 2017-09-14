@@ -26,50 +26,49 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.util.memo import memoized_method
 
 
 logger = logging.getLogger(__name__)
 
 
-# N.B. This should be top-level in the module for pickleability - don't nest it.
 class LegacySymbolTable(SymbolTable):
   """A v1 SymbolTable facade for use with the v2 engine."""
 
-  @classmethod
-  @memoized_method
-  def aliases(cls):
-    """TODO: This is a nasty escape hatch to pass aliases to LegacyPythonCallbacksParser."""
-    _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
-    return build_config.registered_aliases()
+  def __init__(self, build_file_aliases):
+    """
+    :param build_file_aliases: BuildFileAliases to register.
+    :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    """
+    self._build_file_aliases = build_file_aliases
+    self._table = {alias: TargetAdaptor for alias in build_file_aliases.target_types}
 
-  @classmethod
-  @memoized_method
-  def table(cls):
-    aliases = {alias: TargetAdaptor for alias in cls.aliases().target_types}
     # TODO: The alias replacement here is to avoid elevating "TargetAdaptors" into the public
     # API until after https://github.com/pantsbuild/pants/issues/3560 has been completed.
     # These should likely move onto Target subclasses as the engine gets deeper into beta
     # territory.
     for alias in ['java_library', 'java_agent', 'javac_plugin']:
-      aliases[alias] = JavaLibraryAdaptor
+      self._table[alias] = JavaLibraryAdaptor
     for alias in ['scala_library', 'scalac_plugin']:
-      aliases[alias] = ScalaLibraryAdaptor
+      self._table[alias] = ScalaLibraryAdaptor
     for alias in ['python_library', 'pants_plugin']:
-      aliases[alias] = PythonLibraryAdaptor
+      self._table[alias] = PythonLibraryAdaptor
     for alias in ['go_library', 'go_binary']:
-      aliases[alias] = GoTargetAdaptor
+      self._table[alias] = GoTargetAdaptor
 
-    aliases['junit_tests'] = JunitTestsAdaptor
-    aliases['jvm_app'] = JvmAppAdaptor
-    aliases['python_tests'] = PythonTestsAdaptor
-    aliases['python_binary'] = PythonTargetAdaptor
-    aliases['remote_sources'] = RemoteSourcesAdaptor
+    self._table['junit_tests'] = JunitTestsAdaptor
+    self._table['jvm_app'] = JvmAppAdaptor
+    self._table['python_tests'] = PythonTestsAdaptor
+    self._table['python_binary'] = PythonTargetAdaptor
+    self._table['remote_sources'] = RemoteSourcesAdaptor
 
-    return aliases
+  def aliases(self):
+    return self._build_file_aliases
+
+  def table(self):
+    return self._table
 
 
-class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_table_cls',
+class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_table',
                                                          'change_calculator'])):
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
@@ -92,7 +91,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     :returns: A tuple of (BuildGraph, AddressMapper).
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table_cls)
+    graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     with self.scheduler.lock:
       # Ensure the entire generator is unrolled.
@@ -112,7 +111,7 @@ class EngineInitializer(object):
                          workdir,
                          build_root=None,
                          native=None,
-                         symbol_table_cls=None,
+                         build_file_aliases=None,
                          build_ignore_patterns=None,
                          exclude_target_regexps=None,
                          subproject_roots=None,
@@ -124,8 +123,8 @@ class EngineInitializer(object):
     :param str workdir: The pants workdir.
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
-    :param SymbolTable symbol_table_cls: A SymbolTable class to use for build file parsing, or
-                                         None to use the default.
+    :param build_file_aliases: BuildFileAliases to register.
+    :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
     :param list exclude_target_regexps: A list of regular expressions for excluding targets.
@@ -133,19 +132,22 @@ class EngineInitializer(object):
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
                 include the graph trace.
-    :returns: A tuple of (scheduler, engine, symbol_table_cls, build_graph_cls).
+    :returns: A tuple of (scheduler, engine, symbol_table, build_graph_cls).
     """
 
     build_root = build_root or get_buildroot()
     scm = get_scm()
-    symbol_table_cls = symbol_table_cls or LegacySymbolTable
+
+    if not build_file_aliases:
+      _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
+      build_file_aliases = build_config.registered_aliases()
+    symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
     # Register "literal" subjects required for these tasks.
-    # TODO: Replace with `Subsystems`.
-    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   parser_cls=LegacyPythonCallbacksParser,
+    parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
+    address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
@@ -156,13 +158,12 @@ class EngineInitializer(object):
     # Create a Scheduler containing graph and filesystem tasks, with no installed goals. The
     # LegacyBuildGraph will explicitly request the products it needs.
     tasks = (
-      create_legacy_graph_tasks(symbol_table_cls) +
+      create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
-      create_graph_rules(address_mapper, symbol_table_cls)
+      create_graph_rules(address_mapper, symbol_table)
     )
 
-    # TODO: Do not use the cache yet, as it incurs a high overhead.
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)
-    change_calculator = EngineChangeCalculator(scheduler, symbol_table_cls, scm) if scm else None
+    change_calculator = EngineChangeCalculator(scheduler, symbol_table, scm) if scm else None
 
-    return LegacyGraphHelper(scheduler, symbol_table_cls, change_calculator)
+    return LegacyGraphHelper(scheduler, symbol_table, change_calculator)

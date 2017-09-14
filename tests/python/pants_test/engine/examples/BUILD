@@ -34,7 +34,6 @@ python_library(
     'src/python/pants/engine:parser',
     'src/python/pants/engine:scheduler',
     'src/python/pants/engine:selectors',
-    'src/python/pants/engine:storage',
     'src/python/pants/engine:struct',
   ]
 )

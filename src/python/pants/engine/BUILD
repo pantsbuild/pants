@@ -176,17 +176,6 @@ python_library(
 )
 
 python_library(
-  name='storage',
-  sources=['storage.py'],
-  dependencies=[
-    ':nodes',
-    ':objects',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
-  ]
-)
-
-python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
@@ -194,7 +183,6 @@ python_library(
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',
-    'src/python/pants/engine:storage',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:objects'

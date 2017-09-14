@@ -43,19 +43,18 @@ class Thing(object):
 
 
 class ThingTable(SymbolTable):
-  @classmethod
   def table(cls):
     return {'thing': Thing}
 
 
 class AddressMapTest(unittest.TestCase):
-  _parser_cls = JsonParser
-  _symbol_table_cls = ThingTable
+  _symbol_table = ThingTable()
+  _parser = JsonParser(_symbol_table)
 
   @contextmanager
   def parse_address_map(self, json):
     path = '/dev/null'
-    address_map = AddressMap.parse(path, json, self._symbol_table_cls, self._parser_cls)
+    address_map = AddressMap.parse(path, json, self._parser)
     self.assertEqual(path, address_map.path)
     yield address_map
 
@@ -143,11 +142,10 @@ UnhydratedStructs = Collection.of(UnhydratedStruct)
 class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
   def setUp(self):
     # Set up a scheduler that supports address mapping.
-    symbol_table_cls = TargetTable
-    address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                   parser_cls=JsonParser,
+    symbol_table = TargetTable()
+    address_mapper = AddressMapper(parser=JsonParser(symbol_table),
                                    build_patterns=('*.BUILD.json',))
-    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table_cls)
+    rules = create_fs_rules() + create_graph_rules(address_mapper, symbol_table)
     # TODO handle updating the rule graph when passed unexpected root selectors.
     # Adding the following task allows us to get around the fact that SelectDependencies
     # requests are not currently supported.
