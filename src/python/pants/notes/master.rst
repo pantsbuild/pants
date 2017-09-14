@@ -5,23 +5,26 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
-1.4.0.dev12 (9/8/2017)
+1.4.0.dev12 (9/13/2017)
 ----------------------
 
 API Changes
 ~~~~~~~~~~~
+* Use @files for javadoc so it runs with a longer command line and add doc exclude patterns option (#4842)
+  `PR #4842 <https://github.com/pantsbuild/pants/pull/4842>`_
 
 * Migrate BinaryUtil options to bootstrap options. (#4846)
   `PR #4846 <https://github.com/pantsbuild/pants/pull/4846>`_
 
 Bugfixes
 ~~~~~~~~
-
 * Clean up stray pantsd-runner processes (#4835)
   `PR #4835 <https://github.com/pantsbuild/pants/pull/4835>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Re-add requests[security] and pin pyOpenSSL==17.1.0 to avoid deprecation warning. (#4865)
+  `PR #4865 <https://github.com/pantsbuild/pants/pull/4865>`_
 
 * Repair `BinaryNotFound` due to `sslv3 alert handshake failure`. (#4853)
   `PR #4853 <https://github.com/pantsbuild/pants/pull/4853>`_
