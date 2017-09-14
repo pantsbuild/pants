@@ -16,7 +16,7 @@ pex==1.2.11
 psutil==4.3.0
 pyflakes==1.1.0
 Pygments==1.4
-pyopenssl==17.1.0
+pyopenssl==17.3.0
 pystache==0.5.3
 pytest-cov>=2.4,<2.5
 pytest>=3.0.7,<4.0
