@@ -5,6 +5,30 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev13 (9/18/2017)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Bump pyopenssl==17.3.0 (#4872)
+  `PR #4872 <https://github.com/pantsbuild/pants/pull/4872>`_
+
+* Error on task name reuse for a particular goal (#4863)
+  `PR #4863 <https://github.com/pantsbuild/pants/pull/4863>`_
+
+Bugfixes
+~~~~~~~~
+
+* Re-pin to 2017Q2 TravisCI image. (#4869)
+  `PR #4869 <https://github.com/pantsbuild/pants/pull/4869>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Move to SymbolTable/Parser instances (#4864)
+  `PR #4864 <https://github.com/pantsbuild/pants/pull/4864>`_
+
 1.4.0.dev12 (9/13/2017)
 -----------------------
 
