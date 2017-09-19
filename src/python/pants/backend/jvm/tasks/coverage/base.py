@@ -106,14 +106,13 @@ class BaseCoverage(CoverageInterface):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
+    pass
+
+  @classmethod
+  def register_generic_coverage_options(cls, register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
 
-    # TODO(John Sirois): Fold this base class up into `Cobertura` once `--coverage-processor` is
-    # killed.
-    register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura'],
-             removal_version='1.6.0.dev0',
-             removal_hint='Only cobertura is supported for code coverage so this option can be '
-                          'omitted.',
+    register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura', 'jacoco'],
              help='Which coverage subsystem to use.')
 
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,

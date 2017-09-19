@@ -28,6 +28,8 @@ class Cobertura(BaseCoverage):
 
   @classmethod
   def register_options(cls, register, register_jvm_tool):
+    super(Cobertura, cls).register_options(register, register_jvm_tool)
+
     slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
     slf4j_api_jar = JarDependency(org='org.slf4j', name='slf4j-api', rev='1.7.5')
 
