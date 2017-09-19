@@ -242,7 +242,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
 
   output_prefix = os.path.join(output_dir, module_name)
   c_file = '{}.c'.format(output_prefix)
-  env_script = '{}.sh'.format(output_prefix)
+  env_script = '{}.cflags'.format(output_prefix)
 
   ffibuilder = cffi.FFI()
   ffibuilder.cdef(CFFI_TYPEDEFS)
@@ -254,7 +254,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
   print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
-    f.write(b'export CFLAGS="{}"\n'.format(get_build_cflags()))
+    f.write(get_build_cflags())
 
 
 def _initialize_externs(ffi):

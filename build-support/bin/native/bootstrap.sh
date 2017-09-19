@@ -117,11 +117,11 @@ function bootstrap_native_code() {
   local native_engine_version="$(calculate_current_hash)"
   local target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   local cffi_output_dir="${NATIVE_ROOT}/src/cffi"
-  local cffi_env_script="${cffi_output_dir}/${NATIVE_ENGINE_MODULE}.sh"
+  local cffi_env_script="${cffi_output_dir}/${NATIVE_ENGINE_MODULE}.cflags"
   if [ ! -f "${target_binary}" ]
   then
     _ensure_cffi_sources "${cffi_output_dir}"
-    source "${cffi_env_script}"
+    export CFLAGS="$(cat "${cffi_env_script}")"
     local readonly native_binary="$(_build_native_code)"
 
     # If bootstrapping the native engine fails, don't attempt to run pants
