@@ -21,8 +21,7 @@ from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
-from pants.backend.jvm.tasks.coverage.base import NoCoverage
-from pants.backend.jvm.tasks.coverage.cobertura import Cobertura, CoberturaTaskSettings
+from pants.backend.jvm.tasks.coverage.factory import CoverageFactory
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, NoJunitHtmlReport
@@ -188,7 +187,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Attempt to open the html summary report in a browser (implies --html-report)')
 
     # TODO(John Sirois): Remove direct register when coverage steps are moved to their own tasks.
-    Cobertura.register_options(register, cls.register_jvm_tool)
+    CoverageFactory.register_options(register, cls.register_jvm_tool)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -632,11 +631,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     else:
       junit_html_report = NoJunitHtmlReport()
 
-    if self.get_options().coverage or self.get_options().is_flagged('coverage_open'):
-      settings = CoberturaTaskSettings.from_task(self, workdir=output_dir)
-      coverage = Cobertura(settings, all_targets, self.execute_java_for_coverage)
-    else:
-      coverage = NoCoverage()
+    coverage = CoverageFactory.from_task(self, output_dir, all_targets, self.execute_java_for_coverage)
 
     reports = self.Reports(junit_html_report, coverage)
 
