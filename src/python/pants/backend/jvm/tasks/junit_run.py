@@ -399,82 +399,74 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     classpath_prepend = coverage.classpath_prepend
     classpath_append = coverage.classpath_append
 
-    tests_by_properties = test_registry.index(
-        lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
-        lambda tgt: tgt.test_platform,
-        lambda tgt: tgt.payload.extra_jvm_options,
-        lambda tgt: tgt.payload.extra_env_vars,
-        lambda tgt: tgt.concurrency,
-        lambda tgt: tgt.threads)
-
-    # the below will be None if not set, and we'll default back to runtime_classpath
+    # The 'instrument_classpath' product below below will be `None` if not set, and we'll default
+    # back to runtime_classpath
     classpath_product = self.context.products.get_data('instrument_classpath')
 
     result = 0
-    for properties, tests in tests_by_properties.items():
+    for properties, batch in self._partition(test_registry):
       (workdir, platform, target_jvm_options, target_env_vars, concurrency, threads) = properties
-      for batch in self._partition(tests):
-        # Batches of test classes will likely exist within the same targets: dedupe them.
-        relevant_targets = {test_registry.get_owning_target(t) for t in batch}
-        complete_classpath = OrderedSet()
-        complete_classpath.update(classpath_prepend)
-        complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
-        complete_classpath.update(self.classpath(relevant_targets,
-                                                 classpath_product=classpath_product))
-        complete_classpath.update(classpath_append)
-        distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
+      # Batches of test classes will likely exist within the same targets: dedupe them.
+      relevant_targets = {test_registry.get_owning_target(t) for t in batch}
+      complete_classpath = OrderedSet()
+      complete_classpath.update(classpath_prepend)
+      complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
+      complete_classpath.update(self.classpath(relevant_targets,
+                                               classpath_product=classpath_product))
+      complete_classpath.update(classpath_append)
+      distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
 
-        # Override cmdline args with values from junit_test() target that specify concurrency:
-        args = self._args(output_dir) + [u'-xmlreport']
+      # Override cmdline args with values from junit_test() target that specify concurrency:
+      args = self._args(output_dir) + [u'-xmlreport']
 
-        if concurrency is not None:
-          args = remove_arg(args, '-default-parallel')
-          if concurrency == JUnitTests.CONCURRENCY_SERIAL:
-            args = ensure_arg(args, '-default-concurrency', param='SERIAL')
-          elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
-            args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES')
-          elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
-            args = ensure_arg(args, '-default-concurrency', param='PARALLEL_METHODS')
-          elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
-            args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES_AND_METHODS')
+      if concurrency is not None:
+        args = remove_arg(args, '-default-parallel')
+        if concurrency == JUnitTests.CONCURRENCY_SERIAL:
+          args = ensure_arg(args, '-default-concurrency', param='SERIAL')
+        elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES:
+          args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES')
+        elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_METHODS:
+          args = ensure_arg(args, '-default-concurrency', param='PARALLEL_METHODS')
+        elif concurrency == JUnitTests.CONCURRENCY_PARALLEL_CLASSES_AND_METHODS:
+          args = ensure_arg(args, '-default-concurrency', param='PARALLEL_CLASSES_AND_METHODS')
 
-        if threads is not None:
-          args = remove_arg(args, '-parallel-threads', has_param=True)
-          args += ['-parallel-threads', str(threads)]
+      if threads is not None:
+        args = remove_arg(args, '-parallel-threads', has_param=True)
+        args += ['-parallel-threads', str(threads)]
 
-        batch_test_specs = [test.render_test_spec() for test in batch]
-        with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
-          with self._chroot(relevant_targets, workdir) as chroot:
-            self.context.log.debug('CWD = {}'.format(chroot))
-            self.context.log.debug('platform = {}'.format(platform))
-            with environment_as(**dict(target_env_vars)):
-              subprocess_result = self._spawn_and_wait(
-                executor=SubprocessExecutor(distribution),
-                distribution=distribution,
-                classpath=complete_classpath,
-                main=JUnit.RUNNER_MAIN,
-                jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
-                args=args + batch_tests,
-                workunit_factory=self.context.new_workunit,
-                workunit_name='run',
-                workunit_labels=[WorkUnitLabel.TEST],
-                cwd=chroot,
-                synthetic_jar_dir=output_dir,
-                create_synthetic_jar=self.synthetic_classpath,
-              )
-              self.context.log.debug('JUnit subprocess exited with result ({})'
-                                     .format(subprocess_result))
-              result += abs(subprocess_result)
+      batch_test_specs = [test.render_test_spec() for test in batch]
+      with argfile.safe_args(batch_test_specs, self.get_options()) as batch_tests:
+        with self._chroot(relevant_targets, workdir) as chroot:
+          self.context.log.debug('CWD = {}'.format(chroot))
+          self.context.log.debug('platform = {}'.format(platform))
+          with environment_as(**dict(target_env_vars)):
+            subprocess_result = self._spawn_and_wait(
+              executor=SubprocessExecutor(distribution),
+              distribution=distribution,
+              classpath=complete_classpath,
+              main=JUnit.RUNNER_MAIN,
+              jvm_options=self.jvm_options + extra_jvm_options + list(target_jvm_options),
+              args=args + batch_tests,
+              workunit_factory=self.context.new_workunit,
+              workunit_name='run',
+              workunit_labels=[WorkUnitLabel.TEST],
+              cwd=chroot,
+              synthetic_jar_dir=output_dir,
+              create_synthetic_jar=self.synthetic_classpath,
+            )
+            self.context.log.debug('JUnit subprocess exited with result ({})'
+                                   .format(subprocess_result))
+            result += abs(subprocess_result)
 
-          tests_info = self.parse_test_info(output_dir, parse_error_handler, ['classname'])
-          for test_name, test_info in tests_info.items():
-            test_item = Test(test_info['classname'], test_name)
-            test_target = test_registry.get_owning_target(test_item)
-            self.report_all_info_for_single_test(self.options_scope, test_target,
-                                                 test_name, test_info)
+        tests_info = self.parse_test_info(output_dir, parse_error_handler, ['classname'])
+        for test_name, test_info in tests_info.items():
+          test_item = Test(test_info['classname'], test_name)
+          test_target = test_registry.get_owning_target(test_item)
+          self.report_all_info_for_single_test(self.options_scope, test_target,
+                                               test_name, test_info)
 
-          if result != 0 and self._fail_fast:
-            break
+        if result != 0 and self._fail_fast:
+          break
 
     if result != 0:
       target_to_failed_test = parse_failed_targets(test_registry, output_dir, parse_error_handler)
@@ -503,10 +495,19 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       )
       raise ErrorWhileTesting('\n'.join(error_message_lines), failed_targets=list(failed_targets))
 
-  def _partition(self, tests):
-    stride = min(self._batch_size, len(tests))
-    for i in range(0, len(tests), stride):
-      yield tests[i:i + stride]
+  def _partition(self, test_registry):
+    tests_by_properties = test_registry.index(
+      lambda tgt: tgt.cwd if tgt.cwd is not None else self._working_dir,
+      lambda tgt: tgt.test_platform,
+      lambda tgt: tgt.payload.extra_jvm_options,
+      lambda tgt: tgt.payload.extra_env_vars,
+      lambda tgt: tgt.concurrency,
+      lambda tgt: tgt.threads)
+
+    for properties, tests in tests_by_properties.items():
+      stride = min(self._batch_size, len(tests))
+      for i in range(0, len(tests), stride):
+        yield properties, tests[i:i + stride]
 
   def _get_possible_tests_to_run(self):
     buildroot = get_buildroot()
