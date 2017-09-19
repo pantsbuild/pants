@@ -10,13 +10,13 @@ import contextlib
 import multiprocessing
 import os
 import re
-import subprocess
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])

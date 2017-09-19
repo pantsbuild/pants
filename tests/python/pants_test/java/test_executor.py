@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import textwrap
 import unittest
 from contextlib import contextmanager
@@ -15,6 +14,7 @@ from pants.java.distribution.distribution import Distribution
 from pants.java.executor import Executor, SubprocessExecutor
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_open
+from pants.util.process_handler import subprocess
 
 
 class SubprocessExecutorTest(unittest.TestCase):

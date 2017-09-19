@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-import subprocess
 
 from pants.backend.codegen.ragel.java.java_ragel_library import JavaRagelLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -17,6 +16,7 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class RagelGen(SimpleCodegenTask):

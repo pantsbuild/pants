@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import subprocess
 
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir
+from pants.util.process_handler import subprocess
 
 from pants.contrib.android.android_config_util import AndroidConfigUtil
 from pants.contrib.android.keystore.keystore_resolver import KeystoreResolver

@@ -8,7 +8,8 @@ python_library(
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
     'src/python/pants/pantsd/subsystem:subprocess',
-    'src/python/pants/util:dirutil'
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 

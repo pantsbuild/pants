@@ -15,7 +15,8 @@ python_tests(
   coverage = ['pants.pantsd.process_manager'],
   dependencies = [
     ':test_deps',
-    'src/python/pants/pantsd:process_manager'
+    'src/python/pants/pantsd:process_manager',
+    'src/python/pants/util:process_handler',
   ]
 )
 

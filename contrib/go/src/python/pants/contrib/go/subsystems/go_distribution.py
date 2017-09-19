@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -15,6 +14,7 @@ from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class GoDistribution(object):

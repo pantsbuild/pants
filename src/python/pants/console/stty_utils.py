@@ -5,8 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import subprocess
 from contextlib import contextmanager
+
+from pants.util.process_handler import subprocess
 
 
 @contextmanager

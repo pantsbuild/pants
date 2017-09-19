@@ -36,6 +36,7 @@ python_tests(
   name = 'exclude_target_regexp_integration',
   sources = [ 'test_exclude_target_regexp_integration.py' ],
   dependencies = [
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},
@@ -129,6 +130,7 @@ python_tests(
     ':pants_ignore_test_base',
     'src/python/pants/base:project_tree',
     'src/python/pants/scm:git',
+    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -194,11 +196,12 @@ python_tests(
   name = 'scm_build_file',
   sources = ['test_scm_build_file.py'],
   dependencies = [
-    ':build_file_test_base',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':build_file_test_base',
     'src/python/pants/base:project_tree',
     'src/python/pants/scm:git',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 

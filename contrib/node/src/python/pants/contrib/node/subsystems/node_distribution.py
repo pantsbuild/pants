@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import subprocess
 from collections import namedtuple
 
 from pants.base.exceptions import TaskError
@@ -15,6 +14,7 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

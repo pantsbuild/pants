@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import signal
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -18,6 +17,7 @@ import psutil
 from pants.base.build_environment import get_buildroot
 from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

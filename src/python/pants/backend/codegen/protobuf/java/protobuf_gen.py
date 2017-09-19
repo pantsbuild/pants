@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from collections import OrderedDict
 from hashlib import sha1
 
@@ -24,6 +23,7 @@ from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class ProtobufGen(SimpleCodegenTask):

@@ -10,12 +10,12 @@ python_tests(
     '3rdparty/python:coverage',
     '3rdparty/python:mock',
     '3rdparty/python:pex',
-    'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_artifact',
-    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks2',
+    'src/python/pants/backend/python:interpreter_cache',
+    'src/python/pants/backend/python:python_artifact',
+    'src/python/pants/backend/python:python_requirement',
     'src/python/pants/base:build_root',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:run_info',
@@ -24,9 +24,9 @@ python_tests(
     'src/python/pants/python',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/tasks:task_test_base',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
-    'tests/python/pants_test/subsystem:subsystem_utils'
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/tasks:task_test_base',
   ]
 )
 
@@ -36,6 +36,7 @@ python_tests(
   sources=globs('*_integration.py'),
   dependencies=[
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

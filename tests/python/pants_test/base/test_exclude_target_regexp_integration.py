@@ -6,10 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from contextlib import contextmanager
 
 from pants.base.build_environment import get_buildroot
+from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 
 

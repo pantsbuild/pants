@@ -3,10 +3,10 @@
 
 python_library(
   dependencies=[
-    ':templates',
     '3rdparty/python:ansicolors',
-    '3rdparty/python:setuptools',
     '3rdparty/python:packaging',
+    '3rdparty/python:setuptools',
+    ':templates',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
@@ -25,6 +25,7 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
     'src/python/pants:version',
   ])
 
