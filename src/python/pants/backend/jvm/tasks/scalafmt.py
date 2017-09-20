@@ -69,12 +69,14 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
         mapping[src] = dst
       result = self.invoke_tool(sources_relative_to_buildroot)
       self.process_results(mapping, result)
+      return result
 
-  def _invoke_took_in_place(self, sources_relative_to_buildroot):
+  def _invoke_tool_in_place(self, sources_relative_to_buildroot):
     # Invoke in place.
     mapping = {s: s for s in sources_relative_to_buildroot}
     result = self.invoke_tool(sources_relative_to_buildroot)
     self.process_results(mapping, result)
+    return result
 
   @abstractmethod
   def invoke_tool(self, sources_relative_to_buildroot):
@@ -105,7 +107,7 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
 
     No return value is expected. If an error occurred while running the tool, raising a TaskError
     is recommended.
-    
+
     If `in_place=True`, the input/output mapping will map files to themselves.
     """
 
