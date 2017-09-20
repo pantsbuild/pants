@@ -37,6 +37,10 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
                   for alias in aliases
                   for target_type in registered_aliases.target_types_by_alias[alias]})
 
+  @property
+  def cache_target_dirs(self):
+    return not self.sideeffecting
+
   def execute(self):
     """Runs the tool on all Scala source files that are located."""
     if self.get_options().skip:
@@ -44,18 +48,25 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
 
     targets = self.get_non_synthetic_scala_targets(self.context.targets())
 
-    with self.invalidated(targets) as invalidation_check:
-      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
-      sources = self.calculate_sources(invalid_targets)
-      if not sources:
-        return
+    if self.sideeffecting:
+      # Always execute sideeffecting tasks without invalidation.
+      self._execute_for(targets)
+    else:
+      # If the task is not sideeffecting we can use invalidation.
+      with self.invalidated(targets) as invalidation_check:
+        self._execute_for([vt.target for vt in invalidation_check.invalid_vts])
 
-      command = self._invoke_tool_in_place if self.in_place else self._invoke_tool_with_tempdir
-      result = Xargs(command).execute(sources)
-      if result != 0:
-        # Both _invoke_tool_in_place and _invoke_tool_with_tempdir raise exceptions eagerly.
-        raise TaskError('{} is improperly implemented: a failed process '
-                        'should raise an exception earlier.'.format(type(self).__name__))
+  def _execute_for(self, targets):
+    sources = self.calculate_sources(targets)
+    if not sources:
+      return
+
+    command = self._invoke_tool_in_place if self.in_place else self._invoke_tool_with_tempdir
+    result = Xargs(command).execute(sources)
+    if result != 0:
+      # Both _invoke_tool_in_place and _invoke_tool_with_tempdir raise exceptions eagerly.
+      raise TaskError('{} is improperly implemented: a failed process '
+                      'should raise an exception earlier.'.format(type(self).__name__))
 
   def _invoke_tool_with_tempdir(self, sources_relative_to_buildroot):
     # Clone all sources to relative names in a temporary directory.
@@ -91,6 +102,10 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
 
     If False, files will first be cloned to a temporary directory.
     """
+
+  @abstractproperty
+  def sideeffecting(self):
+    """Returns True if this command has sideeffects: ie, mutates the working copy."""
 
   @abstractmethod
   def get_command_args(self, files):
@@ -183,9 +198,8 @@ class ScalaFmtCheckFormat(ScalaFmt):
   deprecated_options_scope = 'compile.scalafmt'
   deprecated_options_scope_removal_version = '1.5.0.dev0'
 
-  # Because this task has no sideeffects, it is safe to run in place and to cache.
-  cache_target_dirs = True
   in_place = True
+  sideeffecting = False
 
   def get_command_args(self, files):
     # If no config file is specified use default scalafmt config.
@@ -212,8 +226,8 @@ class ScalaFmtFormat(ScalaFmt):
   :API: public
   """
 
-  # TODO: should not use invalidation.
   in_place = True
+  sideeffecting = True
 
   def get_command_args(self, files):
     # If no config file is specified use default scalafmt config.
