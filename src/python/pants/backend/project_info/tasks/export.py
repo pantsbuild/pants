@@ -37,8 +37,8 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.option.errors import OptionsError
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
+from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
-
 
 logger = logging.getLogger(__name__)
 
@@ -514,10 +514,14 @@ class CoursierResolve:
 
     logger.info(' '.join(cmd_args))
 
-    env = os.environ.copy()
-    env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
+    # env = os.environ.copy()
+    # env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
+
+    pants_jar_path_base = '/Users/yic/workspace/source/.pants.d/coursier'
+    coursier_cache_path = '/Users/yic/.coursier/cache/'
+
     try:
-      output = subprocess.check_output(cmd_args, env=env)
+      output = subprocess.check_output(cmd_args)
     except subprocess.CalledProcessError as e:
       raise CoursierError()
     else:
@@ -527,9 +531,16 @@ class CoursierResolve:
         rev = os.path.basename(os.path.dirname(jar_path))
         name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
         org = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(jar_path))))
+
+        pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
+
+        safe_mkdir(os.path.dirname(pants_path))
+        os.symlink(jar_path, pants_path)
+
         resolved_jar = ResolvedJar(M2Coordinate(org=org, name=name, rev=rev),
                                    cache_path=jar_path,
-                                   pants_path=jar_path)
+                                   pants_path=pants_path)
+
         resolved_jars.append(resolved_jar)
 
       compile_classpath.add_jars_for_targets(targets=t_subset, conf='default', resolved_jars=resolved_jars)
