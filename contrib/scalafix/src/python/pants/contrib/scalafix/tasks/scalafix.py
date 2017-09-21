@@ -26,6 +26,9 @@ class ScalaFix(ScalaRewriteBase):
              help='The config file to use (in HOCON format).')
     register('--rewrites', default=None, fingerprint=True,
              help='The `rewrites` arg to scalafix: generally a name like `ProcedureSyntax`.')
+    register('--semantic', type=bool, default=True, fingerprint=True,
+             help='True to enable `semantic` scalafix rules by requesting compilation, and '
+                  'providing the target classpath to scalafix.')
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
@@ -35,21 +38,30 @@ class ScalaFix(ScalaRewriteBase):
   @classmethod
   def prepare(cls, options, round_manager):
     super(ScalaFix, cls).prepare(options, round_manager)
-    # TODO: Make conditional.
-    round_manager.require_data('runtime_classpath')
+    # Only request a classpath if semantic checks are enabled.
+    if options.semantic:
+      round_manager.require_data('runtime_classpath')
 
-  def invoke_tool(self, absolute_root, absolute_sources):
+  def _compute_classpath(self, targets):
+    classpaths = self.context.products.get_data('runtime_classpath')
+    return [entry for _, entry in classpaths.get_for_targets(targets)]
+
+  def invoke_tool(self, absolute_root, target_sources):
     args = []
-    # TODO: Reenable optionally.
-    #args.append('--sourceroot={}'.format(absolute_root))
-    #args.append('--classpath={}'.format(':'.join(classpath)))
+    if self.get_options().semantic:
+      # If semantic checks are enabled, pass the relevant classpath entries for these
+      # targets.
+      classpath = self._compute_classpath({target for target, _ in target_sources})
+      args.append('--sourceroot={}'.format(absolute_root))
+      args.append('--classpath={}'.format(':'.join(classpath)))
     if self.get_options().configuration:
       args.append('--config={}'.format(self.get_options().configuration))
     if self.get_options().rewrites:
       args.append('--rewrites={}'.format(self.get_options().rewrites))
     if self.get_options().level == 'debug':
       args.append('--verbose')
-    args.extend(absolute_sources)
+
+    args.extend(source for _, source in target_sources)
 
     # Execute.
     return self.runjava(classpath=self.tool_classpath('scalafix'),

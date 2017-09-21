@@ -22,12 +22,14 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
   @classmethod
   def register_options(cls, register):
     super(ScalaRewriteBase, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=False, help='Skip Scalafmt Check')
+    register('--skip', type=bool, default=False, help='Skip running the tool.')
     register('--target-types',
              default=['scala_library', 'junit_tests', 'java_tests'],
-             advanced=True,
-             type=list,
+             advanced=True, type=list,
              help='The target types to apply formatting to.')
+    register('--transitive', type=bool, default=True,
+             help='True to run the tool transitively on targets in the context, false to run '
+                  'for only roots specified on the commandline.')
 
   @memoized_property
   def _formatted_target_types(self):
@@ -46,38 +48,40 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
     if self.get_options().skip:
       return
 
-    targets = self.get_non_synthetic_scala_targets(self.context.targets())
+    targets = self.context.targets() if self.get_options().transitive else self.context.target_roots
+    relevant_targets = self._get_non_synthetic_scala_targets(targets)
 
     if self.sideeffecting:
       # Always execute sideeffecting tasks without invalidation.
-      self._execute_for(targets)
+      self._execute_for(relevant_targets)
     else:
       # If the task is not sideeffecting we can use invalidation.
-      with self.invalidated(targets) as invalidation_check:
+      with self.invalidated(relevant_targets) as invalidation_check:
         self._execute_for([vt.target for vt in invalidation_check.invalid_vts])
 
   def _execute_for(self, targets):
-    sources = self.calculate_sources(targets)
-    if not sources:
+    target_sources = self._calculate_sources(targets)
+    if not target_sources:
       return
 
-    result = Xargs(self._invoke_tool_in_place).execute(sources)
+    result = Xargs(self._invoke_tool_in_place).execute(target_sources)
     if result != 0:
       raise TaskError('{} is improperly implemented: a failed process '
                       'should raise an exception earlier.'.format(type(self).__name__))
 
-  def _invoke_tool_in_place(self, sources_relative_to_buildroot):
+  def _invoke_tool_in_place(self, target_sources):
     # Invoke in place.
-    abs_sources = [os.path.join(get_buildroot(), s) for s in sources_relative_to_buildroot]
-    result = self.invoke_tool(get_buildroot(), abs_sources)
+    result = self.invoke_tool(get_buildroot(), target_sources)
     self.process_result(result)
     return result
 
   @abstractmethod
-  def invoke_tool(self, absolute_root, absolute_sources):
-    """Invoke the tool on the given sources, guaranteed to be located below the given root.
+  def invoke_tool(self, absolute_root, target_sources):
+    """Invoke the tool on the given (target, absolute source) tuples.
 
-    Should return the UNIX return code of the tool.
+    Sources are guaranteed to be located below the given root.
+
+    Returns the UNIX return code of the tool.
     """
 
   @abstractproperty
@@ -92,16 +96,15 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
     with a useful error message is required.
     """
 
-  def get_non_synthetic_scala_targets(self, targets):
+  def _get_non_synthetic_scala_targets(self, targets):
     return filter(
       lambda target: isinstance(target, self._formatted_target_types)
                      and target.has_sources(self._SCALA_SOURCE_EXTENSION)
                      and (not target.is_synthetic),
       targets)
 
-  def calculate_sources(self, targets):
-    sources = set()
-    for target in targets:
-      sources.update(source for source in target.sources_relative_to_buildroot()
-                      if source.endswith(self._SCALA_SOURCE_EXTENSION))
-    return sources
+  def _calculate_sources(self, targets):
+    return [(target, os.path.join(get_buildroot(), source))
+            for target in targets
+            for source in target.sources_relative_to_buildroot()
+            if source.endswith(self._SCALA_SOURCE_EXTENSION)]
