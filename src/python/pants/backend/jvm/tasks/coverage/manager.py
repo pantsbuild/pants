@@ -66,10 +66,10 @@ class CoverageManager(object):
   def register_options(register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
 
-    register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura'],
-             removal_version='1.6.0.dev0',
+    register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura', 'jacoco'],
              removal_hint='Only cobertura is supported for code coverage so this option can be '
-                          'omitted.',
+                          'omitted. jacoco is here only as a placeholder, and acts as a no-op until '
+                          'it is implemented.',
              help='Which coverage subsystem to use.')
 
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
