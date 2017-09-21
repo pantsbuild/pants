@@ -534,8 +534,9 @@ class CoursierResolve:
 
         pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
-        safe_mkdir(os.path.dirname(pants_path))
-        os.symlink(jar_path, pants_path)
+        if not os.path.exists(pants_path):
+          safe_mkdir(os.path.dirname(pants_path))
+          os.symlink(jar_path, pants_path)
 
         resolved_jar = ResolvedJar(M2Coordinate(org=org, name=name, rev=rev),
                                    cache_path=jar_path,
