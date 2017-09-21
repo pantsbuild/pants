@@ -24,6 +24,7 @@ from pants.core_tasks.targets_help import TargetsHelp
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.build_graph.meta_rename import MetaRename
 
 
 def register_goals():
@@ -98,3 +99,5 @@ def register_goals():
   # Processing aliased targets has to occur very early.
   task(name='substitute-aliased-targets', action=SubstituteAliasedTargets).install('bootstrap',
                                                                                    first=True)
+  # Register a task to rename a target.
+  task(name='meta-rename', action=MetaRename).install()
