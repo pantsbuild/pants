@@ -11,11 +11,13 @@ import shutil
 from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.engine import NoCoverage
 from pants.backend.jvm.tasks.coverage.jacoco import Jacoco
+from pants.subsystem.subsystem import Subsystem
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
 
-class CoverageTaskSettings(object):
+class CodeCoverageSettings(object):
   """A class containing settings for code coverage tasks."""
 
   def __init__(self, options, context, workdir, tool_classpath, confs, log,
@@ -57,13 +59,18 @@ class CoverageTaskSettings(object):
                log=task.context.log)
 
 
-# TODO(jtrobec): make this a subsystem after deprecating options.
-class CoverageManager(object):
+class CodeCoverage(Subsystem, SubsystemClientMixin):
   """Manages setup and construction of JVM code coverage engines.
   """
+  options_scope = 'coverage'
 
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(CodeCoverage, cls).subsystem_dependencies() + (Cobertura.Factory, Jacoco.Factory)
+
+  # TODO(jtrobec): move these to subsystem scope after deprecating
   @staticmethod
-  def register_options(register, register_jvm_tool):
+  def register_junit_options(register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
 
     register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura', 'jacoco'],
@@ -82,20 +89,19 @@ class CoverageManager(object):
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
 
     # register options for coverage engines
-    # TODO(jtrobec): get rid of these calls when engines are dependent subsystems
-    Cobertura.register_options(register, register_jvm_tool)
-    Jacoco.register_options(register, register_jvm_tool)
+    # TODO(jtrobec): get rid of this calls when engines are dependent subsystems
+    Cobertura.register_junit_options(register, register_jvm_tool)
 
   @staticmethod
   def get_coverage_engine(task, output_dir, all_targets, execute_java):
     options = task.get_options()
-    settings = CoverageTaskSettings.from_task(task, workdir=output_dir)
+    settings = CodeCoverageSettings.from_task(task, workdir=output_dir)
     coverage = NoCoverage()
 
     if options.coverage or options.coverage_processor or options.is_flagged('coverage_open'):
       if options.coverage_processor == 'cobertura':
-        coverage = Cobertura(settings, all_targets, execute_java)
+        coverage = Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
       elif options.coverage_processor == 'jacoco':
-        coverage = Jacoco(settings, all_targets, execute_java)
+        coverage = Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)
 
     return coverage
