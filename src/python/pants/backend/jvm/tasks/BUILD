@@ -634,11 +634,22 @@ python_library(
   name = 'scalafmt',
   sources = ['scalafmt.py'],
   dependencies = [
-    'src/python/pants/java/jar',
+    ':scala_rewrite_base',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/java/jar',
     'src/python/pants/option',
+  ]
+)
+
+python_library(
+  name = 'scala_rewrite_base',
+  sources = ['scala_rewrite_base.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
     'src/python/pants/util:meta',
     'src/python/pants/util:memo',
   ]
