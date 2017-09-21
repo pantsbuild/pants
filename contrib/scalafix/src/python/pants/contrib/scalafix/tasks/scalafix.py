@@ -27,8 +27,10 @@ class ScalaFix(ScalaRewriteBase):
     register('--rewrites', default=None, fingerprint=True,
              help='The `rewrites` arg to scalafix: generally a name like `ProcedureSyntax`.')
     register('--semantic', type=bool, default=True, fingerprint=True,
-             help='True to enable `semantic` scalafix rules by requesting compilation, and '
-                  'providing the target classpath to scalafix.')
+             help='True to enable `semantic` scalafix rules by requesting compilation and '
+                  'providing the target classpath to scalafix. To enable this option, you '
+                  'will need to install the `semanticdb-scalac` compiler plugin. See '
+                  'https://www.pantsbuild.org/scalac_plugins.html for more information.')
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
