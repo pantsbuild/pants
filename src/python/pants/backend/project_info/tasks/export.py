@@ -6,13 +6,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
+import logging
 import os
-from collections import defaultdict
+import subprocess
+from collections import OrderedDict, defaultdict
 
 import six
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
+                                                                    PinnedJarArtifactSet)
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
@@ -28,11 +33,14 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
-from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.option.errors import OptionsError
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
@@ -104,6 +112,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
+    register('--resolver', choices=['ivy', 'coursier'], default='coursier',
+             help='Specify which 3rdparty resolver to use.')
     # Required by IvyTaskMixin.
     # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
     # See also https://github.com/pantsbuild/pants/issues/3200.
@@ -129,13 +139,20 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
     self._support_current_pants_plugin_options_usage()
 
-    compile_classpath = None
+    compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
     if confs:
-      compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
-      self.resolve(executor=executor,
-                   targets=targets,
-                   classpath_products=compile_classpath,
-                   confs=confs)
+      if self.get_options().resolver == 'coursier':
+        # TODO: assign jars to the correct target
+        # Current hack: assign all jars to all targets
+        CoursierResolve.resolve(targets=targets,
+                                compile_classpath=compile_classpath)
+        # for jar_path in jar_paths:
+        #   compile_classpath.add_for_targets(jar_targets, [('default', jar_path)])
+      else:
+        self.resolve(executor=executor,
+                     targets=targets,
+                     classpath_products=compile_classpath,
+                     confs=confs)
     return compile_classpath
 
   # TODO: This is a terrible hack for backwards-compatibility with the pants-plugin.
@@ -405,3 +422,114 @@ class Export(ExportTask, ConsoleTask):
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
       return [json.dumps(graph_info)]
+
+class CoursierError(Exception):
+  pass
+
+class CoursierResolve:
+
+  @classmethod
+  def resolve(cls, targets, compile_classpath, pinned_artifacts=None, excludes=[]):
+    manager = JarDependencyManagement.global_instance()
+
+    jar_targets = manager.targets_by_artifact_set(targets)
+
+    assert len(jar_targets) == 1
+
+    for artifact_set, target_subset in jar_targets.items():
+      jars, global_excludes = IvyUtils.calculate_classpath(target_subset)
+
+    t_subset = target_subset
+
+    org = IvyUtils.INTERNAL_ORG_NAME
+    # name = resolve_hash_name
+    #
+    # extra_configurations = [conf for conf in confs if conf and conf != 'default']
+
+    jars_by_key = OrderedDict()
+    for jar in jars:
+      jars = jars_by_key.setdefault((jar.org, jar.name), [])
+      jars.append(jar)
+
+    artifact_set = PinnedJarArtifactSet(pinned_artifacts) # Copy, because we're modifying it.
+    for jars in jars_by_key.values():
+      for i, dep in enumerate(jars):
+        direct_coord = M2Coordinate.create(dep)
+        managed_coord = artifact_set[direct_coord]
+        if direct_coord.rev != managed_coord.rev:
+          # It may be necessary to actually change the version number of the jar we want to resolve
+          # here, because overrides do not apply directly (they are exclusively transitive). This is
+          # actually a good thing, because it gives us more control over what happens.
+          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+          jars[i] = dep.copy(rev=coord.rev)
+        elif dep.force:
+          # If this dependency is marked as 'force' and there is no version conflict, use the normal
+          # pants behavior for 'force'.
+          artifact_set.put(direct_coord)
+
+    dependencies = [IvyUtils._generate_jar_template(jars) for jars in jars_by_key.values()]
+
+    # As it turns out force is not transitive - it only works for dependencies pants knows about
+    # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
+    # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
+    # edit the generated ivy.xml and use the override feature [3] though and that does work
+    # transitively as you'd hope.
+    #
+    # [1] http://ant.apache.org/ivy/history/2.3.0/settings/conflict-managers.html
+    # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
+    #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
+    # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
+    overrides = [IvyUtils._generate_override_template(_coord) for _coord in artifact_set]
+
+    excludes = [IvyUtils._generate_exclude_template(exclude) for exclude in excludes]
+
+    resolve_args = []
+    exclude_args = set()
+    for k, v in jars_by_key.items():
+      for jar in v:
+        # logger.warn(v.__repr__())
+        # logger.warn(jar.coordinate)
+        resolve_args.append(jar.coordinate)
+        for ex in jar.excludes:
+          ex_arg = "{}:{}".format(ex.org, ex.name)
+          exclude_args.add(ex_arg)
+
+          # logger.warn("EXCLUDE: {}".format(ex_arg))
+
+    def get_m2_id(coord):
+      return ':'.join([coord.org, coord.name, coord.rev, coord.classifier or 'default'])
+
+    # Prepare cousier args
+    cmd_args = ['/Users/yic/workspace/coursier/coursier',
+                'fetch',
+                '-r', 'https://artifactory-ci.twitter.biz/java-virtual']
+
+    # Add the m2 id to resolve
+    cmd_args.extend(get_m2_id(x) for x in resolve_args)
+
+    # Add org:artifact to exclude
+    for x in exclude_args:
+      cmd_args.append('-E')
+      cmd_args.append(x)
+
+    logger.info(' '.join(cmd_args))
+
+    env = os.environ.copy()
+    env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
+    try:
+      output = subprocess.check_output(cmd_args, env=env)
+    except subprocess.CalledProcessError as e:
+      raise CoursierError()
+    else:
+      resolved_jar_paths = output.splitlines()
+      resolved_jars = []
+      for jar_path in resolved_jar_paths:
+        rev = os.path.basename(os.path.dirname(jar_path))
+        name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
+        org = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(jar_path))))
+        resolved_jar = ResolvedJar(M2Coordinate(org=org, name=name, rev=rev),
+                                   cache_path=jar_path,
+                                   pants_path=jar_path)
+        resolved_jars.append(resolved_jar)
+
+      compile_classpath.add_jars_for_targets(targets=t_subset, conf='default', resolved_jars=resolved_jars)

@@ -990,6 +990,34 @@ class IvyUtils(object):
       excludes=excludes,
       overrides=overrides)
 
+    # My stuff
+    # logger.warn("extra config: ")
+    # logger.warn(extra_configurations)
+    # logger.warn("jars by key: ")
+    resolve_args = []
+    exclude_args = set()
+    for k, v in jars_by_key.items():
+      for jar in v:
+        # logger.warn(v.__repr__())
+        # logger.warn(jar.coordinate)
+        resolve_args.append(jar.coordinate)
+        for ex in jar.excludes:
+          ex_arg = "{}:{}".format(ex.org, ex.name)
+          exclude_args.add(ex_arg)
+
+          # logger.warn("EXCLUDE: {}".format(ex_arg))
+
+    def get_m2_id(coord):
+      return ':'.join([coord.org, coord.name, coord.rev, coord.classifier or 'default'])
+
+    cmd = "{} {}".format(' '.join(get_m2_id(x) for x in resolve_args), ' '.join('-E {}'.format(x) for x in exclude_args))
+    logger.warn(cmd)
+
+    # logger.warn("artifact set: ")
+    # logger.warn(artifact_set)
+    # logger.warn("excludes: ")
+    # logger.warn(excludes)
+
     template_relpath = os.path.join('templates', 'ivy_utils', 'ivy.xml.mustache')
     cls._write_ivy_xml_file(ivyxml, template_data, template_relpath)
 
