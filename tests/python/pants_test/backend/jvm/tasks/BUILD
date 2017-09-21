@@ -630,7 +630,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:scalafmt',
     'tests/python/pants_test:int-test',
   ],
-  timeout=180,
+  timeout=240,
   tags = {'integration'},
 )
 

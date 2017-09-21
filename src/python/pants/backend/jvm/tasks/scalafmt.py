@@ -16,9 +16,10 @@ from pants.option.custom_types import file_option
 class ScalaFmt(ScalaRewriteBase):
   """Abstract class to run ScalaFmt commands.
 
-  Classes that inherit from this should override get_command_args and
-  process_results to run different scalafmt commands.
+  Classes that inherit from this should override additional_args and
+  process_result to run different scalafmt commands.
   """
+
   _SCALAFMT_MAIN = 'org.scalafmt.cli.Cli'
   _SCALA_SOURCE_EXTENSION = '.scala'
 
@@ -39,17 +40,22 @@ class ScalaFmt(ScalaRewriteBase):
   def implementation_version(cls):
     return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
 
-  def invoke_tool(self, sources):
-    files = ",".join(sources)
+  def invoke_tool(self, _, absolute_sources):
+    # If no config file is specified use default scalafmt config.
+    config_file = self.get_options().configuration
+    args = list(self.additional_args)
+    args.extend(['--files', ','.join(absolute_sources)])
+    if config_file != None:
+      args.extend(['--config', config_file])
 
     return self.runjava(classpath=self.tool_classpath('scalafmt'),
                         main=self._SCALAFMT_MAIN,
-                        args=self.get_command_args(files),
+                        args=args,
                         workunit_name='scalafmt',
                         jvm_options=self.get_options().jvm_options)
 
   @abstractproperty
-  def get_command_args(self, files):
+  def additional_args(self):
     """Returns the arguments used to run Scalafmt command.
 
     The return value should be an array of strings.  For
@@ -70,19 +76,10 @@ class ScalaFmtCheckFormat(ScalaFmt):
   deprecated_options_scope = 'compile.scalafmt'
   deprecated_options_scope_removal_version = '1.5.0.dev0'
 
-  in_place = True
   sideeffecting = False
+  additional_args = ['--test']
 
-  def get_command_args(self, files):
-    # If no config file is specified use default scalafmt config.
-    config_file = self.get_options().configuration
-    args = ['--test', '--files', files]
-    if config_file != None:
-      args.extend(['--config', config_file])
-
-    return args
-
-  def process_results(self, _, result):
+  def process_result(self, result):
     if result != 0:
       raise TaskError('Scalafmt failed with exit code {}; to fix run: '
                       '`./pants fmt <targets>`'.format(result), exit_code=result)
@@ -98,19 +95,10 @@ class ScalaFmtFormat(ScalaFmt):
   :API: public
   """
 
-  in_place = True
   sideeffecting = True
+  additional_args = ['-i']
 
-  def get_command_args(self, files):
-    # If no config file is specified use default scalafmt config.
-    config_file = self.get_options().configuration
-    args = ['-i', '--files', files]
-    if config_file != None:
-      args.extend(['--config', config_file])
-
-    return args
-
-  def process_results(self, _, result):
+  def process_result(self, result):
     # Processes the results of running the scalafmt command.
     if result != 0:
       raise TaskError('Scalafmt failed to format files', exit_code=result)
