@@ -11,7 +11,9 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.tasks.coverage.base import BaseCoverage, CoverageTaskSettings
+from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
+from pants.backend.jvm.tasks.coverage.util import (initialize_instrument_classpath,
+                                                   is_coverage_target)
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util import desktop
@@ -19,17 +21,11 @@ from pants.util.contextutil import temporary_file
 from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
 
 
-class CoberturaTaskSettings(CoverageTaskSettings):
-  """A class that holds task settings for cobertura coverage."""
-
-
-class Cobertura(BaseCoverage):
+class Cobertura(CoverageEngine):
   """Class to run coverage tests with cobertura."""
 
-  @classmethod
-  def register_options(cls, register, register_jvm_tool):
-    super(Cobertura, cls).register_options(register, register_jvm_tool)
-
+  @staticmethod
+  def register_options(register, register_jvm_tool):
     slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
     slf4j_api_jar = JarDependency(org='org.slf4j', name='slf4j-api', rev='1.7.5')
 
@@ -68,7 +64,7 @@ class Cobertura(BaseCoverage):
   def __init__(self, settings, targets, execute_java_for_targets):
     """
     :param settings: The options for a `Cobertura` coverage run.
-    :type settings: :class:`CoberturaTaskSettings`
+    :type settings: :class:`CoverageTaskSettings`
     :param list targets: A list of targets to instrument and record code coverage for.
     :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
                                      constraints are used to pick a JVM `Distribution`. The function
@@ -76,9 +72,11 @@ class Cobertura(BaseCoverage):
                                      remaining parameters accepted by
                                      `pants.java.util.execute_java`.
     """
-    super(Cobertura, self).__init__(settings)
+    self._settings = settings
     options = settings.options
-    self._coverage_datafile = os.path.join(self._settings.coverage_dir, 'cobertura.ser')
+    self._context = settings.context
+    self._coverage = options.coverage
+    self._coverage_datafile = os.path.join(settings.coverage_dir, 'cobertura.ser')
     touch(self._coverage_datafile)
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes
@@ -92,13 +90,13 @@ class Cobertura(BaseCoverage):
     runtime_classpath = self._context.products.get_data('runtime_classpath')
     instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath',
                                                                         runtime_classpath.copy)
-    self.initialize_instrument_classpath(self._targets, instrumentation_classpath)
+    initialize_instrument_classpath(self._settings, self._targets, instrumentation_classpath)
 
     cobertura_cp = self._settings.tool_classpath('cobertura-instrument')
     safe_delete(self._coverage_datafile)
     files_to_instrument = []
     for target in self._targets:
-      if self.is_coverage_target(target):
+      if is_coverage_target(target):
         paths = instrumentation_classpath.get_for_target(target)
         for (name, path) in paths:
           files_to_instrument.append(path)
@@ -135,7 +133,7 @@ class Cobertura(BaseCoverage):
           "executing cobertura instrumentation with the following args: {}".format(args))
         result = self._execute_java(classpath=cobertura_cp,
                                     main=main,
-                                    jvm_options=self._coverage_jvm_options,
+                                    jvm_options=self._settings.coverage_jvm_options,
                                     args=args,
                                     workunit_factory=self._context.new_workunit,
                                     workunit_name='cobertura-instrument')
@@ -166,7 +164,7 @@ class Cobertura(BaseCoverage):
       else:
         return
     cobertura_cp = self._settings.tool_classpath('cobertura-report')
-    source_roots = {t.target_base for t in self._targets if self.is_coverage_target(t)}
+    source_roots = {t.target_base for t in self._targets if is_coverage_target(t)}
     for report_format in ['xml', 'html']:
       report_dir = os.path.join(self._settings.coverage_dir, report_format)
       safe_mkdir(report_dir, clean=True)
@@ -182,7 +180,7 @@ class Cobertura(BaseCoverage):
       main = 'net.sourceforge.cobertura.reporting.ReportMain'
       result = self._execute_java(classpath=cobertura_cp,
                                   main=main,
-                                  jvm_options=self._coverage_jvm_options,
+                                  jvm_options=self._settings.coverage_jvm_options,
                                   args=args,
                                   workunit_factory=self._context.new_workunit,
                                   workunit_name='cobertura-report-' + report_format)
@@ -191,7 +189,7 @@ class Cobertura(BaseCoverage):
                         " 'failed to report'".format(main, result))
 
   def maybe_open_report(self):
-    if self._coverage_open:
+    if self._settings.coverage_open:
       report_file_path = os.path.join(self._settings.coverage_dir, 'html', 'index.html')
       try:
         desktop.ui_open(report_file_path)

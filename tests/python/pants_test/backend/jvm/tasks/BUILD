@@ -187,7 +187,7 @@ python_tests(
 
 python_tests(
   name = 'coverage',
-  sources = ['coverage/test_base.py'],
+  sources = ['coverage/test_util.py'],
   dependencies = [
     ':jvm_binary_task_test_base',
     'src/python/pants/java/jar',
