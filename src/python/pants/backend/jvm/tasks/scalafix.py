@@ -26,7 +26,7 @@ class ScalaFix(ScalaRewriteBase):
              help='The config file to use (in HOCON format).')
     register('--rewrites', default=None, fingerprint=True,
              help='The `rewrites` arg to scalafix: generally a name like `ProcedureSyntax`.')
-    register('--semantic', type=bool, default=True, fingerprint=True,
+    register('--semantic', type=bool, default=False, fingerprint=True,
              help='True to enable `semantic` scalafix rules by requesting compilation and '
                   'providing the target classpath to scalafix. To enable this option, you '
                   'will need to install the `semanticdb-scalac` compiler plugin. See '

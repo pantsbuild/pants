@@ -39,6 +39,7 @@ target(
     ':run_jvm_prep_command',
     ':scala_repl',
     ':scaladoc_gen',
+    ':scalafix',
     ':scalafmt',
     ':scalastyle',
     ':unpack_jars',
@@ -628,6 +629,19 @@ python_library(
     'src/python/pants/java/distribution',
     'src/python/pants/util:memo',
   ],
+)
+
+python_library(
+  name = 'scalafix',
+  sources = ['scalafix.py'],
+  dependencies = [
+    ':scala_rewrite_base',
+    'src/python/pants/backend/jvm/tasks:nailgun_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph',
+    'src/python/pants/java/jar',
+    'src/python/pants/option',
+  ]
 )
 
 python_library(
