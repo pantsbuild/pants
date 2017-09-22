@@ -24,8 +24,8 @@ class ScalaFix(ScalaRewriteBase):
     super(ScalaFix, cls).register_options(register)
     register('--configuration', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
-    register('--rewrites', default=None, fingerprint=True,
-             help='The `rewrites` arg to scalafix: generally a name like `ProcedureSyntax`.')
+    register('--rules', default=None, fingerprint=True,
+             help='The `rules` arg to scalafix: generally a name like `ProcedureSyntax`.')
     register('--semantic', type=bool, default=False, fingerprint=True,
              help='True to enable `semantic` scalafix rules by requesting compilation and '
                   'providing the target classpath to scalafix. To enable this option, you '
@@ -34,7 +34,7 @@ class ScalaFix(ScalaRewriteBase):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.4.2'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.1'),
                           ])
 
   @classmethod
@@ -58,8 +58,8 @@ class ScalaFix(ScalaRewriteBase):
       args.append('--classpath={}'.format(':'.join(classpath)))
     if self.get_options().configuration:
       args.append('--config={}'.format(self.get_options().configuration))
-    if self.get_options().rewrites:
-      args.append('--rewrites={}'.format(self.get_options().rewrites))
+    if self.get_options().rules:
+      args.append('--rules={}'.format(self.get_options().rules))
     if self.get_options().level == 'debug':
       args.append('--verbose')
 
