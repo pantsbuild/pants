@@ -7,8 +7,8 @@ use super::{ExecuteProcessRequest, ExecuteProcessResult};
 /// Runs a command on this machine in the pwd.
 ///
 pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, Error> {
-  Command::new(&req.argv[0])
-    .args(&req.argv[1..])
+  Command::new(&req.args[0])
+    .args(&req.args[1..])
     .env_clear()
     // It would be really nice not to have to manually set PATH but this is sadly the only way
     // to stop automatic PATH searching.
@@ -34,7 +34,7 @@ mod tests {
   #[cfg(unix)]
   fn stdout() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
+      args: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
     });
 
@@ -52,7 +52,7 @@ mod tests {
   #[cfg(unix)]
   fn stdout_and_stderr_and_exit_code() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(
+      args: owned_string_vec(
         &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
       ),
       env: BTreeMap::new(),
@@ -76,7 +76,7 @@ mod tests {
     env.insert("BAR".to_string(), "not foo".to_string());
 
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&["/usr/bin/env"]),
+      args: owned_string_vec(&["/usr/bin/env"]),
       env: env.clone(),
     });
 
@@ -106,7 +106,7 @@ mod tests {
       env.insert("BAR".to_string(), "not foo".to_string());
 
       ExecuteProcessRequest {
-        argv: owned_string_vec(&["/usr/bin/env"]),
+        args: owned_string_vec(&["/usr/bin/env"]),
         env: env,
       }
     }
@@ -120,7 +120,7 @@ mod tests {
   #[test]
   fn binary_not_found() {
     run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&["echo", "-n", "foo"]),
+      args: owned_string_vec(&["echo", "-n", "foo"]),
       env: BTreeMap::new(),
     }).expect_err("Want Err");
   }

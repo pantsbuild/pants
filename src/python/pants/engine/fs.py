@@ -96,6 +96,7 @@ def files_content_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')
 
 
+
 def create_fs_rules():
   """Creates rules that consume the intrinsic filesystem types."""
   return [

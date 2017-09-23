@@ -12,6 +12,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
+from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
@@ -159,7 +160,8 @@ class EngineInitializer(object):
     tasks = (
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
-      create_graph_rules(address_mapper, symbol_table)
+      create_graph_rules(address_mapper, symbol_table) +
+      create_process_rules()
     )
 
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)

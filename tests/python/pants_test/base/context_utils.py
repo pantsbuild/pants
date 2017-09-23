@@ -92,7 +92,7 @@ class TestContext(Context):
 # TODO: Make Console and Workspace into subsystems, and simplify this signature.
 def create_context(options=None, passthru_args=None, target_roots=None, build_graph=None,
                    build_file_parser=None, address_mapper=None,
-                   console_outstream=None, workspace=None):
+                   console_outstream=None, workspace=None, scheduler=None):
   """Creates a ``Context`` with no options or targets by default.
 
   :API: public
@@ -109,12 +109,13 @@ def create_context(options=None, passthru_args=None, target_roots=None, build_gr
                                      build_file_parser=build_file_parser,
                                      address_mapper=address_mapper,
                                      console_outstream=console_outstream,
-                                     workspace=workspace)
+                                     workspace=workspace,
+                                     scheduler=scheduler)
 
 
 def create_context_from_options(options, target_roots=None, build_graph=None,
                                 build_file_parser=None, address_mapper=None, console_outstream=None,
-                                workspace=None):
+                                workspace=None, scheduler=None):
   """Creates a ``Context`` with the given options and no targets by default.
 
   :param options: An :class:`pants.option.options.Option`-alike object that supports read methods.
@@ -126,4 +127,4 @@ def create_context_from_options(options, target_roots=None, build_graph=None,
   return TestContext(options=options, run_tracker=run_tracker, target_roots=target_roots,
                      build_graph=build_graph, build_file_parser=build_file_parser,
                      address_mapper=address_mapper, console_outstream=console_outstream,
-                     workspace=workspace)
+                     workspace=workspace, scheduler=scheduler)

@@ -11,6 +11,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.binaries.binary_util import BinaryUtil
+from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
@@ -53,20 +54,33 @@ class CountLinesOfCode(ConsoleTask):
 
       report_file = os.path.join(tmpdir, 'report_file')
       ignored_file = os.path.join(tmpdir, 'ignored')
-      cloc_script = self._get_cloc_script()
-      # See http://cloc.sourceforge.net/#options for cloc cmd-line options.
-      cmd = [cloc_script,
-             '--skip-uniqueness',
-             '--ignored={}'.format(ignored_file),
-             '--list-file={}'.format(list_file),
-             '--report-file={}'.format(report_file)]
-      with self.context.new_workunit(name='cloc',
-                                     labels=[WorkUnitLabel.TOOL],
-                                     cmd=' '.join(cmd)) as workunit:
-        result = subprocess.call(cmd,
-                                 stdout=workunit.output('stdout'),
-                                 stderr=workunit.output('stderr'))
 
+      # See http://cloc.sourceforge.net/#options for cloc cmd-line options.
+      cmd = (
+        self._get_cloc_script(),
+        '--skip-uniqueness',
+        '--ignored={}'.format(ignored_file),
+        '--list-file={}'.format(list_file),
+        '--report-file={}'.format(report_file))
+      if self.context._scheduler is None:
+        with self.context.new_workunit(
+          name='cloc',
+          labels=[WorkUnitLabel.TOOL],
+          cmd=' '.join(cmd)) as workunit:
+            result = subprocess.call(
+              cmd,
+              stdout=workunit.output('stdout'),
+              stderr=workunit.output('stderr')
+            )
+      else:
+        req = ExecuteProcessRequest(cmd, dict(os.environ))
+        self.context._scheduler.product_request(ExecuteProcessResult, [req])
+        request = self.context._scheduler.execution_request([ExecuteProcessResult], [req])
+        root_entries = self.context._scheduler.execute(request).root_products
+        if len(root_entries) != 1:
+          raise Exception("Got {} root entries ({})".format(len(root_entries), root_entries))
+        root, state = root_entries[0]
+        result = state.value.exit_code
       if result != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
 

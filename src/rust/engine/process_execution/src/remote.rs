@@ -59,7 +59,7 @@ fn make_execute_request(
   req: &ExecuteProcessRequest,
 ) -> Result<bazel_protos::remote_execution::ExecuteRequest, String> {
   let mut command = bazel_protos::remote_execution::Command::new();
-  command.set_arguments(protobuf::RepeatedField::from_vec(req.argv.clone()));
+  command.set_arguments(protobuf::RepeatedField::from_vec(req.args.clone()));
   for (ref name, ref value) in req.env.iter() {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name.to_string());
@@ -159,7 +159,7 @@ mod tests {
         test_server::MockExecution::new(
           "wrong-command".to_string(),
           super::make_execute_request(&ExecuteProcessRequest {
-            argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
+            args: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
           }).unwrap(),
           vec![],
@@ -452,7 +452,7 @@ mod tests {
 
   fn echo_foo_request() -> ExecuteProcessRequest {
     ExecuteProcessRequest {
-      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
+      args: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
     }
   }

@@ -1,8 +1,8 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashSet;
 use std::error::Error;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -15,6 +15,8 @@ use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants, throw};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
+use handles::maybe_drain_handles;
+use process_execution as process_executor;
 use rule_graph;
 use selectors::{self, Selector};
 use tasks;
@@ -288,6 +290,32 @@ impl Select {
                 Err(e) => Err(throw(&e)),
               }))
           .to_boxed(),
+      ]
+    } else if self.product() == &context.core.types.process_result {
+      let value = externs::val_for_id(self.subject.id());
+      let mut env: BTreeMap<String, String> = BTreeMap::new();
+      let env_var_parts = externs::project_multi_strs(&value, "env");
+      // TODO: Error if env_var_parts.len() % 2 != 0
+      for i in 0..(env_var_parts.len() / 2) {
+        env.insert(
+          env_var_parts[2 * i].clone(),
+          env_var_parts[2 * i + 1].clone(),
+        );
+      }
+      let request = process_executor::ExecuteProcessRequest {
+        args: externs::project_multi_strs(&value, "args"),
+        env: env,
+      };
+      let result = process_executor::local::run_command_locally(request).unwrap();
+      vec![
+        future::ok(externs::invoke_unsafe(
+          &context.core.types.construct_process_result,
+          &vec![
+            externs::store_bytes(&result.stdout),
+            externs::store_bytes(&result.stderr),
+            externs::store_i32(result.exit_code),
+          ],
+        )).to_boxed(),
       ]
     } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       vec![future::ok(value.clone()).to_boxed()]
@@ -721,6 +749,33 @@ impl SelectProjection {
 }
 
 ///
+/// A Node that represents executing a process.
+///
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ExecuteProcess(process_executor::ExecuteProcessRequest);
+
+#[derive(Clone, Debug)]
+pub struct ProcessResult(process_executor::ExecuteProcessResult);
+
+impl Node for ExecuteProcess {
+  type Output = ProcessResult;
+
+  fn run(self, _: Context) -> NodeFuture<ProcessResult> {
+    let request = self.0.clone();
+    future::ok(ProcessResult(
+      process_executor::local::run_command_locally(request)
+        .unwrap(),
+    )).to_boxed()
+  }
+}
+
+impl From<ExecuteProcess> for NodeKey {
+  fn from(n: ExecuteProcess) -> Self {
+    NodeKey::ExecuteProcess(n)
+  }
+}
+
+///
 /// A Node that represents reading the destination of a symlink (non-recursively).
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -1075,6 +1130,7 @@ impl From<Task> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
   DigestFile(DigestFile),
+  ExecuteProcess(ExecuteProcess),
   ReadLink(ReadLink),
   Scandir(Scandir),
   Stat(Stat),
@@ -1093,6 +1149,7 @@ impl NodeKey {
     }
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
+      &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
       &NodeKey::Stat(ref s) => format!("Stat({:?})", s.0),
@@ -1120,6 +1177,7 @@ impl NodeKey {
       externs::id_to_str(tc.0)
     }
     match self {
+      &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
@@ -1149,6 +1207,7 @@ impl Node for NodeKey {
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
       NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
@@ -1165,6 +1224,7 @@ pub enum NodeResult {
   Digest(fs::Digest),
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
+  ProcessResult(ProcessResult),
   Snapshot(fs::Snapshot),
   Value(Value),
 }
@@ -1190,6 +1250,12 @@ impl From<fs::Snapshot> for NodeResult {
 impl From<fs::Digest> for NodeResult {
   fn from(v: fs::Digest) -> Self {
     NodeResult::Digest(v)
+  }
+}
+
+impl From<ProcessResult> for NodeResult {
+  fn from(v: ProcessResult) -> Self {
+    NodeResult::ProcessResult(v)
   }
 }
 
@@ -1275,6 +1341,17 @@ impl TryFrom<NodeResult> for fs::Digest {
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
       NodeResult::Digest(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeResult> for ProcessResult {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::ProcessResult(v) => Ok(v),
       _ => Err(()),
     }
   }
