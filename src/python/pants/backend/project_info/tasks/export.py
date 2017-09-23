@@ -157,7 +157,11 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
         all_jars_deps = []
         for t in targets:
-          all_jars_deps.extend(t.jar_dependencies)
+          try:
+            all_jars_deps.extend(t.jar_dependencies)
+          except AttributeError:
+            # TODO: check which target has jar_dependencies
+            pass
 
         synthetic_target = self.context.add_new_target(
           address= Address('abc', 'dummy_library'),
@@ -541,6 +545,7 @@ class CoursierResolve:
     cmd_args = ['/Users/yic/workspace/coursier/coursier',
                 'fetch',
                 '-r', 'https://artifactory-ci.twitter.biz/java-virtual',
+                '-r', 'https://artifactory.twitter.biz/java-virtual',
                 '-n', '20']
 
     # Add the m2 id to resolve
