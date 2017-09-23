@@ -12,6 +12,7 @@ dependencies = [
  "lazy_static 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordermap 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "process_executor 0.0.1",
  "tar 0.4.12 (git+https://github.com/stuhood/tar-rs?rev=893a96e89c84f44f60f0e2398d27ae3267d196f8)",
  "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -164,6 +165,10 @@ dependencies = [
  "fixedbitset 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordermap 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "process_executor"
+version = "0.0.1"
 
 [[package]]
 name = "rand"
