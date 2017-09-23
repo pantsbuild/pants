@@ -12,6 +12,7 @@ import subprocess
 from collections import OrderedDict, defaultdict
 
 import six
+import zlib
 from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
@@ -20,6 +21,7 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -30,7 +32,10 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.workunit import WorkUnitLabel, WorkUnit
+from pants.build_graph.address import BuildFileAddress, Address
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
@@ -142,12 +147,37 @@ class ExportTask(IvyTaskMixin, PythonTask):
     compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
     if confs:
       if self.get_options().resolver == 'coursier':
-        # TODO: assign jars to the correct target
+
         # Current hack: assign all jars to all targets
-        CoursierResolve.resolve(targets=targets,
-                                compile_classpath=compile_classpath)
-        # for jar_path in jar_paths:
-        #   compile_classpath.add_for_targets(jar_targets, [('default', jar_path)])
+        coursier_resolved_jars = CoursierResolve.resolve(
+          targets=targets,
+          compile_classpath=compile_classpath,
+          workunit_factory=self.context.new_workunit,
+        )
+
+        all_jars_deps = []
+        for t in targets:
+          all_jars_deps.extend(t.jar_dependencies)
+
+        synthetic_target = self.context.add_new_target(
+          address= Address('abc', 'dummy_library'),
+          target_type=JarLibrary,
+          jars=all_jars_deps
+        )
+
+        # manager = JarDependencyManagement.global_instance()
+        # jar_targets = manager.targets_by_artifact_set(targets)
+
+        for t in targets:
+          self.context.build_graph.inject_dependency(
+            dependent=t.address,
+            dependency=synthetic_target.address,
+          )
+
+        # self.context.target_roots.append(synthetic_target)
+        targets.append(synthetic_target)
+        # compile_classpath.add_for_target(synthetic_target, )
+        compile_classpath.add_jars_for_targets([synthetic_target], conf='default', resolved_jars=coursier_resolved_jars)
       else:
         self.resolve(executor=executor,
                      targets=targets,
@@ -261,11 +291,11 @@ class ExportTask(IvyTaskMixin, PythonTask):
         target_libraries = OrderedSet(iter_transitive_jars(current_target))
       for dep in current_target.dependencies:
         info['targets'].append(dep.address.spec)
-        if isinstance(dep, JarLibrary):
-          for jar in dep.jar_dependencies:
-            target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
-          # Add all the jars pulled in by this jar_library
-          target_libraries.update(iter_transitive_jars(dep))
+        # if isinstance(dep, JarLibrary):
+        #   for jar in dep.jar_dependencies:
+        #     target_libraries.add(M2Coordinate(jar.org, jar.name, jar.rev))
+        #   # Add all the jars pulled in by this jar_library
+        #   target_libraries.update(iter_transitive_jars(dep))
         if isinstance(dep, Resources):
           resource_target_map[dep] = current_target
 
@@ -331,6 +361,8 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
     if classpath_products:
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
+    else:
+      graph_info['libraries'] = {}
 
     if python_interpreter_targets_mapping:
       interpreters = self.interpreter_cache.select_interpreter(
@@ -418,6 +450,12 @@ class Export(ExportTask, ConsoleTask):
 
   def console_output(self, targets, classpath_products=None):
     graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)
+
+    # compressed_content = zlib.compress(json.dumps(graph_info))
+    # with open("temp.zlib", "wb") as myfile:
+    #   myfile.write(compressed_content)
+    # return ['123']
+
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
     else:
@@ -429,7 +467,7 @@ class CoursierError(Exception):
 class CoursierResolve:
 
   @classmethod
-  def resolve(cls, targets, compile_classpath, pinned_artifacts=None, excludes=[]):
+  def resolve(cls, targets, compile_classpath, workunit_factory, pinned_artifacts=None, excludes=[]):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -502,7 +540,8 @@ class CoursierResolve:
     # Prepare cousier args
     cmd_args = ['/Users/yic/workspace/coursier/coursier',
                 'fetch',
-                '-r', 'https://artifactory-ci.twitter.biz/java-virtual']
+                '-r', 'https://artifactory-ci.twitter.biz/java-virtual',
+                '-n', '20']
 
     # Add the m2 id to resolve
     cmd_args.extend(get_m2_id(x) for x in resolve_args)
@@ -512,7 +551,8 @@ class CoursierResolve:
       cmd_args.append('-E')
       cmd_args.append(x)
 
-    logger.info(' '.join(cmd_args))
+    cmd_str = ' '.join(cmd_args)
+    logger.info(cmd_str)
 
     # env = os.environ.copy()
     # env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
@@ -521,11 +561,27 @@ class CoursierResolve:
     coursier_cache_path = '/Users/yic/.coursier/cache/'
 
     try:
-      output = subprocess.check_output(cmd_args)
+      with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+        # ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
+        # output = subprocess.check_output(cmd_args, stderr=workunit.output('stderr'))
+
+        return_code = subprocess.call(cmd_args,
+                                      stdout=workunit.output('stdout'),
+                                      stderr=workunit.output('stderr'))
+
+        workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+
+        with open(workunit.output('stdout')._io.name) as f:
+          stdout = f.read()
+
+        if return_code:
+          raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+
     except subprocess.CalledProcessError as e:
       raise CoursierError()
+
     else:
-      resolved_jar_paths = output.splitlines()
+      resolved_jar_paths = stdout.splitlines()
       resolved_jars = []
       for jar_path in resolved_jar_paths:
         rev = os.path.basename(os.path.dirname(jar_path))
@@ -544,4 +600,6 @@ class CoursierResolve:
 
         resolved_jars.append(resolved_jar)
 
-      compile_classpath.add_jars_for_targets(targets=t_subset, conf='default', resolved_jars=resolved_jars)
+      return resolved_jars
+
+      # compile_classpath.add_jars_for_targets(targets=['123'], conf='default', resolved_jars=resolved_jars)
