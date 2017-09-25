@@ -34,7 +34,7 @@ class PythonSetup(Subsystem):
     register('--interpreter-constraints', advanced=True, default=[], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
-                  "e.g. 'CPython>=2.6,<3' or 'PyPy'. Multiple constraints will be ORed together. "
+                  "e.g. 'CPython>=2.7,<3' or 'PyPy'. Multiple constraints will be ORed together. "
                   "These constraints are applied in addition to any compatibilities required by "
                   "the relevant targets.")
     register('--setuptools-version', advanced=True, default='30.0.0',

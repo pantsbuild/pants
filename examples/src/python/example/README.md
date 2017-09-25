@@ -135,14 +135,17 @@ Use `test` to run the tests. This uses `pytest`:
     13:29:29 00:01     [pytest]
     13:29:29 00:01       [run]
                          ============== test session starts ===============
-                         platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
-                         plugins: cov, timeout
+                         platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
+                         rootdir: /home/jsirois, inifile:
+                         plugins: cov-2.4.0, timeout-1.2.0
                          collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/test_greet.py ..
+                         .pants.d/pyprep/sources/48bd113ee4f5fa26f55357fbd9bb6d31382241fa/example_test/hello/greet/test_greet.py ..
 
-                         ============ 1 passed in 0.02 seconds ============
+                          generated xml file: /home/jsirois/dev/pantsbuild/jsirois-pants2/.pants.d/test/pytest/examples.tests.python.example_test.hello.greet.greet/junitxml/TEST-examples.tests.python.example_test.hello.greet.greet.xml 
+                         ============ 2 passed in 0.01 seconds ============
 
+                       examples.tests.python.example_test.hello.greet.greet                            .....   SUCCESS
     13:30:18 00:50     [junit]
     13:30:18 00:50     [specs]
                    SUCCESS
@@ -279,16 +282,19 @@ Pants runs Python tests with `pytest`. You can pass CLI options to `pytest` with
 you could run:
 
     :::bash
-    $ ./pants test.pytest --options='-k req' examples/tests/python/example_test/hello/greet
+    $ ./pants test.pytest --options='-k foo' examples/tests/python/example_test/hello/greet
     ...
                      ============== test session starts ===============
-                     platform darwin -- Python 2.6.8 -- py-1.4.20 -- pytest-2.5.2
-                     plugins: cov, timeout
+                     platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
+                     rootdir: /home/jsirois, inifile:
+                     plugins: cov-2.4.0, timeout-1.2.0
                      collected 2 items
 
-                     ========= 2 tests deselected by '-kfoo' ==========
+                      generated xml file: /home/jsirois/dev/pantsbuild/jsirois-pants2/.pants.d/test/pytest/examples.tests.python.example_test.hello.greet.greet/junitxml/TEST-examples.tests.python.example_test.hello.greet.greet.xml 
+                     =============== 2 tests deselected ===============
                      ========== 2 deselected in 0.01 seconds ==========
 
+                   examples.tests.python.example_test.hello.greet.greet                            .....   SUCCESS
     13:34:28 00:02     [junit]
     13:34:28 00:02     [specs]
                SUCCESS
@@ -305,16 +311,19 @@ parameters:
     10:43:04 00:01       [prep_command]
     10:43:04 00:01     [pytest]
     10:43:04 00:01       [run]
-                         ============== test session starts ===============
-                         platform darwin -- Python 2.7.5 -- py-1.4.26 -- pytest-2.6.4
-                         plugins: cov, timeout
-                         collected 2 items
+                     ============== test session starts ===============
+                     platform linux2 -- Python 2.7.12, pytest-3.0.7, py-1.4.32, pluggy-0.4.0
+                     rootdir: /home/jsirois, inifile:
+                     plugins: cov-2.4.0, timeout-1.2.0
+                     collected 2 items
 
-                         examples/tests/python/example_test/hello/greet/test_greet.py .
+                     .pants.d/pyprep/sources/48bd113ee4f5fa26f55357fbd9bb6d31382241fa/example_test/hello/greet/test_greet.py .
 
-                         ========= 1 tests deselected by '-kreq' ==========
-                         ===== 1 passed, 1 deselected in 0.05 seconds =====
+                      generated xml file: /home/jsirois/dev/pantsbuild/jsirois-pants2/.pants.d/test/pytest/examples.tests.python.example_test.hello.greet.greet/junitxml/TEST-examples.tests.python.example_test.hello.greet.greet.xml 
+                     =============== 1 tests deselected ===============
+                     ===== 1 passed, 1 deselected in 0.01 seconds =====
 
+                   examples.tests.python.example_test.hello.greet.greet                            .....   SUCCESS
     10:43:05 00:02     [junit]
     10:43:05 00:02     [specs]
                    SUCCESS

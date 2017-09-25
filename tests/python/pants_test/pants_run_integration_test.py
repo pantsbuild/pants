@@ -97,7 +97,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def has_python_version(cls, version):
     """Returns true if the current system has the specified version of python.
 
-    :param version: A python version string, such as 2.6, 3.
+    :param version: A python version string, such as 2.7, 3.
     """
     try:
       subprocess.call(['python%s' % version, '-V'])

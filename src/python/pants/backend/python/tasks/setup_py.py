@@ -551,9 +551,9 @@ class SetupPy(PythonTask):
     # pprint.pformat embeds u's in the string itself during conversion.
     # For that reason we convert each unicode string independently.
     #
-    # hoth:~ travis$ python
-    # Python 2.6.8 (unknown, Aug 25 2013, 00:04:29)
-    # [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
+    # jsirois@gill ~ $ python2
+    # Python 2.7.13 (default, Jul 21 2017, 03:24:34)
+    # [GCC 7.1.1 20170630] on linux2
     # Type "help", "copyright", "credits" or "license" for more information.
     # >>> import pprint
     # >>> data = {u'entry_points': {u'console_scripts': [u'pants = pants.bin.pants_exe:main']}}
