@@ -17,12 +17,6 @@ from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.engine.util import init_native
 
 
-class EmptyTable(SymbolTable):
-  @classmethod
-  def table(cls):
-    return {}
-
-
 class SchedulerTestBase(object):
   """A mixin for classes (tests, presumably) which need to create temporary schedulers.
 
