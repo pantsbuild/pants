@@ -155,7 +155,7 @@ class UnpackLibraries(Task):
 
     # Depending on the contents of the unpacked aar file, create the dependencies.
     deps = []
-    if os.path.isdir(resource_dir):
+    if os.path.isdir(resource_dir) and os.listdir(resource_dir):
       new_resource_target = self.create_resource_target(library, coordinate, manifest, resource_dir)
 
       # # The new libraries resources must be compiled both by themselves and along with the dependent library.
