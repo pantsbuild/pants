@@ -10,7 +10,6 @@ import shutil
 
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.nodes import Return
-from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
