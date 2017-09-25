@@ -29,6 +29,11 @@ class SymbolTable(AbstractClass):
     return Exactly(*symbol_table_types, description='symbol table types')
 
 
+class EmptyTable(SymbolTable):
+  def table(self):
+    return {}
+
+
 class Parser(AbstractClass):
 
   @abstractmethod

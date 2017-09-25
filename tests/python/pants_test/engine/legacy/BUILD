@@ -134,6 +134,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'parser',
+  sources = ['test_parser.py'],
+  dependencies = [
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:parser',
+    'src/python/pants/engine:parser',
+  ]
+)
+
+python_tests(
   name = 'structs',
   sources = ['test_structs.py'],
   dependencies = [

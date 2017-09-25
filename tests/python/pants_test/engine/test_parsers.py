@@ -29,12 +29,6 @@ class Bob(object):
     return isinstance(other, Bob) and self._key() == other._key()
 
 
-class EmptyTable(parser.SymbolTable):
-  @classmethod
-  def table(cls):
-    return {}
-
-
 class TestTable(parser.SymbolTable):
   @classmethod
   def table(cls):
@@ -53,7 +47,7 @@ def parse(parser, document, **args):
 
 class JsonParserTest(unittest.TestCase):
   def parse(self, document, symbol_table=None, **kwargs):
-    symbol_table = symbol_table or EmptyTable()
+    symbol_table = symbol_table or parser.EmptyTable()
     return parse(parsers.JsonParser(symbol_table), document, **kwargs)
 
   def round_trip(self, obj, symbol_table=None):
@@ -229,7 +223,7 @@ class JsonParserTest(unittest.TestCase):
     """).strip()
     filepath = '/dev/null'
     with self.assertRaises(parser.ParseError) as exc:
-      parsers.JsonParser(EmptyTable()).parse(filepath, document)
+      parsers.JsonParser(parser.EmptyTable()).parse(filepath, document)
 
     # Strip trailing whitespace from the message since our expected literal below will have
     # trailing ws stripped via editors and code reviews calling for it.
@@ -327,7 +321,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
       hobbies=[1, 2, 3]
     )
     """)
-    results = parse(parsers.PythonAssignmentsParser(EmptyTable()), document)
+    results = parse(parsers.PythonAssignmentsParser(parser.EmptyTable()), document)
     self.assertEqual([Bob(name='nancy', hobbies=[1, 2, 3])], results)
 
     # No symbol table was used so no `type_alias` plumbing can be expected.
