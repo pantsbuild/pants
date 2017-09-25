@@ -11,6 +11,7 @@ Markdown==2.1.1
 mock==2.0.0
 packaging==16.8
 pathspec==0.5.0
+parameterized==0.6.1
 pep8==1.6.2
 pex==1.2.11
 psutil==4.3.0
