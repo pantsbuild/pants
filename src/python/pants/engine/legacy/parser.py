@@ -120,6 +120,10 @@ class LegacyPythonCallbacksParser(Parser):
     python = filecontent
 
     # Mutate the parse context for the new path, then exec, and copy the resulting objects.
+    # We execute with a (shallow) clone of the symbols as a defense against accidental
+    # pollution of the namespace via imports or variable definitions. Defending against
+    # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
+    # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
-    six.exec_(python, self._symbols)
+    six.exec_(python, dict(self._symbols))
     return list(self._parse_context._storage.objects)
