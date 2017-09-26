@@ -5,11 +5,20 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
-1.4.0.dev13 (9/18/2017)
+1.4.0.dev13 (9/25/2017)
 -----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Support wheels when loading plugins. (#4887)
+  `PR #4887 <https://github.com/pantsbuild/pants/pull/4887>`_
 
 API Changes
 ~~~~~~~~~~~
+
+* Remove python 2.6 support completely. (#4871)
+  `PR #4871 <https://github.com/pantsbuild/pants/pull/4871>`_
 
 * Bump pyopenssl==17.3.0 (#4872)
   `PR #4872 <https://github.com/pantsbuild/pants/pull/4872>`_
@@ -20,17 +29,47 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
+* Add default routing for OSX High Sierra binaries. (#4894)
+  `PR #4894 <https://github.com/pantsbuild/pants/pull/4894>`_
+
+* Reduce BUILD file parse pollution (#4892)
+  `PR #4892 <https://github.com/pantsbuild/pants/pull/4892>`_
+
+* Exit with error on error bootstrapping cffi (#4891)
+  `PR #4891 <https://github.com/pantsbuild/pants/pull/4891>`_
+
+* Only generate Android resource deps when needed. (#4888)
+  `PR #4888 <https://github.com/pantsbuild/pants/pull/4888>`_
+
 * Re-pin to 2017Q2 TravisCI image. (#4869)
   `PR #4869 <https://github.com/pantsbuild/pants/pull/4869>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Update the committer docs. (#4889)
+  `PR #4889 <https://github.com/pantsbuild/pants/pull/4889>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Refactor test partitioning. (#4879)
+  `PR #4879 <https://github.com/pantsbuild/pants/pull/4879>`_
+
+* Leverage `subprocess32` subprocess backports. (#4851)
+  `PR #4851 <https://github.com/pantsbuild/pants/pull/4851>`_
+
+* Customize native engine build through code (#4876)
+  `PR #4876 <https://github.com/pantsbuild/pants/pull/4876>`_
+
 * Move to SymbolTable/Parser instances (#4864)
   `PR #4864 <https://github.com/pantsbuild/pants/pull/4864>`_
 
-1.4.0.dev12 (9/13/2017)
------------------------
+1.4.0.dev12 (9/13/2017) [UNRELEASED]
+------------------------------------
+
+NB: 1.4.0.dev12 was never released to pypi due to technical difficulties; its changes were rolled
+up into 1.4.0.dev13 and released with it.
 
 API Changes
 ~~~~~~~~~~~
