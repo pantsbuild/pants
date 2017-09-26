@@ -15,6 +15,7 @@ import sbt.internal.inc.{
   javac,
   ZincUtil
 }
+import sbt.internal.inc.classpath.ClassLoaderCache
 import sbt.io.Path
 import sbt.io.syntax._
 import sbt.util.Logger
@@ -60,6 +61,12 @@ object CompilerUtils {
   }
 
   /**
+   * Cache of classloaders: see https://github.com/pantsbuild/pants/issues/4744
+   */
+  private val classLoaderCache: Option[ClassLoaderCache] =
+    Some(new ClassLoaderCache(new URLClassLoader(Array())))
+
+  /**
    * Get or create a zinc compiler based on compiler setup.
    */
   def getOrCreate(settings: Settings, log: Logger): Compilers = {
@@ -86,9 +93,7 @@ object CompilerUtils {
       ZincCompilerUtil.constantBridgeProvider(instance, interfaceJar),
       ClasspathOptionsUtil.auto,
       _ => (),
-      // TODO: Should likely use the classloader cache here:
-      //   see https://github.com/pantsbuild/pants/issues/4744
-      None
+      classLoaderCache
     )
 
   /**

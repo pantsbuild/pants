@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import subprocess
 from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 
@@ -18,6 +17,7 @@ from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as
 from pants.util.dirutil import relativize_paths
 from pants.util.meta import AbstractClass
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

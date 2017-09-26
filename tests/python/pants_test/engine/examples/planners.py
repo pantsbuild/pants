@@ -439,13 +439,12 @@ def setup_json_scheduler(build_root, native):
   :rtype :class:`pants.engine.scheduler.LocalScheduler`
   """
 
-  symbol_table_cls = ExampleTable
+  symbol_table = ExampleTable()
 
   # Register "literal" subjects required for these tasks.
   # TODO: Replace with `Subsystems`.
-  address_mapper = AddressMapper(symbol_table_cls=symbol_table_cls,
-                                 build_patterns=('BLD.json',),
-                                 parser_cls=JsonParser)
+  address_mapper = AddressMapper(build_patterns=('BLD.json',),
+                                 parser=JsonParser(symbol_table))
 
   work_dir = os_path_join(build_root, '.pants.d')
   project_tree = FileSystemProjectTree(build_root)
@@ -485,7 +484,7 @@ def setup_json_scheduler(build_root, native):
       javac,
       scalac,
     ] + (
-      create_graph_rules(address_mapper, symbol_table_cls)
+      create_graph_rules(address_mapper, symbol_table)
     ) + (
       create_fs_rules()
     )

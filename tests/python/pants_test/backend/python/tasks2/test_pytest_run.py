@@ -9,7 +9,6 @@ import os
 from textwrap import dedent
 
 import coverage
-from mock import patch
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.pytest_prep import PytestPrep
@@ -19,7 +18,6 @@ from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.util.contextutil import pushd
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
-from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
 
@@ -479,31 +477,6 @@ class PytestTest(PytestTestBase):
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
-
-  @ensure_cached(PytestRun, expected_num_artifacts=1)
-  def test_none_timeout(self):
-    # When we have two targets, any of them doesn't have a timeout, and we have no default,
-    # then no timeout is set.
-
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
-
-      # Ensures that Timeout is instantiated with no timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (None,))
-
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_timeout(self):
-    # Check that a failed timeout returns the right results.
-
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__.side_effect = TimeoutReached(1)
-      self.run_failing_tests(targets=[self.sleep_timeout],
-                             failed_targets=[self.sleep_timeout])
-
-      # Ensures that Timeout is instantiated with a 1 second timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (1,))
 
   def coverage_data_file(self):
     return os.path.join(self.build_root, '.coverage')

@@ -34,8 +34,12 @@ class PantsService(AbstractClass):
   def pre_fork(self):
     """Called pre-fork, before `run` to allow for service->service or other side-effecting setup."""
 
-  def setup(self):
-    """Called before `run` to allow for service->service or other side-effecting setup."""
+  def setup(self, lock):
+    """Called before `run` to allow for service->service or other side-effecting setup.
+
+    :param threading.Lock lock: A global service<->service lock for guarding critical work.
+    """
+    self.lock = lock
 
   @abstractmethod
   def run(self):

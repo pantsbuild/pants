@@ -47,21 +47,26 @@ setup(**
 
 
 class SetupPyRunner(InstallerBase):
+  _EXTRAS = ('setuptools', 'wheel')
+
   def __init__(self, source_dir, setup_command, **kw):
     self.__setup_command = setup_command.split()
     super(SetupPyRunner, self).__init__(source_dir, **kw)
 
   def mixins(self):
     mixins = super(SetupPyRunner, self).mixins().copy()
+    extras = set(self._EXTRAS)
     for (key, version) in self._interpreter.extras:
-      if key == 'setuptools':
-        mixins['setuptools'] = 'setuptools=={}'.format(version)
-        break
+      if key in extras:
+        mixins[key] = '{}=={}'.format(key, version)
+        extras.remove(key)
+        if not extras:
+          break
     else:
-      # We know Pants sets up python interpreters with wheel and setuptools via the `PythonSetup`
+      # We know Pants sets up python interpreters with setuptools and wheel via the `PythonSetup`
       # subsystem; so this should never happen
-      raise AssertionError("Expected interpreter {} to have the extra 'setuptools'"
-                           .format(self._interpreter))
+      raise AssertionError("Expected interpreter {} to have the extras {}"
+                           .format(self._interpreter, self._EXTRAS))
     return mixins
 
   def _setup_command(self):
@@ -307,7 +312,7 @@ class SetupPy(Task):
 
   @classmethod
   def has_provides(cls, target):
-    return cls.is_python_target(target) and target.provides
+    return cls.is_python_target(target) and target.provides is not None
 
   @classmethod
   def product_types(cls):
@@ -539,9 +544,9 @@ class SetupPy(Task):
     # pprint.pformat embeds u's in the string itself during conversion.
     # For that reason we convert each unicode string independently.
     #
-    # hoth:~ travis$ python
-    # Python 2.6.8 (unknown, Aug 25 2013, 00:04:29)
-    # [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
+    # jsirois@gill ~ $ python2
+    # Python 2.7.13 (default, Jul 21 2017, 03:24:34)
+    # [GCC 7.1.1 20170630] on linux2
     # Type "help", "copyright", "credits" or "license" for more information.
     # >>> import pprint
     # >>> data = {u'entry_points': {u'console_scripts': [u'pants = pants.bin.pants_exe:main']}}

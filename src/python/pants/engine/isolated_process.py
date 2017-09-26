@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import functools
 import logging
 import os
-import subprocess
 from abc import abstractproperty
 from binascii import hexlify
 
@@ -17,6 +16,7 @@ from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
 from pants.util.objects import datatype
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)

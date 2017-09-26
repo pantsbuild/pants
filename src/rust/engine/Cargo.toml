@@ -25,7 +25,7 @@ glob = "0.2.11"
 ignore = "0.1.8"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
-petgraph = "0.4.4"
+petgraph = "0.4.5"
 # TODO: See https://github.com/alexcrichton/tar-rs/pull/107.
 tar = { git = "https://github.com/stuhood/tar-rs", rev = "893a96e89c84f44f60f0e2398d27ae3267d196f8" }
 tempdir = "0.3.5"

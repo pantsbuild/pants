@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.util.contextutil import temporary_file_path
+from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 

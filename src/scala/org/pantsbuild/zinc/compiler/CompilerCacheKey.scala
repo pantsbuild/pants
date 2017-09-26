@@ -22,7 +22,6 @@ case class CompilerCacheKey(
   compilerBridgeSrc: File,
   compilerInterface: File,
   javaHome: Option[File],
-  forkJava: Boolean,
   cacheDir: File)
 
 object CompilerCacheKey {
@@ -40,7 +39,6 @@ object CompilerCacheKey {
       compilerBridgeSrc,
       compilerInterface,
       settings.javaHome,
-      settings.forkJava,
       settings.zincCacheDir
     )
   }
@@ -55,7 +53,6 @@ object CompilerCacheKey {
     compilerBridgeSrc: File,
     compilerInterface: File,
     javaHomeDir: Option[File],
-    forkJava: Boolean,
     cacheDir: File
   ): CompilerCacheKey = {
     val normalise: File => File = { _.getAbsoluteFile }
@@ -65,6 +62,6 @@ object CompilerCacheKey {
     val compilerBridgeJar    = normalise(compilerBridgeSrc)
     val compilerInterfaceJar = normalise(compilerInterface)
     val javaHome             = javaHomeDir map normalise
-    CompilerCacheKey(compilerJar, libraryJar, extraJars, compilerBridgeJar, compilerInterfaceJar, javaHome, forkJava, cacheDir)
+    CompilerCacheKey(compilerJar, libraryJar, extraJars, compilerBridgeJar, compilerInterfaceJar, javaHome, cacheDir)
   }
 }

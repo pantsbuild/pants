@@ -8,10 +8,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import time
+from collections import namedtuple
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 
 from pants.util.dirutil import safe_mkdir
+
+
+class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_stream'])):
+  """A structured result for logging setup."""
 
 
 # TODO: Once pantsd had a separate launcher entry point, and so no longer needs to call this
@@ -42,12 +47,14 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # logging control and we don't need to be the middleman plumbing an option for each python
   # standard logging knob.
 
+  log_filename = None
+  log_stream = None
+
   logger = logging.getLogger(scope)
   for handler in logger.handlers:
     logger.removeHandler(handler)
 
   if console_stream:
-    log_file = None
     console_handler = StreamHandler(stream=console_stream)
     console_handler.setFormatter(Formatter(fmt='%(levelname)s] %(message)s'))
     console_handler.setLevel(level)
@@ -55,8 +62,9 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
 
   if log_dir:
     safe_mkdir(log_dir)
-    log_file = os.path.join(log_dir, log_name or 'pants.log')
-    file_handler = RotatingFileHandler(log_file, maxBytes=10 * 1024 * 1024, backupCount=4)
+    log_filename = os.path.join(log_dir, log_name or 'pants.log')
+    file_handler = RotatingFileHandler(log_filename, maxBytes=10 * 1024 * 1024, backupCount=4)
+    log_stream = file_handler.stream
 
     class GlogFormatter(Formatter):
       LEVEL_MAP = {
@@ -87,4 +95,4 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
 
-  return log_file
+  return LoggingSetupResult(log_filename, log_stream)

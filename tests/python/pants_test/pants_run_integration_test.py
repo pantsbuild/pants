@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import ConfigParser
 import os
 import shutil
-import subprocess
 import unittest
 from collections import namedtuple
 from contextlib import contextmanager
@@ -23,6 +22,7 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.process_handler import subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
@@ -97,7 +97,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
   def has_python_version(cls, version):
     """Returns true if the current system has the specified version of python.
 
-    :param version: A python version string, such as 2.6, 3.
+    :param version: A python version string, such as 2.7, 3.
     """
     try:
       subprocess.call(['python%s' % version, '-V'])

@@ -15,10 +15,10 @@ from pants.engine.mapper import AddressMapper
 from pants.engine.rules import RootRule, RuleIndex, SingletonRule, TaskRule
 from pants.engine.scheduler import WrappedNativeScheduler
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
-from pants.engine.subsystem.native import Native
 from pants_test.engine.examples.parsers import JsonParser
 from pants_test.engine.examples.planners import Goal
-from pants_test.engine.util import TargetTable, assert_equal_with_printing, create_native_scheduler
+from pants_test.engine.util import (TargetTable, assert_equal_with_printing,
+                                    create_native_scheduler, init_native)
 
 
 class AGoal(Goal):
@@ -274,9 +274,9 @@ class RuleGraphMakerTest(unittest.TestCase):
                      }""").strip(), fullgraph)
 
   def test_full_graph_for_planner_example(self):
-    symbol_table_cls = TargetTable
-    address_mapper = AddressMapper(symbol_table_cls, JsonParser, '*.BUILD.json')
-    rules = create_graph_rules(address_mapper, symbol_table_cls) + create_fs_rules()
+    symbol_table = TargetTable()
+    address_mapper = AddressMapper(JsonParser(symbol_table), '*.BUILD.json')
+    rules = create_graph_rules(address_mapper, symbol_table) + create_fs_rules()
 
     rule_index = RuleIndex.create(rules)
     fullgraph_str = self.create_full_graph(rule_index)
@@ -736,7 +736,7 @@ class RuleGraphMakerTest(unittest.TestCase):
       subgraph)
 
   def create_scheduler(self, rule_index):
-    native = Native.Factory.global_instance().create()
+    native = init_native()
     scheduler = WrappedNativeScheduler(
       native=native,
       build_root='/tmp',

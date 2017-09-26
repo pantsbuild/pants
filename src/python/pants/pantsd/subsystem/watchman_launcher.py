@@ -26,7 +26,7 @@ class WatchmanLauncher(object):
 
     @classmethod
     def register_options(cls, register):
-      register('--version', advanced=True, default='4.5.0',
+      register('--version', advanced=True, default='4.9.0',
                help='Watchman version.')
       register('--supportdir', advanced=True, default='bin/watchman',
                help='Find watchman binaries under this dir. Used as part of the path to lookup '

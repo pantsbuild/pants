@@ -9,7 +9,6 @@ import itertools
 import os
 import re
 import shutil
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -31,7 +30,7 @@ from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import (environment_as, temporary_dir, temporary_file,
                                     temporary_file_path)
 from pants.util.dirutil import safe_mkdir, safe_open
-from pants.util.process_handler import SubprocessProcessHandler
+from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants.util.strutil import safe_shlex_split
 
 

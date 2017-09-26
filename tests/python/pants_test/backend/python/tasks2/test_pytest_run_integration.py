@@ -47,7 +47,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stderr_data)
 
     # Ensure that the timeout message triggered.
-    self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
+    self.assertIn(" timed out after 1 seconds", pants_run.stdout_data)
 
   @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_cant_terminate(self):

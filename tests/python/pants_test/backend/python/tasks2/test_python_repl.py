@@ -19,7 +19,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.task.repl_task_mixin import ReplTaskMixin
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -176,6 +176,13 @@ class PythonReplTest(PythonTaskTestBase):
     self.do_test_repl(code=['import java.lang.unreachable'],
                       expected=[''],
                       targets=[self.non_python_target])
+
+  def test_access_to_env(self):
+    with environment_as(SOME_ENV_VAR='twelve'):
+      self.do_test_repl(code=['import os',
+                               'print(os.environ.get("SOME_ENV_VAR"))'],
+                        expected=['twelve'],
+                        targets=[self.library])
 
   def test_ipython(self):
     # IPython supports shelling out with a leading !, so indirectly test its presence by reading

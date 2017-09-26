@@ -192,9 +192,9 @@ def execute_runner_async(runner, workunit_factory=None, workunit_name=None, work
     process = runner.spawn(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
 
     class WorkUnitProcessHandler(ProcessHandler):
-      def wait(_):
+      def wait(_, timeout=None):
         try:
-          ret = process.wait()
+          ret = process.wait(timeout=timeout)
           workunit.set_outcome(WorkUnit.FAILURE if ret else WorkUnit.SUCCESS)
           workunit_generator.__exit__(None, None, None)
           return ret
