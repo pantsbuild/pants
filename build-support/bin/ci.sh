@@ -228,15 +228,9 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
 fi
 
 if [[ "${skip_rust_tests:-false}" == "false" ]]; then
-  source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
-
   start_travis_section "RustTests" "Running Pants rust tests"
   (
-    source "${REPO_ROOT}/build-support/pants_venv"
-    activate_pants_venv
-    PANTS_SRCPATH="${REPO_ROOT}/src/python" prepare_to_build_native_code
-    export RUST_BACKTRACE=1
-    "${CARGO_HOME}/bin/cargo" test --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
+    "${REPO_ROOT}/src/rust/engine/run-all-tests.sh"
   ) || die "Pants rust test failure"
   end_travis_section
 fi

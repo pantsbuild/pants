@@ -6,6 +6,14 @@ To build for development, run:
 
     cargo build
 
+To run tests for any particular crate, run:
+
+    cargo test
+
+Or to run tests for all crates, run:
+
+    ./run-all-tests.sh
+
 To build for release, and enable optimization:
 
     cargo build --release
