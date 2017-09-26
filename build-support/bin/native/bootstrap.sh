@@ -11,7 +11,7 @@
 # Exposes:
 # + calculate_current_hash: Calculates the current native engine version hash and echoes it to
 #                           stdout.
-# + bootstrap_native_code: Builds target-specific native engine binaries.
+# + bootstrap_native_code: Builds native engine binaries.
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
@@ -66,10 +66,7 @@ function _ensure_cffi_sources() {
 }
 
 function _ensure_build_prerequisites() {
-  # Control a pants-specific rust toolchain, optionally ensuring the given target toolchain is
-  # installed.
-  local readonly target=$1
-
+  # Control a pants-specific rust toolchain.
   export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
   export RUSTUP_HOME=${CARGO_HOME}
 
@@ -83,32 +80,16 @@ function _ensure_build_prerequisites() {
     rm -f ${rustup}
     ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
   fi
-
-  if [[ -n "${target}" ]]
-  then
-    if ! ${RUSTUP_HOME}/bin/rustup target list | grep -E "${target} \((default|installed)\)" &> /dev/null
-    then
-      ${RUSTUP_HOME}/bin/rustup target add ${target}
-    fi
-  fi
 }
 
 function _build_native_code() {
-  # Builds the native code, optionally taking an explicit target triple arg, and echos the path of
-  # the built binary.
-  local readonly target=$1
-  _ensure_build_prerequisites ${target}
+  # Builds the native code, and echos the path of the built binary.
+  _ensure_build_prerequisites
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
   local readonly build_cmd="${cargo} build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}"
-  if [[ -z "${target}" ]]
-  then
-    ${build_cmd} || die
-    echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
-  else
-    ${build_cmd} --target ${target} || echo "FAILED to build for target ${target}"
-    echo "${NATIVE_ROOT}/target/${target}/${MODE}/libengine.${LIB_EXTENSION}"
-  fi
+  ${build_cmd} || die
+  echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
 function bootstrap_native_code() {
