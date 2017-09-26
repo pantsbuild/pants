@@ -29,6 +29,9 @@ API Changes
 Bugfixes
 ~~~~~~~~
 
+* Release native engine binaries for OSX 10.13. (#4898)
+  `PR #4898 <https://github.com/pantsbuild/pants/pull/4898>`_
+
 * Add default routing for OSX High Sierra binaries. (#4894)
   `PR #4894 <https://github.com/pantsbuild/pants/pull/4894>`_
 
