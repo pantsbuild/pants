@@ -24,7 +24,7 @@ function get_native_engine_version() {
 readonly RUST_OSX_MIN_VERSION=7
 
 # Bump this when there is a new OSX released:
-readonly OSX_MAX_VERSION=12
+readonly OSX_MAX_VERSION=13
 
 function get_rust_osx_versions() {
   seq ${RUST_OSX_MIN_VERSION} ${OSX_MAX_VERSION}
