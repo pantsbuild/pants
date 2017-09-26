@@ -11,6 +11,5 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
   ],
 )

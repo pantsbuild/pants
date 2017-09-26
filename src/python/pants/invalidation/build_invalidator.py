@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+
 import errno
 import hashlib
 import os
 from abc import abstractmethod
+from collections import namedtuple
 
 from pants.base.hash_utils import hash_all
 from pants.build_graph.target import Target
@@ -16,7 +18,6 @@ from pants.fs.fs import safe_filename
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.meta import AbstractClass
-from pants.util.objects import datatype
 
 
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
@@ -25,7 +26,7 @@ from pants.util.objects import datatype
 GLOBAL_CACHE_KEY_GEN_VERSION = '7'
 
 
-class CacheKey(datatype('CacheKey', ['id', 'hash'])):
+class CacheKey(namedtuple('CacheKey', ['id', 'hash'])):
   """A CacheKey represents some version of a set of targets.
 
   - id identifies the set of targets.
