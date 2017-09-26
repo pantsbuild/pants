@@ -146,7 +146,7 @@ void externs_set(ExternContext*,
                  extern_ptr_invoke_runnable,
                  TypeId);
 
-Tasks* tasks_create();
+Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
@@ -202,7 +202,7 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 
 void nodes_destroy(RawNodes*);
 
-void set_panic_handler();
+void set_panic_handler(void);
 '''
 
 CFFI_EXTERNS = '''
