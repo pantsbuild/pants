@@ -32,6 +32,7 @@ function usage() {
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
   echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
+  echo " -e           skip rust tests"
   echo " -y SHARD_NUMBER/TOTAL_SHARDS"
   echo "              if running contrib python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
@@ -58,7 +59,7 @@ python_unit_shard="0/1"
 python_contrib_shard="0/1"
 python_intg_shard="0/1"
 
-while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
+while getopts "hfxbkmsrjlpue:ny:ci:at" opt; do
   case ${opt} in
     h) usage ;;
     f) skip_pre_commit_checks="true" ;;
@@ -72,6 +73,7 @@ while getopts "hfxbkmsrjlpu:ny:ci:at" opt; do
     l) skip_internal_backends="true" ;;
     p) skip_python="true" ;;
     u) python_unit_shard=${OPTARG} ;;
+    e) skip_rust_tests="true" ;;
     n) skip_contrib="true" ;;
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
@@ -224,6 +226,21 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   ) || die "Contrib python test failure"
   end_travis_section
 fi
+
+if [[ "${skip_rust_tests:-false}" == "false" ]]; then
+  source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
+
+  start_travis_section "RustTests" "Running Pants rust tests"
+  (
+    source "${REPO_ROOT}/build-support/pants_venv"
+    activate_pants_venv
+    PANTS_SRCPATH="${REPO_ROOT}/src/python" prepare_to_build_native_code
+    export RUST_BACKTRACE=1
+    "${CARGO_HOME}/bin/cargo" test --all
+  ) || die "Pants rust test failure"
+  end_travis_section
+fi
+
 
 if [[ "${skip_integration:-false}" == "false" ]]; then
   if [[ "0/1" != "${python_intg_shard}" ]]; then
