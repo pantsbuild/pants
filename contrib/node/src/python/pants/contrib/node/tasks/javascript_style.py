@@ -109,7 +109,17 @@ class JavascriptStyle(NodeTask):
       return
     failed_targets = []
 
-    # TODO: If javascriptstyle is not configured, pants should use a default installtion.
+    # TODO: If javascriptstyle is not configured, pants should use a default installation.
+    # Some concerns and thoughts regarding the current javascriptstyle implementation:
+    # 1.) The javascriptstyle package itself is designed to be mutable. That is problematic
+    #     as there can be many changes in the same package version across multiple installations.
+    #     Pushing updates to the original package will feel more like a major revision.
+    # 2.) The decision was made to ensure deterministic installation using yarn.lock file. The lock
+    #     file is produced after an installation. And all eslint plugins need to be final and
+    #     explicit during installation time.
+    # 3.) We can potentially solve this using a caching solution for yarn.lock/package.json files.
+    #     That is, javascriptstyle package should only include base eslint + rules and all plugins
+    #     and additional rules should be configured through pants.ini.
     javascriptstyle_dir = self.get_options().javascriptstyle_dir
     if not (javascriptstyle_dir and self._is_javascriptstyle_dir_valid(javascriptstyle_dir)):
       self.context.log.warn('javascriptstyle is not configured, skipping javascript style check.')

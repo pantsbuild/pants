@@ -17,7 +17,7 @@
 	[fmt.javascriptstyle]
 	javascriptstyle_dir: %(pants_supportdir)s/javascriptstyle
 	skip: False
-	fail_slow: Falsertdir)s/javascriptstyle
+	fail_slow: False
 
 
 ## Adding new rules
