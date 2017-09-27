@@ -424,8 +424,10 @@ matrix:
       dist: trusty
       language: python
       python: "2.7.13"
+      env:
+        - SHARD="Rust tests"
       script:
-        - ./build-support/bin/ci.sh -abcfjklmnprstx "Rust tests"
+        - ./build-support/bin/ci.sh -abcfjklmnprstx
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
