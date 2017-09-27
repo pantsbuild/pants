@@ -109,7 +109,7 @@ matrix:
       env:
         - SHARD="Various pants self checks and lint"
       script:
-        - ./build-support/bin/ci.sh -x -cjlpn 'Various pants self checks and lint'
+        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
 
     - os: linux
       dist: trusty
@@ -137,7 +137,7 @@ matrix:
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrcnt -u 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrcnt -u 0/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -165,7 +165,7 @@ matrix:
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrcnt -u 1/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrcnt -u 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -193,7 +193,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrcjlpt -y 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrcjlpt -y 0/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -221,7 +221,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrcjlpt -y 1/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrcjlpt -y 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -249,7 +249,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 0/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 0/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -277,7 +277,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 1/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 1/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -305,7 +305,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 2/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 2/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -333,7 +333,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 3/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 3/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -361,7 +361,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 4/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 4/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -389,7 +389,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 5/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 5/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -417,7 +417,17 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 6/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 6/7 "${SHARD}"
+
+    # Rust tests
+    - os: linux
+      dist: trusty
+      language: python
+      python: "2.7.13"
+      env:
+        - SHARD="Rust tests"
+      script:
+        - ./build-support/bin/ci.sh -abcfjklmnprstx
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
