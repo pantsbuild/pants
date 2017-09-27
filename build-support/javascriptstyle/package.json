@@ -20,5 +20,9 @@
   },
   "bugs": {
     "url": "https://github.com/pantsbuild/pants/issues"
+  },
+
+  "javascriptstyle": {
+    "ignore": []
   }
 }
