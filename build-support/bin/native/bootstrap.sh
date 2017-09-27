@@ -62,11 +62,12 @@ function calculate_current_hash() {
 
 function _ensure_cffi_sources() {
   # N.B. Here we assume that higher level callers have already setup the pants' venv and $PANTS_SRCPATH.
-  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "$@"
+  PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "${NATIVE_ROOT}/src/cffi" >&2
 }
 
 function _ensure_build_prerequisites() {
   # Control a pants-specific rust toolchain.
+
   export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
   export RUSTUP_HOME=${CARGO_HOME}
 
@@ -82,9 +83,17 @@ function _ensure_build_prerequisites() {
   fi
 }
 
+function prepare_to_build_native_code() {
+  # Must happen in the pants venv and have PANTS_SRCPATH set.
+
+  _ensure_build_prerequisites
+  _ensure_cffi_sources
+}
+
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
-  _ensure_build_prerequisites
+
+  prepare_to_build_native_code
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
   local readonly build_cmd="${cargo} build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}"
@@ -97,12 +106,8 @@ function bootstrap_native_code() {
   # version if needed.
   local native_engine_version="$(calculate_current_hash)"
   local target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-  local cffi_output_dir="${NATIVE_ROOT}/src/cffi"
-  local cffi_env_script="${cffi_output_dir}/${NATIVE_ENGINE_MODULE}.cflags"
   if [ ! -f "${target_binary}" ]
   then
-    _ensure_cffi_sources "${cffi_output_dir}"
-    export CFLAGS="$(cat "${cffi_env_script}")"
     local readonly native_binary="$(_build_native_code)"
 
     # If bootstrapping the native engine fails, don't attempt to run pants
