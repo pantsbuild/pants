@@ -195,7 +195,21 @@ class SimpleCodegenTask(Task):
               self._handle_duplicate_sources(vt.target, vt.results_dir)
             vt.update()
           # And inject a synthetic target to represent it.
-          self._inject_synthetic_target(vt.target, vt.results_dir, vt.cache_key)
+          self._inject_synthetic_target(
+            vt.target,
+            vt.results_dir,
+            vt.cache_key,
+            mark_transitive_invalidation_hash_dirty=False,
+          )
+        self._mark_transitive_invalidation_hashes_dirty(
+          vt.target.address for vt in invalidation_check.all_vts
+        )
+
+  def _mark_transitive_invalidation_hashes_dirty(self, addresses):
+    self.context.build_graph.walk_transitive_dependee_graph(
+      addresses,
+      work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
+    )
 
   @property
   def _copy_target_attributes(self):
@@ -228,13 +242,21 @@ class SimpleCodegenTask(Task):
     return EagerFilesetWithSpec(results_dir_relpath, filespec=filespec,
       files=files, files_hash='{}.{}'.format(fingerprint.id, fingerprint.hash))
 
-  def _inject_synthetic_target(self, target, target_workdir, fingerprint):
+  def _inject_synthetic_target(
+    self,
+    target,
+    target_workdir,
+    fingerprint,
+    mark_transitive_invalidation_hash_dirty=True,
+  ):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
     :param target_workdir: The work directory containing the generated code for the target.
     :param fingerprint: The fingerprint to create the synthetic target
            with to avoid re-fingerprinting
+    :param mark_transitive_invalidation_hash_dirty: Whether to walk the build graph to invalidate
+           dependees of the target.
     """
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
@@ -271,10 +293,9 @@ class SimpleCodegenTask(Task):
         dependent=synthetic_target.address,
         dependency=concrete_dependency_address,
       )
-    build_graph.walk_transitive_dependee_graph(
-      build_graph.dependencies_of(target.address),
-      work=lambda t: t.mark_transitive_invalidation_hash_dirty(),
-    )
+
+    if mark_transitive_invalidation_hash_dirty:
+      self._mark_transitive_invalidation_hashes_dirty([target.address])
 
     if target in self.context.target_roots:
       self.context.target_roots.append(synthetic_target)
