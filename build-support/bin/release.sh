@@ -422,21 +422,34 @@ EOM
   fi
 }
 
-# Defines:
+# Indirectly defines:
 # + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
-# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12
+# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12.
 # + LIB_EXTENSION: The extension of native libraries.
 # + KERNEL: The lower-cased name of the kernel as reported by uname.
 # + OS_NAME: The name of the OS as seen by pants.
 # + OS_ID: The ID of the current OS as seen by pants.
-# Exposes:
+# Indirectly exposes:
 # + get_native_engine_version: Echoes the current native engine version.
 # + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
+# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
 # + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
-source ${ROOT}/build-support/bin/native/utils.sh
+# Defines:
+# + CACHE_ROOT: The pants cache root dir.
+# + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
+# + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
+#                                   the current OS.
+# + NATIVE_ENGINE_BINARY: The basename of the native engine binary for the current OS.
+# + NATIVE_ENGINE_VERSION_RESOURCE: The path of the resource file containing the native engine
+#                                   version hash.
+# Exposes:
+# + calculate_current_hash: Calculates the current native engine version hash and echoes it to
+#                           stdout.
+# + bootstrap_native_code: Builds target-specific native engine binaries.
+source ${ROOT}/build-support/bin/native/bootstrap.sh
 
-readonly BINTRAY_BASE_URL=https://dl.bintray.com/pantsbuild/bin
-readonly NATIVE_ENGINE_BASE_URL=${BINTRAY_BASE_URL}/build-support/bin/native-engine
+readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
+readonly NATIVE_ENGINE_BASE_URL=${BINARY_BASE_URL}/bin/native-engine
 
 function check_native_engine() {
   local readonly native_engine_version=${NATIVE_ENGINE_VERSION:-$(get_native_engine_version)}
@@ -446,7 +459,7 @@ function check_native_engine() {
   local result=0
   for os_id in $(get_rust_os_ids)
   do
-    local url=${NATIVE_ENGINE_BASE_URL}/${os_id}/${native_engine_version}/native-engine
+    local url=${NATIVE_ENGINE_BASE_URL}/${os_id}/${native_engine_version}/${NATIVE_ENGINE_BINARY}
     echo -n "  for ${os_id} -> ${url}... "
     curl --progress-bar --fail --head ${url} &> ${headers} && echo OK || {
       result=$(( ${result} + 1 )) && echo FAILURE && cat ${headers} && echo
@@ -465,7 +478,7 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o)"
+  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o|-e)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -477,6 +490,7 @@ function usage() {
   echo "       and can be installed in an ephemeral virtualenv."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
+  echo " -e  Check that native engine binaries are deployed for this release."
   echo
   echo "All options (except for '-d') are mutually exclusive."
 
@@ -522,10 +536,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPi" && \
   (
-    # NB: Ideally we'd `check_native_engine`, but it won't get built until the tag created
-    # in `tag_release` is pushed to origin, triggering a TravisCI run.
-    # See: https://github.com/pantsbuild/pants/issues/4269
-    check_origin && check_clean_branch && check_pgp && check_owners && \
+    check_origin && check_clean_branch && check_pgp && check_native_engine && check_owners && \
       dry_run_install && publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi"
   ) || die "Failed to release packages to PyPi."

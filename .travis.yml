@@ -3,17 +3,6 @@ env:
     - PANTS_CONFIG_FILES="pants.travis-ci.ini"
     - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
     - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
-    # Credentials for OSX syncing: GH_USER, GH_EMAIL, GH_TOKEN
-    # These are encrypted with a public key for our repo that only
-    # Travis-CI has the private key for.  We are trusting Travis-CI
-    # here but no-one else.
-    #
-    # See: http://docs.travis-ci.com/user/encryption-keys/
-    - secure: VvwbndU++a2/iNAjk9cd67ATiipDwqcKnxDR4/J2Ik3GH10wHEDUhJ1+MK4WLhedfaOakDOEmarZQS3GwtgvCHO3knpTJuJc8d/bCfZovYuSqdi//BEv4dS7hDt6tQeJfkbBjG0T4yNjPJ3W9R9KDWCy/vj2CUm90BGg2CmxUbg=
-    # User for bintray deploys: BINTRAY_USER
-    - secure: eXGuKvbp297wi/z74jFqGyxzRDCFic9HUb0z2UYDXDmobErILZdgT0KCvqeyAx7QX/JQSp5oQAQNisE8RLrain5lXAIa2ZuswTPsh6yXGmFgwdx/X+Am7CPO27b0P5OxiJAN3kfYglN7qY+opRM1jud4anzEaTJnm7jENFfDXwk=
-    # Key for bintray deploys: BINTRAY_KEY
-    - secure: qid/ot1XIWOpNaN+RhgdJq8IEajcpHI5EFvy2ywkYHJO2hKYawyX2M4gFd0Vq8+xmeGB4MUmpPW8D8gijLi5JB+0aZ3+5JHs5r9NWkK7HVMpVnok3CywknzXBgeo+UoEQv9ugYvRr1Sm9Dj9IezAhM0tw1uS95Ap+JLbnWFB830=
 
 before_cache:
   # Ensure permissions to do the below removals, which happen with or without caching enabled.
@@ -58,13 +47,13 @@ matrix:
     - os: osx
       language: generic
       env:
-        - SHARD="OSX Bintray Builder"
+        - SHARD="OSX Native Engine Binary Builder"
+        - NATIVE_ENGINE_DEPLOY=1
       script:
-        - ./build-support/bin/native/generate-bintray-manifest.sh
+        - ./build-support/bin/native/prepare-binary-deploy.sh
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       # Docker runs will write files as root, so avoid caching for this shard.
       cache: false
@@ -73,9 +62,11 @@ matrix:
       language: python
       python: "2.7.13"
       env:
-        - SHARD="Linux Bintray Builder"
-        # Use the standard python manylinux image for ideal binary compatibility.
-        - DOCKER_IMAGE="quay.io/pypa/manylinux1_x86_64"
+        - SHARD="Linux Native Engine Binary Builder"
+        - NATIVE_ENGINE_DEPLOY=1
+        # Use the standard python-2.7 docker Debian Wheezy image for binary compatibility with old
+        # linux distros.
+        - DOCKER_IMAGE="python:2.7.13-wheezy"
       before_install:
         # Remove any Ubuntu binary cruft before building.
         - git clean -fdx
@@ -89,13 +80,11 @@ matrix:
           -e "HOME=${HOME}"
           "${DOCKER_IMAGE}"
           sh -c "
-            export PATH=/opt/python/cp27-cp27mu/bin:/opt/rh/devtoolset-2/root/usr/bin:${PATH} ;
-            cd $TRAVIS_BUILD_DIR && ./build-support/bin/native/generate-bintray-manifest.sh
+            cd $TRAVIS_BUILD_DIR && ./build-support/bin/native/prepare-binary-deploy.sh
           "
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -105,6 +94,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -122,7 +113,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -132,6 +122,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -149,7 +141,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -159,6 +150,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -176,7 +169,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -186,6 +178,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -203,7 +197,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -213,6 +206,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -230,7 +225,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -240,6 +234,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -257,7 +253,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -267,6 +262,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -284,7 +281,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -294,6 +290,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -311,7 +309,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -321,6 +318,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -338,7 +337,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -348,6 +346,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -365,7 +365,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -375,6 +374,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -392,7 +393,6 @@ matrix:
 
     - os: linux
       dist: trusty
-      group: deprecated-2017Q2
       sudo: required
       addons:
         apt:
@@ -402,6 +402,8 @@ matrix:
             - lib32z1-dev
             - gcc-multilib
             - python-dev
+            - openssl
+            - libssl-dev
       language: python
       python: "2.7.13"
       before_install:
@@ -418,22 +420,20 @@ matrix:
         - ./build-support/bin/ci.sh -x -fkmsrjlpnt -i 6/7 "${SHARD}"
 
 deploy:
-  # See: https://docs.travis-ci.com/user/deployment/bintray/
-  provider: bintray
-  # NB: This is generated in after_success in each shard above.
-  file: ./native-engine.bintray.json
-  user: ${BINTRAY_USER}
-  key: ${BINTRAY_KEY}
-  dry-run: false
+  # See: https://docs.travis-ci.com/user/deployment/s3/
+  provider: s3
+  access_key_id: AKIAIQHTQI5E42SQBSNA
+  secret_access_key:
+    secure: RQVzsNfZL8AgsXdjZ67j2tWs5Tjl/FKpmE1fyVgldMbua/xhW8dzdFrtOeWjTPX4/+sJZ4U7/tZectBtWejmrXUJiZQKJwJBnsyYxysENTWOV80BEYyoz2RPr8HSVbMZ1ZHtUafzO3OqV1x+Pvgpg8FUeUfsy3TGUk0JREO90Q0=
+  bucket: binaries.pantsbuild.org
+  local_dir: build-support/bin/native/s3-upload
+  # Otherwise travis will stash build-support/bin/native/s3-upload and the deploy will fail.
+  skip_cleanup: true
+  acl: public_read
   on:
-    condition: -f ./native-engine.bintray.json
-    # NB: Deploys are always tagged as part of the deploy process encoded in
-    # `build-support/bin/release.sh`, so this ensures we release an appropriate native engine binary
-    # for all releases. Unfortunately, CI only runs after the release tag hits origin and so there
-    # will be a lag of roughly 30 minutes until a pypi release has its paired native engine version
-    # available on bintray for OSX and linux. This trade-off (vs releasing for all branch builds),
-    # helps us use bintray in a friendly way.
-    tags: true
+    condition: $NATIVE_ENGINE_DEPLOY = 1
+    branch: master
+    repo: pantsbuild/pants
 
 # We accept the default travis-ci email author+committer notification
 # for now which is enabled even with no `notifications` config.

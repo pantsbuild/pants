@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import subprocess
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -17,6 +16,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
+from pants.util.process_handler import subprocess
 
 from pants.contrib.android.targets.android_library import AndroidLibrary
 from pants.contrib.android.targets.android_resources import AndroidResources

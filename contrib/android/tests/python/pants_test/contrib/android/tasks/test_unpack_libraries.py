@@ -39,8 +39,10 @@ class UnpackLibrariesTest(TestAndroidBase):
         fp.close()
     if classes_jar:
       self.create_jarfile(location, filenames=filenames)
+    resource_dir = os.path.join(location, 'res')
+    safe_mkdir(resource_dir)
     if resources:
-      safe_mkdir(os.path.join(location, 'res'))
+      touch(os.path.join(resource_dir, 'resource_file'))
     return location
 
   def create_aarfile(self, location, name, filenames=None):

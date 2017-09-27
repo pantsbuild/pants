@@ -103,14 +103,14 @@ public class JarBuilder implements Closeable {
     }
 
     /**
-     * Returns the duplicate path.
+     * @return the duplicate path.
      */
     public String getPath() {
       return entry.getJarPath();
     }
 
     /**
-     * Returns the contents of the duplicate entry.
+     * @return the contents of duplicate entry
      */
     public ByteSource getSource() {
       return entry.contents;
@@ -182,7 +182,7 @@ public class JarBuilder implements Closeable {
     }
 
     /**
-     * Returns the action that should be applied when a duplicate entry falls under this policy's
+     * @return The action that should be applied when a duplicate entry falls under this policy's
      * jurisdiction.
      */
     public DuplicateAction getAction() {
@@ -212,6 +212,7 @@ public class JarBuilder implements Closeable {
      * Creates a handler that always applies the given {@code action}.
      *
      * @param action The action to perform on all duplicate entries encountered.
+     * @return a handler
      */
     public static DuplicateHandler always(DuplicateAction action) {
       Preconditions.checkNotNull(action);
@@ -224,6 +225,8 @@ public class JarBuilder implements Closeable {
      * <p>
      * Merged resources include META-INF/services/ files.
      * </p>
+     *
+     * @return a handler
      */
     public static DuplicateHandler skipDuplicatesConcatWellKnownMetadata() {
       DuplicatePolicy concatServices =
@@ -238,6 +241,9 @@ public class JarBuilder implements Closeable {
     /**
      * A convenience constructor equivalent to calling:
      * {@code DuplicateHandler(defaultAction, Arrays.asList(policies))}
+     *
+     * @param defaultAction The default action to apply when no policy matches.
+     * @param policies The policies to apply in preference order.
      */
     public DuplicateHandler(DuplicateAction defaultAction, DuplicatePolicy... policies) {
       this(defaultAction, ImmutableList.copyOf(policies));
@@ -272,12 +278,15 @@ public class JarBuilder implements Closeable {
   public interface Source {
 
     /**
-     * Returns a name for this source.
+     * @return a name for this source.
      */
     String name();
 
     /**
      * Identifies a member of this source.
+     *
+     * @param name The name of the source
+     * @return identity
      */
     String identify(String name);
   }
@@ -437,17 +446,17 @@ public class JarBuilder implements Closeable {
    */
   public interface Entry {
     /**
-     * Returns the source that contains the entry.
+     * @return the source that contains the entry.
      */
     Source getSource();
 
     /**
-     * Returns the name of the entry within its source.
+     * @return the name of the entry within its source.
      */
     String getName();
 
     /**
-     * Returns the path this entry will be added into the jar at.
+     * @return the path this entry will be added into the jar at.
      */
     String getJarPath();
   }
@@ -668,6 +677,7 @@ public class JarBuilder implements Closeable {
    * If the {@code target} does not exist a new jar will be created at its path.
    *
    * @param target The target jar file to write.
+   * @param listener A progress listener
    */
   public JarBuilder(File target, Listener listener) {
     this.target = Preconditions.checkNotNull(target);

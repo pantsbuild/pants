@@ -1,0 +1,1 @@
+files(sources=globs('*.xml'))

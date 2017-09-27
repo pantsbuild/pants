@@ -81,8 +81,7 @@ def parse_address_family(address_mapper, path, build_files):
       continue
     address_maps.append(AddressMap.parse(filecontent_product.path,
                                          filecontent_product.content,
-                                         address_mapper.symbol_table_cls,
-                                         address_mapper.parser_cls))
+                                         address_mapper.parser))
   return AddressFamily.create(path.path, address_maps)
 
 
@@ -317,13 +316,13 @@ def _recursive_dirname(f):
 BuildFilesCollection = Collection.of(BuildFiles)
 
 
-def create_graph_rules(address_mapper, symbol_table_cls):
+def create_graph_rules(address_mapper, symbol_table):
   """Creates tasks used to parse Structs from BUILD files.
 
   :param address_mapper_key: The subject key for an AddressMapper instance.
-  :param symbol_table_cls: A SymbolTable class to provide symbols for Address lookups.
+  :param symbol_table: A SymbolTable instance to provide symbols for Address lookups.
   """
-  symbol_table_constraint = symbol_table_cls.constraint()
+  symbol_table_constraint = symbol_table.constraint()
   return [
     TaskRule(BuildFilesCollection,
              [SelectDependencies(BuildFiles, BuildDirs, field_types=(Dir,))],

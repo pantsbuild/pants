@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import itertools
 import os
-import subprocess
 import sys
 
 from twitter.common.collections import OrderedSet
@@ -17,6 +16,7 @@ from pants.backend.python.code_generator import CodeGenerator
 from pants.base.build_environment import get_buildroot
 from pants.util.dirutil import safe_walk
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class PythonThriftBuilder(CodeGenerator):

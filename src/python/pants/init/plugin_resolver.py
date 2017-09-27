@@ -8,17 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import logging
 import os
+import site
 
 from pex import resolver
 from pex.base import requirement_is_exact
-from pex.package import EggPackage, SourcePackage
 from pkg_resources import working_set as global_working_set
 from pkg_resources import Requirement
+from wheel.install import WheelFile
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_repos import PythonRepos
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_open
+from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
 from pants.version import PANTS_SEMVER
 
@@ -27,6 +28,26 @@ logger = logging.getLogger(__name__)
 
 
 class PluginResolver(object):
+  @staticmethod
+  def _is_wheel(path):
+    return os.path.isfile(path) and path.endswith('.whl')
+
+  @staticmethod
+  def _activate_wheel(wheel_path):
+    install_dir = '{}-install'.format(wheel_path)
+    safe_mkdir(install_dir, clean=True)
+    WheelFile(wheel_path).install(force=True,
+                                  overrides={
+                                    'purelib': install_dir,
+                                    'headers': os.path.join(install_dir, 'headers'),
+                                    'scripts': os.path.join(install_dir, 'bin'),
+                                    'platlib': install_dir,
+                                    'data': install_dir
+                                  })
+    # Activate any .pth files installed above.
+    site.addsitedir(install_dir)
+    return install_dir
+
   def __init__(self, options_bootstrapper):
     self._options_bootstrapper = options_bootstrapper
 
@@ -44,6 +65,8 @@ class PluginResolver(object):
     working_set = working_set or global_working_set
     if self._plugin_requirements:
       for plugin_location in self._resolve_plugin_locations():
+        if self._is_wheel(plugin_location):
+          plugin_location = self._activate_wheel(plugin_location)
         working_set.add_entry(plugin_location)
     return working_set
 
@@ -76,15 +99,10 @@ class PluginResolver(object):
         yield plugin_location.strip()
 
   def _resolve_plugins(self):
-    # When bootstrapping plugins without the full pants python backend machinery in-play, we are not
-    # guaranteed a properly initialized interpreter with wheel support so we enforce eggs only for
-    # bdists with this custom precedence.
-    precedence = (EggPackage, SourcePackage)
     logger.info('Resolving new plugins...:\n  {}'.format('\n  '.join(self._plugin_requirements)))
     return resolver.resolve(self._plugin_requirements,
                             fetchers=self._python_repos.get_fetchers(),
                             context=self._python_repos.get_network_context(),
-                            precedence=precedence,
                             cache=self.plugin_cache_dir,
                             cache_ttl=10 * 365 * 24 * 60 * 60,  # Effectively never expire.
                             allow_prereleases=PANTS_SEMVER.is_prerelease)

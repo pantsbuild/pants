@@ -18,9 +18,11 @@ from contextlib import contextmanager
 import requests
 
 from pants.base.build_environment import get_pants_cachedir
+from pants.base.deprecated import deprecated_conditional
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit
+from pants.build_graph.target import Target
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.reporting.report import Report
@@ -495,13 +497,24 @@ class RunTracker(Subsystem):
     an error.
 
     :param string scope: The scope for which we are reporting the information.
-    :param string target: The target for which we want to store information.
+    :param Target target: The target for which we want to store information.
     :param list of string keys: The keys that will be recursively
            nested and pointing to the information being stored.
     :param primitive val: The value of the information being stored.
 
     :API: public
     """
-    new_key_list = [target, scope]
+    if isinstance(target, Target):
+      target_spec = target.address.spec
+    else:
+      deprecated_conditional(
+        lambda: True,
+        '1.6.0.dev0',
+        'The `target=` argument to `report_target_info`',
+        'Should pass a Target instance rather than a string.'
+      )
+      target_spec = target
+
+    new_key_list = [target_spec, scope]
     new_key_list += keys
     self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)

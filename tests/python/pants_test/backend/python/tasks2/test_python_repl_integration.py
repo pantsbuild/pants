@@ -14,7 +14,7 @@ class PythonReplIntegrationTest(PantsRunIntegrationTest):
     # Run a repl on a library target. Avoid some known-to-choke-on interpreters.
     command = ['repl',
                'testprojects/src/python/interpreter_selection:echo_interpreter_version_lib',
-               '--python-setup-interpreter-constraints=CPython>=2.6,<3',
+               '--python-setup-interpreter-constraints=CPython>=2.7,<3',
                '--python-setup-interpreter-constraints=CPython>=3.3',
                '--quiet']
     program = 'from interpreter_selection.echo_interpreter_version import say_hello; say_hello()'

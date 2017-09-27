@@ -15,7 +15,7 @@ from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class PantsDaemonLauncherTest(BaseTest):
-  PDL_PATCH_OPTS = dict(autospec=True, spec_set=True, return_value=(None, None))
+  PDL_PATCH_OPTS = dict(autospec=True, spec_set=True, return_value=(None, None, None))
 
   def pants_daemon_launcher(self):
     factory = global_subsystem_instance(PantsDaemonLauncher.Factory)

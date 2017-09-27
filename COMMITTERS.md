@@ -3,22 +3,14 @@ Active Committers
 
 * Benjy Weinberger
 * Chris Heisterkamp
-* Eric Ayers
-* Fedor Korotkov
-* Garrett Malmquist
 * Ity Kaul
 * John Sirois
 * Kris Wilson
 * Larry Hosken
 * Mateo Rodriguez
-* Matt Olsen
 * Nick Howard
-* Patrick Lawson
-* Peiyu Wang
 * Stu Hood
-* Tejal Desai
 * Yi Cheng
-* Yujie Chen
 
 Emeritus
 ========
@@ -26,4 +18,12 @@ Emeritus
 * Andy Reitz
 * David Taylor
 * David Turner
+* Eric Ayers
+* Fedor Korotkov
+* Garrett Malmquist
+* Matt Olsen
+* Patrick Lawson
+* Peiyu Wang
+* Tejal Desai
 * Travis Crawford
+* Yujie Chen

@@ -134,7 +134,14 @@ class AnalysisMap private[AnalysisMap] (
 }
 
 object AnalysisMap {
-  private val analysisCacheLimit = Util.intProperty("zinc.analysis.cache.limit", 100)
+  // Because the analysis cache uses Weak references, bounding its size is generally
+  // counterproductive.
+  private val analysisCacheLimit =
+    Util.intProperty(
+      "zinc.analysis.cache.limit",
+      Int.MaxValue
+    )
+
   /**
    * Static cache for compile analyses. Values must be Options because in get() we don't yet
    * know if, on a cache miss, the underlying file will yield a valid Analysis.

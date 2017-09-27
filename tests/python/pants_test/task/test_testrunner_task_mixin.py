@@ -7,18 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import collections
 import os
+from contextlib import contextmanager
 from unittest import TestCase
 from xml.etree.ElementTree import ParseError
 
-from mock import patch
+from mock import Mock, patch
 
 from pants.base.exceptions import ErrorWhileTesting
 from pants.task.task import TaskBase
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants.util.process_handler import ProcessHandler
-from pants.util.timeout import TimeoutReached
+from pants.util.process_handler import ProcessHandler, subprocess
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -47,7 +47,7 @@ class TestRunnerTaskMixinTest(TaskTestBase):
         self.call_list.append(['_spawn', args, kwargs])
 
         class FakeProcessHandler(ProcessHandler):
-          def wait(_):
+          def wait(_, timeout=None):
             self.call_list.append(['process_handler.wait'])
             return 0
 
@@ -144,28 +144,28 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
   @classmethod
   def task_type(cls):
     class TestRunnerTaskMixinTask(TestRunnerTaskMixin, TaskBase):
-      call_list = []
+      waited_for = None
 
       def _execute(self, all_targets):
-        self.call_list.append(['_execute', all_targets])
         self._spawn_and_wait()
 
       def _spawn(self, *args, **kwargs):
-        self.call_list.append(['_spawn', args, kwargs])
+        timeouts = self.get_options().timeouts
 
         class FakeProcessHandler(ProcessHandler):
-          def wait(_):
-            self.call_list.append(['process_handler.wait'])
+          def wait(_, timeout=None):
+            self.waited_for = timeout
+            if timeouts and timeout:
+              raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
             return 0
 
           def kill(_):
-            self.call_list.append(['process_handler.kill'])
+            pass
 
           def terminate(_):
-            self.call_list.append(['process_handler.terminate'])
+            pass
 
           def poll(_):
-            self.call_list.append(['process_handler.poll'])
             return 0
 
         return FakeProcessHandler()
@@ -174,13 +174,10 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
         return [targetB]
 
       def _test_target_filter(self):
-        def target_filter(target):
-          return True
-
-        return target_filter
+        return lambda target: True
 
       def _validate_target(self, target):
-        self.call_list.append(['_validate_target', target])
+        pass
 
     return TestRunnerTaskMixinTask
 
@@ -188,38 +185,34 @@ class TestRunnerTaskMixinSimpleTimeoutTest(TaskTestBase):
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
 
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+    with self.assertRaises(ErrorWhileTesting):
+      task.execute()
 
-      with self.assertRaises(ErrorWhileTesting):
-        task.execute()
-
-      # Ensures that Timeout is instantiated with a 1 second timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (1,))
+    # Ensures that the wait is for 1 second.
+    self.assertEqual(task.waited_for, 1)
 
   def test_timeout_disabled(self):
     self.set_options(timeouts=False)
     task = self.create_task(self.context())
 
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      task.execute()
+    task.execute()
 
-      # Ensures that Timeout is instantiated with no timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (None,))
+    # Ensures that the wait time is forever (no timeout).
+    self.assertIsNone(task.waited_for)
 
 
 class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
-  def create_process_handler(self, return_none_first=True):
+  def create_process_handler(self, poll_returns):
+    poll_return_values = iter(poll_returns)
+
     class FakeProcessHandler(ProcessHandler):
       call_list = []
       poll_called = False
 
-      def wait(self):
+      def wait(self, timeout=None):
         self.call_list.append(['process_handler.wait'])
-        return 0
+        raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
 
       def kill(self):
         self.call_list.append(['process_handler.kill'])
@@ -228,13 +221,8 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
         self.call_list.append(['process_handler.terminate'])
 
       def poll(self):
-        print("poll called")
         self.call_list.append(['process_handler.poll'])
-        if not self.poll_called and return_none_first:
-          self.poll_called = True
-          return None
-        else:
-          return 0
+        return next(poll_return_values)
 
     return FakeProcessHandler()
 
@@ -269,49 +257,55 @@ class TestRunnerTaskMixinGracefulTimeoutTest(TaskTestBase):
 
     return TestRunnerTaskMixinTask
 
-  def test_graceful_terminate_if_poll_is_none(self):
-    self.process_handler = self.create_process_handler(return_none_first=True)
+  @contextmanager
+  def mock_timer(self):
+    with patch('threading._Timer') as timer_class:
+      timer = Mock()
 
+      def start():
+        args, _ = timer_class.call_args
+        wait_time, action = args
+        self.assertEqual(10, wait_time)
+        action()
+
+      timer.start.side_effect = start
+      timer_class.return_value = timer
+
+      yield
+
+  def test_graceful_terminate_if_poll_is_none(self):
+    self.process_handler = self.create_process_handler(poll_returns=[None, -1])
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
 
-    with patch('pants.task.testrunner_task_mixin.Timer') as mock_timer:
-      def set_handler(dummy, handler):
-        mock_timer_instance = mock_timer.return_value
-        mock_timer_instance.start.side_effect = handler
-        return mock_timer_instance
-
-      mock_timer.side_effect = set_handler
-
-
+    with self.mock_timer():
       with self.assertRaises(ErrorWhileTesting):
         task.execute()
 
-      # Ensure that all the calls we want to kill the process gracefully are made.
-      self.assertEqual(self.process_handler.call_list,
-                       [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.kill'], [u'process_handler.wait']])
+    # Ensure that all the calls we want to kill the process gracefully are made.
+    self.assertEqual(self.process_handler.call_list,
+                     [[u'process_handler.wait'],
+                      [u'process_handler.poll'],
+                      [u'process_handler.terminate'],
+                      [u'process_handler.poll'],
+                      [u'process_handler.kill']])
 
   def test_graceful_terminate_if_poll_is_zero(self):
-    self.process_handler = self.create_process_handler(return_none_first=False)
+    self.process_handler = self.create_process_handler(poll_returns=[-1, 0])
 
     self.set_options(timeouts=True)
     task = self.create_task(self.context())
 
-    with patch('pants.task.testrunner_task_mixin.Timer') as mock_timer:
-      def set_handler(dummy, handler):
-        mock_timer_instance = mock_timer.return_value
-        mock_timer_instance.start.side_effect = handler
-        return mock_timer_instance
-
-      mock_timer.side_effect = set_handler
-
-
+    with self.mock_timer():
       with self.assertRaises(ErrorWhileTesting):
         task.execute()
 
-      # Ensure that we only call terminate, and not kill.
-      self.assertEqual(self.process_handler.call_list,
-                       [[u'process_handler.terminate'], [u'process_handler.poll'], [u'process_handler.wait']])
+    # Ensure that we only call terminate, and not kill.
+    self.assertEqual(self.process_handler.call_list,
+                     [[u'process_handler.wait'],
+                      [u'process_handler.poll'],
+                      [u'process_handler.terminate'],
+                      [u'process_handler.poll']])
 
 
 class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
@@ -319,21 +313,28 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
   @classmethod
   def task_type(cls):
     class TestRunnerTaskMixinMultipleTargetsTask(TestRunnerTaskMixin, TaskBase):
+      wait_time = None
+
       def _execute(self, all_targets):
         self._spawn_and_wait()
 
       def _spawn(self, *args, **kwargs):
+        timeouts = self.get_options().timeouts
+
         class FakeProcessHandler(ProcessHandler):
-          def wait(self):
+          def wait(_, timeout=None):
+            self.wait_time = timeout
+            if timeouts and timeout:
+              raise subprocess.TimeoutExpired(cmd='', timeout=timeout)
             return 0
 
-          def kill(self):
+          def kill(_):
             pass
 
-          def terminate(self):
+          def terminate(_):
             pass
 
-          def poll(self):
+          def poll(_):
             pass
 
         return FakeProcessHandler()
@@ -344,32 +345,37 @@ class TestRunnerTaskMixinMultipleTargets(TaskTestBase):
       def _validate_target(self, target):
         pass
 
-      def _get_targets(self):
-        return [targetA, targetB]
-
       def _get_test_targets_for_spawn(self):
         return self.current_targets
 
     return TestRunnerTaskMixinMultipleTargetsTask
 
-  def test_multiple_targets_single_target_timeout(self):
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__.side_effect = TimeoutReached(1)
+  def test_multiple_targets(self):
+    self.set_options(timeouts=True)
+    task = self.create_task(self.context())
 
-      self.set_options(timeouts=True)
-      task = self.create_task(self.context())
+    # The targetA has a `None` timeout which disables all timeouts for this batch.
+    task.current_targets = [targetA, targetB, targetC]
+    task.execute()
+    self.assertEqual(None, task.wait_time)
 
-      task.current_targets = [targetA]
-      with self.assertRaises(ErrorWhileTesting) as cm:
-        task.execute()
-      self.assertEqual(len(cm.exception.failed_targets), 1)
-      self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetA')
+    task.current_targets = [targetB]
+    with self.assertRaises(ErrorWhileTesting) as cm:
+      task.execute()
+    self.assertEqual(1, task.wait_time)
+    self.assertEqual([targetB], cm.exception.failed_targets)
 
-      task.current_targets = [targetB]
-      with self.assertRaises(ErrorWhileTesting) as cm:
-        task.execute()
-      self.assertEqual(len(cm.exception.failed_targets), 1)
-      self.assertEqual(cm.exception.failed_targets[0].address.spec, 'TargetB')
+    task.current_targets = [targetC]
+    with self.assertRaises(ErrorWhileTesting) as cm:
+      task.execute()
+    self.assertEqual(10, task.wait_time)
+    self.assertEqual([targetC], cm.exception.failed_targets)
+
+    task.current_targets = [targetB, targetC]
+    with self.assertRaises(ErrorWhileTesting) as cm:
+      task.execute()
+    self.assertEqual(11, task.wait_time)  # We should wait for the sum of the target timeouts.
+    self.assertEqual([targetB, targetC], cm.exception.failed_targets)
 
 
 class TestRunnerTaskMixinXmlParsing(TestRunnerTaskMixin, TestCase):

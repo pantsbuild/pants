@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from pants.engine.subsystem.native import bootstrap_c_source
+from pants.engine.native import bootstrap_c_source
 
 
 if __name__ == '__main__':
@@ -15,5 +15,6 @@ if __name__ == '__main__':
     output_dir = sys.argv[1]
   except Exception:
     print('usage: {} <output dir>'.format(sys.argv[0]))
+    sys.exit(1)
 
   bootstrap_c_source(output_dir)

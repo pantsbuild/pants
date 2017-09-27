@@ -4,6 +4,7 @@
 python_library(
   dependencies=[
     '3rdparty/python:requests',
+    '3rdparty/python:pyopenssl',
     '3rdparty/python:six',
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/base:workunit',
@@ -15,5 +16,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:process_handler',
   ],
 )

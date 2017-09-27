@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -29,6 +28,7 @@ from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.java.distribution.distribution import DistributionLocator
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
+from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 

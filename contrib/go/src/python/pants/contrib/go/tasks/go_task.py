@@ -7,12 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import re
-import subprocess
 from collections import namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.task.task import Task
 from pants.util.memo import memoized_method, memoized_property
+from pants.util.process_handler import subprocess
 from twitter.common.collections.orderedset import OrderedSet
 
 from pants.contrib.go.subsystems.go_distribution import GoDistribution

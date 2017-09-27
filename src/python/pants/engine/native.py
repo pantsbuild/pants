@@ -14,13 +14,9 @@ import threading
 import traceback
 
 import cffi
-import pkg_resources
 import six
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.engine.storage import Storage
-from pants.option.custom_types import dir_option
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
@@ -150,7 +146,7 @@ void externs_set(ExternContext*,
                  extern_ptr_invoke_runnable,
                  TypeId);
 
-Tasks* tasks_create();
+Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
@@ -206,7 +202,7 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 
 void nodes_destroy(RawNodes*);
 
-void set_panic_handler();
+void set_panic_handler(void);
 '''
 
 CFFI_EXTERNS = '''
@@ -246,7 +242,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
 
   output_prefix = os.path.join(output_dir, module_name)
   c_file = '{}.c'.format(output_prefix)
-  env_script = '{}.sh'.format(output_prefix)
+  env_script = '{}.cflags'.format(output_prefix)
 
   ffibuilder = cffi.FFI()
   ffibuilder.cdef(CFFI_TYPEDEFS)
@@ -258,7 +254,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
   print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
-    f.write('export CFLAGS="{}"\n'.format(get_build_cflags()))
+    f.write(get_build_cflags())
 
 
 def _initialize_externs(ffi):
@@ -449,28 +445,25 @@ class ObjectIdMap(object):
   """
 
   def __init__(self):
-    # Objects indexed by their keys, i.e, content digests
-    self._objects = Storage.create()
     # Memoized object Ids.
-    self._id_to_key = dict()
-    self._key_to_id = dict()
+    self._id_to_obj = dict()
+    self._obj_to_id = dict()
     self._next_id = 0
 
   def put(self, obj):
-    key = self._objects.put(obj)
     new_id = self._next_id
-    oid = self._key_to_id.setdefault(key, new_id)
+    oid = self._obj_to_id.setdefault(obj, new_id)
     if oid is not new_id:
       # Object already existed.
       return oid
 
     # Object is new/unique.
-    self._id_to_key[oid] = key
+    self._id_to_obj[oid] = obj
     self._next_id += 1
     return oid
 
   def get(self, oid):
-    return self._objects.get(self._id_to_key[oid])
+    return self._id_to_obj[oid]
 
 
 class ExternContext(object):
@@ -511,9 +504,9 @@ class ExternContext(object):
     buf_buf = self._ffi.new('Buffer[]', bufs)
     return (buf_buf, len(bufs), self.to_value(buf_buf))
 
-  def vals_buf(self, keys):
-    buf = self._ffi.new('Value[]', keys)
-    return (buf, len(keys), self.to_value(buf))
+  def vals_buf(self, vals):
+    buf = self._ffi.new('Value[]', vals)
+    return (buf, len(vals), self.to_value(buf))
 
   def type_ids_buf(self, types):
     buf = self._ffi.new('TypeId[]', types)
@@ -553,35 +546,16 @@ class ExternContext(object):
 
 
 class Native(object):
-  """Encapsulates fetching a platform specific version of the native portion of the engine.
-  """
+  """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
-  class Factory(Subsystem):
-    options_scope = 'native-engine'
-
-    @classmethod
-    def subsystem_dependencies(cls):
-      return (BinaryUtil.Factory,)
-
-    @staticmethod
-    def _default_native_engine_version():
-      return pkg_resources.resource_string(__name__, 'native_engine_version').strip()
-
-    @classmethod
-    def register_options(cls, register):
-      register('--version', advanced=True, default=cls._default_native_engine_version(),
-               help='Native engine version.')
-      register('--supportdir', advanced=True, default='bin/native-engine',
-               help='Find native engine binaries under this dir. Used as part of the path to '
-                    'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
-      register('--visualize-to', default=None, type=dir_option,
-               help='A directory to write execution and rule graphs to as `dot` files. The contents '
-                    'of the directory will be overwritten if any filenames collide.')
-
-    def create(self):
-      binary_util = BinaryUtil.Factory.create()
-      options = self.get_options()
-      return Native(binary_util, options.version, options.supportdir, options.visualize_to)
+  @staticmethod
+  def create(options):
+    """:param options: Any object that provides access to bootstrap option values."""
+    binary_util = BinaryUtil.Factory.create()
+    return Native(binary_util,
+                  options.native_engine_version,
+                  options.native_engine_supportdir,
+                  options.native_engine_visualize_to)
 
   def __init__(self, binary_util, version, supportdir, visualize_to_dir):
     """
