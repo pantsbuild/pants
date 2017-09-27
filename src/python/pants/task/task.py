@@ -16,7 +16,8 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
 from pants.cache.cache_setup import CacheSetup
-from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
+from pants.invalidation.build_invalidator import (BuildInvalidator, CacheKeyGenerator,
+                                                  UncacheableCacheKeyGenerator)
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
@@ -175,6 +176,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self.context = context
     self._workdir = workdir
 
+    self._task_name = type(self).__name__
     self._cache_key_errors = set()
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
     self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
@@ -330,26 +332,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :returns: Yields an InvalidationCheck object reflecting the targets.
     :rtype: InvalidationCheck
     """
-
-    cache_key_generator = CacheKeyGenerator(
-      self.context.options.for_global_scope().cache_key_gen_version,
-      self.fingerprint)
-    cache_manager = InvalidationCacheManager(self.workdir,
-                                             cache_key_generator,
-                                             self._build_invalidator(),
-                                             invalidate_dependents,
-                                             fingerprint_strategy=fingerprint_strategy,
-                                             invalidation_report=self.context.invalidation_report,
-                                             task_name=type(self).__name__,
-                                             task_version=self.implementation_version_str(),
-                                             artifact_write_callback=self.maybe_write_artifact)
-
-    # If this Task's execution has been forced, invalidate all our target fingerprints.
-    if self._cache_factory.ignore and not self._force_invalidated:
-      self.invalidate()
-      self._force_invalidated = True
-
-    invalidation_check = cache_manager.check(targets, topological_order=topological_order)
+    invalidation_check = self._do_invalidation_check(fingerprint_strategy,
+                                                     invalidate_dependents,
+                                                     targets,
+                                                     topological_order)
 
     self._maybe_create_results_dirs(invalidation_check.all_vts)
 
@@ -359,20 +345,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
           self.check_artifact_cache(self.check_artifact_cache_for(invalidation_check))
       if cached_vts:
         cached_targets = [vt.target for vt in cached_vts]
-        self.context.run_tracker.artifact_cache_stats.add_hits(cache_manager.task_name,
-                                                               cached_targets)
+        self.context.run_tracker.artifact_cache_stats.add_hits(self._task_name, cached_targets)
         if not silent:
           self._report_targets('Using cached artifacts for ', cached_targets, '.')
       if uncached_vts:
         uncached_targets = [vt.target for vt in uncached_vts]
-        self.context.run_tracker.artifact_cache_stats.add_misses(cache_manager.task_name,
+        self.context.run_tracker.artifact_cache_stats.add_misses(self._task_name,
                                                                  uncached_targets,
                                                                  uncached_causes)
         if not silent:
           self._report_targets('No cached artifacts for ', uncached_targets, '.')
       # Now that we've checked the cache, re-partition whatever is still invalid.
-      invalidation_check = \
-        InvalidationCheck(invalidation_check.all_vts, uncached_vts)
+      invalidation_check = InvalidationCheck(invalidation_check.all_vts, uncached_vts)
 
     if not silent:
       targets = []
@@ -385,11 +369,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
                         '.']
         self.context.log.info(*msg_elements)
 
-    invalidation_report = self.context.invalidation_report
-    if invalidation_report:
-      for vts in invalidation_check.all_vts:
-        invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
-                                    phase='pre-check')
+    self._update_invalidation_report(invalidation_check, 'pre-check')
 
     # Cache has been checked to create the full list of invalid VTs.
     # Only copy previous_results for this subset of VTs.
@@ -416,10 +396,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     # Yield the result, and then mark the targets as up to date.
     yield invalidation_check
 
-    if invalidation_report:
-      for vts in invalidation_check.all_vts:
-        invalidation_report.add_vts(cache_manager, vts.targets, vts.cache_key, vts.valid,
-                                    phase='post-check')
+    self._update_invalidation_report(invalidation_check, 'post-check')
 
     for vt in invalidation_check.invalid_vts:
       vt.update()
@@ -428,17 +405,57 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     if self.context.options.for_global_scope().workdir_max_build_entries is not None:
       self._launch_background_workdir_cleanup(invalidation_check.all_vts)
 
+  def _update_invalidation_report(self, invalidation_check, phase):
+    invalidation_report = self.context.invalidation_report
+    if invalidation_report:
+      for vts in invalidation_check.all_vts:
+        invalidation_report.add_vts(self._task_name, vts.targets, vts.cache_key, vts.valid,
+                                    phase=phase)
+
+  def _do_invalidation_check(self,
+                             fingerprint_strategy,
+                             invalidate_dependents,
+                             targets,
+                             topological_order):
+
+    if self._cache_factory.ignore:
+      cache_key_generator = UncacheableCacheKeyGenerator()
+    else:
+      cache_key_generator = CacheKeyGenerator(
+        self.context.options.for_global_scope().cache_key_gen_version,
+        self.fingerprint)
+
+    cache_manager = InvalidationCacheManager(self.workdir,
+                                             cache_key_generator,
+                                             self._build_invalidator(),
+                                             invalidate_dependents,
+                                             fingerprint_strategy=fingerprint_strategy,
+                                             invalidation_report=self.context.invalidation_report,
+                                             task_name=self._task_name,
+                                             task_version=self.implementation_version_str(),
+                                             artifact_write_callback=self.maybe_write_artifact)
+
+    # If this Task's execution has been forced, invalidate all our target fingerprints.
+    if self._cache_factory.ignore and not self._force_invalidated:
+      self.invalidate()
+      self._force_invalidated = True
+
+    return cache_manager.check(targets, topological_order=topological_order)
+
   def maybe_write_artifact(self, vt):
     if self._should_cache_target_dir(vt):
       self.update_artifact_cache([(vt, [vt.current_results_dir])])
 
   def _launch_background_workdir_cleanup(self, vts):
-    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds, [(vts,)], 'workdir_build_cleanup')
+    workdir_build_cleanup_job = Work(self._cleanup_workdir_stale_builds,
+                                     [(vts,)],
+                                     'workdir_build_cleanup')
     self.context.submit_background_work_chain([workdir_build_cleanup_job])
 
   def _cleanup_workdir_stale_builds(self, vts):
     # workdir_max_build_entries has been assured of not None before invoking this method.
-    max_entries_per_target = max(2, self.context.options.for_global_scope().workdir_max_build_entries)
+    workdir_max_build_entries = self.context.options.for_global_scope().workdir_max_build_entries
+    max_entries_per_target = max(2, workdir_max_build_entries)
     for vt in vts:
       live_dirs = list(vt.live_dirs())
       if not live_dirs:
@@ -450,7 +467,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """Return true if the given vt should be written to a cache (if configured)."""
     return (
       self.cache_target_dirs and
-      not vt.target.has_label('no_cache') and
+      vt.cacheable and
       (not vt.is_incremental or self.cache_incremental) and
       self.artifact_cache_writes_enabled()
     )
