@@ -38,6 +38,9 @@ class JavascriptStyle(NodeTask):
              help='Check all targets and present the full list of errors.')
     register('--javascriptstyle-dir', advanced=True, fingerprint=True,
              help='Package directory for lint tool.')
+    register('--transitive', type=bool, default=True,
+             help='True to run the tool transitively on targets in the context, false to run '
+                  'for only roots specified on the commandline.')
 
   def get_lintable_node_targets(self, targets):
     return filter(
@@ -104,7 +107,8 @@ class JavascriptStyle(NodeTask):
       self.context.log.info('Skipping javascript style check.')
       return
 
-    targets = self.get_lintable_node_targets(self.context.targets())
+    all_targets = self.context.targets() if self.get_options().transitive else self.context.target_roots
+    targets = self.get_lintable_node_targets(all_targets)
     if not targets:
       return
     failed_targets = []
