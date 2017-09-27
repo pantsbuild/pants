@@ -236,7 +236,7 @@ if [[ "${skip_rust_tests:-false}" == "false" ]]; then
     activate_pants_venv
     PANTS_SRCPATH="${REPO_ROOT}/src/python" prepare_to_build_native_code
     export RUST_BACKTRACE=1
-    "${CARGO_HOME}/bin/cargo" test --all --manifest-path="${REPO_ROOT}/src/rust/engine"
+    "${CARGO_HOME}/bin/cargo" test --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
   ) || die "Pants rust test failure"
   end_travis_section
 fi
