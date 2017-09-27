@@ -112,23 +112,6 @@ python_tests(
 )
 
 python_tests(
-  name='node_test',
-  sources=['test_node_test.py'],
-  dependencies=[
-    '3rdparty/python:mock',
-    'contrib/node/src/python/pants/contrib/node/targets:node_module',
-    'contrib/node/src/python/pants/contrib/node/targets:node_test',
-    'contrib/node/src/python/pants/contrib/node/tasks:node_paths',
-    'contrib/node/src/python/pants/contrib/node/tasks:node_resolve',
-    'contrib/node/src/python/pants/contrib/node/tasks:node_test',
-    'contrib/node/src/python/pants/contrib/node/subsystems/resolvers:npm_resolver',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:timeout',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
   name='node_lint_integration',
   sources=['test_node_lint_integration.py'],
   dependencies=[
