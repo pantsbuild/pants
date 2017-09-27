@@ -27,6 +27,7 @@ python_tests(
   sources = ['test_interpreter_selection_integration.py'],
   dependencies = [
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
   tags = {'integration'},

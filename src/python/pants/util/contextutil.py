@@ -31,7 +31,7 @@ def environment_as(**kwargs):
   """Update the environment to the supplied values, for example:
 
   with environment_as(PYTHONPATH='foo:bar:baz',
-                      PYTHON='/usr/bin/python2.6'):
+                      PYTHON='/usr/bin/python2.7'):
     subprocess.Popen(foo).wait()
   """
   new_environment = kwargs

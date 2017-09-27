@@ -9,12 +9,14 @@ import collections
 import contextlib
 import multiprocessing
 import os
-import subprocess
+import re
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
+from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
@@ -54,6 +56,9 @@ class JvmdocGen(JvmTask):
              fingerprint=True,
              help='Do not consider {0} errors to be build errors.'.format(tool_name))
 
+    register('--exclude-patterns', type=list, default=[], fingerprint=True,
+             help='Patterns for targets to be excluded from doc generation.')
+
     # TODO(John Sirois): This supports the JarPublish task and is an abstraction leak.
     # It allows folks doing a local-publish to skip an expensive and un-needed step.
     # Remove this flag and instead support conditional requirements being registered against
@@ -78,6 +83,10 @@ class JvmdocGen(JvmTask):
     self.ignore_failure = options.ignore_failure
     self.skip = options.skip
 
+  @memoized_property
+  def _exclude_patterns(self):
+    return [re.compile(x) for x in set(self.get_options().exclude_patterns or [])]
+
   def generate_doc(self, language_predicate, create_jvmdoc_command):
     """
     Generate an execute method given a language predicate and command to create documentation
@@ -95,8 +104,19 @@ class JvmdocGen(JvmTask):
       raise TaskError(
           'Cannot provide {} target mappings for combined output'.format(self.jvmdoc().product_type))
 
-    def docable(tgt):
-      return language_predicate(tgt) and (self._include_codegen or not tgt.is_synthetic)
+    def docable(target):
+      if not language_predicate(target):
+        self.context.log.debug('Skipping [{}] because it is does not pass the language predicate'.format(target.address.spec))
+        return False
+      if not self._include_codegen and target.is_synthetic:
+        self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
+        return False
+      for pattern in self._exclude_patterns:
+        if pattern.search(target.address.spec):
+          self.context.log.debug(
+            "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+          return False
+      return True
 
     targets = self.context.targets(predicate=docable)
     if not targets:
@@ -185,9 +205,9 @@ class JvmdocGen(JvmTask):
 
   def _handle_create_jvmdoc_result(self, targets, result, command):
     if result != 0:
-      targetlist = ", ".join(map(str, targets))
+      targetlist = ", ".join(map(lambda target: target.address.spec, targets))
       message = 'Failed to process {} for {} [{}]: {}'.format(
-                self.jvmdoc().tool_name, targetlist, result, command)
+                self.jvmdoc().tool_name, targetlist, result, " ".join(command))
       if self.ignore_failure:
         self.context.log.warn(message)
       else:

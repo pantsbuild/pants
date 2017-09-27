@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -15,6 +14,7 @@ from pants.fs.archive import TGZ
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
+from pants.util.process_handler import subprocess
 
 
 class GoDistribution(object):
@@ -32,7 +32,7 @@ class GoDistribution(object):
       register('--supportdir', advanced=True, default='bin/go',
                help='Find the go distributions under this dir.  Used as part of the path to lookup '
                     'the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', advanced=True, default='1.8', fingerprint=True,
+      register('--version', advanced=True, default='1.8.3', fingerprint=True,
                help='Go distribution version.  Used as part of the path to lookup the distribution '
                     'with --binary-util-baseurls and --pants-bootstrapdir')
 

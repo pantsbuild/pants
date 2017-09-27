@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 import types
 import unittest
 from contextlib import contextmanager
@@ -17,6 +16,7 @@ from pants.scm.git import Git
 from pants.scm.scm import Scm
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
+from pants.util.process_handler import subprocess
 from pants_test.testutils.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 
 

@@ -5,13 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import subprocess
-
 from twitter.common.collections import OrderedSet
 
 from pants.base.scm_project_tree import ScmProjectTree
 from pants.scm.git import Git
 from pants.util.contextutil import pushd
+from pants.util.process_handler import subprocess
 from pants_test.base.build_file_test_base import BuildFileTestBase
 
 

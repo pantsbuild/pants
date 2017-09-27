@@ -9,6 +9,7 @@ python_tests(
     'src/python/pants/java:executor',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 

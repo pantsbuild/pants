@@ -6,6 +6,7 @@ python_tests(
   sources=['test_node_distribution.py'],
   dependencies=[
     'contrib/node/src/python/pants/contrib/node/subsystems:node_distribution',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

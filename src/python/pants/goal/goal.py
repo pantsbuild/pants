@@ -141,6 +141,11 @@ class _Goal(object):
       raise GoalError('Can only specify one of first, replace, before or after')
 
     task_name = task_registrar.name
+    if task_name in self._task_type_by_name:
+      raise GoalError(
+        'Can only specify a task name once per goal, saw multiple values for {} in goal {}'.format(
+          task_name,
+          self.name))
     Optionable.validate_scope_name_component(task_name)
     options_scope = Goal.scope(self.name, task_name)
 

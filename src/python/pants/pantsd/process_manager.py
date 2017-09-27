@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import signal
-import subprocess
 import time
 import traceback
 from contextlib import contextmanager
@@ -18,6 +17,7 @@ import psutil
 from pants.base.build_environment import get_buildroot
 from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
+from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
@@ -433,16 +433,16 @@ class ProcessManager(ProcessMetadataManager):
           self.post_fork_child(**post_fork_child_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
       else:
         try:
           if write_pid: self.write_pid(second_pid)
           self.post_fork_parent(**post_fork_parent_opts or {})
         except Exception:
           logger.critical(traceback.format_exc())
-
-        os._exit(0)
+        finally:
+          os._exit(0)
     else:
       # This prevents un-reaped, throw-away parent processes from lingering in the process table.
       os.waitpid(pid, 0)
@@ -465,8 +465,8 @@ class ProcessManager(ProcessMetadataManager):
         self.post_fork_child(**post_fork_child_opts or {})
       except Exception:
         logger.critical(traceback.format_exc())
-
-      os._exit(0)
+      finally:
+        os._exit(0)
     else:
       try:
         self.post_fork_parent(**post_fork_parent_opts or {})

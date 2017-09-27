@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import re
-import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import open_zip
+from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.file_test_util import exact_files
 

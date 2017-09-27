@@ -10,6 +10,7 @@ import json
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
@@ -26,7 +27,7 @@ class ExplainOptionsTask(ConsoleTask):
   @classmethod
   def register_options(cls, register):
     super(ExplainOptionsTask, cls).register_options(register)
-    register('--scope', help='Only show options in this scope.')
+    register('--scope', help='Only show options in this scope. Use GLOBAL for global scope.')
     register('--name', help='Only show options with this name.')
     register('--rank', choices=RankedValue.get_names(),
              help='Only show options with at least this importance.')
@@ -41,7 +42,8 @@ class ExplainOptionsTask(ConsoleTask):
 
   def _scope_filter(self, scope):
     pattern = self.get_options().scope
-    return not pattern or scope.startswith(pattern)
+    return (not pattern or scope.startswith(pattern) or
+            (pattern == 'GLOBAL' and scope == GLOBAL_SCOPE))
 
   def _option_filter(self, option):
     pattern = self.get_options().name

@@ -9,16 +9,16 @@ python_library(
   sources = ['echo_interpreter_version.py'],
   dependencies = [],
   # Play with this to test interpreter selection in the pex machinery.
-  compatibility = ['CPython>=2.6,<3']
+  compatibility = ['CPython>=2.7,<3', 'CPython>=3.3']
 )
 
 python_binary(
-  name = 'echo_interpreter_version_2.6',
+  name = 'echo_interpreter_version_3',
   dependencies = [
     ':echo_interpreter_version_lib',
   ],
   entry_point = 'interpreter_selection.echo_interpreter_version',
-  compatibility = ['CPython>=2.6,<2.7']
+  compatibility = ['CPython>=3.3']
 )
 
 python_binary(
@@ -46,14 +46,14 @@ python_binary(
     ':echo_interpreter_version_lib',
   ],
   entry_point = 'interpreter_selection.echo_interpreter_version',
-  compatibility = ['CPython<2.6']
+  compatibility = ['CPython<2.7']
 )
 
 python_library(
   name = 'die_lib',
   sources = ['die.py'],
   dependencies = [],
-  compatibility = ['CPython>=2.6,<3']
+  compatibility = ['CPython>=2.7,<3']
 )
 
 python_binary(

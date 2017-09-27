@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from unittest import expectedFailure
 
 from pants.core_tasks.list_goals import ListGoals
+from pants.goal.error import GoalError
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.task.task import Task
@@ -80,6 +81,27 @@ class ListGoalsTest(ConsoleTaskTestBase):
       '  {0}'.format(self._ALPACA_NAME),
       options={'all': True}
     )
+
+  def test_register_duplicate_task_name_is_error(self):
+    Goal.clear()
+
+    class NoopTask(Task):
+      def execute(self):
+        pass
+
+    class OtherNoopTask(Task):
+      def execute(self):
+        pass
+
+    goal = Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    task_name = 'foo'
+    goal.install(TaskRegistrar(task_name, NoopTask))
+
+    with self.assertRaises(GoalError) as ctx:
+      goal.install(TaskRegistrar(task_name, OtherNoopTask))
+
+    self.assertIn('foo', ctx.exception.message)
+    self.assertIn(self._LIST_GOALS_NAME, ctx.exception.message)
 
   # TODO(John Sirois): Re-enable when fixing up ListGoals `--graph` in
   # https://github.com/pantsbuild/pants/issues/918

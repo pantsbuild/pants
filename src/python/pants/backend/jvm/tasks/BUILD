@@ -361,18 +361,18 @@ python_library(
   name = 'junit_run',
   sources = ['junit_run.py'],
   dependencies = [
-    '3rdparty/python:six',
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:six',
     ':classpath_util',
     ':coverage',
     ':jvm_task',
     ':jvm_tool_task_mixin',
     ':reports',
-    'src/python/pants/backend/jvm:argfile',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm:argfile',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
@@ -388,6 +388,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
+    'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
   ],
 )
@@ -517,6 +518,7 @@ python_library(
     'src/python/pants/binaries:binary_util',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
   ],
 )
 

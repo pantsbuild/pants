@@ -14,9 +14,10 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
-    'src/python/pants/goal:task_registrar',
     'src/python/pants/fs',
+    'src/python/pants/goal:task_registrar',
     'src/python/pants/task',
     'src/python/pants/util:memo',
+    'src/python/pants/util:process_handler',
   ],
 )

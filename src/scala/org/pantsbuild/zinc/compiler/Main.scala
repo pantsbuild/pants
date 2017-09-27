@@ -52,6 +52,10 @@ object Main {
   def printVersion(): Unit = println("%s (%s) %s" format (Command, Description, versionString))
 
   def mkLogger(settings: Settings) = {
+    // If someone has not explicitly enabled log4j2 JMX, disable it.
+    if (!Util.isSetProperty("log4j2.disable.jmx")) {
+      Util.setProperty("log4j2.disable.jmx", "true")
+    }
     val cl =
       ConsoleLogger(
         out = ConsoleOut.systemOut,

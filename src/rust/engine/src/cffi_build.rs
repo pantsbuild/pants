@@ -18,10 +18,32 @@ native engine binary, allowing us to address it both as an importable python mod
 
 */
 
+use std::fs;
+use std::io::{Read, Result};
+use std::path::{Path, PathBuf};
+
 fn main() {
-  gcc::Config::new()
-    // N.B. The filename of this source code - at generation time - must line up 1:1 with the
-    // python import name, as python keys the initialization function name off of the import name.
-    .file("src/cffi/native_engine.c")
-    .compile("libnative_engine_ffi.a");
+  let mut config = gcc::Config::new();
+
+  // N.B. The filename of this source code - at generation time - must line up 1:1 with the
+  // python import name, as python keys the initialization function name off of the import name.
+  let path = PathBuf::from("src/cffi/native_engine.c");
+
+  config.file(path.to_str().unwrap());
+  for flag in make_flags(&path).unwrap() {
+    config.flag(flag.as_str());
+  }
+
+  config.compile("libnative_engine_ffi.a");
+}
+
+fn make_flags(c_file: &Path) -> Result<Vec<String>> {
+  let mut path = PathBuf::from(c_file);
+  path.set_extension("cflags");
+
+  let mut contents = String::new();
+  fs::File::open(path)?.read_to_string(&mut contents)?;
+  // It would be a shame if someone were to include a space in an actual quoted value.
+  // If they did that, I guess we'd need to implement shell tokenization or something.
+  return Ok(contents.trim().split(' ').map(str::to_owned).collect());
 }

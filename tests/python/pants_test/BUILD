@@ -3,7 +3,6 @@
 
 python_library(
   name='test_infra',
-  sources=[],
   dependencies=[
     'tests/python/pants_test:base_test',
     'tests/python/pants_test:int-test',
@@ -55,6 +54,7 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:file_test_util',
   ]
 )

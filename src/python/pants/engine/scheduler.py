@@ -10,7 +10,6 @@ import os
 import threading
 import time
 from collections import defaultdict
-from contextlib import contextmanager
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
@@ -18,12 +17,12 @@ from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
 from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
+from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
 from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
-from pants.engine.subsystem.native import Function, TypeConstraint, TypeId
 from pants.util.contextutil import temporary_file_path
 from pants.util.objects import datatype
 
@@ -86,30 +85,30 @@ class WrappedNativeScheduler(object):
     self._register_rules(rule_index)
 
     self._scheduler = native.new_scheduler(
-        self._tasks,
-        self._root_subject_types,
-        build_root,
-        work_dir,
-        ignore_patterns,
-        Snapshot,
-        _Snapshots,
-        FileContent,
-        FilesContent,
-        Path,
-        Dir,
-        File,
-        Link,
-        has_products_constraint,
-        constraint_for(Address),
-        constraint_for(Variants),
-        constraint_for(PathGlobs),
-        constraint_for(Snapshot),
-        constraint_for(_Snapshots),
-        constraint_for(FilesContent),
-        constraint_for(Dir),
-        constraint_for(File),
-        constraint_for(Link),
-      )
+      self._tasks,
+      self._root_subject_types,
+      build_root,
+      work_dir,
+      ignore_patterns,
+      Snapshot,
+      _Snapshots,
+      FileContent,
+      FilesContent,
+      Path,
+      Dir,
+      File,
+      Link,
+      has_products_constraint,
+      constraint_for(Address),
+      constraint_for(Variants),
+      constraint_for(PathGlobs),
+      constraint_for(Snapshot),
+      constraint_for(_Snapshots),
+      constraint_for(FilesContent),
+      constraint_for(Dir),
+      constraint_for(File),
+      constraint_for(Link),
+    )
 
   def _root_type_ids(self):
     return self._to_ids_buf(sorted(self._root_subject_types))
@@ -319,7 +318,7 @@ class LocalScheduler(object):
     :param rules: A set of Rules which is used to compute values in the product graph.
     :param project_tree: An instance of ProjectTree for the current build root.
     :param work_dir: The pants work dir.
-    :param native: An instance of engine.subsystem.native.Native.
+    :param native: An instance of engine.native.Native.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
     :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
@@ -349,6 +348,10 @@ class LocalScheduler(object):
       self.visualize_rule_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), rule_graph_name))
 
     self._scheduler.assert_ruleset_valid()
+
+  @property
+  def lock(self):
+    return self._product_graph_lock
 
   def trace(self):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
@@ -399,11 +402,6 @@ class LocalScheduler(object):
     :returns: An ExecutionRequest for the given products and subjects.
     """
     return ExecutionRequest(tuple((s, p) for s in subjects for p in products))
-
-  @contextmanager
-  def locked(self):
-    with self._product_graph_lock:
-      yield
 
   def root_entries(self, execution_request):
     """Returns the roots for the given ExecutionRequest as a list of tuples of:

@@ -10,6 +10,7 @@ import os
 from pants.base.build_environment import get_buildroot, pants_version
 from pants.build_graph.aliased_target import AliasTargetFactory
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.files import Files
 from pants.build_graph.intransitive_dependency import (IntransitiveDependencyFactory,
                                                        ProvidedDependencyFactory)
 from pants.build_graph.prep_command import PrepCommand
@@ -39,6 +40,7 @@ def build_file_aliases():
   return BuildFileAliases(
     targets={
       'alias': AliasTargetFactory(),
+      'files': Files,
       'prep_command': PrepCommand,
       'resources': Resources,
       'remote_sources': RemoteSources,

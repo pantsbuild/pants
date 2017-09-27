@@ -135,6 +135,17 @@ by expanding the `stderr` nodes.
 2015/03/12 03:55:57:451 PDT [DEBUG] header - -<< "X-Timer: S1426157757.333469,VS0,VE36[\r][\n]"
 ```
 
+Getting a stack trace from a running pants process
+--------------------------------------------------
+
+Pants implements `faulthandler` support in all execution contexts. To get a stack trace from a running pants process, send a `SIGUSR2` signal like so:
+
+```
+$ kill -31 <pid>
+```
+
+For traditional pants runs, this will dump a stack trace (for all threads) to stderr. For pantsd-based runs and for pantsd itself, the traces will end up in the `.pantsd/pantsd/pantsd.log` file.
+
 Questions, Issues, Bug Reports
 ------------------------------
 
