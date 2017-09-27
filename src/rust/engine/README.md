@@ -6,7 +6,7 @@ To build for development, run:
 
     cargo build
 
-To run tests for any particular crate, run:
+To run tests for any particular crate, cd into it and run:
 
     cargo test
 
