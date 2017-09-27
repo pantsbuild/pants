@@ -22,6 +22,7 @@ python_library(
   sources = ['desktop.py'],
   dependencies = [
     ':osutil',
+    'src/python/pants/util:process_handler',
   ],
 )
 
@@ -82,6 +83,10 @@ python_library(
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
+  dependencies=[
+    '3rdparty/python:subprocess32',
+    ':meta',
+  ]
 )
 
 python_library(
@@ -116,11 +121,6 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
   ],
-)
-
-python_library(
-  name = 'timeout',
-  sources = ['timeout.py'],
 )
 
 python_library(

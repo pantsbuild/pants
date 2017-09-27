@@ -16,34 +16,32 @@ class ParseError(Exception):
 
 
 class SymbolTable(AbstractClass):
-  """A one-classmethod interface exposing a symbol table dict.
+  """A one-classmethod interface exposing a symbol table dict."""
 
-  SymbolTables exist as named classes because it allows them to be loaded by name as a python
-  module, rather than being pickled when they cross between processes.
-  """
-
-  @classmethod
   @abstractmethod
-  def table(cls):
+  def table(self):
     """Returns a dict of name to implementation class."""
 
-  @classmethod
-  def constraint(cls):
+  def constraint(self):
     """Returns the typeconstraint for the symbol table"""
     # NB Sort types so that multiple calls get the same tuples.
-    symbol_table_types = sorted(set(cls.table().values()))
+    symbol_table_types = sorted(set(self.table().values()))
     return Exactly(*symbol_table_types, description='symbol table types')
 
 
+class EmptyTable(SymbolTable):
+  def table(self):
+    return {}
+
+
 class Parser(AbstractClass):
-  @classmethod
+
   @abstractmethod
-  def parse(cls, filepath, filecontent, symbol_table_cls):
+  def parse(self, filepath, filecontent):
     """
     :param string filepath: The name of the file being parsed. The parser should not assume
                             that the path is accessible, and should consume the filecontent.
     :param bytes filecontent: The raw byte content to parse.
-    :param dict symbol_table_cls: A symbol table to expose to the python file being parsed.
     :returns: A list of decoded addressable, Serializable objects. The callable will
               raise :class:`ParseError` if there were any problems encountered parsing the filecontent.
     :rtype: :class:`collections.Callable`

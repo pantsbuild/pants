@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import subprocess
 from contextlib import closing
 from StringIO import StringIO
 
@@ -14,6 +13,7 @@ from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
+from pants.util.process_handler import subprocess
 from pants_test.base_test import BaseTest
 
 

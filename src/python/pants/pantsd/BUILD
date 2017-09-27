@@ -8,7 +8,8 @@ python_library(
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
     'src/python/pants/pantsd/subsystem:subprocess',
-    'src/python/pants/util:dirutil'
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:process_handler',
   ]
 )
 
@@ -47,6 +48,7 @@ python_library(
   sources = ['pants_daemon.py'],
   dependencies = [
     '3rdparty/python:setproctitle',
+    'src/python/pants/base:exiter',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/logging',
     ':process_manager',

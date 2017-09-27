@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import StringIO
-import subprocess
 import traceback
 from contextlib import contextmanager
 
 from pants.scm.scm import Scm
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
+from pants.util.process_handler import subprocess
 from pants.util.strutil import ensure_binary
 
 

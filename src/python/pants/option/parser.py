@@ -520,7 +520,17 @@ class Parser(object):
     # instances of RankedValue (so none will be None, although they may wrap a None value).
     ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
-    # Record info about the derivation of each of the values.
+    def record_option(value, rank, option_details=None):
+      deprecation_version = kwargs.get('removal_version')
+      self._option_tracker.record_option(scope=self._scope,
+                                         option=dest,
+                                         value=value,
+                                         rank=rank,
+                                         deprecation_version=deprecation_version,
+                                         details=option_details)
+
+    # Record info about the derivation of each of the contributing values.
+    detail_history = []
     for ranked_val in ranked_vals:
       if ranked_val.rank in (RankedValue.CONFIG, RankedValue.CONFIG_DEFAULT):
         details = config_details
@@ -528,12 +538,9 @@ class Parser(object):
         details = env_details
       else:
         details = None
-      self._option_tracker.record_option(scope=self._scope,
-                                         option=dest,
-                                         value=ranked_val.value,
-                                         rank=ranked_val.rank,
-                                         deprecation_version=kwargs.get('removal_version'),
-                                         details=details)
+      if details:
+        detail_history.append(details)
+      record_option(value=ranked_val.value, rank=ranked_val.rank, option_details=details)
 
     # Helper function to check various validity constraints on final option values.
     def check(val):
@@ -568,6 +575,10 @@ class Parser(object):
     else:
       ret = ranked_vals[-1]
       check(ret.value)
+
+    # Record info about the derivation of the final value.
+    merged_details = ', '.join(detail_history) if detail_history else None
+    record_option(value=ret.value, rank=ret.rank, option_details=merged_details)
 
     # All done!
     return ret

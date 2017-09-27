@@ -10,33 +10,36 @@
 # Exposes:
 # + get_native_engine_version: Echoes the current native engine version.
 # + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
+# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
 # + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 
 function get_native_engine_version() {
-  ${REPO_ROOT}/pants options --scope=native-engine --name=version --output-format=json | \
-    python -c 'import json, sys; print(json.load(sys.stdin)["native-engine.version"]["value"])'
+  ${REPO_ROOT}/pants options --scope=GLOBAL --name=native-engine-version --output-format=json | \
+    python -c 'import json, sys; print(json.load(sys.stdin)["native_engine_version"]["value"])'
 }
 
+# Rust targets OSX 10.7+ as noted here: https://doc.rust-lang.org/book/getting-started.html#tier-1
 readonly RUST_OSX_MIN_VERSION=7
 
 # Bump this when there is a new OSX released:
-readonly OSX_MAX_VERSION=12
+readonly OSX_MAX_VERSION=13
 
 function get_rust_osx_versions() {
   seq ${RUST_OSX_MIN_VERSION} ${OSX_MAX_VERSION}
 }
 
-function get_rust_os_ids() {
-  for os_id in linux/{i386,x86_64}
-  do
-    echo "${os_id}"
-  done
+function get_rust_osx_ids() {
   for rev in $(get_rust_osx_versions)
   do
     echo "mac/10.${rev}"
   done
+}
+
+function get_rust_os_ids() {
+  echo "linux/x86_64"
+  get_rust_osx_ids
 }
 
 # TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when

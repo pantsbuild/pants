@@ -11,6 +11,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.managed_jar_dependencies import (ManagedJarDependencies,
                                                                 ManagedJarLibraries)
 from pants.backend.jvm.targets.unpacked_jars import UnpackedJars
+from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
@@ -403,3 +404,72 @@ class TestJarDependencyManagementSetup(JvmBinaryTaskTestBase):
     manager = self._init_manager(default_target='//foo:management')
     with self.assertRaises(JarDependencyManagementSetup.IllegalVersionOverride):
       check_task_execution(manager)
+
+  def test_artifacts_indirection(self):
+    jar_library_unversioned = self.make_target(
+      target_type=JarLibrary,
+      spec='//foo:library-unversioned',
+      jars=[
+        JarDependency(org='foobar', name='foobar'),
+      ],
+    )
+    jar_library_versioned = self.make_target(
+      target_type=JarLibrary,
+      spec='//foo:library-versioned',
+      jars=[
+        JarDependency(org='foobar', name='foobar', rev='2'),
+      ],
+    )
+    indirect_target = self.make_target(
+      target_type=Target,
+      spec='//foo:indirect-deps',
+      dependencies=[
+        jar_library_versioned,
+      ])
+    management_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management',
+      artifacts=[
+        '//foo:indirect-deps',
+      ])
+    context = self.context(target_roots=[
+      management_target,
+      indirect_target,
+      jar_library_versioned,
+      jar_library_unversioned
+    ])
+    manager = self._init_manager(default_target='//foo:management')
+    task = self.create_task(context)
+    task.execute()
+    artifact_set = self._single_artifact_set(manager, [jar_library_unversioned])
+    self.assertFalse(artifact_set is None)
+    self.assertEquals('2', artifact_set[M2Coordinate('foobar', 'foobar')].rev)
+
+  def test_invalid_artifacts_indirection(self):
+    class DummyTarget(Target):
+      pass
+    dummy_target = self.make_target(
+      target_type=DummyTarget,
+      spec='//foo:dummy',
+    )
+    indirect_target = self.make_target(
+      target_type=Target,
+      spec='//foo:indirect',
+      dependencies=[
+        dummy_target,
+      ])
+    management_target = self.make_target(
+      target_type=ManagedJarDependencies,
+      spec='//foo:management',
+      artifacts=[
+        '//foo:indirect',
+      ])
+    context = self.context(target_roots=[
+      management_target,
+      indirect_target,
+      dummy_target,
+    ])
+    self._init_manager()
+    task = self.create_task(context)
+    with self.assertRaises(TargetDefinitionException):
+      task.execute()

@@ -12,7 +12,7 @@ from abc import abstractmethod
 from threading import Timer
 
 from pants.base.exceptions import ErrorWhileTesting
-from pants.util.timeout import Timeout, TimeoutReached
+from pants.util.process_handler import subprocess
 
 
 class TestRunnerTaskMixin(object):
@@ -91,10 +91,9 @@ class TestRunnerTaskMixin(object):
     :param primitive test_info: The information being stored.
     """
     if target and scope:
-      address = target.address.spec
       target_type = target.type_alias
-      self.context.run_tracker.report_target_info('GLOBAL', address, ['target_type'], target_type)
-      self.context.run_tracker.report_target_info(scope, address, keys, test_info)
+      self.context.run_tracker.report_target_info('GLOBAL', target, ['target_type'], target_type)
+      self.context.run_tracker.report_target_info(scope, target, keys, test_info)
 
   @staticmethod
   def parse_test_info(xml_path, error_handler, additional_testcase_attributes=None):
@@ -187,37 +186,29 @@ class TestRunnerTaskMixin(object):
 
     process_handler = self._spawn(*args, **kwargs)
 
-    def _graceful_terminate(handler, wait_time):
-      """
-      Returns a function which attempts to terminate the process gracefully.
+    def maybe_terminate(wait_time):
+      if process_handler.poll() < 0:
+        process_handler.terminate()
 
-      If terminate doesn't work after wait_time seconds, do a kill.
-      """
-
-      def terminator():
-        handler.terminate()
         def kill_if_not_terminated():
-          if handler.poll() is None:
-            # We can't use the context logger because it might not exist.
+          if process_handler.poll() < 0:
+            # We can't use the context logger because it might not exist when this delayed function
+            # is executed by the Timer below.
             import logging
             logger = logging.getLogger(__name__)
             logger.warn('Timed out test did not terminate gracefully after {} seconds, killing...'
                         .format(wait_time))
-            handler.kill()
+            process_handler.kill()
 
         timer = Timer(wait_time, kill_if_not_terminated)
         timer.start()
 
-      return terminator
-
     try:
-      with Timeout(timeout,
-                   threading_timer=Timer,
-                   abort_handler=_graceful_terminate(process_handler,
-                                                     self.get_options().timeout_terminate_wait)):
-        return process_handler.wait()
-    except TimeoutReached as e:
+      return process_handler.wait(timeout=timeout)
+    except subprocess.TimeoutExpired as e:
       raise ErrorWhileTesting(str(e), failed_targets=test_targets)
+    finally:
+      maybe_terminate(wait_time=self.get_options().timeout_terminate_wait)
 
   @abstractmethod
   def _spawn(self, *args, **kwargs):
@@ -225,8 +216,6 @@ class TestRunnerTaskMixin(object):
 
     :rtype: ProcessHandler
     """
-
-    raise NotImplementedError
 
   def _timeout_for_target(self, target):
     timeout = getattr(target, 'timeout', None)

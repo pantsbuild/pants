@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import subprocess
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
@@ -15,6 +14,7 @@ from textwrap import dedent
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
+from pants.util.process_handler import subprocess
 from pants_test.base_test import TestGenerator
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
 from pants_test.testutils.git_util import initialize_repo

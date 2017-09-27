@@ -39,6 +39,5 @@ python_library(
     'src/python/pants/util:process_handler',
     'src/python/pants/util:strutil',
     'src/python/pants/util:xml_parser',
-    'src/python/pants/util:timeout',
   ]
 )

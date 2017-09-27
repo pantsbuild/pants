@@ -40,7 +40,8 @@ class FSEventService(PantsService):
     self._executor = None
     self._handlers = {}
 
-  def setup(self, executor=None):
+  def setup(self, lock, executor=None):
+    super(FSEventService, self).setup(lock)
     self._executor = executor or ThreadPoolExecutor(max_workers=self._worker_count)
 
   def terminate(self):

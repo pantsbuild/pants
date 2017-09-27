@@ -307,11 +307,6 @@ class Options(object):
         # This makes the code a bit neater.
         values.update(self.for_scope(deprecated_scope))
 
-    # Record the value derivation.
-    for option in values:
-      self._option_tracker.record_option(scope=scope, option=option, value=values[option],
-                                         rank=values.get_rank(option))
-
     # Cache the values.
     self._values_by_scope[scope] = values
 

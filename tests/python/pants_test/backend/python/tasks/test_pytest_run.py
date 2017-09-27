@@ -10,12 +10,9 @@ import os
 import xml.dom.minidom as DOM
 from textwrap import dedent
 
-from mock import patch
-
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.base.exceptions import ErrorWhileTesting
 from pants.util.contextutil import pushd
-from pants.util.timeout import TimeoutReached
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -288,29 +285,6 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
 
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
-
-  def test_one_timeout(self):
-    # When we have two targets, any of them doesn't have a timeout, and we have no default,
-    # then no timeout is set.
-
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      self.run_tests(targets=[self.sleep_no_timeout, self.sleep_timeout])
-
-      # Ensures that Timeout is instantiated with no timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (None,))
-
-  def test_timeout(self):
-    # Check that a failed timeout returns the right results.
-
-    with patch('pants.task.testrunner_task_mixin.Timeout') as mock_timeout:
-      mock_timeout().__exit__.side_effect = TimeoutReached(1)
-      self.run_failing_tests(targets=[self.sleep_timeout],
-                             failed_targets=[self.sleep_timeout])
-
-      # Ensures that Timeout is instantiated with a 1 second timeout.
-      args, kwargs = mock_timeout.call_args
-      self.assertEqual(args, (1,))
 
   def test_junit_xml_option(self):
     # We expect xml of the following form:

@@ -10,9 +10,3 @@ from pants.contrib.cpp.targets.cpp_target import CppTarget
 
 class CppLibrary(CppTarget):
   """A statically linked C++ library."""
-
-  # TODO: public headers
-  def __init__(self,
-               *args,
-               **kwargs):
-    super(CppLibrary, self).__init__(*args, **kwargs)

@@ -9,7 +9,8 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.subsystem.native import Native
+from pants.binaries.binary_util import BinaryUtil
+from pants.engine.native import Native
 from pants.init.target_roots import TargetRoots
 from pants.init.util import clean_global_runtime_state
 from pants.pantsd.pants_daemon import PantsDaemon
@@ -47,7 +48,8 @@ class PantsDaemonLauncher(object):
     @classmethod
     def subsystem_dependencies(cls):
       return super(PantsDaemonLauncher.Factory,
-                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory, Subprocess.Factory, Native.Factory)
+                   cls).subsystem_dependencies() + (WatchmanLauncher.Factory, Subprocess.Factory,
+                                                    BinaryUtil.Factory)
 
     def create(self, engine_initializer=None):
       """
@@ -57,59 +59,36 @@ class PantsDaemonLauncher(object):
       build_root = get_buildroot()
       options = self.global_instance().get_options()
       return PantsDaemonLauncher(build_root=build_root,
-                                 pants_workdir=options.pants_workdir,
                                  engine_initializer=engine_initializer,
-                                 log_dir=options.log_dir,
-                                 log_level=options.level.upper(),
-                                 pailgun_host=options.pailgun_host,
-                                 pailgun_port=options.pailgun_port,
-                                 fs_event_workers=options.fs_event_workers,
-                                 pants_ignore_patterns=options.pants_ignore,
-                                 build_ignore_patterns=options.build_ignore,
-                                 exclude_target_regexp=options.exclude_target_regexp,
-                                 subproject_roots=options.subproject_roots)
+                                 options=options)
 
   def __init__(self,
                build_root,
-               pants_workdir,
                engine_initializer,
-               log_dir,
-               log_level,
-               pailgun_host,
-               pailgun_port,
-               fs_event_workers,
-               pants_ignore_patterns,
-               build_ignore_patterns,
-               exclude_target_regexp,
-               subproject_roots):
+               options):
     """
     :param str build_root: The path of the build root.
-    :param str pants_workdir: The path of the pants workdir.
     :param class engine_initializer: The class representing the EngineInitializer.
-    :param str log_dir: The path for pantsd logs.
-    :param str log_level: The log level for pantsd logs (derived from the pants log level).
-    :param str pailgun_host: The bind address for the Pailgun server.
-    :param int pailgun_port: The bind port for the Pailgun server.
-    :param int fs_event_workers: The number of workers to use for processing the fs event queue.
-    :param list pants_ignore_patterns: A list of path ignore patterns for filesystem operations.
-    :param list build_ignore_patterns: A list of path ignore patterns for BUILD file parsing.
-    :param list exclude_target_regexp: A list of target exclude regexps.
-    :param list subproject_roots: A list of subproject roots.
-
     """
     self._build_root = build_root
-    self._pants_workdir = pants_workdir
     self._engine_initializer = engine_initializer
-    self._log_dir = log_dir
-    self._log_level = log_level
-    self._pailgun_host = pailgun_host
-    self._pailgun_port = pailgun_port
-    self._fs_event_workers = fs_event_workers
-    self._pants_ignore_patterns = pants_ignore_patterns
-    self._build_ignore_patterns = build_ignore_patterns
-    self._exclude_target_regexp = exclude_target_regexp
-    self._subproject_roots = subproject_roots
-    self._native = Native.Factory.global_instance().create()
+
+    # The options we register directly.
+    self._pailgun_host = options.pailgun_host
+    self._pailgun_port = options.pailgun_port
+    self._log_dir = options.log_dir
+    self._fs_event_workers = options.fs_event_workers
+
+    # Values derived from global options (which our scoped options inherit).
+    self._pants_workdir = options.pants_workdir
+    self._log_level = options.level.upper()
+    self._pants_ignore_patterns = options.pants_ignore
+    self._build_ignore_patterns = options.build_ignore
+    self._exclude_target_regexp = options.exclude_target_regexp
+    self._subproject_roots = options.subproject_roots
+    # Native.create() reads global options, which, thanks to inheritance, it can
+    # read them via our scoped options.
+    self._native = Native.create(options)
     # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
 
     lock_location = os.path.join(self._build_root, '.pantsd.startup')
@@ -118,8 +97,14 @@ class PantsDaemonLauncher(object):
 
   @testable_memoized_property
   def pantsd(self):
-    return PantsDaemon(self._build_root, self._pants_workdir, self._log_level, self._native, self._log_dir,
-                       reset_func=clean_global_runtime_state)
+    return PantsDaemon(
+      self._build_root,
+      self._pants_workdir,
+      self._log_level,
+      self._native,
+      self._log_dir,
+      reset_func=clean_global_runtime_state
+    )
 
   @testable_memoized_property
   def watchman_launcher(self):
@@ -135,10 +120,6 @@ class PantsDaemonLauncher(object):
     # ultimately import the pantsd services in order to itself launch pantsd.
     from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 
-    services = []
-
-    fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
-
     legacy_graph_helper = self._engine_initializer.setup_legacy_graph(
       self._pants_ignore_patterns,
       self._pants_workdir,
@@ -147,30 +128,35 @@ class PantsDaemonLauncher(object):
       exclude_target_regexps=self._exclude_target_regexp,
       subproject_roots=self._subproject_roots,
     )
+
+    fs_event_service = FSEventService(watchman, self._build_root, self._fs_event_workers)
     scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
-    services.extend((fs_event_service, scheduler_service))
+    pailgun_service = PailgunService(
+      bind_addr=(self._pailgun_host, self._pailgun_port),
+      exiter_class=DaemonExiter,
+      runner_class=DaemonPantsRunner,
+      target_roots_class=TargetRoots,
+      scheduler_service=scheduler_service
+    )
 
-    pailgun_service = PailgunService(bind_addr=(self._pailgun_host, self._pailgun_port),
-                                     exiter_class=DaemonExiter,
-                                     runner_class=DaemonPantsRunner,
-                                     target_roots_class=TargetRoots,
-                                     scheduler_service=scheduler_service)
-    services.append(pailgun_service)
-
-    # Construct a mapping of named ports used by the daemon's services. In the default case these
-    # will be randomly assigned by the underlying implementation so we can't reference via options.
-    port_map = dict(pailgun=pailgun_service.pailgun_port)
-
-    return tuple(services), port_map
+    return (
+      # Use the schedulers reentrant lock as the daemon's global lock.
+      legacy_graph_helper.scheduler.lock,
+      # Services.
+      (fs_event_service, scheduler_service, pailgun_service),
+      # Port map.
+      dict(pailgun=pailgun_service.pailgun_port)
+    )
 
   def _launch_pantsd(self):
     # Launch Watchman (if so configured).
     watchman = self.watchman_launcher.maybe_launch()
 
     # Initialize pantsd services.
-    services, port_map = self._setup_services(watchman)
+    lock, services, port_map = self._setup_services(watchman)
 
     # Setup and fork pantsd.
+    self.pantsd.set_lock(lock)
     self.pantsd.set_services(services)
     self.pantsd.set_socket_map(port_map)
     self.pantsd.daemonize()
