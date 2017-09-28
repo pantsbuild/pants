@@ -195,12 +195,7 @@ class SimpleCodegenTask(Task):
               self._handle_duplicate_sources(vt.target, vt.results_dir)
             vt.update()
           # And inject a synthetic target to represent it.
-          self._inject_synthetic_target(
-            vt.target,
-            vt.results_dir,
-            vt.cache_key,
-            mark_transitive_invalidation_hash_dirty=False,
-          )
+          self._inject_synthetic_target(vt.target, vt.results_dir, vt.cache_key)
         self._mark_transitive_invalidation_hashes_dirty(
           vt.target.address for vt in invalidation_check.all_vts
         )
@@ -247,7 +242,6 @@ class SimpleCodegenTask(Task):
     target,
     target_workdir,
     fingerprint,
-    mark_transitive_invalidation_hash_dirty=True,
   ):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
@@ -293,9 +287,6 @@ class SimpleCodegenTask(Task):
         dependent=synthetic_target.address,
         dependency=concrete_dependency_address,
       )
-
-    if mark_transitive_invalidation_hash_dirty:
-      self._mark_transitive_invalidation_hashes_dirty([target.address])
 
     if target in self.context.target_roots:
       self.context.target_roots.append(synthetic_target)
