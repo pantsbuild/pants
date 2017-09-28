@@ -12,7 +12,7 @@ from hashlib import sha1
 
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
-from pants.invalidation.build_invalidator import CacheKeyGenerator
+from pants.invalidation.build_invalidator import CacheKey
 from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method
 
@@ -54,15 +54,17 @@ class VersionedTargetSet(object):
     self.targets = [vt.target for vt in versioned_targets]
 
     # The following line is a no-op if cache_key was set in the VersionedTarget __init__ method.
-    self.cache_key = CacheKeyGenerator.combine_cache_keys([vt.cache_key
-                                                           for vt in versioned_targets])
+    self.cache_key = CacheKey.combine_cache_keys([vt.cache_key for vt in versioned_targets])
     # NB: previous_cache_key may be None on the first build of a target.
     self.previous_cache_key = cache_manager.previous_key(self.cache_key)
     self.valid = self.previous_cache_key == self.cache_key
 
     if cache_manager.invalidation_report:
-      cache_manager.invalidation_report.add_vts(cache_manager, self.targets, self.cache_key,
-                                                self.valid, phase='init')
+      cache_manager.invalidation_report.add_vts(cache_manager.task_name,
+                                                self.targets,
+                                                self.cache_key,
+                                                self.valid,
+                                                phase='init')
 
     self._results_dir = None
     self._current_results_dir = None
@@ -70,6 +72,15 @@ class VersionedTargetSet(object):
     # True if the results_dir for this VT was created incrementally via clone of the
     # previous results_dir.
     self.is_incremental = False
+
+  @property
+  def cacheable(self):
+    """Indicates whether artifacts associated with this target set should be cached.
+
+    :return: `True` if this target set's associated artifacts can be cached.
+    :rtype: bool
+    """
+    return self._cache_manager.cacheable(self.cache_key)
 
   def update(self):
     self._cache_manager.update(self)
@@ -122,18 +133,6 @@ class VersionedTargetSet(object):
     return self._previous_results_dir
 
   def ensure_legal(self):
-    """Return True as long as the state does not break any internal contracts."""
-    # Do our best to provide complete feedback, it's easy to imagine the frustration of flipping between error states.
-    if self._results_dir:
-      errors = ''
-      if not os.path.islink(self._results_dir):
-        errors += '\nThe results_dir is no longer a symlink:\n\t* {}'.format(self._results_dir)
-      if not os.path.isdir(self._current_results_dir):
-        errors += '\nThe current_results_dir directory was not found\n\t* {}'.format(self._current_results_dir)
-      if errors:
-        raise self.IllegalResultsDir(
-          '\nThe results_dirs state should not be manually cleaned or recreated by tasks.\n{}'.format(errors)
-        )
     return True
 
   def live_dirs(self):
@@ -173,6 +172,15 @@ class VersionedTarget(VersionedTargetSet):
     # Must come after the assignments above, as they are used in the parent's __init__.
     super(VersionedTarget, self).__init__(cache_manager, [self])
     self.id = target.id
+
+  @property
+  def cacheable(self):
+    """Indicates whether artifacts associated with this target should be cached.
+
+    :return: `True` if this target's associated artifacts can be cached.
+    :rtype: bool
+    """
+    return super(VersionedTarget, self).cacheable and not self.target.has_label('no_cache')
 
   def create_results_dir(self):
     """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""
@@ -348,6 +356,14 @@ class InvalidationCacheManager(object):
         if target_key is not None:
           yield VersionedTarget(self, target, target_key)
     return list(vt_iter())
+
+  def cacheable(self, cache_key):
+    """Indicates whether artifacts associated with the given `cache_key` should be cached.
+
+    :return: `True` if the `cache_key` represents a cacheable set of target artifacts.
+    :rtype: bool
+    """
+    return self._invalidator.cacheable(cache_key)
 
   def previous_key(self, cache_key):
     return self._invalidator.previous_key(cache_key)

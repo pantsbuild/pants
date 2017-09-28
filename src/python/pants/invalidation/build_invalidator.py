@@ -5,9 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+
 import errno
 import hashlib
 import os
+from abc import abstractmethod
 from collections import namedtuple
 
 from pants.base.hash_utils import hash_all
@@ -15,14 +17,7 @@ from pants.build_graph.target import Target
 from pants.fs.fs import safe_filename
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
-
-
-# A CacheKey represents some version of a set of targets.
-#  - id identifies the set of targets.
-#  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
-#    determines a given version of the artifacts created when building the target set.
-
-CacheKey = namedtuple('CacheKey', ['id', 'hash'])
+from pants.util.meta import AbstractClass
 
 
 # Bump this to invalidate all existing keys in artifact caches across all pants deployments in the
@@ -31,11 +26,23 @@ CacheKey = namedtuple('CacheKey', ['id', 'hash'])
 GLOBAL_CACHE_KEY_GEN_VERSION = '7'
 
 
-class CacheKeyGenerator(object):
-  """Generates cache keys for versions of target sets."""
+class CacheKey(namedtuple('CacheKey', ['id', 'hash'])):
+  """A CacheKey represents some version of a set of targets.
 
-  @staticmethod
-  def combine_cache_keys(cache_keys):
+  - id identifies the set of targets.
+  - hash is a fingerprint of all invalidating inputs to the build step, i.e., it uniquely
+    determines a given version of the artifacts created when building the target set.
+  """
+
+  _UNCACHEABLE_HASH = '__UNCACHEABLE_HASH__'
+
+  @classmethod
+  def uncacheable(cls, id):
+    """Creates a cache key this is never `cacheable`."""
+    return cls(id=id, hash=cls._UNCACHEABLE_HASH)
+
+  @classmethod
+  def combine_cache_keys(cls, cache_keys):
     """Returns a cache key for a list of target sets that already have cache keys.
 
     This operation is 'idempotent' in the sense that if cache_keys contains a single key
@@ -50,8 +57,36 @@ class CacheKeyGenerator(object):
     else:
       combined_id = Target.maybe_readable_combine_ids(cache_key.id for cache_key in cache_keys)
       combined_hash = hash_all(sorted(cache_key.hash for cache_key in cache_keys))
-      return CacheKey(combined_id, combined_hash)
+      return cls(combined_id, combined_hash)
 
+  @property
+  def cacheable(self):
+    """Indicates whether artifacts associated with this cache key should be cached.
+
+    :return: `True` if this cache key represents a cacheable set of target artifacts.
+    :rtype: bool
+    """
+    return self.hash != self._UNCACHEABLE_HASH
+
+
+class CacheKeyGeneratorInterface(AbstractClass):
+  """Generates cache keys for versions of target sets."""
+
+  @abstractmethod
+  def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
+    """Get a key representing the given target and its sources.
+
+    A key for a set of targets can be created by calling CacheKey.combine_cache_keys()
+    on the target's individual cache keys.
+
+    :target: The target to create a CacheKey for.
+    :transitive: Whether or not to include a fingerprint of all of :target:'s dependencies.
+    :fingerprint_strategy: A FingerprintStrategy instance, which can do per task, finer grained
+      fingerprinting of a given Target.
+    """
+
+
+class CacheKeyGenerator(CacheKeyGeneratorInterface):
   def __init__(self, *base_fingerprint_inputs):
     """
     :base_fingerprint_inputs: Information to be included in the fingerprint for all cache keys
@@ -64,17 +99,6 @@ class CacheKeyGenerator(object):
     self._base_hasher = hasher
 
   def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
-    """Get a key representing the given target and its sources.
-
-    A key for a set of targets can be created by calling combine_cache_keys()
-    on the target's individual cache keys.
-
-    :target: The target to create a CacheKey for.
-    :transitive: Whether or not to include a fingerprint of all of :target:'s dependencies.
-    :fingerprint_strategy: A FingerprintStrategy instance, which can do per task, finer grained
-      fingerprinting of a given Target.
-    """
-
     hasher = self._base_hasher.copy()
     key_suffix = hasher.hexdigest()[:12]
     if transitive:
@@ -86,6 +110,13 @@ class CacheKeyGenerator(object):
       return CacheKey(target.id, full_key)
     else:
       return None
+
+
+class UncacheableCacheKeyGenerator(CacheKeyGeneratorInterface):
+  """A cache key generator that always returns uncacheable cache keys."""
+
+  def key_for_target(self, target, transitive=False, fingerprint_strategy=None):
+    return CacheKey.uncacheable(target.id)
 
 
 # A persistent map from target set to cache key, which is a fingerprint of all
@@ -108,6 +139,15 @@ class BuildInvalidator(object):
       root = os.path.join(cls.global_instance().get_options().pants_workdir, 'build_invalidator')
       return BuildInvalidator(root, scope=build_task)
 
+  @staticmethod
+  def cacheable(cache_key):
+    """Indicates whether artifacts associated with the given `cache_key` should be cached.
+
+    :return: `True` if the `cache_key` represents a cacheable set of target artifacts.
+    :rtype: bool
+    """
+    return cache_key.cacheable
+
   def __init__(self, root, scope=None):
     """Create a build invalidator using the given root fingerprint database directory.
 
@@ -126,6 +166,10 @@ class BuildInvalidator(object):
     :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
     :returns: The previous cache_key, or None if there was not a previous build.
     """
+    if not self.cacheable(cache_key):
+      # We should never successfully cache an uncacheable CacheKey.
+      return None
+
     previous_hash = self._read_sha(cache_key)
     if not previous_hash:
       return None
@@ -137,6 +181,10 @@ class BuildInvalidator(object):
     :param cache_key: A CacheKey object (as returned by CacheKeyGenerator.key_for().
     :returns: True if the cached version of the item is out of date.
     """
+    if not self.cacheable(cache_key):
+      # An uncacheable CacheKey is always out of date.
+      return True
+
     return self._read_sha(cache_key) != cache_key.hash
 
   def update(self, cache_key):
@@ -144,7 +192,8 @@ class BuildInvalidator(object):
 
     :param cache_key: A CacheKey object (typically returned by CacheKeyGenerator.key_for()).
     """
-    self._write_sha(cache_key)
+    if self.cacheable(cache_key):
+      self._write_sha(cache_key)
 
   def force_invalidate_all(self):
     """Force-invalidates all cached items."""
@@ -153,7 +202,8 @@ class BuildInvalidator(object):
   def force_invalidate(self, cache_key):
     """Force-invalidate the cached item."""
     try:
-      os.unlink(self._sha_file(cache_key))
+      if self.cacheable(cache_key):
+        os.unlink(self._sha_file(cache_key))
     except OSError as e:
       if e.errno != errno.ENOENT:
         raise
