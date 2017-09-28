@@ -20,6 +20,7 @@ from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
@@ -30,6 +31,53 @@ from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
+
+
+class SyntheticTargetNotFound(Exception):
+  pass
+
+
+def _get_synthetic_target(target, thrift_dep):
+  """Find a thrift_dep's corresponding synthetic target in the dependencies of the given target."""
+  for dep in target.dependencies:
+    if dep != thrift_dep and dep.is_synthetic and dep.derived_from == thrift_dep:
+      return dep
+  raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(thrift_dep))
+
+
+def _resolve_strict_dependencies(target, dep_context):
+  for declared in target.dependencies:
+    if type(declared) in dep_context.alias_types:
+      # Is an alias. Recurse to expand.
+      for r in declared.strict_dependencies(dep_context):
+        yield r
+    else:
+      yield declared
+
+    for export in _resolve_exports(declared, dep_context):
+      yield export
+
+
+def _resolve_exports(target, dep_context):
+  for export in getattr(target, 'exports', []):
+    if not isinstance(export, Target):
+      export = target._build_graph.get_target(Address.parse(export, relative_to=target.address.spec_path))
+      if export not in target.dependencies:
+        # A target can only export its dependencies.
+        raise TargetDefinitionException(target, 'Invalid exports: "{}" is not a dependency of {}'.format(export, target))
+
+    if type(export) in dep_context.alias_types:
+      # If exported target is an alias, expand its dependencies.
+      for dep in export.strict_dependencies(dep_context):
+        yield dep
+    else:
+      if isinstance(export, dep_context.codegen_types):
+        yield _get_synthetic_target(target, export)
+      else:
+        yield export
+
+      for exp in _resolve_exports(export, dep_context):
+        yield exp
 
 
 class AbstractTarget(object):
@@ -377,6 +425,7 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
+    self._cached_strict_dependencies_map = {}
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
@@ -456,6 +505,7 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
+    self._cached_strict_dependencies_map = {}
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -706,6 +756,27 @@ class Target(AbstractTarget):
     """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
+
+  def strict_dependencies(self, dep_context):
+    """
+    :param dep_context: A DependencyContext with configuration for the request.
+    :return: targets that this target "strictly" depends on. This set of dependencies contains
+      only directly declared dependencies, with two exceptions:
+        1) aliases are expanded transitively
+        2) the strict_dependencies of targets exported targets exported by
+      strict_dependencies (transitively).
+    :rtype: list of Target
+    """
+    strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
+    if strict_deps is None:
+      strict_deps = []
+      for declared in _resolve_strict_dependencies(self, dep_context):
+        if isinstance(declared, dep_context.compiler_plugin_types):
+          strict_deps.extend(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
+        else:
+          strict_deps.append(declared)
+      self._cached_strict_dependencies_map[dep_context] = strict_deps
+    return strict_deps
 
   @property
   def dependents(self):

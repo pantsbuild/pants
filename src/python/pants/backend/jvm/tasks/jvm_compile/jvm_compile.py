@@ -23,8 +23,7 @@ from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
-from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
-                                                                 strict_dependencies)
+from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext)
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
@@ -81,7 +80,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
 
   def dependencies(self, target):
     if self.direct(target):
-      return strict_dependencies(target, self._dep_context)
+      return target.strict_dependencies(self._dep_context)
     return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):
