@@ -17,7 +17,7 @@ import cffi
 import six
 
 from pants.binaries.binary_util import BinaryUtil
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, touch
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -255,6 +255,17 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
     f.write(get_build_cflags())
+
+  # These files are built by Cargo which looks at mtime to determine when to rebuild. Since
+  # this source file contains the generated contents this is a simple way to make sure we don't
+  # trigger Cargo rebuilds un-necessarily.
+  source_mtime = os.stat(__file__).st_mtime
+
+  def fixup_times(path):
+    touch(path, times=(source_mtime, source_mtime))
+
+  fixup_times(c_file)
+  fixup_times(env_script)
 
 
 def _initialize_externs(ffi):

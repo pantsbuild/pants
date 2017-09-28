@@ -20,29 +20,33 @@ native engine binary, allowing us to address it both as an importable python mod
 
 use std::fs;
 use std::io::{Read, Result};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 fn main() {
   let mut config = gcc::Config::new();
 
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the
   // python import name, as python keys the initialization function name off of the import name.
-  let path = PathBuf::from("src/cffi/native_engine.c");
+  let cffi_dir = Path::new("src/cffi");
+  let c_path = cffi_dir.join("native_engine.c");
+  let env_script_path = cffi_dir.join("native_engine.cflags");
 
-  config.file(path.to_str().unwrap());
-  for flag in make_flags(&path).unwrap() {
+  config.file(c_path.to_str().unwrap());
+  for flag in make_flags(&env_script_path).unwrap() {
     config.flag(flag.as_str());
   }
 
   config.compile("libnative_engine_ffi.a");
+
+  // Restrict re-compilation check to just our input files.
+  // See: http://doc.crates.io/build-script.html#outputs-of-the-build-script
+  println!("cargo:rerun-if-changed={}", c_path.to_str().unwrap());
+  println!("cargo:rerun-if-changed={}", env_script_path.to_str().unwrap());
 }
 
-fn make_flags(c_file: &Path) -> Result<Vec<String>> {
-  let mut path = PathBuf::from(c_file);
-  path.set_extension("cflags");
-
+fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
   let mut contents = String::new();
-  fs::File::open(path)?.read_to_string(&mut contents)?;
+  fs::File::open(env_script_path)?.read_to_string(&mut contents)?;
   // It would be a shame if someone were to include a space in an actual quoted value.
   // If they did that, I guess we'd need to implement shell tokenization or something.
   return Ok(contents.trim().split(' ').map(str::to_owned).collect());

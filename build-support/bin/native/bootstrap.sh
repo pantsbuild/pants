@@ -90,14 +90,16 @@ function prepare_to_build_native_code() {
   _ensure_cffi_sources
 }
 
-function _build_native_code() {
-  # Builds the native code, and echos the path of the built binary.
-
+function run_cargo() {
   prepare_to_build_native_code
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
-  local readonly build_cmd="${cargo} build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}"
-  ${build_cmd} || die
+  "${cargo}" "$@"
+}
+
+function _build_native_code() {
+  # Builds the native code, and echos the path of the built binary.
+  run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
