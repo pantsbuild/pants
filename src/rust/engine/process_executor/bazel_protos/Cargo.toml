@@ -1,9 +1,7 @@
 [package]
 version = "0.0.1"
-name = "process_executor"
+name = "bazel_protos"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
-bazel_protos = { path = "bazel_protos" }
 protobuf = "1.4.1"
-rust-crypto = "0.2.36"
