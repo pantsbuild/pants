@@ -1,6 +1,6 @@
 #!/bin/bash -eu
 
-# Fetches protoc 3.1.0 if it's missing in the same style as BinaryUtil.
+# Fetches protoc 3.4.1 if it's missing in the same style as BinaryUtil.
 # Compile protos with that protoc, outputting into source repository.
 
 here="$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)"
@@ -21,7 +21,7 @@ case "$(uname)" in
     ;;
 esac
 
-path="bin/protobuf/${os}/${os_version}/3.1.0/protoc"
+path="bin/protobuf/${os}/${os_version}/3.4.1/protoc"
 cache_path="${HOME}/.cache/${path}"
 
 if [ ! -x "${cache_path}" ]; then
