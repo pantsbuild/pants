@@ -9,6 +9,7 @@ target(
     ':node_resolve',
     ':node_run',
     ':node_test',
+    ':javascript_style',
   ]
 )
 
@@ -95,6 +96,19 @@ python_library(
 python_library(
   name='node_test',
   sources=['node_test.py'],
+  dependencies=[
+    ':node_paths',
+    ':node_task',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:workunit',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:process_handler',
+  ]
+)
+
+python_library(
+  name='javascript_style',
+  sources=['javascript_style.py'],
   dependencies=[
     ':node_paths',
     ':node_task',
