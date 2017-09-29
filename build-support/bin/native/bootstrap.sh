@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 
 # Defines:
+# + LIB_EXTENSION: The extension of native libraries.
+# + KERNEL: The lower-cased name of the kernel as reported by uname.
+# + OS_NAME: The name of the OS as seen by pants.
+# + OS_ID: The ID of the current OS as seen by pants.
 # + CACHE_ROOT: The pants cache root dir.
 # + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
 # + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
@@ -16,24 +20,29 @@
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
-# Defines:
-# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
-# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12.
-# + LIB_EXTENSION: The extension of native libraries.
-# + KERNEL: The lower-cased name of the kernel as reported by uname.
-# + OS_NAME: The name of the OS as seen by pants.
-# + OS_ID: The ID of the current OS as seen by pants.
-# Exposes:
-# + get_native_engine_version: Echoes the current native engine version.
-# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
-# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
-# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
-source ${REPO_ROOT}/build-support/bin/native/utils.sh
+# TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when
+# https://github.com/pantsbuild/pants/issues/4006 is complete.
+readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
+case "${KERNEL}" in
+  linux)
+    readonly LIB_EXTENSION=so
+    readonly OS_NAME=linux
+    readonly OS_ID=${OS_NAME}/$(uname -m)
+    ;;
+  darwin)
+    readonly LIB_EXTENSION=dylib
+    readonly OS_NAME=mac
+    readonly OS_ID=${OS_NAME}/$(sw_vers -productVersion | cut -d: -f2 | tr -d ' \t' | cut -d. -f1-2)
+    ;;
+  *)
+    die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
+    ;;
+esac
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 readonly NATIVE_ENGINE_MODULE="native_engine"
 readonly NATIVE_ENGINE_BINARY="${NATIVE_ENGINE_MODULE}.so"
-readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/native_engine_version"
+readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/${NATIVE_ENGINE_BINARY}"
 readonly CFFI_BOOTSTRAPPER="${REPO_ROOT}/build-support/native-engine/bootstrap_cffi.py"
 
 # N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
@@ -121,8 +130,7 @@ function _build_native_code() {
 }
 
 function bootstrap_native_code() {
-  # Bootstraps the native code and overwrites the native_engine_version to the resulting hash
-  # version if needed.
+  # Bootstraps the native code only if needed.
   local native_engine_version="$(calculate_current_hash)"
   local target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   if [ ! -f "${target_binary}" ]
@@ -142,10 +150,6 @@ function bootstrap_native_code() {
 
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" "${target_binary}"
-
-    # NB: The resource file emitted/over-written below is used by the `Native` class to default
-    # the native engine library version used by pants. More info can be read at the end of this
-    # document:  src/python/pants/engine/README.md
-    echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
+  cp -p "${target_binary}" "${NATIVE_ENGINE_RESOURCE}"
 }

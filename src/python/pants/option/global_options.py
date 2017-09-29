@@ -9,8 +9,6 @@ import logging
 import os
 import sys
 
-import pkg_resources
-
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
 from pants.option.arg_splitter import GLOBAL_SCOPE
@@ -135,12 +133,6 @@ class GlobalOptionsRegistrar(Optionable):
              help='Enables use of the v2 engine.')
 
     # These facilitate configuring the native engine.
-    register('--native-engine-version', advanced=True,
-             default=pkg_resources.resource_string('pants.engine', 'native_engine_version').strip(),
-             help='Native engine version.')
-    register('--native-engine-supportdir', advanced=True, default='bin/native-engine',
-             help='Find native engine binaries under this dir. Used as part of the path to '
-                  'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
