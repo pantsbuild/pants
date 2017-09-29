@@ -81,6 +81,13 @@ function _ensure_build_prerequisites() {
     rm -f ${rustup}
     ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
   fi
+
+  if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
+    "${CARGO_HOME}/bin/cargo" install protobuf
+  fi
+  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]]; then
+    "${CARGO_HOME}/bin/cargo" install grpcio-compiler
+  fi
 }
 
 function prepare_to_build_native_code() {

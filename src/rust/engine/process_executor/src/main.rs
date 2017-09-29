@@ -39,7 +39,7 @@ fn main() {
     (command, env)
   };
 
-  let result = process_executor::run_command(process_executor::ExecuteProcessRequest { argv, env }).unwrap();
+  let result = process_executor::local::run_command_locally(process_executor::ExecuteProcessRequest { argv, env }).unwrap();
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
   exit(result.exit_code);
