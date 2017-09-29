@@ -59,7 +59,7 @@ class CompileContext(object):
     if self.strict_deps:
       return self.target.strict_dependencies(dep_context)
     else:
-      return list(target.closure(bfs=True, **dep_context.target_closure_kwargs))
+      return list(self.target.closure(bfs=True, **dep_context.target_closure_kwargs))
 
   @property
   def _id(self):

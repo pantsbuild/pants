@@ -77,7 +77,7 @@ class JarLibrary(Target):
     return self.payload.excludes
 
   @property
-  def exports(self):
+  def export_specs(self):
     """
     :API: public
     """

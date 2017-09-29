@@ -59,13 +59,7 @@ def _resolve_strict_dependencies(target, dep_context):
 
 
 def _resolve_exports(target, dep_context):
-  for export in getattr(target, 'exports', []):
-    if not isinstance(export, Target):
-      export = target._build_graph.get_target(Address.parse(export, relative_to=target.address.spec_path))
-      if export not in target.dependencies:
-        # A target can only export its dependencies.
-        raise TargetDefinitionException(target, 'Invalid exports: "{}" is not a dependency of {}'.format(export, target))
-
+  for export in target.exports(dep_context):
     if type(export) in dep_context.alias_types:
       # If exported target is an alias, expand its dependencies.
       for dep in export.strict_dependencies(dep_context):
@@ -426,6 +420,7 @@ class Target(AbstractTarget):
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
+    self._cached_exports_map = {}
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
@@ -506,6 +501,7 @@ class Target(AbstractTarget):
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
+    self._cached_exports_map = {}
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -756,6 +752,31 @@ class Target(AbstractTarget):
     """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
+
+  def exports(self, dep_context):
+    """
+    :param dep_context: A DependencyContext with configuration for the request.
+
+    :return: targets that this target directly exports. Note that this list is not transitive,
+      but that exports are transitively expanded during the computation of strict_dependencies.
+    :rtype: list of Target
+    """
+    exports = self._cached_exports_map.get(dep_context, None)
+    if exports is None:
+      exports = []
+      for export in getattr(self, 'export_specs', []):
+        if not isinstance(export, Target):
+          export_spec = export
+          export_addr = Address.parse(export_spec, relative_to=self.address.spec_path)
+          export = self._build_graph.get_target(export_addr)
+          if export not in self.dependencies:
+            # A target can only export its dependencies.
+            raise TargetDefinitionException(
+                self,
+                'Invalid export: "{}" must also be a dependency.'.format(export_spec))
+        exports.append(export)
+      self._cached_exports_map[dep_context] = exports
+    return exports
 
   def strict_dependencies(self, dep_context):
     """
