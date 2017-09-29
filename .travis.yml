@@ -64,7 +64,9 @@ matrix:
       env:
         - SHARD="Linux Native Engine Binary Builder"
         - NATIVE_ENGINE_DEPLOY=1
-        - DOCKER_IMAGE="python:2.7.13-jessie"
+        # Use the standard python-2.7 docker Debian Wheezy image for binary compatibility with old
+        # linux distros.
+        - DOCKER_IMAGE="python:2.7.13-wheezy"
       before_install:
         # Remove any Ubuntu binary cruft before building.
         - git clean -fdx
