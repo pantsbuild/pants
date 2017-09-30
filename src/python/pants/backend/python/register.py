@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.python.buildozer.buildozer import Buildozer
 from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
@@ -60,3 +61,4 @@ def register_goals():
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='isort', action=IsortPythonTask).install('fmt')
+  task(name='buildozer', action=Buildozer).install('buildozer')
