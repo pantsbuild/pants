@@ -56,18 +56,11 @@ matrix:
         - ./pants --version && ./build-support/bin/release.sh -n
 
     - os: linux
-      dist: trusty
-      sudo: required
       services:
         - docker
-      language: python
-      python: "2.7.13"
       env:
         - SHARD="Linux Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
-      before_install:
-        # Remove any host-side binary cruft before building.
-        - git clean -fdx
       script:
         - docker build --rm -t travis_ci
           --build-arg "TRAVIS_USER=$(id -un)"
@@ -76,10 +69,9 @@ matrix:
           --build-arg "TRAVIS_GID=$(id -g)"
             build-support/docker/travis_ci/
         - docker run --rm -t
-          -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "./pants --version && ./build-support/bin/release.sh -n"
+          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
 
     - os: linux
       dist: trusty

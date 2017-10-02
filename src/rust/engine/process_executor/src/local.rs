@@ -26,20 +26,21 @@ pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessR
 mod tests {
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_locally};
   use std::collections::BTreeMap;
+  use test_utils::{owned_string_vec, as_byte_owned_vec};
 
   #[test]
   #[cfg(unix)]
   fn stdout() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: make_argv(&["/bin/echo", "-n", "foo"]),
+      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
     });
 
     assert_eq!(
       result.unwrap(),
       ExecuteProcessResult {
-        stdout: make_byte_vec("foo"),
-        stderr: make_byte_vec(""),
+        stdout: as_byte_owned_vec("foo"),
+        stderr: as_byte_owned_vec(""),
         exit_code: 0,
       }
     )
@@ -49,7 +50,7 @@ mod tests {
   #[cfg(unix)]
   fn stdout_and_stderr_and_exit_code() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: make_argv(
+      argv: owned_string_vec(
         &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
       ),
       env: BTreeMap::new(),
@@ -58,8 +59,8 @@ mod tests {
     assert_eq!(
       result.unwrap(),
       ExecuteProcessResult {
-        stdout: make_byte_vec("foo"),
-        stderr: make_byte_vec("bar"),
+        stdout: as_byte_owned_vec("foo"),
+        stderr: as_byte_owned_vec("bar"),
         exit_code: 1,
       }
     )
@@ -73,7 +74,7 @@ mod tests {
     env.insert("BAR".to_string(), "not foo".to_string());
 
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: make_argv(&["/usr/bin/env"]),
+      argv: owned_string_vec(&["/usr/bin/env"]),
       env: env.clone(),
     });
 
@@ -103,7 +104,7 @@ mod tests {
       env.insert("BAR".to_string(), "not foo".to_string());
 
       ExecuteProcessRequest {
-        argv: make_argv(&["/usr/bin/env"]),
+        argv: owned_string_vec(&["/usr/bin/env"]),
         env: env,
       }
     }
@@ -117,16 +118,8 @@ mod tests {
   #[test]
   fn binary_not_found() {
     run_command_locally(ExecuteProcessRequest {
-      argv: make_argv(&["echo", "-n", "foo"]),
+      argv: owned_string_vec(&["echo", "-n", "foo"]),
       env: BTreeMap::new(),
     }).expect_err("Want Err");
-  }
-
-  fn make_argv(args: &[&str]) -> Vec<String> {
-    args.into_iter().map(|s| s.to_string()).collect()
-  }
-
-  fn make_byte_vec(str: &str) -> Vec<u8> {
-    Vec::from(str.as_bytes())
   }
 }

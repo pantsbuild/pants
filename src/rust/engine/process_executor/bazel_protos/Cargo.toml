@@ -4,4 +4,6 @@ name = "bazel_protos"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
+futures = "0.1.16"
+grpcio = { git = "https://github.com/illicitonion/grpc-rs", rev = "8a563f97a15faecb3fe82aeaff24bc64ce187a6f" }
 protobuf = "1.4.1"
