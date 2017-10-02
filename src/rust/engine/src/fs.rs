@@ -6,7 +6,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
-use futures::future::{self, BoxFuture, Future};
+use futures::future::{self, Future};
 use futures_cpupool::{self, CpuFuture, CpuPool};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
@@ -15,6 +15,7 @@ use ordermap::OrderMap;
 use tar;
 use tempdir::TempDir;
 
+use boxfuture::{Boxable, BoxFuture};
 use hash::{Fingerprint, WriterHasher};
 
 
@@ -400,7 +401,7 @@ impl PosixFS {
             }
           })
       })
-      .boxed()
+      .to_boxed()
   }
 
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
@@ -411,7 +412,7 @@ impl PosixFS {
       .spawn_fn(move || {
         PosixFS::scandir_sync(dir, dir_abs)
       })
-      .boxed()
+      .to_boxed()
   }
 }
 
@@ -455,7 +456,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
           PathStat::File { stat, .. } => PathStat::file(symbolic_path, stat),
         })
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn directory_listing(&self, canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> BoxFuture<Vec<PathStat>, E> {
@@ -488,7 +489,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
               match stat {
                 Stat::Link(l) => {
                   if context.ignore(l.0.as_path(), false) {
-                    future::ok(None).boxed()
+                    future::ok(None).to_boxed()
                   } else {
                     context.canonicalize(stat_symbolic_path, l)
                   }
@@ -500,7 +501,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
                     } else {
                       Some(PathStat::dir(stat_symbolic_path.to_owned(), d))
                     };
-                  future::ok(res).boxed()
+                  future::ok(res).to_boxed()
                 },
                 Stat::File(f) => {
                   let res =
@@ -509,7 +510,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
                     } else {
                       Some(PathStat::file(stat_symbolic_path.to_owned(), f))
                     };
-                  future::ok(res).boxed()
+                  future::ok(res).to_boxed()
                 },
               }
             })
@@ -520,7 +521,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         // See the TODO above.
         path_stats.into_iter().filter_map(|pso| pso).collect()
       })
-      .boxed()
+      .to_boxed()
   }
 
   ///
@@ -536,7 +537,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         let exclude_set: HashSet<_> = exclude.into_iter().collect();
         include.into_iter().filter(|i| !exclude_set.contains(i)).collect()
       })
-      .boxed()
+      .to_boxed()
   }
 
   ///
@@ -544,7 +545,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
   ///
   fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
     if path_globs.is_empty() {
-      return future::ok(vec![]).boxed();
+      return future::ok(vec![]).to_boxed();
     }
 
     let init =
@@ -592,7 +593,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
       // Finally, capture the resulting PathStats from the expansion.
       expansion.outputs.into_iter().map(|(k, _)| k).collect()
     })
-    .boxed()
+    .to_boxed()
   }
 
   ///
@@ -605,7 +606,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
         // Filter directory listing to return PathStats, with no continuation.
         self.directory_listing(canonical_dir, symbolic_path, wildcard)
           .map(|path_stats| (path_stats, vec![]))
-          .boxed(),
+          .to_boxed(),
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
         self.directory_listing(canonical_dir, symbolic_path, wildcard)
@@ -628,7 +629,7 @@ pub trait VFS<E: Send + Sync + 'static> : Clone + Send + Sync + 'static {
                 .collect();
             (vec![], flattened)
           })
-          .boxed(),
+          .to_boxed(),
     }
   }
 }

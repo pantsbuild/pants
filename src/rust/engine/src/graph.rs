@@ -13,6 +13,7 @@ use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
 use futures::future::{self, Future};
 
 use externs;
+use boxfuture::{BoxFuture, Boxable};
 use context::ContextFactory;
 use core::{Failure, FNV, Noop};
 use nodes::{
@@ -40,7 +41,7 @@ impl EntryStateGetter for EntryStateField {
     self
       .clone()
       .then(|node_result| Entry::unwrap::<N>(node_result))
-      .boxed()
+      .to_boxed()
   }
 }
 
@@ -115,10 +116,14 @@ impl Entry {
             // Wrap the launch in future::lazy to defer it until after we're outside the Graph lock.
             let context = context_factory.create(entry_id);
             let node = n.clone();
-            future::lazy(move || node.run(context)).boxed()
+            future::lazy(move || node.run(context)).to_boxed()
           },
-          &EntryKey::Cyclic(_) =>
-            future::err(Failure::Noop(Noop::Cycle)).boxed(),
+          &EntryKey::Cyclic(_) => {
+            // The type-checker cannot unify BoxFuture<_, Failure> with BoxFuture<NodeResult, Failure>
+            // so we need to explicitly specify the BoxFuture type parameters here.
+            // See https://github.com/rust-lang/rust/issues/44976
+            future::err(Failure::Noop(Noop::Cycle)).to_boxed() as BoxFuture<NodeResult, Failure>
+          }
         };
 
       self.state = Some(state.shared());
