@@ -13,6 +13,7 @@ fi
 echo -n "* Checking native_engine_version: " && ./build-support/bin/check_native_engine_version.sh || exit 1
 echo "* Checking packages" && ./build-support/bin/check_packages.sh || exit 1
 echo "* Checking headers" && ./build-support/bin/check_header.sh || exit 1
+echo "* Checking for banned imports" && ./build-support/bin/check_banned_imports.sh || exit 1
 
 $(git rev-parse --verify master > /dev/null 2>&1)
 if [[ $? -eq 0 ]]; then
