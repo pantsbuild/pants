@@ -8,9 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os.path
 from hashlib import sha1
 
+import mock
+
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.payload import Payload
+from pants.base.payload_field import SetOfPrimitivesField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.source.wrapped_globs import Globs
@@ -25,6 +28,20 @@ class ImplicitSourcesTestingTarget(Target):
 class ImplicitSourcesTestingTargetMulti(Target):
   default_sources_globs = ('*.foo', '*.bar')
   default_sources_exclude_globs = ('*.baz', '*.qux')
+
+
+class SourcesTarget(Target):
+  def __init__(self, sources, address=None, exports=None, **kwargs):
+    payload = Payload()
+    payload.add_field('sources', self.create_sources_field(sources,
+                                                           sources_rel_path=address.spec_path,
+                                                           key_arg='sources'))
+    payload.add_field('exports', SetOfPrimitivesField(exports))
+    super(SourcesTarget, self).__init__(address=address, payload=payload, **kwargs)
+
+  @property
+  def export_specs(self):
+    return self.payload.exports
 
 
 class TargetTest(BaseTest):
@@ -205,14 +222,6 @@ class TargetTest(BaseTest):
     self.assertEqual(hash_value, target_c.transitive_invalidation_hash(fingerprint_strategy=fingerprint_strategy))
 
   def test_has_sources(self):
-    class SourcesTarget(Target):
-      def __init__(me, sources, address=None, **kwargs):
-        payload = Payload()
-        payload.add_field('sources', me.create_sources_field(sources,
-                                                             sources_rel_path=address.spec_path,
-                                                             key_arg='sources'))
-        super(SourcesTarget, me).__init__(address=address, payload=payload, **kwargs)
-
     def sources(rel_path, *args):
       return Globs.create_fileset_with_spec(rel_path, *args)
 
@@ -231,3 +240,65 @@ class TargetTest(BaseTest):
     self.assertFalse(no_sources.has_sources())
     self.assertFalse(no_sources.has_sources('.txt'))
     self.assertFalse(no_sources.has_sources('.rs'))
+
+  def _generate_strict_dependencies(self):
+    init_subsystem(Target.Arguments)
+    self.lib_aa = self.make_target(
+      'com/foo:AA',
+      target_type=SourcesTarget,
+      sources=['com/foo/AA.scala'],
+    )
+
+    self.lib_a = self.make_target(
+      'com/foo:A',
+      target_type=SourcesTarget,
+      sources=['com/foo/A.scala'],
+    )
+
+    self.lib_b = self.make_target(
+      'com/foo:B',
+      target_type=SourcesTarget,
+      sources=['com/foo/B.scala'],
+      dependencies=[self.lib_a, self.lib_aa],
+      exports=[':A'],
+    )
+
+    self.lib_c = self.make_target(
+      'com/foo:C',
+      target_type=SourcesTarget,
+      sources=['com/foo/C.scala'],
+      dependencies=[self.lib_b],
+      exports=[':B'],
+    )
+
+    self.lib_c_alias = self.make_target(
+      'com/foo:C_alias',
+      dependencies=[self.lib_c],
+    )
+
+    self.lib_d = self.make_target(
+      'com/foo:D',
+      target_type=SourcesTarget,
+      sources=['com/foo/D.scala'],
+      dependencies=[self.lib_c_alias],
+      exports=[':C_alias'],
+    )
+
+    self.lib_e = self.make_target(
+      'com/foo:E',
+      target_type=SourcesTarget,
+      sources=['com/foo/E.scala'],
+      dependencies=[self.lib_d],
+    )
+
+  def test_strict_dependencies(self):
+    self._generate_strict_dependencies()
+    dep_context = mock.Mock()
+    dep_context.compiler_plugin_types = ()
+    dep_context.codegen_types = ()
+    dep_context.alias_types = (Target,)
+    self.assertEqual(set(self.lib_b.strict_dependencies(dep_context)), {self.lib_a, self.lib_aa})
+    self.assertEqual(set(self.lib_c.strict_dependencies(dep_context)), {self.lib_b, self.lib_a})
+    self.assertEqual(set(self.lib_c_alias.strict_dependencies(dep_context)), {self.lib_c, self.lib_b, self.lib_a})
+    self.assertEqual(set(self.lib_d.strict_dependencies(dep_context)), {self.lib_c, self.lib_b, self.lib_a})
+    self.assertEqual(set(self.lib_e.strict_dependencies(dep_context)), {self.lib_d, self.lib_c, self.lib_b, self.lib_a})
