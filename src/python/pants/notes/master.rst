@@ -75,6 +75,9 @@ Refactoring, Improvements, and Tooling
 * Remove obsolete target-specific scripts (#4903)
   `PR #4903 <https://github.com/pantsbuild/pants/pull/4903>`_
 
+* Re-build Bazel gRPC if the build script changes (#4924)
+  `PR #4924 <https://github.com/pantsbuild/pants/pull/4924>`_
+
 1.4.0.dev13 (9/25/2017)
 -----------------------
 
