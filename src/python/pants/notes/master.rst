@@ -5,6 +5,79 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev14 (10/2/2017)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Engine can work with Bazel Remote Execution API (#4910)
+  `PR #4910 <https://github.com/pantsbuild/pants/pull/4910>`_
+
+* Add lint and fmt goal for javascript style rules checking (#4785)
+  `PR #4785 <https://github.com/pantsbuild/pants/pull/4785>`_
+
+API Changes
+~~~~~~~~~~~
+
+* managed_jar_dependencies: allow target()'s with jar_library dependencies (#4742)
+  `PR #4742 <https://github.com/pantsbuild/pants/pull/4742>`_
+
+Bugfixes
+~~~~~~~~
+
+* Error if the wrong subprocess is imported (#4922)
+  `PR #4922 <https://github.com/pantsbuild/pants/pull/4922>`_
+
+* Avoid os.fork() prior to stats upload. (#4919)
+  `PR #4919 <https://github.com/pantsbuild/pants/pull/4919>`_
+
+* Repair requests range pin to include higher versions. (#4916)
+  `PR #4916 <https://github.com/pantsbuild/pants/pull/4916>`_
+
+* Use Jessie not Weezy for docker image on travis (#4912)
+  `PR #4912 <https://github.com/pantsbuild/pants/pull/4912>`_
+
+* Fixup build script to rebuild only when needed. (#4908)
+  `PR #4908 <https://github.com/pantsbuild/pants/pull/4908>`_
+
+* Fix -Wstrict-prototypes warnings (#4902)
+  `PR #4902 <https://github.com/pantsbuild/pants/pull/4902>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Install cmake on travis (#4923)
+  `PR #4923 <https://github.com/pantsbuild/pants/pull/4923>`_
+
+* Use newer protoc and older debian (#4918)
+  `PR #4918 <https://github.com/pantsbuild/pants/pull/4918>`_
+  `PR #40 <https://github.com/pantsbuild/binaries/pull/40>`_
+
+* Refactor code coverage in preparation for adding a new coverage engine (jacoco) (#4881)
+  `PR #4881 <https://github.com/pantsbuild/pants/pull/4881>`_
+
+* Improve performance of simple codegen. (#4907)
+  `PR #4907 <https://github.com/pantsbuild/pants/pull/4907>`_
+
+* Implement local process execution in rust (#4901)
+  `PR #4901 <https://github.com/pantsbuild/pants/pull/4901>`_
+
+* Improve `--cache-ignore` performance. (#4905)
+  `PR #4905 <https://github.com/pantsbuild/pants/pull/4905>`_
+
+* Script to run sub-crate tests (#4900)
+  `PR #4900 <https://github.com/pantsbuild/pants/pull/4900>`_
+
+* Run rust tests on travis (#4899)
+  `PR #4899 <https://github.com/pantsbuild/pants/pull/4899>`_
+
+* Remove obsolete target-specific scripts (#4903)
+  `PR #4903 <https://github.com/pantsbuild/pants/pull/4903>`_
+
+* Re-build Bazel gRPC if the build script changes (#4924)
+  `PR #4924 <https://github.com/pantsbuild/pants/pull/4924>`_
+
 1.4.0.dev13 (9/25/2017)
 -----------------------
 
