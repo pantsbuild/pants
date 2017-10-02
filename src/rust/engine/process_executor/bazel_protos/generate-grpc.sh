@@ -13,7 +13,7 @@ case "$(uname)" in
     ;;
   "Linux")
     os="linux"
-    os_version="$(arch)"
+    os_version="$(uname -m)"
     ;;
   *)
     echo >&2 "Unknown platform when fetching protoc"
