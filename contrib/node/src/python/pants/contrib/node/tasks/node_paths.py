@@ -32,3 +32,11 @@ class NodePaths(object):
     :rtype string
     """
     return self._paths_by_target.get(target)
+
+  @property
+  def all_node_paths(self):
+    """Return all resolved chroots as a list.
+
+    :rtype list string
+    """
+    return self._paths_by_target.values()
