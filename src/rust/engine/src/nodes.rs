@@ -6,9 +6,10 @@ use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use futures::future::{self, BoxFuture, Future};
+use futures::future::{self, Future};
 use ordermap::OrderMap;
 
+use boxfuture::{Boxable, BoxFuture};
 use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
@@ -31,11 +32,11 @@ use tasks;
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
 fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
-  future::ok(value).boxed()
+  future::ok(value).to_boxed()
 }
 
 fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
-  future::err(failure).boxed()
+  future::err(failure).to_boxed()
 }
 
 fn throw(msg: &str) -> Failure {
@@ -77,11 +78,11 @@ impl GetNode for Context {
 
 impl VFS<Failure> for Context {
   fn read_link(&self, link: Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link)).map(|res| res.0).boxed()
+    self.get(ReadLink(link)).map(|res| res.0).to_boxed()
   }
 
   fn scandir(&self, dir: Dir) -> NodeFuture<Vec<fs::Stat>> {
-    self.get(Scandir(dir)).map(|res| res.0).boxed()
+    self.get(Scandir(dir)).map(|res| res.0).to_boxed()
   }
 
   fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
@@ -296,7 +297,7 @@ impl Select {
       vec![
         self.get_snapshot(&context)
           .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-          .boxed()
+          .to_boxed()
       ]
     } else if self.product() == &context.core.types.files_content {
       // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
@@ -311,11 +312,11 @@ impl Select {
                 Err(e) => Err(throw(&e)),
               })
           )
-          .boxed()
+          .to_boxed()
       ]
     } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
       vec![
-        future::ok(value.clone()).boxed()
+        future::ok(value.clone()).to_boxed()
       ]
     } else {
       self.entries.iter()
@@ -375,7 +376,7 @@ impl Node for Select {
       .and_then(move |dep_results| {
         future::result(self.choose_task_result(context, dep_results, &variant_value))
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -493,13 +494,13 @@ impl Node for SelectDependencies {
                     Err(was_required(failure)),
                 }
               })
-              .boxed()
+              .to_boxed()
           },
           Err(failure) =>
             err(failure),
         }
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -583,7 +584,7 @@ impl SelectTransitive {
         let deps = externs::project_multi(&product, &field_name);
         (subject_key, product, deps)
       })
-      .boxed()
+      .to_boxed()
   }
 }
 
@@ -660,13 +661,13 @@ impl Node for SelectTransitive {
             .map(|expansion| {
               externs::store_list(expansion.outputs.values().collect::<Vec<_>>(), false)
             })
-            .boxed()
+            .to_boxed()
           },
           Err(failure) =>
             err(failure),
         }
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -760,13 +761,13 @@ impl Node for SelectProjection {
                   Err(failure) => Err(was_required(failure)),
                 }
               })
-              .boxed()
+              .to_boxed()
           },
           Err(failure) =>
             err(failure),
         }
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -799,7 +800,7 @@ impl Node for ReadLink {
       .map_err(move |e|
         throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
       )
-      .boxed()
+      .to_boxed()
   }
   fn is_inline() -> bool {
     false
@@ -827,7 +828,7 @@ impl Node for Stat {
   type Output = ();
 
   fn run(self, _: Context) -> NodeFuture<()> {
-    future::ok(()).boxed()
+    future::ok(()).to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -864,7 +865,7 @@ impl Node for Scandir {
         Err(e) =>
           Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
-      .boxed()
+      .to_boxed()
   }
   fn is_inline() -> bool {
     false
@@ -916,12 +917,12 @@ impl Snapshot {
                   throw(&format!("Snapshot failed: {}", e))
                 })
             })
-            .boxed()
+            .to_boxed()
         },
         Err(e) =>
           err(throw(&format!("PathGlobs expansion failed: {:?}", e))),
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
@@ -1020,7 +1021,7 @@ impl Node for Snapshot {
         Err(failure) =>
           err(failure)
       })
-      .boxed()
+      .to_boxed()
   }
   fn is_inline() -> bool {
     false
@@ -1100,7 +1101,7 @@ impl Node for Task {
         Err(err) =>
           Err(err),
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -1199,15 +1200,15 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
-      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Task(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
   }
 
