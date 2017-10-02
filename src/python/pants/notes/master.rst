@@ -52,7 +52,7 @@ Refactoring, Improvements, and Tooling
 
 * Use newer protoc and older debian (#4918)
   `PR #4918 <https://github.com/pantsbuild/pants/pull/4918>`_
-  `PR #40, <https://github.com/pantsbuild/binaries/pull/40,>`_
+  `PR #40 <https://github.com/pantsbuild/binaries/pull/40>`_
 
 * Refactor code coverage in preparation for adding a new coverage engine (jacoco) (#4881)
   `PR #4881 <https://github.com/pantsbuild/pants/pull/4881>`_
