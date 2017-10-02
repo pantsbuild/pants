@@ -61,6 +61,10 @@ matrix:
         - docker
       language: python
       python: "2.7.13"
+      addons:
+        apt:
+          packages:
+            - cmake
       env:
         - SHARD="Linux Native Engine Binary Builder"
         - NATIVE_ENGINE_DEPLOY=1
@@ -424,6 +428,10 @@ matrix:
       dist: trusty
       language: python
       python: "2.7.13"
+      addons:
+        apt:
+          packages:
+            - cmake
       env:
         - SHARD="Rust tests"
       script:
