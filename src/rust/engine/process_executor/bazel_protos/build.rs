@@ -2,6 +2,7 @@ use std::process::{Command, exit};
 
 fn main() {
   println!("cargo:rerun-if-changed=../../../../../3rdparty/protobuf");
+  println!("cargo:rerun-if-changed=generate-grpc.sh");
   let output = Command::new("./generate-grpc.sh")
     .output()
     .unwrap();
