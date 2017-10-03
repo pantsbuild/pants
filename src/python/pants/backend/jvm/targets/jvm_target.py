@@ -134,7 +134,7 @@ class JvmTarget(Target, Jarable):
     return self.payload.strict_deps
 
   @property
-  def exports(self):
+  def export_specs(self):
     return self.payload.exports
 
   @property
