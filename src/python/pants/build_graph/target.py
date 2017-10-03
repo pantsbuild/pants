@@ -65,11 +65,7 @@ def _resolve_exports(target, dep_context):
       for dep in export.strict_dependencies(dep_context):
         yield dep
     else:
-      if isinstance(export, dep_context.codegen_types):
-        yield _get_synthetic_target(target, export)
-      else:
-        yield export
-
+      yield export
       for exp in _resolve_exports(export, dep_context):
         yield exp
 
@@ -774,6 +770,8 @@ class Target(AbstractTarget):
             raise TargetDefinitionException(
                 self,
                 'Invalid export: "{}" must also be a dependency.'.format(export_spec))
+        if isinstance(export, dep_context.codegen_types):
+          export = _get_synthetic_target(self, export)
         exports.append(export)
       self._cached_exports_map[dep_context] = exports
     return exports
