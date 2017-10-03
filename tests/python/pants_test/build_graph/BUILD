@@ -138,3 +138,15 @@ python_tests(
     'tests/python/pants_test:base_test',
   ]
 )
+
+python_tests(
+  name = 'meta-rename',
+  sources = ['test_meta_rename.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/targets:java',
+    'src/python/pants/build_graph',
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/tasks:task_test_base',
+  ]
+)
