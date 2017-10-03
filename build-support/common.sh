@@ -22,7 +22,7 @@ function green() {
 }
 
 # Initialization for elapsed()
-if [ -z "$elapsed_start_time" ] ; then
+if [ -z "${elapsed_start_time:-}" ] ; then
   export elapsed_start_time=$(date +'%s')
 fi
 
