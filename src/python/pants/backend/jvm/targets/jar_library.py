@@ -78,11 +78,7 @@ class JarLibrary(Target):
 
   @property
   def export_specs(self):
-    """
-    :API: public
-    """
-
-    # It is currently aliased to dependencies. For future work see
+    # Is currently aliased to dependencies. For future work see
     # https://github.com/pantsbuild/pants/issues/4398
     return self.dependencies
 
