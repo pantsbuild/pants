@@ -37,12 +37,18 @@ class SyntheticTargetNotFound(Exception):
   pass
 
 
-def _get_synthetic_target(target, thrift_dep):
-  """Find a thrift_dep's corresponding synthetic target in the dependencies of the given target."""
+def _get_synthetic_target(target, codegen_dep):
+  """Find a codegen_dep's corresponding synthetic target in the dependencies of the given target.
+
+  TODO: This lookup represents a workaround to avoid including logic about exports at codegen time.
+  We should likely make SimpleCodegenTask aware of exports, so that it can clone exports to
+  generated targets while updating the exports with relevant synthetic target specs.
+    see https://github.com/pantsbuild/pants/issues/4936
+  """
   for dep in target.dependencies:
-    if dep != thrift_dep and dep.is_synthetic and dep.derived_from == thrift_dep:
+    if dep != codegen_dep and dep.is_synthetic and dep.derived_from == codegen_dep:
       return dep
-  raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(thrift_dep))
+  raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(codegen_dep))
 
 
 def _resolve_strict_dependencies(target, dep_context):

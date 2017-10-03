@@ -8,9 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import zipfile
 from contextlib import contextmanager
 
+from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
-from pants.base.exceptions import TargetDefinitionException
-from pants.build_graph.address import Address
 from pants.build_graph.aliased_target import AliasTarget
 from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
@@ -18,7 +17,8 @@ from pants.util.contextutil import open_zip
 
 class DependencyContext(object):
   alias_types = (Target, AliasTarget)
-  codegen_types = (JavaThriftLibrary,)
+  # TODO: See comment on pants.build_graph.target._get_synthetic_target.
+  codegen_types = (JavaProtobufLibrary, JavaThriftLibrary)
 
   def __init__(self, compiler_plugin_types, target_closure_kwargs):
     """
