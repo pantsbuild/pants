@@ -43,7 +43,7 @@ class NodeDistribution(object):
                choices=NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys(),
                help='Default package manager config for repo. Should be one of {}'.format(
                  NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()))
-      register('--yarnpkg-version', advanced=True, default='v0.19.1', fingerprint=True,
+      register('--yarnpkg-version', advanced=True, default='v0.27.5', fingerprint=True,
                help='Yarnpkg version. Used for binary utils')
 
     def create(self):
