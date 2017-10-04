@@ -875,7 +875,13 @@ class JvmCompile(NailgunTaskBase):
       if not hit_cache:
         # Compute the compile classpath for this target.
         cp_entries = [ctx.classes_dir]
-        cp_entries.extend(ClasspathUtil.compute_classpath(ctx.dependencies(self._dep_context),
+        # TODO: We convert to an iterator here in order to _preserve_ a bug that will be fixed
+        # in https://github.com/pantsbuild/pants/issues/4874: `ClasspathUtil.compute_classpath`
+        # expects to receive a list, but had been receiving an iterator. In the context of an
+        # iterator, `excludes` are not applied
+        # in ClasspathProducts.get_product_target_mappings_for_targets.
+        dependencies_iter = iter(ctx.dependencies(self._dep_context))
+        cp_entries.extend(ClasspathUtil.compute_classpath(dependencies_iter,
                                                           classpath_products,
                                                           extra_compile_time_classpath,
                                                           self._confs))
