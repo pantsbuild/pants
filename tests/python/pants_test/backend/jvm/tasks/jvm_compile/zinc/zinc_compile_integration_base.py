@@ -172,7 +172,7 @@ class BaseZincCompileIntegrationTest(object):
   def test_soft_excludes_at_compiletime(self):
     with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
                               extra_args=['--resolve-ivy-soft-excludes'],
-                              expect_failure=True) as found:
+                              expect_failure=True):
       # TODO See #4874. Should have failed to compile because its only dependency is excluded.
       pass
 
