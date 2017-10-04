@@ -219,7 +219,7 @@ if [[ "${skip_contrib:-false}" == "false" ]]; then
   fi
   start_travis_section "ContribTests" "Running contrib python tests${shard_desc}"
   (
-    ./pants.pex ${PANTS_ARGS[@]} --exclude-target-regexp='.*/testprojects/.*' \
+    ./pants.pex ${PANTS_ARGS[@]} -ldebug --exclude-target-regexp='.*/testprojects/.*' \
     --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
     --test-pytest-test-shard=${python_contrib_shard} \
     contrib:: \
