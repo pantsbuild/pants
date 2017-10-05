@@ -1,4 +1,4 @@
-extern crate gcc;
+extern crate cc;
 
 /*
 
@@ -23,7 +23,11 @@ use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
 
 fn main() {
-  let mut config = gcc::Config::new();
+  let mut config = cc::Build::new();
+
+  // Don't implicitly set -Wall -Wextra because cffi generates code with warnings.
+  // TODO: Consider removing this if/when https://github.com/alexcrichton/cc-rs/pull/248 lands.
+  config.warnings(false);
 
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the
   // python import name, as python keys the initialization function name off of the import name.
