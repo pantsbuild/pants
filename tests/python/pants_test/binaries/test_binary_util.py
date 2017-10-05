@@ -165,7 +165,7 @@ class BinaryUtilTest(BaseTest):
 
     with self.assertRaisesRegexp(BinaryUtil.MissingMachineInfo,
                                  r'Pants has no binaries for vms'):
-      binary_util._select_binary_base_path("supportdir", "name", "version", uname_func=uname_func)
+      binary_util._select_binary_base_path("supportdir", "version", "name", uname_func=uname_func)
 
   def test_select_binary_base_path_missing_version(self):
     binary_util = BinaryUtil([], 0, '/tmp')
@@ -175,9 +175,9 @@ class BinaryUtilTest(BaseTest):
 
     os_id = ('darwin', '999')
     with self.assertRaisesRegexp(BinaryUtil.MissingMachineInfo,
-                                 r'Update --binaries-path-by-id to find binaries for '
+                                 r'myname.*Update --binaries-path-by-id to find binaries for '
                                  r'{}'.format(re.escape(repr(os_id)))):
-      binary_util._select_binary_base_path("supportdir", "name", "version", uname_func=uname_func)
+      binary_util._select_binary_base_path("supportdir", "myversion", "myname", uname_func=uname_func)
 
   def test_select_binary_base_path_override(self):
     binary_util = BinaryUtil([], 0, '/tmp',
