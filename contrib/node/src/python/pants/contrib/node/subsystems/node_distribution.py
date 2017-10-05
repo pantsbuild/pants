@@ -168,7 +168,7 @@ class NodeDistribution(object):
       logging.info('running node command [%s]', self.cmd)
       logging.info('environment')
       logging.info('*' * 80)
-      for k, v in env.items:
+      for k, v in env.items():
         logging.info('%s => %s', k, v)
       logging.info('*' * 80)
       return subprocess.Popen(self.cmd, env=env, **kwargs)
