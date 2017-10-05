@@ -62,11 +62,17 @@ class PythonSetup(Subsystem):
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
+    register('--interpreter-search-paths', advanced=True, type=list, default=[], metavar='<binary-paths>',
+             help='A list of paths to search for python interpreters.')
 
   @property
   def interpreter_constraints(self):
     return (self.get_options().interpreter_constraints or self.get_options().interpreter or
             [self.get_options().interpreter_requirement or b''])
+
+  @property
+  def interpreter_search_paths(self):
+    return self.get_options().interpreter_search_paths
 
   @property
   def setuptools_version(self):
