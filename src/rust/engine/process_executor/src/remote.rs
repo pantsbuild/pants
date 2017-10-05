@@ -27,7 +27,7 @@ pub fn run_command_remote(req: ExecuteProcessRequest) -> Result<ExecuteProcessRe
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
   execute_request.set_action(action);
 
-  unimplemented!("Not yet implemented");
+  unimplemented!();
 }
 
 fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution::Digest, String> {
