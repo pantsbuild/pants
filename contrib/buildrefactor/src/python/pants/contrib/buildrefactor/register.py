@@ -6,7 +6,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.contrib.buildozer.buildozer import Buildozer
+
+from pants.contrib.buildrefactor.buildozer import Buildozer
 
 
 def register_goals():

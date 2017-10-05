@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
@@ -17,18 +16,22 @@ class Buildozer(Task):
   """Enables interaction with the Buildozer Go binary
 
   Behavior:
-  1. `./pants buildozer --add-dependencies=<dependencies> --location=<directory>`
-      will add the dependency to the location's relative BUILD file.
+  1. `./pants buildozer --add-dependencies=<dependencies>`
+      will add the dependency to the context's relative BUILD file.
 
       Example: `./pants buildozer --add-dependencies='a/b b/c' //tmp:tmp`
 
-  2. `./pants buildozer --remove-dependencies=<dependencies> --location=<directory>`
-      will remove the dependency from the location's relative BUILD file.
+  2. `./pants buildozer --remove-dependencies=<dependencies>`
+      will remove the dependency from the context's BUILD file.
 
       Example: `./pants buildozer --remove-dependencies='a/b b/c' //tmp:tmp`
 
-  Note that buildozer assumes that BUILD files contain a name field for the target.
+    Note that buildozer assumes that BUILD files contain a name field for the target.
   """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(Buildozer, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
 
   @classmethod
   def register_options(cls, register):
@@ -40,7 +43,6 @@ class Buildozer(Task):
     super(Buildozer, self).__init__(*args, **kwargs)
 
     self.options = self.get_options()
-    self.address = self.context.target_roots[0].address
     self._executable = BinaryUtil.Factory.create().select_binary('scripts/buildozer', self.options.version, 'buildozer')
 
   def execute(self):
@@ -57,12 +59,14 @@ class Buildozer(Task):
     self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
 
   def _execute_buildozer_script(self, command):
-    buildozer_command = [self._executable, command, '//{}:{}'.format(self.address._spec_path, self.address._target_name)]
+    for root in self.context.target_roots:
+      address = root.address
+      buildozer_command = [self._executable, command, '//{}:{}'.format(address._spec_path, address._target_name)]
 
-    try:
-      subprocess.check_call(buildozer_command, cwd=get_buildroot())
-    except subprocess.CalledProcessError as err:
-      if (err.returncode == 3):
-        raise TaskError('{} ... no changes were made'.format(buildozer_command))
-      else:
-        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+      try:
+        subprocess.check_call(buildozer_command, cwd=get_buildroot())
+      except subprocess.CalledProcessError as err:
+        if (err.returncode == 3):
+          raise TaskError('{} ... no changes were made'.format(buildozer_command))
+        else:
+          raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))

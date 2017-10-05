@@ -9,8 +9,9 @@ import re
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.contrib.buildozer.buildozer import Buildozer
 from pants_test.tasks.task_test_base import TaskTestBase
+
+from pants.contrib.buildrefactor.buildozer import Buildozer
 
 
 class BuildozerTest(TaskTestBase):
@@ -29,21 +30,35 @@ class BuildozerTest(TaskTestBase):
 
     self.targets = self._prepare_dependencies()
 
-  def test_add_dependency(self):
-    mock_dependency = '/a/b/c'
+  def test_add_single_dependency(self):
+    self._test_add_dependencies('b', '/a/b/c')
+
+  def test_add_multiple_dependencies(self):
+    self._test_add_dependencies('b', '/a/b/c /d/e/f')
+
+  def test_remove_single_dependency(self):
+    self._test_remove_dependencies('c', 'b')
+
+  def test_remove_multiple_dependencies(self):
+    self._test_remove_dependencies('d', 'a b')
+
+  def _test_add_dependencies(self, spec_path, dependencies_to_add):
+    build_file = self.build_root + '/{}/BUILD'.format(spec_path)
+
+    self._clean_build_file(build_file)
+    self._test_buildozer_execution({ 'add_dependencies': dependencies_to_add })
+
+    for dependency in dependencies_to_add.split(' '):
+      self.assertIn(dependency, self._build_file_dependencies(build_file))
+
+  def _test_remove_dependencies(self, spec_path, dependencies_to_remove):
     build_file = self.build_root + '/b/BUILD'
 
     self._clean_build_file(build_file)
-    self._test_buildozer_execution({ 'add_dependencies': mock_dependency })
-    self.assertIn(mock_dependency, self._build_file_dependencies(build_file))
+    self._test_buildozer_execution({ 'remove_dependencies': dependencies_to_remove })
 
-  def test_remove_dependency(self):
-    dependency_to_remove = 'a'
-    build_file = self.build_root + '/b/BUILD'
-
-    self._clean_build_file(build_file)
-    self._test_buildozer_execution({ 'remove_dependencies': dependency_to_remove })
-    self.assertNotIn(dependency_to_remove, self._build_file_dependencies(build_file))
+    for dependency in dependencies_to_remove.split(' '):
+      self.assertNotIn(dependency, self._build_file_dependencies(build_file))
 
   def _test_buildozer_execution(self, options):
     self.set_options(**options)
@@ -53,7 +68,9 @@ class BuildozerTest(TaskTestBase):
     targets = {}
 
     targets['a'] = self.create_library('a', 'java_library', 'a', ['A.java'])
-    targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'], dependencies=['a'])
+    targets['b'] = self.create_library('b', 'java_library', 'b', ['B.java'])
+    targets['c'] = self.create_library('c', 'java_library', 'c', ['C.java'], dependencies=['b'])
+    targets['d'] = self.create_library('d', 'java_library', 'd', ['D.java'], dependencies=['a', 'b'])
 
     return targets
 

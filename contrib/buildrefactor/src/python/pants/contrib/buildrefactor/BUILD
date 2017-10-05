@@ -6,8 +6,8 @@ contrib_plugin(
   dependencies=[
     ':buildozer'
   ],
-  distribution_name='pantsbuild.pants.contrib.buildozer',
-  description='Buildozer tool to manipulate and edit BUILD files',
+  distribution_name='pantsbuild.pants.contrib.buildrefactor',
+  description='Plugin to manipulate and refactor BUILD files and targets',
   register_goals=True,
 )
 
@@ -16,6 +16,6 @@ python_library(
   name='buildozer',
   sources=['buildozer.py'],
   dependencies = [
-    'src/python/pants/goal:task_registrar',
+    'src/python/pants/binaries:binary_util'
   ]
 )
