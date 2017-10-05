@@ -165,6 +165,12 @@ class NodeDistribution(object):
       :rtype: :class:`subprocess.Popen`
       """
       env, kwargs = self._prepare_env(kwargs)
+      logging.info('running node command [%s]', self.cmd)
+      logging.info('environment')
+      logging.info('*' * 80)
+      for k, v in env.items:
+        logging.info('%s => %s', k, v)
+      logging.info('*' * 80)
       return subprocess.Popen(self.cmd, env=env, **kwargs)
 
     def check_output(self, **kwargs):
