@@ -56,6 +56,7 @@ function calculate_current_hash() {
    git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
+     "${REPO_ROOT}/build-support/bin/native" \
    | git hash-object -t blob --stdin-paths | fingerprint_data
   )
 }
@@ -71,22 +72,27 @@ function _ensure_build_prerequisites() {
   export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
   export RUSTUP_HOME=${CARGO_HOME}
 
+  local rust_toolchain="1.20.0"
+
   if [[ ! -x "${RUSTUP_HOME}/bin/rustup" ]]
   then
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
     local readonly rustup=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup}
-    sh ${rustup} -y --no-modify-path 1>&2
+    sh ${rustup} -y --no-modify-path --default-toolchain "${rust_toolchain}" 1>&2
     rm -f ${rustup}
-    ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
   fi
 
+  # Make sure rust is pinned at the correct version.
+  # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
+  "${CARGO_HOME}/bin/rustup" override set "${rust_toolchain}" >&2
+
   if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
-    "${CARGO_HOME}/bin/cargo" install protobuf
+    "${CARGO_HOME}/bin/cargo" install protobuf >&2
   fi
   if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]]; then
-    "${CARGO_HOME}/bin/cargo" install grpcio-compiler
+    "${CARGO_HOME}/bin/cargo" install grpcio-compiler >&2
   fi
 }
 
