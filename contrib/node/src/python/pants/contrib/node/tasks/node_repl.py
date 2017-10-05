@@ -62,6 +62,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
       node_repl = self.node_distribution.node_command(
         args=args, node_paths=node_paths.all_node_paths if node_paths else None)
 
+      self.log.info('launch_repl: targets: %s', targets)
       with pushd(temp_dir):
         result, npm_install = self.execute_npm(['install'],
                                                workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
