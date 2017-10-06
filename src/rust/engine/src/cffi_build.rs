@@ -52,7 +52,9 @@ fn mark_for_change_detection(path: PathBuf) -> PathBuf {
 
 fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
   let mut contents = String::new();
-  fs::File::open(env_script_path)?.read_to_string(&mut contents)?;
+  fs::File::open(env_script_path)?.read_to_string(
+    &mut contents,
+  )?;
   // It would be a shame if someone were to include a space in an actual quoted value.
   // If they did that, I guess we'd need to implement shell tokenization or something.
   return Ok(contents.trim().split(' ').map(str::to_owned).collect());

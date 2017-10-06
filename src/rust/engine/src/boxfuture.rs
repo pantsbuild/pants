@@ -10,8 +10,14 @@ pub trait Boxable {
   fn to_boxed(self) -> Box<Self>;
 }
 
-impl<F, T, E> Boxable for F where F: Future<Item=T, Error=E> + Send {
-  fn to_boxed(self) -> Box<Self> where Self: Sized {
+impl<F, T, E> Boxable for F
+where
+  F: Future<Item = T, Error = E> + Send,
+{
+  fn to_boxed(self) -> Box<Self>
+  where
+    Self: Sized,
+  {
     Box::new(self)
   }
 }

@@ -59,22 +59,37 @@ impl Scheduler {
   }
 
   pub fn root_states(&self) -> Vec<(&Key, &TypeConstraint, Option<RootResult>)> {
-    self.roots.iter()
-      .map(|s|
-        (&s.subject, &s.selector.product, self.core.graph.peek(s.clone()))
-      )
+    self
+      .roots
+      .iter()
+      .map(|s| {
+        (
+          &s.subject,
+          &s.selector.product,
+          self.core.graph.peek(s.clone()),
+        )
+      })
       .collect()
   }
 
   pub fn add_root_select(&mut self, subject: Key, product: TypeConstraint) {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::Select(selectors::Select::without_variant(product))
+      selectors::Selector::Select(selectors::Select::without_variant(product)),
     );
-    self.roots.push(Select::new(product, subject, Default::default(), &edges));
+    self.roots.push(Select::new(
+      product,
+      subject,
+      Default::default(),
+      &edges,
+    ));
   }
 
-  fn find_root_edges_or_update_rule_graph(&self, subject_type: TypeId, selector: selectors::Selector) -> rule_graph::RuleEdges {
+  fn find_root_edges_or_update_rule_graph(
+    &self,
+    subject_type: TypeId,
+    selector: selectors::Selector,
+  ) -> rule_graph::RuleEdges {
     // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
     // TODO up front.
     // TODO Handle the case where the requested root is not in the list of roots that the graph was
@@ -85,10 +100,15 @@ impl Scheduler {
     //           I can do this with minimal changes.
     //        2. Update the graph & check result,
 
-    self.core.rule_graph.find_root_edges(
-      subject_type.clone(),
-      selector.clone()
-    ).expect(&format!("Edges to have been found TODO handle this selector: {:?}, subject {:?}", selector, subject_type))
+    self
+      .core
+      .rule_graph
+      .find_root_edges(subject_type.clone(), selector.clone())
+      .expect(&format!(
+        "Edges to have been found TODO handle this selector: {:?}, subject {:?}",
+        selector,
+        subject_type
+      ))
   }
 
   ///
@@ -100,19 +120,29 @@ impl Scheduler {
     let scheduling_iterations = 0;
 
     // Bootstrap tasks for the roots, and then wait for all of them.
-    externs::log(LogLevel::Debug, &format!("Launching {} roots.", self.roots.len()));
-    let roots_res =
-      future::join_all(
-        self.root_nodes().into_iter()
-          .map(|root| {
-            self.core.graph.create(root.clone(), &self.core)
-              .then::<_, Result<(), ()>>(move |_| {
-                externs::log(LogLevel::Debug, &format!("Root {} completed.", root.format()));
-                Ok(())
-              })
-          })
-          .collect::<Vec<_>>()
-      );
+    externs::log(
+      LogLevel::Debug,
+      &format!("Launching {} roots.", self.roots.len()),
+    );
+    let roots_res = future::join_all(
+      self
+        .root_nodes()
+        .into_iter()
+        .map(|root| {
+          self
+            .core
+            .graph
+            .create(root.clone(), &self.core)
+            .then::<_, Result<(), ()>>(move |_| {
+              externs::log(
+                LogLevel::Debug,
+                &format!("Root {} completed.", root.format()),
+              );
+              Ok(())
+            })
+        })
+        .collect::<Vec<_>>(),
+    );
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was mapped into success regardless of its result.

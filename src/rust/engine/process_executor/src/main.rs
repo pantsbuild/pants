@@ -15,7 +15,7 @@ fn main() {
     let mut flags: Vec<String> = env::args().skip(1).collect();
     let splitter = flags.iter().position(|x| x == "--");
     let command = {
-      if let Some(index) =splitter {
+      if let Some(index) = splitter {
         flags.split_off(index + 1)
       } else {
         flags.drain(..).collect()
@@ -31,7 +31,10 @@ fn main() {
     for flag in flags {
       if flag.starts_with("--env=") {
         let mut parts = flag["--env=".len()..].splitn(2, "=");
-        env.insert(parts.next().unwrap().to_string(), parts.next().unwrap_or_default().to_string());
+        env.insert(
+          parts.next().unwrap().to_string(),
+          parts.next().unwrap_or_default().to_string(),
+        );
       } else {
         panic!("Didn't know how to interpret flag {}", flag);
       }
@@ -39,7 +42,9 @@ fn main() {
     (command, env)
   };
 
-  let result = process_executor::local::run_command_locally(process_executor::ExecuteProcessRequest { argv, env }).unwrap();
+  let result = process_executor::local::run_command_locally(
+    process_executor::ExecuteProcessRequest { argv, env },
+  ).unwrap();
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
   exit(result.exit_code);
