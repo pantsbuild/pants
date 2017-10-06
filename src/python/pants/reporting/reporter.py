@@ -11,8 +11,8 @@ from pants.reporting.report import Report
 
 
 class ReporterDestination(object):
-  OUT = 'out'
-  ERR = 'err'
+  OUT = 0
+  ERR = 1
 
 
 class Reporter(object):
