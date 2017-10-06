@@ -40,15 +40,15 @@ impl Core {
 
     // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
     //   see: https://github.com/pantsbuild/pants/issues/4397
-    let snapshots =
-      Snapshots::new(snapshots_dir)
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize Snapshot directory: {:?}", e);
-        });
+    let snapshots = Snapshots::new(snapshots_dir).unwrap_or_else(|e| {
+      panic!("Could not initialize Snapshot directory: {:?}", e);
+    });
     tasks.singleton_replace(
       externs::invoke_unsafe(
         &types.construct_snapshots,
-        &vec![externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes())],
+        &vec![
+          externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes()),
+        ],
       ),
       types.snapshots.clone(),
     );
@@ -62,11 +62,9 @@ impl Core {
       snapshots: snapshots,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs:
-        PosixFS::new(build_root, ignore_patterns)
-        .unwrap_or_else(|e| {
-          panic!("Could not initialize VFS: {:?}", e);
-        }),
+      vfs: PosixFS::new(build_root, ignore_patterns).unwrap_or_else(|e| {
+        panic!("Could not initialize VFS: {:?}", e);
+      }),
     }
   }
 

@@ -67,7 +67,7 @@ function _ensure_cffi_sources() {
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "${NATIVE_ROOT}/src/cffi" >&2
 }
 
-function _ensure_build_prerequisites() {
+function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
 
   export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
@@ -95,12 +95,15 @@ function _ensure_build_prerequisites() {
   if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]]; then
     "${CARGO_HOME}/bin/cargo" install grpcio-compiler >&2
   fi
+  if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
+    "${CARGO_HOME}/bin/cargo" install rustfmt >&2
+  fi
 }
 
 function prepare_to_build_native_code() {
   # Must happen in the pants venv and have PANTS_SRCPATH set.
 
-  _ensure_build_prerequisites
+  ensure_native_build_prerequisites
   _ensure_cffi_sources
 }
 

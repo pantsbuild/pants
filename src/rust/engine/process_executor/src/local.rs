@@ -35,26 +35,34 @@ mod tests {
       env: BTreeMap::new(),
     });
 
-    assert_eq!(result.unwrap(), ExecuteProcessResult {
-      stdout: make_byte_vec("foo"),
-      stderr: make_byte_vec(""),
-      exit_code: 0,
-    })
+    assert_eq!(
+      result.unwrap(),
+      ExecuteProcessResult {
+        stdout: make_byte_vec("foo"),
+        stderr: make_byte_vec(""),
+        exit_code: 0,
+      }
+    )
   }
 
   #[test]
   #[cfg(unix)]
   fn stdout_and_stderr_and_exit_code() {
     let result = run_command_locally(ExecuteProcessRequest {
-      argv: make_argv(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
+      argv: make_argv(
+        &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
+      ),
       env: BTreeMap::new(),
     });
 
-    assert_eq!(result.unwrap(), ExecuteProcessResult {
-      stdout: make_byte_vec("foo"),
-      stderr: make_byte_vec("bar"),
-      exit_code: 1,
-    })
+    assert_eq!(
+      result.unwrap(),
+      ExecuteProcessResult {
+        stdout: make_byte_vec("foo"),
+        stderr: make_byte_vec("bar"),
+        exit_code: 1,
+      }
+    )
   }
 
   #[test]
@@ -70,10 +78,16 @@ mod tests {
     });
 
     let stdout = String::from_utf8(result.unwrap().stdout).unwrap();
-    let got_env: BTreeMap<String, String> = stdout.split("\n")
+    let got_env: BTreeMap<String, String> = stdout
+      .split("\n")
       .filter(|line| !line.is_empty())
       .map(|line| line.splitn(2, "="))
-      .map(|mut parts| (parts.next().unwrap().to_string(), parts.next().unwrap_or("").to_string()))
+      .map(|mut parts| {
+        (
+          parts.next().unwrap().to_string(),
+          parts.next().unwrap_or("").to_string(),
+        )
+      })
       .filter(|x| x.0 != "PATH")
       .collect();
 

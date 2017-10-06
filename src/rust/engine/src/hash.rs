@@ -9,15 +9,18 @@ use blake2_rfc::blake2b::Blake2b;
 const FINGERPRINT_SIZE: usize = 32;
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub struct Fingerprint(pub [u8;FINGERPRINT_SIZE]);
+pub struct Fingerprint(pub [u8; FINGERPRINT_SIZE]);
 
 impl Fingerprint {
   pub fn from_bytes_unsafe(bytes: &[u8]) -> Fingerprint {
     if bytes.len() != FINGERPRINT_SIZE {
-      panic!("Input value was not a fingerprint; had length: {}", bytes.len());
+      panic!(
+        "Input value was not a fingerprint; had length: {}",
+        bytes.len()
+      );
     }
 
-    let mut fingerprint = [0;FINGERPRINT_SIZE];
+    let mut fingerprint = [0; FINGERPRINT_SIZE];
     fingerprint.clone_from_slice(&bytes[0..FINGERPRINT_SIZE]);
     Fingerprint(fingerprint)
   }

@@ -15,7 +15,7 @@ pub fn run_command_remote(req: ExecuteProcessRequest) -> Result<ExecuteProcessRe
   let mut command = bazel_protos::remote_execution::Command::new();
   command.set_arguments(protobuf::RepeatedField::from_vec(req.argv));
   for (name, value) in req.env {
-    let mut env =  bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env.set_name(name);
     env.set_value(value);
     command.mut_environment_variables().push(env);
@@ -56,19 +56,22 @@ mod tests {
     command.mut_arguments().push("/bin/echo".to_string());
     command.mut_arguments().push("foo".to_string());
 
-    let mut env1 =  bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    let mut env1 = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env1.set_name("A".to_string());
     env1.set_value("a".to_string());
     command.mut_environment_variables().push(env1);
 
-    let mut env2 =  bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    let mut env2 = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
     env2.set_name("B".to_string());
     env2.set_value("b".to_string());
     command.mut_environment_variables().push(env2);
 
     let digest = super::digest(&command).unwrap();
 
-    assert_eq!(digest.get_hash(), "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4");
+    assert_eq!(
+      digest.get_hash(),
+      "a32cd427e5df6a998199266681692989f56c19cabd1cc637bdd56ae2e62619b4"
+    );
     assert_eq!(digest.get_size_bytes(), 32)
   }
 }
