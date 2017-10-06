@@ -1,6 +1,7 @@
 extern crate bazel_protos;
+extern crate digest;
 extern crate protobuf;
-extern crate crypto;
+extern crate sha2;
 
 use std::collections::BTreeMap;
 

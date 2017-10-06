@@ -5,5 +5,6 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
 bazel_protos = { path = "bazel_protos" }
+digest = "0.6.2"
 protobuf = "1.4.1"
-rust-crypto = "0.2.36"
+sha2 = "0.6.0"

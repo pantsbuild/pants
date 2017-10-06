@@ -1,9 +1,9 @@
 use std::error::Error;
 
 use bazel_protos;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+use digest::{Digest, FixedOutput};
 use protobuf;
+use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 
@@ -36,12 +36,12 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
     Err(e) => return Err(e.description().to_string()),
   };
 
-  let mut hasher = Sha256::new();
+  let mut hasher = Sha256::default();
   hasher.input(&bytes);
 
   let mut digest = bazel_protos::remote_execution::Digest::new();
   digest.set_size_bytes(bytes.len() as i64);
-  digest.set_hash(hasher.result_str());
+  digest.set_hash(format!("{:x}", hasher.fixed_result()));
 
   return Ok(digest);
 }
