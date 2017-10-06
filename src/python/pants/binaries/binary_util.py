@@ -103,8 +103,8 @@ class BinaryUtil(object):
     try:
       middle_path = self._path_by_id[os_id]
     except KeyError:
-      raise self.MissingMachineInfo(('Unable to find binary {name} version {version}. ' +
-                                    'Update --binaries-path-by-id to find binaries for {os_id!r}')
+      raise self.MissingMachineInfo('Unable to find binary {name} version {version}. '
+                                    'Update --binaries-path-by-id to find binaries for {os_id!r}'
                                     .format(name=name, version=version, os_id=os_id))
     return os.path.join(supportdir, *(middle_path + (version, name)))
 
