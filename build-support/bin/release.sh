@@ -25,9 +25,8 @@ source ${ROOT}/contrib/release_packages.sh
 
 function find_pkg() {
   local readonly pkg_name=$1
-  find "${ROOT}/dist/${pkg_name}-$(local_version)/dist" \
-    -type f \
-    -name "${pkg_name}-$(local_version)-*.whl"
+  local readonly search_dir=${2:-${ROOT}/dist/${pkg_name}-$(local_version)/dist}
+  find "${search_dir}" -type f -name "${pkg_name}-$(local_version)-*.whl"
 }
 
 function find_plat_name() {
@@ -470,16 +469,46 @@ function fetch_prebuilt_wheels() {
   local readonly to_dir="$1"
 
   banner "Fetching prebuilt wheels for $(local_version)"
-
   (
     cd "${to_dir}"
     list_prebuilt_wheels | {
       while read path
       do
-        curl -O "${BINARY_BASE_URL}/${path}"
+        echo "${BINARY_BASE_URL}/${path}:"
+        curl --progress-bar -O "${BINARY_BASE_URL}/${path}"
       done
     }
   )
+}
+
+function check_prebuilt_wheels() {
+  local check_dir="$1"
+  if [[ -z "${check_dir}" ]]
+  then
+    check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
+    trap "rm -rf ${check_dir}" RETURN
+  fi
+
+  banner "Checking prebuilt wheels for $(local_version)"
+  fetch_prebuilt_wheels "${check_dir}"
+
+  local missing=()
+  for PACKAGE in "${RELEASE_PACKAGES[@]}"
+  do
+    NAME=$(pkg_name $PACKAGE)
+    packages=($(find_pkg "${NAME}" "${check_dir}"))
+    (( ${#packages[@]} > 0 )) || missing+=("${NAME}")
+  done
+
+  if (( ${#missing[@]} > 0 ))
+  then
+    echo "Failed to find prebuilt packages for:"
+    for package in "${missing[@]}"
+    do
+      echo "  ${package}"
+    done
+    die
+  fi
 }
 
 function activate_twine() {
@@ -497,7 +526,7 @@ function publish_packages() {
 
   start_travis_section "Publishing" "Publishing packages"
 
-  fetch_prebuilt_wheels "${DEPLOY_WHEEL_DIR}"
+  check_prebuilt_wheels "${DEPLOY_WHEEL_DIR}"
 
   activate_twine
   trap deactivate RETURN
