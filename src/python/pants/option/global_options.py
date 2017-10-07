@@ -133,6 +133,15 @@ class GlobalOptionsRegistrar(Optionable):
              help='Enables use of the v2 engine.')
 
     # These facilitate configuring the native engine.
+    register('--native-engine-version', advanced=True, default='DEPRECATED',
+             removal_version='1.6.0.dev0',
+             removal_hint='Unused, the native engine is now embedded in the pantsbuild.pants wheel',
+             help='Native engine version.')
+    register('--native-engine-supportdir', advanced=True, default='DEPRECATED',
+             removal_version='1.6.0.dev0',
+             removal_hint='Unused, the native engine is now embedded in the pantsbuild.pants wheel',
+             help='Find native engine binaries under this dir. Used as part of the path to '
+                  'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
     register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')

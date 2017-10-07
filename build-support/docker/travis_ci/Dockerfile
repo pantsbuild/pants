@@ -21,7 +21,7 @@ RUN echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" > \
       cmake \
       oracle-java8-installer
 
-# Setup mount points tfor the travis ci user & workdir.
+# Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
 VOLUME /travis/workdir
 

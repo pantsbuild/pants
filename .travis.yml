@@ -45,7 +45,8 @@ cache:
 matrix:
   include:
     - os: osx
-      # We request the oldest image we can for maximum compatibility.
+      # We request the oldest image we can (corresponding to OSX 10.10) for maximum compatibility.
+      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
       osx_image: xcode6.4
       language: generic
       env:
@@ -443,7 +444,9 @@ deploy:
   acl: public_read
   on:
     condition: $PREPARE_DEPLOY = 1
-    branch: master
+    # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
+    # release branches; eg `1.3.x`
+    all_branches: true
     repo: pantsbuild/pants
 
 # We accept the default travis-ci email author+committer notification

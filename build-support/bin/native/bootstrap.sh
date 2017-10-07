@@ -3,12 +3,9 @@
 # Defines:
 # + LIB_EXTENSION: The extension of native libraries.
 # + KERNEL: The lower-cased name of the kernel as reported by uname.
-# + OS_NAME: The name of the OS as seen by pants.
-# + OS_ID: The ID of the current OS as seen by pants.
 # + CACHE_ROOT: The pants cache root dir.
-# + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
-# + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
-#                                   the current OS.
+# + NATIVE_ENGINE_CACHE_DIR: The directory containing all versions of the native engine for
+#                            the current OS.
 # + NATIVE_ENGINE_BINARY: The basename of the native engine binary for the current OS.
 # + NATIVE_ENGINE_VERSION_RESOURCE: The path of the resource file containing the native engine
 #                                   version hash.
@@ -20,19 +17,13 @@
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
-# TODO(John Sirois): Eliminate this replication of BinaryUtil logic internal to pants code when
-# https://github.com/pantsbuild/pants/issues/4006 is complete.
 readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
 case "${KERNEL}" in
   linux)
     readonly LIB_EXTENSION=so
-    readonly OS_NAME=linux
-    readonly OS_ID=${OS_NAME}/$(uname -m)
     ;;
   darwin)
     readonly LIB_EXTENSION=dylib
-    readonly OS_NAME=mac
-    readonly OS_ID=${OS_NAME}/$(sw_vers -productVersion | cut -d: -f2 | tr -d ' \t' | cut -d. -f1-2)
     ;;
   *)
     die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
@@ -40,8 +31,7 @@ case "${KERNEL}" in
 esac
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
-readonly NATIVE_ENGINE_MODULE="native_engine"
-readonly NATIVE_ENGINE_BINARY="${NATIVE_ENGINE_MODULE}.so"
+readonly NATIVE_ENGINE_BINARY="native_engine.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/${NATIVE_ENGINE_BINARY}"
 readonly CFFI_BOOTSTRAPPER="${REPO_ROOT}/build-support/native-engine/bootstrap_cffi.py"
 
@@ -54,7 +44,6 @@ esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
-readonly NATIVE_ENGINE_CACHE_TARGET_DIR=${NATIVE_ENGINE_CACHE_DIR}/${OS_ID}
 
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
@@ -132,7 +121,7 @@ function _build_native_code() {
 function bootstrap_native_code() {
   # Bootstraps the native code only if needed.
   local native_engine_version="$(calculate_current_hash)"
-  local target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+  local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   if [ ! -f "${target_binary}" ]
   then
     local readonly native_binary="$(_build_native_code)"
@@ -146,7 +135,7 @@ function bootstrap_native_code() {
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
-    target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+    target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
 
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" "${target_binary}"
