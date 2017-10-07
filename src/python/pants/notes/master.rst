@@ -5,6 +5,72 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev15 (10/7/2017)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Send timing/cache report to stderr (#4946)
+  `PR #4946 <https://github.com/pantsbuild/pants/pull/4946>`_
+
+* Allow users to tell pants where to look for python interpreters (#4930)
+  `PR #4930 <https://github.com/pantsbuild/pants/pull/4930>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `BundleIntegrationTest`. (#4953)
+  `PR #4953 <https://github.com/pantsbuild/pants/pull/4953>`_
+
+* Pin Rust version to 1.20.0 (#4941)
+  `PR #4941 <https://github.com/pantsbuild/pants/pull/4941>`_
+
+* Remove bad string (#4942)
+  `PR #4942 <https://github.com/pantsbuild/pants/pull/4942>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Load the native engine lib from a pkg_resource. (#4914)
+  `PR #4914 <https://github.com/pantsbuild/pants/pull/4914>`_
+
+* Switch from rust-crypto to sha2 (#4951)
+  `PR #4951 <https://github.com/pantsbuild/pants/pull/4951>`_
+
+* Exclude target directories from rustfmt (#4950)
+  `PR #4950 <https://github.com/pantsbuild/pants/pull/4950>`_
+
+* Update tar to a released version (#4949)
+  `PR #4949 <https://github.com/pantsbuild/pants/pull/4949>`_
+
+* Mention name of binary we can't find (#4947)
+  `PR #4947 <https://github.com/pantsbuild/pants/pull/4947>`_
+
+* Reformat rust files (#4948)
+  `PR #4948 <https://github.com/pantsbuild/pants/pull/4948>`_
+
+* Bump cffi dep to latest (1.11.1). (#4944)
+  `PR #4944 <https://github.com/pantsbuild/pants/pull/4944>`_
+
+* Upgrade gcc to cc 1.0 (#4945)
+  `PR #4945 <https://github.com/pantsbuild/pants/pull/4945>`_
+
+* Preserve soft excludes bug while removing duplicates (#4940)
+  `PR #4940 <https://github.com/pantsbuild/pants/pull/4940>`_
+
+* Move --open-with under idea-plugin to regular options (#4939)
+  `PR #4939 <https://github.com/pantsbuild/pants/pull/4939>`_
+
+* Memoize strict deps and exports (#4934)
+  `PR #4934 <https://github.com/pantsbuild/pants/pull/4934>`_
+
+* Use `uname` in place of `arch`. (#4928)
+  `PR #4928 <https://github.com/pantsbuild/pants/pull/4928>`_
+
+* Update futures to 0.1.16 and futures-cpupool to 0.1.6 (#4925)
+  `PR #4925 <https://github.com/pantsbuild/pants/pull/4925>`_
+
 1.4.0.dev14 (10/2/2017)
 -----------------------
 
