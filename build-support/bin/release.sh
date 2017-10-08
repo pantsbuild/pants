@@ -100,8 +100,7 @@ RELEASE_PACKAGES=(
 function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  pants \
-    --python-repos-repos="${DEPLOY_WHEEL_DIR}" \
+  PANTS_PYTHON_REPOS_REPOS="${DEPLOY_WHEEL_DIR}" pants \
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
