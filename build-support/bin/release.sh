@@ -58,7 +58,7 @@ PKG_PANTS=(
   "pantsbuild.pants"
   "//src/python/pants:pants-packaged"
   "pkg_pants_install_test"
-  "--python-tag cp27 --plat-name=$(find_plat_name)"
+  "--python-tag cp27 --plat-name $(find_plat_name)"
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
@@ -497,6 +497,17 @@ function check_prebuilt_wheels() {
     NAME=$(pkg_name $PACKAGE)
     packages=($(find_pkg "${NAME}" "${check_dir}"))
     (( ${#packages[@]} > 0 )) || missing+=("${NAME}")
+
+    # Here we re-name the linux platform specific wheels we build to masquerade as manylinux1
+    # compatible wheels. We take care to support this when we generate the wheels and pypi will
+    # only accept manylinux1 linux binary wheels.
+    for package in "${packages[@]}"
+    do
+      if [[ "${package}" =~ "-linux_" ]]
+      then
+        mv -v "${package}" "${package/-linux_/-manylinux1_}"
+      fi
+    done
   done
 
   if (( ${#missing[@]} > 0 ))
