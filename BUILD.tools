@@ -52,5 +52,5 @@ jar_library(
 
 jar_library(
   name = 'scalac-plugin-dep',
-  jars = [jar(org='org.scalameta', name='scalahost_{}'.format(SCALA_REV), rev='1.8.0')],
+  jars = [jar(org='org.scalameta', name='semanticdb-scalac_{}'.format(SCALA_REV), rev='2.0.0-RC1')],
 )
