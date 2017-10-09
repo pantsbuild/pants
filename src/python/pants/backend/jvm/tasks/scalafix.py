@@ -24,7 +24,7 @@ class ScalaFix(ScalaRewriteBase):
     super(ScalaFix, cls).register_options(register)
     register('--configuration', type=file_option, default=None, fingerprint=True,
              help='The config file to use (in HOCON format).')
-    register('--rules', default=None, fingerprint=True,
+    register('--rules', default='ProcedureSyntax', type=str, fingerprint=True,
              help='The `rules` arg to scalafix: generally a name like `ProcedureSyntax`.')
     register('--semantic', type=bool, default=False, fingerprint=True,
              help='True to enable `semantic` scalafix rules by requesting compilation and '
