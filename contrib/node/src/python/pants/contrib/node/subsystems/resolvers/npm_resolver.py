@@ -33,7 +33,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         raise TaskError(
           'Cannot find package.json. Did you forget to put it in target sources?')
       package_manager = node_task.get_package_manager_for_target(target=target)
-      node_task.context.log.info('\nResolver: target (%s)', target)
+      node_task.context.log.info('\nResolver: target (%s)' % target)
       if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
