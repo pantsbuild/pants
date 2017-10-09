@@ -33,6 +33,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         raise TaskError(
           'Cannot find package.json. Did you forget to put it in target sources?')
       package_manager = node_task.get_package_manager_for_target(target=target)
+      node_task.context.log.info('\nResolver: target (%s)', target)
       if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
@@ -43,7 +44,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
             'including node_remote_module and other node dependencies. However, this is '
             'not fully supported.')
           self._emit_package_descriptor(node_task, target, results_dir, node_paths)
-        node_task.context.log.info('\nNpmResolver: target (%s)', target)
         result, npm_install = node_task.execute_npm(['install'],
                                                     workunit_name=target.address.reference(),
                                                     workunit_labels=[WorkUnitLabel.COMPILER])
