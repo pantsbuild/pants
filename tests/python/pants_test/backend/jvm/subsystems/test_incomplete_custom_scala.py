@@ -97,10 +97,10 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   def test_repl_working_custom_210(self):
     with self.tmp_custom_scala('custom_210_scalatools.build') as scalastyle_config_option:
       pants_run = self.run_repl(
-        'examples/src/scala/org/pantsbuild/example/hello/welcome',
+        'testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform',
         dedent("""
-            import org.pantsbuild.example.hello.welcome.WelcomeEverybody
-            println(WelcomeEverybody("World" :: Nil).head)
+            import org.pantsbuild.testproject.custom_scala_platform
+            Hello.main(Seq("World").toArray))
           """),
         options=[
           '--scala-platform-version=custom',
@@ -116,10 +116,10 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
   def test_repl_working_custom_211(self):
     with self.tmp_custom_scala('custom_211_scalatools.build') as scalastyle_config_option:
       pants_run = self.run_repl(
-        'examples/src/scala/org/pantsbuild/example/hello/welcome',
+        'testprojects/src/scala/org/pantsbuild/testproject/custom_scala_platform',
         dedent("""
-            import org.pantsbuild.example.hello.welcome.WelcomeEverybody
-            println(WelcomeEverybody("World" :: Nil).head)
+            import org.pantsbuild.testproject.custom_scala_platform
+            Hello.main(Seq("World").toArray))
           """),
         options=[
           '--scala-platform-version=custom',
