@@ -1,8 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-SCALA_REV='2.11.11'
-
 target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
 target(name = 'scala-js-compiler', dependencies=[
   'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
@@ -37,6 +35,7 @@ jar_library(name = 'scrooge-linter',
               '3rdparty:thrift-0.6.1',
             ])
 
+
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
 # (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
 # for more info.
@@ -48,9 +47,4 @@ jar_library(
 jar_library(
   name='kythe-indexer',
   jars = [jar(org='kythe', name='indexers/java_indexer', rev='v0.0.26-snowchain3')]
-)
-
-jar_library(
-  name = 'scalac-plugin-dep',
-  jars = [jar(org='org.scalameta', name='semanticdb-scalac_{}'.format(SCALA_REV), rev='2.0.0-RC1')],
 )
