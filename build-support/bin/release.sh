@@ -17,9 +17,10 @@ function local_version() {
   run_local_pants --version 2>/dev/null
 }
 
-readonly  DEPLOY_DIR="${ROOT}/dist/deploy"
-readonly  DEPLOY_WHEELS_PATH="wheels/pantsbuild.pants/$(local_version)"
-readonly  DEPLOY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_WHEELS_PATH}"
+readonly DEPLOY_DIR="${ROOT}/dist/deploy"
+readonly DEPLOY_WHEELS_PATH="wheels/pantsbuild.pants/$(local_version)"
+readonly DEPLOY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_WHEELS_PATH}"
+readonly DEPLOY_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/$(local_version)"
 
 source ${ROOT}/contrib/release_packages.sh
 
@@ -142,8 +143,11 @@ function bdist_wheel_flags() {
 }
 
 function build_packages() {
-  rm -rf "${DEPLOY_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_WHEEL_DIR}"
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+
+  rm -rf "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
+  mkdir -p "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
 
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
@@ -153,11 +157,12 @@ function build_packages() {
 
     start_travis_section "${NAME}" "Building package ${NAME}-$(local_version) with target '${BUILD_TARGET}'"
     run_local_pants setup-py \
-      --run="bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
+      --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
         ${BUILD_TARGET} || \
       die "Failed to build package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
     wheel=$(find_pkg ${NAME})
-    cp -p "${wheel}" "${DEPLOY_WHEEL_DIR}/$(basename ${wheel})"
+    cp -p "${wheel}" "${DEPLOY_WHEEL_DIR}/"
+    cp -p "${ROOT}/dist/${NAME}-$(local_version)/dist/${NAME}-$(local_version).tar.gz" "${DEPLOY_SDIST_DIR}/"
     end_travis_section
   done
 }
@@ -541,6 +546,7 @@ function publish_packages() {
   activate_twine
   trap deactivate RETURN
   twine upload --sign "${DEPLOY_WHEEL_DIR}"/*.whl
+  twine upload --sign "${DEPLOY_SDIST_DIR}"/*.tar.gz
 
   end_travis_section
 }
