@@ -78,4 +78,4 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
        'testprojects/src/java/org/pantsbuild/testproject/bundle:bundle-resource-ordering']
     )
     self.assert_success(pants_run)
-    self.assertEquals(pants_run.stdout_data, 'Hello world from Foo\n\n')
+    self.assertEquals(pants_run.stdout_data.strip(), 'Hello world from Foo')

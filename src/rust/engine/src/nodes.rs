@@ -6,22 +6,14 @@ use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
-use futures::future::{self, BoxFuture, Future};
+use futures::future::{self, Future};
 use ordermap::OrderMap;
 
+use boxfuture::{Boxable, BoxFuture};
 use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
-use fs::{
-  self,
-  Dir,
-  File,
-  FileContent,
-  Link,
-  PathGlobs,
-  PathStat,
-  VFS,
-};
+use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
 use handles::maybe_drain_handles;
 use rule_graph;
 use selectors::{self, Selector};
@@ -31,15 +23,21 @@ use tasks;
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
 fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
-  future::ok(value).boxed()
+  future::ok(value).to_boxed()
 }
 
 fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
-  future::err(failure).boxed()
+  future::err(failure).to_boxed()
 }
 
 fn throw(msg: &str) -> Failure {
-  Failure::Throw(externs::create_exception(msg), format!("Traceback (no traceback):\n  <pants native internals>\nException: {}", msg).to_string())
+  Failure::Throw(
+    externs::create_exception(msg),
+    format!(
+      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+      msg
+    ).to_string(),
+  )
 }
 
 ///
@@ -48,8 +46,7 @@ fn throw(msg: &str) -> Failure {
 ///
 fn was_required(failure: Failure) -> Failure {
   match failure {
-    Failure::Noop(noop) =>
-      throw(&format!("No source of required dependency: {:?}", noop)),
+    Failure::Noop(noop) => throw(&format!("No source of required dependency: {:?}", noop)),
     f => f,
   }
 }
@@ -67,9 +64,7 @@ impl GetNode for Context {
       node.run(self.clone())
     } else {
       // TODO: Odd place for this... could do it periodically in the background?
-      maybe_drain_handles().map(|handles| {
-          externs::drop_handles(handles);
-      });
+      maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
       self.core.graph.get(self.entry_id, self, node)
     }
   }
@@ -77,11 +72,11 @@ impl GetNode for Context {
 
 impl VFS<Failure> for Context {
   fn read_link(&self, link: Link) -> NodeFuture<PathBuf> {
-    self.get(ReadLink(link)).map(|res| res.0).boxed()
+    self.get(ReadLink(link)).map(|res| res.0).to_boxed()
   }
 
   fn scandir(&self, dir: Dir) -> NodeFuture<Vec<fs::Stat>> {
-    self.get(Scandir(dir)).map(|res| res.0).boxed()
+    self.get(Scandir(dir)).map(|res| res.0).to_boxed()
   }
 
   fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
@@ -89,7 +84,10 @@ impl VFS<Failure> for Context {
   }
 
   fn mk_error(msg: &str) -> Failure {
-    Failure::Throw(externs::create_exception(msg), "<pants native internals>".to_string())
+    Failure::Throw(
+      externs::create_exception(msg),
+      "<pants native internals>".to_string(),
+    )
   }
 }
 
@@ -112,8 +110,8 @@ pub trait Node: Into<NodeKey> {
 ///
 /// A Node that selects a product for a subject.
 ///
-/// A Select can be satisfied by multiple sources, but fails if multiple sources produce a value. The
-/// 'variants' field represents variant configuration that is propagated to dependencies. When
+/// A Select can be satisfied by multiple sources, but fails if multiple sources produce a value.
+/// The 'variants' field represents variant configuration that is propagated to dependencies. When
 /// a task needs to consume a product as configured by the variants map, it can pass variant_key,
 /// which matches a 'variant' value to restrict the names of values selected by a SelectNode.
 ///
@@ -122,21 +120,23 @@ pub struct Select {
   pub subject: Key,
   pub variants: Variants,
   pub selector: selectors::Select,
-  entries: rule_graph::Entries
+  entries: rule_graph::Entries,
 }
 
 impl Select {
-  pub fn new(product: TypeConstraint,
-             subject: Key,
-             variants: Variants,
-             edges: &rule_graph::RuleEdges) -> Select {
+  pub fn new(
+    product: TypeConstraint,
+    subject: Key,
+    variants: Variants,
+    edges: &rule_graph::RuleEdges,
+  ) -> Select {
     let selector = selectors::Select::without_variant(product);
     let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
     Select {
       selector: selector,
       subject: subject,
       variants: variants,
-      entries: edges.entries_for(&select_key)
+      entries: edges.entries_for(&select_key),
     }
   }
 
@@ -144,17 +144,18 @@ impl Select {
     selector: selectors::Select,
     subject: Key,
     variants: Variants,
-    edges: &rule_graph::RuleEdges
+    edges: &rule_graph::RuleEdges,
   ) -> Select {
     let select_key = rule_graph::SelectKey::JustSelect(selector.clone());
     Select {
       selector: selector,
       subject: subject,
       variants: variants,
-      entries: edges.entries_for(&select_key)
+      entries: edges
+        .entries_for(&select_key)
         .into_iter()
         .filter(|e| e.matches_subject_type(subject.type_id().clone()))
-        .collect()
+        .collect(),
     }
   }
 
@@ -165,7 +166,7 @@ impl Select {
   fn select_literal_single<'a>(
     &self,
     candidate: &'a Value,
-    variant_value: &Option<String>
+    variant_value: &Option<String>,
   ) -> bool {
     if !externs::satisfied_by(&self.selector.product, candidate) {
       return false;
@@ -176,7 +177,7 @@ impl Select {
         false,
       _ =>
         true,
-    }
+    };
   }
 
   ///
@@ -188,11 +189,11 @@ impl Select {
     &self,
     context: &Context,
     candidate: Value,
-    variant_value: &Option<String>
+    variant_value: &Option<String>,
   ) -> Option<Value> {
     // Check whether the subject is-a instance of the product.
     if self.select_literal_single(&candidate, variant_value) {
-      return Some(candidate)
+      return Some(candidate);
     }
 
     // Else, check whether it has-a instance of the product.
@@ -225,7 +226,7 @@ impl Select {
           if let Some(v) = self.select_literal(&context, value, variant_value) {
             matches.push(v);
           }
-        },
+        }
         Err(err) => {
           match err {
             Failure::Noop(noop) => {
@@ -233,12 +234,11 @@ impl Select {
               if noop > max_noop {
                 max_noop = noop;
               }
-              continue
-            },
-            f @ Failure::Throw(..) =>
-              return Err(f),
+              continue;
+            }
+            f @ Failure::Throw(..) => return Err(f),
           }
-        },
+        }
       }
     }
 
@@ -273,14 +273,12 @@ impl Select {
       panic!("we're supposed to get a snapshot, but there are no matching rule entries!");
     }
 
-    context.get(
-      Snapshot {
-        subject: self.subject.clone(),
-        product: self.product().clone(),
-        variants: self.variants.clone(),
-        entry: self.entries[0].clone()
-      }
-    )
+    context.get(Snapshot {
+      subject: self.subject.clone(),
+      product: self.product().clone(),
+      variants: self.variants.clone(),
+      entry: self.entries[0].clone(),
+    })
   }
 
   ///
@@ -294,41 +292,43 @@ impl Select {
       // for this caller.
       let context = context.clone();
       vec![
-        self.get_snapshot(&context)
-          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
-          .boxed()
+        self
+          .get_snapshot(&context)
+          .map(move |snapshot| {
+            Snapshot::store_snapshot(&context, &snapshot)
+          })
+          .to_boxed(),
       ]
     } else if self.product() == &context.core.types.files_content {
       // If the requested product is FilesContent, request a Snapshot and lower it as FilesContent.
       let context = context.clone();
       vec![
-        self.get_snapshot(&context)
+        self
+          .get_snapshot(&context)
           .and_then(move |snapshot|
             // Request the file contents of the Snapshot, and then store them.
             context.core.snapshots.contents_for(&context.core.vfs, snapshot)
               .then(move |files_content_res| match files_content_res {
                 Ok(files_content) => Ok(Snapshot::store_files_content(&context, &files_content)),
                 Err(e) => Err(throw(&e)),
-              })
-          )
-          .boxed()
+              }))
+          .to_boxed(),
       ]
     } else if let Some(&(_, ref value)) = context.core.tasks.gen_singleton(self.product()) {
-      vec![
-        future::ok(value.clone()).boxed()
-      ]
+      vec![future::ok(value.clone()).to_boxed()]
     } else {
-      self.entries.iter()
+      self
+        .entries
+        .iter()
         .map(|entry| {
           let task = context.core.rule_graph.task_for_inner(entry);
-          context.get(
-            Task {
-              subject: self.subject.clone(),
-              product: self.product().clone(),
-              variants: self.variants.clone(),
-              task: task,
-              entry: entry.clone()
-            })
+          context.get(Task {
+            subject: self.subject.clone(),
+            product: self.product().clone(),
+            variants: self.variants.clone(),
+            task: task,
+            entry: entry.clone(),
+          })
         })
         .collect::<Vec<NodeFuture<Value>>>()
     }
@@ -342,40 +342,46 @@ impl Node for Select {
     // TODO add back support for variants https://github.com/pantsbuild/pants/issues/4020
 
     // If there is a variant_key, see whether it has been configured; if not, no match.
-    let variant_value: Option<String> =
-      match self.selector.variant_key {
-        Some(ref variant_key) => {
-          let variant_value = self.variants.find(variant_key);
-          if variant_value.is_none() {
-            return err(Failure::Noop(Noop::NoVariant));
-          }
-          variant_value.map(|v| v.to_string())
-        },
-        None => None,
-      };
+    let variant_value: Option<String> = match self.selector.variant_key {
+      Some(ref variant_key) => {
+        let variant_value = self.variants.find(variant_key);
+        if variant_value.is_none() {
+          return err(Failure::Noop(Noop::NoVariant));
+        }
+        variant_value.map(|v| v.to_string())
+      }
+      None => None,
+    };
 
     // If the Subject "is a" or "has a" Product, then we're done.
-    if let Some(literal_value) = self.select_literal(&context, externs::val_for(&self.subject), &variant_value) {
+    if let Some(literal_value) =
+      self.select_literal(&context, externs::val_for(&self.subject), &variant_value)
+    {
       return ok(literal_value);
     }
 
     // Else, attempt to use the configured tasks to compute the value.
-    let deps_future =
-      future::join_all(
-        self.gen_nodes(&context).into_iter()
-          .map(|node_future| {
-            // Don't fail the join if one fails.
-            node_future.then(|r| future::ok(r))
-          })
-          .collect::<Vec<_>>()
-      );
+    let deps_future = future::join_all(
+      self
+        .gen_nodes(&context)
+        .into_iter()
+        .map(|node_future| {
+          // Don't fail the join if one fails.
+          node_future.then(|r| future::ok(r))
+        })
+        .collect::<Vec<_>>(),
+    );
 
     let variant_value = variant_value.map(|s| s.to_string());
     deps_future
       .and_then(move |dep_results| {
-        future::result(self.choose_task_result(context, dep_results, &variant_value))
+        future::result(self.choose_task_result(
+          context,
+          dep_results,
+          &variant_value,
+        ))
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -412,22 +418,22 @@ impl SelectDependencies {
     selector: selectors::SelectDependencies,
     subject: Key,
     variants: Variants,
-    edges: &rule_graph::RuleEdges
+    edges: &rule_graph::RuleEdges,
   ) -> SelectDependencies {
     // filters entries by whether the subject type is the right subject type
-    let dep_p_entries = edges.entries_for(
-      &rule_graph::SelectKey::NestedSelect(
-        Selector::SelectDependencies(selector.clone()),
-        selectors::Select::without_variant(selector.clone().dep_product)
-      )
-    );
-    let p_entries = edges.entries_for(
-      &rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-        Selector::SelectDependencies(selector.clone()),
-        selector.field_types.clone(),
-        selectors::Select::without_variant(selector.product.clone())
-      )
-    );
+    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
+      Selector::SelectDependencies(selector.clone()),
+      selectors::Select::without_variant(
+        selector.clone().dep_product,
+      ),
+    ));
+    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
+      Selector::SelectDependencies(selector.clone()),
+      selector.field_types.clone(),
+      selectors::Select::without_variant(
+        selector.product.clone(),
+      ),
+    ));
     SelectDependencies {
       subject: subject,
       variants: variants,
@@ -443,18 +449,21 @@ impl SelectDependencies {
     //   https://github.com/pantsbuild/pants/issues/4020
 
     let dep_subject_key = externs::key_for(dep_subject);
-    context.get(
-      Select {
-        selector: selectors::Select::without_variant(self.selector.product),
-        subject: dep_subject_key,
-        variants: self.variants.clone(),
-        // NB: We're filtering out all of the entries for field types other than
-        //    dep_subject's since none of them will match.
-        entries: self.product_entries.clone().into_iter()
-                                             .filter(|e| e.matches_subject_type(dep_subject_key.type_id().clone()))
-                                             .collect()
-      }
-    )
+    context.get(Select {
+      selector: selectors::Select::without_variant(self.selector.product),
+      subject: dep_subject_key,
+      variants: self.variants.clone(),
+      // NB: We're filtering out all of the entries for field types other than
+      //    dep_subject's since none of them will match.
+      entries: self
+        .product_entries
+        .clone()
+        .into_iter()
+        .filter(|e| {
+          e.matches_subject_type(dep_subject_key.type_id().clone())
+        })
+        .collect(),
+    })
   }
 }
 
@@ -469,37 +478,33 @@ impl Node for SelectDependencies {
           selector: selectors::Select::without_variant(self.selector.dep_product),
           subject: self.subject.clone(),
           variants: self.variants.clone(),
-          entries: self.dep_product_entries.clone()
-        }
+          entries: self.dep_product_entries.clone(),
+        },
       )
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
             // The product and its dependency list are available: project them.
-            let deps =
-              future::join_all(
-                externs::project_multi(&dep_product, &self.selector.field).iter()
-                  .map(|dep_subject| self.get_dep(&context, &dep_subject))
-                  .collect::<Vec<_>>()
-              );
+            let deps = future::join_all(
+              externs::project_multi(&dep_product, &self.selector.field)
+                .iter()
+                .map(|dep_subject| self.get_dep(&context, &dep_subject))
+                .collect::<Vec<_>>(),
+            );
             deps
               .then(move |dep_values_res| {
                 // Finally, store the resulting values.
                 match dep_values_res {
-                  Ok(dep_values) => {
-                    Ok(externs::store_list(dep_values.iter().collect(), false))
-                  },
-                  Err(failure) =>
-                    Err(was_required(failure)),
+                  Ok(dep_values) => Ok(externs::store_list(dep_values.iter().collect(), false)),
+                  Err(failure) => Err(was_required(failure)),
                 }
               })
-              .boxed()
-          },
-          Err(failure) =>
-            err(failure),
+              .to_boxed()
+          }
+          Err(failure) => err(failure),
         }
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -526,7 +531,7 @@ pub struct SelectTransitive {
   pub variants: Variants,
   pub selector: selectors::SelectTransitive,
   dep_product_entries: rule_graph::Entries,
-  product_entries: rule_graph::Entries
+  product_entries: rule_graph::Entries,
 }
 
 impl SelectTransitive {
@@ -534,21 +539,21 @@ impl SelectTransitive {
     selector: selectors::SelectTransitive,
     subject: Key,
     variants: Variants,
-    edges: &rule_graph::RuleEdges
+    edges: &rule_graph::RuleEdges,
   ) -> SelectTransitive {
-    let dep_p_entries = edges.entries_for(
-      &rule_graph::SelectKey::NestedSelect(
-        Selector::SelectTransitive(selector.clone()),
-        selectors::Select::without_variant(selector.clone().dep_product)
-      )
-    );
-    let p_entries = edges.entries_for(
-      &rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-        Selector::SelectTransitive(selector.clone()),
-        selector.field_types.clone(),
-        selectors::Select::without_variant(selector.clone().product)
-      )
-    );
+    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
+      Selector::SelectTransitive(selector.clone()),
+      selectors::Select::without_variant(
+        selector.clone().dep_product,
+      ),
+    ));
+    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
+      Selector::SelectTransitive(selector.clone()),
+      selector.field_types.clone(),
+      selectors::Select::without_variant(
+        selector.clone().product,
+      ),
+    ));
 
     SelectTransitive {
       subject: subject,
@@ -562,28 +567,34 @@ impl SelectTransitive {
   ///
   /// Process single subject.
   ///
-  /// Return tuple of (processed subject_key, product output, dependencies to be processed in future iterations).
+  /// Return tuple of:
+  /// (processed subject_key, product output, dependencies to be processed in future iterations).
   ///
-  fn expand_transitive(&self, context: &Context, subject_key: Key) -> NodeFuture<(Key, Value, Vec<Value>)> {
+  fn expand_transitive(
+    &self,
+    context: &Context,
+    subject_key: Key,
+  ) -> NodeFuture<(Key, Value, Vec<Value>)> {
     let field_name = self.selector.field.to_owned();
     context
-      .get(
-        Select {
-          selector: selectors::Select::without_variant(self.selector.product),
-          subject: subject_key,
-          variants: self.variants.clone(),
-          // NB: We're filtering out all of the entries for field types other than
-          //     subject_key's since none of them will match.
-          entries: self.product_entries.clone().into_iter()
-                                               .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
-                                               .collect()
-        }
-      )
+      .get(Select {
+        selector: selectors::Select::without_variant(self.selector.product),
+        subject: subject_key,
+        variants: self.variants.clone(),
+        // NB: We're filtering out all of the entries for field types other than
+        //     subject_key's since none of them will match.
+        entries: self
+          .product_entries
+          .clone()
+          .into_iter()
+          .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
+          .collect(),
+      })
       .map(move |product| {
         let deps = externs::project_multi(&product, &field_name);
         (subject_key, product, deps)
       })
-      .boxed()
+      .to_boxed()
   }
 }
 
@@ -611,62 +622,65 @@ impl Node for SelectTransitive {
           selector: selectors::Select::without_variant(self.selector.dep_product),
           subject: self.subject.clone(),
           variants: self.variants.clone(),
-          entries: self.dep_product_entries.clone()
-        }
+          entries: self.dep_product_entries.clone(),
+        },
       )
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
-            let subject_keys = externs::project_multi(&dep_product, &self.selector.field).iter()
+            let subject_keys = externs::project_multi(&dep_product, &self.selector.field)
+              .iter()
               .map(|subject| externs::key_for(&subject))
               .collect();
 
             let init = TransitiveExpansion {
               todo: subject_keys,
-              outputs: OrderMap::default()
+              outputs: OrderMap::default(),
             };
 
             future::loop_fn(init, move |mut expansion| {
               let round = future::join_all({
-                 expansion.todo.drain()
-                   .map(|subject_key| self.expand_transitive(&context, subject_key))
-                   .collect::<Vec<_>>()
+                expansion
+                  .todo
+                  .drain()
+                  .map(|subject_key| self.expand_transitive(&context, subject_key))
+                  .collect::<Vec<_>>()
               });
 
-              round
-                .map(move |finished_items| {
-                  let mut todo_candidates = Vec::new();
-                  for (subject_key, product, more_deps) in finished_items.into_iter() {
-                    expansion.outputs.insert(subject_key, product);
-                    todo_candidates.extend(more_deps);
-                  }
+              round.map(move |finished_items| {
+                let mut todo_candidates = Vec::new();
+                for (subject_key, product, more_deps) in finished_items.into_iter() {
+                  expansion.outputs.insert(subject_key, product);
+                  todo_candidates.extend(more_deps);
+                }
 
-                  // NB enclose with {} to limit the borrowing scope.
-                  {
-                    let outputs = &expansion.outputs;
-                    expansion.todo.extend(todo_candidates.into_iter()
-                      .map(|dep| { externs::key_for(&dep) })
+                // NB enclose with {} to limit the borrowing scope.
+                {
+                  let outputs = &expansion.outputs;
+                  expansion.todo.extend(
+                    todo_candidates
+                      .into_iter()
+                      .map(|dep| externs::key_for(&dep))
                       .filter(|dep_key| !outputs.contains_key(dep_key))
-                      .collect::<Vec<_>>());
-                  }
+                      .collect::<Vec<_>>(),
+                  );
+                }
 
-                  if expansion.todo.is_empty() {
-                    future::Loop::Break(expansion)
-                  } else {
-                    future::Loop::Continue(expansion)
-                  }
-                })
-            })
-            .map(|expansion| {
+                if expansion.todo.is_empty() {
+                  future::Loop::Break(expansion)
+                } else {
+                  future::Loop::Continue(expansion)
+                }
+              })
+            }).map(|expansion| {
               externs::store_list(expansion.outputs.values().collect::<Vec<_>>(), false)
             })
-            .boxed()
-          },
-          Err(failure) =>
-            err(failure),
+              .to_boxed()
+          }
+          Err(failure) => err(failure),
         }
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -686,28 +700,29 @@ pub struct SelectProjection {
   variants: Variants,
   selector: selectors::SelectProjection,
   input_product_entries: rule_graph::Entries,
-  projected_entries: rule_graph::Entries
+  projected_entries: rule_graph::Entries,
 }
 
 impl SelectProjection {
-  fn new(selector: selectors::SelectProjection,
-         subject: Key,
-         variants: Variants,
-         edges: &rule_graph::RuleEdges
+  fn new(
+    selector: selectors::SelectProjection,
+    subject: Key,
+    variants: Variants,
+    edges: &rule_graph::RuleEdges,
   ) -> SelectProjection {
-    let dep_p_entries = edges.entries_for(
-      &rule_graph::SelectKey::NestedSelect(
-        Selector::SelectProjection(selector.clone()),
-        selectors::Select::without_variant(selector.clone().input_product)
-      )
-    );
-    let p_entries = edges.entries_for(
-      &rule_graph::SelectKey::ProjectedNestedSelect(
-        Selector::SelectProjection(selector.clone()),
-        selector.projected_subject.clone(),
-        selectors::Select::without_variant(selector.clone().product)
-      )
-    );
+    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
+      Selector::SelectProjection(selector.clone()),
+      selectors::Select::without_variant(
+        selector.clone().input_product,
+      ),
+    ));
+    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedNestedSelect(
+      Selector::SelectProjection(selector.clone()),
+      selector.projected_subject.clone(),
+      selectors::Select::without_variant(
+        selector.clone().product,
+      ),
+    ));
     SelectProjection {
       subject: subject,
       variants: variants,
@@ -726,33 +741,33 @@ impl Node for SelectProjection {
       .get(
         // Request the product we need to compute the subject.
         Select {
-          selector: selectors::Select { product: self.selector.input_product, variant_key: None },
+          selector: selectors::Select {
+            product: self.selector.input_product,
+            variant_key: None,
+          },
           subject: self.subject.clone(),
           variants: self.variants.clone(),
-          entries: self.input_product_entries.clone()
-        }
+          entries: self.input_product_entries.clone(),
+        },
       )
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
             // And then project the relevant field.
-            let projected_subject =
-              externs::project(
-                &dep_product,
-                &self.selector.field,
-                &self.selector.projected_subject
-              );
+            let projected_subject = externs::project(
+              &dep_product,
+              &self.selector.field,
+              &self.selector.projected_subject,
+            );
             context
-              .get(
-                Select {
-                  selector: selectors::Select::without_variant(self.selector.product),
-                  subject: externs::key_for(&projected_subject),
-                  variants: self.variants.clone(),
-                  // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by subject here,
-                   //    because there is only one projected type.
-                  entries: self.projected_entries.clone()
-                }
-              )
+              .get(Select {
+                selector: selectors::Select::without_variant(self.selector.product),
+                subject: externs::key_for(&projected_subject),
+                variants: self.variants.clone(),
+                // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
+                // subject here, because there is only one projected type.
+                entries: self.projected_entries.clone(),
+              })
               .then(move |output_res| {
                 // If the output product is available, return it.
                 match output_res {
@@ -760,13 +775,12 @@ impl Node for SelectProjection {
                   Err(failure) => Err(was_required(failure)),
                 }
               })
-              .boxed()
-          },
-          Err(failure) =>
-            err(failure),
+              .to_boxed()
+          }
+          Err(failure) => err(failure),
         }
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -794,12 +808,15 @@ impl Node for ReadLink {
 
   fn run(self, context: Context) -> NodeFuture<LinkDest> {
     let link = self.0.clone();
-    context.core.vfs.read_link(&self.0)
+    context
+      .core
+      .vfs
+      .read_link(&self.0)
       .map(|dest_path| LinkDest(dest_path))
-      .map_err(move |e|
+      .map_err(move |e| {
         throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
-      )
-      .boxed()
+      })
+      .to_boxed()
   }
   fn is_inline() -> bool {
     false
@@ -827,7 +844,7 @@ impl Node for Stat {
   type Output = ();
 
   fn run(self, _: Context) -> NodeFuture<()> {
-    future::ok(()).boxed()
+    future::ok(()).to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -856,15 +873,15 @@ impl Node for Scandir {
 
   fn run(self, context: Context) -> NodeFuture<DirectoryListing> {
     let dir = self.0.clone();
-    context.core.vfs.scandir(&self.0)
+    context
+      .core
+      .vfs
+      .scandir(&self.0)
       .then(move |listing_res| match listing_res {
-        Ok(listing) => {
-          Ok(DirectoryListing(listing))
-        },
-        Err(e) =>
-          Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
+        Ok(listing) => Ok(DirectoryListing(listing)),
+        Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
-      .boxed()
+      .to_boxed()
   }
   fn is_inline() -> bool {
     false
@@ -888,7 +905,7 @@ pub struct Snapshot {
   subject: Key,
   product: TypeConstraint,
   variants: Variants,
-  entry: rule_graph::Entry
+  entry: rule_graph::Entry,
 }
 
 impl Snapshot {
@@ -899,45 +916,49 @@ impl Snapshot {
       .then(move |path_stats_res| match path_stats_res {
         Ok(path_stats) => {
           // Declare dependencies on the relevant Stats, and then create a Snapshot.
-          let stats =
-            future::join_all(
-              path_stats.iter()
-                .map(|path_stat|
-                  context.get(Stat(path_stat.path().to_owned())) // for recording only
-                )
-                .collect::<Vec<_>>()
-            );
+          let stats = future::join_all(
+            path_stats
+              .iter()
+              .map(
+                |path_stat| context.get(Stat(path_stat.path().to_owned())), // for recording only
+              )
+              .collect::<Vec<_>>(),
+          );
           // And then create a Snapshot.
           stats
             .and_then(move |_| {
-              context.core.snapshots
+              context
+                .core
+                .snapshots
                 .create(&context.core.vfs, path_stats)
-                .map_err(move |e| {
-                  throw(&format!("Snapshot failed: {}", e))
-                })
+                .map_err(move |e| throw(&format!("Snapshot failed: {}", e)))
             })
-            .boxed()
-        },
-        Err(e) =>
-          err(throw(&format!("PathGlobs expansion failed: {:?}", e))),
+            .to_boxed()
+        }
+        Err(e) => err(throw(&format!("PathGlobs expansion failed: {:?}", e))),
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn lift_path_globs(item: &Value) -> Result<PathGlobs, String> {
     let include = externs::project_multi_strs(item, "include");
     let exclude = externs::project_multi_strs(item, "exclude");
-    PathGlobs::create(&include, &exclude)
-      .map_err(|e| {
-        format!("Failed to parse PathGlobs for include({:?}), exclude({:?}): {}", include, exclude, e)
-      })
+    PathGlobs::create(&include, &exclude).map_err(|e| {
+      format!(
+        "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
+        include,
+        exclude,
+        e
+      )
+    })
   }
 
   fn store_snapshot(context: &Context, item: &fs::Snapshot) -> Value {
-    let path_stats: Vec<_> =
-      item.path_stats.iter()
-        .map(|ps| Self::store_path_stat(context, ps))
-        .collect();
+    let path_stats: Vec<_> = item
+      .path_stats
+      .iter()
+      .map(|ps| Self::store_path_stat(context, ps))
+      .collect();
     externs::invoke_unsafe(
       &context.core.types.construct_snapshot,
       &vec![
@@ -962,13 +983,14 @@ impl Snapshot {
   }
 
   fn store_path_stat(context: &Context, item: &PathStat) -> Value {
-    let args =
-      match item {
-        &PathStat::Dir { ref path, ref stat } =>
-          vec![Self::store_path(path), Self::store_dir(context, stat)],
-        &PathStat::File { ref path, ref stat } =>
-          vec![Self::store_path(path), Self::store_file(context, stat)],
-      };
+    let args = match item {
+      &PathStat::Dir { ref path, ref stat } => {
+        vec![Self::store_path(path), Self::store_dir(context, stat)]
+      }
+      &PathStat::File { ref path, ref stat } => {
+        vec![Self::store_path(path), Self::store_file(context, stat)]
+      }
+    };
     externs::invoke_unsafe(&context.core.types.construct_path_stat, &args)
   }
 
@@ -983,12 +1005,13 @@ impl Snapshot {
   }
 
   fn store_files_content(context: &Context, item: &Vec<FileContent>) -> Value {
-    let entries: Vec<_> = item.iter().map(|e| Self::store_file_content(context, e)).collect();
+    let entries: Vec<_> = item
+      .iter()
+      .map(|e| Self::store_file_content(context, e))
+      .collect();
     externs::invoke_unsafe(
       &context.core.types.construct_files_content,
-      &vec![
-        externs::store_list(entries.iter().collect(), false),
-      ],
+      &vec![externs::store_list(entries.iter().collect(), false)],
     )
   }
 }
@@ -997,30 +1020,29 @@ impl Node for Snapshot {
   type Output = fs::Snapshot;
 
   fn run(self, context: Context) -> NodeFuture<fs::Snapshot> {
-    let ref edges = context.core.rule_graph.edges_for_inner(&self.entry).expect("edges for snapshot exist.");
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&self.entry)
+      .expect("edges for snapshot exist.");
     // Compute and parse PathGlobs for the subject.
     context
-      .get(
-        Select::new(
-          context.core.types.path_globs.clone(),
-          self.subject.clone(),
-          self.variants.clone(),
-          edges
-        )
-      )
+      .get(Select::new(
+        context.core.types.path_globs.clone(),
+        self.subject.clone(),
+        self.variants.clone(),
+        edges,
+      ))
       .then(move |path_globs_res| match path_globs_res {
         Ok(path_globs_val) => {
           match Self::lift_path_globs(&path_globs_val) {
-            Ok(pgs) =>
-              Snapshot::create(context, pgs),
-            Err(e) =>
-              err(throw(&format!("Failed to parse PathGlobs: {}", e))),
+            Ok(pgs) => Snapshot::create(context, pgs),
+            Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
           }
-        },
-        Err(failure) =>
-          err(failure)
+        }
+        Err(failure) => err(failure),
       })
-      .boxed()
+      .to_boxed()
   }
   fn is_inline() -> bool {
     false
@@ -1039,7 +1061,7 @@ pub struct Task {
   product: TypeConstraint,
   variants: Variants,
   task: tasks::Task,
-  entry: rule_graph::Entry
+  entry: rule_graph::Entry,
 }
 
 impl Task {
@@ -1047,32 +1069,44 @@ impl Task {
   /// TODO: Can/should inline execution of all of these.
   ///
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
-    let ref edges = context.core.rule_graph.edges_for_inner(&self.entry).expect("edges for task exist.");
+    let ref edges = context
+      .core
+      .rule_graph
+      .edges_for_inner(&self.entry)
+      .expect("edges for task exist.");
     match selector {
-      Selector::Select(s) =>
+      Selector::Select(s) => {
         context.get(Select::new_with_selector(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges)),
-      Selector::SelectDependencies(s) =>
+          edges,
+        ))
+      }
+      Selector::SelectDependencies(s) => {
         context.get(SelectDependencies::new(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges)),
-      Selector::SelectTransitive(s) =>
+          edges,
+        ))
+      }
+      Selector::SelectTransitive(s) => {
         context.get(SelectTransitive::new(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges)),
-      Selector::SelectProjection(s) =>
+          edges,
+        ))
+      }
+      Selector::SelectProjection(s) => {
         context.get(SelectProjection::new(
           s,
           self.subject.clone(),
           self.variants.clone(),
-          edges)),
+          edges,
+        ))
+      }
     }
   }
 }
@@ -1081,26 +1115,24 @@ impl Node for Task {
   type Output = Value;
 
   fn run(self, context: Context) -> NodeFuture<Value> {
-    let deps =
-      future::join_all(
-        self.task.clause.iter()
-          .map(|selector| self.get(&context, selector.clone()))
-          .collect::<Vec<_>>()
-      );
+    let deps = future::join_all(
+      self
+        .task
+        .clause
+        .iter()
+        .map(|selector| self.get(&context, selector.clone()))
+        .collect::<Vec<_>>(),
+    );
 
     let task = self.task.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) =>
-          externs::invoke_runnable(
-            &externs::val_for_id(task.func.0),
-            &deps,
-            task.cacheable,
-          ),
-        Err(err) =>
-          Err(err),
+        Ok(deps) => {
+          externs::invoke_runnable(&externs::val_for_id(task.func.0), &deps, task.cacheable)
+        }
+        Err(err) => Err(err),
       })
-      .boxed()
+      .to_boxed()
   }
 
   fn is_inline() -> bool {
@@ -1136,31 +1168,46 @@ impl NodeKey {
       externs::id_to_str(tc.0)
     }
     match self {
-      &NodeKey::ReadLink(ref s) =>
-        format!("ReadLink({:?})", s.0),
-      &NodeKey::Scandir(ref s) =>
-        format!("Scandir({:?})", s.0),
-      &NodeKey::Stat(ref s) =>
-        format!("Stat({:?})", s.0),
-      &NodeKey::Select(ref s) =>
-        format!("Select({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
-      &NodeKey::SelectDependencies(ref s) =>
-        format!("Dependencies({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
-      &NodeKey::SelectTransitive(ref s) =>
-        format!("TransitiveDependencies( {}, {})",
-                typstr(&s.selector.product),
-                typstr(&s.selector.dep_product)),
-      &NodeKey::SelectProjection(ref s) =>
-        format!("Projection({}, {})", keystr(&s.subject), typstr(&s.selector.product)),
-      &NodeKey::Task(ref s) =>
+      &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
+      &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
+      &NodeKey::Stat(ref s) => format!("Stat({:?})", s.0),
+      &NodeKey::Select(ref s) => {
+        format!(
+          "Select({}, {})",
+          keystr(&s.subject),
+          typstr(&s.selector.product)
+        )
+      }
+      &NodeKey::SelectDependencies(ref s) => {
+        format!(
+          "Dependencies({}, {})",
+          keystr(&s.subject),
+          typstr(&s.selector.product)
+        )
+      }
+      &NodeKey::SelectTransitive(ref s) => {
+        format!(
+          "TransitiveDependencies( {}, {})",
+          typstr(&s.selector.product),
+          typstr(&s.selector.dep_product)
+        )
+      }
+      &NodeKey::SelectProjection(ref s) => {
+        format!(
+          "Projection({}, {})",
+          keystr(&s.subject),
+          typstr(&s.selector.product)
+        )
+      }
+      &NodeKey::Task(ref s) => {
         format!(
           "Task({}, {}, {})",
           externs::id_to_str(s.task.func.0),
           keystr(&s.subject),
           typstr(&s.product)
-        ),
-      &NodeKey::Snapshot(ref s) =>
-        format!("Snapshot({})", keystr(&s.subject)),
+        )
+      }
+      &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.subject)),
     }
   }
 
@@ -1199,15 +1246,15 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
-      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Select(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).boxed(),
-      NodeKey::Task(n) => n.run(context).map(|v| v.into()).boxed(),
+      NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
   }
 
@@ -1267,7 +1314,10 @@ pub trait TryInto<T>: Sized {
   fn try_into(self) -> Result<T, Self::Err>;
 }
 
-impl<T, U> TryInto<U> for T where U: TryFrom<T> {
+impl<T, U> TryInto<U> for T
+where
+  U: TryFrom<T>,
+{
   type Err = U::Err;
 
   fn try_into(self) -> Result<U, U::Err> {

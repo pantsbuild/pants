@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 
 # Defines:
+# + LIB_EXTENSION: The extension of native libraries.
+# + KERNEL: The lower-cased name of the kernel as reported by uname.
 # + CACHE_ROOT: The pants cache root dir.
-# + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
-# + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
-#                                   the current OS.
+# + NATIVE_ENGINE_CACHE_DIR: The directory containing all versions of the native engine for
+#                            the current OS.
 # + NATIVE_ENGINE_BINARY: The basename of the native engine binary for the current OS.
 # + NATIVE_ENGINE_VERSION_RESOURCE: The path of the resource file containing the native engine
 #                                   version hash.
@@ -16,24 +17,22 @@
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd ../../.. && pwd -P)
 source ${REPO_ROOT}/build-support/common.sh
 
-# Defines:
-# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
-# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12.
-# + LIB_EXTENSION: The extension of native libraries.
-# + KERNEL: The lower-cased name of the kernel as reported by uname.
-# + OS_NAME: The name of the OS as seen by pants.
-# + OS_ID: The ID of the current OS as seen by pants.
-# Exposes:
-# + get_native_engine_version: Echoes the current native engine version.
-# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
-# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
-# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
-source ${REPO_ROOT}/build-support/bin/native/utils.sh
+readonly KERNEL=$(uname -s | tr '[:upper:]' '[:lower:]')
+case "${KERNEL}" in
+  linux)
+    readonly LIB_EXTENSION=so
+    ;;
+  darwin)
+    readonly LIB_EXTENSION=dylib
+    ;;
+  *)
+    die "Unknown kernel ${KERNEL}, cannot bootstrap pants native code!"
+    ;;
+esac
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
-readonly NATIVE_ENGINE_MODULE="native_engine"
-readonly NATIVE_ENGINE_BINARY="${NATIVE_ENGINE_MODULE}.so"
-readonly NATIVE_ENGINE_VERSION_RESOURCE="${REPO_ROOT}/src/python/pants/engine/native_engine_version"
+readonly NATIVE_ENGINE_BINARY="native_engine.so"
+readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/${NATIVE_ENGINE_BINARY}"
 readonly CFFI_BOOTSTRAPPER="${REPO_ROOT}/build-support/native-engine/bootstrap_cffi.py"
 
 # N.B. Set $MODE to "debug" to generate a binary with debugging symbols.
@@ -45,7 +44,6 @@ esac
 
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
-readonly NATIVE_ENGINE_CACHE_TARGET_DIR=${NATIVE_ENGINE_CACHE_DIR}/${OS_ID}
 
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
@@ -56,6 +54,8 @@ function calculate_current_hash() {
    git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
+     "${REPO_ROOT}/build-support/bin/native" \
+     "${REPO_ROOT}/3rdparty/python/requirements.txt" \
    | git hash-object -t blob --stdin-paths | fingerprint_data
   )
 }
@@ -65,11 +65,13 @@ function _ensure_cffi_sources() {
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "${NATIVE_ROOT}/src/cffi" >&2
 }
 
-function _ensure_build_prerequisites() {
+function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
 
   export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
   export RUSTUP_HOME=${CARGO_HOME}
+
+  local rust_toolchain="1.20.0"
 
   if [[ ! -x "${RUSTUP_HOME}/bin/rustup" ]]
   then
@@ -77,35 +79,49 @@ function _ensure_build_prerequisites() {
         "https://www.rustup.rs ..."
     local readonly rustup=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup}
-    sh ${rustup} -y --no-modify-path 1>&2
+    sh ${rustup} -y --no-modify-path --default-toolchain "${rust_toolchain}" 1>&2
     rm -f ${rustup}
-    ${RUSTUP_HOME}/bin/rustup override set stable 1>&2
+  fi
+
+  # Make sure rust is pinned at the correct version.
+  # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
+  "${CARGO_HOME}/bin/rustup" override set "${rust_toolchain}" >&2
+
+  if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
+    "${CARGO_HOME}/bin/cargo" install protobuf >&2
+  fi
+  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]]; then
+    "${CARGO_HOME}/bin/cargo" install grpcio-compiler >&2
+  fi
+  if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
+    "${CARGO_HOME}/bin/cargo" install rustfmt >&2
   fi
 }
 
 function prepare_to_build_native_code() {
   # Must happen in the pants venv and have PANTS_SRCPATH set.
 
-  _ensure_build_prerequisites
+  ensure_native_build_prerequisites
   _ensure_cffi_sources
+}
+
+function run_cargo() {
+  prepare_to_build_native_code
+
+  local readonly cargo="${CARGO_HOME}/bin/cargo"
+  "${cargo}" "$@"
 }
 
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
-
-  prepare_to_build_native_code
-
-  local readonly cargo="${CARGO_HOME}/bin/cargo"
-  local readonly build_cmd="${cargo} build --manifest-path ${NATIVE_ROOT}/Cargo.toml ${MODE_FLAG}"
-  ${build_cmd} || die
+  run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
 function bootstrap_native_code() {
-  # Bootstraps the native code and overwrites the native_engine_version to the resulting hash
-  # version if needed.
+  # Bootstraps the native code only if needed.
   local native_engine_version="$(calculate_current_hash)"
-  local target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+  local target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
   if [ ! -f "${target_binary}" ]
   then
     local readonly native_binary="$(_build_native_code)"
@@ -119,14 +135,10 @@ function bootstrap_native_code() {
 
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
-    target_binary="${NATIVE_ENGINE_CACHE_TARGET_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
+    target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
 
     mkdir -p "$(dirname ${target_binary})"
     cp "${native_binary}" "${target_binary}"
-
-    # NB: The resource file emitted/over-written below is used by the `Native` class to default
-    # the native engine library version used by pants. More info can be read at the end of this
-    # document:  src/python/pants/engine/README.md
-    echo ${native_engine_version} > ${NATIVE_ENGINE_VERSION_RESOURCE}
   fi
+  cp -p "${target_binary}" "${NATIVE_ENGINE_RESOURCE}"
 }

@@ -31,7 +31,9 @@ lazy_static! {
 /// Enqueue a handle to be dropped.
 ///
 pub fn enqueue_drop_handle(handle: Handle) {
-  DROPPING_HANDLES.lock().unwrap().push(SendableHandle(handle));
+  DROPPING_HANDLES.lock().unwrap().push(
+    SendableHandle(handle),
+  );
 }
 
 ///

@@ -10,6 +10,11 @@ from collections import namedtuple
 from pants.reporting.report import Report
 
 
+class ReporterDestination(object):
+  OUT = 0
+  ERR = 1
+
+
 class Reporter(object):
   """Formats and emits reports.
 

@@ -1,0 +1,10 @@
+[package]
+version = "0.0.1"
+name = "process_executor"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+bazel_protos = { path = "bazel_protos" }
+digest = "0.6.2"
+protobuf = "1.4.1"
+sha2 = "0.6.0"

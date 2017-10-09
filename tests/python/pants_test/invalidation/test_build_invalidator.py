@@ -15,10 +15,46 @@ from pants.util.dirutil import safe_rmtree
 from pants_test.subsystem.subsystem_util import init_subsystem
 
 
+class CacheKeyTest(unittest.TestCase):
+  def test_equality(self):
+    self.assertEqual(CacheKey(id='1', hash='a'), CacheKey(id='1', hash='a'))
+    self.assertEqual(CacheKey.uncacheable(id='1'), CacheKey.uncacheable(id='1'))
+
+    self.assertNotEqual(CacheKey(id='1', hash='a'), CacheKey(id='2', hash='a'))
+    self.assertNotEqual(CacheKey.uncacheable(id='1'), CacheKey.uncacheable(id='2'))
+
+    self.assertNotEqual(CacheKey(id='1', hash='a'), CacheKey(id='1', hash='b'))
+
+  def test_combine_single(self):
+    key = CacheKey(id='a', hash='b')
+    self.assertIs(key, CacheKey.combine_cache_keys([key]))
+
+  def test_combine_multiple(self):
+    key1 = CacheKey(id='1', hash='a')
+    key2 = CacheKey(id='2', hash='b')
+    combined_key = CacheKey.combine_cache_keys([key1, key2])
+
+    self.assertNotEqual(key1, combined_key)
+    self.assertNotEqual(key2, combined_key)
+    self.assertEqual(combined_key, CacheKey.combine_cache_keys([key1, key2]))
+
+  def test_cacheable(self):
+    self.assertTrue(CacheKey(id='1', hash='a').cacheable)
+    self.assertFalse(CacheKey.uncacheable(id='1').cacheable)
+
+
 class BaseBuildInvalidatorTest(unittest.TestCase):
   @staticmethod
-  def cache_key(key_id=None, key_hash=None):
-    return CacheKey(id=key_id or 'a.target', hash=key_hash or '42')
+  def ensure_key_id(key_id):
+    return key_id or 'a.target'
+
+  @classmethod
+  def cache_key(cls, key_id=None, key_hash=None):
+    return CacheKey(id=cls.ensure_key_id(key_id), hash=key_hash or '42')
+
+  @classmethod
+  def uncacheable_cache_key(cls, key_id=None):
+    return CacheKey.uncacheable(id=cls.ensure_key_id(key_id))
 
   @staticmethod
   def update_hash(cache_key, new_hash):
@@ -39,9 +75,22 @@ class BuildInvalidatorTest(BaseBuildInvalidatorTest):
       self.assertFalse(invalidator.needs_update(key))
       self.assertEqual(key, invalidator.previous_key(key))
 
+  def test_cache_key_previous_uncacheable(self):
+    with self.invalidator() as invalidator:
+      key = self.uncacheable_cache_key()
+      self.assertIsNone(invalidator.previous_key(key))
+      invalidator.update(key)
+      self.assertTrue(invalidator.needs_update(key))
+      self.assertIsNone(invalidator.previous_key(key))
+
   def test_needs_update_missing_key(self):
     with self.invalidator() as invalidator:
       key = self.cache_key()
+      self.assertTrue(invalidator.needs_update(key))
+
+  def test_needs_update_missing_key_uncacheable(self):
+    with self.invalidator() as invalidator:
+      key = self.uncacheable_cache_key()
       self.assertTrue(invalidator.needs_update(key))
 
   def test_needs_update_after_change(self):
@@ -54,6 +103,13 @@ class BuildInvalidatorTest(BaseBuildInvalidatorTest):
       self.assertTrue(invalidator.needs_update(key))
       invalidator.update(key)
       self.assertFalse(invalidator.needs_update(key))
+
+  def test_needs_update_after_change_uncacheable(self):
+    with self.invalidator() as invalidator:
+      key = self.uncacheable_cache_key()
+      self.assertTrue(invalidator.needs_update(key))
+      invalidator.update(key)
+      self.assertTrue(invalidator.needs_update(key))
 
   def test_force_invalidate(self):
     with self.invalidator() as invalidator:

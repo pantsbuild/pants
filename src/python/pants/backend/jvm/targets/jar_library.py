@@ -77,12 +77,8 @@ class JarLibrary(Target):
     return self.payload.excludes
 
   @property
-  def exports(self):
-    """
-    :API: public
-    """
-
-    # It is currently aliased to dependencies. For future work see
+  def export_specs(self):
+    # Is currently aliased to dependencies. For future work see
     # https://github.com/pantsbuild/pants/issues/4398
     return self.dependencies
 

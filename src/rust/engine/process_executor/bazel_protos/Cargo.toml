@@ -1,0 +1,7 @@
+[package]
+version = "0.0.1"
+name = "bazel_protos"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+protobuf = "1.4.1"

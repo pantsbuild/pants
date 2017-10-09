@@ -1,0 +1,28 @@
+{
+  "name": "javascriptstyle",
+  "version": "1.0.0",
+  "description": "Pants JavaScript Standard Style",
+  "main": "index.js",
+  "homepage": "https://github.com/pantsbuild/pants",
+  "license": "MIT",
+  "bin": {
+    "javascriptstyle": "./bin/cli.js"
+  },
+  "scripts": {
+    "test": "node ./bin/cli.js && tape test/*.js",
+    "test-quick": "node ./bin/cli.js"
+  },
+  "dependencies": {
+    "babel-eslint": "^7.2.3",
+    "eslint": "^4.3.0",
+    "standard-engine": "^7.1.0",
+    "tape": "^4.8.0"
+  },
+  "bugs": {
+    "url": "https://github.com/pantsbuild/pants/issues"
+  },
+
+  "javascriptstyle": {
+    "ignore": []
+  }
+}

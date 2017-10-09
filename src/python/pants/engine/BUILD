@@ -180,7 +180,7 @@ python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    ':native_engine_version',
+    ':native_engine_shared_library',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',
@@ -191,6 +191,6 @@ python_library(
 )
 
 resources(
-  name='native_engine_version',
-  sources=['native_engine_version']
+  name='native_engine_shared_library',
+  sources=['native_engine.so']
 )

@@ -12,12 +12,13 @@ import sys
 import sysconfig
 import threading
 import traceback
+from contextlib import closing
 
 import cffi
+import pkg_resources
 import six
 
-from pants.binaries.binary_util import BinaryUtil
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp, touch
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -255,6 +256,17 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
     f.write(get_build_cflags())
+
+  # These files are built by Cargo which looks at mtime to determine when to rebuild. Since
+  # this source file contains the generated contents this is a simple way to make sure we don't
+  # trigger Cargo rebuilds un-necessarily.
+  source_mtime = os.stat(__file__).st_mtime
+
+  def fixup_times(path):
+    touch(path, times=(source_mtime, source_mtime))
+
+  fixup_times(c_file)
+  fixup_times(env_script)
 
 
 def _initialize_externs(ffi):
@@ -551,22 +563,12 @@ class Native(object):
   @staticmethod
   def create(options):
     """:param options: Any object that provides access to bootstrap option values."""
-    binary_util = BinaryUtil.Factory.create()
-    return Native(binary_util,
-                  options.native_engine_version,
-                  options.native_engine_supportdir,
-                  options.native_engine_visualize_to)
+    return Native(options.native_engine_visualize_to)
 
-  def __init__(self, binary_util, version, supportdir, visualize_to_dir):
+  def __init__(self, visualize_to_dir):
     """
-    :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
-    :param version: The binary version of the native engine.
-    :param supportdir: The supportdir for the native engine.
     :param visualize_to_dir: An existing directory (or None) to visualize executions to.
     """
-    self._binary_util = binary_util
-    self._version = version
-    self._supportdir = supportdir
     self._visualize_to_dir = visualize_to_dir
 
   @property
@@ -576,9 +578,12 @@ class Native(object):
   @memoized_property
   def binary(self):
     """Load and return the path to the native engine binary."""
-    return self._binary_util.select_binary(self._supportdir,
-                                           self._version,
-                                           '{}.so'.format(NATIVE_ENGINE_MODULE))
+    lib_name = '{}.so'.format(NATIVE_ENGINE_MODULE)
+    lib_path = os.path.join(safe_mkdtemp(), lib_name)
+    with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
+      with open(lib_path, 'wb') as output_fp:
+        output_fp.write(input_fp.read())
+    return lib_path
 
   @memoized_property
   def lib(self):

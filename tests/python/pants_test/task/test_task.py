@@ -9,25 +9,15 @@ import os
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.payload import Payload
-from pants.build_graph.target import Target
+from pants.build_graph.files import Files
 from pants.cache.cache_setup import CacheSetup
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
-class DummyLibrary(Target):
-  def __init__(self, address, source, *args, **kwargs):
-    payload = Payload()
-    payload.add_fields({'sources': self.create_sources_field(sources=[source],
-                                                             sources_rel_path=address.spec_path)})
-    self.source = source
-    super(DummyLibrary, self).__init__(address=address, payload=payload, *args, **kwargs)
-
-
 class DummyTask(Task):
-  """A task that appends the content of a DummyLibrary's source into its results_dir."""
+  """A task that appends the content of a Files's sources into its results_dir."""
 
   _implementation_version = 0
   _force_fail = False
@@ -54,10 +44,11 @@ class DummyTask(Task):
       if not was_valid:
         if vt.is_incremental:
           assert os.path.isdir(vt.previous_results_dir)
-        with open(os.path.join(get_buildroot(), vt.target.source), 'r') as infile:
-          outfile_name = os.path.join(vt.results_dir, os.path.basename(vt.target.source))
-          with open(outfile_name, 'a') as outfile:
-            outfile.write(infile.read())
+        for source in vt.target.sources_relative_to_buildroot():
+          with open(os.path.join(get_buildroot(), source), 'r') as infile:
+            outfile_name = os.path.join(vt.results_dir, source)
+            with open(outfile_name, 'a') as outfile:
+              outfile.write(infile.read())
         if self._force_fail:
           raise TaskError('Task forced to fail before updating vt state.')
         vt.update()
@@ -89,7 +80,7 @@ class TaskTest(TaskTestBase):
     )
 
   def _fixture(self, incremental, options=None):
-    target = self.make_target(':t', target_type=DummyLibrary, source=self._filename)
+    target = self.make_target(':t', target_type=Files, sources=[self._filename])
     context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
@@ -318,27 +309,39 @@ class TaskTest(TaskTestBase):
     self.assertNotIn(vtB.current_results_dir, vtC_live)
     self.assertEqual(len(vtC_live), 2)
 
+  def _cache_ignore_options(self, globally=False):
+    return {
+      'cache' + ('' if globally else '.' + self.options_scope): {
+        'ignore': True
+      }
+    }
+
   def test_ignore_global(self):
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertFalse(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertTrue(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture(options={'cache': {'ignore': True}})
+    _, vtA, was_valid = self._run_fixture(options=self._cache_ignore_options(globally=True))
     self.assertFalse(was_valid)
+    self.assertFalse(vtA.cacheable)
 
   def test_ignore(self):
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertFalse(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture()
+    _, vtA, was_valid = self._run_fixture()
     self.assertTrue(was_valid)
+    self.assertTrue(vtA.cacheable)
 
     self.reset_build_graph()
-    _, _, was_valid = self._run_fixture(options={'cache.{}'.format(self.options_scope):
-                                                   {'ignore': True}})
+    _, vtA, was_valid = self._run_fixture(options=self._cache_ignore_options())
     self.assertFalse(was_valid)
+    self.assertFalse(vtA.cacheable)

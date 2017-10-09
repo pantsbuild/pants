@@ -13,19 +13,21 @@ debug = true
 crate-type = ["dylib"]
 
 [build-dependencies]
-gcc = "0.3"
+cc = "1.0"
+
+# TODO: Enable workspace when https://github.com/rust-lang/rust/issues/44862 is resolved.
+# [workspace]
 
 [dependencies]
 blake2-rfc = "0.2.17"
 fnv = "1.0.5"
-# TODO: Waiting on a release incorporating https://github.com/alexcrichton/futures-rs/pull/442
-futures = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
-futures-cpupool = { git = "https://github.com/alexcrichton/futures-rs", branch = "master" }
+futures = "0.1.16"
+futures-cpupool = "0.1.6"
 glob = "0.2.11"
 ignore = "0.1.8"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.5"
-# TODO: See https://github.com/alexcrichton/tar-rs/pull/107.
-tar = { git = "https://github.com/stuhood/tar-rs", rev = "893a96e89c84f44f60f0e2398d27ae3267d196f8" }
+process_executor = { path = "process_executor" }
+tar = "0.4.13"
 tempdir = "0.3.5"

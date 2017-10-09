@@ -23,8 +23,7 @@ from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.class_not_found_error_patterns import \
   CLASS_NOT_FOUND_ERROR_PATTERNS
-from pants.backend.jvm.tasks.jvm_compile.compile_context import (CompileContext, DependencyContext,
-                                                                 strict_dependencies)
+from pants.backend.jvm.tasks.jvm_compile.compile_context import CompileContext, DependencyContext
 from pants.backend.jvm.tasks.jvm_compile.execution_graph import (ExecutionFailure, ExecutionGraph,
                                                                  Job)
 from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (CompileErrorExtractor,
@@ -81,7 +80,7 @@ class ResolvedJarAwareFingerprintStrategy(FingerprintStrategy):
 
   def dependencies(self, target):
     if self.direct(target):
-      return strict_dependencies(target, self._dep_context)
+      return target.strict_dependencies(self._dep_context)
     return super(ResolvedJarAwareFingerprintStrategy, self).dependencies(target)
 
   def __hash__(self):
@@ -876,7 +875,13 @@ class JvmCompile(NailgunTaskBase):
       if not hit_cache:
         # Compute the compile classpath for this target.
         cp_entries = [ctx.classes_dir]
-        cp_entries.extend(ClasspathUtil.compute_classpath(ctx.dependencies(self._dep_context),
+        # TODO: We convert to an iterator here in order to _preserve_ a bug that will be fixed
+        # in https://github.com/pantsbuild/pants/issues/4874: `ClasspathUtil.compute_classpath`
+        # expects to receive a list, but had been receiving an iterator. In the context of an
+        # iterator, `excludes` are not applied
+        # in ClasspathProducts.get_product_target_mappings_for_targets.
+        dependencies_iter = iter(ctx.dependencies(self._dep_context))
+        cp_entries.extend(ClasspathUtil.compute_classpath(dependencies_iter,
                                                           classpath_products,
                                                           extra_compile_time_classpath,
                                                           self._confs))

@@ -20,6 +20,7 @@ from pants.base.hash_utils import hash_all
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.base.validation import assert_list
+from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
@@ -30,6 +31,49 @@ from pants.util.memo import memoized_property
 
 
 logger = logging.getLogger(__name__)
+
+
+class SyntheticTargetNotFound(Exception):
+  pass
+
+
+def _get_synthetic_target(target, codegen_dep):
+  """Find a codegen_dep's corresponding synthetic target in the dependencies of the given target.
+
+  TODO: This lookup represents a workaround to avoid including logic about exports at codegen time.
+  We should likely make SimpleCodegenTask aware of exports, so that it can clone exports to
+  generated targets while updating the exports with relevant synthetic target specs.
+    see https://github.com/pantsbuild/pants/issues/4936
+  """
+  for dep in target.dependencies:
+    if dep != codegen_dep and dep.is_synthetic and dep.derived_from == codegen_dep:
+      return dep
+  raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(codegen_dep))
+
+
+def _resolve_strict_dependencies(target, dep_context):
+  for declared in target.dependencies:
+    if type(declared) in dep_context.alias_types:
+      # Is an alias. Recurse to expand.
+      for r in declared.strict_dependencies(dep_context):
+        yield r
+    else:
+      yield declared
+
+    for export in _resolve_exports(declared, dep_context):
+      yield export
+
+
+def _resolve_exports(target, dep_context):
+  for export in target.exports(dep_context):
+    if type(export) in dep_context.alias_types:
+      # If exported target is an alias, expand its dependencies.
+      for dep in export.strict_dependencies(dep_context):
+        yield dep
+    else:
+      yield export
+      for exp in _resolve_exports(export, dep_context):
+        yield exp
 
 
 class AbstractTarget(object):
@@ -377,6 +421,8 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
+    self._cached_strict_dependencies_map = {}
+    self._cached_exports_map = {}
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
@@ -456,6 +502,8 @@ class Target(AbstractTarget):
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
+    self._cached_strict_dependencies_map = {}
+    self._cached_exports_map = {}
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -706,6 +754,55 @@ class Target(AbstractTarget):
     """
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
+
+  def exports(self, dep_context):
+    """
+    :param dep_context: A DependencyContext with configuration for the request.
+
+    :return: targets that this target directly exports. Note that this list is not transitive,
+      but that exports are transitively expanded during the computation of strict_dependencies.
+    :rtype: list of Target
+    """
+    exports = self._cached_exports_map.get(dep_context, None)
+    if exports is None:
+      exports = []
+      for export in getattr(self, 'export_specs', []):
+        if not isinstance(export, Target):
+          export_spec = export
+          export_addr = Address.parse(export_spec, relative_to=self.address.spec_path)
+          export = self._build_graph.get_target(export_addr)
+          if export not in self.dependencies:
+            # A target can only export its dependencies.
+            raise TargetDefinitionException(
+                self,
+                'Invalid export: "{}" must also be a dependency.'.format(export_spec))
+        if isinstance(export, dep_context.codegen_types):
+          export = _get_synthetic_target(self, export)
+        exports.append(export)
+      self._cached_exports_map[dep_context] = exports
+    return exports
+
+  def strict_dependencies(self, dep_context):
+    """
+    :param dep_context: A DependencyContext with configuration for the request.
+    :return: targets that this target "strictly" depends on. This set of dependencies contains
+      only directly declared dependencies, with two exceptions:
+        1) aliases are expanded transitively
+        2) the strict_dependencies of targets exported targets exported by
+      strict_dependencies (transitively).
+    :rtype: list of Target
+    """
+    strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
+    if strict_deps is None:
+      strict_deps = OrderedSet()
+      for declared in _resolve_strict_dependencies(self, dep_context):
+        if isinstance(declared, dep_context.compiler_plugin_types):
+          strict_deps.update(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
+        else:
+          strict_deps.add(declared)
+      strict_deps = list(strict_deps)
+      self._cached_strict_dependencies_map[dep_context] = strict_deps
+    return strict_deps
 
   @property
   def dependents(self):

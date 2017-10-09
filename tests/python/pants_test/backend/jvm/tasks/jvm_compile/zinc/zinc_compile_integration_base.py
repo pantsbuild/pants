@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import unittest
 import xml.etree.ElementTree as ET
 
 from pants.util.contextutil import open_zip
@@ -166,6 +167,14 @@ class BaseZincCompileIntegrationTest(object):
       extra_args=['--compile-zinc-fatal-warnings-enabled-args=[\'-C-Werror\']'])
     test_combination('fatal', default_fatal_warnings=False, expect_success=False,
       extra_args=['--compile-zinc-fatal-warnings-disabled-args=[\'-S-Xfatal-warnings\']'])
+
+  @unittest.expectedFailure
+  def test_soft_excludes_at_compiletime(self):
+    with self.do_test_compile('testprojects/src/scala/org/pantsbuild/testproject/exclude_direct_dep',
+                              extra_args=['--resolve-ivy-soft-excludes'],
+                              expect_failure=True):
+      # TODO See #4874. Should have failed to compile because its only dependency is excluded.
+      pass
 
   def test_pool_created_for_fresh_compile_but_not_for_valid_compile(self):
     with self.temporary_cachedir() as cachedir, self.temporary_workdir() as workdir:
