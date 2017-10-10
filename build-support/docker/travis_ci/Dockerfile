@@ -35,6 +35,7 @@ RUN echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" > \
       oracle-java8-installer
 
 # Setup mount points for the travis ci user & workdir.
+VOLUME /travis/home
 VOLUME /travis/workdir
 
 # Setup a non-root user to execute the build under (avoids problems with npm install).
@@ -43,11 +44,8 @@ ARG TRAVIS_UID=1000
 ARG TRAVIS_GROUP=root
 ARG TRAVIS_GID=0
 
-RUN mkdir -p /travis/home
-
 RUN groupadd --gid ${TRAVIS_GID} ${TRAVIS_GROUP}
 RUN useradd -d /travis/home -g ${TRAVIS_GROUP} --uid ${TRAVIS_UID} ${TRAVIS_USER}
-RUN chown ${TRAVIS_USER}:${TRAVIS_GROUP} /travis/home
 USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 
 WORKDIR /travis/workdir
