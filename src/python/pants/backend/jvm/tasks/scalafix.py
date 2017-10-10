@@ -34,7 +34,7 @@ class ScalaFix(ScalaRewriteBase):
     cls.register_jvm_tool(register,
                           'scalafix',
                           classpath=[
-                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.1'),
+                            JarDependency(org='ch.epfl.scala', name='scalafix-cli_2.11.11', rev='0.5.2'),
                           ])
 
   @classmethod
@@ -62,6 +62,7 @@ class ScalaFix(ScalaRewriteBase):
       args.append('--rules={}'.format(self.get_options().rules))
     if self.get_options().level == 'debug':
       args.append('--verbose')
+    args.extend(self.additional_args)
 
     args.extend(source for _, source in target_sources)
 
