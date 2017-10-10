@@ -36,7 +36,7 @@ class NodeDistribution(object):
       register('--supportdir', advanced=True, default='bin/node',
                help='Find the Node distributions under this dir.  Used as part of the path to '
                     'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', advanced=True, default='8.2.1',
+      register('--version', advanced=True, default='6.11.1',
                help='Node distribution version.  Used as part of the path to lookup the '
                     'distribution with --binary-util-baseurls and --pants-bootstrapdir')
       register('--package-manager', advanced=True, default='npm', fingerprint=True,
