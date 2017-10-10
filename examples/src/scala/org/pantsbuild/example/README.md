@@ -106,6 +106,7 @@ targets and their dependencies.
 
 Testing
 -------
+
 Scala tests are run using the `junit_tests` BUILD target.  Both Junit and ScalaTest tests are
 supported by default.  Most other scala test frameworks support running with JUnit via a base
 class/trait or via a `@RunWith` annotation; so you can use
@@ -113,18 +114,21 @@ class/trait or via a `@RunWith` annotation; so you can use
 
 Formatting and Linting
 ----------------------
+
 `scalafmt` and `scalafix` are installed by default in both the `fmt` and `lint` goals, but
 "semantic" scalafix rewrites are disabled by default since most deployments will prefer that the
 `lint` goal run quickly. Semantic rewrites introduce a dependency on compilation, and require an
 additional compiler plugin.
 
 ### Usage
+
 To run a particular scalafix rule on targets, pass:
 
     :::bash
     ./pants fmt.scalafix --rules=ProcedureSyntax ${TARGETS}
 
 ### Enabling semantic rewrites
+
 Enabling `scalafix` semantic rewrites involves using a compiler plugin, and passing the
 `--semantic` flag to the `scalafix` task.
 
