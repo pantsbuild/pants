@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 ///
 /// It does not perform $PATH lookup or shell expansion.
 fn main() {
-  let (argv, env) = {
+  let (argv, env, server) = {
     let mut flags: Vec<String> = env::args().skip(1).collect();
     let splitter = flags.iter().position(|x| x == "--");
     let command = {
@@ -27,6 +27,7 @@ fn main() {
     flags.pop(); // --
 
     let mut env = BTreeMap::new();
+    let mut server: Option<String> = None;
 
     for flag in flags {
       if flag.starts_with("--env=") {
@@ -35,16 +36,20 @@ fn main() {
           parts.next().unwrap().to_string(),
           parts.next().unwrap_or_default().to_string(),
         );
+      } else if flag.starts_with("--server=") {
+        server = Some(flag["--server=".len()..].to_string());
       } else {
         panic!("Didn't know how to interpret flag {}", flag);
       }
     }
-    (command, env)
+    (command, env, server)
   };
 
-  let result = process_executor::local::run_command_locally(
-    process_executor::ExecuteProcessRequest { argv, env },
-  ).unwrap();
+  let request = process_executor::ExecuteProcessRequest { argv, env };
+  let result = match server {
+    Some(addr) => process_executor::remote::run_command_remote(&addr, request).unwrap(),
+    None => process_executor::local::run_command_locally(request).unwrap(),
+  };
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
   exit(result.exit_code);
