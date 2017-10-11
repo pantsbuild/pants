@@ -62,9 +62,8 @@ class NodeRepl(ReplTaskMixin, NodeTask):
       node_repl = self.node_distribution.node_command(
         args=args, node_paths=node_paths.all_node_paths if node_paths else None)
 
-      self.context.log.info('launch_repl: targets: %s', targets)
       with pushd(temp_dir):
-        result, npm_install = self.execute_npm(['install'],
+        result, npm_install = self.execute_npm(['install', '--no-optional'],
                                                workunit_name=self.SYNTHETIC_NODE_TARGET_NAME)
         if result != 0:
           raise TaskError('npm install of synthetic REPL module failed:\n'
