@@ -248,9 +248,7 @@ class SimpleCodegenTask(Task):
     :param target: The target to inject a synthetic target for.
     :param target_workdir: The work directory containing the generated code for the target.
     :param fingerprint: The fingerprint to create the synthetic target
-           with to avoid re-fingerprinting
-    :param mark_transitive_invalidation_hash_dirty: Whether to walk the build graph to invalidate
-           dependees of the target.
+           with to avoid re-fingerprinting.
     """
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
