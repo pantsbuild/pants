@@ -65,6 +65,7 @@ function _ensure_cffi_sources() {
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "${NATIVE_ROOT}/src/cffi" >&2
 }
 
+# Echos directories to add to $PATH.
 function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
 
@@ -96,8 +97,15 @@ function ensure_native_build_prerequisites() {
   if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
     "${CARGO_HOME}/bin/cargo" install rustfmt >&2
   fi
+
+  local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
+  cmake="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")/bin/cmake"
+  go="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go/bin/go"
+
+  echo "$(dirname "${cmake}"):$(dirname "${go}")"
 }
 
+# Echos directories to add to $PATH.
 function prepare_to_build_native_code() {
   # Must happen in the pants venv and have PANTS_SRCPATH set.
 
@@ -106,11 +114,11 @@ function prepare_to_build_native_code() {
 }
 
 function run_cargo() {
-  prepare_to_build_native_code
+  EXTRA_PATH="$(prepare_to_build_native_code)"
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
   # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
-  (cd "${REPO_ROOT}" && "${cargo}" "$@")
+  (cd "${REPO_ROOT}" && PATH="${EXTRA_PATH}:${PATH}" "${cargo}" "$@")
 }
 
 function _build_native_code() {
