@@ -37,7 +37,8 @@ cache_path="${HOME}/.cache/pants/${path}"
 
 if [[ ! -f "${cache_path}" ]]; then
   mkdir -p "$(dirname "${cache_path}")"
-  curl "https://binaries.pantsbuild.org/${path}" > "${cache_path}"
+  curl --fail "https://binaries.pantsbuild.org/${path}" > "${cache_path}".tmp
+  mv "${cache_path}"{.tmp,}
   if [[ "${filename}" == *tar.gz ]]; then
     tar -C "$(dirname "${cache_path}")" -xzf "${cache_path}"
   else

@@ -99,8 +99,8 @@ function ensure_native_build_prerequisites() {
   fi
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
-  cmake="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")/bin/cmake"
-  go="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go/bin/go"
+  cmake="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")/bin/cmake" || die "Failed to fetch cmake"
+  go="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go/bin/go" || die "Failed to fetch go"
 
   echo "$(dirname "${cmake}"):$(dirname "${go}")"
 }
@@ -109,12 +109,12 @@ function ensure_native_build_prerequisites() {
 function prepare_to_build_native_code() {
   # Must happen in the pants venv and have PANTS_SRCPATH set.
 
-  ensure_native_build_prerequisites
-  _ensure_cffi_sources
+  ensure_native_build_prerequisites || die
+  _ensure_cffi_sources || die
 }
 
 function run_cargo() {
-  EXTRA_PATH="$(prepare_to_build_native_code)"
+  EXTRA_PATH="$(prepare_to_build_native_code)" || die
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
   # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
