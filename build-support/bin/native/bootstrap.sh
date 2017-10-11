@@ -109,7 +109,8 @@ function run_cargo() {
   prepare_to_build_native_code
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
-  "${cargo}" "$@"
+  # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
+  (cd "${REPO_ROOT}" && "${cargo}" "$@")
 }
 
 function _build_native_code() {
