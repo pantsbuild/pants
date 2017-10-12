@@ -116,7 +116,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
           pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
-        
+
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 
         if extra_pex_paths:
