@@ -50,24 +50,13 @@ class WrappedPEX(object):
     return self._pex.path()
 
   def cmdline(self, args=()):
-    cmdline = ' '.join(self._pex.cmdline(args))
-    pex_path = self._pex_path()
-    if pex_path:
-      return '{env_var_name}={pex_path} {cmdline}'.format(env_var_name=self._PEX_PATH_ENV_VAR_NAME,
-                                                          pex_path=pex_path,
-                                                          cmdline=cmdline)
-    else:
-      return cmdline
+    return ' '.join(self._pex.cmdline(args))
 
   def run(self, *args, **kwargs):
     kwargs_copy = copy(kwargs)
     env = copy(kwargs_copy.get('env')) if 'env' in kwargs_copy else {}
-    env[self._PEX_PATH_ENV_VAR_NAME] = self._pex_path()
     kwargs_copy['env'] = env
     return self._pex.run(*args, **kwargs_copy)
-
-  def _pex_path(self):
-    return ':'.join(self._extra_pex_paths)
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
@@ -127,8 +116,11 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
           pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
-
+        
         extra_pex_paths = [pex.path() for pex in pexes if pex]
+
+        if extra_pex_paths:
+          pex_info.pex_path = ':'.join(extra_pex_paths)
 
         with safe_concurrent_creation(path) as safe_path:
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
