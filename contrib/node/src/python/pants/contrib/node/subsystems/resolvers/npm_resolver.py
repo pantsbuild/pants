@@ -33,7 +33,6 @@ class NpmResolver(Subsystem, NodeResolverBase):
         raise TaskError(
           'Cannot find package.json. Did you forget to put it in target sources?')
       package_manager = node_task.get_package_manager_for_target(target=target)
-      node_task.context.log.info('\nResolver: target (%s)' % target)
       if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
@@ -94,12 +93,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
     dependenciesToRemove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
-    node_task.context.log.info(
+    node_task.context.log.debug(
       'Removing {} from package.json for {}'.format(dependenciesToRemove, package['name']))
     for dependencyType in dependenciesToRemove:
       package.pop(dependencyType, None)
 
-    node_task.context.log.info(
+    node_task.context.log.debug(
       'Adding {} to package.json for {}'.format(dependencies, package['name']))
     package['dependencies'] = dependencies
 
