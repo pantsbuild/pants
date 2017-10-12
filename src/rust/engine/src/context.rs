@@ -52,7 +52,8 @@ impl Core {
 
     let store = safe_create_dir_all_ioerror(&store_path)
         .map_err(|e| format!("{:?}", e))
-        .and_then(|()| Store::new(store_path, pool.clone()))
+        // TODO: Pass in a CAS address
+        .and_then(|()| Store::new(store_path, pool.clone(), None))
         .unwrap_or_else(
       |e| {
         panic!("Could not initialize Store directory {:?}", e)
