@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from copy import copy
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
