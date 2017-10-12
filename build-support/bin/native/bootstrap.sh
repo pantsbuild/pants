@@ -102,7 +102,7 @@ function ensure_native_build_prerequisites() {
   cmake="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")/bin/cmake" || die "Failed to fetch cmake"
   go="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go/bin/go" || die "Failed to fetch go"
 
-  echo "$(dirname "${cmake}"):$(dirname "${go}")"
+  export EXTRA_PATH_FOR_CARGO="$(dirname "${cmake}"):$(dirname "${go}")"
 }
 
 # Echos directories to add to $PATH.
@@ -114,11 +114,11 @@ function prepare_to_build_native_code() {
 }
 
 function run_cargo() {
-  EXTRA_PATH="$(prepare_to_build_native_code)" || die
+  prepare_to_build_native_code || die
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
   # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
-  (cd "${REPO_ROOT}" && PATH="${EXTRA_PATH}:${PATH}" "${cargo}" "$@")
+  (cd "${REPO_ROOT}" && PATH="${EXTRA_PATH_FOR_CARGO}:${PATH}" "${cargo}" "$@")
 }
 
 function _build_native_code() {
