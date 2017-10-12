@@ -1,0 +1,3 @@
+src/*.rs
+!src/lib.rs
+Cargo.lock
