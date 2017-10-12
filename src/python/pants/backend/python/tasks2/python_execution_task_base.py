@@ -53,10 +53,7 @@ class WrappedPEX(object):
     return ' '.join(self._pex.cmdline(args))
 
   def run(self, *args, **kwargs):
-    kwargs_copy = copy(kwargs)
-    env = copy(kwargs_copy.get('env')) if 'env' in kwargs_copy else {}
-    kwargs_copy['env'] = env
-    return self._pex.run(*args, **kwargs_copy)
+    return self._pex.run(*args, **kwargs)
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
@@ -120,7 +117,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 
         if extra_pex_paths:
-          pex_info.pex_path = ':'.join(extra_pex_paths)
+          pex_info.merge_pex_path(':'.join(extra_pex_paths))
 
         with safe_concurrent_creation(path) as safe_path:
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
