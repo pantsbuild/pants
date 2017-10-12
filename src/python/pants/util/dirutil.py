@@ -76,12 +76,12 @@ def safe_mkdir(directory, clean=False):
       raise
 
 
-def safe_mkdir_for(path):
+def safe_mkdir_for(path, clean=False):
   """Ensure that the parent directory for a file is present.
 
   If it's not there, create it. If it is, no-op.
   """
-  safe_mkdir(os.path.dirname(path), clean=False)
+  safe_mkdir(os.path.dirname(path), clean=clean)
 
 
 def safe_file_dump(filename, payload):

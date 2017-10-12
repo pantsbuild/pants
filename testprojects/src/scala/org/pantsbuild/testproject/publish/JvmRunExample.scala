@@ -8,7 +8,7 @@ package org.pantsbuild.testproject.publish
 //   testprojects/src/scala/org/pantsbuild/testproject/publish:jvm-run-example-lib
 
 object JvmRunExample {
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     println("Hello, World")
     println("args: " + args.mkString(", "))
   }
