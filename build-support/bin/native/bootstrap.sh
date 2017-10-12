@@ -99,10 +99,11 @@ function ensure_native_build_prerequisites() {
   fi
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
-  cmake="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")/bin/cmake" || die "Failed to fetch cmake"
-  go="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go/bin/go" || die "Failed to fetch go"
+  local readonly cmakeroot="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")" || die "Failed to fetch cmake"
+  local readonly goroot="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
 
-  export EXTRA_PATH_FOR_CARGO="$(dirname "${cmake}"):$(dirname "${go}")"
+  export GOROOT="${goroot}"
+  export EXTRA_PATH_FOR_CARGO="${cmakeroot}/bin:${goroot}/bin"
 }
 
 # Echos directories to add to $PATH.
