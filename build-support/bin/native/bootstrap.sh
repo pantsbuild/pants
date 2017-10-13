@@ -122,15 +122,27 @@ function run_cargo() {
   (cd "${REPO_ROOT}" && PATH="${EXTRA_PATH_FOR_CARGO}:${PATH}" "${cargo}" "$@")
 }
 
+function _wait_noisily() {
+  "$@" &
+  pid=$!
+
+  i=0
+  while ps -p "${pid}" >/dev/null 2>/dev/null; do
+    [[ "$((i % 60))" -eq 0 ]] && echo >&2 "[Waiting for $@ (pid ${pid}) to complete]"
+    i="$((i + 1))"
+    sleep 1
+  done
+
+  wait "${pid}"
+}
+
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
   # Sometimes fetching a large git repo dependency can take more than 10 minutes.
   # This times out on travis, because nothing is printed to stdout/stderr in that time.
-  # Pre-fetch those git repos with an extended timeout.
-  if type -t travis_wait >/dev/null; then
-    travis_wait 30 run_cargo fetch --manifest-path ${NATIVE_ROOT}/Cargo.toml
-  fi
+  # Pre-fetch those git repos and keep writing to stdout as we do.
+  _wait_noisily run_cargo fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
   run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
