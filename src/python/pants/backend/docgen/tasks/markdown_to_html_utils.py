@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 import sys
 
 import markdown
@@ -56,6 +57,10 @@ class WikilinksExtension(markdown.Extension):
 # !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
 INCLUDE_PATTERN = r'!inc(\[(?P<params>[^]]*)\])?\((?P<path>[^' + '\n' + r']*)\)'
 
+INCLUDE_RECOGNIZED_PARAMS = frozenset(
+  'start-before', 'start-at', 'end-before', 'end-at', 'lines')
+
+LINES_PATTERN = re.compile(r'\A([1-9][0-9]*)-([1-9][0-9]*)\Z')
 
 def choose_include_text(s, params, source_path):
   """Given the contents of a file and !inc[these params], return matching lines
@@ -66,11 +71,8 @@ def choose_include_text(s, params, source_path):
   :param params: string like "start-at=foo&end-at=bar"
   :param source_path: path to source .md. Useful in error messages
   """
-  lines = s.splitlines()
-  start_after = None
-  start_at = None
-  end_before = None
-  end_at = None
+  source_lines = s.splitlines()
+  params_dict = {}
 
   for term in params.split("&"):
     if '=' in term:
@@ -78,45 +80,79 @@ def choose_include_text(s, params, source_path):
     else:
       param, value = term.strip(), ''
     if not param: continue
-    if param == "start-after":
-      start_after = value
-    elif param == "start-at":
-      start_at = value
-    elif param == "end-before":
-      end_before = value
-    elif param == "end-at":
-      end_at = value
-    else:
-      raise TaskError('Invalid include directive "{0}"'
-                      ' in {1}'.format(params, source_path))
+    if param not in INCLUDE_RECOGNIZED_PARAMS:
+      raise TaskError('Invalid include directive "{0}" in params "{1}"'
+                      ' from {2}'.format(param, params, source_path))
+    params_dict[param] = value
 
   chosen_lines = []
+  try:
+    if 'lines' in params_dict:
+      lines_arg = params_dict['lines']
+      chosen_lines = include_by_line_range(source_lines, lines_arg, params_dict)
+    else:
+      chosen_lines = include_by_text_match(source_lines, params_dict)
+  except TaskError as include_error:
+    raise TaskError('Error: {0} (in params "{1}" from {2})'
+                    .format(include_error, params, source_path))
+  return '\n'.join(chosen_lines)
+
+def include_by_line_range(source_lines, line_range_arg, params_dict):
+  # 'lines' should be the only parameter specified
+  conflicts = ('"{0}={1}"'.format(p, v) for p, v in params_dict if p != 'lines')
+  if len(conflicts) > 0:
+    raise TaskError('"lines" directive conflicts with other directives: [{0}]'
+                    .format(', '.join(conflicts)))
+
+  # validate the line range
+  lines_match = LINES_PATTERN.match(line_range_arg)
+  if lines_match is None:
+    raise TaskError('Invalid line range "{0}" (should match "{1}") for "lines"'
+                    .format(line_range_arg, LINES_PATTERN.pattern))
+  [line_start, line_end] = (int(g) for g in lines_match.groups())
+  # LINES_PATTERN does not allow 0 or negative numbers
+  if line_end < line_start:
+    raise TaskError('Invalid end line "{0}" (should be >= {1}, the start line)'
+                    ' from "{2}" for "lines"'
+                    .format(line_end, line_start, line_range_arg))
+  nlines = len(source_lines)
+  if line_end > nlines:
+    raise TaskError('Invalid end line "{0}"'
+                    ' (should be <= {1}, the number of lines in the source)'
+                    ' from "{2}" for "lines"'
+                    .format(line_end, nlines, line_range_arg))
+
+  # line range arguments start at 1
+  return source_lines[(line_start - 1):line_end]
+
+def include_by_text_match(source_lines, params_dict):
+  chosen_lines = []
   # two loops, one waits to "start recording", one "records"
-  for line_ix in range(0, len(lines)):
-    line = lines[line_ix]
-    if (not start_at) and (not start_after):
+  for line_ix in range(0, len(source_lines)):
+    line = source_lines[line_ix]
+    if ('start-at' not in params_dict) and ('start-after' not in params_dict):
       # if we didn't set a start-* param, don't wait to start
       break
-    if start_at is not None and start_at in line:
+    if 'start-at' in params_dict and params_dict['start-at'] in line:
       break
-    if start_after is not None and start_after in line:
+    if 'start-after' in params_dict and params_dict['start-after'] in line:
       line_ix += 1
       break
   else:
     # never started recording:
     return ''
-  for line_ix in range(line_ix, len(lines)):
-    line = lines[line_ix]
-    if end_before is not None and end_before in line:
+  for line_ix in range(line_ix, len(source_lines)):
+    line = source_lines[line_ix]
+    if 'end-before' in params_dict and params_dict['end-before'] in line:
       break
     chosen_lines.append(line)
-    if end_at is not None and end_at in line:
+    if 'end-at' in params_dict and params_dict['end-at'] in line:
       break
   else:
-    if (end_before or end_at):
+    if 'end-before' in params_dict or 'end-at' in params_dict:
       # we had an end- filter, but never encountered it.
       return ''
-  return '\n'.join(chosen_lines)
+  return chosen_lines
 
 
 class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
