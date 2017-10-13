@@ -57,8 +57,8 @@ class WikilinksExtension(markdown.Extension):
 # !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
 INCLUDE_PATTERN = r'!inc(\[(?P<params>[^]]*)\])?\((?P<path>[^' + '\n' + r']*)\)'
 
-INCLUDE_RECOGNIZED_PARAMS = frozenset(
-  'start-before', 'start-at', 'end-before', 'end-at', 'lines')
+INCLUDE_RECOGNIZED_PARAMS = frozenset([
+  'start-after', 'start-at', 'end-before', 'end-at', 'lines'])
 
 LINES_PATTERN = re.compile(r'\A([1-9][0-9]*)-([1-9][0-9]*)\Z')
 
@@ -99,10 +99,11 @@ def choose_include_text(s, params, source_path):
 
 def include_by_line_range(source_lines, line_range_arg, params_dict):
   # 'lines' should be the only parameter specified
-  conflicts = ('"{0}={1}"'.format(p, v) for p, v in params_dict if p != 'lines')
+  conflicts = [(p, v) for p, v in params_dict.iteritems() if p != 'lines']
   if len(conflicts) > 0:
+    error_msgs = ', '.join(['"{0}={1}"'.format(p, v) for (p, v) in conflicts])
     raise TaskError('"lines" directive conflicts with other directives: [{0}]'
-                    .format(', '.join(conflicts)))
+                    .format(error_msgs))
 
   # validate the line range
   lines_match = LINES_PATTERN.match(line_range_arg)

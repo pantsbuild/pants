@@ -99,6 +99,43 @@ class ChooseLinesTest(unittest.TestCase):
       markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak&end-at=abl', 'fake.md'),
       '')
 
+  def test_include_lines(self):
+    self.assertEquals(
+      markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2', 'fake.md'),
+      '\n'.join(['able', 'baker']))
+
+    self.assertEquals(
+      markdown_to_html_utils.choose_include_text(ABC, 'lines=1-1', 'fake.md'),
+      'able')
+
+    self.assertEquals(
+      markdown_to_html_utils.choose_include_text(ABC, 'lines=2-3', 'fake.md'),
+      '\n'.join(['baker', 'charlie']))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-at=AAA', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=AAA', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=0-2', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=-1-2', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=3-2', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-4', 'fake.md'))
+
 
 class MarkdownToHtmlTest(TaskTestBase):
   @classmethod
