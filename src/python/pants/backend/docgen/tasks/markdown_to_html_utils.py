@@ -62,6 +62,7 @@ INCLUDE_RECOGNIZED_PARAMS = frozenset([
 
 LINES_PATTERN = re.compile(r'\A([1-9][0-9]*)-([1-9][0-9]*)\Z')
 
+
 def choose_include_text(s, params, source_path):
   """Given the contents of a file and !inc[these params], return matching lines
 
@@ -97,9 +98,10 @@ def choose_include_text(s, params, source_path):
                     .format(include_error, params, source_path))
   return '\n'.join(chosen_lines)
 
+
 def include_by_line_range(source_lines, line_range_arg, params_dict):
   # 'lines' should be the only parameter specified
-  conflicts = [(p, v) for p, v in params_dict.iteritems() if p != 'lines']
+  conflicts = [(p, params_dict[p]) for p in params_dict if p != 'lines']
   if len(conflicts) > 0:
     error_msgs = ', '.join(['"{0}={1}"'.format(p, v) for (p, v) in conflicts])
     raise TaskError('"lines" directive conflicts with other directives: [{0}]'
@@ -125,6 +127,7 @@ def include_by_line_range(source_lines, line_range_arg, params_dict):
 
   # line range arguments start at 1
   return source_lines[(line_start - 1):line_end]
+
 
 def include_by_text_match(source_lines, params_dict):
   chosen_lines = []
