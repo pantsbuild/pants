@@ -45,47 +45,35 @@ cache:
 matrix:
   include:
     - os: osx
+      # We request the oldest image we can (corresponding to OSX 10.10) for maximum compatibility.
+      # See: https://docs.travis-ci.com/user/reference/osx/#OS-X-Version
+      osx_image: xcode6.4
       language: generic
       env:
         - SHARD="OSX Native Engine Binary Builder"
-        - NATIVE_ENGINE_DEPLOY=1
+        - PREPARE_DEPLOY=1
       script:
-        - ./build-support/bin/native/prepare-binary-deploy.sh
+        - ./pants --version && ./build-support/bin/release.sh -n
 
     - os: linux
-      dist: trusty
-      sudo: required
-      # Docker runs will write files as root, so avoid caching for this shard.
-      cache: false
       services:
         - docker
-      language: python
-      python: "2.7.13"
-      addons:
-        apt:
-          packages:
-            - cmake
       env:
         - SHARD="Linux Native Engine Binary Builder"
-        - NATIVE_ENGINE_DEPLOY=1
-        # Use the standard python-2.7 docker Debian Wheezy image for binary compatibility with old
-        # linux distros.
-        - DOCKER_IMAGE="python:2.7.13-wheezy"
-      before_install:
-        # Remove any Ubuntu binary cruft before building.
-        - git clean -fdx
-        - rm -rf ~/.cache/pants
-        - docker pull $DOCKER_IMAGE
+        - PREPARE_DEPLOY=1
       script:
-        # Map virtual mount paths 1:1 to simulate running in-place in travis.
+        - docker build --rm -t travis_ci
+          --build-arg "TRAVIS_USER=$(id -un)"
+          --build-arg "TRAVIS_UID=$(id -u)"
+          --build-arg "TRAVIS_GROUP=$(id -gn)"
+          --build-arg "TRAVIS_GID=$(id -g)"
+            build-support/docker/travis_ci/
+        # Mount ${HOME} to cache the ${HOME}/.cache/pants/rust-toolchain
         - docker run --rm -t
-          -v "${TRAVIS_BUILD_DIR}:${TRAVIS_BUILD_DIR}"
-          -v "${HOME}:${HOME}"
-          -e "HOME=${HOME}"
-          "${DOCKER_IMAGE}"
-          sh -c "
-            cd $TRAVIS_BUILD_DIR && ./build-support/bin/native/prepare-binary-deploy.sh
-          "
+          -v "${HOME}:/travis/home"
+          -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
+          travis_ci:latest
+          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
 
     - os: linux
       dist: trusty
@@ -141,7 +129,7 @@ matrix:
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrcnt -u 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcnt -u 0/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -169,7 +157,7 @@ matrix:
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrcnt -u 1/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcnt -u 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -197,7 +185,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrcjlpt -y 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -225,7 +213,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrcjlpt -y 1/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -253,7 +241,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 0/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 0/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -281,7 +269,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 1/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -309,7 +297,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 2/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 2/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -337,7 +325,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 3/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -365,7 +353,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 4/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 4/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -393,7 +381,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 5/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 5/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -421,7 +409,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
-        - ./build-support/bin/ci.sh -x -efkmsrjlpnt -i 6/7 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrjlpnt -i 6/7 "${SHARD}"
 
     # Rust tests
     - os: linux
@@ -435,7 +423,7 @@ matrix:
       env:
         - SHARD="Rust tests"
       script:
-        - ./build-support/bin/ci.sh -abcfjklmnprstx
+        - ./build-support/bin/ci.sh -abcfjklmnprtx
 
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
@@ -444,13 +432,15 @@ deploy:
   secret_access_key:
     secure: RQVzsNfZL8AgsXdjZ67j2tWs5Tjl/FKpmE1fyVgldMbua/xhW8dzdFrtOeWjTPX4/+sJZ4U7/tZectBtWejmrXUJiZQKJwJBnsyYxysENTWOV80BEYyoz2RPr8HSVbMZ1ZHtUafzO3OqV1x+Pvgpg8FUeUfsy3TGUk0JREO90Q0=
   bucket: binaries.pantsbuild.org
-  local_dir: build-support/bin/native/s3-upload
-  # Otherwise travis will stash build-support/bin/native/s3-upload and the deploy will fail.
+  local_dir: dist/deploy
+  # Otherwise travis will stash dist/deploy and the deploy will fail.
   skip_cleanup: true
   acl: public_read
   on:
-    condition: $NATIVE_ENGINE_DEPLOY = 1
-    branch: master
+    condition: $PREPARE_DEPLOY = 1
+    # NB: We mainly want deploys for `master` commits; but we also need new binaries for stable
+    # release branches; eg `1.3.x`
+    all_branches: true
     repo: pantsbuild/pants
 
 # We accept the default travis-ci email author+committer notification

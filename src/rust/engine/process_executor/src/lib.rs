@@ -1,11 +1,17 @@
 extern crate bazel_protos;
+extern crate digest;
+extern crate grpcio;
 extern crate protobuf;
-extern crate crypto;
+extern crate sha2;
 
 use std::collections::BTreeMap;
 
 pub mod local;
 pub mod remote;
+#[cfg(test)]
+mod test_server;
+#[cfg(test)]
+mod test_utils;
 
 ///
 /// A process to be executed.

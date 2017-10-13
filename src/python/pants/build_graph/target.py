@@ -794,12 +794,13 @@ class Target(AbstractTarget):
     """
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
-      strict_deps = []
+      strict_deps = OrderedSet()
       for declared in _resolve_strict_dependencies(self, dep_context):
         if isinstance(declared, dep_context.compiler_plugin_types):
-          strict_deps.extend(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
+          strict_deps.update(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
         else:
-          strict_deps.append(declared)
+          strict_deps.add(declared)
+      strict_deps = list(strict_deps)
       self._cached_strict_dependencies_map[dep_context] = strict_deps
     return strict_deps
 

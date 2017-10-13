@@ -27,6 +27,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Dan Harrison
 + Daniel Anderson
 + Daniel Bentley
++ Daniel Peebles
 + Daniel Wagner-Hall
 + Dave Brewster
 + David Taylor

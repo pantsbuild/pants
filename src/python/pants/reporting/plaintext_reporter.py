@@ -13,7 +13,7 @@ from colors import cyan, green, red, yellow
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.plaintext_reporter_base import PlainTextReporterBase
 from pants.reporting.report import Report
-from pants.reporting.reporter import Reporter
+from pants.reporting.reporter import Reporter, ReporterDestination
 from pants.util.memo import memoized_method
 
 
@@ -53,14 +53,15 @@ class PlainTextReporter(PlainTextReporterBase):
   """
 
   # Console reporting settings.
-  #   outfile: Write to this file-like object.
+  #   outfile: Write output to this file-like object (analogous to stdout).
+  #   errfile: Write error output to this file-like object (analogous to stderr).
   #   color: use ANSI colors in output.
   #   indent: Whether to indent the reporting to reflect the nesting of workunits.
   #   timing: Show timing report at the end of the run.
   #   cache_stats: Show artifact cache report at the end of the run.
   Settings = namedtuple('Settings',
-                        Reporter.Settings._fields + ('outfile', 'color', 'indent', 'timing',
-                                                     'cache_stats', 'label_format',
+                        Reporter.Settings._fields + ('outfile', 'errfile', 'color', 'indent',
+                                                     'timing', 'cache_stats', 'label_format',
                                                      'tool_output_format'))
 
   _COLOR_BY_LEVEL = {
@@ -117,7 +118,7 @@ class PlainTextReporter(PlainTextReporterBase):
 
   def close(self):
     """Implementation of Reporter callback."""
-    self.emit(self.generate_epilog(self.settings))
+    self.emit(self.generate_epilog(self.settings), dest=ReporterDestination.ERR)
 
   def start_workunit(self, workunit):
     """Implementation of Reporter callback."""
@@ -180,11 +181,17 @@ class PlainTextReporter(PlainTextReporterBase):
       self.emit(s)
     self.flush()
 
-  def emit(self, s):
-    self.settings.outfile.write(s)
+  def emit(self, s, dest=ReporterDestination.OUT):
+    if dest == ReporterDestination.OUT:
+      self.settings.outfile.write(s)
+    elif dest == ReporterDestination.ERR:
+      self.settings.errfile.write(s)
+    else:
+      raise Exception('Invalid {}: {}'.format(ReporterDestination, dest))
 
   def flush(self):
     self.settings.outfile.flush()
+    self.settings.errfile.flush()
 
   def _get_label_format(self, workunit):
     for label, label_format in self.LABEL_FORMATTING.items():

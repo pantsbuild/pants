@@ -21,7 +21,6 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 pub struct Variants(pub Vec<(String, String)>);
 
 impl Variants {
-
   ///
   /// Merges right over self (by key, and then sorted by key).
   ///
@@ -39,9 +38,11 @@ impl Variants {
   }
 
   pub fn find(&self, key: &String) -> Option<&str> {
-    self.0.iter()
-      .find(|&&(ref k, _)| k == key)
-      .map(|&(_, ref v)| v.as_str())
+    self.0.iter().find(|&&(ref k, _)| k == key).map(
+      |&(_, ref v)| {
+        v.as_str()
+      },
+    )
   }
 }
 
@@ -95,7 +96,10 @@ impl hash::Hash for Key {
 
 impl Key {
   pub fn new_with_anon_type_id(id: Id) -> Key {
-    Key { id: id, type_id: ANY_TYPE }
+    Key {
+      id: id,
+      type_id: ANY_TYPE,
+    }
   }
 
   pub fn id(&self) -> Id {
@@ -171,12 +175,10 @@ pub enum Noop {
 
 impl fmt::Debug for Noop {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    f.write_str(
-      match self {
-        &Noop::Cycle => "Dep graph contained a cycle.",
-        &Noop::NoTask => "No task was available to compute the value.",
-        &Noop::NoVariant => "A matching variant key was not configured in variants.",
-      }
-    )
+    f.write_str(match self {
+      &Noop::Cycle => "Dep graph contained a cycle.",
+      &Noop::NoTask => "No task was available to compute the value.",
+      &Noop::NoVariant => "A matching variant key was not configured in variants.",
+    })
   }
 }

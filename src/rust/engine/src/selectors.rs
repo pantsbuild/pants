@@ -11,7 +11,10 @@ pub struct Select {
 
 impl Select {
   pub fn without_variant(product: TypeConstraint) -> Select {
-    Select { product: product, variant_key: None }
+    Select {
+      product: product,
+      variant_key: None,
+    }
   }
 }
 

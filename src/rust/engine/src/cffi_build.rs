@@ -1,4 +1,4 @@
-extern crate gcc;
+extern crate cc;
 
 /*
 
@@ -23,7 +23,11 @@ use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
 
 fn main() {
-  let mut config = gcc::Config::new();
+  let mut config = cc::Build::new();
+
+  // Don't implicitly set -Wall -Wextra because cffi generates code with warnings.
+  // TODO: Consider removing this if/when https://github.com/alexcrichton/cc-rs/pull/248 lands.
+  config.warnings(false);
 
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the
   // python import name, as python keys the initialization function name off of the import name.
@@ -48,7 +52,9 @@ fn mark_for_change_detection(path: PathBuf) -> PathBuf {
 
 fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
   let mut contents = String::new();
-  fs::File::open(env_script_path)?.read_to_string(&mut contents)?;
+  fs::File::open(env_script_path)?.read_to_string(
+    &mut contents,
+  )?;
   // It would be a shame if someone were to include a space in an actual quoted value.
   // If they did that, I guess we'd need to implement shell tokenization or something.
   return Ok(contents.trim().split(' ').map(str::to_owned).collect());
