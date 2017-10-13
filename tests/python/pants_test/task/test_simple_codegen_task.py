@@ -299,3 +299,266 @@ class SimpleCodegenTaskTest(TaskTestBase):
 
     t2_hash = syn_targets_for_t2[0].invalidation_hash()
     self.assertNotEqual(t1_hash, t2_hash)
+
+
+class ExportingDummyGen(DummyGen):
+
+  def __init__(self, *args, **kwargs):
+    super(ExportingDummyGen, self).__init__(*args, **kwargs)
+    self.synthetic_type = ExportingSyntheticDummyLibrary
+    self.synthetic_exports = ['marionette:no-strings']
+    self.synthetic_dependencies = ['marionette:no-strings']
+
+  def synthetic_target_extra_exports(self, target, target_workdir):
+    return self.synthetic_exports
+
+  def synthetic_target_extra_dependencies(self, target, target_workdir):
+    return [self.context.build_graph.get_target_from_spec(s) for s in self.synthetic_dependencies]
+
+  def synthetic_target_type(self, target):
+    return self.synthetic_type
+
+
+class ExportingDummyLibrary(DummyLibrary):
+  def __init__(self, exports=None, **kwargs):
+    super(ExportingDummyLibrary, self).__init__(**kwargs)
+    self._export_specs = exports
+
+  @property
+  def export_specs(self):
+    return self._export_specs
+
+
+class ExportingSyntheticDummyLibrary(SyntheticDummyLibrary):
+  def __init__(self, address, sources, exports=None, **kwargs):
+    super(ExportingSyntheticDummyLibrary, self).__init__(address, sources, **kwargs)
+    self._export_specs = exports
+
+  @property
+  def export_specs(self):
+    return self._export_specs
+
+
+class ExportSimpleCodegenTaskTest(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return ExportingDummyGen
+
+  @property
+  def alias_groups(self):
+    return register_core().merge(BuildFileAliases({
+      'target': Target,
+      'dummy_library': DummyLibrary,
+      'exporting_dummy_library': ExportingDummyLibrary
+    }))
+
+  def _create_dummy_task(self,
+    target_roots=None,
+    synthetic_type=ExportingSyntheticDummyLibrary,
+    synthetic_exports=None,
+    synthetic_dependencies=None,
+    **options):
+
+    self.set_options(**options)
+    task = self.create_task(self.context(target_roots=target_roots))
+    task.synthetic_type = synthetic_type
+    if synthetic_exports is not None:
+      task.synthetic_exports = synthetic_exports
+    if synthetic_dependencies is not None:
+      task.synthetic_dependencies = synthetic_dependencies
+
+    task.setup_for_testing(self)
+    return task
+
+  def synthetic_target_for(self, spec):
+    for syn_addr in self.build_graph.synthetic_addresses:
+      t = self.build_graph.get_target(syn_addr)
+      if t.derived_from == self.build_graph.get_target_from_spec(spec):
+        return t
+    else:
+      return None
+
+  def test_add_export_from_target_that_supports_exports(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets)
+    task.execute()
+
+    self.assertEqual(self.synthetic_target_for('fleem').export_specs, ['marionette:no-strings'])
+
+  def test_skip_adding_export_from_target_that_supports_exports_to_one_that_doesnt(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets, synthetic_type=SyntheticDummyLibrary)
+    task.execute()
+
+    self.assertEqual(type(self.synthetic_target_for('fleem')), SyntheticDummyLibrary)
+
+  def test_merges_exports(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+        dependencies=[':flaam'],
+        exports=[':flaam']
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets)
+    task.execute()
+
+    self.assertEqual(
+      self.synthetic_target_for('fleem').export_specs,
+      [':flaam', 'marionette:no-strings'])
+
+  def test_exports_always_copied_even_if_no_extra(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+        dependencies=[':flaam'],
+        exports=[':flaam']
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets, synthetic_exports=[])
+
+    task.execute()
+
+    self.assertEqual(self.synthetic_target_for('fleem').export_specs, [':flaam'])
+
+  def test_missing_extra_dependency_fails(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(
+      target_roots=targets,
+      synthetic_exports=['marionette:no-strings'],
+      synthetic_dependencies=[])
+
+    with self.assertRaises(SimpleCodegenTask.MismatchedExtraExports):
+      task.execute()
+
+  def test_additional_extra_dependency_fine(self):
+    self.add_to_build_file('marionette', dedent("""
+      dummy_library(name='no-strings', sources=[])
+    """))
+    self.target('marionette:no-strings')
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets,
+      synthetic_exports=[],
+      synthetic_dependencies=['marionette:no-strings'])
+
+    task.execute()
+
+    self.assertEqual(
+      self.synthetic_target_for('fleem').dependencies[0].address.spec,
+      'marionette:no-strings')
+
+  def test_todo_if_exports_a_code_gen_target(self):
+    # If a codegen target exports another codegen target,
+    # is the dependency's synthetic target exported by the current target?
+    # A: it should be, but I'm not sure that it is
+
+    # self.create_file('fliim/org/pantsbuild/example/fliim.dummy',
+    #   'org.pantsbuild.example Fliim')
+    # self.add_to_build_file('fliim', dedent("""
+    #   exporting_dummy_library(name='flaam', sources=[])
+    #   exporting_dummy_library(name='fleem',
+    #     sources=[],
+    #     exports=[':flaam']
+    #   )
+    #
+    #   exporting_dummy_library(name='fliim',
+    #     sources=['org/pantsbuild/example/fliim.dummy'],
+    #     exports=[]
+    #   )
+    # """))
+
+    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
+      'org.pantsbuild.example Fleem')
+    self.add_to_build_file('fleem', dedent("""
+      dummy_library(name='flaam', sources=[])
+
+      exporting_dummy_library(name='fleem',
+        sources=['org/pantsbuild/example/fleem.dummy'],
+      )
+    """))
+    self.target('fleem:flaam')
+    targets = [self.target('fleem')]
+    task = self._create_dummy_task(target_roots=targets,
+      synthetic_exports=[],
+      synthetic_dependencies=[])
+
+    task.execute()
+
+    self.assertEqual(
+      self.synthetic_target_for('fleem').export_specs, [])
+
