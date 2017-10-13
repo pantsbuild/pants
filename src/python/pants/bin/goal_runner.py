@@ -164,7 +164,7 @@ class GoalRunnerFactory(object):
     if self._global_options.get_rank('quiet') != RankedValue.HARDCODED:
       return self._global_options.quiet
 
-    return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals) or self._explain
+    return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
 
   def _setup_context(self, pantsd_launcher):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
