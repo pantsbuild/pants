@@ -31,14 +31,13 @@ class WrappedPEX(object):
 
   _PEX_PATH_ENV_VAR_NAME = 'PEX_PATH'
 
-  def __init__(self, pex, extra_pex_paths, interpreter):
+  def __init__(self, pex, interpreter):
     """
     :param pex: The main pex we wrap.
     :param extra_pex_paths: Other pexes, to "merge" in via the PEX_PATH mechanism.
     :param interpreter: The interpreter the main pex will run on.
     """
     self._pex = pex
-    self._extra_pex_paths = extra_pex_paths
     self._interpreter = interpreter
 
   @property
@@ -122,12 +121,4 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
           builder.freeze()
 
-        with open(extra_pex_paths_file_path, 'w') as outfile:
-          for epp in extra_pex_paths:
-            outfile.write(epp)
-            outfile.write(b'\n')
-
-    if extra_pex_paths is None:
-      with open(extra_pex_paths_file_path, 'r') as infile:
-        extra_pex_paths = [p.strip() for p in infile.readlines()]
-    return WrappedPEX(PEX(os.path.realpath(path), interpreter), extra_pex_paths, interpreter)
+    return WrappedPEX(PEX(os.path.realpath(path), interpreter), interpreter)
