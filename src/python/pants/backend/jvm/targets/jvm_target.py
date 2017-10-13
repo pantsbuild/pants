@@ -94,8 +94,12 @@ class JvmTarget(Target, Jarable):
     :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
     :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
     """
-    deprecated_conditional(lambda: resources is not None, '1.5.0.dev0',
-                           'The `resources=` JVM target argument', 'Use `dependencies=` instead.')
+    deprecated_conditional(
+      lambda: resources is not None,
+      '1.5.0.dev0',
+      'The `resources=` JVM target argument found on target {}'.format(address.to_address()),
+      'Use `dependencies=` instead.'
+    )
 
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()

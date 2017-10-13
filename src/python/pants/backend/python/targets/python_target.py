@@ -37,7 +37,11 @@ class PythonTarget(Target):
       deprecated_conditional(
         lambda: True,
         '1.5.0.dev0',
-        'The `resources=` Python target argument', 'Depend on resources targets instead.'
+        'The `resources=` Python target argument found on target //{}:{}'.format(
+            parse_context.rel_path,
+            kwargs.get('name', 'unknown')
+        ),
+        'Depend on resources targets instead.'
       )
       resources_kwargs = dict(
         name=cls._suffix_for_synthetic_spec(kwargs.get('name', 'unknown')),
@@ -90,10 +94,20 @@ class PythonTarget(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
-    deprecated_conditional(lambda: resources is not None, '1.5.0.dev0',
-                           'The `resources=` Python target argument', 'Depend on resources targets instead.')
-    deprecated_conditional(lambda: resource_targets is not None, '1.5.0.dev0',
-                           'The `resource_targets=` Python target argument', 'Use `dependencies=` instead.')
+    deprecated_conditional(
+      lambda: resources is not None,
+      '1.5.0.dev0',
+      'The `resources=` Python target argument found on target {}'.format(address.to_address()),
+      'Depend on resources targets instead.'
+    )
+    deprecated_conditional(
+      lambda: resource_targets is not None,
+      '1.5.0.dev0',
+      'The `resource_targets=` Python target argument found on target {}'.format(
+        address.to_address()
+      ),
+      'Use `dependencies=` instead.'
+    )
     self.address = address
     payload = payload or Payload()
     payload.add_fields({
