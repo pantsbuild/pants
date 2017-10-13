@@ -26,12 +26,12 @@ from pants.help.help_printer import HelpPrinter
 from pants.init.pants_daemon_launcher import PantsDaemonLauncher
 from pants.init.target_roots import TargetRoots
 from pants.java.nailgun_executor import NailgunProcessGroup
+from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
 from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
-
 
 logger = logging.getLogger(__name__)
 
@@ -124,8 +124,6 @@ class GoalRunnerFactory(object):
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
-    def is_quiet(goals):
-      return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals) or self._explain
 
     spec_parser = CmdLineSpecParser(self._root_dir)
     for goal in requested_goals:
@@ -134,7 +132,7 @@ class GoalRunnerFactory(object):
                        "a goal. If this is incorrect, disambiguate it with ./{0}.".format(goal))
 
     goals = [Goal.by_name(goal) for goal in requested_goals]
-    return goals, is_quiet(goals)
+    return goals
 
   def _specs_to_targets(self, specs):
     """Populate the BuildGraph and target list from a set of input specs."""
@@ -159,6 +157,15 @@ class GoalRunnerFactory(object):
       with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
         pantsd_launcher.maybe_launch()
 
+  def _should_be_quiet(self, goals):
+    if self._explain:
+      return True
+
+    if self._global_options.get_rank('quiet') != RankedValue.HARDCODED:
+      return self._global_options.quiet
+
+    return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals) or self._explain
+
   def _setup_context(self, pantsd_launcher):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._build_graph, self._address_mapper, spec_roots = self._init_graph(
@@ -171,7 +178,10 @@ class GoalRunnerFactory(object):
         self._daemon_graph_helper,
         self._global_options.subproject_roots,
       )
-      goals, is_quiet = self._determine_goals(self._requested_goals)
+
+      goals = self._determine_goals(self._requested_goals)
+      is_quiet = self._should_be_quiet(goals)
+
       target_roots = self._specs_to_targets(spec_roots)
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
