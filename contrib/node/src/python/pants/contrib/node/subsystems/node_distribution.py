@@ -36,7 +36,7 @@ class NodeDistribution(object):
       register('--supportdir', advanced=True, default='bin/node',
                help='Find the Node distributions under this dir.  Used as part of the path to '
                     'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
-      register('--version', advanced=True, default='8.6.0',
+      register('--version', advanced=True, default='6.9.1',
                help='Node distribution version.  Used as part of the path to lookup the '
                     'distribution with --binary-util-baseurls and --pants-bootstrapdir')
       register('--package-manager', advanced=True, default='npm', fingerprint=True,
@@ -165,11 +165,6 @@ class NodeDistribution(object):
       :rtype: :class:`subprocess.Popen`
       """
       env, kwargs = self._prepare_env(kwargs)
-      logging.info('\nrunning node command [%s]', self.cmd)
-      logging.info('environment')
-      logging.info('*' * 80)
-      logging.info('PATH => %s', env.get('PATH'))
-      logging.info('*' * 80)
       return subprocess.Popen(self.cmd, env=env, **kwargs)
 
     def check_output(self, **kwargs):
