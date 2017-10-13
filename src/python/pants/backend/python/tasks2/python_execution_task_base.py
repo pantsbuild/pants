@@ -92,7 +92,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.join(self.workdir, str(interpreter.identity), target_set_id)
-      extra_pex_paths_file_path = path + '.extra_pex_paths'
       extra_pex_paths = None
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
