@@ -97,7 +97,6 @@ class Reporting(Subsystem):
   def _get_invalidation_report(self):
     return InvalidationReport() if self.get_options().invalidation_report else None
 
-  def update_reporting(self, global_options, is_quiet, run_tracker):
   @staticmethod
   def _consume_stringio(f):
     f.flush()
@@ -105,7 +104,7 @@ class Reporting(Subsystem):
     f.close()
     return buffered_output
 
-  def update_reporting(self, global_options, is_quiet_task, run_tracker):
+  def update_reporting(self, global_options, is_quiet, run_tracker):
     """Updates reporting config once we've parsed cmd-line flags."""
 
     # Get any output silently buffered in the old console reporter, and remove it.
