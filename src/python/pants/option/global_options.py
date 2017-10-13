@@ -46,7 +46,7 @@ class GlobalOptionsRegistrar(Optionable):
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
     register('-q', '--quiet', type=bool, recursive=True,
-             help='Squelches most console output. NOTE: if this value is specified via a command line option'
+             help='Squelches most console output. NOTE: if this value is specified via a command line option '
                   'or an environment variable, it will be enforced regardless how the goals behave by default.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
