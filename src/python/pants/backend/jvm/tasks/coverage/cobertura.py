@@ -93,8 +93,8 @@ class Cobertura(CoverageEngine):
     self._settings = settings
     options = settings.options
     self._context = settings.context
-    self._coverage = options.coverage
     self._coverage_datafile = os.path.join(settings.coverage_dir, 'cobertura.ser')
+    self._coverage_force = options.coverage_force
     touch(self._coverage_datafile)
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes

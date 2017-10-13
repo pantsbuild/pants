@@ -6,19 +6,50 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import functools
+import os
 
+from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
+from pants.base.exceptions import TaskError
+from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
+from pants.util import desktop
+from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir
 
 
 class Jacoco(CoverageEngine):
   """Class to run coverage tests with Jacoco."""
 
-  class Factory(Subsystem):
+  class Factory(Subsystem, JvmToolMixin):
     options_scope = 'jacoco'
 
     @classmethod
-    def create(cls, settings, targets, execute_java_for_targets):
+    def register_options(cls, register):
+      super(Jacoco.Factory, cls).register_options(register)
+
+      # We need to inject the jacoco agent at test runtime
+      cls.register_jvm_tool(register,
+                        'jacoco-agent',
+                        classpath=[
+                          JarDependency(
+                            org='org.jacoco',
+                            name='org.jacoco.agent',
+                            rev='0.7.9',
+                            classifier='runtime',
+                            intransitive=True)
+                        ])
+
+      # We need to inject the jacoco agent at test runtime
+      cls.register_jvm_tool(register,
+                        'jacoco-cli',
+                        classpath=[
+                          JarDependency(
+                            org='org.jacoco',
+                            name='org.jacoco.cli',
+                            rev='0.7.10-SNAPSHOT')
+                        ])
+
+    def create(self, settings, targets, execute_java_for_targets):
       """
       :param settings: Generic code coverage settings.
       :type settings: :class:`CodeCoverageSettings`
@@ -30,9 +61,11 @@ class Jacoco(CoverageEngine):
                                        `pants.java.util.execute_java`.
       """
 
-      return Jacoco(settings, targets, execute_java_for_targets)
+      agent_path = self.tool_jar_from_products(settings.context.products, 'jacoco-agent', scope='jacoco')
+      cli_path = self.tool_classpath_from_products(settings.context.products, 'jacoco-cli', scope='jacoco')
+      return Jacoco(settings, agent_path, cli_path, targets, execute_java_for_targets)
 
-  def __init__(self, settings, targets, execute_java_for_targets):
+  def __init__(self, settings, agent_path, cli_path, targets, execute_java_for_targets):
     """
     :param settings: Generic code coverage settings.
     :type settings: :class:`CodeCoverageSettings`
@@ -44,12 +77,18 @@ class Jacoco(CoverageEngine):
                                      `pants.java.util.execute_java`.
     """
     self._settings = settings
+    options = settings.options
+    self._context = settings.context
     self._targets = targets
+    self._agent_path = agent_path
+    self._cli_path = cli_path
     self._execute_java = functools.partial(execute_java_for_targets, targets)
+    self._coverage_force = options.coverage_force
+    self._coverage_datafile = os.path.join(settings.coverage_dir, 'jacoco.exec')
 
   def instrument(self):
-    # jacoco does runtime instrumentation, so this is a noop
-    pass
+    # jacoco does runtime instrumentation, so this only does clean-up of existing run
+    safe_delete(self._coverage_datafile)
 
   @property
   def classpath_append(self):
@@ -61,13 +100,69 @@ class Jacoco(CoverageEngine):
 
   @property
   def extra_jvm_options(self):
-    # TODO(jtrobec): implement code coverage using jacoco
-    return []
+    agent_option = '-javaagent:{agent}=destfile={destfile}'.format(agent=self._agent_path,
+                                                                   destfile=self._coverage_datafile)
+    return [agent_option]
+
+  @staticmethod
+  def is_coverage_target(tgt):
+    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
   def report(self, execution_failed_exception=None):
-    # TODO(jtrobec): implement code coverage using jacoco
-    pass
+    if execution_failed_exception:
+      self._context.log.warn('Test failed: {0}'.format(execution_failed_exception))
+      if self._coverage_force:
+        self._context.log.warn('Generating report even though tests failed.')
+      else:
+        return
+
+    report_dir = os.path.join(self._settings.coverage_dir, 'reports')
+    safe_mkdir(report_dir, clean=True)
+    for report_format in ['xml', 'csv', 'html']:
+      target_path = os.path.join(report_dir, report_format)
+      args = ['report', self._coverage_datafile] + self.get_target_classpaths() + self.get_source_roots() + [
+        '--{report_format}={target_path}'.format(report_format=report_format,
+                                                 target_path=target_path)
+      ]
+      main = 'net.sourceforge.cobertura.reporting.ReportMain'
+      result = self._execute_java(classpath=self._cli_path,
+                                  main='org.jacoco.cli.internal.Main',
+                                  jvm_options=self._settings.coverage_jvm_options,
+                                  args=args,
+                                  workunit_factory=self._context.new_workunit,
+                                  workunit_name='jacoco-report-' + report_format)
+      if result != 0:
+        raise TaskError("java {0} ... exited non-zero ({1})"
+                        " 'failed to report'".format(main, result))
+
+  def get_target_classpaths(self):
+    runtime_classpath = self._context.products.get_data('runtime_classpath')
+
+    target_paths = []
+    for target in self._targets:
+      if Jacoco.is_coverage_target(target):
+        paths = runtime_classpath.get_for_target(target)
+        for (name, path) in paths:
+          target_paths.append(path)
+
+    return self.make_multiple_arg('--classfiles', target_paths)
+
+  def get_source_roots(self):
+    source_roots = {t.target_base for t in self._targets if Jacoco.is_coverage_target(t)}
+    return self.make_multiple_arg('--sourcefiles', source_roots)
+
+  def make_multiple_arg(self, arg_name, arg_list):
+    unique_args = list(set(arg_list))
+
+    args = [(arg_name, f) for f in unique_args]
+    flattened = list(sum(args, ()))
+
+    return flattened
 
   def maybe_open_report(self):
-    # TODO(jtrobec): implement code coverage using jacoco
-    pass
+    if self._settings.coverage_open:
+      report_file_path = os.path.join(self._settings.coverage_dir, 'reports/html', 'index.html')
+      try:
+        desktop.ui_open(report_file_path)
+      except desktop.OpenError as e:
+        raise TaskError(e)
