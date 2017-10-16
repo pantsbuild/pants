@@ -18,6 +18,7 @@ python_tests(
   name='options_integration',
   sources=[
     'test_options_integration.py',
+    'test_quiet_option_integration.py',
   ],
   dependencies=[
     'src/python/pants/util:contextutil',
