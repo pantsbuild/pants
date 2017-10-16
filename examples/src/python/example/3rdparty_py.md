@@ -33,7 +33,7 @@ E.g, your `3rdparty/python/BUILD` file might look like:
 
 ...with `3rdparty/python/requirements.txt` like:
 
-!inc[end-before=pathspec](../../../../3rdparty/python/requirements.txt)
+!inc[lines=1-12](../../../../3rdparty/python/requirements.txt)
 
 `python_requirements` defines a named target for each line in the
 `requirements.txt` line. For example, a line like `ansicolors==1.0.2` in
