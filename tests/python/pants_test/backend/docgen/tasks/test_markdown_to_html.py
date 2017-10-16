@@ -30,6 +30,23 @@ class ChooseLinesTest(unittest.TestCase):
         markdown_to_html_utils.choose_include_text(ABC, '', 'fake.md'),
         '\n'.join(['able', 'baker', 'charlie']))
 
+  def test_include_bad_params(self):
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param', 'fake-md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param=3', 'fake-md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'start-at=AAA&bad-param=3', 'fake-md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param=3&start-at=AAA', 'fake-md'))
+
   def test_include_start_at(self):
     self.assertEquals(
         markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl', 'fake.md'),
