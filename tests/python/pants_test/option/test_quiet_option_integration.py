@@ -33,7 +33,6 @@ class TestOptionsQuietIntegration(PantsRunIntegrationTest):
     with self.assertRaises(ValueError):
       json.loads(pants_run.stdout_data)
 
-
   def test_pants_no_quiet_output_file(self):
     with temporary_file() as f:
       pants_run = self.run_pants(['--no-quiet', 'export', '--output-file={}'.format(f.name)])
