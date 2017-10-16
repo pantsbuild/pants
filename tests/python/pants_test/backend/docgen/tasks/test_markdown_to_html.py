@@ -100,6 +100,7 @@ class ChooseLinesTest(unittest.TestCase):
       '')
 
   def test_include_lines(self):
+    # valid line ranges
     self.assertEquals(
       markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2', 'fake.md'),
       '\n'.join(['able', 'baker']))
@@ -112,10 +113,29 @@ class ChooseLinesTest(unittest.TestCase):
       markdown_to_html_utils.choose_include_text(ABC, 'lines=2-3', 'fake.md'),
       '\n'.join(['baker', 'charlie']))
 
+    # mixing lines directives with conflicting ones
     self.assertRaises(
       markdown_to_html_utils.TaskError,
       lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-at=AAA', 'fake.md'))
 
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'start-at=AAA&lines=1-2', 'fake.md'))
+
+    # should throw regardless of relative positions of "lines" and other directives
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-before=AAA', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'end-at=AAA&lines=1-2', 'fake.md'))
+
+    self.assertRaises(
+      markdown_to_html_utils.TaskError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'end-before=AAA&lines=1-2', 'fake.md'))
+
+    # invalid line ranges
     self.assertRaises(
       markdown_to_html_utils.TaskError,
       lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=AAA', 'fake.md'))
