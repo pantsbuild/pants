@@ -3,7 +3,6 @@
 
 package org.pantsbuild.testproject.unicode.unicodedep.provider
 
-
 object Provider {
   val ε = "epsilon"
 }

@@ -65,6 +65,7 @@ function _ensure_cffi_sources() {
   PYTHONPATH="${PANTS_SRCPATH}:${PYTHONPATH}" python "${CFFI_BOOTSTRAPPER}" "${NATIVE_ROOT}/src/cffi" >&2
 }
 
+# Echos directories to add to $PATH.
 function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
 
@@ -96,24 +97,52 @@ function ensure_native_build_prerequisites() {
   if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
     "${CARGO_HOME}/bin/cargo" install rustfmt >&2
   fi
+
+  local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
+  local readonly cmakeroot="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")" || die "Failed to fetch cmake"
+  local readonly goroot="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
+
+  export GOROOT="${goroot}"
+  export EXTRA_PATH_FOR_CARGO="${cmakeroot}/bin:${goroot}/bin"
 }
 
+# Echos directories to add to $PATH.
 function prepare_to_build_native_code() {
   # Must happen in the pants venv and have PANTS_SRCPATH set.
 
-  ensure_native_build_prerequisites
-  _ensure_cffi_sources
+  ensure_native_build_prerequisites || die
+  _ensure_cffi_sources || die
 }
 
 function run_cargo() {
-  prepare_to_build_native_code
+  prepare_to_build_native_code || die
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
-  "${cargo}" "$@"
+  # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
+  (cd "${REPO_ROOT}" && PATH="${EXTRA_PATH_FOR_CARGO}:${PATH}" "${cargo}" "$@")
+}
+
+function _wait_noisily() {
+  "$@" &
+  pid=$!
+
+  i=0
+  while ps -p "${pid}" >/dev/null 2>/dev/null; do
+    [[ "$((i % 60))" -eq 0 ]] && echo >&2 "[Waiting for $@ (pid ${pid}) to complete]"
+    i="$((i + 1))"
+    sleep 1
+  done
+
+  wait "${pid}"
 }
 
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
+
+  # Sometimes fetching a large git repo dependency can take more than 10 minutes.
+  # This times out on travis, because nothing is printed to stdout/stderr in that time.
+  # Pre-fetch those git repos and keep writing to stdout as we do.
+  _wait_noisily run_cargo fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
   run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }

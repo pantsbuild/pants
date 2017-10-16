@@ -630,7 +630,18 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:scalafmt',
     'tests/python/pants_test:int-test',
   ],
-  timeout=120,
+  timeout=240,
+  tags = {'integration'},
+)
+
+python_tests(
+  name = 'scalafix',
+  sources = ['test_scalafix.py'],
+  dependencies = [
+    'src/python/pants/backend/jvm/tasks:scalafix',
+    'tests/python/pants_test:int-test',
+  ],
+  timeout=240,
   tags = {'integration'},
 )
 
