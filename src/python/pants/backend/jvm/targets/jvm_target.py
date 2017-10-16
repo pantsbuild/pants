@@ -97,7 +97,7 @@ class JvmTarget(Target, Jarable):
     deprecated_conditional(
       lambda: resources is not None,
       '1.5.0.dev0',
-      'The `resources=` JVM target argument found on target {}'.format(address.to_address()),
+      'The `resources=` JVM target argument found on target {}'.format(address.spec),
       'Use `dependencies=` instead.'
     )
 

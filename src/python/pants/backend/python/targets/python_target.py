@@ -37,7 +37,7 @@ class PythonTarget(Target):
       deprecated_conditional(
         lambda: True,
         '1.5.0.dev0',
-        'The `resources=` Python target argument found on target //{}:{}'.format(
+        'The `resources=` Python target argument found on target {}:{}'.format(
             parse_context.rel_path,
             kwargs.get('name', 'unknown')
         ),
@@ -97,15 +97,13 @@ class PythonTarget(Target):
     deprecated_conditional(
       lambda: resources is not None,
       '1.5.0.dev0',
-      'The `resources=` Python target argument found on target {}'.format(address.to_address()),
+      'The `resources=` Python target argument found on target {}'.format(address.spec),
       'Depend on resources targets instead.'
     )
     deprecated_conditional(
       lambda: resource_targets is not None,
       '1.5.0.dev0',
-      'The `resource_targets=` Python target argument found on target {}'.format(
-        address.to_address()
-      ),
+      'The `resource_targets=` Python target argument found on target {}'.format(address.spec),
       'Use `dependencies=` instead.'
     )
     self.address = address
