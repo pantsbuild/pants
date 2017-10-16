@@ -161,7 +161,7 @@ class GoalRunnerFactory(object):
     if self._explain:
       return True
 
-    if self._global_options.get_rank('quiet') != RankedValue.HARDCODED:
+    if self._global_options.get_rank('quiet') > RankedValue.HARDCODED:
       return self._global_options.quiet
 
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
