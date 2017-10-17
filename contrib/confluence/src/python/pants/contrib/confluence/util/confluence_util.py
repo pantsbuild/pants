@@ -13,6 +13,8 @@ from twitter.common import log
 from os.path import basename
 
 
+# Copied from `twitter.common.confluence`
+
 try:
   from xmlrpclib import ServerProxy, Error as XMLRPCError, Binary
 except ImportError:

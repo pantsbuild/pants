@@ -16,6 +16,8 @@ from pants.contrib.confluence.targets.doc_page import Page
 from pants.contrib.confluence.util.confluence_util import Confluence, ConfluenceError
 
 
+# Copied from `pants.backend.docgen.tasks.confluence_publish`
+
 # TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come
 # from options. However if we decide against that, we should rename this ConfluencePublishBase.
 class ConfluencePublish(Task):
