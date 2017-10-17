@@ -46,7 +46,7 @@ class PantsDaemonLauncher(object):
     self._subproject_roots = bootstrap_options.subproject_roots
     self._metadata_base_dir = bootstrap_options.pants_subprocessdir
 
-    # TODO(kwlzn): Thread filesystem path ignores here to Watchman's subscription registration.
+    # TODO: https://github.com/pantsbuild/pants/issues/3479
     self._build_root = get_buildroot()
     self._native = Native.create(bootstrap_options)
     self._logger = logging.getLogger(__name__)

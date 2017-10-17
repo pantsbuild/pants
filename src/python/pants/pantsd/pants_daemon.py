@@ -165,7 +165,7 @@ class PantsDaemon(ProcessManager):
         self.shutdown(service_thread_map)
         raise self.StartupFailure('service {} failed to start, shutting down!'.format(service))
 
-    # Once all services are strted, write our pid.
+    # Once all services are started, write our pid.
     self.write_pid()
 
     # Monitor services.
