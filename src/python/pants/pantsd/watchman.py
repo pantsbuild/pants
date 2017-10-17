@@ -140,6 +140,15 @@ class Watchman(ProcessManager):
     self.write_pid(pid)
     self.write_socket(self._sock_file)
 
+  def _attempt_set_timeout(self, timeout):
+    """Sets a timeout on the inner watchman client's socket."""
+    try:
+      self.client.setTimeout(timeout)
+    except Exception:
+      self._logger.debug('failed to set post-startup watchman timeout to %s', self._timeout)
+    else:
+      self._logger.debug('set post-startup watchman timeout to %s', self._timeout)
+
   def watch_project(self, path):
     """Issues the watch-project command to watchman to begin watching the buildroot.
 
@@ -149,12 +158,7 @@ class Watchman(ProcessManager):
     try:
       return self.client.query('watch-project', os.path.realpath(path))
     finally:
-      try:
-        self.client.setTimeout(self._timeout)
-      except Exception:
-        self._logger.debug('failed to set post-startup watchman timeout to %s', self._timeout)
-      else:
-        self._logger.debug('set post-startup watchman timeout to %s', self._timeout)
+      self._attempt_set_timeout(self._timeout)
 
   def subscribed(self, build_root, handlers):
     """Bulk subscribe generator for StreamableWatchmanClient.
