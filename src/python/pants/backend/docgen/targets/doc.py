@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated_module
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes, stable_json_sha1
 from pants.build_graph.target import Target
-from pants.base.deprecated import deprecated_module
 
 
 deprecated_module('1.6.0.dev0', 'Use contrib.confluence.targets.doc_page.py instead')

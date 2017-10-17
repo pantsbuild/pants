@@ -11,11 +11,11 @@ import textwrap
 from twitter.common.confluence import Confluence, ConfluenceError
 
 from pants.backend.docgen.targets.doc import Page
+from pants.base.deprecated import deprecated_module
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util import desktop
 from pants.util.dirutil import safe_open
-from pants.base.deprecated import deprecated_module
 
 
 deprecated_module('1.6.0.dev0', 'Use contrib.confluence.tasks.confluence_publish.py instead')

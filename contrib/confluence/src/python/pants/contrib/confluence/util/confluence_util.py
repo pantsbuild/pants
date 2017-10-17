@@ -2,18 +2,19 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-"""Code to ease publishing text to Confluence wikis."""
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 import getpass
 import mimetypes
 import urllib
+from os.path import basename
 
 from twitter.common import log
 
-from os.path import basename
-
 
 # Copied from `twitter.common.confluence`
+"""Code to ease publishing text to Confluence wikis."""
 
 try:
   from xmlrpclib import ServerProxy, Error as XMLRPCError, Binary
