@@ -1,18 +1,30 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+mod hash;
+
+extern crate blake2_rfc;
+extern crate boxfuture;
+extern crate futures;
+extern crate futures_cpupool;
+extern crate glob;
+extern crate ignore;
+#[macro_use]
+extern crate lazy_static;
+extern crate ordermap;
+extern crate tar;
+extern crate tempdir;
+
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
 
 use futures::future::{self, Future};
-use futures_cpupool::{self, CpuFuture, CpuPool};
+use futures_cpupool::{CpuFuture, CpuPool};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
-use ignore;
 use ordermap::OrderMap;
-use tar;
 use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
