@@ -53,9 +53,9 @@ class WrappedPEX(object):
     cmdline = ' '.join(self._pex.cmdline(args))
     pex_path = self._pex_path()
     if pex_path:
-     return '{env_var_name}={pex_path} {cmdline}'.format(env_var_name=self._PEX_PATH_ENV_VAR_NAME,
-                                                         pex_path=pex_path,
-                                                         cmdline=cmdline)
+      return '{env_var_name}={pex_path} {cmdline}'.format(env_var_name=self._PEX_PATH_ENV_VAR_NAME,
+                                                          pex_path=pex_path,
+                                                          cmdline=cmdline)
     else:
       return cmdline
 
