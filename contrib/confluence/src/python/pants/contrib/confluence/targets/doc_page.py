@@ -37,15 +37,16 @@ class WikiArtifact(object):
 class Wiki(object):
   """Identifies a wiki where pages can be published."""
 
-  def __init__(self, name, url):
+  def __init__(self, name, url_builder):
     """
     :param url_builder: Function that accepts a page target and an optional wiki config dict.
     """
     self.name = name
-    self.url = url
+    self.url_builder = url_builder
 
   def fingerprint(self):
-    return combine_hashes([stable_json_sha1(self.name), stable_json_sha1(self.url)])
+    # TODO: url_builder is not a part of fingerprint.
+    return stable_json_sha1(self.name)
 
 
 class Page(Target):
@@ -57,7 +58,7 @@ class Page(Target):
      page(name='mypage',
        source='mypage.md',
        provides=[
-         wiki_artifact(wiki=wiki('foozle', 'http://some.url.com/blah'),
+         wiki_artifact(wiki=Wiki('foozle', <url builder>),
                        space='my_space',
                        title='my_page',
                        parent='my_parent'),
@@ -125,7 +126,7 @@ class Page(Target):
 
   @property
   def provides(self):
-    """An array of WikiArtifact instances provided by this Page.
+    """A tuple of WikiArtifact instances provided by this Page.
 
     Notably different from JvmTarget.provides, which has only a single Artifact rather than a
     list.

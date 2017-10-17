@@ -5,6 +5,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.contrib.confluence.targets.doc_page import Page, WikiArtifact, Wiki
+from pants.contrib.confluence.tasks.confluence_publish import ConfluencePublish
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
