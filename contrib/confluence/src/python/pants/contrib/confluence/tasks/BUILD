@@ -3,19 +3,9 @@
 
 python_library(
   dependencies = [
-    '3rdparty/python:setuptools',
-    '3rdparty/python:six',
-    '3rdparty/python/twitter/commons:twitter.common.confluence',
-    'src/python/pants/backend/docgen/targets',
-    'src/python/pants/base:build_environment',
+    'contrib/confluence/src/python/pants/contrib/confluence/targets',
+    'contrib/confluence/src/python/pants/contrib/confluence/util',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
-    'src/python/pants/base:mustache',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal',
-    'src/python/pants/help',
-    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',

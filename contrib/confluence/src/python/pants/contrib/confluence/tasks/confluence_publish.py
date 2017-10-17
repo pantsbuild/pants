@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import textwrap
 
-from pants.contrib.confluence.util.confluence_util import Confluence, ConfluenceError
-
-from pants.backend.docgen.targets.doc import Page
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util import desktop
 from pants.util.dirutil import safe_open
+
+from pants.contrib.confluence.targets.doc_page import Page
+from pants.contrib.confluence.util.confluence_util import Confluence, ConfluenceError
 
 
 # TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come
