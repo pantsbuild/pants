@@ -1,7 +1,6 @@
 var path = require('path');
 
 var NormalConfig = {
-  context: path.join(__dirname, "..", ".."),
   resolveLoader: {
     root: path.join(__dirname, "node_modules")
   },
@@ -14,7 +13,6 @@ var NormalConfig = {
 };
 
 var UnitTestConfig = {
-  context: path.join(__dirname, "..", ".."),
   resolveLoader: {
     root: path.join(__dirname, "node_modules")
   },
