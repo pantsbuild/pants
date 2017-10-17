@@ -28,6 +28,6 @@ ignore = "0.1.8"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.5"
-process_executor = { path = "process_executor" }
+process_execution = { path = "process_execution" }
 tar = "0.4.13"
 tempdir = "0.3.5"

@@ -26,7 +26,7 @@ extern crate ignore;
 extern crate lazy_static;
 extern crate ordermap;
 extern crate petgraph;
-extern crate process_executor;
+extern crate process_execution;
 extern crate tar;
 extern crate tempdir;
 

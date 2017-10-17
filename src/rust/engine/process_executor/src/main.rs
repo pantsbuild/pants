@@ -1,4 +1,4 @@
-extern crate process_executor;
+extern crate process_execution;
 
 use std::env;
 use std::process::exit;
@@ -45,10 +45,10 @@ fn main() {
     (command, env, server)
   };
 
-  let request = process_executor::ExecuteProcessRequest { argv, env };
+  let request = process_execution::ExecuteProcessRequest { argv, env };
   let result = match server {
-    Some(addr) => process_executor::remote::run_command_remote(&addr, request).unwrap(),
-    None => process_executor::local::run_command_locally(request).unwrap(),
+    Some(addr) => process_execution::remote::run_command_remote(&addr, request).unwrap(),
+    None => process_execution::local::run_command_locally(request).unwrap(),
   };
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
