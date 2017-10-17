@@ -166,14 +166,12 @@ class PythonEval(ResolveRequirementsTaskBase):
           # executable_file_content does what the user intends (including, probably, calling that
           # underlying entry point).
           pex_info.entry_point = self._EXEC_NAME
-          extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]
-          if extra_pex_paths:
-            pex_info.merge_pex_path(':'.join(extra_pex_paths))
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
           builder.freeze()
 
       exec_pex = PEX(exec_pex_path, interpreter)
-      pex = WrappedPEX(exec_pex, interpreter)
+      extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]
+      pex = WrappedPEX(exec_pex, interpreter, extra_pex_paths)
 
       with self.context.new_workunit(name='eval',
                                      labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,
