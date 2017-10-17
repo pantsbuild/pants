@@ -4,4 +4,5 @@ name = "process_executor"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
+clap = "2"
 process_execution = {path = "../process_execution"}
