@@ -15,7 +15,9 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def build_file_aliases():
-  warn_or_error('1.6.0.dev0', 'Wiki(...) target object', 'Use wiki(...) instead')
+  warn_or_error('1.6.0.dev0',
+                'Wiki(...) target object',
+                'Use pants.contrib.confluence.targets.wiki(...) instead')
   
   return BuildFileAliases(
     targets={
