@@ -1,14 +1,11 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-mod boxfuture;
 mod context;
 mod core;
 mod externs;
-mod fs;
 mod graph;
 mod handles;
-mod hash;
 mod nodes;
 mod rule_graph;
 mod scheduler;
@@ -16,19 +13,16 @@ mod selectors;
 mod tasks;
 mod types;
 
-extern crate blake2_rfc;
+extern crate boxfuture;
 extern crate fnv;
 extern crate futures;
 extern crate futures_cpupool;
-extern crate glob;
-extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
 extern crate petgraph;
 extern crate process_executor;
-extern crate tar;
-extern crate tempdir;
+extern crate fs;
 
 use std::ffi::CStr;
 use std::fs::File;
