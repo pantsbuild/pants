@@ -15,7 +15,6 @@ from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
-from pants.util.dirutil import fast_relpath
 
 
 class GlobalOptionsRegistrar(Optionable):
@@ -37,8 +36,9 @@ class GlobalOptionsRegistrar(Optionable):
     status as "bootstrap options" is only pertinent during option registration.
     """
     buildroot = get_buildroot()
-    default_distdir = os.path.join(buildroot, 'dist')
-    default_rel_distdir = '/{}/'.format(fast_relpath(default_distdir, get_buildroot()))
+    default_distdir_name = 'dist'
+    default_distdir = os.path.join(buildroot, default_distdir_name)
+    default_rel_distdir = '/{}/'.format(default_distdir_name)
 
     # Although logging supports the WARN level, its not documented and could conceivably be yanked.
     # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
