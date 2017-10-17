@@ -15,14 +15,14 @@ mod types;
 
 extern crate boxfuture;
 extern crate fnv;
+extern crate fs;
 extern crate futures;
 extern crate futures_cpupool;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
 extern crate petgraph;
-extern crate process_executor;
-extern crate fs;
+extern crate process_execution;
 
 use std::ffi::CStr;
 use std::fs::File;

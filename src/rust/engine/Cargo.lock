@@ -11,7 +11,7 @@ dependencies = [
  "lazy_static 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordermap 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "process_executor 0.0.1",
+ "process_execution 0.0.1",
 ]
 
 [[package]]
@@ -314,7 +314,7 @@ version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "process_executor"
+name = "process_execution"
 version = "0.0.1"
 dependencies = [
  "bazel_protos 0.0.1",

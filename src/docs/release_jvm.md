@@ -164,7 +164,7 @@ but the process is also described below:
   1. Log into Sonatype's OSSRH Nexus repository manager web UI.
 
      You do this [here](https://oss.sonatype.org/#stagingRepositories).
-     You should use the the same user id and password you use to login
+     You should use the same user id and password you use to login
      to the Sonatype JIRA server.
 
   2. Find the staging repository auto-created when you

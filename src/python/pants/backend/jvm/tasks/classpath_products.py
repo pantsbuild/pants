@@ -282,7 +282,7 @@ class ClasspathProducts(object):
     """Returns a copy of this ClasspathProducts.
 
     Edits to the copy's classpaths or exclude associations will not affect the classpaths or
-    excludes in the original. The copy is shallow though, so edits to the the copy's product values
+    excludes in the original. The copy is shallow though, so edits to the copy's product values
     will mutate the original's product values.  See `UnionProducts.copy`.
 
     :API: public

@@ -27,4 +27,4 @@ futures-cpupool = "0.1.6"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.5"
-process_executor = { path = "process_executor" }
+process_execution = { path = "process_execution" }
