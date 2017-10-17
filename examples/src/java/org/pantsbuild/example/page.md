@@ -107,6 +107,13 @@ end-at=*substring*<br>
 When excerpting the file to include, stop at a line containing
 *substring*.
 
+lines=*start-line*-*end-line*<br>
+When excerpting the file to include, start at *start-line* and end at
+*end-line*. *start-line* and *end-line* should both be positive integers
+(nonzero) with a hyphen between them, and *end-line* should not be less than *start-line* (e.g
+`lines=1-12`). If the `lines` parameter is provided, no other parameter can be
+used.
+
 ReStructedText Syntax
 ---------------------
 
