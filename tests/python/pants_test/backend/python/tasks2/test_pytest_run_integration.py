@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import time
-import unittest
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -28,52 +27,51 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
                                 'testprojects/tests/python/pants/conf_test'])
     self.assert_success(pants_run)
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_fails(self):
     start = time.time()
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
                                 '--test-pytest-coverage=auto',
                                 '--test-pytest-options=-k exceeds_timeout',
-                                '--timeout-default=1',
+                                '--test-pytest-timeout-default=1',
+                                '--cache-test-pytest-ignore',
                                 'testprojects/tests/python/pants/timeout:exceeds_timeout'])
     end = time.time()
     self.assert_failure(pants_run)
 
-    # Ensure that the failure took less than 20 seconds to run.
-    self.assertLess(end - start, 20)
+    # Ensure that the failure took less than 100 seconds to run to allow for test overhead.
+    self.assertLess(end - start, 100)
 
     # Ensure that a warning about coverage reporting was emitted.
-    self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stderr_data)
+    self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stdout_data)
 
     # Ensure that the timeout message triggered.
-    self.assertIn(" timed out after 1 seconds", pants_run.stdout_data)
+    self.assertIn("FAILURE: Timeout of 1 seconds reached.", pants_run.stdout_data)
 
-  @unittest.skip('https://github.com/pantsbuild/pants/issues/3255')
   def test_pytest_run_timeout_cant_terminate(self):
     start = time.time()
-    terminate_wait = 2
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
+                                '--test-pytest-timeout-terminate-wait=2',
+                                '--test-pytest-timeout-default=1',
                                 '--test-pytest-coverage=auto',
-                                '--test-pytest-timeout-terminate-wait=%d' % terminate_wait,
-                                '--timeout-default=1',
+                                '--cache-test-pytest-ignore',
                                 'testprojects/tests/python/pants/timeout:ignores_terminate'])
     end = time.time()
     self.assert_failure(pants_run)
 
-    # Ensure that the failure took less than 20 seconds to run.
-    self.assertLess(end - start, 20)
+    # Ensure that the failure took less than 100 seconds to run to allow for test overhead.
+    self.assertLess(end - start, 100)
 
     # Ensure that a warning about coverage reporting was emitted.
-    self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stderr_data)
+    self.assertIn("No .coverage file was found! Skipping coverage reporting", pants_run.stdout_data)
 
     # Ensure that the timeout message triggered.
-    self.assertIn("FAILURE: Timeout of 1 seconds reached", pants_run.stdout_data)
+    self.assertIn("FAILURE: Timeout of 1 seconds reached.", pants_run.stdout_data)
 
     # Ensure that the warning about killing triggered.
-    self.assertIn("WARN] Timed out test did not terminate gracefully after {} seconds, "
-                  "killing...".format(terminate_wait), pants_run.stderr_data)
+    self.assertIn("WARN] Timed out test did not terminate gracefully after 2 seconds, "
+                  "killing...", pants_run.stderr_data)
 
   def test_pytest_explicit_coverage(self):
     with temporary_dir(cleanup=False) as coverage_dir:
