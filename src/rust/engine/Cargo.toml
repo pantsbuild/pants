@@ -23,7 +23,6 @@ boxfuture = { path = "boxfuture" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.16"
-futures-cpupool = "0.1.6"
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.5"

@@ -17,7 +17,6 @@ extern crate boxfuture;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
-extern crate futures_cpupool;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
