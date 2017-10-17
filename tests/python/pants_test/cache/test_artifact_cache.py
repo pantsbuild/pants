@@ -76,7 +76,7 @@ class TestArtifactCache(unittest.TestCase):
                                               local)
         with self.assertRaises(NonfatalArtifactCacheError) as ex:
           self.do_test_artifact_cache(artifact_cache)
-        self.assertIn('Connection aborted', str(ex.exception))
+        self.assertIn('Failed to HEAD', str(ex.exception))
 
         self.do_test_artifact_cache(artifact_cache)
 
