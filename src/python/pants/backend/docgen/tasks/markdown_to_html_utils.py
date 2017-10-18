@@ -54,7 +54,11 @@ class WikilinksExtension(markdown.Extension):
     md.inlinePatterns['wikilinks'] = WikilinksPattern(self.build_url, md)
 
 
-# !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
+class IncludeParamParseError(Exception):
+  """Raised when a parameter in an !inc directive is invalid in some way."""
+
+
+# e.g. !inc[start-at=void main&end-before=private HelloMain](HelloMain.java)
 INCLUDE_PATTERN = r'!inc(\[(?P<params>[^]]*)\])?\((?P<path>[^' + '\n' + r']*)\)'
 
 INCLUDE_RECOGNIZED_PARAMS = frozenset([
@@ -63,14 +67,14 @@ INCLUDE_RECOGNIZED_PARAMS = frozenset([
 LINES_PATTERN = re.compile(r'\A([1-9][0-9]*)-([1-9][0-9]*)\Z')
 
 
-def choose_include_text(s, params, source_path):
+def choose_include_text(s, params):
   """Given the contents of a file and !inc[these params], return matching lines
 
+  FIXME: this is an incorrect description!
   If there was a problem matching parameters, return empty list.
 
   :param s: file's text
   :param params: string like "start-at=foo&end-at=bar"
-  :param source_path: path to source .md. Useful in error messages
   """
   source_lines = s.splitlines()
   params_dict = {}
@@ -82,64 +86,62 @@ def choose_include_text(s, params, source_path):
       param, value = term.strip(), ''
     if not param: continue
     if param not in INCLUDE_RECOGNIZED_PARAMS:
-      raise TaskError('Invalid include directive "{0}" in params "{1}"'
-                      ' from {2}'.format(param, params, source_path))
+      valid_params = ["'{0}'".format(p) for p in INCLUDE_RECOGNIZED_PARAMS]
+      raise IncludeParamParseError('Invalid !inc parameter name "{0}"'
+                                   ': valid parameters are: [{1}].'
+                                   .format(param, ', '.join(valid_params)))
     params_dict[param] = value
 
   chosen_lines = []
-  try:
-    if 'lines' in params_dict:
-      lines_arg = params_dict['lines']
-      chosen_lines = include_by_line_range(source_lines, lines_arg, params_dict)
-    else:
-      chosen_lines = include_by_text_match(source_lines, params_dict)
-  except TaskError as include_error:
-    raise TaskError('Error: {0} (in params "{1}" from {2})'
-                    .format(include_error, params, source_path))
+  # do any validation/parsing here and pass parsed values directly to helper
+  if 'lines' not in params_dict:
+    chosen_lines = include_by_text_match(
+      source_lines,
+      params_dict.get('start-after'),
+      params_dict.get('start-at'),
+      params_dict.get('end-before'),
+      params_dict.get('end-at'))
+  else:
+    line_range_arg = params_dict['lines']
+    if len(params_dict) > 1:
+      raise IncludeParamParseError(
+        'Parameter conflict: "lines" cannot be used except by itself')
+    lines_match = LINES_PATTERN.match(line_range_arg)
+    if lines_match is None:
+      raise IncludeParamParseError(
+        'Invalid line range "{0}" provided for parameter "lines"'
+        ': should match "{1}"'
+        .format(line_range_arg, LINES_PATTERN.pattern))
+    [line_start, line_end] = (int(g) for g in lines_match.groups())
+    # LINES_PATTERN does not allow 0 or negative numbers
+    if line_end < line_start:
+      raise IncludeParamParseError(
+        'Invalid end line "{0}" in parameter "lines={1}":'
+        ' should be >= {2}, the start line'
+        .format(line_end, line_range_arg, line_start))
+    nlines = len(source_lines)
+    if line_end > nlines:
+      raise IncludeParamParseError('Invalid end line "{0}"'
+                      ' (should be <= {1}, the number of lines in the source)'
+                      ' from "{2}" for "lines"'
+                      .format(line_end, nlines, line_range_arg))
+    # line range arguments start at 1
+    chosen_lines = source_lines[(line_start - 1):line_end]
+
   return '\n'.join(chosen_lines)
 
 
-def include_by_line_range(source_lines, line_range_arg, params_dict):
-  # 'lines' should be the only parameter specified
-  conflicts = [(p, params_dict[p]) for p in params_dict if p != 'lines']
-  if len(conflicts) > 0:
-    error_msgs = ', '.join(['"{0}={1}"'.format(p, v) for (p, v) in conflicts])
-    raise TaskError('"lines" directive conflicts with other directives: [{0}]'
-                    .format(error_msgs))
-
-  # validate the line range
-  lines_match = LINES_PATTERN.match(line_range_arg)
-  if lines_match is None:
-    raise TaskError('Invalid line range "{0}" (should match "{1}") for "lines"'
-                    .format(line_range_arg, LINES_PATTERN.pattern))
-  [line_start, line_end] = (int(g) for g in lines_match.groups())
-  # LINES_PATTERN does not allow 0 or negative numbers
-  if line_end < line_start:
-    raise TaskError('Invalid end line "{0}" (should be >= {1}, the start line)'
-                    ' from "{2}" for "lines"'
-                    .format(line_end, line_start, line_range_arg))
-  nlines = len(source_lines)
-  if line_end > nlines:
-    raise TaskError('Invalid end line "{0}"'
-                    ' (should be <= {1}, the number of lines in the source)'
-                    ' from "{2}" for "lines"'
-                    .format(line_end, nlines, line_range_arg))
-
-  # line range arguments start at 1
-  return source_lines[(line_start - 1):line_end]
-
-
-def include_by_text_match(source_lines, params_dict):
+def include_by_text_match(source_lines, start_after, start_at, end_before, end_at):
   chosen_lines = []
   # two loops, one waits to "start recording", one "records"
   for line_ix in range(0, len(source_lines)):
     line = source_lines[line_ix]
-    if ('start-at' not in params_dict) and ('start-after' not in params_dict):
+    if start_at is None and start_after is None:
       # if we didn't set a start-* param, don't wait to start
       break
-    if 'start-at' in params_dict and params_dict['start-at'] in line:
+    if start_at is not None and start_at in line:
       break
-    if 'start-after' in params_dict and params_dict['start-after'] in line:
+    if start_after is not None and start_after in line:
       line_ix += 1
       break
   else:
@@ -147,13 +149,13 @@ def include_by_text_match(source_lines, params_dict):
     return ''
   for line_ix in range(line_ix, len(source_lines)):
     line = source_lines[line_ix]
-    if 'end-before' in params_dict and params_dict['end-before'] in line:
+    if end_before is not None and end_before in line:
       break
     chosen_lines.append(line)
-    if 'end-at' in params_dict and params_dict['end-at'] in line:
+    if end_at is not None and end_at in line:
       break
   else:
-    if 'end-before' in params_dict or 'end-at' in params_dict:
+    if end_before is not None or end_at is not None:
       # we had an end- filter, but never encountered it.
       return ''
   return chosen_lines
@@ -177,15 +179,20 @@ class IncludeExcerptPattern(markdown.inlinepatterns.Pattern):
       with open(include_path) as include_file:
         file_text = include_file.read()
     except IOError as e:
-      raise IOError('Markdown file {0} tried to include file {1}, got '
-                    '{2}'.format(self.source_path,
-                                 rel_include_path,
-                                 e.strerror))
-    include_text = choose_include_text(file_text, params, self.source_path)
+      raise IOError(
+        'Markdown file {0} tried to include file {1}, but got "{2}"'
+        .format(self.source_path, rel_include_path, e.strerror))
+    try:
+      include_text = choose_include_text(file_text, params)
+    except IncludeParamParseError as e:
+      raise TaskError(
+        'Markdown file {0} tried to include file {1}'
+        ' with params "{2}", but got "{3}"'
+        .format(self.source_path, rel_include_path, params, e.strerror))
     if not include_text:
-      raise TaskError('Markdown file {0} tried to include file {1} but '
-                      'filtered out everything'.format(self.source_path,
-                                                       rel_include_path))
+      raise TaskError('Markdown file {0} tried to include file {1}'
+                      ' with params "{2}", but filtered out everything'
+                      .format(self.source_path, rel_include_path, params))
     el = markdown.util.etree.Element('div')
     el.set('class', 'md-included-snippet')
     try:

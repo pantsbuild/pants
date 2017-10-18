@@ -27,151 +27,151 @@ charlie"""
 class ChooseLinesTest(unittest.TestCase):
   def test_include_no_params(self):
     self.assertEquals(
-        markdown_to_html_utils.choose_include_text(ABC, '', 'fake.md'),
+        markdown_to_html_utils.choose_include_text(ABC, ''),
         '\n'.join(['able', 'baker', 'charlie']))
 
   def test_include_bad_params(self):
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param', 'fake-md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param=3', 'fake-md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param=3'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'start-at=AAA&bad-param=3', 'fake-md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'start-at=AAA&bad-param=3'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param=3&start-at=AAA', 'fake-md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'bad-param=3&start-at=AAA'))
 
   def test_include_start_at(self):
     self.assertEquals(
-        markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl', 'fake.md'),
+        markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl'),
         '\n'.join(['able', 'baker', 'charlie']))
 
     self.assertEquals(
-        markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak', 'fake.md'),
+        markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak'),
         '\n'.join(['baker', 'charlie']))
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-at=xxx', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-at=xxx'),
       '')
 
   def test_include_start_after(self):
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-after=bak', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-after=bak'),
       'charlie')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-after=cha', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-after=cha'),
       '')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-after=xxx', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-after=xxx'),
       '')
 
   def test_include_end_at(self):
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'end-at=abl', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'end-at=abl'),
       'able')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'end-at=bak', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'end-at=bak'),
       '\n'.join(['able', 'baker']))
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'end-at=xxx', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'end-at=xxx'),
       '')
 
   def test_include_end_before(self):
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'end-before=abl', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'end-before=abl'),
       '')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'end-before=xxx', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'end-before=xxx'),
       '')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'end-before=bak', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'end-before=bak'),
       'able')
 
   def test_include_start_at_end_at(self):
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl&end-at=abl', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl&end-at=abl'),
       'able')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-at=cha&end-at=cha', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-at=cha&end-at=cha'),
       'charlie')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl&end-at=bak', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-at=abl&end-at=bak'),
       '\n'.join(['able', 'baker']))
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak&end-at=abl', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'start-at=bak&end-at=abl'),
       '')
 
   def test_include_lines(self):
     # valid line ranges
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2'),
       '\n'.join(['able', 'baker']))
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'lines=1-1', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'lines=1-1'),
       'able')
 
     self.assertEquals(
-      markdown_to_html_utils.choose_include_text(ABC, 'lines=2-3', 'fake.md'),
+      markdown_to_html_utils.choose_include_text(ABC, 'lines=2-3'),
       '\n'.join(['baker', 'charlie']))
 
     # mixing lines directives with conflicting ones
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-at=AAA', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-at=AAA'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'start-at=AAA&lines=1-2', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'start-at=AAA&lines=1-2'))
 
     # should throw regardless of relative positions of "lines" and other directives
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-before=AAA', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-2&start-before=AAA'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'end-at=AAA&lines=1-2', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'end-at=AAA&lines=1-2'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'end-before=AAA&lines=1-2', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'end-before=AAA&lines=1-2'))
 
     # invalid line ranges
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=AAA', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=AAA'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=0-2', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=0-2'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=-1-2', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=-1-2'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=3-2', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=3-2'))
 
     self.assertRaises(
-      markdown_to_html_utils.TaskError,
-      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-4', 'fake.md'))
+      markdown_to_html_utils.IncludeParamParseError,
+      lambda: markdown_to_html_utils.choose_include_text(ABC, 'lines=1-4'))
 
 
 class MarkdownToHtmlTest(TaskTestBase):
