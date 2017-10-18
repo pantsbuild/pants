@@ -56,6 +56,7 @@ matrix:
         - ./pants --version && ./build-support/bin/release.sh -nc
 
     - os: linux
+      language: generic
       services:
         - docker
       env:
