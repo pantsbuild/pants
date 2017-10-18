@@ -310,7 +310,7 @@ class ExportingDummyGen(DummyGen):
     self.synthetic_dependencies = ['marionette:no-strings']
 
   def synthetic_target_extra_exports(self, target, target_workdir):
-    return self.synthetic_exports
+    return [self.context.build_graph.get_target_from_spec(s) for s in self.synthetic_exports]
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     return [self.context.build_graph.get_target_from_spec(s) for s in self.synthetic_dependencies]
@@ -441,9 +441,8 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
     task = self._create_dummy_task(target_roots=targets)
     task.execute()
 
-    self.assertEqual(
-      self.synthetic_target_for('fleem').export_specs,
-      [':flaam', 'marionette:no-strings'])
+    self.assertIn('fleem:flaam',self.synthetic_target_for('fleem').export_specs)
+    self.assertIn('marionette:no-strings',self.synthetic_target_for('fleem').export_specs)
 
   def test_exports_always_copied_even_if_no_extra(self):
     self.add_to_build_file('marionette', dedent("""
@@ -468,7 +467,7 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
 
     task.execute()
 
-    self.assertEqual(self.synthetic_target_for('fleem').export_specs, [':flaam'])
+    self.assertIn('fleem:flaam',self.synthetic_target_for('fleem').export_specs)
 
   def test_missing_extra_dependency_fails(self):
     self.add_to_build_file('marionette', dedent("""
@@ -522,26 +521,7 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
       self.synthetic_target_for('fleem').dependencies[0].address.spec,
       'marionette:no-strings')
 
-  def test_todo_if_exports_a_code_gen_target(self):
-    # If a codegen target exports another codegen target,
-    # is the dependency's synthetic target exported by the current target?
-    # A: it should be, but I'm not sure that it is
-
-    # self.create_file('fliim/org/pantsbuild/example/fliim.dummy',
-    #   'org.pantsbuild.example Fliim')
-    # self.add_to_build_file('fliim', dedent("""
-    #   exporting_dummy_library(name='flaam', sources=[])
-    #   exporting_dummy_library(name='fleem',
-    #     sources=[],
-    #     exports=[':flaam']
-    #   )
-    #
-    #   exporting_dummy_library(name='fliim',
-    #     sources=['org/pantsbuild/example/fliim.dummy'],
-    #     exports=[]
-    #   )
-    # """))
-
+  def test_ensure_synthetic_equivalents_of_exports_added_to_synthetic_exports(self):
     self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
       'org.pantsbuild.example Fleem')
     self.add_to_build_file('fleem', dedent("""
@@ -549,16 +529,25 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
 
       exporting_dummy_library(name='fleem',
         sources=['org/pantsbuild/example/fleem.dummy'],
+        dependencies=[':flaam'],
+        exports=[':flaam'],
       )
     """))
     self.target('fleem:flaam')
+
     targets = [self.target('fleem')]
-    task = self._create_dummy_task(target_roots=targets,
+    task = self._create_dummy_task(
+      target_roots=targets,
       synthetic_exports=[],
       synthetic_dependencies=[])
 
     task.execute()
 
     self.assertEqual(
-      self.synthetic_target_for('fleem').export_specs, [])
+      self.synthetic_target_for('fleem').export_specs,
+      [(self.spec_of_synthetic_target_for('fleem:flaam')), 'fleem:flaam'])
+
+  def spec_of_synthetic_target_for(self, spec):
+    address_spec = self.synthetic_target_for(spec).address.spec
+    return address_spec
 

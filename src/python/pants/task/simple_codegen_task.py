@@ -25,6 +25,18 @@ from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 logger = logging.getLogger(__name__)
 
 
+def _ensure_synthetic_target_if_codegen(target, codegen_dep):
+  """Find a codegen_dep's corresponding synthetic target in the dependencies of the given target.
+
+  If codegen_dep has a synthetic equivalent, return it and the synthetic target. If not, return
+  just codegen_dep.
+  """
+  for dep in target.dependencies:
+    if dep != codegen_dep and dep.is_synthetic and dep.derived_from == codegen_dep:
+      return [codegen_dep, dep]
+  return [codegen_dep]
+
+
 class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language.
 
@@ -102,7 +114,7 @@ class SimpleCodegenTask(Task):
     """
     return []
 
-  def synthetic_target_extra_export_specs(self, target, target_workdir):
+  def synthetic_target_extra_exports(self, target, target_workdir):
     """Gets any extra exports generated synthetic targets should have.
 
    This method is optional for subclasses to implement, because some code generators may have no
@@ -114,7 +126,7 @@ class SimpleCodegenTask(Task):
 
     :API: public
 
-    :return: a list of exported targets. TODO, currently uses specs
+    :return: a list of exported targets.
     """
     return []
 
@@ -276,21 +288,18 @@ class SimpleCodegenTask(Task):
     synthetic_target_type = self.synthetic_target_type(target)
 
     if hasattr(synthetic_target_type, 'export_specs'):
-      original_exports = getattr(target, 'export_specs', None)
-      if original_exports is None:
-        original_exports = list()
+      original_exports = self._original_export_specs(target)
       extra_exports = self.synthetic_target_extra_exports(target, target_workdir)
-      if extra_exports:
-        extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
-          {d.address.spec for d in synthetic_extra_dependencies})
-        if extra_exports_not_in_extra_dependencies != set():
-          raise self.MismatchedExtraExports(
-            'Extra synthetic exports included targets not in the extra dependencies: {}'
-              .format(extra_exports_not_in_extra_dependencies))
-        union = set(original_exports).union(set(extra_exports))
-        copied_attributes['exports'] = sorted(union)
-      else:
-        copied_attributes['exports'] = sorted(original_exports)
+
+      extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
+        set(synthetic_extra_dependencies))
+      if len(extra_exports_not_in_extra_dependencies) > 0:
+        raise self.MismatchedExtraExports(
+          'Extra synthetic exports included targets not in the extra dependencies: {}'
+            .format(extra_exports_not_in_extra_dependencies))
+      union = set(original_exports).union({e.address.spec for e in extra_exports})
+
+      copied_attributes['exports'] = sorted(union)
 
     sources = list(self.find_sources(target, target_workdir))
     if fingerprint:
@@ -326,6 +335,20 @@ class SimpleCodegenTask(Task):
       self.context.target_roots.append(synthetic_target)
 
     return synthetic_target
+
+  def _original_export_specs(self, target):
+    collected_original_exports = getattr(target, 'export_specs', None)
+    if collected_original_exports is None:
+      collected_original_exports = list()
+
+    # resolve and maybe synthetic-ify original exports
+    new_orig = set()
+    for e in collected_original_exports:
+      resolved_targets = _ensure_synthetic_target_if_codegen(target,
+        self.context.build_graph.get_target_from_spec(e, target.address.spec_path))
+      new_orig.update(r.address.spec for r in resolved_targets)
+    original_exports = list(new_orig)
+    return original_exports
 
   def resolve_deps(self, unresolved_deps):
     """
