@@ -8,6 +8,10 @@ FROM python:2.7.13-wheezy
 # Ensure Pants runs under the 2.7.13 interpreter.
 ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.13']"
 
+# Install various things Pants requires.
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y default-jdk
+
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
 VOLUME /travis/workdir
