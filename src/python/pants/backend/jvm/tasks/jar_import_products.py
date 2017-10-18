@@ -42,7 +42,7 @@ class JarImportProducts(object):
   def imports(self, target):
     """Returns a list of :class:`JarImportProducts.JarImport`s for the given target.
 
-    Will be an empty list if the the target has no jar imports.
+    Will be an empty list if the target has no jar imports.
 
     :rtype: list
     """

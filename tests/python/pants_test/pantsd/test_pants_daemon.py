@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import threading
 
 import mock
 
@@ -44,6 +45,7 @@ class LoggerStreamTest(BaseTest):
 class PantsDaemonTest(BaseTest):
   def setUp(self):
     super(PantsDaemonTest, self).setUp()
+    lock = threading.RLock()
     self.pantsd = PantsDaemon('test_buildroot',
                               'test_work_dir',
                               logging.INFO,
@@ -52,6 +54,7 @@ class PantsDaemonTest(BaseTest):
                               metadata_base_dir=self.subprocess_dir)
     self.pantsd.set_services([])
     self.pantsd.set_socket_map({})
+    self.pantsd.set_lock(lock)
 
     self.mock_killswitch = mock.Mock()
     self.pantsd._kill_switch = self.mock_killswitch

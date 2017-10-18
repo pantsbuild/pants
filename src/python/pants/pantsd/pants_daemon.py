@@ -97,12 +97,13 @@ class PantsDaemon(ProcessManager):
 
   def shutdown(self, service_thread_map):
     """Gracefully terminate all services and kill the main PantsDaemon loop."""
-    for service, service_thread in service_thread_map.items():
-      self._logger.info('terminating pantsd service: {}'.format(service))
-      service.terminate()
-      service_thread.join()
-    self._logger.info('terminating pantsd')
-    self._kill_switch.set()
+    with self._lock:
+      for service, service_thread in service_thread_map.items():
+        self._logger.info('terminating pantsd service: {}'.format(service))
+        service.terminate()
+        service_thread.join()
+      self._logger.info('terminating pantsd')
+      self._kill_switch.set()
 
   @staticmethod
   def _close_fds():
@@ -163,6 +164,9 @@ class PantsDaemon(ProcessManager):
       except (RuntimeError, service.ServiceError):
         self.shutdown(service_thread_map)
         raise self.StartupFailure('service {} failed to start, shutting down!'.format(service))
+
+    # Once all services are started, write our pid.
+    self.write_pid()
 
     # Monitor services.
     while not self.is_killed:

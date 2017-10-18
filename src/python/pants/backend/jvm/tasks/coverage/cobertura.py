@@ -214,7 +214,7 @@ class Cobertura(CoverageEngine):
       return
     if execution_failed_exception:
       self._context.log.warn('Test failed: {0}'.format(execution_failed_exception))
-      if self._coverage_force:
+      if self._settings.coverage_force:
         self._context.log.warn('Generating report even though tests failed.')
       else:
         return

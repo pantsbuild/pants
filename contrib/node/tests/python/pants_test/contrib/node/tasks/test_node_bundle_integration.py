@@ -54,10 +54,12 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
     with self._extract_archive(self.WEB_COMPONENT_BUTTON_ARTIFACT) as temp_dir:
-      self.assertEquals(
-        set(os.listdir(temp_dir)),
-        set(['src', 'test', 'node_modules', 'package.json', 'webpack.config.js'])
-      )
+      actual_set = set(os.listdir(temp_dir))
+      expected_set = set(['src', 'test', 'node_modules', 'package.json', 'webpack.config.js'])
+      self.assertTrue(expected_set <= actual_set)
+      if expected_set < actual_set:
+        # npm 5 introduced package-lock.json
+        self.assertEqual(actual_set - expected_set, set(['package-lock.json']))
       # Make sure .bin symlinks remains as symlinks.
       self.assertTrue(os.path.islink(os.path.join(temp_dir, 'node_modules', '.bin', 'mocha')))
 

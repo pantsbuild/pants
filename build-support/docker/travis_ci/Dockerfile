@@ -9,17 +9,8 @@ FROM python:2.7.13-wheezy
 ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.13']"
 
 # Install various things Pants requires.
-RUN echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" > \
-      /etc/apt/sources.list.d/java-8-debian.list && \
-    echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu trusty main" >> \
-      /etc/apt/sources.list.d/java-8-debian.list && \
-    apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EEA14886 && \
-    echo debconf shared/accepted-oracle-license-v1-1 select true | debconf-set-selections && \
-    echo debconf shared/accepted-oracle-license-v1-1 seen true | debconf-set-selections && \
-    apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y \
-      cmake \
-      oracle-java8-installer
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y default-jdk
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
