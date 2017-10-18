@@ -6,14 +6,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import getpass
+import logging
 import mimetypes
 import urllib
 from os.path import basename
 
-from twitter.common import log
+
+log = logging.getLogger(__name__)
 
 
 # Copied from `twitter.common.confluence`
+# Copyright 2012 Twitter, Inc.
+
 """Code to ease publishing text to Confluence wikis."""
 
 try:
@@ -87,7 +91,7 @@ class Confluence(object):
     try:
       return self._api_entrypoint.getPage(self._session_token, wiki_space, page_title)
     except XMLRPCError as e:
-      log.warn('Failed to fetch page %s: %s' % (page_title, e))
+      log.warning('Failed to fetch page %s: %s' % (page_title, e))
       return None
 
   def storepage(self, page):

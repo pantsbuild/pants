@@ -4,8 +4,5 @@
 
 
 python_library(
-  sources = globs('confluence_util.py'),
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.log'
-  ],
+  sources = globs('*.py'),
 )

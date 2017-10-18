@@ -9,5 +9,5 @@ python_library(
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
   ],
-  sources=['doc_page.py'],
+  sources=globs('*.py'),
 )

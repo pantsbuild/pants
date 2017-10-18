@@ -5,13 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.deprecated import deprecated_module
+from pants.base.deprecated import deprecated
 from pants.base.payload import Payload
 from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashes, stable_json_sha1
 from pants.build_graph.target import Target
 
-
-deprecated_module('1.6.0.dev0', 'Use contrib.confluence.targets.doc_page.py instead')
 
 class WikiArtifact(object):
   """Binds a single documentation page to a wiki instance.
@@ -19,7 +17,10 @@ class WikiArtifact(object):
   This object allows you to specify which wiki a page should be published to, along with additional
   wiki-specific parameters, such as the title, parent page, etc.
   """
-
+  
+  @deprecated('1.6.0.dev0',
+              'Use contrib.confluence.targets.doc_page.wiki_artifact(...) instead',
+              'wiki_artifact(...) target object')
   def __init__(self, wiki, **kwargs):
     """
     :param wiki: target spec of a ``wiki``.
@@ -40,6 +41,7 @@ class WikiArtifact(object):
 class Wiki(object):
   """Identifies a wiki where pages can be published."""
 
+  @deprecated('1.6.0.dev0', 'Use contrib.confluence.targets.wiki(...) instead', 'Wiki(...) target object')
   def __init__(self, name, url_builder):
     """
     :param url_builder: Function that accepts a page target and an optional wiki config dict.
@@ -76,6 +78,7 @@ class Page(Target):
     def _compute_fingerprint(self):
       return combine_hashes(artifact.fingerprint() for artifact in self)
 
+  @deprecated('1.6.0.dev0', 'Use contrib.confluence.targets.doc_page.page(...) instead', 'page(...) target')
   def __init__(self,
                address=None,
                payload=None,

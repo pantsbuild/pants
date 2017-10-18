@@ -11,5 +11,5 @@ python_library(
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
   ],
-  sources=['confluence_publish.py'],
+  sources=globs('*.py'),
 )

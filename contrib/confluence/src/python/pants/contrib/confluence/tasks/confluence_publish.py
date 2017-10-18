@@ -24,6 +24,7 @@ from pants.contrib.confluence.util.confluence_util import Confluence, Confluence
 class ConfluencePublish(Task):
   """A task to publish Page targets to Confluence wikis."""
   
+  
   @classmethod
   def register_options(cls, register):
     super(ConfluencePublish, cls).register_options(register)
