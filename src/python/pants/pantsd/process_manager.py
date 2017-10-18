@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.pantsd.subsystem.subprocess import Subprocess
+from pants.init.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
 from pants.util.process_handler import subprocess
 
@@ -301,8 +301,9 @@ class ProcessManager(ProcessMetadataManager):
     """Wait up to a given timeout for a process to write socket info."""
     return self.await_metadata_by_name(self._name, 'socket', timeout, self._socket_type)
 
-  def write_pid(self, pid):
+  def write_pid(self, pid=None):
     """Write the current processes PID to the pidfile location"""
+    pid = pid or os.getpid()
     self.write_metadata_by_name(self._name, 'pid', str(pid))
 
   def write_socket(self, socket_info):
@@ -312,6 +313,10 @@ class ProcessManager(ProcessMetadataManager):
   def write_named_socket(self, socket_name, socket_info):
     """A multi-tenant, named alternative to ProcessManager.write_socket()."""
     self.write_metadata_by_name(self._name, 'socket_{}'.format(socket_name), str(socket_info))
+
+  def read_named_socket(self, socket_name, socket_type):
+    """A multi-tenant, named alternative to ProcessManager.socket."""
+    return self.read_metadata_by_name(self._name, 'socket_{}'.format(socket_name), socket_type)
 
   def _as_process(self):
     """Returns a psutil `Process` object wrapping our pid.
