@@ -103,7 +103,7 @@ must be published jars. They cannot be local `scalac_plugin` targets.
 
 Usually, it will make more sense to use `scala-plugin-dep` with global plugins, to avoid 
 laborious repetition of that dependency, and to use target dependencies for per-target plugins,
-to keep the dependencies selective.  
+to keep the dependencies selective.
 
 Depending directly on the `scalac_plugin` has the added advantage of allowing plugin changes
 to be picked up when compiling the target that uses the plugin, with no need for an intermediate 
@@ -113,5 +113,3 @@ Note that, to avoid a chicken-and-egg problem, an in-repo plugin will not be use
 compiling its own `scalac_plugin` target, or any of that target's dependencies.
 To use a plugin on its own code, you must publish it and consume the published plugin
 via `scala-plugin-dep`.
-
-
