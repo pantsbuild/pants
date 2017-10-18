@@ -160,13 +160,21 @@ class OptionsBootstrapper(object):
     :param options: Fully bootstrapped valid options.
     :return: None.
     """
+    def is_valid_option(prefix, option, valid_options_under_scope):
+      if option in valid_options_under_scope:
+        return True
+      if prefix and '_'.join((prefix, option)) in valid_options_under_scope:
+        return True
+      return False
+
     error_log = []
     for config in self._post_bootstrap_config.configs():
       for section in config.sections():
-        if section == GLOBAL_SCOPE_CONFIG_SECTION:
-          scope = GLOBAL_SCOPE
-        else:
-          scope = section
+        global_scopes = (
+          # Consider inherited scopes when verifying options.
+          [GLOBAL_SCOPE_CONFIG_SECTION] + GlobalOptionsRegistrar.options_inherited_scopes
+        )
+        scope = GLOBAL_SCOPE if section in global_scopes else section
         try:
           valid_options_under_scope = set(options.for_scope(scope))
         # Only catch ConfigValidationError. Other exceptions will be raised directly.
@@ -177,8 +185,9 @@ class OptionsBootstrapper(object):
           all_options_under_scope = (set(config.configparser.options(section)) -
                                      set(config.configparser.defaults()))
           for option in all_options_under_scope:
-            if option not in valid_options_under_scope:
-              error_log.append("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
+            if not is_valid_option(section, option, valid_options_under_scope):
+              error_log.append("Invalid option '{}' under [{}] in {}"
+                               .format(option, section, config.configpath))
 
     if error_log:
       for error in error_log:
