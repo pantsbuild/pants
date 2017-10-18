@@ -6,6 +6,7 @@ package org.pantsbuild.example.scalac.plugin
 import tools.nsc.{Global, Phase}
 import tools.nsc.plugins.{Plugin, PluginComponent}
 
+
 /**
  * A very simple plugin that just logs its existence in the pipeline.
  *
@@ -13,8 +14,8 @@ import tools.nsc.plugins.{Plugin, PluginComponent}
  */
 class SimpleScalacPlugin(val global: Global) extends Plugin {
   // Required Plugin boilerplate.
-  val name = "simple_scalac_plugin"
-  val description = "Logs a greeting."
+  val name = SimpleScalacPluginHelper.name
+  val description = "Logs a greeting"
   val components = List[PluginComponent](Component)
 
   var pluginOpts: List[String] = Nil

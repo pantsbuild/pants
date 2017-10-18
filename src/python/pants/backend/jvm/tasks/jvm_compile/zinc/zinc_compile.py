@@ -22,6 +22,7 @@ from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.javac_plugin import JavacPlugin
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scalac_plugin import ScalacPlugin
+from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.backend.jvm.tasks.jvm_compile.analysis_tools import AnalysisTools
 from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_analysis import ZincAnalysis
@@ -122,7 +123,7 @@ class BaseZincCompile(JvmCompile):
 
   @classmethod
   def implementation_version(cls):
-    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 5)]
+    return super(BaseZincCompile, cls).implementation_version() + [('BaseZincCompile', 6)]
 
   @classmethod
   def compiler_plugin_types(cls):
@@ -331,18 +332,19 @@ class BaseZincCompile(JvmCompile):
     zinc_args.extend(['-scala-path', ':'.join(self.scalac_classpath())])
 
     zinc_args.extend(self._javac_plugin_args(javac_plugin_map))
-    # Search for scalac plugins on the entire classpath, which will allow use of
-    # in-repo plugins for scalac (which works naturally for javac).
+    # Search for scalac plugins on the classpath.
     # Note that:
-    # - At this point the classpath will already have the extra_compile_time_classpath_elements()
-    #   appended to it, so those will also get searched here.
+    # - We also search in the extra scalac plugin dependencies, if specified.
     # - In scala 2.11 and up, the plugin's classpath element can be a dir, but for 2.10 it must be
     #   a jar.  So in-repo plugins will only work with 2.10 if --use-classpath-jars is true.
     # - We exclude our own classes_output_dir, because if we're a plugin ourselves, then our
     #   classes_output_dir doesn't have scalac-plugin.xml yet, and we don't want that fact to get
     #   memoized (which in practice will only happen if this plugin uses some other plugin, thus
     #   triggering the plugin search mechanism, which does the memoizing).
-    scalac_plugin_search_classpath = set(classpath) - {classes_output_dir}
+    scalac_plugin_search_classpath = (
+      (set(classpath) | set(self.scalac_plugin_classpath_elements())) -
+      {classes_output_dir}
+    )
     zinc_args.extend(self._scalac_plugin_args(scalac_plugin_map, scalac_plugin_search_classpath))
     if upstream_analysis:
       zinc_args.extend(['-analysis-map',
@@ -425,22 +427,37 @@ class BaseZincCompile(JvmCompile):
       ret.append('-C-Xplugin:{} {}'.format(plugin, ' '.join(args)))
     return ret
 
-  @classmethod
-  def _scalac_plugin_args(cls, scalac_plugin_map, classpath):
+  def _scalac_plugin_args(self, scalac_plugin_map, classpath):
     if not scalac_plugin_map:
       return []
 
-    plugin_jar_map = cls._find_scalac_plugins(scalac_plugin_map.keys(), classpath)
+    plugin_jar_map = self._find_scalac_plugins(scalac_plugin_map.keys(), classpath)
     ret = []
-    for name, jar in plugin_jar_map.items():
-      ret.append('-S-Xplugin:{}'.format(jar))
+    for name, cp_entries in plugin_jar_map.items():
+      # Note that the first element in cp_entries is the one containing the plugin's metadata,
+      # meaning that this is the plugin that will be loaded, even if there happen to be other
+      # plugins in the list of entries (e.g., because this plugin depends on another plugin).
+      ret.append('-S-Xplugin:{}'.format(':'.join(cp_entries)))
       for arg in scalac_plugin_map[name]:
         ret.append('-S-P:{}:{}'.format(name, arg))
     return ret
 
-  @classmethod
-  def _find_scalac_plugins(cls, scalac_plugins, classpath):
-    """Returns a map from plugin name to plugin jar/dir."""
+  def _find_scalac_plugins(self, scalac_plugins, classpath):
+    """Returns a map from plugin name to list of plugin classpath entries.
+
+    The first entry in each list is the classpath entry containing the plugin metadata.
+    The rest are the internal transitive deps of the plugin.
+
+    This allows us to have in-repo plugins with dependencies (unlike javac, scalac doesn't load
+    plugins or their deps from the regular classpath, so we have to provide these entries
+    separately, in the -Xplugin: flag).
+
+    Note that we don't currently support external plugins with dependencies, as we can't know which
+    external classpath elements are required, and we'd have to put the entire external classpath
+    on each -Xplugin: flag, which seems excessive.
+    Instead, external plugins should be published as "fat jars" (which appears to be the norm,
+    since SBT doesn't support plugins with dependencies anyway).
+    """
     # Allow multiple flags and also comma-separated values in a single flag.
     plugin_names = set([p for val in scalac_plugins for p in val.split(',')])
     if not plugin_names:
@@ -449,17 +466,24 @@ class BaseZincCompile(JvmCompile):
     active_plugins = {}
     buildroot = get_buildroot()
 
+    cp_product = self.context.products.get_data('runtime_classpath')
     for classpath_element in classpath:
-      name = cls._maybe_get_plugin_name(classpath_element)
+      name = self._maybe_get_plugin_name(classpath_element)
       if name in plugin_names:
+        plugin_target_closure = self._plugin_targets('scalac').get(name, [])
         # It's important to use relative paths, as the compiler flags get embedded in the zinc
         # analysis file, and we port those between systems via the artifact cache.
-        rel_classpath_element = os.path.relpath(classpath_element, buildroot)
+        rel_classpath_elements = [
+          os.path.relpath(cpe, buildroot) for cpe in
+          ClasspathUtil.internal_classpath(plugin_target_closure, cp_product, self._confs)]
+        # If the plugin is external then rel_classpath_elements will be empty, so we take
+        # just the external jar itself.
+        rel_classpath_elements = rel_classpath_elements or [classpath_element]
         # Some classpath elements may be repeated, so we allow for that here.
-        if active_plugins.get(name, rel_classpath_element) != rel_classpath_element:
+        if active_plugins.get(name, rel_classpath_elements) != rel_classpath_elements:
           raise TaskError('Plugin {} defined in {} and in {}'.format(name, active_plugins[name],
                                                                      classpath_element))
-        active_plugins[name] = rel_classpath_element
+        active_plugins[name] = rel_classpath_elements
         if len(active_plugins) == len(plugin_names):
           # We've found all the plugins, so return now to spare us from processing
           # of the rest of the classpath for no reason.
@@ -529,9 +553,18 @@ class ZincCompile(BaseZincCompile):
   def product_types(cls):
     return ['runtime_classpath', 'classes_by_source', 'product_deps_by_src', 'zinc_args']
 
+  @memoized_method
   def extra_compile_time_classpath_elements(self):
-    """Classpath entries containing plugins."""
-    return self.tool_classpath('javac-plugin-dep') + self.tool_classpath('scalac-plugin-dep')
+    # javac plugins are loaded from the regular class entries containing javac plugins,
+    # so we can provide them here.
+    # Note that, unlike javac, scalac plugins are not loaded from the regular classpath,
+    # so we don't provide them here.
+    return self.tool_classpath('javac-plugin-dep')
+
+  @memoized_method
+  def scalac_plugin_classpath_elements(self):
+    """Classpath entries containing scalac plugins."""
+    return self.tool_classpath('scalac-plugin-dep')
 
   def select(self, target):
     # Require that targets are marked for JVM compilation, to differentiate from
