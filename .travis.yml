@@ -53,7 +53,7 @@ matrix:
         - SHARD="OSX Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
       script:
-        - ./pants --version && ./build-support/bin/release.sh -n
+        - ./pants --version && ./build-support/bin/release.sh -nc
 
     - os: linux
       services:
