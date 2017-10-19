@@ -42,6 +42,18 @@ class BuildozerTest(TaskTestBase):
   def test_remove_multiple_dependencies(self):
     self._test_remove_dependencies('d', 'a b')
 
+  def test_custom_command(self):
+    build_file = self.build_root + '/b/BUILD'
+    new_build_name = 'b_2'
+
+    self._clean_build_file(build_file)
+    self._test_buildozer_execution({ 'command': 'set name {}'.format(new_build_name) })
+
+    with open(build_file) as f:
+      build_source = f.read()
+
+    self.assertIn(new_build_name, build_source)
+
   def _test_add_dependencies(self, spec_path, dependencies_to_add):
     build_file = self.build_root + '/{}/BUILD'.format(spec_path)
 
