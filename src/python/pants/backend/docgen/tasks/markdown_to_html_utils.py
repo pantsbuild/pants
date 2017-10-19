@@ -87,9 +87,9 @@ def choose_include_text(s, params):
     if not param: continue
     if param not in INCLUDE_RECOGNIZED_PARAMS:
       valid_params = ["'{0}'".format(p) for p in INCLUDE_RECOGNIZED_PARAMS]
-      raise IncludeParamParseError('Invalid !inc parameter name "{0}"'
-                                   ': valid parameters are: [{1}].'
-                                   .format(param, ', '.join(valid_params)))
+      raise IncludeParamParseError(
+        'Invalid parameter name "{0}": valid parameters are: [{1}].'
+        .format(param, ', '.join(valid_params)))
     params_dict[param] = value
 
   chosen_lines = []
@@ -116,15 +116,15 @@ def choose_include_text(s, params):
     # LINES_PATTERN does not allow 0 or negative numbers
     if line_end < line_start:
       raise IncludeParamParseError(
-        'Invalid end line "{0}" in parameter "lines={1}":'
-        ' should be >= {2}, the start line'
+        'Invalid end line "{0}" in argument "{1}" for parameter "lines"'
+        ': should be >= {2}, the start line'
         .format(line_end, line_range_arg, line_start))
     nlines = len(source_lines)
     if line_end > nlines:
-      raise IncludeParamParseError('Invalid end line "{0}"'
-                      ' (should be <= {1}, the number of lines in the source)'
-                      ' from "{2}" for "lines"'
-                      .format(line_end, nlines, line_range_arg))
+      raise IncludeParamParseError(
+        'Invalid end line "{0}" in argument "{1}" for parameter "lines"'
+        ': should be <= {1}, the number of lines in the source text'
+        .format(line_end, line_range_arg, nlines))
     # line range arguments start at 1
     chosen_lines = source_lines[(line_start - 1):line_end]
 
