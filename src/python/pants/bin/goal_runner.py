@@ -166,7 +166,7 @@ class GoalRunnerFactory(object):
 
     return any(goal.has_task_of_type(QuietTaskMixin) for goal in goals)
 
-  def _setup_context(self, pantsd_launcher):
+  def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
       self._build_graph, self._address_mapper, spec_roots = self._init_graph(
         self._global_options.enable_v2_engine,
