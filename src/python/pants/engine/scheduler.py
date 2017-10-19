@@ -414,13 +414,12 @@ class LocalScheduler(object):
             self._execution_request, execution_request))
       return self._scheduler.root_entries(execution_request)
 
-  def invalidate_files(self, filenames):
+  def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
-    # NB: Watchman will never trigger an invalidation event for the root directory that
-    # is being watched. Instead, we treat any invalidation of a path directly in the
-    # root directory as an invalidation of the root.
-    if any(os.path.dirname(f) in ('', '.') for f in filenames):
-      filenames = tuple(filenames) + ('', '.')
+    # NB: Watchman no longer triggers events when children are created/deleted under a directory,
+    # so we always need to invalidate the direct parent as well.
+    filenames = set(direct_filenames)
+    filenames.update(os.path.dirname(f) for f in direct_filenames)
     with self._product_graph_lock:
       invalidated = self._scheduler.invalidate(filenames)
       logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
