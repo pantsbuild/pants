@@ -25,6 +25,7 @@ from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.build_graph.target import Target
 from pants.init.util import clean_global_runtime_state
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
@@ -435,3 +436,12 @@ class BaseTest(unittest.TestCase):
     :API: public
     """
     self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
+
+  def get_bootstrap_options(self, cli_options=()):
+    """Retrieves bootstrap options.
+
+    :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
+    """
+    # Can't parse any options without a pants.ini.
+    self.create_file('pants.ini')
+    return OptionsBootstrapper(args=cli_options).get_bootstrap_options().for_global_scope()

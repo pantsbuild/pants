@@ -9,11 +9,11 @@ import os
 
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
+from pants.init.subprocess import Subprocess
 from pants.java import util
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.nailgun_executor import NailgunExecutor, NailgunProcessGroup
-from pants.pantsd.subsystem.subprocess import Subprocess
 from pants.task.task import Task, TaskBase
 
 

@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.pantsd.subsystem.subprocess import Subprocess
+from pants.init.subprocess import Subprocess
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
 

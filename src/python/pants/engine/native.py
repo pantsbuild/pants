@@ -561,9 +561,9 @@ class Native(object):
   """Encapsulates fetching a platform specific version of the native portion of the engine."""
 
   @staticmethod
-  def create(options):
+  def create(bootstrap_options):
     """:param options: Any object that provides access to bootstrap option values."""
-    return Native(options.native_engine_visualize_to)
+    return Native(bootstrap_options.native_engine_visualize_to)
 
   def __init__(self, visualize_to_dir):
     """

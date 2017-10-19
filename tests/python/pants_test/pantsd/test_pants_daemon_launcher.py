@@ -7,19 +7,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import mock
 
-from pants.init.pants_daemon_launcher import PantsDaemonLauncher
 from pants.pantsd.pants_daemon import PantsDaemon
-from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
+from pants.pantsd.pants_daemon_launcher import PantsDaemonLauncher
+from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class PantsDaemonLauncherTest(BaseTest):
   PDL_PATCH_OPTS = dict(autospec=True, spec_set=True, return_value=(None, None, None))
 
-  def pants_daemon_launcher(self):
-    factory = global_subsystem_instance(PantsDaemonLauncher.Factory)
-    pdl = factory.create(None)
+  def pants_daemon_launcher(self, cli_options=()):
+    bootstrap_options = self.get_bootstrap_options(cli_options)
+    pdl = PantsDaemonLauncher(bootstrap_options)
     pdl.pantsd = self.mock_pantsd
     pdl.watchman_launcher = self.mock_watchman_launcher
     return pdl
@@ -43,9 +42,8 @@ class PantsDaemonLauncherTest(BaseTest):
   @mock.patch.object(PantsDaemonLauncher, '_setup_services', **PDL_PATCH_OPTS)
   def test_maybe_launch_already_alive(self, mock_setup_services):
     self.mock_pantsd.is_alive.return_value = True
-    #options = {'default': {'pantsd_enabled': 'true'}}
 
-    pdl = self.pants_daemon_launcher()
+    pdl = self.pants_daemon_launcher(['--pantsd-enabled'])
     pdl.maybe_launch()
 
     self.assertEqual(mock_setup_services.call_count, 0)

@@ -206,6 +206,9 @@ class TestRunnerTaskMixin(object):
     try:
       return process_handler.wait(timeout=timeout)
     except subprocess.TimeoutExpired as e:
+      # Since we no longer surface the actual underlying exception, we log.error here
+      # to ensure the output indicates why the test has suddenly failed.
+      self.context.log.error('FAILURE: Timeout of {} seconds reached.'.format(timeout))
       raise ErrorWhileTesting(str(e), failed_targets=test_targets)
     finally:
       maybe_terminate(wait_time=self.get_options().timeout_terminate_wait)
