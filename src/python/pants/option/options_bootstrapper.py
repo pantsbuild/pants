@@ -173,14 +173,14 @@ class OptionsBootstrapper(object):
       return False
 
     error_log = []
+    global_scopes = (
+      # Consider inherited scopes when verifying options.
+      [GLOBAL_SCOPE_CONFIG_SECTION] + [
+        scope for scope, _ in GlobalOptionsRegistrar.options_subsumed_scopes
+      ]
+    )
     for config in self._post_bootstrap_config.configs():
       for section in config.sections():
-        global_scopes = (
-          # Consider inherited scopes when verifying options.
-          [GLOBAL_SCOPE_CONFIG_SECTION] + [
-            scope for scope, _ in GlobalOptionsRegistrar.options_subsumed_scopes
-          ]
-        )
         scope = GLOBAL_SCOPE if section in global_scopes else section
         try:
           valid_options_under_scope = set(options.for_scope(scope))
