@@ -40,6 +40,12 @@ class fake_log(object):
     """
     pass
 
+  def warn(self, string):
+    """
+    :API: public
+    """
+    pass
+
 
 class MockSystemCalls(object):
   """
@@ -85,6 +91,7 @@ class TestCobertura(BaseTest):
 
     self.pants_workdir = 'workdir'
     self.conf = 'default'
+    self.factory = Cobertura.Factory("test_scope", [])
 
     self.jar_lib = self.make_target(spec='3rdparty/jvm/org/example:foo',
                                     target_type=JarLibrary,
@@ -195,3 +202,41 @@ class TestCobertura(BaseTest):
     self.assertEquals(len(syscalls.copy2_calls), 0,
                       'Should be 0 call for the single annotation target.')
     self._assert_target_copytree(syscalls, '/anno/target/dir', '/coverage/classes/foo.foo-anno/0')
+
+  def _get_fake_execute_java(self):
+    def _fake_execute_java(classpath, main, jvm_options, args, workunit_factory, workunit_name):
+      # at some point we could add assertions here for expected paramerter values
+      pass
+    return _fake_execute_java
+
+
+  def test_coverage_forced(self):
+    """
+    :API: public
+    """
+    options = attrdict(coverage=True, coverage_force=True, coverage_jvm_options=[])
+
+    syscalls = MockSystemCalls()
+    settings = self.get_settings(options, self.pants_workdir, fake_log(), syscalls)
+    cobertura = self.factory.create(settings, [self.binary_target], self._get_fake_execute_java())
+
+    self.assertEquals(cobertura.should_report(), False, 'Without instrumentation step, there should be nothing to instrument or report')
+
+    # simulate an instrument step with results
+    cobertura._nothing_to_instrument = False
+
+    self.assertEquals(cobertura.should_report(), True, 'Should do reporting when there is something to instrument')
+
+    exception = Exception("uh oh, test failed")
+
+    self.assertEquals(cobertura.should_report(exception), True, 'We\'ve forced coverage, so should report.')
+
+    no_force_options = attrdict(coverage=True, coverage_force=False, coverage_jvm_options=[])
+    no_force_settings = self.get_settings(no_force_options, self.pants_workdir, fake_log(), syscalls)
+    no_force_cobertura = self.factory.create(no_force_settings, [self.binary_target], self._get_fake_execute_java())
+
+    no_force_cobertura._nothing_to_instrument = False
+    self.assertEquals(no_force_cobertura.should_report(exception), False, 'Don\'t report after a failure if coverage isn\'t forced.')
+
+
+

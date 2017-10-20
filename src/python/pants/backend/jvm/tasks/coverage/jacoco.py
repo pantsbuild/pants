@@ -112,9 +112,9 @@ class Jacoco(CoverageEngine):
 
   def report(self, execution_failed_exception=None):
     if execution_failed_exception:
-      self._context.log.warn('Test failed: {0}'.format(execution_failed_exception))
+      self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
       if self._coverage_force:
-        self._context.log.warn('Generating report even though tests failed, because the coverage-force flag is set.')
+        self._settings.log.warn('Generating report even though tests failed, because the coverage-force flag is set.')
       else:
         return
 
