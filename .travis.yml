@@ -26,6 +26,10 @@ before_cache:
   # The stats cache contains timestamped reports unused by CI but that
   # thrash the cache.  Skip caching these.
   - rm -rf ${HOME}/.cache/pants/stats
+  # While the bin directory is relatively large, it's also very quick to restore from S3:
+  # prune it to keep the total cache size down.
+  #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
+  - rm -rf ${HOME}/.cache/pants/bin
 
 cache:
   directories:

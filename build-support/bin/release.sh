@@ -199,7 +199,7 @@ EOM
 }
 
 function install_and_test_packages() {
-  CORE_ONLY=$0
+  CORE_ONLY=$1
   shift 1
   PIP_ARGS=(
     "$@"
@@ -217,9 +217,9 @@ function install_and_test_packages() {
 
   if [[ "${CORE_ONLY}" == "true" ]]
   then
-    PACKAGES=$CORE_PACKAGES
+    PACKAGES=("${CORE_PACKAGES[@]}")
   else
-    PACKAGES=$RELEASE_PACKAGES
+    PACKAGES=("${RELEASE_PACKAGES[@]}")
   fi
 
   for PACKAGE in "${PACKAGES[@]}"
@@ -238,9 +238,9 @@ function install_and_test_packages() {
 }
 
 function dry_run_install() {
-  CORE_ONLY=$0
+  CORE_ONLY=$1
   build_packages && \
-  install_and_test_packages $CORE_ONLY --find-links="${DEPLOY_WHEEL_DIR}"
+  install_and_test_packages "${CORE_ONLY}" --find-links="${DEPLOY_WHEEL_DIR}"
 }
 
 ALLOWED_ORIGIN_URLS=(
@@ -618,13 +618,13 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install $core_only && \
+    dry_run_install "${core_only}" && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
-    install_and_test_packages $core_only && \
+    install_and_test_packages "${core_only}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
