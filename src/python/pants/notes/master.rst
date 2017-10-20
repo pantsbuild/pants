@@ -5,6 +5,102 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev16 (10/20/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add `buildrefactor` to `contrib` and buildozer goal (#4921)
+  `PR #4921 <https://github.com/pantsbuild/pants/pull/4921>`_
+
+* Allow in-repo scalac plugins to have in-repo deps. (#4987)
+  `PR #4987 <https://github.com/pantsbuild/pants/pull/4987>`_
+
+* Add plugin for scalafix (#4635)
+  `PR #4635 <https://github.com/pantsbuild/pants/pull/4635>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Remove outdated doc (#4989)
+  `PR #4989 <https://github.com/pantsbuild/pants/pull/4989>`_
+
+Bugfixes
+~~~~~~~~
+
+* Invalidate parent directories (#5000)
+  `PR #5000 <https://github.com/pantsbuild/pants/pull/5000>`_
+
+* Enforce quiet option if not hardcoded (#4974)
+  `PR #4974 <https://github.com/pantsbuild/pants/pull/4974>`_
+
+* Refer to correct location of variable (#4994)
+  `PR #4994 <https://github.com/pantsbuild/pants/pull/4994>`_
+
+* Fix setting of PEX_PATH in ./pants run (v2 backend)  (#4969)
+  `PR #4969 <https://github.com/pantsbuild/pants/pull/4969>`_
+
+* Repair pytest timeout tests. (#4972)
+  `PR #4972 <https://github.com/pantsbuild/pants/pull/4972>`_
+
+* Add node_module .bin path to node / npm / yarnpkg execution path. (#4932)
+  `Issue #18233 <https://github.com/npm/npm/issues/18233>`_
+  `PR #4932 <https://github.com/pantsbuild/pants/pull/4932>`_
+  `PR #15900 <https://github.com/npm/npm/pull/15900>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Reduce time/package requirements on binary-builder shards (#4992)
+  `PR #4992 <https://github.com/pantsbuild/pants/pull/4992>`_
+
+* [pantsd] Launch the daemon via the thin client. (#4931)
+  `PR #4931 <https://github.com/pantsbuild/pants/pull/4931>`_
+
+* Extract fs and boxfuture crates (#4985)
+  `PR #4985 <https://github.com/pantsbuild/pants/pull/4985>`_
+
+* process_executor binary can do remote execution (#4980)
+  `PR #4980 <https://github.com/pantsbuild/pants/pull/4980>`_
+
+* Fix some minor textual and shell nits (#4841)
+  `PR #4841 <https://github.com/pantsbuild/pants/pull/4841>`_
+
+* Use more generic portion of `requests` exception message in tests. (#4981)
+  `PR #4981 <https://github.com/pantsbuild/pants/pull/4981>`_
+
+* Include target addresses which trigger deprecation warnings (#4979)
+  `PR #4979 <https://github.com/pantsbuild/pants/pull/4979>`_
+
+* Remote process execution works more generally (#4937)
+  `PR #4937 <https://github.com/pantsbuild/pants/pull/4937>`_
+
+* Extend timeout for cargo fetching git repos (#4971)
+  `PR #4971 <https://github.com/pantsbuild/pants/pull/4971>`_
+
+* Ignore Cargo.lock files for libraries (#4968)
+  `PR #4968 <https://github.com/pantsbuild/pants/pull/4968>`_
+
+* rm unused strategy concept from simple code gen tests (#4964)
+  `PR #4964 <https://github.com/pantsbuild/pants/pull/4964>`_
+
+* Fetch go and cmake as part of bootstrap (#4962)
+  `PR #4962 <https://github.com/pantsbuild/pants/pull/4962>`_
+  `PR #45 <https://github.com/pantsbuild/binaries/pull/45>`_
+
+* Make sure .cargo/config is respected for all cargo invocations (#4965)
+  `PR #4965 <https://github.com/pantsbuild/pants/pull/4965>`_
+
+* Restore to specifying /travis/home as a volume (#4960)
+  `PR #4960 <https://github.com/pantsbuild/pants/pull/4960>`_
+
+* Engine can request process execution via gRPC (#4929)
+  `PR #4929 <https://github.com/pantsbuild/pants/pull/4929>`_
+
+* Add back sdist generation and deployment. (#4957)
+  `PR #4957 <https://github.com/pantsbuild/pants/pull/4957>`_
+
 1.4.0.dev15 (10/7/2017)
 -----------------------
 
