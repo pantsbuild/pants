@@ -69,12 +69,14 @@ function _ensure_cffi_sources() {
 function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
 
-  export CARGO_HOME=${CACHE_ROOT}/rust-toolchain
-  export RUSTUP_HOME=${CARGO_HOME}
+  local rust_toolchain_root="${CACHE_ROOT}/rust"
+  export CARGO_HOME="${rust_toolchain_root}/cargo"
+  export RUSTUP_HOME="${rust_toolchain_root}/rustup"
 
   local rust_toolchain="1.20.0"
 
-  if [[ ! -x "${RUSTUP_HOME}/bin/rustup" ]]
+  # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
+  if [[ ! -x "${CARGO_HOME}/bin/rustup" ]]
   then
     log "A pants owned rustup installation could not be found, installing via the instructions at" \
         "https://www.rustup.rs ..."
