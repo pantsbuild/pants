@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import glob
 import re
 import tarfile
 
@@ -56,4 +57,28 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(
       sorted(expected_entries),
       sorted(entries)
+    )
+
+  def test_setup_py_force_native(self):
+    run = self.run_pants(command=[
+      'setup-py',
+      '--run=bdist_wheel',
+      'examples/src/python/example/forced_native_bdist',
+    ])
+    self.assert_success(run)
+
+    self.assertIn(
+      'Running bdist_wheel against /Users/kwilson/dev/pants/dist/forced_native_bdist-1.0.0',
+      run.stdout_data
+    )
+
+    files = glob.glob('dist/forced_native_bdist-1.0.0/dist/*.whl')
+    self.assertEqual(len(files), 1)
+    wheel_path = files[0]
+    self.assertTrue(
+      wheel_path.startswith(
+        'dist/forced_native_bdist-1.0.0/dist/forced_native_bdist-1.0.0-cp27-cp27m'
+      ) and (
+        wheel_path.endswith('intel.whl') or wheel_path.endswith('x86_64.whl')
+      )
     )
