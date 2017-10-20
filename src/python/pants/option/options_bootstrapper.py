@@ -102,12 +102,17 @@ class OptionsBootstrapper(object):
       pre_bootstrap_config = Config.load(configpaths)
 
       def bootstrap_options_from_config(config):
-        bootstrap_options = Options.create(env=self._env, config=config,
-            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs,
-            option_tracker=self._option_tracker)
+        bootstrap_options = Options.create(
+          env=self._env,
+          config=config,
+          known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
+          args=bargs,
+          option_tracker=self._option_tracker
+        )
 
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
+
         GlobalOptionsRegistrar.register_bootstrap_options(register_global)
         return bootstrap_options
 
@@ -172,7 +177,7 @@ class OptionsBootstrapper(object):
       for section in config.sections():
         global_scopes = (
           # Consider inherited scopes when verifying options.
-          [GLOBAL_SCOPE_CONFIG_SECTION] + GlobalOptionsRegistrar.options_inherited_scopes
+          [GLOBAL_SCOPE_CONFIG_SECTION] + GlobalOptionsRegistrar.options_subsumed_scopes
         )
         scope = GLOBAL_SCOPE if section in global_scopes else section
         try:

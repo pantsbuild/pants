@@ -21,7 +21,7 @@ from pants.option.scope import ScopeInfo
 class GlobalOptionsRegistrar(Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
-  options_inherited_scopes = []
+  options_subsumed_scopes = []
 
   @classmethod
   def register_bootstrap_options(cls, register):
@@ -45,8 +45,8 @@ class GlobalOptionsRegistrar(Optionable):
     @contextmanager
     def subsumed_scope(scope):
       """A helper for declaring options from a subsumed scope."""
-      if scope not in cls.options_inherited_scopes:
-        cls.options_inherited_scopes.append(scope)
+      if scope not in cls.options_subsumed_scopes:
+        cls.options_subsumed_scopes.append(scope)
 
       def _replace_args(args):
         for arg in args:
