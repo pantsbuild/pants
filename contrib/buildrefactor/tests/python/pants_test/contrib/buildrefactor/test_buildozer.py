@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -53,6 +54,10 @@ class BuildozerTest(TaskTestBase):
       build_source = f.read()
 
     self.assertIn(new_build_name, build_source)
+
+  def test_custom_command_error(self):
+    with self.assertRaises(TaskError):
+      self._test_buildozer_execution({ 'command': 'foo', 'add-dependencies': 'boo' })
 
   def _test_add_dependencies(self, spec_path, dependencies_to_add):
     build_file = self.build_root + '/{}/BUILD'.format(spec_path)

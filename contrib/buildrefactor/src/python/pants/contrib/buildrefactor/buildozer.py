@@ -47,14 +47,16 @@ class Buildozer(Task):
     self._executable = BinaryUtil.Factory.create().select_binary('scripts/buildozer', self.options.version, 'buildozer')
 
   def execute(self):
+    if self.options.command:
+      if self.options.add_dependencies or self.remove_dependencies():
+        raise TaskError('Use the command option only')
+      self.execute_custom_command()
+
     if self.options.add_dependencies:
       self.add_dependencies()
 
     if self.options.remove_dependencies:
       self.remove_dependencies()
-
-    if self.options.command:
-      self.execute_custom_command()
 
   def add_dependencies(self):
     self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
