@@ -67,9 +67,9 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
     ])
     self.assert_success(run)
 
-    self.assertIn(
-      'Running bdist_wheel against /Users/kwilson/dev/pants/dist/forced_native_bdist-1.0.0',
-      run.stdout_data
+    self.assertRegexpMatches(
+      run.stdout_data,
+      'Running bdist_wheel against .*/dist/forced_native_bdist-1.0.0',
     )
 
     files = glob.glob('dist/forced_native_bdist-1.0.0/dist/*.whl')
