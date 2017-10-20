@@ -13,9 +13,9 @@ import six
 from six.moves import configparser
 from twitter.common.collections import OrderedSet
 
-from pants.option.global_options import GlobalOptionsRegistrar
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.base.deprecated import deprecated_conditional
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.util.eval import parse_expression
 from pants.util.meta import AbstractClass
 

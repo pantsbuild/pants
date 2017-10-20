@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from contextlib import contextmanager
 import logging
 import os
 import sys
+from contextlib import contextmanager
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
