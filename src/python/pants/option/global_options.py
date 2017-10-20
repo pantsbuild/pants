@@ -21,7 +21,7 @@ from pants.option.scope import ScopeInfo
 class GlobalOptionsRegistrar(Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
-  options_subsumed_scopes = []
+  options_subsumed_scopes = []  # Will be populated in register_bootstrap_options.
 
   @classmethod
   def register_bootstrap_options(cls, register):

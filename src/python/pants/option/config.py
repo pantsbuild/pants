@@ -13,6 +13,7 @@ import six
 from six.moves import configparser
 from twitter.common.collections import OrderedSet
 
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
 from pants.util.eval import parse_expression
 from pants.util.meta import AbstractClass
@@ -53,8 +54,20 @@ class Config(AbstractClass):
       parser = cls._create_parser(seed_values)
       with open(configpath, 'r') as ini:
         parser.readfp(ini)
+      cls._transform_sections_to_global(parser, GlobalOptionsRegistrar.options_subsumed_scopes)
       single_file_configs.append(_SingleFileConfig(configpath, parser))
     return _ChainedConfig(single_file_configs)
+
+  @staticmethod
+  def _transform_sections_to_global(parser, global_subsumed_sections):
+    """Transforms section names as needed for options scope deprecation."""
+    default_keys = parser.defaults().keys()
+    for subsumed_section in global_subsumed_sections:
+      if parser.has_section(subsumed_section):
+        for k, v in parser.items(subsumed_section):
+          if k not in default_keys:
+            parser.set('GLOBAL', '_'.join((subsumed_section, k)), v)
+        parser.remove_section(subsumed_section)
 
   @classmethod
   def _create_parser(cls, seed_values=None):
