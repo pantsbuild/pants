@@ -43,10 +43,10 @@ class GlobalOptionsRegistrar(Optionable):
     default_rel_distdir = '/{}/'.format(default_distdir_name)
 
     @contextmanager
-    def subsumed_scope(scope):
+    def subsumed_scope(scope, removal_version):
       """A helper for declaring options from a subsumed scope."""
       if scope not in cls.options_subsumed_scopes:
-        cls.options_subsumed_scopes.append(scope)
+        cls.options_subsumed_scopes.append((scope, removal_version))
 
       def _replace_args(args):
         for arg in args:
@@ -190,7 +190,7 @@ class GlobalOptionsRegistrar(Optionable):
                   'of the directory will be overwritten if any filenames collide.')
 
     # BinaryUtil options.
-    with subsumed_scope('binaries') as binary_register:
+    with subsumed_scope('binaries', '1.6.0.dev0') as binary_register:
       binary_register('--baseurls', type=list, advanced=True,
                       default=['https://binaries.pantsbuild.org'],
                       help='List of URLs from which binary tools are downloaded. URLs are '
@@ -204,7 +204,7 @@ class GlobalOptionsRegistrar(Optionable):
                             ', "arm32"]}'))
 
     # Pants Daemon options.
-    with subsumed_scope('pantsd') as pantsd_register:
+    with subsumed_scope('pantsd', '1.6.0.dev0') as pantsd_register:
       pantsd_register('--pailgun-host', advanced=True, default='127.0.0.1',
                       help='The host to bind the pants nailgun server to.')
       pantsd_register('--pailgun-port', advanced=True, type=int, default=0,
@@ -221,7 +221,7 @@ class GlobalOptionsRegistrar(Optionable):
                            'executor pool.')
 
     # Watchman options.
-    with subsumed_scope('watchman') as watchman_register:
+    with subsumed_scope('watchman', '1.6.0.dev0') as watchman_register:
       watchman_register('--version', advanced=True, default='4.5.0',
                         help='Watchman version.')
       watchman_register('--supportdir', advanced=True, default='bin/watchman',

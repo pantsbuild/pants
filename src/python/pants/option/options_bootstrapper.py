@@ -177,7 +177,9 @@ class OptionsBootstrapper(object):
       for section in config.sections():
         global_scopes = (
           # Consider inherited scopes when verifying options.
-          [GLOBAL_SCOPE_CONFIG_SECTION] + GlobalOptionsRegistrar.options_subsumed_scopes
+          [GLOBAL_SCOPE_CONFIG_SECTION] + [
+            scope for scope, _ in GlobalOptionsRegistrar.options_subsumed_scopes
+          ]
         )
         scope = GLOBAL_SCOPE if section in global_scopes else section
         try:
