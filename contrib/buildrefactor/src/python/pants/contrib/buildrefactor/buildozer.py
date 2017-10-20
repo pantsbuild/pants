@@ -48,24 +48,16 @@ class Buildozer(Task):
 
   def execute(self):
     if self.options.command:
-      if self.options.add_dependencies or self.remove_dependencies():
-        raise TaskError('Use the command option only')
-      self.execute_custom_command()
+      if self.options.add_dependencies or self.options.remove_dependencies:
+        raise TaskError('Buildozer custom command cannot be used together with ' +
+                        '--add-dependencies or --remove-dependencies.')
+      self._execute_buildozer_script(self.options.command)
 
     if self.options.add_dependencies:
-      self.add_dependencies()
+      self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
 
     if self.options.remove_dependencies:
-      self.remove_dependencies()
-
-  def add_dependencies(self):
-    self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
-
-  def remove_dependencies(self):
-    self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
-
-  def execute_custom_command(self):
-    self._execute_buildozer_script(self.options.command)
+      self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
 
   def _execute_buildozer_script(self, command):
     for root in self.context.target_roots:
