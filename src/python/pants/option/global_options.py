@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import sys
-from contextlib import contextmanager
 
 from pants.base.build_environment import (get_buildroot, get_default_pants_config_file,
                                           get_pants_cachedir, get_pants_configdir, pants_version)
@@ -21,7 +20,11 @@ from pants.option.scope import ScopeInfo
 class GlobalOptionsRegistrar(Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
-  options_subsumed_scopes = []  # Will be populated in register_bootstrap_options.
+  options_subsumed_scopes = [
+    ('binaries', '1.6.0.dev0'),
+    ('pantsd', '1.6.0.dev0'),
+    ('watchman', '1.6.0.dev0')
+  ]
 
   @classmethod
   def register_bootstrap_options(cls, register):
@@ -41,22 +44,6 @@ class GlobalOptionsRegistrar(Optionable):
     default_distdir_name = 'dist'
     default_distdir = os.path.join(buildroot, default_distdir_name)
     default_rel_distdir = '/{}/'.format(default_distdir_name)
-
-    @contextmanager
-    def subsumed_scope(scope, removal_version):
-      """A helper for declaring options from a subsumed scope."""
-      if scope not in cls.options_subsumed_scopes:
-        cls.options_subsumed_scopes.append((scope, removal_version))
-
-      def _replace_args(args):
-        for arg in args:
-          yield '--{}-{}'.format(scope, arg[2:]) if arg.startswith('--') else arg
-
-      def _register(*args, **kwargs):
-        args = list(_replace_args(args))
-        register(*args, **kwargs)
-
-      yield _register
 
     # Although logging supports the WARN level, its not documented and could conceivably be yanked.
     # Since pants has supported 'warn' since inception, leave the 'warn' choice as-is but explicitly
@@ -190,54 +177,45 @@ class GlobalOptionsRegistrar(Optionable):
                   'of the directory will be overwritten if any filenames collide.')
 
     # BinaryUtil options.
-    with subsumed_scope('binaries', '1.6.0.dev0') as binary_register:
-      binary_register('--baseurls', type=list, advanced=True,
-                      default=['https://binaries.pantsbuild.org'],
-                      help='List of URLs from which binary tools are downloaded. URLs are '
-                           'searched in order until the requested path is found.')
-      binary_register('--fetch-timeout-secs', type=int, default=30, advanced=True,
-                      help='Timeout in seconds for URL reads when fetching binary tools from the '
-                           'repos specified by --baseurls.')
-      binary_register('--path-by-id', type=dict, advanced=True,
-                      help=('Maps output of uname for a machine to a binary search path. e.g. '
-                            '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux"'
-                            ', "arm32"]}'))
+    register('--binaries-baseurls', type=list, advanced=True,
+             default=['https://binaries.pantsbuild.org'],
+             help='List of URLs from which binary tools are downloaded. URLs are '
+                  'searched in order until the requested path is found.')
+    register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True,
+             help='Timeout in seconds for URL reads when fetching binary tools from the '
+                  'repos specified by --baseurls.')
+    register('--binaries-path-by-id', type=dict, advanced=True,
+             help=('Maps output of uname for a machine to a binary search path. e.g. '
+                   '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux"'
+                   ', "arm32"]}'))
 
     # Pants Daemon options.
-    with subsumed_scope('pantsd', '1.6.0.dev0') as pantsd_register:
-      pantsd_register('--pailgun-host', advanced=True, default='127.0.0.1',
-                      help='The host to bind the pants nailgun server to.')
-      pantsd_register('--pailgun-port', advanced=True, type=int, default=0,
-                      help='The port to bind the pants nailgun server to. Defaults to a '
-                           'random port.')
-      pantsd_register('--log-dir', advanced=True, default=None,
-                      help='The directory to log pantsd output to.')
-      pantsd_register('--fs-event-detection', advanced=True, type=bool,
-                      removal_version='1.5.0.dev0',
-                      removal_hint='This option is now implied by `--enable-pantsd`.',
-                      help='Whether or not to use filesystem event detection.')
-      pantsd_register('--fs-event-workers', advanced=True, type=int, default=4,
-                      help='The number of workers to use for the filesystem event service '
-                           'executor pool.')
+    register('--pantsd-pailgun-host', advanced=True, default='127.0.0.1',
+             help='The host to bind the pants nailgun server to.')
+    register('--pantsd-pailgun-port', advanced=True, type=int, default=0,
+             help='The port to bind the pants nailgun server to. Defaults to a random port.')
+    register('--pantsd-log-dir', advanced=True, default=None,
+             help='The directory to log pantsd output to.')
+    register('--pantsd-fs-event-detection', advanced=True, type=bool,
+             removal_version='1.5.0.dev0',
+             removal_hint='This option is now implied by `--enable-pantsd`.',
+             help='Whether or not to use filesystem event detection.')
+    register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
+             help='The number of workers to use for the filesystem event service executor pool.')
 
     # Watchman options.
-    with subsumed_scope('watchman', '1.6.0.dev0') as watchman_register:
-      watchman_register('--version', advanced=True, default='4.5.0',
-                        help='Watchman version.')
-      watchman_register('--supportdir', advanced=True, default='bin/watchman',
-                        help='Find watchman binaries under this dir. Used as part of the path '
-                             'to lookup the binary with --binary-util-baseurls and '
-                             '--pants-bootstrapdir.')
-      watchman_register('--startup-timeout', type=float, advanced=True, default=30.0,
-                        help='The watchman socket timeout (in seconds) for the initial '
-                             '`watch-project` command. This may need to be set higher for '
-                             'larger repos due to watchman startup cost.')
-      watchman_register('--socket-timeout', type=float, advanced=True, default=5.0,
-                        help='The watchman client socket timeout in seconds.')
-      watchman_register('--socket-path', type=str, advanced=True, default=None,
-                        help='The path to the watchman UNIX socket. This can be overridden if '
-                             'the default absolute path length exceeds the maximum allowed by '
-                             'the OS.')
+    register('--watchman-version', advanced=True, default='4.5.0', help='Watchman version.')
+    register('--watchman-supportdir', advanced=True, default='bin/watchman',
+             help='Find watchman binaries under this dir. Used as part of the path to lookup '
+                  'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
+    register('--watchman-startup-timeout', type=float, advanced=True, default=30.0,
+             help='The watchman socket timeout (in seconds) for the initial `watch-project` command. '
+                  'This may need to be set higher for larger repos due to watchman startup cost.')
+    register('--watchman-socket-timeout', type=float, advanced=True, default=5.0,
+             help='The watchman client socket timeout in seconds.')
+    register('--watchman-socket-path', type=str, advanced=True, default=None,
+             help='The path to the watchman UNIX socket. This can be overridden if the default '
+                  'absolute path length exceeds the maximum allowed by the OS.')
 
   @classmethod
   def register_options(cls, register):
