@@ -209,7 +209,6 @@ class TestCobertura(BaseTest):
       pass
     return _fake_execute_java
 
-
   def test_coverage_forced(self):
     """
     :API: public
