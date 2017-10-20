@@ -20,6 +20,9 @@ from pants.util.eval import parse_expression
 from pants.util.meta import AbstractClass
 
 
+GLOBAL_SECTION = 'GLOBAL'
+
+
 class Config(AbstractClass):
   """Encapsulates ini-style config file loading and access.
 
@@ -62,6 +65,8 @@ class Config(AbstractClass):
   @staticmethod
   def _transform_sections_to_global(parser, global_subsumed_sections):
     """Transforms section names as needed for options scope deprecation."""
+    if not parser.has_section(GLOBAL_SECTION):
+      parser.add_section(GLOBAL_SECTION)
     default_keys = parser.defaults().keys()
     for subsumed_section, removal_version in global_subsumed_sections:
       if parser.has_section(subsumed_section):
@@ -73,7 +78,7 @@ class Config(AbstractClass):
         )
         for k, v in parser.items(subsumed_section):
           if k not in default_keys:
-            parser.set('GLOBAL', '_'.join((subsumed_section, k)), v)
+            parser.set(GLOBAL_SECTION, '_'.join((subsumed_section, k)), v)
         parser.remove_section(subsumed_section)
 
   @classmethod
