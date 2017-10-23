@@ -34,6 +34,8 @@ class Jacoco(CoverageEngine):
                           JarDependency(
                             org='org.jacoco',
                             name='org.jacoco.agent',
+                            # TODO(jtrobec): get off of snapshat once jacoco release with cli is available
+                            # see https://github.com/pantsbuild/pants/issues/5010
                             rev='0.7.10-SNAPSHOT',
                             classifier='runtime',
                             intransitive=True)
@@ -46,6 +48,8 @@ class Jacoco(CoverageEngine):
                           JarDependency(
                             org='org.jacoco',
                             name='org.jacoco.cli',
+                            # TODO(jtrobec): get off of snapshat once jacoco release with cli is available
+                            # see https://github.com/pantsbuild/pants/issues/5010
                             rev='0.7.10-SNAPSHOT')
                         ])
 
