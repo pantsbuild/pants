@@ -5,7 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import multiprocessing
 import os
+import StringIO
+import sys
 from abc import abstractmethod
 
 import six
@@ -71,3 +74,41 @@ class SubprocessProcessHandler(ProcessHandler):
 
   def poll(self):
     return self._process.poll()
+
+  def communicate_teeing_stdout_and_stderr(self, stdin=None):
+    """
+    Just like subprocess.communicate, but tees stdout and stderr to both sys.std{out,err} and a
+    buffer. Only operates on stdout/stderr if the Popen call send them to subprocess.PIPE.
+    :param stdin: A string to send to the stdin of the subprocess.
+    :return: (stdout, stderr) as strings.
+    """
+    if stdin is not None and self._process.stdin is not None:
+      self._process.stdin.write(stdin)
+
+    def fork_tee(infile, outfile):
+      if infile is None:
+        return lambda: None
+
+      queue = multiprocessing.Queue()
+      process = multiprocessing.Process(target=_tee, args=(infile, outfile, queue.put))
+      process.start()
+      def join_and_get_output():
+        process.join()
+        return queue.get()
+      return join_and_get_output
+
+    stdout = fork_tee(self._process.stdout, sys.stdout)
+    stderr = fork_tee(self._process.stderr, sys.stderr)
+
+    self._process.wait()
+
+    return stdout(), stderr()
+
+
+def _tee(infile, outfile, return_function):
+  accumulator = StringIO.StringIO()
+  for line in iter(infile.readline, ""):
+    accumulator.write(line)
+    outfile.write(line)
+  infile.close()
+  return_function(accumulator.getvalue())
