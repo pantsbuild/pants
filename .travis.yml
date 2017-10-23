@@ -105,6 +105,10 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
+      before_script:
+        # The lint shard attempts to ivy resolve against the Android SDK due to
+        # references in `build-support/ivy/ivysettings.xml`.
+        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Various pants self checks and lint"
       script:
