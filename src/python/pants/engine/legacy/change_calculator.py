@@ -5,15 +5,97 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import logging
+from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
-from pants.engine.legacy.graph import LegacyBuildGraph
-from pants.engine.legacy.source_mapper import EngineSourceMapper
+from pants.build_graph.address import Address
+from pants.engine.legacy.graph import HydratedTargets
+from pants.engine.legacy.source_mapper import EngineSourceMapper, resolve_and_parse_specs
 from pants.scm.change_calculator import ChangeCalculator
 
 
 logger = logging.getLogger(__name__)
+
+
+class _HydratedTargetDependentGraph(object):
+  """A graph for walking dependent addresses of HydratedTarget objects.
+
+  This avoids/imitates constructing a v1 BuildGraph object, because that codepath results
+  in many references held in mutable global state (ie, memory leaks).
+
+  The long term goal is to deprecate the `changed` goal in favor of sufficiently good cache
+  hit rates, such that rather than running:
+
+    ./pants --changed-parent=master test
+
+  ...you would always be able to run:
+
+    ./pants test ::
+
+  ...and have it complete in a similar amount of time by hitting relevant caches.
+  """
+
+  @classmethod
+  def from_iterable(cls, iterable):
+    """Create a new HydratedTargetDependentGraph from an iterable of HydratedTarget instances."""
+    inst = cls()
+    for hydrated_target in iterable:
+      inst.inject_target(hydrated_target)
+    return inst
+
+  def __init__(self):
+    self._dependent_address_map = defaultdict(set)
+
+  def _resources_addresses(self, hydrated_target):
+    """Yields fully qualified string addresses of resources for a given `HydratedTarget`."""
+    kwargs = hydrated_target.adaptor.kwargs()
+
+    # TODO: Figure out a better way to filter these.
+    # Python targets `resources` are lists of files, not addresses - short circuit for them.
+    if kwargs.get('type_alias', '').startswith('python_'):
+      return
+
+    resource_specs = kwargs.get('resources', [])
+    if not resource_specs:
+      return
+
+    parsed_resource_specs = resolve_and_parse_specs(hydrated_target.adaptor.address.spec_path,
+                                                    resource_specs)
+    for spec in parsed_resource_specs:
+      yield Address.parse(spec.to_spec_string())
+
+  def inject_target(self, hydrated_target):
+    """Inject a target, respecting both its direct dependencies and its resources targets."""
+    for dep in itertools.chain(hydrated_target.dependencies, self._resources_addresses(hydrated_target)):
+      self._dependent_address_map[dep].add(hydrated_target.adaptor.address)
+
+  def dependents_of_addresses(self, addresses):
+    """Given an iterable of addresses, yield all of those addresses dependents."""
+    seen = set(addresses)
+    for address in addresses:
+      for dependent_address in self._dependent_address_map[address]:
+        if dependent_address not in seen:
+          seen.add(dependent_address)
+          yield dependent_address
+
+  def transitive_dependents_of_addresses(self, addresses):
+    """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
+    addresses_to_visit = set(addresses)
+    while 1:
+      dependents = set(self.dependents_of_addresses(addresses))
+      # If we've exhausted all dependencies or visited all remaining nodes, break.
+      if (not dependents) or dependents.issubset(addresses_to_visit):
+        break
+      addresses = dependents.difference(addresses_to_visit)
+      addresses_to_visit.update(dependents)
+
+    transitive_set = itertools.chain(
+      *(self._dependent_address_map[address] for address in addresses_to_visit)
+    )
+    for dep in transitive_set:
+      yield dep
 
 
 class EngineChangeCalculator(ChangeCalculator):
@@ -46,20 +128,17 @@ class EngineChangeCalculator(ChangeCalculator):
       return
 
     # For dependee finding, we need to parse all build files.
-    graph = LegacyBuildGraph.create(self._scheduler, self._symbol_table)
-    for _ in graph.inject_specs_closure([DescendantAddresses('')]):
-      pass
+    product_iter = (t
+                    for targets in self._scheduler.product_request(HydratedTargets, [DescendantAddresses('')])
+                    for t in targets.dependencies)
+    graph = _HydratedTargetDependentGraph.from_iterable(product_iter)
 
     if changed_request.include_dependees == 'direct':
-      emitted = set()
-      for address in changed_addresses:
-        for dependee in graph.dependents_of(address):
-          if dependee not in emitted:
-            emitted.add(dependee)
-            yield dependee
+      for address in graph.dependents_of_addresses(changed_addresses):
+        yield address
     elif changed_request.include_dependees == 'transitive':
-      for target in graph.transitive_dependees_of_addresses(changed_addresses):
-        yield target.address
+      for address in graph.transitive_dependents_of_addresses(changed_addresses):
+        yield address
 
   def changed_target_addresses(self, changed_request):
     return list(self.iter_changed_target_addresses(changed_request))
