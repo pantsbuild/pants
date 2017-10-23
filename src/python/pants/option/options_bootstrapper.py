@@ -102,17 +102,12 @@ class OptionsBootstrapper(object):
       pre_bootstrap_config = Config.load(configpaths)
 
       def bootstrap_options_from_config(config):
-        bootstrap_options = Options.create(
-          env=self._env,
-          config=config,
-          known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()],
-          args=bargs,
-          option_tracker=self._option_tracker
-        )
+        bootstrap_options = Options.create(env=self._env, config=config,
+            known_scope_infos=[GlobalOptionsRegistrar.get_scope_info()], args=bargs,
+            option_tracker=self._option_tracker)
 
         def register_global(*args, **kwargs):
           bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
-
         GlobalOptionsRegistrar.register_bootstrap_options(register_global)
         return bootstrap_options
 
@@ -165,23 +160,13 @@ class OptionsBootstrapper(object):
     :param options: Fully bootstrapped valid options.
     :return: None.
     """
-    def is_valid_option(prefix, option, valid_options_under_scope):
-      if option in valid_options_under_scope:
-        return True
-      if prefix and '_'.join((prefix, option)) in valid_options_under_scope:
-        return True
-      return False
-
     error_log = []
-    global_scopes = (
-      # Consider inherited scopes when verifying options.
-      [GLOBAL_SCOPE_CONFIG_SECTION] + [
-        scope for scope, _ in GlobalOptionsRegistrar.options_subsumed_scopes
-      ]
-    )
     for config in self._post_bootstrap_config.configs():
       for section in config.sections():
-        scope = GLOBAL_SCOPE if section in global_scopes else section
+        if section == GLOBAL_SCOPE_CONFIG_SECTION:
+          scope = GLOBAL_SCOPE
+        else:
+          scope = section
         try:
           valid_options_under_scope = set(options.for_scope(scope))
         # Only catch ConfigValidationError. Other exceptions will be raised directly.
@@ -192,9 +177,8 @@ class OptionsBootstrapper(object):
           all_options_under_scope = (set(config.configparser.options(section)) -
                                      set(config.configparser.defaults()))
           for option in all_options_under_scope:
-            if not is_valid_option(section, option, valid_options_under_scope):
-              error_log.append("Invalid option '{}' under [{}] in {}"
-                               .format(option, section, config.configpath))
+            if option not in valid_options_under_scope:
+              error_log.append("Invalid option '{}' under [{}] in {}".format(option, section, config.configpath))
 
     if error_log:
       for error in error_log:
