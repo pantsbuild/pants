@@ -56,6 +56,27 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
       with codecs.open(cucumber_src_html, 'r', encoding='utf8') as src:
         self.assertIn('String pleasantry()', src.read())
 
+  def test_junit_run_with_jacoco_coverage_succeeds(self):
+    with self.pants_results(['clean-all',
+                             'test.junit',
+                             'testprojects/tests/java/org/pantsbuild/testproject/unicode::',
+                             '--test-junit-coverage-processor=jacoco',
+                             '--test-junit-coverage']) as results:
+      self.assert_success(results)
+      # validate that the expected coverage file exists, and it reflects 100% line rate coverage
+      coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/reports/xml')
+      self.assertTrue(os.path.isfile(coverage_xml))
+      with codecs.open(coverage_xml, 'r', encoding='utf8') as xml:
+        self.assertIn('<class name="org/pantsbuild/testproject/unicode/cucumber/CucumberAnnotatedExample"><method name="&lt;init&gt;" desc="()V" line="13"><counter type="INSTRUCTION" missed="0" covered="3"/>', xml.read())
+      # validate that the html report was able to find sources for annotation
+      cucumber_src_html = os.path.join(
+          results.workdir,
+          'test/junit/coverage/reports/html/'
+          'org.pantsbuild.testproject.unicode.cucumber/CucumberAnnotatedExample.html')
+      self.assertTrue(os.path.isfile(cucumber_src_html))
+      with codecs.open(cucumber_src_html, 'r', encoding='utf8') as src:
+        self.assertIn('class="el_method">pleasantry()</a>', src.read())
+
   def test_junit_run_against_invalid_class_fails(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.junit',
