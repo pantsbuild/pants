@@ -291,3 +291,34 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
       self.assertIn("pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {})"
                     .format(config_path),
                     pants_run.stdout_data)
+
+  @ensure_engine
+  def test_subsumed_options_scope_config(self):
+    with temporary_dir(root_dir=os.path.abspath('.')) as tempdir:
+      config_path = os.path.relpath(os.path.join(tempdir, 'config.ini'))
+      with open(config_path, 'w+') as f:
+        f.write(dedent("""
+          [binaries]
+          fetch_timeout_secs: 30
+
+          [pantsd]
+          log_dir: /tmp/logs
+
+          [watchman]
+          socket_path: /tmp/test.sock
+        """))
+
+      pants_run = self.run_pants(['--pants-config-files={}'.format(config_path), 'options'])
+      self.assert_success(pants_run)
+
+      template = (
+        'DEPRECATED: The pants.ini options scope `[{}]` is deprecated. Please '
+        'migrate options in this scope to `[GLOBAL]`. will be removed in version'
+      )
+      for scope in ('binaries', 'pantsd', 'watchman'):
+        self.assertIn(template.format(scope), pants_run.stderr_data)
+
+      for option in ('binaries_baseurls', 'pantsd_log_dir', 'watchman_socket_path'):
+        for line in pants_run.stdout_data:
+          if line.startswith(option):
+            self.assertIn('from CONFIG', line)

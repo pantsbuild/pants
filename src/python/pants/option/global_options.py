@@ -20,6 +20,11 @@ from pants.option.scope import ScopeInfo
 class GlobalOptionsRegistrar(Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
+  options_subsumed_scopes = [
+    ('binaries', '1.6.0.dev0'),
+    ('pantsd', '1.6.0.dev0'),
+    ('watchman', '1.6.0.dev0')
+  ]
 
   @classmethod
   def register_bootstrap_options(cls, register):
@@ -174,14 +179,15 @@ class GlobalOptionsRegistrar(Optionable):
     # BinaryUtil options.
     register('--binaries-baseurls', type=list, advanced=True,
              default=['https://binaries.pantsbuild.org'],
-             help='List of URLs from which binary tools are downloaded. URLs are searched in '
-                  'order until the requested path is found.')
+             help='List of URLs from which binary tools are downloaded. URLs are '
+                  'searched in order until the requested path is found.')
     register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True,
              help='Timeout in seconds for URL reads when fetching binary tools from the '
                   'repos specified by --baseurls.')
     register('--binaries-path-by-id', type=dict, advanced=True,
              help=('Maps output of uname for a machine to a binary search path. e.g. '
-             '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux", "arm32"]}'))
+                   '{("darwin", "15"): ["mac", "10.11"]), ("linux", "arm32"): ["linux"'
+                   ', "arm32"]}'))
 
     # Pants Daemon options.
     register('--pantsd-pailgun-host', advanced=True, default='127.0.0.1',
