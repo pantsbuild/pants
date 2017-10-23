@@ -11,7 +11,7 @@ from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.legacy.graph import HydratedTargets
+from pants.engine.legacy.graph import HydratedTargets, target_types_from_symbol_table
 from pants.engine.legacy.source_mapper import EngineSourceMapper, resolve_and_parse_specs
 from pants.scm.change_calculator import ChangeCalculator
 
@@ -38,15 +38,16 @@ class _HydratedTargetDependentGraph(object):
   """
 
   @classmethod
-  def from_iterable(cls, iterable):
+  def from_iterable(cls, target_types, iterable):
     """Create a new HydratedTargetDependentGraph from an iterable of HydratedTarget instances."""
-    inst = cls()
+    inst = cls(target_types)
     for hydrated_target in iterable:
       inst.inject_target(hydrated_target)
     return inst
 
-  def __init__(self):
+  def __init__(self, target_types):
     self._dependent_address_map = defaultdict(set)
+    self._target_types = target_types
 
   def _resources_addresses(self, hydrated_target):
     """Yields fully qualified string addresses of resources for a given `HydratedTarget`."""
@@ -67,8 +68,14 @@ class _HydratedTargetDependentGraph(object):
       yield Address.parse(spec.to_spec_string())
 
   def inject_target(self, hydrated_target):
-    """Inject a target, respecting both its direct dependencies and its resources targets."""
-    for dep in itertools.chain(hydrated_target.dependencies, self._resources_addresses(hydrated_target)):
+    """Inject a target, respecting all sources of dependencies."""
+    target_cls = self._target_types[hydrated_target.adaptor.type_alias]
+
+    declared_deps = hydrated_target.dependencies
+    implicit_deps = target_cls.compute_dependency_specs(kwargs=hydrated_target.adaptor.kwargs())
+    resources_deps = self._resources_addresses(hydrated_target)
+
+    for dep in itertools.chain(declared_deps, implicit_deps, resources_deps):
       self._dependent_address_map[dep].add(hydrated_target.adaptor.address)
 
   def dependents_of_addresses(self, addresses):
@@ -131,7 +138,8 @@ class EngineChangeCalculator(ChangeCalculator):
     product_iter = (t
                     for targets in self._scheduler.product_request(HydratedTargets, [DescendantAddresses('')])
                     for t in targets.dependencies)
-    graph = _HydratedTargetDependentGraph.from_iterable(product_iter)
+    graph = _HydratedTargetDependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
+                                                        product_iter)
 
     if changed_request.include_dependees == 'direct':
       for address in graph.dependents_of_addresses(changed_addresses):
