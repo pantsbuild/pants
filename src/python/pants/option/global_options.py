@@ -47,7 +47,8 @@ class GlobalOptionsRegistrar(Optionable):
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
     register('-q', '--quiet', type=bool, recursive=True,
-             help='Squelches most console output.')
+             help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
+                  'inverting this option supports making them noisier than they would be otherwise.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
     register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True,
