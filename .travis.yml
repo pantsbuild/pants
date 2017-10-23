@@ -5,8 +5,6 @@ env:
     - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
 
 before_cache:
-  - echo "Pre-prune du:"
-  - du -d2 -h ${HOME}/.cache/pants ${HOME}/.ivy2/pants ${HOME}/.npm ${HOME}/.android ${ANDROID_SDK_INSTALL_LOCATION}
   # Ensure permissions to do the below removals, which happen with or without caching enabled.
   - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
   # Kill all python bytecode in our cached venvs.  Some files appear to
@@ -35,8 +33,9 @@ before_cache:
   # individually resolved artifacts.
   - rm -rf ${HOME}/.cache/pants/bin
   - rm -rf ${HOME}/.cache/pants/rust/rustup
-  - echo "Post-prune du:"
-  - du -d2 -h ${HOME}/.cache/pants ${HOME}/.ivy2/pants ${HOME}/.npm ${HOME}/.android ${ANDROID_SDK_INSTALL_LOCATION}
+  # Render a summary of what is left in the home directory, to assist with further pruning of
+  # the cache.
+  - du -d2 -h ${HOME} | sort -h -r
 
 cache:
   directories:
@@ -46,8 +45,6 @@ cache:
     # using its own isolated cache:
     #   https://github.com/pantsbuild/pants/issues/2485
     - ${HOME}/.npm
-    - ${HOME}/.android
-    - ${ANDROID_SDK_INSTALL_LOCATION}
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
 
@@ -108,8 +105,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Various pants self checks and lint"
       script:
@@ -136,8 +131,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
@@ -164,8 +157,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
@@ -193,6 +184,7 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
       before_script:
+        # Contrib tests need Android.
         - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python contrib tests - shard 1"
@@ -221,6 +213,7 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
       before_script:
+        # Contrib tests need Android.
         - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python contrib tests - shard 2"
@@ -248,8 +241,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
@@ -276,8 +267,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
@@ -304,8 +293,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
@@ -332,8 +319,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
@@ -360,8 +345,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
@@ -388,8 +371,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
@@ -416,8 +397,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-      before_script:
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
