@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt;
-use std::io::{Write, Result};
+use std::io::{self, Write};
 
 use blake2_rfc::blake2b::Blake2b;
 
@@ -25,12 +25,54 @@ impl Fingerprint {
     Fingerprint(fingerprint)
   }
 
+  pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
+    if hex_string.len() != FINGERPRINT_SIZE * 2 {
+      return Err(format!(
+        "{} had length {}, fingerprint hex string should be {} characters",
+        hex_string,
+        hex_string.len(),
+        FINGERPRINT_SIZE * 2
+      ));
+    }
+    let mut bytes = [0; FINGERPRINT_SIZE];
+    for i in 0..FINGERPRINT_SIZE {
+      let pair = &hex_string[2 * i..2 * i + 2];
+      match u8::from_str_radix(pair, 16) {
+        Ok(byte) => bytes[i] = byte,
+        Err(_) => {
+          return Err(format!(
+            "Not a hex string (bad pair: {}): {}",
+            pair,
+            hex_string
+          ))
+        }
+      }
+    }
+    Ok(Fingerprint(bytes))
+  }
+
+  pub fn as_bytes(&self) -> &[u8; FINGERPRINT_SIZE] {
+    &self.0
+  }
+
   pub fn to_hex(&self) -> String {
     let mut s = String::new();
     for &byte in self.0.iter() {
       fmt::Write::write_fmt(&mut s, format_args!("{:02x}", byte)).unwrap();
     }
     s
+  }
+}
+
+impl fmt::Display for Fingerprint {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "{}", self.to_hex())
+  }
+}
+
+impl fmt::Debug for Fingerprint {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Fingerprint<{}>", self.to_hex())
   }
 }
 
@@ -59,14 +101,176 @@ impl<W: Write> WriterHasher<W> {
 }
 
 impl<W: Write> Write for WriterHasher<W> {
-  fn write(&mut self, buf: &[u8]) -> Result<usize> {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
     self.hasher.update(&buf[0..written]);
     Ok(written)
   }
 
-  fn flush(&mut self) -> Result<()> {
+  fn flush(&mut self) -> io::Result<()> {
     self.inner.flush()
+  }
+}
+
+#[cfg(test)]
+mod fingerprint_tests {
+  use super::Fingerprint;
+
+  #[test]
+  fn from_bytes_unsafe() {
+    assert_eq!(
+      Fingerprint::from_bytes_unsafe(&vec![
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+        0xab,
+      ]),
+      Fingerprint([0xab; 32])
+    );
+  }
+
+  #[test]
+  fn from_hex_string() {
+    assert_eq!(
+      Fingerprint::from_hex_string(
+        "0123456789abcdefFEDCBA98765432100000000000000000ffFFfFfFFfFfFFff",
+      ).unwrap(),
+      Fingerprint(
+        [
+          0x01,
+          0x23,
+          0x45,
+          0x67,
+          0x89,
+          0xab,
+          0xcd,
+          0xef,
+          0xfe,
+          0xdc,
+          0xba,
+          0x98,
+          0x76,
+          0x54,
+          0x32,
+          0x10,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+        ],
+      )
+    )
+  }
+
+  #[test]
+  fn from_hex_string_not_long_enough() {
+    Fingerprint::from_hex_string("abcd").expect_err("Want err");
+  }
+
+  #[test]
+  fn from_hex_string_too_long() {
+    Fingerprint::from_hex_string(
+      "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0",
+    ).expect_err("Want err");
+  }
+
+  #[test]
+  fn from_hex_string_invalid_chars() {
+    Fingerprint::from_hex_string(
+      "Q123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF",
+    ).expect_err("Want err");
+  }
+
+  #[test]
+  fn to_hex() {
+    assert_eq!(
+      Fingerprint(
+        [
+          0x01,
+          0x23,
+          0x45,
+          0x67,
+          0x89,
+          0xab,
+          0xcd,
+          0xef,
+          0xfe,
+          0xdc,
+          0xba,
+          0x98,
+          0x76,
+          0x54,
+          0x32,
+          0x10,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0x00,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+          0xff,
+        ],
+      ).to_hex(),
+      "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_lowercase()
+    )
+  }
+
+  #[test]
+  fn display() {
+    let hex = "0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
+    assert_eq!(
+      Fingerprint::from_hex_string(hex).unwrap().to_hex(),
+      hex.to_lowercase()
+    )
   }
 }
