@@ -104,7 +104,7 @@ class Reporting(Subsystem):
     f.close()
     return buffered_output
 
-  def update_reporting(self, global_options, is_quiet_task, run_tracker):
+  def update_reporting(self, global_options, is_quiet, run_tracker):
     """Updates reporting config once we've parsed cmd-line flags."""
 
     # Get any output silently buffered in the old console reporter, and remove it.
@@ -119,7 +119,7 @@ class Reporting(Subsystem):
     timing = global_options.time
     cache_stats = global_options.time  # TODO: Separate flag for this?
 
-    if global_options.quiet or is_quiet_task:
+    if is_quiet:
       console_reporter = QuietReporter(run_tracker,
                                        QuietReporter.Settings(log_level=log_level, color=color,
                                                               timing=timing, cache_stats=cache_stats))

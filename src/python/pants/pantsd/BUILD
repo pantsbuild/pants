@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
-    'src/python/pants/pantsd/subsystem:subprocess',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
   ]
@@ -36,6 +35,16 @@ python_library(
 )
 
 python_library(
+  name = 'watchman_launcher',
+  sources = ['watchman_launcher.py'],
+  dependencies = [
+    ':watchman',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/util:memo',
+  ]
+)
+
+python_library(
   name = 'watchman_client',
   sources = ['watchman_client.py'],
   dependencies = [
@@ -52,5 +61,23 @@ python_library(
     'src/python/pants/goal:run_tracker',
     'src/python/pants/logging',
     ':process_manager',
+  ]
+)
+
+python_library(
+  name = 'pants_daemon_launcher',
+  sources = ['pants_daemon_launcher.py'],
+  dependencies = [
+    ':pants_daemon',
+    ':watchman_launcher',
+    'src/python/pants/pantsd/service:fs_event_service',
+    'src/python/pants/pantsd/service:pailgun_service',
+    'src/python/pants/pantsd/service:scheduler_service',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/engine:native',
+    'src/python/pants/init',
+    'src/python/pants/process',
+    'src/python/pants/util:memo'
   ]
 )

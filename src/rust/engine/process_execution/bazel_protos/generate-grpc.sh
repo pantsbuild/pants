@@ -12,4 +12,4 @@ googleapis="${thirdpartyprotobuf}/googleapis"
 outdir="${here}/src"
 mkdir -p "${outdir}"
 
-"${protoc}" --rust_out="${outdir}" --grpc_out="${outdir}" --plugin=protoc-gen-grpc="${HOME}/.cache/pants/rust-toolchain/bin/grpc_rust_plugin" --proto_path="${googleapis}" --proto_path="${thirdpartyprotobuf}/standard" "${googleapis}"/{google/devtools/remoteexecution/v1test/remote_execution.proto,google/rpc/{code,status}.proto,google/longrunning/operations.proto} "${thirdpartyprotobuf}/standard/google/protobuf/empty.proto"
+"${protoc}" --rust_out="${outdir}" --grpc_out="${outdir}" --plugin=protoc-gen-grpc="${HOME}/.cache/pants/rust/cargo/bin/grpc_rust_plugin" --proto_path="${googleapis}" --proto_path="${thirdpartyprotobuf}/standard" "${googleapis}"/{google/devtools/remoteexecution/v1test/remote_execution.proto,google/rpc/{code,status}.proto,google/longrunning/operations.proto} "${thirdpartyprotobuf}/standard/google/protobuf/empty.proto"

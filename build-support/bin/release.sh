@@ -83,9 +83,12 @@ function pkg_pants_testinfra_install_test() {
 }
 
 # Once an individual (new) package is declared above, insert it into the array below)
-RELEASE_PACKAGES=(
+CORE_PACKAGES=(
   PKG_PANTS
   PKG_PANTS_TESTINFRA
+)
+RELEASE_PACKAGES=(
+  ${CORE_PACKAGES[*]}
   ${CONTRIB_PACKAGES[*]}
 )
 #
@@ -196,6 +199,8 @@ EOM
 }
 
 function install_and_test_packages() {
+  CORE_ONLY=$1
+  shift 1
   PIP_ARGS=(
     "$@"
     --quiet
@@ -210,7 +215,14 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
+  if [[ "${CORE_ONLY}" == "true" ]]
+  then
+    PACKAGES=("${CORE_PACKAGES[@]}")
+  else
+    PACKAGES=("${RELEASE_PACKAGES[@]}")
+  fi
+
+  for PACKAGE in "${PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
@@ -226,8 +238,9 @@ function install_and_test_packages() {
 }
 
 function dry_run_install() {
+  CORE_ONLY=$1
   build_packages && \
-  install_and_test_packages --find-links="${DEPLOY_WHEEL_DIR}"
+  install_and_test_packages "${CORE_ONLY}" --find-links="${DEPLOY_WHEEL_DIR}"
 }
 
 ALLOWED_ORIGIN_URLS=(
@@ -556,7 +569,7 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o|-e)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -566,11 +579,13 @@ function usage() {
   echo " -t  Tests a live release."
   echo "       Ensures the latest packages have been propagated to PyPi"
   echo "       and can be installed in an ephemeral virtualenv."
+  echo " -c  Skips contrib during a dry or test run."
+  echo "       It is still necessary to pass -n or -t to trigger the test/dry run."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo " -e  Check that wheels are prebuilt for this release."
   echo
-  echo "All options (except for '-d') are mutually exclusive."
+  echo "All options (except for '-d' and '-c') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -579,12 +594,13 @@ function usage() {
   fi
 }
 
-while getopts "hdntloe" opt; do
+while getopts "hdntcloe" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
+    c) core_only="true" ;;
     l) list_packages && exit 0 ;;
     o) list_owners && exit 0 ;;
     e) check_prebuilt_wheels && exit 0 ;;
@@ -602,13 +618,13 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install && \
+    dry_run_install "${core_only}" && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
-    install_and_test_packages && \
+    install_and_test_packages "${core_only}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else

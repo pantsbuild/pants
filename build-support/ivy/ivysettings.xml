@@ -13,6 +13,9 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
   <property name="kythe.artifact" value="[organization]-[revision]/[artifact].[ext]"/>
+  <!-- for retrieving jacoco snapshot, remove when a version containing cli is released -->
+  <!-- see https://github.com/pantsbuild/pants/issues/5010 -->
+  <property name="sonatype.nexus.snapshots.url" value="https://oss.sonatype.org/content/repositories/snapshots/" />
 
   <!-- This dance to set ANDROID_HOME seems more complex than it need be, but an absolute path is
        needed whether or not the ANDROID_HOME env var is set and just using the following does
@@ -69,6 +72,10 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <url name="benjyw/binhost">
         <artifact pattern="https://github.com/benjyw/binhost/raw/master/[organisation]/${kythe.artifact}" />
       </url>
+
+      <!-- for retrieving jacoco snapshot, remove when a version containing cli is released -->
+      <!-- see https://github.com/pantsbuild/pants/issues/5010 -->
+      <ibiblio name="sonatype-nexus-snapshots" m2compatible="true" root="${sonatype.nexus.snapshots.url} "/>
     </chain>
   </resolvers>
 </ivysettings>

@@ -32,15 +32,15 @@ class WrappedPEX(object):
 
   _PEX_PATH_ENV_VAR_NAME = 'PEX_PATH'
 
-  def __init__(self, pex, extra_pex_paths, interpreter):
+  def __init__(self, pex, interpreter, extra_pex_paths=None):
     """
     :param pex: The main pex we wrap.
-    :param extra_pex_paths: Other pexes, to "merge" in via the PEX_PATH mechanism.
     :param interpreter: The interpreter the main pex will run on.
+    :param extra_pex_paths: Other pexes, to "merge" in via the PEX_PATH mechanism.
     """
     self._pex = pex
-    self._extra_pex_paths = extra_pex_paths
     self._interpreter = interpreter
+    self._extra_pex_paths = extra_pex_paths
 
   @property
   def interpreter(self):
@@ -60,14 +60,21 @@ class WrappedPEX(object):
       return cmdline
 
   def run(self, *args, **kwargs):
-    kwargs_copy = copy(kwargs)
-    env = copy(kwargs_copy.get('env')) if 'env' in kwargs_copy else {}
-    env[self._PEX_PATH_ENV_VAR_NAME] = self._pex_path()
-    kwargs_copy['env'] = env
-    return self._pex.run(*args, **kwargs_copy)
+    pex_path = self._pex_path()
+    if pex_path:
+      kwargs_copy = copy(kwargs)
+      env = copy(kwargs_copy.get('env')) if 'env' in kwargs_copy else {}
+      env[self._PEX_PATH_ENV_VAR_NAME] = self._pex_path()
+      kwargs_copy['env'] = env
+      return self._pex.run(*args, **kwargs_copy)
+    else:
+      return self._pex.run(*args, **kwargs)
 
   def _pex_path(self):
-    return ':'.join(self._extra_pex_paths)
+    if self._extra_pex_paths:
+      return ':'.join(self._extra_pex_paths)
+    else:
+      return None
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
@@ -108,7 +115,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.join(self.workdir, str(interpreter.identity), target_set_id)
-      extra_pex_paths_file_path = path + '.extra_pex_paths'
       extra_pex_paths = None
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
@@ -130,16 +136,11 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 
+        if extra_pex_paths:
+          pex_info.merge_pex_path(':'.join(extra_pex_paths))
+
         with safe_concurrent_creation(path) as safe_path:
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
           builder.freeze()
 
-        with open(extra_pex_paths_file_path, 'w') as outfile:
-          for epp in extra_pex_paths:
-            outfile.write(epp)
-            outfile.write(b'\n')
-
-    if extra_pex_paths is None:
-      with open(extra_pex_paths_file_path, 'r') as infile:
-        extra_pex_paths = [p.strip() for p in infile.readlines()]
-    return WrappedPEX(PEX(os.path.realpath(path), interpreter), extra_pex_paths, interpreter)
+    return WrappedPEX(PEX(os.path.realpath(path), interpreter), interpreter)

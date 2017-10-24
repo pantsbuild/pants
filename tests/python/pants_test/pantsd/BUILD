@@ -73,3 +73,25 @@ python_tests(
   tags = {'integration'},
   timeout = 120
 )
+
+python_tests(
+  name = 'pants_daemon_launcher',
+  sources = ['test_pants_daemon_launcher.py'],
+  coverage = ['pants.pantsd.pants_daemon_launcher'],
+  dependencies = [
+    'tests/python/pants_test/pantsd:test_deps',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/pantsd:pants_daemon_launcher'
+  ]
+)
+
+python_tests(
+  name = 'watchman_launcher',
+  sources = ['test_watchman_launcher.py'],
+  coverage = ['pants.pantsd.watchman_launcher'],
+  dependencies = [
+    'tests/python/pants_test/pantsd:test_deps',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/pantsd:watchman_launcher'
+  ]
+)

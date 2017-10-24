@@ -7,16 +7,15 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import mock
 
-from pants.pantsd.subsystem.watchman_launcher import WatchmanLauncher
 from pants.pantsd.watchman import Watchman
+from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants_test.base_test import BaseTest
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class TestWatchmanLauncher(BaseTest):
-  def watchman_launcher(self, options=None):
-    options = options or {}
-    return global_subsystem_instance(WatchmanLauncher.Factory, options=options).create()
+  def watchman_launcher(self, cli_options=()):
+    bootstrap_options = self.get_bootstrap_options(cli_options)
+    return WatchmanLauncher.create(bootstrap_options)
 
   def create_mock_watchman(self, is_alive):
     mock_watchman = mock.create_autospec(Watchman, spec_set=False)
@@ -62,6 +61,6 @@ class TestWatchmanLauncher(BaseTest):
 
   def test_watchman_socket_path(self):
     expected_path = '/a/shorter/path'
-    options = {WatchmanLauncher.Factory.options_scope: {'socket_path': expected_path}}
+    options = ['--watchman-socket-path={}'.format(expected_path)]
     wl = self.watchman_launcher(options)
     self.assertEquals(wl.watchman._sock_file, expected_path)
