@@ -49,33 +49,14 @@ class _HydratedTargetDependentGraph(object):
     self._dependent_address_map = defaultdict(set)
     self._target_types = target_types
 
-  def _resources_addresses(self, hydrated_target):
-    """Yields fully qualified string addresses of resources for a given `HydratedTarget`."""
-    kwargs = hydrated_target.adaptor.kwargs()
-
-    # TODO: Figure out a better way to filter these.
-    # Python targets `resources` are lists of files, not addresses - short circuit for them.
-    if kwargs.get('type_alias', '').startswith('python_'):
-      return
-
-    resource_specs = kwargs.get('resources', [])
-    if not resource_specs:
-      return
-
-    parsed_resource_specs = resolve_and_parse_specs(hydrated_target.adaptor.address.spec_path,
-                                                    resource_specs)
-    for spec in parsed_resource_specs:
-      yield Address.parse(spec.to_spec_string())
-
   def inject_target(self, hydrated_target):
     """Inject a target, respecting all sources of dependencies."""
     target_cls = self._target_types[hydrated_target.adaptor.type_alias]
 
     declared_deps = hydrated_target.dependencies
     implicit_deps = (Address.parse(s) for s in target_cls.compute_dependency_specs(kwargs=hydrated_target.adaptor.kwargs()))
-    resources_deps = self._resources_addresses(hydrated_target)
 
-    for dep in itertools.chain(declared_deps, implicit_deps, resources_deps):
+    for dep in itertools.chain(declared_deps, implicit_deps):
       self._dependent_address_map[dep].add(hydrated_target.adaptor.address)
 
   def dependents_of_addresses(self, addresses):
