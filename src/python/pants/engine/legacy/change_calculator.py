@@ -12,7 +12,7 @@ from collections import defaultdict
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
 from pants.engine.legacy.graph import HydratedTargets, target_types_from_symbol_table
-from pants.engine.legacy.source_mapper import EngineSourceMapper, resolve_and_parse_specs
+from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.scm.change_calculator import ChangeCalculator
 
 
