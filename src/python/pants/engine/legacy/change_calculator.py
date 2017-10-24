@@ -72,7 +72,7 @@ class _HydratedTargetDependentGraph(object):
     target_cls = self._target_types[hydrated_target.adaptor.type_alias]
 
     declared_deps = hydrated_target.dependencies
-    implicit_deps = target_cls.compute_dependency_specs(kwargs=hydrated_target.adaptor.kwargs())
+    implicit_deps = (Address.parse(s) for s in target_cls.compute_dependency_specs(kwargs=hydrated_target.adaptor.kwargs()))
     resources_deps = self._resources_addresses(hydrated_target)
 
     for dep in itertools.chain(declared_deps, implicit_deps, resources_deps):
