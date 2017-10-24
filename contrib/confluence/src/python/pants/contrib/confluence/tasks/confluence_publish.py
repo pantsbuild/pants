@@ -18,12 +18,10 @@ from pants.contrib.confluence.util.confluence_util import Confluence, Confluence
 
 
 # Copied from `pants.backend.docgen.tasks.confluence_publish`
-
 # TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come
 # from options. However if we decide against that, we should rename this ConfluencePublishBase.
 class ConfluencePublish(Task):
   """A task to publish Page targets to Confluence wikis."""
-  
   
   @classmethod
   def register_options(cls, register):

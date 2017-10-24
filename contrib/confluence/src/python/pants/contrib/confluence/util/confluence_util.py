@@ -27,6 +27,7 @@ except ImportError:
 
 mimetypes.init()
 
+
 class ConfluenceError(Exception):
   """Indicates a problem performing an action with confluence."""
 

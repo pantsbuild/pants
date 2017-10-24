@@ -10,8 +10,7 @@ from pants.base.payload_field import PayloadField, PrimitiveField, combine_hashe
 from pants.build_graph.target import Target
 
 
-# Copied from `pants.backend.docgen.targets.doc`
-
+# File copied from `pants.backend.docgen.targets.doc`
 class WikiArtifact(object):
   """Binds a single documentation page to a wiki instance.
 
