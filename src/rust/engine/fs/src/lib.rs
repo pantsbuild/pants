@@ -1,8 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-mod hash;
+pub mod hash;
+pub mod store;
 
+extern crate bazel_protos;
 extern crate boxfuture;
 extern crate digest;
 extern crate futures;
@@ -12,7 +14,9 @@ extern crate hex;
 extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
+extern crate lmdb_rs;
 extern crate ordermap;
+extern crate protobuf;
 extern crate sha2;
 extern crate tar;
 extern crate tempdir;
