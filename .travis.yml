@@ -35,7 +35,7 @@ before_cache:
   - rm -rf ${HOME}/.cache/pants/rust/rustup
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
-  - du -d2 ${HOME} | sort -r
+  - du -d2 ${HOME} | sort -r -n
 
 cache:
   directories:
