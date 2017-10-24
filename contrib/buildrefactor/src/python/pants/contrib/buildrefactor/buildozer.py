@@ -38,6 +38,7 @@ class Buildozer(Task):
     register('--version', default='0.4.5', help='Version of buildozer.')
     register('--add-dependencies', type=str, help='The dependency or dependencies to add')
     register('--remove-dependencies', type=str, help='The dependency or dependencies to remove')
+    register('--command', type=str, help='A custom buildozer command to execute')
 
   def __init__(self, *args, **kwargs):
     super(Buildozer, self).__init__(*args, **kwargs)
@@ -46,17 +47,17 @@ class Buildozer(Task):
     self._executable = BinaryUtil.Factory.create().select_binary('scripts/buildozer', self.options.version, 'buildozer')
 
   def execute(self):
+    if self.options.command:
+      if self.options.add_dependencies or self.options.remove_dependencies:
+        raise TaskError('Buildozer custom command cannot be used together with ' +
+                        '--add-dependencies or --remove-dependencies.')
+      self._execute_buildozer_script(self.options.command)
+
     if self.options.add_dependencies:
-      self.add_dependencies()
+      self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
 
     if self.options.remove_dependencies:
-      self.remove_dependencies()
-
-  def add_dependencies(self):
-    self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
-
-  def remove_dependencies(self):
-    self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
+      self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
 
   def _execute_buildozer_script(self, command):
     for root in self.context.target_roots:

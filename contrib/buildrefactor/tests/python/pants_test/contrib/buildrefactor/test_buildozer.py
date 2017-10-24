@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import re
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -41,6 +42,22 @@ class BuildozerTest(TaskTestBase):
 
   def test_remove_multiple_dependencies(self):
     self._test_remove_dependencies('d', 'a b')
+
+  def test_custom_command(self):
+    build_file = self.build_root + '/b/BUILD'
+    new_build_name = 'b_2'
+
+    self._clean_build_file(build_file)
+    self._test_buildozer_execution({ 'command': 'set name {}'.format(new_build_name) })
+
+    with open(build_file) as f:
+      build_source = f.read()
+
+    self.assertIn(new_build_name, build_source)
+
+  def test_custom_command_error(self):
+    with self.assertRaises(TaskError):
+      self._test_buildozer_execution({ 'command': 'foo', 'add-dependencies': 'boo' })
 
   def _test_add_dependencies(self, spec_path, dependencies_to_add):
     build_file = self.build_root + '/{}/BUILD'.format(spec_path)
