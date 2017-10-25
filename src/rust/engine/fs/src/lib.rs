@@ -3,8 +3,8 @@
 
 mod hash;
 
-extern crate blake2_rfc;
 extern crate boxfuture;
+extern crate digest;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
@@ -13,6 +13,7 @@ extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
+extern crate sha2;
 extern crate tar;
 extern crate tempdir;
 
