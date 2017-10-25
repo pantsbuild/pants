@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
