@@ -13,64 +13,78 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 
 fn main() {
-  let top_match = App::new("fs_util")
-    .subcommand(
-      SubCommand::with_name("file")
-        .subcommand(
-          SubCommand::with_name("cat")
-            .about("Output the contents of a file by fingerprint.")
-            .arg(Arg::with_name("fingerprint").required(true).takes_value(
-              true,
-            )),
-        )
-        .subcommand(
+  match execute(
+    App::new("fs_util")
+      .subcommand(
+        SubCommand::with_name("file")
+          .subcommand(
+            SubCommand::with_name("cat")
+              .about("Output the contents of a file by fingerprint.")
+              .arg(Arg::with_name("fingerprint").required(true).takes_value(
+                true,
+              )),
+          )
+          .subcommand(
+            SubCommand::with_name("save")
+              .about(
+                "Ingest a file by path, which allows it to be used in Directories/Snapshots. \
+Outputs a fingerprint of its contents.",
+              )
+              .arg(Arg::with_name("path").required(true).takes_value(true)),
+          ),
+      )
+      .subcommand(
+        SubCommand::with_name("directory").subcommand(
           SubCommand::with_name("save")
             .about(
-              "Ingest a file by path, which allows it to be used in Directories/Snapshots. \
-Outputs a fingerprint of its contents.",
-            )
-            .arg(Arg::with_name("path").required(true).takes_value(true)),
-        ),
-    )
-    .subcommand(
-      SubCommand::with_name("directory").subcommand(
-        SubCommand::with_name("save")
-          .about(
-            "Ingest a directory recursively. Saves all files found therein and saves Directory \
+              "Ingest a directory recursively. Saves all files found therein and saves Directory \
 protos for each directory found. Outputs a fingerprint of the canonical top-level Directory proto.",
-          )
-          .arg(Arg::with_name("source").required(true).takes_value(true)),
-      ),
-    )
-    .arg(
-      Arg::with_name("store_dir")
-        .takes_value(true)
-          // TODO: Default this to wherever pants actually stores this.
-        .default_value("/tmp/lmdb"),
-    )
-    .get_matches();
+            )
+            .arg(Arg::with_name("source").required(true).takes_value(true)),
+        ),
+      )
+      .arg(
+        Arg::with_name("store_dir")
+            .takes_value(true)
+            // TODO: Default this to wherever pants actually stores this.
+            .default_value("/tmp/lmdb"),
+      )
+      .get_matches(),
+  ) {
+    Ok(_) => {}
+    Err(err) => {
+      eprintln!("{}", err);
+      exit(1)
+    }
+  };
+}
 
-  let store = Store::new(top_match.value_of("store_dir").unwrap()).unwrap();
+fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
+  let store_dir = top_match.value_of("store_dir").unwrap();
+  let store = Store::new(store_dir).map_err(|e| {
+    format!(
+      "Failed to open/create store for directory {}: {}",
+      store_dir,
+      e
+    )
+  })?;
 
   match top_match.subcommand() {
     ("file", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
-          let fingerprint = fingerprint_or_die(args.value_of("fingerprint").unwrap());
+          let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
           match store.load_bytes(&fingerprint).unwrap() {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
+              Ok(())
             }
-            None => {
-              die(format!("File with fingerprint {} not found", fingerprint));
-            }
+            None => Err(format!("File with fingerprint {} not found", fingerprint)),
           }
         }
         ("save", Some(args)) => {
-          match save_file(&store, &PathBuf::from(args.value_of("path").unwrap())) {
-            Ok((fingerprint, _)) => println!("{}", fingerprint),
-            Err(err) => die(err),
-          };
+          save_file(&store, &PathBuf::from(args.value_of("path").unwrap()))
+            .map(|(fingerprint, _)| println!("{}", fingerprint))
         }
         (_, _) => unimplemented!(),
       }
@@ -78,10 +92,8 @@ protos for each directory found. Outputs a fingerprint of the canonical top-leve
     ("directory", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("save", Some(args)) => {
-          match save_directory(&store, &PathBuf::from(args.value_of("source").unwrap())) {
-            Ok((fingerprint, _)) => println!("{}", fingerprint),
-            Err(err) => die(err),
-          }
+          save_directory(&store, &PathBuf::from(args.value_of("source").unwrap()))
+            .map(|(fingerprint, _)| println!("{}", fingerprint))
         }
         (_, _) => unimplemented!(),
       }
@@ -171,19 +183,4 @@ where
       dir.path()
     )),
   }
-}
-
-fn fingerprint_or_die(s: &str) -> Fingerprint {
-  match Fingerprint::from_hex_string(s) {
-    Ok(f) => f,
-    Err(err) => {
-      die(err);
-      panic!()
-    }
-  }
-}
-
-fn die(error: String) {
-  eprintln!("{}", error);
-  exit(1);
 }
