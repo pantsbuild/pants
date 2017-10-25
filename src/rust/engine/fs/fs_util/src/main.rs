@@ -6,7 +6,7 @@ use clap::{App, Arg, SubCommand};
 use fs::hash::Fingerprint;
 use fs::store::Store;
 use std::error::Error;
-use std::fs::{DirEntry, File, read_dir};
+use std::fs::File;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -44,7 +44,7 @@ protos for each directory found. Outputs a fingerprint of the canonical top-leve
         ),
       )
       .arg(
-        Arg::with_name("store_dir")
+        Arg::with_name("local_store_path")
             .takes_value(true)
             // TODO: Default this to wherever pants actually stores this.
             .default_value("/tmp/lmdb"),
@@ -74,7 +74,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          match store.load_bytes(&fingerprint).unwrap() {
+          match store.load_bytes(&fingerprint)? {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
@@ -114,49 +114,43 @@ fn save_file(store: &Store, path: &Path) -> Result<(Fingerprint, usize), String>
 
 fn save_directory(store: &Store, root: &Path) -> Result<(Fingerprint, usize), String> {
   let mut directory = bazel_protos::remote_execution::Directory::new();
-  for maybe_entry in read_dir(root).map_err(|e| {
-    format!("Error reading dir {:?}: {}", root, e.description())
-  })?
+  for entry in fs::PosixFS::scandir_sync(fs::Dir(root.to_path_buf()), &root)
+    .map_err(|e| {
+      format!("Error listing directory {:?}: {}", root, e.description())
+    })?
   {
-    let entry = maybe_entry.map_err(|e| {
-      format!(
-        "Error reading dir entry within {:?}: {}",
-        root,
-        e.description()
-      )
-    })?;
-    let metadata = entry.metadata().map_err(|e| {
-      format!(
-        "Error stating file {:?}: {}",
-        entry.path(),
-        e.description().to_string()
-      )
-    })?;
-    if metadata.is_dir() {
-      let (fingerprint, proto_size_bytes) = save_directory(store, &entry.path())?;
-      directory.mut_directories().push({
-        let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
-        dir_node.set_name(path_to_utf8(&entry, DirEntry::file_name)?);
-        dir_node.set_digest(fingerprint_to_digest(&fingerprint, proto_size_bytes as i64));
-        dir_node
-      })
-    } else if metadata.is_file() {
-      let (fingerprint, size_bytes) = save_file(store, &entry.path())?;
-      directory.mut_files().push({
-        let mut file_node = bazel_protos::remote_execution::FileNode::new();
-        file_node.set_name(path_to_utf8(&entry, DirEntry::file_name)?);
-        file_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
-        file_node.set_is_executable(metadata.permissions().mode() & 1 == 1);
-        file_node
-      });
+    match entry {
+      fs::Stat::Dir(fs::Dir(path)) => {
+        let (fingerprint, proto_size_bytes) = save_directory(store, &path)?;
+        directory.mut_directories().push({
+          let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
+          dir_node.set_name(file_name_as_utf8(&path)?);
+          dir_node.set_digest(fingerprint_to_digest(&fingerprint, proto_size_bytes as i64));
+          dir_node
+        })
+      }
+      fs::Stat::File(fs::File(path)) => {
+        let (fingerprint, size_bytes) = save_file(store, &path)?;
+        directory.mut_files().push({
+          let mut file_node = bazel_protos::remote_execution::FileNode::new();
+          file_node.set_name(file_name_as_utf8(&path)?);
+          file_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
+          let mut absolute_path = root.to_path_buf();
+          absolute_path.push(path.file_name().ok_or_else(|| {
+            format!("{:?} did not have a file_name", path)
+          })?);
+          file_node.set_is_executable(
+            std::fs::metadata(&absolute_path)
+              .map_err(|e| e.description().to_string())?
+              .permissions()
+              .mode() & 1 == 1,
+          );
+          file_node
+        });
+      }
+      fs::Stat::Link(_) => unimplemented!(),
     }
   }
-  directory.mut_directories().sort_by_key(
-    |f| f.get_name().to_string(),
-  );
-  directory.mut_files().sort_by_key(
-    |f| f.get_name().to_string(),
-  );
   store.record_directory(&directory)
 }
 
@@ -170,16 +164,17 @@ pub fn fingerprint_to_digest(
   digest
 }
 
-fn path_to_utf8<F, P>(dir: &DirEntry, f: F) -> Result<String, String>
-where
-  F: Fn(&DirEntry) -> P,
-  P: AsRef<Path>,
-{
-  match f(dir).as_ref().to_str() {
-    Some(dir) => Ok(dir.to_string()),
-    None => Err(format!(
-      "Error convering file path to UTF8: {:?}",
-      dir.path()
-    )),
+fn file_name_as_utf8(path: &Path) -> Result<String, String> {
+  match path.file_name() {
+    Some(name) => {
+      match name.to_str() {
+        Some(name_utf8) => Ok(name_utf8.to_string()),
+        None => Err(format!(
+          "{:?}'s file_name is not representable in UTF8",
+          path
+        )),
+      }
+    }
+    None => Err(format!("{:?} did not have a file_name", path)),
   }
 }

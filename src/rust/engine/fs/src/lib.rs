@@ -368,7 +368,7 @@ impl PosixFS {
     ignore_builder.build()
   }
 
-  fn scandir_sync(dir: Dir, dir_abs: PathBuf) -> Result<Vec<Stat>, io::Error> {
+  pub fn scandir_sync(dir: Dir, dir_abs: &Path) -> Result<Vec<Stat>, io::Error> {
     let mut stats = Vec::new();
     for dir_entry_res in dir_abs.read_dir()? {
       let dir_entry = dir_entry_res?;
@@ -453,7 +453,7 @@ impl PosixFS {
     pool
       .as_ref()
       .expect("Uninitialized CpuPool!")
-      .spawn_fn(move || PosixFS::scandir_sync(dir, dir_abs))
+      .spawn_fn(move || PosixFS::scandir_sync(dir, &dir_abs))
       .to_boxed()
   }
 }
