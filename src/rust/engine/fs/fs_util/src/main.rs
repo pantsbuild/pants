@@ -103,13 +103,12 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
 }
 
 fn save_file(store: &Store, path: &Path) -> Result<(Fingerprint, usize), String> {
-  let mut file = File::open(path).map_err(|e| {
-    format!("Error opening file {:?}: {}", path, e.description())
-  })?;
   let mut buf = Vec::new();
-  file.read_to_end(&mut buf).map_err(|e| {
-    format!("Error reading file {:?}: {}", path, e.description())
-  })?;
+  File::open(path)
+    .and_then(|mut f| f.read_to_end(&mut buf))
+    .map_err(|e| {
+      format!("Error reading file {:?}: {}", path, e.description())
+    })?;
   Ok((store.store_file_bytes(&buf)?, buf.len()))
 }
 
