@@ -134,6 +134,7 @@ dependencies = [
  "futures 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-cpupool 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "glob 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex 0.2.0 (git+https://github.com/illicitonion/rust-hex?rev=42e3c1ee5b90ec854eda00fd8e968fb6266d84df)",
  "ignore 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "ordermap 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -219,6 +220,11 @@ dependencies = [
  "libc 0.2.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "hex"
+version = "0.2.0"
+source = "git+https://github.com/illicitonion/rust-hex?rev=42e3c1ee5b90ec854eda00fd8e968fb6266d84df#42e3c1ee5b90ec854eda00fd8e968fb6266d84df"
 
 [[package]]
 name = "ignore"
@@ -483,6 +489,7 @@ dependencies = [
 "checksum globset 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "90d069fe6beb9be359ef505650b3f73228c5591a3c4b1f32be2f4f44459ffa3a"
 "checksum grpcio 0.1.1 (git+https://github.com/illicitonion/grpc-rs?rev=2acabdbff71e77a14b95b0b30c6d7de516355df7)" = "<none>"
 "checksum grpcio-sys 0.1.1 (git+https://github.com/illicitonion/grpc-rs?rev=2acabdbff71e77a14b95b0b30c6d7de516355df7)" = "<none>"
+"checksum hex 0.2.0 (git+https://github.com/illicitonion/rust-hex?rev=42e3c1ee5b90ec854eda00fd8e968fb6266d84df)" = "<none>"
 "checksum ignore 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "f05225ab97d449ffd22c4e80b5ba179370ce4ff5c6ad87232109bd0e403c8307"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lazy_static 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)" = "c9e5e58fa1a4c3b915a561a78a22ee0cac6ab97dca2504428bc1cb074375f8d5"

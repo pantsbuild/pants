@@ -8,6 +8,7 @@ extern crate boxfuture;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
+extern crate hex;
 extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
