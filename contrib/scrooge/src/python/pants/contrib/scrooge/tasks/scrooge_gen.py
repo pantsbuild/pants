@@ -211,11 +211,18 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if 0 != returncode:
       raise TaskError('Scrooge compiler exited non-zero for {} ({})'.format(target, returncode))
 
+  EXCEPTION_PARSER = re.compile(r'^\s*exception\s+(?:[^\s{]+)')
   SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
 
+  def _declares_exception(self, source):
+    return self._has_declaration(source, self.EXCEPTION_PARSER)
+
   def _declares_service(self, source):
+    return self._has_declaration(source, self.SERVICE_PARSER)
+
+  def _has_declaration(self, source, regex):
     with open(source) as thrift:
-      return any(line for line in thrift if self.SERVICE_PARSER.search(line))
+      return any(line for line in thrift if regex.search(line))
 
   def parse_gen_file_map(self, gen_file_map_path, outdir):
     d = defaultdict(set)
@@ -282,11 +289,11 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   def _thrift_dependencies_for_target(self, target):
     dep_info = self._resolved_dep_info
-    target_declares_service = any(self._declares_service(source)
-                                  for source in target.sources_relative_to_buildroot())
+    target_declares_service_or_exception = any(self._declares_service(source) or self._declares_exception(source)
+                                               for source in target.sources_relative_to_buildroot())
     language = self._thrift_defaults.language(target)
 
-    if target_declares_service:
+    if target_declares_service_or_exception:
       return dep_info.service[language]
     else:
       return dep_info.structs[language]

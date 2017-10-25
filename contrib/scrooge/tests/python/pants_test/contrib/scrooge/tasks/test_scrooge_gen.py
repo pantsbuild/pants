@@ -148,6 +148,7 @@ class ScroogeGenTest(NailgunTaskTestBase):
     context = self.context(target_roots=[target])
     task = self.prepare_execute(context)
 
+    task._declares_exception = lambda source: False
     task._declares_service = lambda source: False
 
     task.gen = MagicMock()
