@@ -212,7 +212,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
         task.execute_codegen(target, target_workdir)
         task._handle_duplicate_sources(target, target_workdir)
         fingerprint = CacheKey("test", target.invalidation_hash())
-        syn_targets.append(task._inject_synthetic_target(target, target_workdir, fingerprint))
+        syn_targets.append(task._inject_synthetic_target(target, fingerprint, target_workdir, [], []))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.

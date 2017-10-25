@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 from abc import abstractmethod
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 from twitter.common.collections import OrderedSet
 
@@ -211,9 +211,32 @@ class SimpleCodegenTask(Task):
     return synthetic_address
 
   def execute(self):
+    _SyntheticTargetExtras = namedtuple(
+      '_SyntheticTargetExtras',
+      ['workdir', 'extra_dependencies', 'extra_exports'])
     with self.invalidated(self.codegen_targets(),
                           invalidate_dependents=True,
+                          topological_order=True,
                           fingerprint_strategy=self.get_fingerprint_strategy()) as invalidation_check:
+
+      extras_for_target = dict()
+      for vt in invalidation_check.all_vts:
+        target_workdir = self.synthetic_target_dir(vt.target, vt.results_dir)
+        synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(vt.target, target_workdir)
+        extra_exports = self.synthetic_target_extra_exports(vt.target, target_workdir)
+
+        extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
+          set(synthetic_extra_dependencies))
+        if len(extra_exports_not_in_extra_dependencies) > 0:
+          raise self.MismatchedExtraExports(
+            'Extra synthetic exports included targets not in the extra dependencies: {}. Affected target: {}'
+              .format(extra_exports_not_in_extra_dependencies, vt.target))
+
+        extras_for_target[vt.target] = _SyntheticTargetExtras(
+          target_workdir,
+          synthetic_extra_dependencies,
+          extra_exports)
+
       with self.context.new_workunit(name='execute', labels=[WorkUnitLabel.MULTITOOL]):
         for vt in invalidation_check.all_vts:
           # Build the target and handle duplicate sources.
@@ -222,8 +245,13 @@ class SimpleCodegenTask(Task):
               self.execute_codegen(vt.target, vt.results_dir)
               self._handle_duplicate_sources(vt.target, vt.results_dir)
             vt.update()
-          # And inject a synthetic target to represent it.
-          self._inject_synthetic_target(vt.target, vt.results_dir, vt.cache_key)
+          synthetic_extras = extras_for_target[vt.target]
+          self._inject_synthetic_target(
+            vt.target,
+            vt.cache_key,
+            synthetic_extras.workdir,
+            synthetic_extras.extra_dependencies,
+            synthetic_extras.extra_exports)
         self._mark_transitive_invalidation_hashes_dirty(
           vt.target.address for vt in invalidation_check.all_vts
         )
@@ -268,36 +296,30 @@ class SimpleCodegenTask(Task):
   def _inject_synthetic_target(
     self,
     target,
-    target_workdir,
     fingerprint,
+    target_workdir,
+    target_extra_deps,
+    target_extra_exports
   ):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
-    :param target_workdir: The work directory containing the generated code for the target.
     :param fingerprint: The fingerprint to create the synthetic target
            with to avoid re-fingerprinting.
+    :param target_workdir: The base directory for the new synthetic target.
+    :param target_extra_deps: Extra dependencies to inject into the new target.
+    :param target_extra_exports: Extra exports to inject into the new target.
     """
     copied_attributes = {}
     for attribute in self._copy_target_attributes:
       copied_attributes[attribute] = getattr(target, attribute)
 
-    target_workdir = self.synthetic_target_dir(target, target_workdir)
-
-    synthetic_extra_dependencies = self.synthetic_target_extra_dependencies(target, target_workdir)
     synthetic_target_type = self.synthetic_target_type(target)
 
     if hasattr(synthetic_target_type, 'export_specs'):
       original_exports = self._original_export_specs(target)
-      extra_exports = self.synthetic_target_extra_exports(target, target_workdir)
 
-      extra_exports_not_in_extra_dependencies = set(extra_exports).difference(
-        set(synthetic_extra_dependencies))
-      if len(extra_exports_not_in_extra_dependencies) > 0:
-        raise self.MismatchedExtraExports(
-          'Extra synthetic exports included targets not in the extra dependencies: {}'
-            .format(extra_exports_not_in_extra_dependencies))
-      union = set(original_exports).union({e.address.spec for e in extra_exports})
+      union = set(original_exports).union({e.address.spec for e in target_extra_exports})
 
       copied_attributes['exports'] = sorted(union)
 
@@ -308,7 +330,7 @@ class SimpleCodegenTask(Task):
     synthetic_target = self.context.add_new_target(
       address=self._get_synthetic_address(target, target_workdir),
       target_type=synthetic_target_type,
-      dependencies=synthetic_extra_dependencies,
+      dependencies=target_extra_deps,
       sources=sources,
       derived_from=target,
       **copied_attributes
@@ -341,7 +363,7 @@ class SimpleCodegenTask(Task):
     if collected_original_exports is None:
       collected_original_exports = list()
 
-    # resolve and maybe synthetic-ify original exports
+    # resolve and also collect the synthetic equivalents to exports if they exist.
     new_orig = set()
     for e in collected_original_exports:
       resolved_targets = _ensure_synthetic_target_if_codegen(target,
