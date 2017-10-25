@@ -60,32 +60,15 @@ impl Store {
     hasher.input(&bytes);
     let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
 
-    let txn = self.env.new_transaction().map_err(|e| {
-      format!(
-        "Error making new transaction to store fingerprint {}: {}",
-        fingerprint,
-        e.description()
+    match self.env.new_transaction().and_then(|txn| {
+      txn.bind(db).insert(&fingerprint, &bytes).and_then(
+        |_| txn.commit(),
       )
-    })?;
-    {
-      let db = txn.bind(db);
-      match db.insert(&fingerprint, &bytes) {
-        Ok(_) => {}
-        Err(MdbError::KeyExists) => return Ok(fingerprint),
-        Err(err) => {
-          return Err(format!(
-            "Error storing fingerprint {}: {}",
-            fingerprint,
-            err.description()
-          ))
-        }
-      };
-    }
-    match txn.commit() {
-      Ok(_) => Ok(fingerprint),
+    }) {
+      Ok(()) => Ok(fingerprint),
       Err(MdbError::KeyExists) => Ok(fingerprint),
       Err(err) => Err(format!(
-        "Error committing transaction for fingerprint {}: {}",
+        "Error storing fingerprint {}: {}",
         fingerprint,
         err.description()
       )),
@@ -93,19 +76,13 @@ impl Store {
   }
 
   pub fn load_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
-    let reader = self.env.get_reader().map_err(|e| {
-      format!(
-        "Error getting reader for fingerprint {}: {}",
-        fingerprint,
-        e.description()
-      )
-    })?;
-    let db = reader.bind(&self.file_store);
-    match db.get(&fingerprint.as_bytes().as_ref()) {
+    match self.env.get_reader().and_then(|reader| {
+      reader.bind(&self.file_store).get(fingerprint)
+    }) {
       Ok(v) => Ok(Some(v)),
       Err(MdbError::NotFound) => Ok(None),
       Err(err) => Err(format!(
-        "Error getting fingerprint {}: {}",
+        "Error loading fingerprint {}: {}",
         fingerprint,
         err.description().to_string()
       )),
