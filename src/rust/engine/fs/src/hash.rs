@@ -1,10 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
 
 use blake2_rfc::blake2b::Blake2b;
+use hex;
 
 const FINGERPRINT_SIZE: usize = 32;
 
@@ -26,29 +28,9 @@ impl Fingerprint {
   }
 
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
-    if hex_string.len() != FINGERPRINT_SIZE * 2 {
-      return Err(format!(
-        "{} had length {}, fingerprint hex string should be {} characters",
-        hex_string,
-        hex_string.len(),
-        FINGERPRINT_SIZE * 2
-      ));
-    }
-    let mut bytes = [0; FINGERPRINT_SIZE];
-    for i in 0..FINGERPRINT_SIZE {
-      let pair = &hex_string[2 * i..2 * i + 2];
-      match u8::from_str_radix(pair, 16) {
-        Ok(byte) => bytes[i] = byte,
-        Err(_) => {
-          return Err(format!(
-            "Not a hex string (bad pair: {}): {}",
-            pair,
-            hex_string
-          ))
-        }
-      }
-    }
-    Ok(Fingerprint(bytes))
+    <[u8; FINGERPRINT_SIZE] as hex::FromHex>::from_hex(hex_string)
+      .map(|v| Fingerprint(v))
+      .map_err(|e| e.description().to_string())
   }
 
   pub fn as_bytes(&self) -> &[u8; FINGERPRINT_SIZE] {
