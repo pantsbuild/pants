@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import unittest
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -410,14 +409,22 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assertEqual(pants_run.stdout_data.strip(), '')
 
   @ensure_engine
-  def test_changed_with_deleted_file(self):
-    deleted_file = 'src/python/sources/sources.py'
-
+  def test_changed_with_deleted_source(self):
     with create_isolated_git_repo() as worktree:
-      safe_delete(os.path.join(worktree, deleted_file))
+      safe_delete(os.path.join(worktree, 'src/python/sources/sources.py'))
       pants_run = self.run_pants(['changed'])
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
+
+  def test_changed_with_deleted_resource(self):
+    # NB: This test cannot be executed via the TEST_MAPPING because the v1 engine claims that python
+    # targets own their Resources targets (meaning that `--include-dependees=none` lies to you),
+    # while the v2 engine does what you would expect.
+    with create_isolated_git_repo() as worktree:
+      safe_delete(os.path.join(worktree, 'src/python/sources/sources.txt'))
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:text')
 
   def test_list_changed(self):
     deleted_file = 'src/python/sources/sources.py'
@@ -428,19 +435,15 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
 
-  # Following 4 tests do not run in isolated repo because they don't mutate working copy.
   def test_changed(self):
     self.assert_changed_new_equals_old([])
 
-  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
   def test_changed_with_changes_since(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^'])
 
-  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
   def test_changed_with_changes_since_direct(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=direct'])
 
-  @unittest.skip("Pending fix for https://github.com/pantsbuild/pants/issues/4010")
   def test_changed_with_changes_since_transitive(self):
     self.assert_changed_new_equals_old(['--changes-since=HEAD^^', '--include-dependees=transitive'])
 
