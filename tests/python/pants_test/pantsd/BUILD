@@ -71,7 +71,7 @@ python_tests(
     'tests/python/pants_test/testutils:process_test_util'
   ],
   tags = {'integration'},
-  timeout = 120
+  timeout = 300
 )
 
 python_tests(
