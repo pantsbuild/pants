@@ -1,11 +1,13 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use digest::{Digest, FixedOutput};
+use sha2::Sha256;
+
 use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
 
-use blake2_rfc::blake2b::Blake2b;
 use hex;
 
 const FINGERPRINT_SIZE: usize = 32;
@@ -62,14 +64,14 @@ impl fmt::Debug for Fingerprint {
 /// A Write instance that fingerprints all data that passes through it.
 ///
 pub struct WriterHasher<W: Write> {
-  hasher: Blake2b,
+  hasher: Sha256,
   inner: W,
 }
 
 impl<W: Write> WriterHasher<W> {
   pub fn new(inner: W) -> WriterHasher<W> {
     WriterHasher {
-      hasher: Blake2b::new(FINGERPRINT_SIZE),
+      hasher: Sha256::default(),
       inner: inner,
     }
   }
@@ -78,7 +80,7 @@ impl<W: Write> WriterHasher<W> {
   /// Returns the result of fingerprinting this stream, and Drops the stream.
   ///
   pub fn finish(self) -> Fingerprint {
-    Fingerprint::from_bytes_unsafe(&self.hasher.finalize().as_bytes())
+    Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result())
   }
 }
 
@@ -86,7 +88,7 @@ impl<W: Write> Write for WriterHasher<W> {
   fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
-    self.hasher.update(&buf[0..written]);
+    self.hasher.input(&buf[0..written]);
     Ok(written)
   }
 
