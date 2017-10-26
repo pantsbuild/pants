@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::os::unix::ffi::OsStrExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use core::TypeId;
@@ -31,11 +31,11 @@ impl Core {
     root_subject_types: Vec<TypeId>,
     mut tasks: Tasks,
     types: Types,
-    build_root: PathBuf,
+    build_root: &Path,
     ignore_patterns: Vec<String>,
-    work_dir: PathBuf,
+    work_dir: &Path,
   ) -> Core {
-    let mut snapshots_dir = work_dir.clone();
+    let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
 
     // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
