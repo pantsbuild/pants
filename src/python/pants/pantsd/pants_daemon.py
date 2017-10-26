@@ -27,7 +27,6 @@ from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
 from pants.util.memo import memoized_property
-from pants.util.process_handler import subprocess
 
 
 class _LoggerStream(object):
@@ -273,7 +272,7 @@ class PantsDaemon(ProcessManager):
     cmd = [sys.executable] + sys.argv
     self._logger.debug('cmd is: PANTS_ENTRYPOINT={} {}'.format(entry_point, ' '.join(cmd)))
     # TODO: Improve error handling on launch failures.
-    subprocess.call(cmd, env=exec_env)
+    os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
 
   def maybe_launch(self):
     """Launches pantsd (if not already running) in a subprocess.
