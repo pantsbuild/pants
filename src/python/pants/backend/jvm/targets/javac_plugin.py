@@ -34,4 +34,4 @@ class JavacPlugin(JavaLibrary):
     for spec in super(JavacPlugin, cls).compute_dependency_specs(kwargs, payload):
       yield spec
 
-    yield Java.global_instance().injectables_spec_for_key('javac')
+    yield Java.global_instance().injectables_spec_for_key('tools.jar')
