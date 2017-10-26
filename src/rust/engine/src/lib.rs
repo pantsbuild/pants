@@ -190,8 +190,6 @@ pub extern "C" fn scheduler_create(
   root_type_ids: TypeIdBuffer,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
-  let build_root = PathBuf::from(build_root_buf.to_os_string());
-  let work_dir = PathBuf::from(work_dir_buf.to_os_string());
   let ignore_patterns = ignore_patterns_buf.to_strings().unwrap_or_else(|e| {
     panic!("Failed to decode ignore patterns as UTF8: {:?}", e)
   });
@@ -222,9 +220,9 @@ pub extern "C" fn scheduler_create(
       string: type_string,
       bytes: type_bytes,
     },
-    build_root,
+    build_root_buf.to_os_string().as_ref(),
     ignore_patterns,
-    work_dir,
+    work_dir_buf.to_os_string().as_ref(),
   ))))
 }
 

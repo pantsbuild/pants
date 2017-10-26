@@ -314,7 +314,7 @@ pub struct PosixFS {
 }
 
 impl PosixFS {
-  pub fn new(build_root: PathBuf, ignore_patterns: Vec<String>) -> Result<PosixFS, String> {
+  pub fn new(build_root: &Path, ignore_patterns: Vec<String>) -> Result<PosixFS, String> {
     let canonical_build_root = build_root
       .canonicalize()
       .and_then(|canonical| {
