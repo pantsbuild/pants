@@ -45,17 +45,22 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
              fingerprint=True)
 
   def injectables(self, build_graph):
-    # If a javac target has been defined on disk, use it: otherwise, inject a ToolsJar
-    # target to provide the dependency.
-    javac_address = Address.parse(self._javac_spec)
-    if not build_graph.contains_address(javac_address):
-      build_graph.inject_synthetic_target(javac_address, ToolsJar)
+    tools_jar_address = Address.parse(self._tools_jar_spec)
+    if not build_graph.contains_address(tools_jar_address):
+      build_graph.inject_synthetic_target(tools_jar_address, ToolsJar)
+    elif not build_graph.get_target(tools_jar_address).is_synthetic:
+      raise build_graph.ManualSyntheticTargetError(tools_jar_address)
 
   @property
   def injectables_spec_mapping(self):
     return {
       'plugin': self._plugin_dependency_specs,
+      # Zinc directly accesses the javac tool.
       'javac': [self._javac_spec],
+      # The ProvideToolsJar task will first attempt to use the (optional) configured
+      # javac tool, and then fall back to injecting a classpath entry linking to the current
+      # distribution's `tools.jar`.
+      'tools.jar': [self._tools_jar_spec],
     }
 
   @classmethod
@@ -77,6 +82,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
     self._plugin_dependency_specs = [
       Address.parse(spec).spec for spec in getattr(opts, 'compiler_plugin_deps', [])
     ]
+    self._tools_jar_spec = '//:tools-jar-synthetic'
 
   def javac_classpath(self, products):
     return self.tool_classpath_from_products(products, 'javac', self.options_scope)

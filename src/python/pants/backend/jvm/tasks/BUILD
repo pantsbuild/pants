@@ -576,6 +576,7 @@ python_library(
   dependencies = [
     ':classpath_products',
     ':jvm_tool_task_mixin',
+    'src/python/pants/backend/jvm/subsystems:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
