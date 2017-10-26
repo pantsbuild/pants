@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from unittest import skipIf
+from unittest import skip, skipIf
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
@@ -199,6 +199,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                               extra_args=['--no-compile-zinc-capture-classpath']) as found:
       self.assertFalse(classpath_filename in found)
 
+  @skip("TODO: Fix post #5016.")
   @skipIf(is_missing_jvm('1.8'), 'no java 1.8 installation on testing machine')
   def test_custom_javac(self):
     with self.temporary_workdir() as workdir:
