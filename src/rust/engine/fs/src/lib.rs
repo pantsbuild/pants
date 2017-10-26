@@ -14,7 +14,7 @@ extern crate hex;
 extern crate ignore;
 #[macro_use]
 extern crate lazy_static;
-extern crate lmdb_rs;
+extern crate lmdb;
 extern crate ordermap;
 extern crate protobuf;
 extern crate sha2;

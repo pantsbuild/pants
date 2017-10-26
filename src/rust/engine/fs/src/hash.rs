@@ -60,6 +60,12 @@ impl fmt::Debug for Fingerprint {
   }
 }
 
+impl AsRef<[u8]> for Fingerprint {
+  fn as_ref(&self) -> &[u8] {
+    &self.0[..]
+  }
+}
+
 ///
 /// A Write instance that fingerprints all data that passes through it.
 ///

@@ -14,7 +14,7 @@ glob = "0.2.11"
 hex = { git = "https://github.com/illicitonion/rust-hex", rev = "42e3c1ee5b90ec854eda00fd8e968fb6266d84df" }
 ignore = "0.1.8"
 lazy_static = "0.2.2"
-lmdb-rs = "0.7.6"
+lmdb = "0.7.2"
 ordermap = "0.2.8"
 protobuf = "1.4.1"
 sha2 = "0.6.0"

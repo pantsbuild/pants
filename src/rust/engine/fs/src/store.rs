@@ -1,10 +1,10 @@
 use bazel_protos;
 use digest::{Digest, FixedOutput};
-use lmdb_rs::{DbFlags, DbHandle, EnvBuilder, Environment, MdbError, MdbValue, ToMdbValue};
+use lmdb::{Database, DatabaseFlags, Environment, NO_OVERWRITE, Transaction};
+use lmdb::Error::{KeyExist, NotFound};
 use protobuf::core::Message;
 use sha2::Sha256;
 use std::error::Error;
-use std::mem::transmute;
 use std::path::Path;
 
 use hash::Fingerprint;
@@ -17,56 +17,57 @@ use hash::Fingerprint;
 ///
 pub struct Store {
   env: Environment,
-  file_store: DbHandle,
+  file_store: Database,
 
   // Store directories separately from files because:
   //  1. They may have different lifetimes.
   //  2. It's nice to know whether we should be able to parse something as a proto.
-  directory_store: DbHandle,
+  directory_store: Database,
 }
 
 impl Store {
   pub fn new<P: AsRef<Path>>(path: P) -> Result<Store, String> {
     // 2 DBs; one for file contents, one for directories.
-    let env = EnvBuilder::new().max_dbs(2).open(path, 0o600).map_err(
-      |e| {
-        format!("Error making env: {}", e.description())
-      },
-    )?;
-    let file_db_handle = env.create_db("files", DbFlags::empty()).map_err(|e| {
-      format!("Error creating/opening files database: {}", e.description())
-    })?;
-    let directory_db_handle = env.create_db("directories", DbFlags::empty()).map_err(
-      |e| {
+    let env = Environment::new()
+      .set_max_dbs(2)
+      .open(path.as_ref())
+      .map_err(|e| format!("Error making env: {}", e.description()))?;
+    let file_database = env
+      .create_db(Some("files"), DatabaseFlags::empty())
+      .map_err(|e| {
+        format!("Error creating/opening files database: {}", e.description())
+      })?;
+    let directory_database = env
+      .create_db(Some("directories"), DatabaseFlags::empty())
+      .map_err(|e| {
         format!(
           "Error creating/opening directories database: {}",
           e.description()
         )
-      },
-    )?;
+      })?;
     Ok(Store {
       env: env,
-      file_store: file_db_handle,
-      directory_store: directory_db_handle,
+      file_store: file_database,
+      directory_store: directory_database,
     })
   }
 
   pub fn store_file_bytes(&self, bytes: &[u8]) -> Result<Fingerprint, String> {
-    self.store_bytes(bytes, &self.file_store)
+    self.store_bytes(bytes, self.file_store.clone())
   }
 
-  fn store_bytes(&self, bytes: &[u8], db: &DbHandle) -> Result<Fingerprint, String> {
+  fn store_bytes(&self, bytes: &[u8], db: Database) -> Result<Fingerprint, String> {
     let mut hasher = Sha256::default();
     hasher.input(&bytes);
     let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
 
-    match self.env.new_transaction().and_then(|txn| {
-      txn.bind(db).insert(&fingerprint, &bytes).and_then(
-        |_| txn.commit(),
+    match self.env.begin_rw_txn().and_then(|mut txn| {
+      txn.put(db, &fingerprint, &bytes, NO_OVERWRITE).and_then(
+        |()| txn.commit(),
       )
     }) {
       Ok(()) => Ok(fingerprint),
-      Err(MdbError::KeyExists) => Ok(fingerprint),
+      Err(KeyExist) => Ok(fingerprint),
       Err(err) => Err(format!(
         "Error storing fingerprint {}: {}",
         fingerprint,
@@ -76,11 +77,13 @@ impl Store {
   }
 
   pub fn load_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
-    match self.env.get_reader().and_then(|reader| {
-      reader.bind(&self.file_store).get(fingerprint)
+    match self.env.begin_ro_txn().and_then(|txn| {
+      txn.get(self.file_store.clone(), fingerprint).map(
+        |v| v.to_vec(),
+      )
     }) {
       Ok(v) => Ok(Some(v)),
-      Err(MdbError::NotFound) => Ok(None),
+      Err(NotFound) => Ok(None),
       Err(err) => Err(format!(
         "Error loading fingerprint {}: {}",
         fingerprint,
@@ -108,24 +111,21 @@ impl Store {
     })?;
 
     Ok((
-      self.store_bytes(&bytes, &self.directory_store)?,
+      self.store_bytes(&bytes, self.directory_store.clone())?,
       bytes.len(),
     ))
   }
 }
 
-impl ToMdbValue for Fingerprint {
-  fn to_mdb_value<'a>(&'a self) -> MdbValue<'a> {
-    unsafe { MdbValue::new(transmute(self.as_bytes().as_ptr()), self.as_bytes().len()) }
-  }
-}
-
 #[cfg(test)]
 mod tests {
+  extern crate tempdir;
+
   use bazel_protos;
   use super::{Fingerprint, Store};
-  extern crate tempdir;
+  use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
   use tempdir::TempDir;
+
 
   const STR: &str = "European Burmese";
   const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
@@ -159,6 +159,51 @@ mod tests {
         .unwrap()
         .to_hex(),
       HASH
+    );
+  }
+
+  #[test]
+  fn save_file_collision_preserves_first() {
+    let dir = TempDir::new("store").unwrap();
+
+    let fingerprint = Fingerprint::from_hex_string(HASH).unwrap();
+    let bogus_value: &[u8] = &[][..];
+
+    let env = Environment::new().set_max_dbs(1).open(dir.path()).unwrap();
+    let database = env.create_db(Some("files"), DatabaseFlags::empty());
+    env
+      .begin_rw_txn()
+      .and_then(|mut txn| {
+        txn.put(database.unwrap(), &fingerprint, &bogus_value, WriteFlags::empty())
+            .and_then(|()| txn.commit())
+      })
+      .unwrap();
+
+    assert_eq!(
+      Store::new(dir.path())
+        .unwrap()
+        .load_bytes(&fingerprint)
+        .unwrap()
+        .unwrap(),
+      bogus_value
+    );
+
+    assert_eq!(
+      &Store::new(dir.path())
+        .unwrap()
+        .store_file_bytes(STR.as_bytes())
+        .unwrap()
+        .to_hex(),
+      HASH
+    );
+
+    assert_eq!(
+      &Store::new(dir.path())
+        .unwrap()
+        .load_bytes(&fingerprint)
+        .unwrap()
+        .unwrap(),
+      &Vec::from(bogus_value)
     );
   }
 
