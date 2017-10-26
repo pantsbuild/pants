@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
+    'src/python/pants/process',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
   ]
@@ -67,7 +68,6 @@ python_library(
     'src/python/pants/pantsd/service:fs_event_service',
     'src/python/pants/pantsd/service:pailgun_service',
     'src/python/pants/pantsd/service:scheduler_service',
-    'src/python/pants/process',
     'src/python/pants/util:memo',
     ':process_manager',
     ':watchman_launcher'
