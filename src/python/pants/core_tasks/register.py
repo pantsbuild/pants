@@ -50,6 +50,7 @@ def register_goals():
   Goal.register('lint', 'Find formatting errors in source code.')
   Goal.register('fmt', 'Autoformat source code.')
   Goal.register('buildozer', 'Manipulate BUILD files.')
+  Goal.register('meta-rename', 'Rename a target for its dependents')
 
   # Register tasks.
 
