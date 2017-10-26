@@ -46,7 +46,10 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
 
   def injectables(self, build_graph):
     tools_jar_address = Address.parse(self._tools_jar_spec)
-    build_graph.inject_synthetic_target(tools_jar_address, ToolsJar)
+    if not build_graph.contains_address(tools_jar_address):
+      build_graph.inject_synthetic_target(tools_jar_address, ToolsJar)
+    elif not build_graph.get_target(tools_jar_address).is_synthetic:
+      raise build_graph.ManualSyntheticTargetError(tools_jar_address)
 
   @property
   def injectables_spec_mapping(self):
