@@ -22,7 +22,6 @@
 .pants.workdir.file_lock
 .lock.process_manager.*
 .pants.stats
-.pantsd.startup
 .pids
 .project
 .settings
