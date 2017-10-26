@@ -249,8 +249,12 @@ class ProcessManager(ProcessMetadataManager):
   @memoized_property
   def process_lock(self):
     """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
+    safe_mkdir(self._metadata_base_dir)
     return OwnerPrintingInterProcessFileLock(
-      os.path.join(self._buildroot, '.lock.process_manager.{}'.format(self._name))
+      # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
+      # via `ProcessMetadataManager._get_metadata_dir_by_name()`) because of a need to purge
+      # the named metadata dir on startup to avoid stale metadata reads.
+      os.path.join(self._metadata_base_dir, '.lock.{}'.format(self._name))
     )
 
   @property
