@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from unittest import skipIf, skip
+from unittest import skip, skipIf
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
