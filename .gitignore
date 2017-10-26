@@ -20,6 +20,7 @@
 .pants.d
 .pants.run
 .pants.workdir.file_lock
+.lock.process_manager.*
 .pants.stats
 .pantsd.startup
 .pids

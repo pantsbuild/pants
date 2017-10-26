@@ -33,6 +33,7 @@ from pants.source.source_root import SourceRootConfig
 from pants.task.task import QuietTaskMixin
 from pants.util.filtering import create_filters, wrap_filters
 
+
 logger = logging.getLogger(__name__)
 
 

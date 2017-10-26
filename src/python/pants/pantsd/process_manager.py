@@ -16,7 +16,9 @@ import psutil
 
 from pants.base.build_environment import get_buildroot
 from pants.init.subprocess import Subprocess
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
+from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
 
@@ -226,7 +228,7 @@ class ProcessManager(ProcessMetadataManager):
     :param str metadata_base_dir: The overridden base directory for process metadata.
     """
     super(ProcessManager, self).__init__(metadata_base_dir)
-    self._name = name
+    self._name = name.lower().strip()
     self._pid = pid
     self._socket = socket
     self._socket_type = socket_type
@@ -243,6 +245,13 @@ class ProcessManager(ProcessMetadataManager):
   def process_name(self):
     """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
     return self._process_name
+
+  @memoized_property
+  def process_lock(self):
+    """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
+    return OwnerPrintingInterProcessFileLock(
+      os.path.join(self._buildroot, '.lock.process_manager.{}'.format(self._name))
+    )
 
   @property
   def cmdline(self):
@@ -480,12 +489,9 @@ class ProcessManager(ProcessMetadataManager):
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""
-    pass
 
   def post_fork_child(self):
     """Pre-fork child callback for subclasses."""
-    pass
 
   def post_fork_parent(self):
     """Post-fork parent callback for subclasses."""
-    pass
