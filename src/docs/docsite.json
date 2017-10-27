@@ -75,6 +75,7 @@
     "scalac_plugins": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/scalac/plugin/README.html",
     "server": "dist/markdown/html/src/docs/common_tasks/server.html",
     "setup_repo": "dist/markdown/html/src/docs/setup_repo.html",
+    "strict_deps_jvm": "dist/markdown/html/examples/src/scala/org/pantsbuild/example/strict_deps_jvm.html",
     "styleguide": "dist/markdown/html/src/docs/styleguide.html",
     "target_addresses": "dist/markdown/html/src/docs/target_addresses.html",
     "test": "dist/markdown/html/src/docs/common_tasks/test.html",
@@ -135,6 +136,7 @@
         { "page": "scala" },
         { "page": "publish" },
         { "page": "from_maven" },
+        { "page": "strict_deps_jvm" },
 
         { "heading": "Python" },
         { "page": "python_readme" },
