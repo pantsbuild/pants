@@ -30,6 +30,7 @@ impl Store {
     // 2 DBs; one for file contents, one for directories.
     let env = Environment::new()
       .set_max_dbs(2)
+      .set_map_size(16 * 1024 * 1024 * 1024)
       .open(path.as_ref())
       .map_err(|e| format!("Error making env: {}", e.description()))?;
     let file_database = env
