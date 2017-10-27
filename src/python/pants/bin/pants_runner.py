@@ -35,11 +35,7 @@ class PantsRunner(object):
 
     if bootstrap_options.enable_pantsd:
       try:
-        return RemotePantsRunner(self._exiter,
-                                 self._args,
-                                 self._env,
-                                 bootstrap_options.pants_subprocessdir,
-                                 bootstrap_options).run()
+        return RemotePantsRunner(self._exiter, self._args, self._env, bootstrap_options).run()
       except RemotePantsRunner.Fallback as e:
         logger.debug('caught client exception: {!r}, falling back to non-daemon mode'.format(e))
 

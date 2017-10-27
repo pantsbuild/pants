@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TaskError
-from pants.pantsd.pants_daemon_launcher import PantsDaemonLauncher
+from pants.pantsd.pants_daemon import PantsDaemon
 from pants.pantsd.process_manager import ProcessManager
 from pants.task.task import Task
 
@@ -16,6 +16,6 @@ class PantsDaemonKill(Task):
 
   def execute(self):
     try:
-      PantsDaemonLauncher(self.get_options()).terminate()
+      PantsDaemon.Factory.create(self.get_options()).terminate()
     except ProcessManager.NonResponsiveProcess as e:
       raise TaskError('failure while terminating pantsd: {}'.format(e))

@@ -41,10 +41,6 @@ class SchedulerService(PantsService):
     """Surfaces the change calculator."""
     return self._graph_helper.change_calculator
 
-  def pre_fork(self):
-    """Pre-fork controls."""
-    self._scheduler.pre_fork()
-
   def setup(self, lock):
     """Service setup."""
     super(SchedulerService, self).setup(lock)
