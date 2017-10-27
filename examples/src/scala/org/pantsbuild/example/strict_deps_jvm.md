@@ -3,23 +3,26 @@ Strict Dependencies
 
 ### What is strict_deps?
 
-Historically, Pants works with transitive dependencies. This means that in
-order to compile each target, the compiler must scan that full transitive set.
-But, most targets do not need access to all of their transitive dependencies at
-compile time. We can make compilation faster if we can reduce those compile
-dependencies to just the necessary ones.
+Strict_deps is a feature of JVM targets which controls the dependencies
+available on the compile classpath when that target is being compiled.
 
-Strict_deps is a Pants feature that changes compile behavior so that only
-direct dependencies and exports are included on the compile classpath for a
-target. This reduces scalac times by reducing the amount of class files scalac
-needs to scan before beginning a compile. It improves cache hit rates by
-reducing the number of files that are included in each target’s compile cache
-key.eat
+When compiling a JVM target with strict_deps disabled, all transitive
+dependencies of that target are included on the compile classpath.
+
+When compiling a JVM target with strict_deps enabled, the only things on the
+compile classpath are those listed in its `dependencies` attribute and those
+listed in the `exports` attribute of any target's transitive `dependencies`.
+
+Enabling strict_deps speeds up builds because most targets don't need access
+to their full transitive dependencies, so 1) it reduces the work the compiler
+has to do when searching for symbols, and 2) it improves cache hit rates by
+reducing the number of targets which contribute to cache keys. However, it
+requires you to be more exact in writing down your dependencies.
 
 ### Why strict_deps?
 
-Use of strict_deps improves cache hit rates and per-target compilation time
-(on the order of 10-20%).
+Depending on the shape of your build graph, use of strict_deps improves cache
+hit rates and per-target compilation time (on the order of 10-20%).
 
 Example
 -------
@@ -63,9 +66,9 @@ and the fix is simple, just add A to C's dependency list.
 classpaths. This is tricky, as author of C may not even be aware of A. It's
 hard for C's author to get the right dependency list in this case.
 
-People may wonder why compiler asks for A to compile C in the first place.
-Unfortunately this is a limitation for both javac and scalac. This is just
-how these compilers behave.
+People may wonder why the compiler asks for A to compile C in the first place.
+The java compiler needs all transitively implemented interfaces to be on the
+classpath so that it can resolve default method implementations.
 
 Strict_deps for Library Developers
 ----------------------------------
@@ -133,6 +136,10 @@ If this doesn't provide a solution, then the second solution to this error
 is exporting the missing type's target in the dependency you depend on.
 
 ### Exports
+
+A target should export any dependencies which provide types or symbols that
+are exposed in its public API. For instance, if target A has a method returning
+something of type X, it should export the target which defines the type X.
 
 Exports reintroduce limited transitivity to the dependencies provided at
 compile time. When a target exports one of its dependencies, that dependency
