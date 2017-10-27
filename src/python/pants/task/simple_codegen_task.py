@@ -25,6 +25,10 @@ from pants.util.dirutil import fast_relpath, safe_delete, safe_walk
 logger = logging.getLogger(__name__)
 
 
+class EmptyDepContext(object):
+  codegen_types = tuple()
+
+
 class SimpleCodegenTask(Task):
   """A base-class for code generation for a single target language.
 
@@ -336,16 +340,7 @@ class SimpleCodegenTask(Task):
     return hasattr(target_type, 'export_specs')
 
   def _original_export_specs(self, target):
-    collected_original_exports = getattr(target, 'export_specs', None)
-    if collected_original_exports is None:
-      collected_original_exports = list()
-
-    new_orig = set()
-    for e in collected_original_exports:
-      resolved_target = self.context.build_graph.get_target_from_spec(e, target.address.spec_path)
-      new_orig.add(resolved_target.address.spec)
-    original_exports = list(new_orig)
-    return original_exports
+    return [t.address.spec for t in target.exports(EmptyDepContext())]
 
   def resolve_deps(self, unresolved_deps):
     """

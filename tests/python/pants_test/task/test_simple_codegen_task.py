@@ -322,7 +322,7 @@ class ExportingDummyGen(DummyGen):
 class ExportingDummyLibrary(DummyLibrary):
   def __init__(self, exports=None, **kwargs):
     super(ExportingDummyLibrary, self).__init__(**kwargs)
-    self._export_specs = exports
+    self._export_specs = exports or tuple() # NB: export_specs can't be None
 
   @property
   def export_specs(self):
@@ -332,7 +332,7 @@ class ExportingDummyLibrary(DummyLibrary):
 class ExportingSyntheticDummyLibrary(SyntheticDummyLibrary):
   def __init__(self, address, sources, exports=None, **kwargs):
     super(ExportingSyntheticDummyLibrary, self).__init__(address, sources, **kwargs)
-    self._export_specs = exports
+    self._export_specs = exports or tuple() # NB: export_specs can't be None
 
   @property
   def export_specs(self):
