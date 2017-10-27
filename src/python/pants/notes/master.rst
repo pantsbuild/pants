@@ -5,6 +5,69 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev17 (10/27/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Move confluence related things to contrib (#4986)
+  `PR #4986 <https://github.com/pantsbuild/pants/pull/4986>`_
+
+* Add custom commands to the `buildozer` goal (#4998)
+  `PR #4998 <https://github.com/pantsbuild/pants/pull/4998>`_
+>`_ttps://github.com/pantsbuild/pants/pull/4921
+>`_ttps://github.com/pantsbuild/pants/pull/4882
+
+
+* Working implementation of jacoco. (#4978)
+  `PR #4978 <https://github.com/pantsbuild/pants/pull/4978>`_
+
+API Changes
+~~~~~~~~~~~
+* [pantsd] Launch the daemon via a subprocess call. (#5021)
+  `PR #5021 <https://github.com/pantsbuild/pants/pull/5021>`_
+
+* Fix support for custom javac definitions (#5024)
+  `PR #5024 <https://github.com/pantsbuild/pants/pull/5024>`_
+
+* Transform scopes in pants.ini that have been subsumed by global options. (#5007)
+  `PR #5007 <https://github.com/pantsbuild/pants/pull/5007>`_
+
+* Coverage isn't enabled by default (#5009)
+  `PR #5009 <https://github.com/pantsbuild/pants/pull/5009>`_
+  `PR #4881 <https://github.com/pantsbuild/pants/pull/4881>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Content-addressable {file,directory} store and utility (#5012)
+  `PR #5012 <https://github.com/pantsbuild/pants/pull/5012>`_
+
+* Use the service deps if the target declares an exception. (#5017)
+  `PR #5017 <https://github.com/pantsbuild/pants/pull/5017>`_
+
+* Pass references to Paths (#5022)
+  `PR #5022 <https://github.com/pantsbuild/pants/pull/5022>`_
+
+* Replace Blake2 with Sha256 (#5014)
+  `PR #5014 <https://github.com/pantsbuild/pants/pull/5014>`_
+
+* Revert pytest successful test caching in CI. (#5016)
+  `PR #5016 <https://github.com/pantsbuild/pants/pull/5016>`_
+
+* Fingerprint has from_hex_string, as_bytes, Display, and Debug (#5013)
+  `PR #5013 <https://github.com/pantsbuild/pants/pull/5013>`_
+
+* Fix memory leak in `./pants changed` (#5011)
+  `PR #5011 <https://github.com/pantsbuild/pants/pull/5011>`_
+
+* Prune travis cache (#5006)
+  `PR #5006 <https://github.com/pantsbuild/pants/pull/5006>`_
+
+* Utility to tee subprocess output to sys.std{out,err} and a buffer (#4967)
+  `PR #4967 <https://github.com/pantsbuild/pants/pull/4967>`_
+  
+
 1.4.0.dev16 (10/20/2017)
 ------------------------
 
