@@ -212,7 +212,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
         task.execute_codegen(target, target_workdir)
         task._handle_duplicate_sources(target, target_workdir)
         fingerprint = CacheKey("test", target.invalidation_hash())
-        syn_targets.append(task._inject_synthetic_target(target, fingerprint, target_workdir, [], []))
+        syn_targets.append(task._inject_synthetic_target(target, target_workdir, fingerprint))
 
     if should_fail:
       # If we're expected to fail, validate the resulting message.
@@ -520,34 +520,3 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
     self.assertEqual(
       self.synthetic_target_for('fleem').dependencies[0].address.spec,
       'marionette:no-strings')
-
-  def test_ensure_synthetic_equivalents_of_exports_added_to_synthetic_exports(self):
-    self.create_file('fleem/org/pantsbuild/example/fleem.dummy',
-      'org.pantsbuild.example Fleem')
-    self.add_to_build_file('fleem', dedent("""
-      dummy_library(name='flaam', sources=[])
-
-      exporting_dummy_library(name='fleem',
-        sources=['org/pantsbuild/example/fleem.dummy'],
-        dependencies=[':flaam'],
-        exports=[':flaam'],
-      )
-    """))
-    self.target('fleem:flaam')
-
-    targets = [self.target('fleem')]
-    task = self._create_dummy_task(
-      target_roots=targets,
-      synthetic_exports=[],
-      synthetic_dependencies=[])
-
-    task.execute()
-
-    self.assertEqual(
-      self.synthetic_target_for('fleem').export_specs,
-      [(self.spec_of_synthetic_target_for('fleem:flaam')), 'fleem:flaam'])
-
-  def spec_of_synthetic_target_for(self, spec):
-    address_spec = self.synthetic_target_for(spec).address.spec
-    return address_spec
-
