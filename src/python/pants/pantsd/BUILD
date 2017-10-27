@@ -7,6 +7,7 @@ python_library(
   dependencies = [
     '3rdparty/python:psutil',
     'src/python/pants/base:build_environment',
+    'src/python/pants/process',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
   ]
@@ -57,27 +58,18 @@ python_library(
   sources = ['pants_daemon.py'],
   dependencies = [
     '3rdparty/python:setproctitle',
+    'src/python/pants/base:build_environment',
     'src/python/pants/base:exiter',
+    'src/python/pants/binaries:binary_util',
+    'src/python/pants/engine:native',
     'src/python/pants/goal:run_tracker',
+    'src/python/pants/init',
     'src/python/pants/logging',
-    ':process_manager',
-  ]
-)
-
-python_library(
-  name = 'pants_daemon_launcher',
-  sources = ['pants_daemon_launcher.py'],
-  dependencies = [
-    ':pants_daemon',
-    ':watchman_launcher',
     'src/python/pants/pantsd/service:fs_event_service',
     'src/python/pants/pantsd/service:pailgun_service',
     'src/python/pants/pantsd/service:scheduler_service',
-    'src/python/pants/binaries:binary_util',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/engine:native',
-    'src/python/pants/init',
-    'src/python/pants/process',
-    'src/python/pants/util:memo'
+    'src/python/pants/util:memo',
+    ':process_manager',
+    ':watchman_launcher'
   ]
 )

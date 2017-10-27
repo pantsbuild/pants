@@ -21,7 +21,6 @@
 .pants.run
 .pants.workdir.file_lock
 .pants.stats
-.pantsd.startup
 .pids
 .project
 .settings
