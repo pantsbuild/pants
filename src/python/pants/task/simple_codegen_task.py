@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 from abc import abstractmethod
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict
 
 from twitter.common.collections import OrderedSet
 
