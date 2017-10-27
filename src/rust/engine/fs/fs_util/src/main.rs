@@ -45,9 +45,8 @@ protos for each directory found. Outputs a fingerprint of the canonical top-leve
       )
       .arg(
         Arg::with_name("local_store_path")
-            .takes_value(true)
-            // TODO: Default this to wherever pants actually stores this.
-            .default_value("/tmp/lmdb"),
+          .takes_value(true)
+          .required(true),
       )
       .get_matches(),
   ) {
@@ -148,7 +147,9 @@ fn save_directory(store: &Store, root: &Path) -> Result<(Fingerprint, usize), St
           file_node
         });
       }
-      fs::Stat::Link(_) => unimplemented!(),
+      fs::Stat::Link(fs::Link(path)) => {
+        return Err(format!("Don't yet know how to handle symlinks: {:?}", path))
+      }
     }
   }
   store.record_directory(&directory)
