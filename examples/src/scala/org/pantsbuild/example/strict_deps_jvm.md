@@ -82,6 +82,7 @@ have their compile invalidated.
 
 With strict_deps, a change to a library target will only invalidate the
 compile artifacts of dependent targets if they have
+
 1. A direct dependency on the changed library target, or
 2. A dependency on it via the export graph.
 
@@ -92,6 +93,7 @@ target would compile happily. Strict deps removes that implicit transitivity,
 which exposes undeclared dependencies.
 
 This introduces two new sources of errors.
+
 1. When adding a new library dependency to a target, if the library dependency
 requires some of its dependencies to be on the compile classpath, the compile
 can fail if those dependencies don’t make it on the classpath. These errors
@@ -107,10 +109,13 @@ The errors sometimes have different messages, but usually in Scala they look
 something like this:
 
     :::bash
-    [error] <path-to-current-sources>/<Some-file>.scala:71:32: Symbol 'type <Some-type>' is missing from the classpath.
+    [error] <path-to-current-sources>/<Some-file>.scala:71:32: Symbol 'type
+            <Some-type>' is missing from the classpath.
     [error] This symbol is required by '<Some-other-type>.timeout'.
-    [error] Make sure that type <Some-type>is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
-    [error] A full rebuild may help if <Some-other-type>.class' was compiled against an incompatible version of <none>.<Some-type>.
+    [error] Make sure that type <Some-type>is in your classpath and check for
+            conflicting dependencies with `-Ylog-classpath`.
+    [error] A full rebuild may help if <Some-other-type>.class was compiled
+            against an incompatible version of <none>.<Some-type>.
     [error]         Some-file.code
     [error]
 
@@ -133,7 +138,7 @@ Exports reintroduce limited transitivity to the dependencies provided at
 compile time. When a target exports one of its dependencies, that dependency
 will be on the classpath of any target that depends on it.
 
-#### How to Solve An Error With Exports
+### How to Solve An Error With Exports
 
 There are three targets that need to be identified to fix an error like this:
 
@@ -145,27 +150,29 @@ Let's look at an example failure:
 
     :::bash
     [1/1] Compiling 1 zinc source in 1 target (examples/src/scala/org/pantsbuild/example/strictdeps:h).
-    17:12:58 00:03       [compile]
+    17:12:58 00:03    [compile]
 
-    17:12:58 00:03         [zinc]
-                            [error] Symbol 'type z.Z' is missing from the classpath.
-                            [error] This symbol is required by 'method z.X.yyy'.
-                            [error] Make sure that type Z is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
-                            [error] A full rebuild may help if 'X.class' was compiled against an incompatible version of z.
-                            [error] one error found
-                            [error] Compile failed at Sep 19, 2017 5:12:59 PM [0.916s]
+    17:12:58 00:03      [zinc]
+                         [error] Symbol 'type z.Z' is missing from the classpath.
+                         [error] This symbol is required by 'method z.X.yyy'.
+                         [error] Make sure that type Z is in your classpath and
+                                 check for conflicting dependencies with `-Ylog-classpath`.
+                         [error] A full rebuild may help if 'X.class' was compiled
+                                 against an incompatible version of z.
+                         [error] one error found
+                         [error] Compile failed at Sep 19, 2017 5:12:59 PM [0.916s]
 
-    17:12:59 00:04         [missing-deps-suggest]
+    17:12:59 00:04      [missing-deps-suggest]
 
-                        compile(examples/src/scala/org/pantsbuild/example/strictdeps:h) failed: Zinc compile failed.
+                     compile(examples/src/scala/org/pantsbuild/example/strictdeps:h) failed: Zinc compile failed.
     FAILURE: Compilation failure: Failed jobs: compile(examples/src/scala/org/pantsbuild/example/strictdeps:h)
 
 Target 1 should be the most straight-forward to find. It's the target named in
 the failure message as a failed job. It's mentioned both at the end of the
-failing compile, in the line starting with FAILURE: Compilation failure, and
-in a line near the error message. In this example, the failure is
-compile(examples/src/scala/org/pantsbuild/example/strictdeps:h). So, target 1
-is examples/src/scala/org/pantsbuild/example/strictdeps:h.
+failing compile, in the line starting with `FAILURE: Compilation failure`,
+and in a line near the error message. In this example, the failure is
+`compile(examples/src/scala/org/pantsbuild/example/strictdeps:h)`. So, target
+1 is `examples/src/scala/org/pantsbuild/example/strictdeps:h`.
 
 Finding target 2 involves looking at target 1's dependencies and figuring out
 which one contains the type from the error message. First, let's find the
@@ -175,8 +182,9 @@ missing type. In this message specifically, it's the following line:
     :::bash
     [error] This symbol is required by 'method z.X.yyy'.
 
-The type from target 2 is the method yyy on z.X. How to we find the target
-for that type? One way would be to eyeball it. Let's look at the BUILD file.
+The type from target 2 is the method `yyy` on `z.X`. How to we find
+the target for that type? One way would be to eyeball it. Let's look at the
+BUILD file.
 
     :::python
     scala_library(
@@ -186,8 +194,8 @@ for that type? One way would be to eyeball it. Let's look at the BUILD file.
         strict_deps=True
     )
 
-In this example, target 1 only has one dependency, x. That makes finding
-target 2 easy. It's :x.
+In this example, target 1 only has one dependency, `x`. That makes finding
+target 2 easy. It's `:x`.
 
 Now that we know target 1 and target 2, let's find 3. Since we're doing this
 manually, we'll look at the build files again.
@@ -201,13 +209,13 @@ Here's target 2's BUILD file declaration:
         dependencies=[':z']
     )
 
-It too has only one dependency, so we know what Target 3 is. It's :z.
+It too has only one dependency, so we know what Target 3 is. It's `:z`.
 
 Now that we know what the missing dependency is, we can fix the error.
 Z has to be on the classpath in order to use X, so any target depending
-on :x will also need :z. We could just add a dependency on :z to :h, but
-doing so would result in new users of :x running into this same error. To
-prevent that, let's add an export to :x of :z.
+on `:x` will also need `:z`. We could just add a dependency on :z to :h, but
+doing so would result in new users of `:x` running into this same error. To
+prevent that, let's add an export to `:x` of `:z`.
 
     :::python
     scala_library(
