@@ -67,8 +67,9 @@ classpaths. This is tricky, as author of C may not even be aware of A. It's
 hard for C's author to get the right dependency list in this case.
 
 People may wonder why the compiler asks for A to compile C in the first place.
-The java compiler needs all transitively implemented interfaces to be on the
-classpath so that it can resolve default method implementations.
+There are a number of reasons for this, an example of which is that the java
+compiler needs all transitively implemented interfaces to be on the classpath
+so that it can resolve default method implementations.
 
 Strict_deps for Library Developers
 ----------------------------------
