@@ -25,8 +25,3 @@ page(
     'examples/src/java/org/pantsbuild/example:readme',
   ],
 )
-
-page(
-  name='strict_deps_jvm',
-  source='strict_deps_jvm.md',
-)
