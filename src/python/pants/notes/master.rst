@@ -15,8 +15,8 @@ New Features
 
 * Add custom commands to the `buildozer` goal (#4998)
   `PR #4998 <https://github.com/pantsbuild/pants/pull/4998>`_
->`_ttps://github.com/pantsbuild/pants/pull/4921
->`_ttps://github.com/pantsbuild/pants/pull/4882
+  `PR #4921 <https://github.com/pantsbuild/pants/pull/4921>`_
+  `PR #4882 <https://github.com/pantsbuild/pants/pull/4882>`_
 
 
 * Working implementation of jacoco. (#4978)
@@ -66,7 +66,7 @@ Refactoring, Improvements, and Tooling
 
 * Utility to tee subprocess output to sys.std{out,err} and a buffer (#4967)
   `PR #4967 <https://github.com/pantsbuild/pants/pull/4967>`_
-  
+
 
 1.4.0.dev16 (10/20/2017)
 ------------------------
