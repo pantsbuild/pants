@@ -272,7 +272,7 @@ class SimpleCodegenTask(Task):
     """Create, inject, and return a synthetic target for the given target and workdir.
 
     :param target: The target to inject a synthetic target for.
-    :param target_workdir: The base directory for the new synthetic target.
+    :param target_workdir: The work directory containing the generated code for the target.
     :param fingerprint: The fingerprint to create the synthetic target
            with to avoid re-fingerprinting.
     """
