@@ -62,7 +62,14 @@ class JarCreate(JarBuilderTask):
     return True
 
   def execute(self):
-    with self.invalidated(self.context.targets(is_jvm_library)) as invalidation_check:
+    # NB: Invalidating dependents transitively is more than is strictly necessary, but
+    # we know that JarBuilderTask touches (at least) the direct dependencies of targets (in
+    # the case of resources). One of these tasks could implement an FingerprintStrategy that
+    # would attempt to hash the relevant dependencies, but that is really error prone, and
+    # this task is more than fast enough to re-run (JarTool "copies" pre-zipped data from input
+    # zip/jar files).
+    with self.invalidated(self.context.targets(is_jvm_library),
+                          invalidate_dependents=True) as invalidation_check:
       with self.context.new_workunit(name='jar-create', labels=[WorkUnitLabel.MULTITOOL]):
         jar_mapping = self.context.products.get('jars')
 
