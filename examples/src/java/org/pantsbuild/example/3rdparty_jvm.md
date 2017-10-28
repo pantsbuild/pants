@@ -303,15 +303,17 @@ available on the compile classpath when that target is being compiled.
 When compiling a JVM target with strict_deps disabled, all transitive
 dependencies of that target are included on the compile classpath.
 
-When compiling a JVM target with strict_deps enabled, the only things on the
-compile classpath are those listed in its `dependencies` attribute and those
-listed in the `exports` attribute of any target's transitive `dependencies`.
+When compiling a JVM target with strict deps enabled, the compile classpath
+is more restricted. Instead of containing all transitive dependencies, only
+the direct dependencies and the targets exported by those dependencies are
+included in the compile classpath.
 
-Enabling strict_deps speeds up builds because most targets don't need access
-to their full transitive dependencies, so 1) it reduces the work the compiler
-has to do when searching for symbols, and 2) it improves cache hit rates by
-reducing the number of targets which contribute to cache keys. However, it
-requires you to be more exact in writing down your dependencies.
+Enabling strict_deps speeds up builds because it 1) reduces the work the
+compiler has to do when searching for symbols, and 2) improves cache hit
+rates by reducing the number of dependencies that contribute to a targets
+cache keys. This works because most targets don't need their full transitive
+dependencies available to compile. However, it does require you to be more
+exact in writing down your dependencies.
 
 ### Why strict_deps?
 
@@ -433,17 +435,12 @@ A target should export any dependencies which provide types or symbols that
 are exposed in its public API. For instance, if target A has a method returning
 something of type X, it should export the target which defines the type X.
 
-Exports reintroduce limited transitivity to the dependencies provided at
-compile time. When a target exports one of its dependencies, that dependency
-will be on the classpath of any target that depends on it.
+Exports are transitive. This means that if a target exports one of its
+dependencies and that exported dependency has exports, those exports will
+also be end up on the classpath. This allows the export graph to model
+requirements created by type hierarchies.
 
 #### How to Solve An Error With Exports
-
-There are three targets that need to be identified to fix an error like this:
-
-1. the target that failed to compile.
-2. the dependency of 1 that owns the type that needed the missing type
-3. the dependency of target 2 that owns the missing type.
 
 Let's look at an example failure:
 
@@ -465,6 +462,12 @@ Let's look at an example failure:
 
                      compile(examples/src/scala/org/pantsbuild/example/strictdeps:h) failed: Zinc compile failed.
     FAILURE: Compilation failure: Failed jobs: compile(examples/src/scala/org/pantsbuild/example/strictdeps:h)
+
+There are three targets that need to be identified to fix an error like this:
+
+1. the target that failed to compile.
+2. the dependency of 1 that owns the type that needed the missing type
+3. the dependency of target 2 that owns the missing type.
 
 Target 1 should be the most straight-forward to find. It's the target named in
 the failure message as a failed job. It's mentioned both at the end of the
