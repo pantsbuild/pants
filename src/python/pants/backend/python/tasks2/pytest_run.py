@@ -25,11 +25,12 @@ from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.base.hash_utils import Sharder
 from pants.base.workunit import WorkUnitLabel
+from pants.build_graph.files import Files
 from pants.build_graph.target import Target
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
-from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
@@ -141,6 +142,11 @@ class PytestRun(TestRunnerTaskMixin, Task):
              help='Run all tests in a single pytest invocation. If turned off, each test target '
                   'will run in its own pytest invocation, which will be slower, but isolates '
                   'tests from process-wide state created by tests in other targets.')
+
+    register('--chroot', advanced=True, fingerprint=True, type=bool, default=False,
+             help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '
+                  'will be copied to the chroot.'
+             .format(Files.alias()))
 
     # NB: We always produce junit xml privately, and if this option is specified, we then copy
     # it to the user-specified directory, post any interaction with the cache to retrieve the
@@ -286,8 +292,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       yield []
       return
 
-    pex_src_root = os.path.relpath(
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
+    pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
 
     source_mappings = {}
     for target in targets:
@@ -500,8 +505,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
-    pex_src_root = os.path.relpath(
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), get_buildroot())
+    pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
     # First map chrooted sources back to their targets.
     relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
       for src in target.sources_relative_to_source_root()}
@@ -717,13 +721,16 @@ class PytestRun(TestRunnerTaskMixin, Task):
     if not targets:
       return PytestResult.rc(0)
 
-    buildroot = get_buildroot()
-    source_chroot = os.path.relpath(
-      self.context.products.get_data(GatherSources.PYTHON_SOURCES).path(), buildroot)
+    if self._run_in_chroot:
+      path_func = lambda rel_src: rel_src
+    else:
+      source_chroot = os.path.relpath(self._source_chroot_path, get_buildroot())
+      path_func = lambda rel_src: os.path.join(source_chroot, rel_src)
+
     sources_map = {}  # Path from chroot -> Path from buildroot.
     for t in targets:
       for p in t.sources_relative_to_source_root():
-        sources_map[os.path.join(source_chroot, p)] = os.path.join(t.target_base, p)
+        sources_map[path_func(p)] = os.path.join(t.target_base, p)
 
     if not sources_map:
       return PytestResult.rc(0)
@@ -780,6 +787,10 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
       return result.with_failed_targets(failed_targets)
 
+  @memoized_property
+  def _source_chroot_path(self):
+    return self.context.products.get_data(GatherSources.PYTHON_SOURCES).path()
+
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
                                    cmd=pex.cmdline(args),
@@ -787,8 +798,26 @@ class PytestRun(TestRunnerTaskMixin, Task):
       process = self._spawn(pex, workunit, args, setsid=False, env=env)
       return process.wait()
 
+  @property
+  def _run_in_chroot(self):
+    return self.get_options().chroot
+
+  @contextmanager
+  def _maybe_run_in_chroot(self):
+    if self._run_in_chroot:
+      with pushd(self._source_chroot_path):
+        yield
+    else:
+      yield
+
   def _spawn(self, pex, workunit, args, setsid=False, env=None):
-    env = env or {}
-    process = pex.run(args, blocking=False, setsid=setsid, env=env,
-                      stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-    return SubprocessProcessHandler(process)
+    with self._maybe_run_in_chroot():
+      env = env or {}
+      process = pex.run(args,
+                        with_chroot=False,  # We handle chrooting ourselves.
+                        blocking=False,
+                        setsid=setsid,
+                        env=env,
+                        stdout=workunit.output('stdout'),
+                        stderr=workunit.output('stderr'))
+      return SubprocessProcessHandler(process)

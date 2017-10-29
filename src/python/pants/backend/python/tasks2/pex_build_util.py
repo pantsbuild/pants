@@ -19,7 +19,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.build_graph.resources import Resources
+from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
 
 
@@ -27,11 +27,11 @@ def has_python_sources(tgt):
   # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
   # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
   # we remove the old python pipeline entirely) we want to ignore those target types here.
-  return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary, Resources))
+  return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary))
 
 
 def has_resources(tgt):
-  return isinstance(tgt, Resources)
+  return isinstance(tgt, Files)
 
 
 def has_python_requirements(tgt):
@@ -41,10 +41,15 @@ def has_python_requirements(tgt):
 def dump_sources(builder, tgt, log):
   buildroot = get_buildroot()
   log.debug('  Dumping sources: {}'.format(tgt))
-  for relpath in tgt.sources_relative_to_source_root():
+  for relpath in tgt.sources_relative_to_buildroot():
     try:
-      src = os.path.join(buildroot, tgt.target_base, relpath)
-      if isinstance(tgt, Resources):
+      if type(tgt) == Files:
+        src = os.path.join(buildroot, relpath)
+      else:
+        relpath = os.path.relpath(relpath, tgt.target_base)
+        src = os.path.join(buildroot, tgt.target_base, relpath)
+
+      if has_resources(tgt):
         builder.add_resource(src, relpath)
       else:
         builder.add_source(src, relpath)

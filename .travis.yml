@@ -1,6 +1,6 @@
 env:
   global:
-    - PANTS_CONFIG_FILES="pants.travis-ci.ini"
+    - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
     - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
     - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
 
