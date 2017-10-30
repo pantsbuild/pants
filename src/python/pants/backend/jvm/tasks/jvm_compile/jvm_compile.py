@@ -188,12 +188,11 @@ class JvmCompile(NailgunTaskBase):
              help='Suggest missing dependencies on a best-effort basis from target\'s transitive'
                   'deps for compilation failures that are due to class not found.')
     
-    register('--missing-deps-not-found-msg', type=str,
-             help='The string that should be printed when missing-deps-suggest can\'t find any '
-                  'targets for the classes not found during compilation. This should likely '
-                  'include a link to documentation about dependency management.',
-             default='Missing-deps-suggest could not find the dependencies needed to compile '
-                     'your target. Please see https://www.pantsbuild.org/3rdparty_jvm.html for '
+    register('--missing-deps-not-found-msg', advanced=True, type=str,
+             help='The string that should be printed when pants can\'t find any suggestions for '
+                  'targets containing the classes not found during compilation. This should '
+                  'likely include a link to documentation about dependency management.',
+             default='Please see https://www.pantsbuild.org/3rdparty_jvm.html for '
                      'more information.')
 
     register('--class-not-found-error-patterns', advanced=True, type=list,
@@ -807,11 +806,11 @@ class JvmCompile(NailgunTaskBase):
         self.context.log.info(suggestion_msg)
 
       if no_suggestions:
-        self.context.log.error('Unable to find any deps from target\'s transitive '
+        self.context.log.warn('Unable to find any deps from target\'s transitive '
                                'dependencies that provide the following missing classes:')
         no_suggestion_msg = '\n   '.join(sorted(list(no_suggestions)))
-        self.context.log.error('  {}'.format(no_suggestion_msg))
-        self.context.log.error(self.get_options().missing_deps_not_found_msg)
+        self.context.log.warn('  {}'.format(no_suggestion_msg))
+        self.context.log.warn(self.get_options().missing_deps_not_found_msg)
 
   def _upstream_analysis(self, compile_contexts, classpath_entries):
     """Returns tuples of classes_dir->analysis_file for the closure of the target."""
