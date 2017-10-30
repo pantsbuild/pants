@@ -5,6 +5,26 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+
+1.4.0.dev18 (10/29/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Dedup dependencies output (#5029)
+  `PR #5029 <https://github.com/pantsbuild/pants/pull/5029>`_
+
+* [simple-code-gen] extension point for injecting extra exports (#4976)
+  `PR #4976 <https://github.com/pantsbuild/pants/pull/4976>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * Use the script verified identity when signing. (#5032)
+  `PR #5032 <https://github.com/pantsbuild/pants/pull/5032>`_
+
+ * Have twine use the previously established pgp key during release. (#5031)
+  `PR #5031 <https://github.com/pantsbuild/pants/pull/5031>`_
+
 1.4.0.dev17 (10/27/2017)
 ------------------------
 
@@ -17,7 +37,6 @@ New Features
   `PR #4998 <https://github.com/pantsbuild/pants/pull/4998>`_
   `PR #4921 <https://github.com/pantsbuild/pants/pull/4921>`_
   `PR #4882 <https://github.com/pantsbuild/pants/pull/4882>`_
-
 
 * Working implementation of jacoco. (#4978)
   `PR #4978 <https://github.com/pantsbuild/pants/pull/4978>`_
@@ -36,7 +55,6 @@ API Changes
 * Coverage isn't enabled by default (#5009)
   `PR #5009 <https://github.com/pantsbuild/pants/pull/5009>`_
   `PR #4881 <https://github.com/pantsbuild/pants/pull/4881>`_
-
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
