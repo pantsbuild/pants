@@ -19,10 +19,10 @@ New Features
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- * Use the script verified identity when signing. (#5032)
+* Use the script verified identity when signing. (#5032)
   `PR #5032 <https://github.com/pantsbuild/pants/pull/5032>`_
 
- * Have twine use the previously established pgp key during release. (#5031)
+* Have twine use the previously established pgp key during release. (#5031)
   `PR #5031 <https://github.com/pantsbuild/pants/pull/5031>`_
 
 1.4.0.dev17 (10/27/2017)
