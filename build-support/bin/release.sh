@@ -558,8 +558,9 @@ function publish_packages() {
 
   activate_twine
   trap deactivate RETURN
-  twine upload --sign "${DEPLOY_WHEEL_DIR}"/*.whl
-  twine upload --sign "${DEPLOY_SDIST_DIR}"/*.tar.gz
+
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_WHEEL_DIR}"/*.whl
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_SDIST_DIR}"/*.tar.gz
 
   end_travis_section
 }

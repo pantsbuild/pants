@@ -2,7 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  dependencies=[],
+  dependencies=[
+    ':readme',
+  ],
   provides=artifact(
     org='org.pantsbuild.testproject.publish',
     name='hello-greet',
@@ -47,4 +49,9 @@ java_library(
       )
     )
  ),
+)
+
+resources(
+  name='readme',
+  sources=globs('*.txt'),
 )
