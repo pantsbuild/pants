@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import sys
 from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 
@@ -242,12 +243,16 @@ class SubprocessExecutor(Executor):
     cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
     return self._spawn(cmd, cwd, **subprocess_args)
 
-  def _spawn(self, cmd, cwd=None, **subprocess_args):
+  def _spawn(self, cmd, cwd=None, stdout=None, stderr=None, stdin=None, **subprocess_args):
+    stdin = stdin or sys.stdin
+    stdout = stdout or sys.stdout
+    stderr = stderr or sys.stderr
     with self._maybe_scrubbed_env():
       cwd = cwd or self._buildroot
       logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
                    .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:
-        return subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
+        return subprocess.Popen(cmd, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr,
+                                **subprocess_args)
       except OSError as e:
         raise self.Error('Problem executing {0}: {1}'.format(self._distribution.java, e))

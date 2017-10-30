@@ -12,7 +12,7 @@ import signal
 import socket
 import sys
 
-from pants.java.nailgun_io import NailgunStreamStdinWriter
+from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket
 
@@ -25,7 +25,11 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
     self._sock = sock
-    self._input_reader = NailgunStreamStdinWriter(in_fd, self._sock) if in_fd else None
+    if in_fd:
+      self._input_reader = NailgunStreamWriter(in_fd, self._sock,
+                                               ChunkType.STDIN, ChunkType.STDIN_EOF)
+    else:
+      self._input_reader = None
     self._stdout = out_fd
     self._stderr = err_fd
     self._exit_on_broken_pipe = exit_on_broken_pipe
