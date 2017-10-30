@@ -12,7 +12,7 @@ import signal
 import socket
 import sys
 
-from pants.java.nailgun_io import NailgunStreamReader
+from pants.java.nailgun_io import NailgunStreamStdinWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket
 
@@ -25,7 +25,7 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
     self._sock = sock
-    self._input_reader = NailgunStreamReader(in_fd, self._sock) if in_fd else None
+    self._input_reader = NailgunStreamStdinWriter(in_fd, self._sock) if in_fd else None
     self._stdout = out_fd
     self._stderr = err_fd
     self._exit_on_broken_pipe = exit_on_broken_pipe
@@ -72,7 +72,7 @@ class NailgunClientSession(NailgunProtocol):
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
-      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamReader is always stopped.
+      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamStdinWriter is always stopped.
       self._maybe_stop_input_reader()
 
   def execute(self, working_dir, main_class, *arguments, **environment):

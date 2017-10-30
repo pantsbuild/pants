@@ -15,7 +15,7 @@ import unittest
 
 import mock
 
-from pants.java.nailgun_io import NailgunStreamReader, NailgunStreamWriter
+from pants.java.nailgun_io import NailgunStreamStdinWriter, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
@@ -36,11 +36,11 @@ class FakeFile(object):
     return
 
 
-class TestNailgunStreamReader(unittest.TestCase):
+class TestNailgunStreamStdinWriter(unittest.TestCase):
   def setUp(self):
     self.in_fd = FakeFile()
     self.mock_socket = mock.Mock()
-    self.reader = NailgunStreamReader(in_fd=self.in_fd, sock=self.mock_socket)
+    self.reader = NailgunStreamStdinWriter(in_fd=self.in_fd, sock=self.mock_socket)
 
   def test_stop(self):
     self.assertFalse(self.reader.is_stopped)
@@ -71,7 +71,7 @@ class TestNailgunStreamReader(unittest.TestCase):
       b''          # Simulate EOF.
     ]
 
-    # Exercise NailgunStreamReader.running() and .run() simultaneously.
+    # Exercise NailgunStreamStdinWriter.running() and .run() simultaneously.
     with self.reader.running():
       while not self.reader.is_stopped:
         time.sleep(0.01)

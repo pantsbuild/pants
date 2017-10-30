@@ -16,8 +16,56 @@ from contextlib import contextmanager
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
-class NailgunStreamReader(threading.Thread):
-  """Reads input from stdin and emits Nailgun 'stdin' chunks over a socket."""
+class NailgunStreamStdinReader(threading.Thread):
+  """Reads Nailgun 'stdin' chunks on a socket and writes them to an output file-like.
+
+  Because a Nailgun server only ever receives STDIN and STDIN_EOF ChunkTypes after initial
+  setup, this thread executes all reading from a server socket.
+
+  Runs until the socket is closed.
+  """
+
+  def __init__(self, sock):
+    """
+    :param socket sock: the socket to read nailgun protocol chunks from.
+    """
+    super(NailgunStreamStdinReader, self).__init__()
+    self.daemon = True
+    self._out = None
+    self._socket = sock
+
+  @contextmanager
+  def running(self):
+    in_fd, self._out = os.pipe()
+    self.start()
+    try:
+      yield in_fd
+    finally:
+      self._try_close()
+
+  def _try_close(self):
+    try:
+      self._socket.close()
+    except:
+      pass
+
+  def run(self):
+    for chunk_type, payload in NailgunProtocol.iter_chunks(self._socket, return_bytes=True):
+      # TODO: Read chunks. Expecting only STDIN, STDIN_EOF, and maybe EXIT.
+      if chunk_type == ChunkType.STDIN:
+        self._out.write(payload)
+      elif chunk_type == ChunkType.STDIN_EOF:
+        self._out.close()
+      elif chunk_type == ChunkType.EXIT:
+        break
+      else:
+        self._try_close()
+        # TODO: Will kill the thread, but may not be handled in a useful way
+        raise Exception('received unexpected chunk {} -> {}: closing.'.format(chunk_type, payload))
+
+
+class NailgunStreamStdinWriter(threading.Thread):
+  """Reads input from stdin and writes Nailgun 'stdin' chunks on a socket."""
 
   SELECT_TIMEOUT = 1
 
@@ -28,7 +76,7 @@ class NailgunStreamReader(threading.Thread):
     :param int buf_size: the buffer size for reads from the file descriptor.
     :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
     """
-    super(NailgunStreamReader, self).__init__()
+    super(NailgunStreamStdinWriter, self).__init__()
     self.daemon = True
     self._stdin = in_fd
     self._socket = sock

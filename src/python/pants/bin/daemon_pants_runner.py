@@ -17,7 +17,7 @@ from setproctitle import setproctitle as set_process_title
 from pants.base.exiter import Exiter
 from pants.bin.local_pants_runner import LocalPantsRunner
 from pants.init.util import clean_global_runtime_state
-from pants.java.nailgun_io import NailgunStreamWriter
+from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import HardSystemExit, stdio_as
@@ -94,20 +94,17 @@ class DaemonPantsRunner(ProcessManager):
   def _nailgunned_stdio(self, sock):
     """Redirects stdio to the connected socket speaking the nailgun protocol."""
     # Determine output tty capabilities from the environment.
-    _, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(self._env)
-
-    # TODO(kwlzn): Implement remote input reading and fix the non-fork()-safe sys.stdin reference
-    # in NailgunClient to enable support for interactive goals like `repl` etc.
+    stdin_isatty, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(self._env)
 
     # Construct StreamWriters for stdout, stderr.
-    streams = (
-      NailgunStreamWriter(sock, ChunkType.STDOUT, isatty=stdout_isatty),
-      NailgunStreamWriter(sock, ChunkType.STDERR, isatty=stderr_isatty)
-    )
+    stdout = NailgunStreamWriter(sock, ChunkType.STDOUT, isatty=stdout_isatty),
+    stderr = NailgunStreamWriter(sock, ChunkType.STDERR, isatty=stderr_isatty)
+    stdin_reader = NailgunStreamStdinReader(sock)
 
     # Launch the stdin StreamReader and redirect stdio.
-    with stdio_as(*streams):
-      yield
+    with stdin_reader.running() as stdin:
+      with stdio_as(stdout=stdout, stderr=stderr, stdin=stdin):
+        yield
 
   def _setup_sigint_handler(self):
     """Sets up a control-c signal handler for the daemon runner context."""
