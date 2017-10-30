@@ -193,7 +193,8 @@ class JvmCompile(NailgunTaskBase):
                   'targets for the classes not found during compilation. This should likely '
                   'include a link to documentation about dependency management.',
              default='Missing-deps-suggest could not find the dependencies needed to compile '
-                     'your target. Please see <> for more information.')
+                     'your target. Please see https://www.pantsbuild.org/3rdparty_jvm.html for '
+                     'more information.')
 
     register('--class-not-found-error-patterns', advanced=True, type=list,
              default=CLASS_NOT_FOUND_ERROR_PATTERNS,
