@@ -6,6 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import copy
+import hashlib
+
+import six
 
 from pants.option.ranked_value import RankedValue
 
@@ -143,3 +146,22 @@ class OptionValueContainer(object):
     ret = type(self)()
     ret._value_map = copy.copy(self._value_map)
     return ret
+
+  def sha1(self, exclude_keys=None):
+    """Computes and returns the current sha1 fingerprint for this `OptionValueContainer`.
+
+    :param list exclude_keys: A list of keys to exclude from fingerprint computation.
+    """
+    exclude_keys = set(exclude_keys or [])
+    acceptable_types = set((bytes, str, list, tuple, dict, int, float, bool, type(None)))
+    hasher = hashlib.sha1()
+    # N.B. This is pre-`sorted()` in `__iter__` above for determinism.
+    for k in self:
+      if k in exclude_keys: continue
+      hasher.update(k)
+      v = self.get(k)
+      assert type(v) in acceptable_types, 'unhashable option type: {}'.format(type(v))
+      # N.B. This relies on implicit string conversion to do the right thing for
+      # primitive types (e.g. `str([1, 2, 3])` -> "[1, 2, 3]").
+      hasher.update(six.binary_type(v))
+    return hasher.hexdigest()

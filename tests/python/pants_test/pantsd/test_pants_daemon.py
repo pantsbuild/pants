@@ -48,6 +48,7 @@ class PantsDaemonTest(BaseTest):
     lock = threading.RLock()
     mock_options = mock.Mock()
     mock_options.pants_subprocessdir = 'non_existent_dir'
+    mock_options.sha1.return_value = 'some_sha'
     self.pantsd = PantsDaemon(None,
                               'test_buildroot',
                               'test_work_dir',
