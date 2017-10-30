@@ -310,7 +310,7 @@ included in the compile classpath.
 
 Enabling strict_deps speeds up builds because it 1) reduces the work the
 compiler has to do when searching for symbols, and 2) improves cache hit
-rates by reducing the number of dependencies that contribute to a targets
+rates by reducing the number of dependencies that contribute to a target's
 cache keys. This works because most targets don't need their full transitive
 dependencies available to compile. However, it does require you to be more
 exact in writing down your dependencies.
