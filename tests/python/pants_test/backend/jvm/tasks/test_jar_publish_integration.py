@@ -9,7 +9,7 @@ import os
 import re
 
 from pants.base.build_environment import get_buildroot
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_rmtree
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -218,6 +218,40 @@ class JarPublishIntegrationTest(PantsRunIntegrationTest):
       pushdb_files=[],
       extra_options=['--override={}=1.2.3'.format(target)],
       assert_publish_config_contents=True)
+
+  def test_invalidate_resources(self):
+    """Tests that resource changes invalidate publishes."""
+    source_root = 'testprojects/src/java'
+    target_relative_to_sourceroot = 'org/pantsbuild/testproject/publish/hello/greet'
+    target = os.path.join(source_root, target_relative_to_sourceroot)
+    resource_relative_to_sourceroot = os.path.join(target_relative_to_sourceroot, 'TEMP.txt')
+    resource = os.path.join(source_root, resource_relative_to_sourceroot)
+
+    with self.temporary_workdir() as workdir:
+      def publish(resource_content):
+        with temporary_dir() as publish_dir:
+          with self.temporary_file_content(resource, resource_content):
+            # Validate that the target depends on the relevant resource.
+            self.assertIn(resource, self.run_pants(['filedeps', target]).stdout_data)
+
+            pants_run = self.run_pants_with_workdir(['publish.jar',
+                                                     '--local={}'.format(publish_dir),
+                                                     '--named-snapshot=X',
+                                                     '--no-dryrun',
+                                                     target
+                                                    ],
+                                                    workdir=workdir)
+            self.assert_success(pants_run)
+          # Validate that the content in the resulting jar matches.
+          jar = os.path.join(publish_dir,
+                             'org/pantsbuild/testproject/publish/hello-greet/X/hello-greet-X.jar')
+          with open_zip(jar, mode='r') as j:
+            with j.open(resource_relative_to_sourceroot) as jar_entry:
+              self.assertEquals(resource_content, jar_entry.read())
+
+      # Publish the same target twice with different resource content.
+      publish('one')
+      publish('two')
 
   def publish_test(self, target, artifacts, pushdb_files, extra_options=None, extra_config=None,
                    extra_env=None, expected_primary_artifact_count=1, success_expected=True,
