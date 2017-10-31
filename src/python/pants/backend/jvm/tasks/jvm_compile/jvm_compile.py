@@ -189,11 +189,11 @@ class JvmCompile(NailgunTaskBase):
                   'deps for compilation failures that are due to class not found.')
     
     register('--missing-deps-not-found-msg', advanced=True, type=str,
-             help='The string that should be printed when pants can\'t find any suggestions for '
-                  'targets containing the classes not found during compilation. This should '
+             help='The message to print when pants can\'t find any suggestions for targets '
+                  'containing the classes not found during compilation. This should '
                   'likely include a link to documentation about dependency management.',
-             default='Please see https://www.pantsbuild.org/3rdparty_jvm.html for '
-                     'more information.')
+             default='Please see https://www.pantsbuild.org/3rdparty_jvm.html#strict-dependencies '
+                     'for more information.')
 
     register('--class-not-found-error-patterns', advanced=True, type=list,
              default=CLASS_NOT_FOUND_ERROR_PATTERNS,
