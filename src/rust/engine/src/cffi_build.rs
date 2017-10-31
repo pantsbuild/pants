@@ -57,5 +57,11 @@ fn make_flags(env_script_path: &Path) -> Result<Vec<String>> {
   )?;
   // It would be a shame if someone were to include a space in an actual quoted value.
   // If they did that, I guess we'd need to implement shell tokenization or something.
-  return Ok(contents.trim().split(' ').map(str::to_owned).collect());
+  return Ok(
+    contents
+      .trim()
+      .split_whitespace()
+      .map(str::to_owned)
+      .collect(),
+  );
 }
