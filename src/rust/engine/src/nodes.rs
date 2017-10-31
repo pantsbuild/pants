@@ -978,7 +978,7 @@ impl Snapshot {
   }
 
   fn store_file(context: &Context, item: &File) -> Value {
-    let args = vec![Self::store_path(item.0.as_path())];
+    let args = vec![Self::store_path(item.path.as_path())];
     externs::invoke_unsafe(&context.core.types.construct_file, &args)
   }
 
