@@ -62,16 +62,14 @@ class NailgunStreamStdinReader(threading.Thread):
 
   def run(self):
     for chunk_type, payload in NailgunProtocol.iter_chunks(self._socket, return_bytes=True):
-      # TODO: Read chunks. Expecting only STDIN and STDIN_EOF.
       if chunk_type == ChunkType.STDIN:
         self._write_handle.write(payload)
         self._write_handle.flush()
       elif chunk_type == ChunkType.STDIN_EOF:
-        self._write_handle.flush()
         self._write_handle.close()
+        break
       else:
         self._try_close()
-        # TODO: Will kill the thread, but may not be handled in a useful way
         raise Exception('received unexpected chunk {} -> {}: closing.'.format(chunk_type, payload))
 
 
@@ -147,10 +145,10 @@ class NailgunStreamWriter(threading.Thread):
           if data:
             NailgunProtocol.write_chunk(self._socket, self._chunk_type, data)
           else:
-            if self._chunk_eof_type is not None:
-              NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
             try:
-              self._socket.shutdown(socket.SHUT_WR)  # Shutdown socket sends.
+              if self._chunk_eof_type is not None:
+                NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
+                self._socket.shutdown(socket.SHUT_WR)  # Shutdown socket sends.
             except socket.error:  # Can happen if response is quick.
               pass
             finally:

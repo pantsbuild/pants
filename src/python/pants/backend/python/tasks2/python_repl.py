@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import sys
 
 from pex.pex_info import PexInfo
 
@@ -52,5 +53,10 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
   # NB: **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
     env = pex_run_kwargs.pop('env', os.environ).copy()
-    po = pex.run(blocking=False, env=env, **pex_run_kwargs)
+    po = pex.run(blocking=False,
+                 env=env,
+                 stdin=sys.stdin,
+                 stdout=sys.stdout,
+                 stderr=sys.stderr,
+                 **pex_run_kwargs)
     po.wait()
