@@ -22,6 +22,7 @@ extern crate tar;
 extern crate tempdir;
 
 use std::collections::HashSet;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs, io};
@@ -48,7 +49,7 @@ impl Stat {
   pub fn path(&self) -> &Path {
     match self {
       &Stat::Dir(Dir(ref p)) => p.as_path(),
-      &Stat::File(File(ref p)) => p.as_path(),
+      &Stat::File(File { path: ref p, .. }) => p.as_path(),
       &Stat::Link(Link(ref p)) => p.as_path(),
     }
   }
@@ -61,7 +62,10 @@ pub struct Link(pub PathBuf);
 pub struct Dir(pub PathBuf);
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct File(pub PathBuf);
+pub struct File {
+  pub path: PathBuf,
+  pub is_executable: bool,
+}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathStat {
@@ -377,7 +381,12 @@ impl PosixFS {
       if file_type.is_dir() {
         stats.push(Stat::Dir(Dir(path)));
       } else if file_type.is_file() {
-        stats.push(Stat::File(File(path)));
+        let is_executable = dir_entry.metadata()?.permissions().mode() & 0o100 == 0o100;
+
+        stats.push(Stat::File(File {
+          path,
+          is_executable,
+        }));
       } else if file_type.is_symlink() {
         stats.push(Stat::Link(Link(path)));
       }
@@ -552,7 +561,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                   future::ok(res).to_boxed()
                 }
                 Stat::File(f) => {
-                  let res = if context.ignore(f.0.as_path(), false) {
+                  let res = if context.ignore(f.path.as_path(), false) {
                     None
                   } else {
                     Some(PathStat::file(stat_symbolic_path.to_owned(), f))
@@ -820,7 +829,7 @@ impl Snapshots {
       let append_res = match path_stat {
         &PathStat::File { ref path, ref stat } => {
           let normalized = Snapshots::normalize(path)?;
-          let mut input = fs::File::open(relative_to.0.join(stat.0.as_path()))
+          let mut input = fs::File::open(relative_to.0.join(stat.path.as_path()))
             .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
           tar_builder.append_file(normalized, &mut input)
         }
@@ -971,5 +980,47 @@ impl Snapshots {
         })
       },
     )
+  }
+}
+
+#[cfg(test)]
+mod posixfs_test {
+  extern crate tempdir;
+
+  use super::{Dir, File, PosixFS};
+  use futures::Future;
+  use std;
+  use std::os::unix::fs::PermissionsExt;
+  use std::path::{Path, PathBuf};
+
+  #[test]
+  fn is_executable_false() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    make_file(&dir.path().join("marmosets"), 0o611);
+    assert_only_file_is_executable(dir.path(), false);
+  }
+
+  #[test]
+  fn is_executable_true() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    make_file(&dir.path().join("photograph_marmosets"), 0o700);
+    assert_only_file_is_executable(dir.path(), true);
+  }
+
+  fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
+    let fs = PosixFS::new(path, vec![]).unwrap();
+    let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
+    assert_eq!(stats.len(), 1);
+    match stats.get(0).unwrap() {
+      &super::Stat::File(File { is_executable: got, .. }) => assert_eq!(want_is_executable, got),
+      other => panic!("Expected file, got {:?}", other),
+    }
+  }
+
+  fn make_file(path: &Path, mode: u32) {
+    let file = std::fs::File::create(&path).unwrap();
+    let mut permissions = std::fs::metadata(path).unwrap().permissions();
+    permissions.set_mode(mode);
+    file.set_permissions(permissions).unwrap();
   }
 }
