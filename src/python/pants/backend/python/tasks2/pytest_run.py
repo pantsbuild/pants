@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import io
 import itertools
 import os
 import shutil
@@ -168,6 +169,11 @@ class PytestRun(TestRunnerTaskMixin, Task):
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to. '
              'If not specified, a default within dist is used.')
+    register('--coverage-config-file', metavar='<FILE>', default=None,
+             help='Absolute path to a file containing configuration for the '
+                  'coverage.py module. If not specified, pantsbuild default '
+                  'configuration is used. See http://coverage.readthedocs.io/en/latest/config.html '
+                  'for syntax and configuration options')
 
     register('--test-shard', fingerprint=True,
              help='Subset of tests to run, in the form M/N, 0 <= M < N. For example, 1/3 means '
@@ -235,7 +241,12 @@ class PytestRun(TestRunnerTaskMixin, Task):
         realpaths.add(realpath)
 
     cp = configparser.SafeConfigParser()
-    cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
+    coverage_config_file = self.get_options().coverage_config_file
+    if coverage_config_file is not None:
+      with io.open(coverage_config_file, 'rt') as fp:
+        cp.readfp(fp)
+    else:
+      cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
     # We use the source_mappings to setup the `combine` coverage command to transform paths in
     # coverage data files into canonical form.
