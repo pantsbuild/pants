@@ -381,9 +381,7 @@ impl PosixFS {
       if file_type.is_dir() {
         stats.push(Stat::Dir(Dir(path)));
       } else if file_type.is_file() {
-        let is_executable = std::fs::metadata(dir_abs.join(dir_entry.file_name()))?
-          .permissions()
-          .mode() & 0o100 == 0o100;
+        let is_executable = dir_entry.metadata()?.permissions().mode() & 0o100 == 0o100;
 
         stats.push(Stat::File(File {
           path,
