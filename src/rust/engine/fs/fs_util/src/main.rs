@@ -8,7 +8,6 @@ use fs::store::Store;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::exit;
 
@@ -128,7 +127,10 @@ fn save_directory(store: &Store, root: &Path) -> Result<(Fingerprint, usize), St
           dir_node
         })
       }
-      fs::Stat::File(fs::File(path)) => {
+      fs::Stat::File(fs::File {
+                       path,
+                       is_executable,
+                     }) => {
         let (fingerprint, size_bytes) = save_file(store, &path)?;
         directory.mut_files().push({
           let mut file_node = bazel_protos::remote_execution::FileNode::new();
@@ -138,12 +140,7 @@ fn save_directory(store: &Store, root: &Path) -> Result<(Fingerprint, usize), St
           absolute_path.push(path.file_name().ok_or_else(|| {
             format!("{:?} did not have a file_name", path)
           })?);
-          file_node.set_is_executable(
-            std::fs::metadata(&absolute_path)
-              .map_err(|e| e.description().to_string())?
-              .permissions()
-              .mode() & 1 == 1,
-          );
+          file_node.set_is_executable(is_executable);
           file_node
         });
       }
