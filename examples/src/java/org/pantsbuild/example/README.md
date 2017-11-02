@@ -638,7 +638,6 @@ Stat explanation:
       {"badness": 16410, "max_usage": 0.1, "cost_transitive": 1641, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome"}
     ]
 
-
 The above example indicates that within the scope of the scala examples, the
 `examples/src/scala/org/pantsbuild/example/hello/welcome` target is the worst dependency. This is
 because it has a high transitive "cost" to build, and sees a maximum of 30% usage by its dependees.
