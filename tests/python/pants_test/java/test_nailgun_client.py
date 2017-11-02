@@ -12,7 +12,7 @@ import unittest
 import mock
 
 from pants.java.nailgun_client import NailgunClient, NailgunClientSession
-from pants.java.nailgun_io import NailgunStreamStdinWriter
+from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 
@@ -54,24 +54,24 @@ class TestNailgunClientSession(unittest.TestCase):
       err_fd=self.fake_stderr
     )
 
-    self.mock_stdin_writer = mock.create_autospec(NailgunStreamStdinWriter, spec_set=True)
-    self.nailgun_client_session._input_reader = self.mock_stdin_writer
+    self.mock_stdin_reader = mock.create_autospec(NailgunStreamWriter, spec_set=True)
+    self.nailgun_client_session._input_writer = self.mock_stdin_reader
 
   def tearDown(self):
     self.server_sock.close()
     self.client_sock.close()
 
-  def test_input_reader_start_stop(self):
-    self.nailgun_client_session._maybe_start_input_reader()
-    self.mock_stdin_writer.start.assert_called_once_with()
+  def test_input_writer_start_stop(self):
+    self.nailgun_client_session._maybe_start_input_writer()
+    self.mock_stdin_reader.start.assert_called_once_with()
 
-    self.nailgun_client_session._maybe_stop_input_reader()
-    self.mock_stdin_writer.stop.assert_called_once_with()
+    self.nailgun_client_session._maybe_stop_input_writer()
+    self.mock_stdin_reader.stop.assert_called_once_with()
 
-  def test_input_reader_noop(self):
-    self.nailgun_client_session._input_reader = None
-    self.nailgun_client_session._maybe_start_input_reader()
-    self.nailgun_client_session._maybe_stop_input_reader()
+  def test_input_writer_noop(self):
+    self.nailgun_client_session._input_writer = None
+    self.nailgun_client_session._maybe_start_input_writer()
+    self.nailgun_client_session._maybe_stop_input_writer()
 
   def test_process_session(self):
     NailgunProtocol.write_chunk(self.server_sock, ChunkType.PID, b'31337')
@@ -85,8 +85,8 @@ class TestNailgunClientSession(unittest.TestCase):
     self.assertEquals(self.nailgun_client_session._process_session(), 1729)
     self.assertEquals(self.fake_stdout.content, self.TEST_PAYLOAD * 2)
     self.assertEquals(self.fake_stderr.content, self.TEST_PAYLOAD * 3)
-    self.mock_stdin_writer.start.assert_called_once_with()
-    self.mock_stdin_writer.stop.assert_called_once_with()
+    self.mock_stdin_reader.start.assert_called_once_with()
+    self.mock_stdin_reader.stop.assert_called_once_with()
     self.assertEquals(self.nailgun_client_session.remote_pid, 31337)
 
   def test_process_session_bad_chunk(self):
@@ -97,8 +97,8 @@ class TestNailgunClientSession(unittest.TestCase):
     with self.assertRaises(NailgunClientSession.ProtocolError):
       self.nailgun_client_session._process_session()
 
-    self.mock_stdin_writer.start.assert_called_once_with()
-    self.mock_stdin_writer.stop.assert_called_once_with()
+    self.mock_stdin_reader.start.assert_called_once_with()
+    self.mock_stdin_reader.stop.assert_called_once_with()
 
   @mock.patch.object(NailgunClientSession, '_process_session', **PATCH_OPTS)
   def test_execute(self, mock_process_session):
