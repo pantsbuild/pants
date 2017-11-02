@@ -626,7 +626,7 @@ be remove (based on a estimate of the transitive cost to build the dep).
 
 Stat explanation:
 
-* `max_usage`: percentage of the dependency target is being used. 0 means the target is safe to drop.
+* `max_usage`: fraction of the dependency target is being used. 0 means the target is safe to drop.
 * `cost_transitive`: the cost to bring in this target including its transitive dependencies in the build process
 * `badness`: `cost_transitive/max_usage`, so the lower the better.
 
@@ -640,7 +640,7 @@ Stat explanation:
 
 The above example indicates that within the scope of the scala examples, the
 `examples/src/scala/org/pantsbuild/example/hello/welcome` target is the worst dependency. This is
-because it has a high transitive "cost" to build, and sees a maximum of 30% usage by its dependees.
+because it has a high transitive "cost" to build, and sees a maximum of 10% usage by its dependees.
 
 ### For global analysis
 
