@@ -112,7 +112,7 @@ fn save_file(store: &Store, path: &Path) -> Result<(Fingerprint, usize), String>
 
 fn save_directory(store: &Store, root: &Path) -> Result<(Fingerprint, usize), String> {
   let mut directory = bazel_protos::remote_execution::Directory::new();
-  for entry in fs::PosixFS::scandir_sync(fs::Dir(root.to_path_buf()), &root)
+  for entry in fs::PosixFS::scandir_sync(root.to_path_buf(), fs::Dir(root.to_path_buf()))
     .map_err(|e| {
       format!("Error listing directory {:?}: {}", root, e.description())
     })?
