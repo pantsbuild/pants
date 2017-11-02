@@ -624,7 +624,7 @@ a simple 'badness' score. The "badness" score is intended to indicate both how e
 would be to remove (based on the maximum fraction used by each dependee) and how valuable it would
 be remove (based on a estimate of the transitive cost to build the dep).
 
-Conceptually:
+Stat explanation:
 
 * `max_usage`: percentage of the dependency target is being used. 0 means the target is safe to drop.
 * `cost_transitive`: the cost to bring in this target including its transitive dependencies in the build process
