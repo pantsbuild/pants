@@ -25,7 +25,9 @@ use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Mutex, RwLock, RwLockReadGuard};
-use std::{fmt, fs, io};
+use std::{fmt, fs};
+use std::io::{self, Read};
+use std::cmp::min;
 
 use futures::future::{self, Future};
 use futures_cpupool::{CpuFuture, CpuPool};
@@ -426,6 +428,23 @@ impl PosixFS {
     }
   }
 
+  pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
+    let path = file.path.clone();
+    let path_abs = self.build_root.0.join(&file.path);
+    self
+      .pool()
+      .as_ref()
+      .expect("Uninitialized CpuPool!")
+      .spawn_fn(move || {
+        std::fs::File::open(&path_abs).and_then(|mut f| {
+          let mut content = Vec::new();
+          f.read_to_end(&mut content)?;
+          Ok(FileContent { path, content })
+        })
+      })
+      .to_boxed()
+  }
+
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.build_root.0.join(link.0.as_path()).to_owned();
@@ -695,6 +714,25 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 pub struct FileContent {
   pub path: PathBuf,
   pub content: Vec<u8>,
+}
+
+impl fmt::Debug for FileContent {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let len = min(self.content.len(), 5);
+    let describer = if len < self.content.len() {
+      "starting "
+    } else {
+      ""
+    };
+    write!(
+      f,
+      "FileContent(path={:?}, content={} bytes {}{:?})",
+      self.path,
+      self.content.len(),
+      describer,
+      &self.content[..len]
+    )
+  }
 }
 
 #[derive(Clone)]
@@ -990,21 +1028,55 @@ mod posixfs_test {
   use super::{Dir, File, PosixFS};
   use futures::Future;
   use std;
+  use std::io::Write;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
 
   #[test]
   fn is_executable_false() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    make_file(&dir.path().join("marmosets"), 0o611);
+    make_file(&dir.path().join("marmosets"), &[], 0o611);
     assert_only_file_is_executable(dir.path(), false);
   }
 
   #[test]
   fn is_executable_true() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    make_file(&dir.path().join("photograph_marmosets"), 0o700);
+    make_file(&dir.path().join("photograph_marmosets"), &[], 0o700);
     assert_only_file_is_executable(dir.path(), true);
+  }
+
+  #[test]
+  fn read_file() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    let path = PathBuf::from("marmosets");
+    let content = "cute".as_bytes().to_vec();
+    make_file(
+      &std::fs::canonicalize(dir.path()).unwrap().join(&path),
+      &content,
+      0o600,
+    );
+    let fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let file_content = fs.read_file(&File {
+      path: path.clone(),
+      is_executable: false,
+    }).wait()
+      .unwrap();
+    assert_eq!(file_content.path, path);
+    assert_eq!(file_content.content, content);
+  }
+
+  #[test]
+  fn read_file_missing() {
+    let dir = tempdir::TempDir::new("posixfs").unwrap();
+    PosixFS::new(&dir.path(), vec![])
+      .unwrap()
+      .read_file(&File {
+        path: PathBuf::from("marmosets"),
+        is_executable: false,
+      })
+      .wait()
+      .expect_err("Expected error");
   }
 
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
@@ -1017,8 +1089,9 @@ mod posixfs_test {
     }
   }
 
-  fn make_file(path: &Path, mode: u32) {
-    let file = std::fs::File::create(&path).unwrap();
+  fn make_file(path: &Path, contents: &[u8], mode: u32) {
+    let mut file = std::fs::File::create(&path).unwrap();
+    file.write(contents).unwrap();
     let mut permissions = std::fs::metadata(path).unwrap().permissions();
     permissions.set_mode(mode);
     file.set_permissions(permissions).unwrap();
