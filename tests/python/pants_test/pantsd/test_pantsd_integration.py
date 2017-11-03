@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from pants.pantsd.process_manager import ProcessManager
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import check_process_exists_by_command
+from pants.util.collections import combined_dict
 
 
 class PantsDaemonMonitor(ProcessManager):
@@ -96,10 +97,10 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         workdir
       )
 
-  def assert_success_runner(self, workdir, config, cmd):
-    print('running: ./pants {}'.format(' '.join(cmd)))
+  def assert_success_runner(self, workdir, config, cmd, extra_config={}):
+    print('running: ./pants {} (extra_config={})'.format(' '.join(cmd), extra_config))
     return self.assert_success(
-      self.run_pants_with_workdir(cmd, workdir, config)
+      self.run_pants_with_workdir(cmd, workdir, combined_dict(config, extra_config))
     )
 
   def test_pantsd_compile(self):
@@ -173,16 +174,18 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     """
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
       variants = (
-        ['-ldebug', 'help'],
-        ['-linfo', 'help']
+        ['debug', 'help'],
+        ['info', 'help']
       )
       last_pid = None
       for cmd in itertools.chain(*itertools.repeat(variants, 3)):
-        pantsd_run(cmd)
+        # Run with a CLI flag.
+        pantsd_run(['-l{}'.format(cmd[0]), cmd[1]])
         next_pid = checker.await_pantsd()
-        if last_pid:
+        if last_pid is not None:
           self.assertNotEqual(last_pid, next_pid)
         last_pid = next_pid
 
-        pantsd_run(cmd)
+        # Run with an env var.
+        pantsd_run(cmd[1:], {'GLOBAL': {'level': cmd[0]}})
         checker.assert_running()
