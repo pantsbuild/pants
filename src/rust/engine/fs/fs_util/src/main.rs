@@ -88,7 +88,16 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
         }
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
-          let posix_fs = make_posix_fs(path.parent().unwrap());
+          // Canonicalize path to guarantee that a relative path has a parent.
+          let posix_fs = make_posix_fs(path
+            .canonicalize()
+            .map_err(|e| {
+              format!("Error canonicalizing path {:?}: {}", path, e.description())
+            })?
+            .parent()
+            .ok_or_else(|| {
+              format!("File being saved must have parent but {:?} did not", path)
+            })?);
           let file = posix_fs
             .stat(PathBuf::from(path.file_name().unwrap()))
             .unwrap();
