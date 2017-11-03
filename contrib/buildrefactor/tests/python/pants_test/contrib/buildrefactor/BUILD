@@ -35,3 +35,12 @@ python_tests(
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
+
+
+python_tests(
+  name='meta_rename_integration',
+  sources=['test_meta_rename_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ]
+)
