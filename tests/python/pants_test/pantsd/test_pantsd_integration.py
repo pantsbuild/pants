@@ -13,9 +13,9 @@ import time
 from contextlib import contextmanager
 
 from pants.pantsd.process_manager import ProcessManager
+from pants.util.collections import combined_dict
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import check_process_exists_by_command
-from pants.util.collections import combined_dict
 
 
 class PantsDaemonMonitor(ProcessManager):
