@@ -3,6 +3,7 @@ extern crate boxfuture;
 extern crate clap;
 extern crate fs;
 extern crate futures;
+extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
@@ -110,15 +111,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
     ("directory", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("save", Some(args)) => {
-          let path_arg = args.value_of("source").unwrap();
-          let root = PathBuf::from(path_arg).canonicalize().map_err(|err| {
-            format!(
-              "Could not canonicalize path {}: {}",
-              path_arg,
-              err.description()
-            )
-          })?;
-          let posix_fs = Arc::new(make_posix_fs(&root));
+          let posix_fs = Arc::new(make_posix_fs(args.value_of("source").unwrap()));
           let (fingerprint, _) =
             save_directory(store, posix_fs, Arc::new(fs::Dir(PathBuf::from("."))))
               .wait()?;
@@ -131,7 +124,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
   }
 }
 
-fn make_posix_fs(root: &Path) -> fs::PosixFS {
+fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
   fs::PosixFS::new(&root, vec![]).unwrap()
 }
 
@@ -174,22 +167,21 @@ fn save_directory(
             fs::Stat::Dir(dir) => dirs.push(dir),
             fs::Stat::File(file) => files.push(file),
             fs::Stat::Link(fs::Link(path)) => {
-              let err: BoxFuture<_, _> = Box::new(futures::future::err(format!(
-                "Don't yet know how to handle symlinks: {:?}",
-                path
-              )));
+              let err: BoxFuture<_, _> =
+                futures::future::err(format!("Don't yet know how to handle symlinks: {:?}", path))
+                  .to_boxed();
               return err;
             }
           }
         }
 
-        let store_copy = store.clone();
+        let store_inner_copy = store_copy.clone();
         let posix_fs_copy = posix_fs.clone();
         let dir_futures: Vec<_> = dirs
           .into_iter()
           .map(move |dir| {
             let dir = Arc::new(dir);
-            save_directory(store_copy.clone(), posix_fs_copy.clone(), dir.clone())
+            save_directory(store_inner_copy.clone(), posix_fs_copy.clone(), dir.clone())
               .and_then(move |(fingerprint, proto_size_bytes)| {
                 let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
                 dir_node.set_name(file_name_as_utf8(&dir.0)?);
@@ -202,21 +194,19 @@ fn save_directory(
         let file_futures: Vec<_> = files
           .into_iter()
           .map(move |file| {
-            file_to_file_node(store.clone(), posix_fs.clone(), file)
+            file_to_file_node(store_copy.clone(), posix_fs.clone(), file)
           })
           .collect();
 
-        Box::new(join_all(dir_futures).join(join_all(file_futures)))
+        join_all(dir_futures)
+          .join(join_all(file_futures))
+          .to_boxed()
       })
       .and_then(move |(dirs, files)| {
         let mut directory = bazel_protos::remote_execution::Directory::new();
-        for dir in dirs.into_iter() {
-          directory.mut_directories().push(dir);
-        }
-        for file in files.into_iter() {
-          directory.mut_files().push(file);
-        }
-        store_copy.record_directory(&directory)
+        directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
+        directory.set_files(protobuf::RepeatedField::from_vec(files));
+        store.record_directory(&directory)
       }),
   )
 }
