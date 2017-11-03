@@ -7,15 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import re
 
-from pants_test.contrib.buildrefactor.buildozer_util import assertInFile, prepare_dependencies
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase
-
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants_test.contrib.buildrefactor.buildozer_util import assertInFile, prepare_dependencies
+from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.buildozer import Buildozer
 
@@ -67,13 +66,13 @@ class BuildozerTest(TaskTestBase):
     assertInFile(self, new_build_name,  '{}/b/BUILD'.format(self.build_root))
 
   def _test_add_dependencies(self, spec_path, dependencies_to_add):
-    self._run_buildozer({ 'add_dependencies': dependencies_to_add })
+    self._run_buildozer({ 'add_dependencies': ' '.join(dependencies_to_add) })
 
     for dependency in dependencies_to_add:
       self.assertIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec_path)))
 
   def _test_remove_dependencies(self, spec_path, dependencies_to_remove):
-    self._run_buildozer({ 'remove_dependencies': dependencies_to_remove }, spec_path)
+    self._run_buildozer({ 'remove_dependencies': ' '.join(dependencies_to_remove) }, spec_path)
 
     for dependency in dependencies_to_remove:
       self.assertNotIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec_path)))

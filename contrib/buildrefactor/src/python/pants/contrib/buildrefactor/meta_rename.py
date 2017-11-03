@@ -10,8 +10,9 @@ from collections import defaultdict
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants.contrib.buildrefactor.buildozer import Buildozer
 from pants.task.task import Task
+
+from pants.contrib.buildrefactor.buildozer import Buildozer
 
 
 class MetaRename(Task):
