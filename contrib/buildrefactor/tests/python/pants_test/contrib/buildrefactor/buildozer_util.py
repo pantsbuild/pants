@@ -5,28 +5,24 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import fnmatch
-import os
-
-
-def clean_build_file(build_file):
-  with open(build_file) as f:
-    source = f.read()
-
-  new_source = source.replace('u\'', '\'')
-
-  with open(build_file, 'w') as new_file:
-    new_file.write(new_source)
-
-
-def clean_build_directory(path):
-  for root, dirs, files in os.walk(path):
-    for build_file in fnmatch.filter(files, '*BUILD'):
-      clean_build_file('{}/{}'.format(root, build_file))
-
 
 def assertInFile(self, string, file):
   with open(file) as f:
     source = f.read()
 
   self.assertIn(string, source)
+
+
+def prepare_dependencies(self):
+  self.add_to_build_file('a', 'java_library(name="a")')
+  self.add_to_build_file('b', 'java_library(name="b", dependencies=["a:a"])')
+  self.add_to_build_file('c', 'java_library(name="c", dependencies=["a:a"])')
+  self.add_to_build_file('d', 'java_library(name="d", dependencies=["a:a", "b"])')
+
+  targets = {}
+  targets['a'] = self.make_target('a')
+  targets['b'] = self.make_target('b', dependencies=[targets['a']])
+  targets['c'] = self.make_target('c', dependencies=[targets['a'], targets['b']])
+  targets['d'] = self.make_target('d', dependencies=[targets['a'], targets['b']])
+
+  return targets

@@ -23,8 +23,5 @@ python_library(
 
 python_library(
   name='meta_rename',
-  sources=['meta_rename.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/targets:scala'
-  ]
+  sources=['meta_rename.py']
 )

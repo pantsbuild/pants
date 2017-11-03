@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import defaultdict
 
-from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
+from pants.build_graph.target import Target
 from pants.contrib.buildrefactor.buildozer import Buildozer
 from pants.task.task import Task
 
@@ -39,23 +39,20 @@ class MetaRename(Task):
     self.update_original_build_name()
 
   def update_dependee_references(self):
-    dependency_graph = self.dependency_graph()
-    dependent_addresses = dependency_graph[
-      ScalaLibrary(name=self._from_address.target_name, address=self._from_address, build_graph=[], **{})
+    dependee_targets = self.dependency_graph()[
+      Target(name=self._from_address.target_name, address=self._from_address, build_graph=[], **{})
     ]
 
-    for address in dependent_addresses:
+    for concrete_target in dependee_targets:
       try:
         Buildozer.execute_binary(
-          'replace dependencies {}:{} {}:{}'.format(
-            self._from_address.spec_path, self._from_address._target_name,
-            self._to_address.spec_path, self._to_address.target_name),
-          address=address
+          'replace dependencies {} {}'.format(self._from_address.spec, self._to_address.spec),
+          address=concrete_target.address
         )
       except Exception:
         Buildozer.execute_binary(
           'replace dependencies :{} :{}'.format(self._from_address.target_name, self._to_address.target_name),
-          address=address
+          address=concrete_target.address
         )
 
   def update_original_build_name(self):
@@ -68,6 +65,6 @@ class MetaRename(Task):
       target = self.context.build_graph.get_target(address)
 
       for dependency in target.dependencies:
-        dependency_graph[dependency].add(address)
+        dependency_graph[dependency].add(target.concrete_derived_from)
 
     return dependency_graph

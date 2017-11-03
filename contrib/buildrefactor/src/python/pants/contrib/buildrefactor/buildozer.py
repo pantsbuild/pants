@@ -38,8 +38,8 @@ class Buildozer(Task):
   @classmethod
   def register_options(cls, register):
     register('--version', default='0.4.5', help='Version of buildozer.')
-    register('--add-dependencies', type=str, help='The dependency or dependencies to add')
-    register('--remove-dependencies', type=str, help='The dependency or dependencies to remove')
+    register('--add-dependencies', type=list, help='The dependency or dependencies to add')
+    register('--remove-dependencies', type=list, help='The dependency or dependencies to remove')
     register('--command', type=str, help='A custom buildozer command to execute')
 
   def __init__(self, *args, **kwargs):
@@ -56,24 +56,21 @@ class Buildozer(Task):
       self._execute_buildozer_script(self.options.command)
 
     if self.options.add_dependencies:
-      self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
+      self._execute_buildozer_script('add dependencies {}'.format(' '.join(self.options.add_dependencies)))
 
     if self.options.remove_dependencies:
-      self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
+      self._execute_buildozer_script('remove dependencies {}'.format(' '.join(self.options.remove_dependencies)))
 
   def _execute_buildozer_script(self, command):
     for root in self.context.target_roots:
       address = root.address
-      buildozer_command = [self._executable, command, '//{}:{}'.format(address._spec_path, address._target_name)]
-      Buildozer._execute_buildozer_command(buildozer_command)
+      Buildozer.execute_binary(command, address, binary=self._executable)
 
   @classmethod
-  def execute_binary(cls, command, address, version='0.4.5'):
-    buildozer_command = [
-      BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer'),
-      command, '//{}:{}'.format(address._spec_path, address._target_name)
-    ]
-    Buildozer._execute_buildozer_command(buildozer_command)
+  def execute_binary(cls, command, address, binary=None, version='0.4.5'):
+    binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
+
+    Buildozer._execute_buildozer_command([binary, command, '//{}'.format(address.spec)])
 
   @classmethod
   def _execute_buildozer_command(cls, buildozer_command):
@@ -84,4 +81,3 @@ class Buildozer(Task):
         raise TaskError('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
-
