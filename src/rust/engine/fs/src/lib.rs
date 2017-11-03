@@ -490,6 +490,7 @@ impl PosixFS {
         ),
       ));
     }
+    // TODO: Make this an instance method, and stop having to check this every call.
     if !absolute_path_to_root.is_absolute() {
       return Err(io::Error::new(
         io::ErrorKind::InvalidInput,
