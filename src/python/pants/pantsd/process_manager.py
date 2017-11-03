@@ -535,7 +535,7 @@ class FingerprintedProcessManager(ProcessManager):
       sep = sep or self.FINGERPRINT_CMD_SEP
       cmdline = cmdline or []
       for cmd_part in cmdline:
-        if cmd_part.startswith('{}='.format(key, sep)):
+        if cmd_part.startswith('{}{}'.format(key, sep)):
           return cmd_part.split(sep)[1]
 
   def has_current_fingerprint(self, fingerprint):
