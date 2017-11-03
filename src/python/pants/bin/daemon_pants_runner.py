@@ -146,6 +146,9 @@ class DaemonPantsRunner(ProcessManager):
     # terminal window.
     self._exiter.set_except_hook(sys.stderr)
 
+    # Ensure anything referencing sys.argv inherits the Pailgun'd args.
+    sys.argv = self._args
+
     # Set context in the process title.
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
