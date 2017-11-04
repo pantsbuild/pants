@@ -32,7 +32,7 @@ fn main() {
             SubCommand::with_name("save")
               .about(
                 "Ingest a file by path, which allows it to be used in Directories/Snapshots. \
-Outputs a fingerprint of its contents.",
+Outputs a fingerprint of its contents and its size in bytes, separated by a space.",
               )
               .arg(Arg::with_name("path").required(true).takes_value(true)),
           ),
@@ -42,7 +42,8 @@ Outputs a fingerprint of its contents.",
           SubCommand::with_name("save")
             .about(
               "Ingest a directory recursively. Saves all files found therein and saves Directory \
-protos for each directory found. Outputs a fingerprint of the canonical top-level Directory proto.",
+protos for each directory found. Outputs a fingerprint of the canonical top-level Directory proto \
+and the size of the serialized proto in bytes, separated by a space.",
             )
             .arg(Arg::with_name("source").required(true).takes_value(true)),
         ),
@@ -94,8 +95,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let (fingerprint, _) = save_file(store, &posix_fs, f).wait().unwrap();
-              Ok(println!("{}", fingerprint))
+              let (fingerprint, size_bytes) = save_file(store, &posix_fs, f).wait().unwrap();
+              Ok(println!("{} {}", fingerprint, size_bytes))
             }
             o => Err(format!(
               "Tried to save file {:?} but it was not a file, was a {:?}",
@@ -112,10 +113,10 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
       match sub_match.subcommand() {
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("source").unwrap()));
-          let (fingerprint, _) =
+          let (fingerprint, size_bytes) =
             save_directory(store, posix_fs, Arc::new(fs::Dir(PathBuf::from("."))))
               .wait()?;
-          Ok(println!("{}", fingerprint))
+          Ok(println!("{} {}", fingerprint, size_bytes))
         }
         (_, _) => unimplemented!(),
       }
