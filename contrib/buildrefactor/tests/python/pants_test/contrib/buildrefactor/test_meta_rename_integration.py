@@ -11,20 +11,20 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 class MetaRenameIntegrationTest(PantsRunIntegrationTest):
   def test_meta_rename(self):
 
-    pre_dependees = self.run_pants(['dependees',
-      'testprojects/tests/java/org/pantsbuild/testproject/builrefactor:X'])
+    pre_dependees_run = self.run_pants(['dependees',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
 
     self.run_pants(['meta-rename',
-      '--from=testprojects/tests/java/org/pantsbuild/testproject/builrefactor:X',
-      '--to=testprojects/tests/java/org/pantsbuild/testproject/builrefactor:Y',
-      'testprojects/tests/java/org/pantsbuild/testproject/builrefactor:X'])
+      '--from=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X',
+      '--to=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:Y',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
 
-    post_dependees = self.run_pants(['dependees',
-      'testprojects/tests/java/org/pantsbuild/testproject/builrefactor:Y'])
+    post_dependees_run = self.run_pants(['dependees',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:Y'])
 
     self.run_pants(['meta-rename',
-      '--from=testprojects/tests/java/org/pantsbuild/testproject/builrefactor:Y',
-      '--to=testprojects/tests/java/org/pantsbuild/testproject/builrefactor:X',
-      'testprojects/tests/java/org/pantsbuild/testproject/builrefactor:Y'])
+      '--from=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:Y',
+      '--to=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:Y'])
 
-    self.assertEquals(pre_dependees.stdout_data, post_dependees.stdout_data)
+    self.assertEquals(pre_dependees_run.stdout_data, post_dependees_run.stdout_data)

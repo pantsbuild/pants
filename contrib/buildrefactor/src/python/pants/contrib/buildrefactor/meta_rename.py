@@ -16,10 +16,10 @@ from pants.contrib.buildrefactor.buildozer import Buildozer
 
 
 class MetaRename(Task):
-  """Rename a target for its dependents
+  """Rename a target and update its dependees' dependencies with the new target name
 
   Provides a mechanism for renaming the target's name within its local BUILD file.
-  Also renames the target for its addresses wherever it's specified as a dependency.
+  Also renames the target wherever it's specified as a dependency.
   """
 
   @classmethod
@@ -48,16 +48,16 @@ class MetaRename(Task):
       try:
         Buildozer.execute_binary(
           'replace dependencies {} {}'.format(self._from_address.spec, self._to_address.spec),
-          address=concrete_target.address
+          spec=concrete_target.address.spec
         )
       except Exception:
         Buildozer.execute_binary(
           'replace dependencies :{} :{}'.format(self._from_address.target_name, self._to_address.target_name),
-          address=concrete_target.address
+          spec=concrete_target.address.spec
         )
 
   def update_original_build_name(self):
-    Buildozer.execute_binary('set name {}'.format(self._to_address.target_name), address=self._from_address)
+    Buildozer.execute_binary('set name {}'.format(self._to_address.target_name), spec=self._from_address.spec)
 
   def dependency_graph(self, scope=''):
     dependency_graph = defaultdict(set)

@@ -6,13 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 
-def assertInFile(self, string, file):
-  with open(file) as f:
-    source = f.read()
-
-  self.assertIn(string, source)
-
-
 def prepare_dependencies(self):
   self.add_to_build_file('a', 'java_library(name="a")')
   self.add_to_build_file('b', 'java_library(name="b", dependencies=["a:a"])')

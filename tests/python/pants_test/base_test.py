@@ -437,6 +437,15 @@ class BaseTest(unittest.TestCase):
     """
     self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
 
+  def assertInFile(self, string, file):
+    """Verifies that a string appears in a file
+
+    :API: public
+    """
+
+    with open(file) as f:
+      self.assertIn(string, f.read())
+
   def get_bootstrap_options(self, cli_options=()):
     """Retrieves bootstrap options.
 

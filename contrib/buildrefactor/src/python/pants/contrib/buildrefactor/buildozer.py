@@ -64,20 +64,20 @@ class Buildozer(Task):
   def _execute_buildozer_script(self, command):
     for root in self.context.target_roots:
       address = root.address
-      Buildozer.execute_binary(command, address, binary=self._executable)
+      Buildozer.execute_binary(command, address.spec, binary=self._executable)
 
   @classmethod
-  def execute_binary(cls, command, address, binary=None, version='0.4.5'):
+  def execute_binary(cls, command, spec, binary=None, version='0.4.5'):
     binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
 
-    Buildozer._execute_buildozer_command([binary, command, address.spec])
+    Buildozer._execute_buildozer_command([binary, command, spec])
 
   @classmethod
   def _execute_buildozer_command(cls, buildozer_command):
     try:
       subprocess.check_call(buildozer_command, cwd=get_buildroot())
     except subprocess.CalledProcessError as err:
-      if (err.returncode == 3):
+      if err.returncode == 3:
         raise TaskError('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))

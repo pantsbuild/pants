@@ -12,7 +12,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.contrib.buildrefactor.buildozer_util import assertInFile, prepare_dependencies
+from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -55,31 +55,48 @@ class BuildozerTest(TaskTestBase):
     new_build_name = 'b_2'
 
     self._run_buildozer({ 'command': 'set name {}'.format(new_build_name) })
-    assertInFile(self, new_build_name, '{}/b/BUILD'.format(self.build_root))
+    self.assertInFile(new_build_name, '{}/b/BUILD'.format(self.build_root))
 
   def test_execute_binary(self):
     init_subsystem(BinaryUtil.Factory)
 
     new_build_name = 'b_2'
 
-    Buildozer.execute_binary('set name {}'.format(new_build_name), address = Address.parse('b'))
-    assertInFile(self, new_build_name,  '{}/b/BUILD'.format(self.build_root))
+    Buildozer.execute_binary('set name {}'.format(new_build_name), spec=Address.parse('b').spec)
 
-  def _test_add_dependencies(self, spec_path, dependencies_to_add):
+    self.assertInFile(new_build_name, '{}/b/BUILD'.format(self.build_root))
+
+  def test_multiple_addresses(self):
+    targets = ['b', 'c']
+
+    dependency_to_add = '/l/m/n'
+
+    self._run_buildozer({ 'add_dependencies': dependency_to_add }, targets=targets)
+
+    for target in targets:
+      self.assertInFile(dependency_to_add, '{}/{}/BUILD'.format(self.build_root, target))
+
+  def _test_add_dependencies(self, spec, dependencies_to_add):
     self._run_buildozer({ 'add_dependencies': ' '.join(dependencies_to_add) })
 
     for dependency in dependencies_to_add:
-      self.assertIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec_path)))
+      self.assertIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec)))
 
-  def _test_remove_dependencies(self, spec_path, dependencies_to_remove):
-    self._run_buildozer({ 'remove_dependencies': ' '.join(dependencies_to_remove) }, spec_path)
+  def _test_remove_dependencies(self, spec, dependencies_to_remove):
+    self._run_buildozer({ 'remove_dependencies': ' '.join(dependencies_to_remove) }, targets=[spec])
 
     for dependency in dependencies_to_remove:
-      self.assertNotIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec_path)))
+      self.assertNotIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec)))
 
-  def _run_buildozer(self, options, root_target='b'):
+  def _run_buildozer(self, options, targets=['b']):
     self.set_options(**options)
-    self.create_task(self.context(target_roots=self.targets[root_target])).execute()
+
+    target_roots = []
+
+    for root in targets:
+      target_roots.append(self.targets[root])
+
+    self.create_task(self.context(target_roots=target_roots)).execute()
 
   def _build_file_dependencies(self, build_file):
     with open(build_file) as f:
