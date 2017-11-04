@@ -19,8 +19,10 @@ from pants.bin.engine_initializer import EngineInitializer
 from pants.engine.native import Native
 from pants.init.target_roots import TargetRoots
 from pants.logging.setup import setup_logging
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.pantsd.process_manager import ProcessManager
+from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
 from pants.pantsd.service.scheduler_service import SchedulerService
@@ -57,7 +59,7 @@ class _LoggerStream(object):
     return self._stream.fileno()
 
 
-class PantsDaemon(ProcessManager):
+class PantsDaemon(FingerprintedProcessManager):
   """A daemon that manages PantsService instances."""
 
   JOIN_TIMEOUT_SECONDS = 1
@@ -76,29 +78,35 @@ class PantsDaemon(ProcessManager):
       :param Options bootstrap_options: The bootstrap options, if available.
       """
       bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
+      bootstrap_options_values = bootstrap_options.for_global_scope()
+
       build_root = get_buildroot()
-      native = Native.create(bootstrap_options)
+      native = Native.create(bootstrap_options_values)
       # TODO: https://github.com/pantsbuild/pants/issues/3479
-      watchman = WatchmanLauncher.create(bootstrap_options).watchman
-      legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options)
-      services, port_map = cls._setup_services(build_root, bootstrap_options, legacy_graph_helper, watchman)
+      watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
+      legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
+      services, port_map = cls._setup_services(
+        build_root,
+        bootstrap_options_values,
+        legacy_graph_helper,
+        watchman
+      )
 
       return PantsDaemon(
         native,
         build_root,
-        bootstrap_options.pants_workdir,
-        bootstrap_options.level.upper(),
+        bootstrap_options_values.pants_workdir,
+        bootstrap_options_values.level.upper(),
         legacy_graph_helper.scheduler.lock,
         services,
         port_map,
-        bootstrap_options.pants_subprocessdir,
+        bootstrap_options_values.pants_subprocessdir,
         bootstrap_options
       )
 
     @staticmethod
     def _parse_bootstrap_options():
-      options_bootstrapper = OptionsBootstrapper()
-      return options_bootstrapper.get_bootstrap_options().for_global_scope()
+      return OptionsBootstrapper().get_bootstrap_options()
 
     @staticmethod
     def _setup_legacy_graph_helper(native, bootstrap_options):
@@ -163,11 +171,20 @@ class PantsDaemon(ProcessManager):
 
   @memoized_property
   def watchman_launcher(self):
-    return WatchmanLauncher.create(self._bootstrap_options)
+    return WatchmanLauncher.create(self._bootstrap_options.for_global_scope())
 
   @property
   def is_killed(self):
     return self._kill_switch.is_set()
+
+  @property
+  def options_fingerprint(self):
+    return OptionsFingerprinter.combined_options_fingerprint_for_scope(
+      GLOBAL_SCOPE,
+      self._bootstrap_options,
+      fingerprint_key='daemon',
+      invert=True
+    )
 
   def shutdown(self, service_thread_map):
     """Gracefully terminate all services and kill the main PantsDaemon loop."""
@@ -229,6 +246,7 @@ class PantsDaemon(ProcessManager):
 
     # Once all services are started, write our pid.
     self.write_pid()
+    self.write_metadata_by_name('pantsd', self.FINGERPRINT_KEY, self.options_fingerprint)
 
     # Monitor services.
     while not self.is_killed:
@@ -283,7 +301,11 @@ class PantsDaemon(ProcessManager):
     self.watchman_launcher.maybe_launch()
     self._logger.debug('acquiring lock: {}'.format(self.process_lock))
     with self.process_lock:
-      if not self.is_alive():
+      new_fingerprint = self.options_fingerprint
+      self._logger.debug('pantsd: is_alive={} new_fingerprint={} current_fingerprint={}'
+                         .format(self.is_alive(), new_fingerprint, self.fingerprint))
+      if self.needs_restart(new_fingerprint):
+        self.terminate(include_watchman=False)
         self._logger.debug('launching pantsd')
         self.daemon_spawn()
         # Wait up to 10 seconds for pantsd to write its pidfile so we can display the pid to the user.
@@ -295,10 +317,11 @@ class PantsDaemon(ProcessManager):
                        .format(pantsd_pid, listening_port))
     return listening_port
 
-  def terminate(self):
+  def terminate(self, include_watchman=True):
     """Terminates pantsd and watchman."""
     super(PantsDaemon, self).terminate()
-    self.watchman_launcher.terminate()
+    if include_watchman:
+      self.watchman_launcher.terminate()
 
 
 def launch():

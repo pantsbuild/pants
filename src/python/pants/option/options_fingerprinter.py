@@ -9,6 +9,8 @@ import json
 import os
 from hashlib import sha1
 
+import six
+
 from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import UnsetBool, dict_with_files_option, file_option, target_option
 
@@ -34,7 +36,35 @@ class OptionsFingerprinter(object):
   :API: public
   """
 
-  def __init__(self, build_graph):
+  @classmethod
+  def combined_options_fingerprint_for_scope(cls, scope, options, fingerprint_key=None,
+                                             invert=None, build_graph=None):
+    """Given options and a scope, compute a combined fingerprint for the scope.
+
+    :param string scope: The scope to fingerprint.
+    :param Options options: The `Options` object to fingerprint.
+    :param string fingerprint_key: The options kwarg to filter against.
+    :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
+    :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
+                                   target options.
+    """
+    fingerprinter = cls(build_graph)
+    hasher = sha1()
+    for (option_type, option_value) in options.get_fingerprintable_for_scope(
+      scope,
+      fingerprint_key=fingerprint_key,
+      invert=invert
+    ):
+      hasher.update(
+        # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
+        # so we always cast to bytes here.
+        six.binary_type(
+          fingerprinter.fingerprint(option_type, option_value)
+        )
+      )
+    return hasher.hexdigest()
+
+  def __init__(self, build_graph=None):
     self._build_graph = build_graph
 
   def fingerprint(self, option_type, option_val):
@@ -63,6 +93,9 @@ class OptionsFingerprinter(object):
 
   def _fingerprint_target_specs(self, specs):
     """Returns a fingerprint of the targets resolved from given target specs."""
+    assert self._build_graph is not None, (
+      'cannot fingerprint specs `{}` without a `BuildGraph`'.format(specs)
+    )
     hasher = sha1()
     for spec in sorted(specs):
       for target in sorted(self._build_graph.resolve(spec)):

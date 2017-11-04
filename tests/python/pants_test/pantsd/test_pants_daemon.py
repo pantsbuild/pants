@@ -97,9 +97,12 @@ class PantsDaemonTest(BaseTest):
 
   @mock.patch('threading.Thread', **PATCH_OPTS)
   @mock.patch.object(PantsDaemon, 'shutdown', spec_set=True)
-  def test_run_services_runtimefailure(self, mock_shutdown, mock_thread):
+  @mock.patch.object(PantsDaemon, 'options_fingerprint', spec_set=True,
+                     new_callable=mock.PropertyMock)
+  def test_run_services_runtimefailure(self, mock_fp, mock_shutdown, mock_thread):
     self.mock_killswitch.is_set.side_effect = [False, False, True]
     mock_thread.return_value.is_alive.side_effect = [True, False]
+    mock_fp.return_value = 'some_sha'
 
     with self.assertRaises(PantsDaemon.RuntimeFailure):
       self.pantsd._run_services([self.mock_service])
