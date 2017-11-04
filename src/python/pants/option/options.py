@@ -312,17 +312,20 @@ class Options(object):
 
     return values
 
-  def get_fingerprintable_for_scope(self, scope, include_passthru=False):
+  def get_fingerprintable_for_scope(self, scope, include_passthru=False, fingerprint_key=None):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
-    Fingerprintable options are options registered via a "fingerprint=True" kwarg.
+    Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
+    can be parameterized with `fingerprint_key` for special cases.
 
     :param str scope: The scope to gather fingerprintable options for.
     :param bool include_passthru: Whether to include passthru args captured by `scope` in the
                                   fingerprintable options.
+    :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
 
     :API: public
     """
+    fingerprint_key = fingerprint_key or 'fingerprint'
     pairs = []
 
     if include_passthru:
@@ -341,7 +344,7 @@ class Options(object):
       for (_, kwargs) in sorted(parser.option_registrations_iter()):
         if kwargs.get('recursive') and not kwargs.get('recursive_root'):
           continue  # We only need to fprint recursive options once.
-        if kwargs.get('fingerprint') is not True:
+        if kwargs.get(fingerprint_key) is not True:
           continue
         # Note that we read the value from scope, even if the registration was on an enclosing
         # scope, to get the right value for recursive options (and because this mirrors what

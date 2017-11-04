@@ -512,6 +512,9 @@ class FingerprintedProcessManager(ProcessManager):
   def fingerprint(self):
     """The fingerprint of the current process.
 
+    This can either read the current fingerprint from the running process's psutil.Process.cmdline
+    (if the managed process supports that) or from the `ProcessManager` metadata.
+
     :returns: The fingerprint of the running process as read from the process table, ProcessManager
               metadata or `None`.
     :rtype: string

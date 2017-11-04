@@ -19,7 +19,9 @@ from pants.bin.engine_initializer import EngineInitializer
 from pants.engine.native import Native
 from pants.init.target_roots import TargetRoots
 from pants.logging.setup import setup_logging
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
@@ -76,29 +78,35 @@ class PantsDaemon(FingerprintedProcessManager):
       :param Options bootstrap_options: The bootstrap options, if available.
       """
       bootstrap_options = bootstrap_options or cls._parse_bootstrap_options()
+      bootstrap_options_values = bootstrap_options.for_global_scope()
+
       build_root = get_buildroot()
-      native = Native.create(bootstrap_options)
+      native = Native.create(bootstrap_options_values)
       # TODO: https://github.com/pantsbuild/pants/issues/3479
-      watchman = WatchmanLauncher.create(bootstrap_options).watchman
-      legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options)
-      services, port_map = cls._setup_services(build_root, bootstrap_options, legacy_graph_helper, watchman)
+      watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
+      legacy_graph_helper = cls._setup_legacy_graph_helper(native, bootstrap_options_values)
+      services, port_map = cls._setup_services(
+        build_root,
+        bootstrap_options_values,
+        legacy_graph_helper,
+        watchman
+      )
 
       return PantsDaemon(
         native,
         build_root,
-        bootstrap_options.pants_workdir,
-        bootstrap_options.level.upper(),
+        bootstrap_options_values.pants_workdir,
+        bootstrap_options_values.level.upper(),
         legacy_graph_helper.scheduler.lock,
         services,
         port_map,
-        bootstrap_options.pants_subprocessdir,
+        bootstrap_options_values.pants_subprocessdir,
         bootstrap_options
       )
 
     @staticmethod
     def _parse_bootstrap_options():
-      options_bootstrapper = OptionsBootstrapper()
-      return options_bootstrapper.get_bootstrap_options().for_global_scope()
+      return OptionsBootstrapper().get_bootstrap_options()
 
     @staticmethod
     def _setup_legacy_graph_helper(native, bootstrap_options):
@@ -163,7 +171,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
   @memoized_property
   def watchman_launcher(self):
-    return WatchmanLauncher.create(self._bootstrap_options)
+    return WatchmanLauncher.create(self._bootstrap_options.for_global_scope())
 
   @property
   def is_killed(self):
@@ -171,16 +179,10 @@ class PantsDaemon(FingerprintedProcessManager):
 
   @property
   def options_fingerprint(self):
-    return self._bootstrap_options.sha1(
-      exclude_keys=[
-        'colors',
-        'quiet',
-        'target_spec_file',
-        'verify_config',
-        'subproject_roots',
-        'exclude_target_regexp',
-        'native_engine_visualize_to'
-      ]
+    return OptionsFingerprinter.combined_options_fingerprint_for_scope(
+      GLOBAL_SCOPE,
+      self._bootstrap_options,
+      fingerprint_key='daemon'
     )
 
   def shutdown(self, service_thread_map):
