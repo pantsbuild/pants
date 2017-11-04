@@ -182,7 +182,8 @@ class PantsDaemon(FingerprintedProcessManager):
     return OptionsFingerprinter.combined_options_fingerprint_for_scope(
       GLOBAL_SCOPE,
       self._bootstrap_options,
-      fingerprint_key='daemon'
+      fingerprint_key='daemon',
+      invert=True
     )
 
   def shutdown(self, service_thread_map):
