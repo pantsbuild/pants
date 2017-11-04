@@ -66,15 +66,13 @@ object InputUtils {
         .withOrder(compileOrder)
     val reporter =
       ReporterUtil.getDefault(
-        ReporterConfig.create(
-          "",
-          Int.MaxValue,
-          true,
-          settings.consoleLog.msgPredicates.toArray,
-          settings.consoleLog.filePredicates.toArray,
-          settings.consoleLog.javaLogLevel,
-          positionMapper
-        )
+        ReporterUtil.getDefaultReporterConfig()
+          .withMaximumErrors(Int.MaxValue)
+          .withUseColor(settings.consoleLog.color)
+          .withMsgFilters(settings.consoleLog.msgPredicates.toArray)
+          .withFileFilters(settings.consoleLog.filePredicates.toArray)
+          .withLogLevel(settings.consoleLog.javaLogLevel)
+          .withPositionMapper(positionMapper)
       )
     val setup =
       Setup.create(
