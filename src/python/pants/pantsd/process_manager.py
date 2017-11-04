@@ -499,3 +499,60 @@ class ProcessManager(ProcessMetadataManager):
 
   def post_fork_parent(self):
     """Post-fork parent callback for subclasses."""
+
+
+class FingerprintedProcessManager(ProcessManager):
+  """A `ProcessManager` subclass that provides a general strategy for process fingerprinting."""
+
+  FINGERPRINT_KEY = 'fingerprint'
+  FINGERPRINT_CMD_KEY = None
+  FINGERPRINT_CMD_SEP = '='
+
+  @property
+  def fingerprint(self):
+    """The fingerprint of the current process.
+
+    This can either read the current fingerprint from the running process's psutil.Process.cmdline
+    (if the managed process supports that) or from the `ProcessManager` metadata.
+
+    :returns: The fingerprint of the running process as read from the process table, ProcessManager
+              metadata or `None`.
+    :rtype: string
+    """
+    return (
+      self.parse_fingerprint(self.cmdline) or
+      self.read_metadata_by_name(self.name, self.FINGERPRINT_KEY)
+    )
+
+  def parse_fingerprint(self, cmdline, key=None, sep=None):
+    """Given a psutil.Process.cmdline, parse and return a fingerprint.
+
+    :param list cmdline: The psutil.Process.cmdline of the current process.
+    :param string key: The key for fingerprint discovery.
+    :param string sep: The key/value separator for fingerprint discovery.
+    :returns: The parsed fingerprint or `None`.
+    :rtype: string or `None`
+    """
+    key = key or self.FINGERPRINT_CMD_KEY
+    if key:
+      sep = sep or self.FINGERPRINT_CMD_SEP
+      cmdline = cmdline or []
+      for cmd_part in cmdline:
+        if cmd_part.startswith('{}{}'.format(key, sep)):
+          return cmd_part.split(sep)[1]
+
+  def has_current_fingerprint(self, fingerprint):
+    """Determines if a new fingerprint is the current fingerprint of the running process.
+
+    :param string fingerprint: The new fingerprint to compare to.
+    :rtype: bool
+    """
+    return fingerprint == self.fingerprint
+
+  def needs_restart(self, fingerprint):
+    """Determines if the current ProcessManager needs to be started or restarted.
+
+    :param string fingerprint: The new fingerprint to compare to.
+    :rtype: bool
+    """
+    return self.is_dead() or not self.has_current_fingerprint(fingerprint)

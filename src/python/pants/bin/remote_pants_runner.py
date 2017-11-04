@@ -69,7 +69,7 @@ class RemotePantsRunner(object):
 
   def _setup_logging(self):
     """Sets up basic stdio logging for the thin client."""
-    log_level = logging.getLevelName(self._bootstrap_options.level.upper())
+    log_level = logging.getLevelName(self._bootstrap_options.for_global_scope().level.upper())
 
     formatter = logging.Formatter('%(levelname)s] %(message)s')
     handler = logging.StreamHandler(sys.stdout)

@@ -20,10 +20,10 @@ from pants.option.custom_types import (DictValueComponent, ListValueComponent, U
                                        dict_option, dir_option, file_option, list_option,
                                        target_option)
 from pants.option.errors import (BooleanOptionNameWithNo, FrozenRegistration, ImplicitValIsNone,
-                                 InvalidKwarg, InvalidMemberType, MemberTypeNotAllowed,
-                                 NoOptionNames, OptionAlreadyRegistered, OptionNameDash,
-                                 OptionNameDoubleDash, ParseError, RecursiveSubsystemOption,
-                                 Shadowing)
+                                 InvalidKwarg, InvalidKwargNonGlobalScope, InvalidMemberType,
+                                 MemberTypeNotAllowed, NoOptionNames, OptionAlreadyRegistered,
+                                 OptionNameDash, OptionNameDoubleDash, ParseError,
+                                 RecursiveSubsystemOption, Shadowing)
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.ranked_value import RankedValue
 from pants.option.scope import ScopeInfo
@@ -340,7 +340,8 @@ class Parser(object):
   _allowed_registration_kwargs = {
     'type', 'member_type', 'choices', 'dest', 'default', 'implicit_value', 'metavar',
     'help', 'advanced', 'recursive', 'recursive_root', 'registering_class',
-    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group'
+    'fingerprint', 'removal_version', 'removal_hint', 'fromfile', 'mutually_exclusive_group',
+    'daemon'
   }
 
   # TODO: Remove dict_option from here after deprecation is complete.
@@ -380,6 +381,10 @@ class Parser(object):
     for kwarg in kwargs:
       if kwarg not in self._allowed_registration_kwargs:
         error(InvalidKwarg, kwarg=kwarg)
+
+      # Ensure `daemon=True` can't be passed on non-global scopes (except for `recursive=True`).
+      if (kwarg == 'daemon' and self._scope != GLOBAL_SCOPE and kwargs.get('recursive') is False):
+        error(InvalidKwargNonGlobalScope, kwarg=kwarg)
 
     removal_version = kwargs.get('removal_version')
     if removal_version is not None:

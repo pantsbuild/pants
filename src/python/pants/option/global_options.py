@@ -51,12 +51,12 @@ class GlobalOptionsRegistrar(Optionable):
     logging.addLevelName(logging.WARNING, 'WARN')
     register('-l', '--level', choices=['debug', 'info', 'warn'], default='info', recursive=True,
              help='Set the logging level.')
-    register('-q', '--quiet', type=bool, recursive=True,
+    register('-q', '--quiet', type=bool, recursive=True, daemon=False,
              help='Squelches most console output. NOTE: Some tasks default to behaving quietly: '
                   'inverting this option supports making them noisier than they would be otherwise.')
     # Not really needed in bootstrap options, but putting it here means it displays right
     # after -l and -q in help output, which is conveniently contextual.
-    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True,
+    register('--colors', type=bool, default=sys.stdout.isatty(), recursive=True, daemon=False,
              help='Set whether log messages are displayed in color.')
 
     # Pants code uses this only to verify that we are of the requested version. However
@@ -122,9 +122,9 @@ class GlobalOptionsRegistrar(Optionable):
                   'Later files override earlier ones.')
     register('--pythonpath', advanced=True, type=list,
              help='Add these directories to PYTHONPATH to search for plugins.')
-    register('--target-spec-file', type=list, dest='target_spec_files',
+    register('--target-spec-file', type=list, dest='target_spec_files', daemon=False,
              help='Read additional specs from this file, one per line')
-    register('--verify-config', type=bool, default=True,
+    register('--verify-config', type=bool, default=True, daemon=False,
              help='Verify that all config file values correspond to known options.')
     register('--build-ignore', advanced=True, type=list, fromfile=True,
              default=['.*/', default_rel_distdir, 'bower_components/',
@@ -139,9 +139,8 @@ class GlobalOptionsRegistrar(Optionable):
                   'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
                   'This currently only affects the v2 engine. '
                   'To experiment with v2 engine, try --enable-v2-engine option.')
-    register('--exclude-target-regexp', advanced=True, type=list, default=[],
-             metavar='<regexp>',
-             help='Exclude target roots that match these regexes.')
+    register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
+             metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
              help='Paths that correspond with build roots for any subproject that this '
                   'project depends on.')
@@ -172,7 +171,7 @@ class GlobalOptionsRegistrar(Optionable):
              removal_hint='Unused, the native engine is now embedded in the pantsbuild.pants wheel',
              help='Find native engine binaries under this dir. Used as part of the path to '
                   'lookup the binary with --binary-util-baseurls and --pants-bootstrapdir.')
-    register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option,
+    register('--native-engine-visualize-to', advanced=True, default=None, type=dir_option, daemon=False,
              help='A directory to write execution and rule graphs to as `dot` files. The contents '
                   'of the directory will be overwritten if any filenames collide.')
 
@@ -181,7 +180,7 @@ class GlobalOptionsRegistrar(Optionable):
              default=['https://binaries.pantsbuild.org'],
              help='List of URLs from which binary tools are downloaded. URLs are '
                   'searched in order until the requested path is found.')
-    register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True,
+    register('--binaries-fetch-timeout-secs', type=int, default=30, advanced=True, daemon=False,
              help='Timeout in seconds for URL reads when fetching binary tools from the '
                   'repos specified by --baseurls.')
     register('--binaries-path-by-id', type=dict, advanced=True,
