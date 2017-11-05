@@ -29,7 +29,6 @@ class WatchmanLauncher(object):
 
     return WatchmanLauncher(
       binary_util,
-      bootstrap_options.pants_workdir,
       bootstrap_options.level,
       bootstrap_options.watchman_version,
       bootstrap_options.watchman_supportdir,
@@ -39,11 +38,10 @@ class WatchmanLauncher(object):
       bootstrap_options.pants_subprocessdir
     )
 
-  def __init__(self, binary_util, workdir, log_level, watchman_version, watchman_supportdir,
+  def __init__(self, binary_util, log_level, watchman_version, watchman_supportdir,
                startup_timeout, socket_timeout, socket_path_override=None, metadata_base_dir=None):
     """
     :param binary_util: The BinaryUtil subsystem instance for binary retrieval.
-    :param workdir: The current pants workdir.
     :param log_level: The current log level of pants.
     :param watchman_version: The watchman binary version to retrieve using BinaryUtil.
     :param watchman_supportdir: The supportdir for BinaryUtil.
@@ -52,7 +50,6 @@ class WatchmanLauncher(object):
     :param metadata_base_dir: The ProcessManager metadata base directory.
     """
     self._binary_util = binary_util
-    self._workdir = workdir
     self._watchman_version = watchman_version
     self._watchman_supportdir = watchman_supportdir
     self._startup_timeout = startup_timeout
@@ -78,12 +75,11 @@ class WatchmanLauncher(object):
                                                       'watchman')
     return Watchman(
       watchman_binary,
-      self._workdir,
+      self._metadata_base_dir,
       self._convert_log_level(self._log_level),
       self._startup_timeout,
       self._socket_timeout,
       self._socket_path_override,
-      metadata_base_dir=self._metadata_base_dir
     )
 
   def maybe_launch(self):
