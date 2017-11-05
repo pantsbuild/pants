@@ -76,7 +76,7 @@ class NailgunClientSession(NailgunProtocol):
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
-      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamStdinWriter is always stopped.
+      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamWriter is always stopped.
       self._maybe_stop_input_writer()
 
   def execute(self, working_dir, main_class, *arguments, **environment):
