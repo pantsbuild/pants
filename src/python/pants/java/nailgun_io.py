@@ -37,6 +37,8 @@ class NailgunStreamStdinReader(threading.Thread):
   def __init__(self, sock, write_handle):
     """
     :param socket sock: the socket to read nailgun protocol chunks from.
+    :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
+      to write data decoded from the chunks.
     """
     super(NailgunStreamStdinReader, self).__init__()
     self.daemon = True
@@ -70,7 +72,8 @@ class NailgunStreamStdinReader(threading.Thread):
         break
       else:
         self._try_close()
-        raise Exception('received unexpected chunk {} -> {}: closing.'.format(chunk_type, payload))
+        raise NailgunProtocol.ProtocolError(
+            'received unexpected chunk {} -> {}: closing.'.format(chunk_type, payload))
 
 
 class NailgunStreamWriter(threading.Thread):
