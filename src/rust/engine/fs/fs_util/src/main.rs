@@ -16,7 +16,11 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 
-// Exit code 2 means "not found".
+enum ExitCode {
+  UnknownError = 1,
+  NotFound = 2,
+}
+
 fn main() {
   match execute(
     App::new("fs_util")
@@ -60,12 +64,12 @@ and the size of the serialized proto in bytes, separated by a space.",
     Ok(_) => {}
     Err((err, exit_code)) => {
       eprintln!("{}", err);
-      exit(exit_code)
+      exit(exit_code as i32)
     }
   };
 }
 
-fn execute(top_match: clap::ArgMatches) -> Result<(), (String, i32)> {
+fn execute(top_match: clap::ArgMatches) -> Result<(), (String, ExitCode)> {
   let store_dir = top_match.value_of("local_store_path").unwrap();
   let store = Arc::new(Store::new(store_dir)
     .map_err(|e| {
@@ -75,22 +79,24 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), (String, i32)> {
         e
       )
     })
-    .map_err(|e| (e, 1))?);
+    .map_err(|e| (e, ExitCode::UnknownError))?);
 
   match top_match.subcommand() {
     ("file", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())
-            .map_err(|e| (e, 1))?;
-          match store.load_bytes(&fingerprint).map_err(|e| (e, 1))? {
+            .map_err(|e| (e, ExitCode::UnknownError))?;
+          match store.load_bytes(&fingerprint).map_err(|e| {
+            (e, ExitCode::UnknownError)
+          })? {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
             }
             None => Err((
               format!("File with fingerprint {} not found", fingerprint),
-              2,
+              ExitCode::NotFound,
             )),
           }
         }
@@ -111,7 +117,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), (String, i32)> {
                 path,
                 o
               ),
-              1,
+              ExitCode::UnknownError,
             )),
           }
 
@@ -126,7 +132,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), (String, i32)> {
           let (fingerprint, size_bytes) =
             save_directory(store, posix_fs, Arc::new(fs::Dir(PathBuf::from("."))))
               .wait()
-              .map_err(|e| (e, 1))?;
+              .map_err(|e| (e, ExitCode::UnknownError))?;
           Ok(println!("{} {}", fingerprint, size_bytes))
         }
         (_, _) => unimplemented!(),
