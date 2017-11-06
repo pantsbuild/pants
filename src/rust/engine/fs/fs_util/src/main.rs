@@ -16,9 +16,19 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 
+#[derive(Debug)]
 enum ExitCode {
   UnknownError = 1,
   NotFound = 2,
+}
+
+#[derive(Debug)]
+struct ExitError(pub String, pub ExitCode);
+
+impl From<String> for ExitError {
+  fn from(s: String) -> Self {
+    ExitError(s, ExitCode::UnknownError)
+  }
 }
 
 fn main() {
@@ -62,39 +72,34 @@ and the size of the serialized proto in bytes, separated by a space.",
       .get_matches(),
   ) {
     Ok(_) => {}
-    Err((err, exit_code)) => {
-      eprintln!("{}", err);
-      exit(exit_code as i32)
+    Err(err) => {
+      eprintln!("{}", err.0);
+      exit(err.1 as i32)
     }
   };
 }
 
-fn execute(top_match: clap::ArgMatches) -> Result<(), (String, ExitCode)> {
+fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local_store_path").unwrap();
-  let store = Arc::new(Store::new(store_dir)
-    .map_err(|e| {
-      format!(
-        "Failed to open/create store for directory {}: {}",
-        store_dir,
-        e
-      )
-    })
-    .map_err(|e| (e, ExitCode::UnknownError))?);
+  let store = Arc::new(Store::new(store_dir).map_err(|e| {
+    format!(
+      "Failed to open/create store for directory {}: {}",
+      store_dir,
+      e
+    )
+  })?);
 
   match top_match.subcommand() {
     ("file", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
-          let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())
-            .map_err(|e| (e, ExitCode::UnknownError))?;
-          match store.load_bytes(&fingerprint).map_err(|e| {
-            (e, ExitCode::UnknownError)
-          })? {
+          let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+          match store.load_bytes(&fingerprint)? {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
             }
-            None => Err((
+            None => Err(ExitError(
               format!("File with fingerprint {} not found", fingerprint),
               ExitCode::NotFound,
             )),
@@ -111,7 +116,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), (String, ExitCode)> {
               let (fingerprint, size_bytes) = save_file(store, &posix_fs, f).wait().unwrap();
               Ok(println!("{} {}", fingerprint, size_bytes))
             }
-            o => Err((
+            o => Err(ExitError(
               format!(
                 "Tried to save file {:?} but it was not a file, was a {:?}",
                 path,
@@ -131,8 +136,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), (String, ExitCode)> {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("source").unwrap()));
           let (fingerprint, size_bytes) =
             save_directory(store, posix_fs, Arc::new(fs::Dir(PathBuf::from("."))))
-              .wait()
-              .map_err(|e| (e, ExitCode::UnknownError))?;
+              .wait()?;
           Ok(println!("{} {}", fingerprint, size_bytes))
         }
         (_, _) => unimplemented!(),
