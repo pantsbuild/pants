@@ -56,7 +56,15 @@ class BinaryUtil(object):
     @classmethod
     def register_options(cls, register):
       register('--baseurls', type=list, advanced=True,
-               default=['https://s3.amazonaws.com/binaries.pantsbuild.org'],
+               default=['https://binaries.pantsbuild.org',
+                        # NB: The 1.3.x branch uses a native engine packaging scheme and release
+                        # process for the native engine that differs widely from the mainline. As
+                        # a result, we include the legacy bintray url where the native engine is
+                        # deployed to on this branch to allow for deployment and fetching of the
+                        # native engine without majopr surgery on the deployment and release
+                        # process.
+                        # See: https://github.com/pantsbuild/pants/issues/5061
+                        'https://dl.bintray.com/pantsbuild/bin/build-support'],
                help='List of urls from which binary tools are downloaded.  Urls are searched in '
                     'order until the requested path is found.')
       register('--fetch-timeout-secs', type=int, default=30, advanced=True,
