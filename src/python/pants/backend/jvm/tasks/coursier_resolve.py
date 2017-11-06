@@ -5,10 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import json
 import logging
 import os
 
-from pants.util.process_handler import subprocess
+# from pants.util.process_handler import subprocess
+import subprocess
+from collections import defaultdict
+
 from twitter.common.collections import OrderedDict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -99,12 +103,15 @@ class CoursierResolve:
 
     # Prepare cousier args
     exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
-    cmd_args = [exe,
+    output_fn = 'output.json'
+    cmd_args = ['bash',
+                exe,
                 'fetch',
                 # '-r', 'https://artifactory-ci.twitter.biz/java-virtual',
                 # '-r', 'https://artifactory.twitter.biz/java-virtual',
                 # '--no-default', # no default repo
-                '-n', '20']
+                # '-n', '20',
+                '--json-output-file', output_fn]
 
     # Add the m2 id to resolve
     cmd_args.extend(get_m2_id(x) for x in resolve_args)
@@ -134,6 +141,9 @@ class CoursierResolve:
 
         workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
+        with open(output_fn) as f:
+          result = json.loads(f.read())
+
         with open(workunit.output('stdout')._io.name) as f:
           stdout = f.read()
 
@@ -144,23 +154,51 @@ class CoursierResolve:
       raise CoursierError()
 
     else:
-      resolved_jar_paths = stdout.splitlines()
-      resolved_jars = []
-      for jar_path in resolved_jar_paths:
-        rev = os.path.basename(os.path.dirname(jar_path))
-        name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
-        org = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(jar_path))))
+      flattened_resolution = cls.flatten_resolution(result)
 
-        pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
+      resolved_jars = cls.parse_jar_paths(coursier_cache_path, pants_jar_path_base, stdout)
 
-        if not os.path.exists(pants_path):
-          safe_mkdir(os.path.dirname(pants_path))
-          os.symlink(jar_path, pants_path)
-
-        resolved_jar = ResolvedJar(M2Coordinate(org=org, name=name, rev=rev),
-                                   cache_path=jar_path,
-                                   pants_path=pants_path)
-
-        resolved_jars.append(resolved_jar)
 
       return resolved_jars
+
+  @classmethod
+  def flatten_resolution(cls, result):
+    """
+    :param result: see a nested dict capturing the resolution.
+    :return: a flattened view with the top artifact as the roots.
+    """
+
+    def flat_walk(dep_map):
+      for art in dep_map:
+        for x in flat_walk(art['dependencies']):
+          yield x
+        yield art['coord']
+
+    flat_result = defaultdict(list)
+
+    for artifact in result['dependencies']:
+      flat_result[artifact['coord']].extend(flat_walk(artifact['dependencies']))
+
+    return flat_result
+
+  @classmethod
+  def parse_jar_paths(cls, coursier_cache_path, pants_jar_path_base, stdout):
+    resolved_jar_paths = stdout.splitlines()
+    resolved_jars = []
+    for jar_path in resolved_jar_paths:
+      rev = os.path.basename(os.path.dirname(jar_path))
+      name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
+      org = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(jar_path))))
+
+      pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
+
+      if not os.path.exists(pants_path):
+        safe_mkdir(os.path.dirname(pants_path))
+        os.symlink(jar_path, pants_path)
+
+      resolved_jar = ResolvedJar(M2Coordinate(org=org, name=name, rev=rev),
+                                 cache_path=jar_path,
+                                 pants_path=pants_path)
+
+      resolved_jars.append(resolved_jar)
+    return resolved_jars

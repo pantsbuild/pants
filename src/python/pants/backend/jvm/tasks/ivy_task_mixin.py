@@ -13,6 +13,7 @@ from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, Ivy
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -136,13 +137,17 @@ class IvyTaskMixin(TaskBase):
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
     results = []
     for artifact_set, target_subset in targets_by_sets.items():
-      results.append(self._resolve_subset(executor,
-                                                     target_subset,
-                                                     classpath_products,
-                                                     confs=confs,
-                                                     extra_args=extra_args,
-                                                     invalidate_dependents=invalidate_dependents,
-                                                     pinned_artifacts=artifact_set))
+
+      CoursierResolve.resolve(target_subset,
+                              classpath_products,
+                              workunit_factory=self.context.new_workunit)
+      # results.append(self._resolve_subset(executor,
+      #                                                target_subset,
+      #                                                classpath_products,
+      #                                                confs=confs,
+      #                                                extra_args=extra_args,
+      #                                                invalidate_dependents=invalidate_dependents,
+      #                                                pinned_artifacts=artifact_set))
     return results
 
   def ivy_classpath(self, targets, silent=True, workunit_name=None):

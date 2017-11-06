@@ -7,5 +7,12 @@ junit_tests(
   dependencies=[
     '3rdparty:junit',
     '3rdparty/jvm/org/hamcrest:hamcrest-library',
+    ':avro'
   ],
 )
+
+
+jar_library(name='avro',
+            jars=[
+              jar('org.apache.avro', 'avro', '1.7.4')
+            ])
