@@ -17,6 +17,7 @@ from twitter.common.collections import OrderedDict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement, PinnedJarArtifactSet
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
@@ -127,7 +128,7 @@ class CoursierResolve:
     # env = os.environ.copy()
     # env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
 
-    pants_jar_path_base = '/Users/yic/workspace/source/.pants.d/coursier'
+    pants_jar_path_base = '/Users/yic/workspace/pants/.pants.d/coursier'
     coursier_cache_path = '/Users/yic/.coursier/cache/'
 
     try:
@@ -158,7 +159,46 @@ class CoursierResolve:
 
       resolved_jars = cls.parse_jar_paths(coursier_cache_path, pants_jar_path_base, stdout)
 
+      for t in targets:
+        if not isinstance(t, JarLibrary):
+          continue
 
+        # def to_resolved_jar(jar_ref, jar_path):
+        #   return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
+        #                                              name=jar_ref.name,
+        #                                              rev=jar_ref.rev,
+        #                                              classifier=jar_ref.classifier,
+        #                                              ext=jar_ref.ext),
+        #                      cache_path=jar_path)
+
+        def get_transitive_resolved_jars(coord, resolved_jars):
+          # TODO: Once coursier outputs the full coord, then we can elimniate the temp incomplete coord
+
+          temp_coord = '{}:{}:{}'.format(coord.org, coord.name, coord.rev)
+
+          all_transitive_coords = []
+          if temp_coord in flattened_resolution:
+            all_transitive_coords = [temp_coord] + flattened_resolution[temp_coord]
+
+          transitive_resolved_jars = []
+          for c in all_transitive_coords:
+            m2coord = M2Coordinate.from_string(c + '::jar')
+            transitive_resolved_jars.append(resolved_jars[m2coord])
+
+          return transitive_resolved_jars
+
+        for jar in t.jar_dependencies:
+          if jar.coordinate in resolved_jars:
+            transitive_resolved_jars = get_transitive_resolved_jars(jar.coordinate, resolved_jars)
+            if transitive_resolved_jars:
+              compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+          # classifier = jar.classifier if self._conf == 'default' else self._conf
+          # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
+          # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
+          #   for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
+          #     resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
+
+      # This return value is not important
       return resolved_jars
 
   @classmethod
@@ -184,7 +224,7 @@ class CoursierResolve:
   @classmethod
   def parse_jar_paths(cls, coursier_cache_path, pants_jar_path_base, stdout):
     resolved_jar_paths = stdout.splitlines()
-    resolved_jars = []
+    resolved_jars = {}
     for jar_path in resolved_jar_paths:
       rev = os.path.basename(os.path.dirname(jar_path))
       name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
@@ -196,9 +236,10 @@ class CoursierResolve:
         safe_mkdir(os.path.dirname(pants_path))
         os.symlink(jar_path, pants_path)
 
-      resolved_jar = ResolvedJar(M2Coordinate(org=org, name=name, rev=rev),
+      coordinate = M2Coordinate(org=org, name=name, rev=rev)
+      resolved_jar = ResolvedJar(coordinate,
                                  cache_path=jar_path,
                                  pants_path=pants_path)
 
-      resolved_jars.append(resolved_jar)
+      resolved_jars[coordinate] = resolved_jar
     return resolved_jars
