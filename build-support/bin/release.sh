@@ -549,6 +549,12 @@ function activate_twine() {
 }
 
 function publish_packages() {
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+  # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
+  # and replace with pre-tested binary wheels we download from s3.
+  build_packages
+
   rm -rf "${DEPLOY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_WHEEL_DIR}"
 
