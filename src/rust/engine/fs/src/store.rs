@@ -77,11 +77,24 @@ impl Store {
     }
   }
 
-  pub fn load_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
+  pub fn load_file_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
+    self.load_bytes(fingerprint, self.file_store.clone())
+  }
+
+  pub fn load_directory_proto_bytes(
+    &self,
+    fingerprint: &Fingerprint,
+  ) -> Result<Option<Vec<u8>>, String> {
+    self.load_bytes(fingerprint, self.directory_store.clone())
+  }
+
+  pub fn load_bytes(
+    &self,
+    fingerprint: &Fingerprint,
+    db: Database,
+  ) -> Result<Option<Vec<u8>>, String> {
     match self.env.begin_ro_txn().and_then(|txn| {
-      txn.get(self.file_store.clone(), fingerprint).map(
-        |v| v.to_vec(),
-      )
+      txn.get(db, fingerprint).map(|v| v.to_vec())
     }) {
       Ok(v) => Ok(Some(v)),
       Err(NotFound) => Ok(None),
