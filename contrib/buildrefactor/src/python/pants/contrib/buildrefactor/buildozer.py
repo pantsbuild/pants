@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import warnings
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
@@ -78,6 +80,6 @@ class Buildozer(Task):
       subprocess.check_call(buildozer_command, cwd=get_buildroot())
     except subprocess.CalledProcessError as err:
       if err.returncode == 3:
-        raise TaskError('{} ... no changes were made'.format(buildozer_command))
+        warnings.warn('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))

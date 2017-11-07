@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import warnings
+
 from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
@@ -44,17 +46,21 @@ class MetaRename(Task):
       Target(name=self._from_address.target_name, address=self._from_address, build_graph=[], **{})
     ]
 
+    warnings.filterwarnings('error')
+
     for concrete_target in dependee_targets:
       try:
         Buildozer.execute_binary(
           'replace dependencies {} {}'.format(self._from_address.spec, self._to_address.spec),
           spec=concrete_target.address.spec
         )
-      except Exception:
+      except Warning:
         Buildozer.execute_binary(
           'replace dependencies :{} :{}'.format(self._from_address.target_name, self._to_address.target_name),
           spec=concrete_target.address.spec
         )
+
+    warnings.filterwarnings('default')
 
   def update_original_build_name(self):
     Buildozer.execute_binary('set name {}'.format(self._to_address.target_name), spec=self._from_address.spec)
