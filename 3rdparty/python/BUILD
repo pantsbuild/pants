@@ -17,3 +17,9 @@ python_requirement_library(
                        repository='http://www.antlr3.org/download/Python/')
   ]
 )
+
+# NB: Needed only for tests: tests/python/pants_test/engine/legacy:graph.
+files(
+  name='requirements_files',
+  sources=rglobs('**/requirements.txt'),
+)
