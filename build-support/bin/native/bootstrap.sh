@@ -101,7 +101,7 @@ function ensure_native_build_prerequisites() {
   fi
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
-  local readonly cmakeroot="$("${download_binary}" "cmake" "3.9.4" "cmake.tar.gz")" || die "Failed to fetch cmake"
+  local readonly cmakeroot="$("${download_binary}" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
   local readonly goroot="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
 
   export GOROOT="${goroot}"
