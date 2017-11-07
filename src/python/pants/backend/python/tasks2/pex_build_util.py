@@ -27,35 +27,42 @@ def has_python_sources(tgt):
   # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
   # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
   # we remove the old python pipeline entirely) we want to ignore those target types here.
-  return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary))
+  return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary)) and tgt.has_sources()
 
 
 def has_resources(tgt):
-  return isinstance(tgt, Files)
+  return isinstance(tgt, Files) and tgt.has_sources()
 
 
 def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
 
 
-def dump_sources(builder, tgt, log):
+def _create_source_dumper(builder, tgt):
+  if type(tgt) == Files:
+    # Loose `Files` as opposed to `Resources` or `PythonTarget`s have no (implied) package structure
+    # and so we chroot them relative to the build root so that they can be accessed via the normal
+    # python filesystem APIs just as they would be accessed outside the chrooted environment.
+    # NB: This requires we mark the pex as not zip safe so these `Files` can still be accessed in
+    # the context of a built pex distribution.
+    chroot_path = lambda relpath: relpath
+    builder.info.zip_safe = False
+  else:
+    chroot_path = lambda relpath: os.path.relpath(relpath, tgt.target_base)
+
+  dump = builder.add_resource if has_resources(tgt) else builder.add_source
   buildroot = get_buildroot()
+  return lambda relpath: dump(os.path.join(buildroot, relpath), chroot_path(relpath))
+
+
+def dump_sources(builder, tgt, log):
+  dump_source = _create_source_dumper(builder, tgt)
   log.debug('  Dumping sources: {}'.format(tgt))
   for relpath in tgt.sources_relative_to_buildroot():
     try:
-      if type(tgt) == Files:
-        src = os.path.join(buildroot, relpath)
-      else:
-        relpath = os.path.relpath(relpath, tgt.target_base)
-        src = os.path.join(buildroot, tgt.target_base, relpath)
-
-      if has_resources(tgt):
-        builder.add_resource(src, relpath)
-      else:
-        builder.add_source(src, relpath)
+      dump_source(relpath)
     except OSError:
-      log.error('Failed to copy {} for target {}'.format(
-        os.path.join(tgt.target_base, relpath), tgt.address.spec))
+      log.error('Failed to copy {} for target {}'.format(relpath, tgt.address.spec))
       raise
 
   if (getattr(tgt, '_resource_target_specs', None) or
