@@ -44,3 +44,12 @@ python_tests(
     'tests/python/pants_test:int-test',
   ]
 )
+
+
+python_tests(
+  name='buildozer_integration',
+  sources=['test_buildozer_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ]
+)
