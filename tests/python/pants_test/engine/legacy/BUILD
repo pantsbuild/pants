@@ -98,6 +98,7 @@ python_tests(
   sources = ['test_graph.py'],
   dependencies = [
     '3rdparty/python:mock',
+    '3rdparty/python:requirements_files',
     'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/init',

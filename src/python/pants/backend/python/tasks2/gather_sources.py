@@ -11,7 +11,8 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.pex_build_util import dump_sources, has_python_sources
+from pants.backend.python.tasks2.pex_build_util import (dump_sources, has_python_sources,
+                                                        has_resources)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -40,7 +41,7 @@ class GatherSources(Task):
     round_manager.require_data('python')  # For codegen.
 
   def execute(self):
-    targets = self.context.targets(predicate=has_python_sources)
+    targets = self.context.targets(predicate=lambda t: has_python_sources(t) or has_resources(t))
     interpreter = self.context.products.get_data(PythonInterpreter)
 
     with self.invalidated(targets) as invalidation_check:
