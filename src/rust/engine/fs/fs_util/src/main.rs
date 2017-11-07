@@ -16,6 +16,21 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 
+#[derive(Debug)]
+enum ExitCode {
+  UnknownError = 1,
+  NotFound = 2,
+}
+
+#[derive(Debug)]
+struct ExitError(pub String, pub ExitCode);
+
+impl From<String> for ExitError {
+  fn from(s: String) -> Self {
+    ExitError(s, ExitCode::UnknownError)
+  }
+}
+
 fn main() {
   match execute(
     App::new("fs_util")
@@ -38,15 +53,25 @@ Outputs a fingerprint of its contents and its size in bytes, separated by a spac
           ),
       )
       .subcommand(
-        SubCommand::with_name("directory").subcommand(
-          SubCommand::with_name("save")
-            .about(
-              "Ingest a directory recursively. Saves all files found therein and saves Directory \
+        SubCommand::with_name("directory")
+          .subcommand(
+            SubCommand::with_name("save")
+              .about(
+                "Ingest a directory recursively. Saves all files found therein and saves Directory \
 protos for each directory found. Outputs a fingerprint of the canonical top-level Directory proto \
 and the size of the serialized proto in bytes, separated by a space.",
-            )
-            .arg(Arg::with_name("source").required(true).takes_value(true)),
-        ),
+              )
+              .arg(Arg::with_name("source").required(true).takes_value(true)),
+          )
+          .subcommand(
+            SubCommand::with_name("cat-proto")
+              .about(
+                "Output the bytes of a serialized Directory proto addressed by fingerprint.",
+              )
+              .arg(Arg::with_name("fingerprint").required(true).takes_value(
+                true,
+              )),
+          ),
       )
       .arg(
         Arg::with_name("local_store_path")
@@ -58,13 +83,13 @@ and the size of the serialized proto in bytes, separated by a space.",
   ) {
     Ok(_) => {}
     Err(err) => {
-      eprintln!("{}", err);
-      exit(1)
+      eprintln!("{}", err.0);
+      exit(err.1 as i32)
     }
   };
 }
 
-fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
+fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local_store_path").unwrap();
   let store = Arc::new(Store::new(store_dir).map_err(|e| {
     format!(
@@ -79,12 +104,15 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          match store.load_bytes(&fingerprint)? {
+          match store.load_file_bytes(&fingerprint)? {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
             }
-            None => Err(format!("File with fingerprint {} not found", fingerprint)),
+            None => Err(ExitError(
+              format!("File with fingerprint {} not found", fingerprint),
+              ExitCode::NotFound,
+            )),
           }
         }
         ("save", Some(args)) => {
@@ -98,10 +126,13 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
               let (fingerprint, size_bytes) = save_file(store, &posix_fs, f).wait().unwrap();
               Ok(println!("{} {}", fingerprint, size_bytes))
             }
-            o => Err(format!(
-              "Tried to save file {:?} but it was not a file, was a {:?}",
-              path,
-              o
+            o => Err(ExitError(
+              format!(
+                "Tried to save file {:?} but it was not a file, was a {:?}",
+                path,
+                o
+              ),
+              ExitCode::UnknownError,
             )),
           }
 
@@ -117,6 +148,22 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
             save_directory(store, posix_fs, Arc::new(fs::Dir(PathBuf::from("."))))
               .wait()?;
           Ok(println!("{} {}", fingerprint, size_bytes))
+        }
+        ("cat-proto", Some(args)) => {
+          let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+          match store.load_directory_proto_bytes(&fingerprint)? {
+            Some(bytes) => {
+              io::stdout().write(&bytes).unwrap();
+              Ok(())
+            }
+            None => Err(ExitError(
+              format!(
+                "Directory with fingerprint {} not found",
+                fingerprint
+              ),
+              ExitCode::NotFound,
+            )),
+          }
         }
         (_, _) => unimplemented!(),
       }
