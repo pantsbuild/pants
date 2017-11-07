@@ -16,6 +16,21 @@ use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
 
+#[derive(Debug)]
+enum ExitCode {
+  UnknownError = 1,
+  NotFound = 2,
+}
+
+#[derive(Debug)]
+struct ExitError(pub String, pub ExitCode);
+
+impl From<String> for ExitError {
+  fn from(s: String) -> Self {
+    ExitError(s, ExitCode::UnknownError)
+  }
+}
+
 fn main() {
   match execute(
     App::new("fs_util")
@@ -58,13 +73,13 @@ and the size of the serialized proto in bytes, separated by a space.",
   ) {
     Ok(_) => {}
     Err(err) => {
-      eprintln!("{}", err);
-      exit(1)
+      eprintln!("{}", err.0);
+      exit(err.1 as i32)
     }
   };
 }
 
-fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
+fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local_store_path").unwrap();
   let store = Arc::new(Store::new(store_dir).map_err(|e| {
     format!(
@@ -84,7 +99,10 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
               io::stdout().write(&bytes).unwrap();
               Ok(())
             }
-            None => Err(format!("File with fingerprint {} not found", fingerprint)),
+            None => Err(ExitError(
+              format!("File with fingerprint {} not found", fingerprint),
+              ExitCode::NotFound,
+            )),
           }
         }
         ("save", Some(args)) => {
@@ -98,10 +116,13 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), String> {
               let (fingerprint, size_bytes) = save_file(store, &posix_fs, f).wait().unwrap();
               Ok(println!("{} {}", fingerprint, size_bytes))
             }
-            o => Err(format!(
-              "Tried to save file {:?} but it was not a file, was a {:?}",
-              path,
-              o
+            o => Err(ExitError(
+              format!(
+                "Tried to save file {:?} but it was not a file, was a {:?}",
+                path,
+                o
+              ),
+              ExitCode::UnknownError,
             )),
           }
 
