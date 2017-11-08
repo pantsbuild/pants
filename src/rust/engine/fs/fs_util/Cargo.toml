@@ -9,4 +9,5 @@ boxfuture = { path = "../../boxfuture" }
 clap = "2"
 fs = { path = ".." }
 futures = "0.1.16"
+itertools = "0.7.2"
 protobuf = "1.4.1"

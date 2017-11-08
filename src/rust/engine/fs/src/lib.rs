@@ -745,7 +745,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         expansion.todo,
       );
       // Finally, capture the resulting PathStats from the expansion.
-      expansion.outputs.into_iter().map(|(k, _)| k).collect()
+      let mut v: Vec<_> = expansion.outputs.into_iter().map(|(k, _)| k).collect();
+      v.sort_by(|a, b| a.path().cmp(b.path()));
+      v
     })
       .to_boxed()
   }
