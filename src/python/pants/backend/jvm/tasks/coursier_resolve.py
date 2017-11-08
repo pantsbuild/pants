@@ -9,8 +9,8 @@ import json
 import logging
 import os
 
-# from pants.util.process_handler import subprocess
-import subprocess
+from pants.util.process_handler import subprocess
+# import subprocess
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
