@@ -105,6 +105,8 @@ class CoursierResolve:
     # Prepare cousier args
     exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
     output_fn = 'output.json'
+    coursier_cache_path = '/Users/yic/.coursier/cache/'
+
     cmd_args = ['bash',
                 exe,
                 'fetch',
@@ -112,6 +114,7 @@ class CoursierResolve:
                 # '-r', 'https://artifactory.twitter.biz/java-virtual',
                 # '--no-default', # no default repo
                 # '-n', '20',
+                '--cache', coursier_cache_path,
                 '--json-output-file', output_fn]
 
     # Add the m2 id to resolve
@@ -129,7 +132,6 @@ class CoursierResolve:
     # env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
 
     pants_jar_path_base = '/Users/yic/workspace/pants/.pants.d/coursier'
-    coursier_cache_path = '/Users/yic/.coursier/cache/'
 
     try:
       with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
@@ -145,8 +147,8 @@ class CoursierResolve:
         with open(output_fn) as f:
           result = json.loads(f.read())
 
-        with open(workunit.output('stdout')._io.name) as f:
-          stdout = f.read()
+        # with open(workunit.output('stdout')._io.name) as f:
+        #   stdout = f.read()
 
         if return_code:
           raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
@@ -155,54 +157,39 @@ class CoursierResolve:
       raise CoursierError()
 
     else:
-      flattened_resolution = cls.flatten_resolution(result)
+      flattened_resolution = cls.flatten_resolution_by_root(result)
+      files_by_coord = cls.files_by_coord(result, coursier_cache_path, pants_jar_path_base)
 
-      resolved_jars = cls.parse_jar_paths(coursier_cache_path, pants_jar_path_base, stdout)
+      # resolved_jars = cls.parse_jar_paths(coursier_cache_path, pants_jar_path_base, stdout)
 
       for t in targets:
-        if not isinstance(t, JarLibrary):
-          continue
+        if isinstance(t, JarLibrary):
 
-        # def to_resolved_jar(jar_ref, jar_path):
-        #   return ResolvedJar(coordinate=M2Coordinate(org=jar_ref.org,
-        #                                              name=jar_ref.name,
-        #                                              rev=jar_ref.rev,
-        #                                              classifier=jar_ref.classifier,
-        #                                              ext=jar_ref.ext),
-        #                      cache_path=jar_path)
+          def get_transitive_resolved_jars(coord, resolved_jars):
 
-        def get_transitive_resolved_jars(coord, resolved_jars):
-          # TODO: Once coursier outputs the full coord, then we can elimniate the temp incomplete coord
+            transitive_jar_path_for_coord = []
+            if coord in flattened_resolution:
+              for c in [coord] + flattened_resolution[coord]:
+                transitive_jar_path_for_coord.extend(resolved_jars[c])
 
-          temp_coord = '{}:{}:{}'.format(coord.org, coord.name, coord.rev)
+            return transitive_jar_path_for_coord
 
-          all_transitive_coords = []
-          if temp_coord in flattened_resolution:
-            all_transitive_coords = [temp_coord] + flattened_resolution[temp_coord]
-
-          transitive_resolved_jars = []
-          for c in all_transitive_coords:
-            m2coord = M2Coordinate.from_string(c + '::jar')
-            transitive_resolved_jars.append(resolved_jars[m2coord])
-
-          return transitive_resolved_jars
-
-        for jar in t.jar_dependencies:
-          if jar.coordinate in resolved_jars:
-            transitive_resolved_jars = get_transitive_resolved_jars(jar.coordinate, resolved_jars)
-            if transitive_resolved_jars:
-              compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
-          # classifier = jar.classifier if self._conf == 'default' else self._conf
-          # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
-          # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-          #   for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-          #     resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
+          for jar in t.jar_dependencies:
+            if jar.coordinate in files_by_coord:
+              transitive_resolved_jars = get_transitive_resolved_jars(jar.coordinate, files_by_coord)
+              if transitive_resolved_jars:
+                compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+            # classifier = jar.classifier if self._conf == 'default' else self._conf
+            # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
+            # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
+            #   for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
+            #     resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
 
       # This return value is not important
-      return resolved_jars
+      return flattened_resolution
 
   @classmethod
-  def flatten_resolution(cls, result):
+  def flatten_resolution_by_root(cls, result):
     """
     :param result: see a nested dict capturing the resolution.
     :return: a flattened view with the top artifact as the roots.
@@ -217,29 +204,60 @@ class CoursierResolve:
     flat_result = defaultdict(list)
 
     for artifact in result['dependencies']:
-      flat_result[artifact['coord']].extend(flat_walk(artifact['dependencies']))
+      flat_result[cls.to_m2_coord(artifact['coord'])].extend(cls.to_m2_coord(x) for x in flat_walk(artifact['dependencies']))
 
     return flat_result
 
   @classmethod
-  def parse_jar_paths(cls, coursier_cache_path, pants_jar_path_base, stdout):
-    resolved_jar_paths = stdout.splitlines()
-    resolved_jars = {}
-    for jar_path in resolved_jar_paths:
-      rev = os.path.basename(os.path.dirname(jar_path))
-      name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
-      org = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(jar_path))))
+  def files_by_coord(cls, result, coursier_cache_path, pants_jar_path_base):
 
-      pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
+    final_result = defaultdict(list)
 
-      if not os.path.exists(pants_path):
-        safe_mkdir(os.path.dirname(pants_path))
-        os.symlink(jar_path, pants_path)
+    def walk(dep_map):
+      for art in dep_map:
+        coord = cls.to_m2_coord(art['coord'])
 
-      coordinate = M2Coordinate(org=org, name=name, rev=rev)
-      resolved_jar = ResolvedJar(coordinate,
-                                 cache_path=jar_path,
-                                 pants_path=pants_path)
+        for jar_path in art['files']:
+          pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
-      resolved_jars[coordinate] = resolved_jar
-    return resolved_jars
+          if not os.path.exists(pants_path):
+            safe_mkdir(os.path.dirname(pants_path))
+            os.symlink(jar_path, pants_path)
+
+          resolved_jar = ResolvedJar(coord,
+                                     cache_path=jar_path,
+                                     pants_path=pants_path)
+          final_result[coord].append(resolved_jar)
+
+        walk(art['dependencies'])
+
+    walk(result['dependencies'])
+    return final_result
+
+  @classmethod
+  def to_m2_coord(cls, coord_str):
+    # TODO: currently assuming everything is a jar and no classifier
+    return M2Coordinate.from_string(coord_str + '::jar')
+
+  # @classmethod
+  # def parse_jar_paths(cls, coursier_cache_path, pants_jar_path_base, stdout):
+  #   resolved_jar_paths = stdout.splitlines()
+  #   resolved_jars = {}
+  #   for jar_path in resolved_jar_paths:
+  #     rev = os.path.basename(os.path.dirname(jar_path))
+  #     name = os.path.basename(os.path.dirname(os.path.dirname(jar_path)))
+  #     org = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(jar_path))))
+  #
+  #     pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
+  #
+  #     if not os.path.exists(pants_path):
+  #       safe_mkdir(os.path.dirname(pants_path))
+  #       os.symlink(jar_path, pants_path)
+  #
+  #     coordinate = M2Coordinate(org=org, name=name, rev=rev)
+  #     resolved_jar = ResolvedJar(coordinate,
+  #                                cache_path=jar_path,
+  #                                pants_path=pants_path)
+  #
+  #     resolved_jars[coordinate] = resolved_jar
+  #   return resolved_jars
