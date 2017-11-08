@@ -105,15 +105,17 @@ class CoursierResolve:
     # Prepare cousier args
     exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
     output_fn = 'output.json'
-    coursier_cache_path = '/Users/yic/.coursier/cache/'
+    coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
 
     cmd_args = ['bash',
                 exe,
                 'fetch',
-                # '-r', 'https://artifactory-ci.twitter.biz/java-virtual',
+                '-r', 'https://artifactory-ci.twitter.biz/libs-releases-local/',
+                '-r', 'https://artifactory-ci.twitter.biz/repo1.maven.org',
+                '-r', 'https://artifactory-ci.twitter.biz/java-virtual',
                 # '-r', 'https://artifactory.twitter.biz/java-virtual',
-                # '--no-default', # no default repo
-                # '-n', '20',
+                '--no-default', # no default repo
+                '-n', '20',
                 '--cache', coursier_cache_path,
                 '--json-output-file', output_fn]
 
