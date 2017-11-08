@@ -292,18 +292,12 @@ fn materialize_directory(
   destination: &Path,
   fingerprint: &Fingerprint,
 ) -> Result<(), ExitError> {
-  let directory = match store.load_directory_proto(&fingerprint)? {
-    Some(d) => d,
-    None => {
-      return Err(ExitError(
-        format!(
-          "Directory with fingerprint {} not found",
-          fingerprint
-        ),
-        ExitCode::NotFound,
-      ));
-    }
-  };
+  let directory = store.load_directory_proto(&fingerprint)?.ok_or_else(|| {
+    ExitError(
+      format!("Directory with fingerprint {} not found", fingerprint),
+      ExitCode::NotFound,
+    )
+  })?;
   make_clean_dir(&destination).map_err(|e| {
     format!(
       "Error making directory {:?}: {}",
@@ -312,9 +306,8 @@ fn materialize_directory(
     )
   })?;
   for file_node in directory.get_files() {
-    match store.load_file_bytes(&Fingerprint::from_hex_string(
-      &file_node.get_digest().get_hash(),
-    )?)? {
+    let fingerprint = &Fingerprint::from_hex_string(&file_node.get_digest().get_hash())?;
+    match store.load_file_bytes(fingerprint)? {
       Some(bytes) => {
         let path = destination.join(file_node.get_name());
         File::create(&path)
