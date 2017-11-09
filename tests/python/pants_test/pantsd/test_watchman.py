@@ -20,21 +20,24 @@ from pants_test.base_test import BaseTest
 
 class TestWatchman(BaseTest):
   PATCH_OPTS = dict(autospec=True, spec_set=True)
-  WORK_DIR = '/path/to/a/fake/work_dir'
   BUILD_ROOT = '/path/to/a/fake/build_root'
   WATCHMAN_PATH = '/path/to/a/fake/watchman'
   TEST_DIR = '/path/to/a/fake/test'
-  WATCHMAN_DIR = os.path.join(WORK_DIR, 'watchman')
-  STATE_FILE = os.path.join(WATCHMAN_DIR, 'watchman.state')
   HANDLERS = [Watchman.EventHandler('test', {}, mock.Mock())]
 
   def setUp(self):
     super(TestWatchman, self).setUp()
     with mock.patch.object(Watchman, '_is_valid_executable', **self.PATCH_OPTS) as mock_is_valid:
       mock_is_valid.return_value = True
-      self.watchman = Watchman('/fake/path/to/watchman',
-                               self.WORK_DIR,
-                               metadata_base_dir=self.subprocess_dir)
+      self.watchman = Watchman('/fake/path/to/watchman', self.subprocess_dir)
+
+  @property
+  def _watchman_dir(self):
+    return os.path.join(self.subprocess_dir, 'watchman')
+
+  @property
+  def _state_file(self):
+    return os.path.join(self._watchman_dir, 'watchman.state')
 
   def test_client_property(self):
     self.assertIsInstance(self.watchman.client, pywatchman.client)
@@ -52,7 +55,6 @@ class TestWatchman(BaseTest):
   def test_resolve_watchman_path_provided_exception(self):
     with self.assertRaises(Watchman.ExecutionError):
       self.watchman = Watchman('/fake/path/to/watchman',
-                               self.WORK_DIR,
                                metadata_base_dir=self.subprocess_dir)
 
   def test_maybe_init_metadata(self):
@@ -60,8 +62,8 @@ class TestWatchman(BaseTest):
          mock.patch('pants.pantsd.watchman.safe_file_dump', **self.PATCH_OPTS) as mock_file_dump:
       self.watchman._maybe_init_metadata()
 
-      mock_mkdir.assert_called_once_with(self.WATCHMAN_DIR)
-      mock_file_dump.assert_called_once_with(self.STATE_FILE, '{}')
+      mock_mkdir.assert_called_once_with(self._watchman_dir)
+      mock_file_dump.assert_called_once_with(self._state_file, '{}')
 
   def test_construct_cmd(self):
     output = self.watchman._construct_cmd(['cmd', 'parts', 'etc'],

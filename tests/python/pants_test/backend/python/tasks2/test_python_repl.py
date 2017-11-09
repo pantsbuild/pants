@@ -121,12 +121,7 @@ class PythonReplTest(PythonTaskTestBase):
     gs_task_type(context, os.path.join(self.pants_workdir, 'gs')).execute()
     python_repl = self.create_task(context)
 
-    original_launcher = python_repl.launch_repl
     with self.new_io('\n'.join(code)) as (inp, out, err):
-      def custom_io_patched_launcher(pex):
-        return original_launcher(pex, stdin=inp, stdout=out, stderr=err)
-      python_repl.launch_repl = custom_io_patched_launcher
-
       python_repl.execute()
       with open(out.name) as fp:
         lines = fp.read()
