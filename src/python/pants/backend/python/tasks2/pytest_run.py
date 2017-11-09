@@ -169,7 +169,10 @@ class PytestRun(TestRunnerTaskMixin, Task):
     register('--coverage-output-dir', metavar='<DIR>', default=None,
              help='Directory to emit coverage reports to. '
              'If not specified, a default within dist is used.')
-    register('--coverage-config-file', metavar='<FILE>', default=None,
+    register('--coverage-config-file',
+             metavar='<FILE>',
+             default=None,
+             fingerprint=True,
              help='Absolute path to a file containing configuration for the '
                   'coverage.py module. If not specified, pantsbuild default '
                   'configuration is used. See http://coverage.readthedocs.io/en/latest/config.html '
