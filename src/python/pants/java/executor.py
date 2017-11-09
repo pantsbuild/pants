@@ -127,7 +127,7 @@ class Executor(AbstractClass):
     Raises Executor.Error if there was a problem launching java itself.
     """
     runner = self.runner(classpath=classpath, main=main, jvm_options=jvm_options, args=args,
-                           cwd=cwd)
+                         cwd=cwd)
     return runner.run(stdout=stdout, stderr=stderr)
 
   @abstractmethod
@@ -210,12 +210,8 @@ class SubprocessExecutor(Executor):
     self._buildroot = get_buildroot()
     self._process = None
 
-  def _create_command(self, classpath, main, jvm_options, args, cwd=None):
-    cwd = cwd or self._buildroot
-    return super(SubprocessExecutor, self)._create_command(classpath, main, jvm_options,
-                                                           args, cwd=cwd)
-
   def _runner(self, classpath, main, jvm_options, args, cwd=None):
+    cwd = cwd or os.getcwd()
     command = self._create_command(classpath, main, jvm_options, args, cwd=cwd)
 
     class Runner(self.Runner):
@@ -228,10 +224,10 @@ class SubprocessExecutor(Executor):
         return list(command)
 
       def spawn(_, stdout=None, stderr=None, stdin=None):
-        return self._spawn(command, stdout=stdout, stderr=stderr, stdin=stdin, cwd=cwd)
+        return self._spawn(command, cwd, stdout=stdout, stderr=stderr, stdin=stdin)
 
       def run(_, stdout=None, stderr=None, stdin=None):
-        return self._spawn(command, stdout=stdout, stderr=stderr, stdin=stdin, cwd=cwd).wait()
+        return self._spawn(command, cwd, stdout=stdout, stderr=stderr, stdin=stdin).wait()
 
     return Runner()
 
@@ -244,16 +240,16 @@ class SubprocessExecutor(Executor):
 
     :raises: :class:`Executor.Error` if there is a problem spawning the subprocess.
     """
+    cwd = cwd or os.getcwd()
     cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
     return self._spawn(cmd, cwd, **subprocess_args)
 
-  def _spawn(self, cmd, cwd=None, stdout=None, stderr=None, stdin=None, **subprocess_args):
+  def _spawn(self, cmd, cwd, stdout=None, stderr=None, stdin=None, **subprocess_args):
     # NB: Only stdout and stderr have non-None defaults: callers that want to capture
     # stdin should pass it explicitly.
     stdout = stdout or sys.stdout
     stderr = stderr or sys.stderr
     with self._maybe_scrubbed_env():
-      cwd = cwd or self._buildroot
       logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
                    .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:

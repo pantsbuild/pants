@@ -24,7 +24,7 @@ extern crate tempdir;
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Mutex, RwLock, RwLockReadGuard};
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
@@ -542,6 +542,24 @@ impl PosixFS {
       .expect("Uninitialized CpuPool!")
       .spawn_fn(move || PosixFS::scandir_sync(root, dir))
       .to_boxed()
+  }
+}
+
+impl VFS<io::Error> for Arc<PosixFS> {
+  fn read_link(&self, link: Link) -> BoxFuture<PathBuf, io::Error> {
+    PosixFS::read_link(self, &link)
+  }
+
+  fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, io::Error> {
+    PosixFS::scandir(self, &dir)
+  }
+
+  fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
+    PosixFS::ignore(self, path, is_dir)
+  }
+
+  fn mk_error(msg: &str) -> io::Error {
+    io::Error::new(io::ErrorKind::Other, msg)
   }
 }
 

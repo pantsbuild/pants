@@ -77,11 +77,40 @@ impl Store {
     }
   }
 
-  pub fn load_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
+  pub fn load_file_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
+    self.load_bytes(fingerprint, self.file_store.clone())
+  }
+
+  pub fn load_directory_proto_bytes(
+    &self,
+    fingerprint: &Fingerprint,
+  ) -> Result<Option<Vec<u8>>, String> {
+    self.load_bytes(fingerprint, self.directory_store.clone())
+  }
+
+  pub fn load_directory_proto(
+    &self,
+    fingerprint: &Fingerprint,
+  ) -> Result<Option<bazel_protos::remote_execution::Directory>, String> {
+    match self.load_directory_proto_bytes(fingerprint)? {
+      Some(bytes) => {
+        let mut proto = bazel_protos::remote_execution::Directory::new();
+        proto.merge_from_bytes(&bytes).map_err(|e| {
+          format!("Error deserializing proto {}: {}", fingerprint, e)
+        })?;
+        Ok(Some(proto))
+      }
+      None => Ok(None),
+    }
+  }
+
+  pub fn load_bytes(
+    &self,
+    fingerprint: &Fingerprint,
+    db: Database,
+  ) -> Result<Option<Vec<u8>>, String> {
     match self.env.begin_ro_txn().and_then(|txn| {
-      txn.get(self.file_store.clone(), fingerprint).map(
-        |v| v.to_vec(),
-      )
+      txn.get(db, fingerprint).map(|v| v.to_vec())
     }) {
       Ok(v) => Ok(Some(v)),
       Err(NotFound) => Ok(None),
@@ -125,6 +154,7 @@ mod tests {
   use bazel_protos;
   use super::{Fingerprint, Store};
   use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
+  use protobuf::Message;
   use tempdir::TempDir;
 
 
@@ -183,7 +213,7 @@ mod tests {
     assert_eq!(
       Store::new(dir.path())
         .unwrap()
-        .load_bytes(&fingerprint)
+        .load_file_bytes(&fingerprint)
         .unwrap()
         .unwrap(),
       bogus_value
@@ -201,7 +231,7 @@ mod tests {
     assert_eq!(
       &Store::new(dir.path())
         .unwrap()
-        .load_bytes(&fingerprint)
+        .load_file_bytes(&fingerprint)
         .unwrap()
         .unwrap(),
       &Vec::from(bogus_value)
@@ -215,7 +245,7 @@ mod tests {
 
     let store = Store::new(dir.path()).unwrap();
     let hash = store.store_file_bytes(&data).unwrap();
-    assert_eq!(store.load_bytes(&hash).unwrap().unwrap(), data);
+    assert_eq!(store.load_file_bytes(&hash).unwrap().unwrap(), data);
   }
 
   #[test]
@@ -224,14 +254,14 @@ mod tests {
     assert_eq!(
       Store::new(dir.path())
         .unwrap()
-        .load_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
+        .load_file_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
     );
   }
 
   #[test]
-  fn record_directory_proto() {
+  fn record_and_load_directory_proto() {
     let mut directory = bazel_protos::remote_execution::Directory::new();
     directory.mut_files().push({
       let mut file = bazel_protos::remote_execution::FileNode::new();
@@ -248,6 +278,8 @@ mod tests {
 
     let dir = TempDir::new("store").unwrap();
 
+    let hash = "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16";
+
     assert_eq!(
       &Store::new(dir.path())
         .unwrap()
@@ -255,7 +287,51 @@ mod tests {
         .unwrap()
         .0
         .to_hex(),
-      "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16"
+      hash
+    );
+
+    assert_eq!(
+      Store::new(dir.path())
+        .unwrap()
+        .load_directory_proto(&Fingerprint::from_hex_string(hash).unwrap())
+        .unwrap()
+        .unwrap(),
+      directory
+    );
+
+    assert_eq!(
+      Store::new(dir.path())
+        .unwrap()
+        .load_directory_proto_bytes(&Fingerprint::from_hex_string(hash).unwrap())
+        .unwrap()
+        .unwrap(),
+      directory.write_to_bytes().unwrap()
+    );
+  }
+
+  #[test]
+  fn file_is_not_directory_proto() {
+    let dir = TempDir::new("store").unwrap();
+
+    Store::new(dir.path())
+      .unwrap()
+      .store_file_bytes(STR.as_bytes())
+      .unwrap();
+
+    assert_eq!(
+      Store::new(dir.path())
+        .unwrap()
+        .load_directory_proto(&Fingerprint::from_hex_string(HASH).unwrap())
+        .unwrap(),
+      None
+    );
+
+    assert_eq!(
+      Store::new(dir.path())
+        .unwrap()
+        .load_directory_proto_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
+        .unwrap(),
+      None
     );
   }
 }

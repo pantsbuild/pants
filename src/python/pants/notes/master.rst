@@ -5,6 +5,61 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev19 (11/04/2017)
+------------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Pass the `color` option through to the report factory. (#5055)
+  `PR #5055 <https://github.com/pantsbuild/pants/pull/5055>`_
+
+* Output size as well as fingerprint (#5053)
+  `PR #5053 <https://github.com/pantsbuild/pants/pull/5053>`_
+
+* [pantsd] Daemon lifecycle for options changes. (#5045)
+  `PR #5045 <https://github.com/pantsbuild/pants/pull/5045>`_
+
+* Convert fs_util to use futures (#5048)
+  `PR #5048 <https://github.com/pantsbuild/pants/pull/5048>`_
+
+* PosixFS can create a Stat from a Path (#5047)
+  `PR #5047 <https://github.com/pantsbuild/pants/pull/5047>`_
+
+* PosixFS can read file contents (#5043)
+  `PR #5043 <https://github.com/pantsbuild/pants/pull/5043>`_
+
+* Bump to zinc 1.0.3. (#5049)
+  `Issue #389, <https://github.com/sbt/zinc/issues/389,>`_
+  `PR #5049 <https://github.com/pantsbuild/pants/pull/5049>`_
+
+* fs::Stat::File includes whether a file is executable (#5042)
+  `PR #5042 <https://github.com/pantsbuild/pants/pull/5042>`_
+
+* Add configurable message when missing-deps-suggest doesn't have suggestions (#5036)
+  `PR #5036 <https://github.com/pantsbuild/pants/pull/5036>`_
+
+* Use split_whitespace for parsing of cflags. (#5038)
+  `PR #5038 <https://github.com/pantsbuild/pants/pull/5038>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Set sys.argv correctly on pantsd-runner fork. (#5051)
+  `PR #5051 <https://github.com/pantsbuild/pants/pull/5051>`_
+
+* Fix JarCreate invalidation in the presence of changing resources. (#5030)
+  `PR #5030 <https://github.com/pantsbuild/pants/pull/5030>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Minor improvement on dep-usage doc (#5041)
+  `PR #5041 <https://github.com/pantsbuild/pants/pull/5041>`_
+
+* Add documentation about strict deps (#5025)
+  `PR #5025 <https://github.com/pantsbuild/pants/pull/5025>`_
+
 
 1.4.0.dev18 (10/29/2017)
 ------------------------

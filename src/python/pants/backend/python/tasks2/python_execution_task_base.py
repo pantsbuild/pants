@@ -19,7 +19,7 @@ from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address
-from pants.build_graph.resources import Resources
+from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.util.dirutil import safe_concurrent_creation
 
@@ -101,7 +101,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
     relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Resources)))
+      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Files)))
     with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving

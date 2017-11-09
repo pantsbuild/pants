@@ -63,7 +63,7 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "$(find_pkg pantsbuild.pants)" || \
+  pip install ${PIP_ARGS} "pantsbuild.pants==$(local_version)" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
@@ -78,7 +78,7 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "$(find_pkg pantsbuild.pants.testinfra)" && \
+  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==$(local_version)" && \
   python -c "import pants_test"
 }
 
@@ -549,6 +549,12 @@ function activate_twine() {
 }
 
 function publish_packages() {
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+  # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
+  # and replace with pre-tested binary wheels we download from s3.
+  build_packages
+
   rm -rf "${DEPLOY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_WHEEL_DIR}"
 

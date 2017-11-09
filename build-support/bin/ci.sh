@@ -196,7 +196,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
       tests/python::
   ) || die "Core python test failure"
