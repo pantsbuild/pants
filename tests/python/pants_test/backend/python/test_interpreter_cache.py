@@ -40,12 +40,8 @@ class TestInterpreterCache(BaseTest):
     with temporary_dir() as path:
       mock_setup.interpreter_cache_dir = path
       cache = PythonInterpreterCache(mock_setup, mock.MagicMock())
-
-      def set_interpreters(_):
-        cache._interpreters.add(self._interpreter)
-
-      cache._setup_cached = mock.Mock(side_effect=set_interpreters)
-      cache._setup_paths = mock.Mock()
+      cache._setup_cached = mock.Mock(return_value=[self._interpreter])
+      cache._setup_paths = mock.Mock(return_value=[])
       yield cache, path
 
   def _do_test(self, constraints, filters, expected):

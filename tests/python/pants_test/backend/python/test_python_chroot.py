@@ -59,11 +59,8 @@ class PythonChrootTest(BaseTest):
     thrift_binary_factory = ThriftBinary.Factory.global_instance().create
 
     interpreter_cache = PythonInterpreterCache(self.python_setup, python_repos)
-    interpreter_cache.setup()
-    interpreters = list(interpreter_cache.matched_interpreters(
-      self.python_setup.interpreter_constraints))
-    self.assertGreater(len(interpreters), 0)
-    interpreter = interpreters[0]
+    interpreter = interpreter_cache.select_interpreter_for_targets(targets)
+    self.assertIsNotNone(interpreter)
 
     with temporary_dir() as chroot:
       pex_builder = PEXBuilder(path=chroot, interpreter=interpreter)
