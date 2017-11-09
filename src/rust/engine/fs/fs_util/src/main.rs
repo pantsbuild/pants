@@ -11,6 +11,7 @@ use fs::hash::Fingerprint;
 use fs::store::Store;
 use futures::future::{Future, join_all};
 use std::error::Error;
+use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -54,6 +55,19 @@ Outputs a fingerprint of its contents and its size in bytes, separated by a spac
       )
       .subcommand(
         SubCommand::with_name("directory")
+          .subcommand(
+            SubCommand::with_name("materialize")
+              .about(
+                "Materialize a directory by fingerprint to the filesystem. \
+Destination must not exist before this command is run.",
+              )
+              .arg(Arg::with_name("fingerprint").required(true).takes_value(
+                true,
+              ))
+              .arg(Arg::with_name("destination").required(true).takes_value(
+                true,
+              )),
+          )
           .subcommand(
             SubCommand::with_name("save")
               .about(
@@ -151,6 +165,11 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
     }
     ("directory", Some(sub_match)) => {
       match sub_match.subcommand() {
+        ("materialize", Some(args)) => {
+          let destination = Path::new(args.value_of("destination").unwrap());
+          let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+          Ok(materialize_directory(store, destination, &fingerprint)?)
+        }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("source").unwrap()));
           let (fingerprint, size_bytes) =
@@ -268,6 +287,56 @@ fn save_directory(
   )
 }
 
+fn materialize_directory(
+  store: Arc<Store>,
+  destination: &Path,
+  fingerprint: &Fingerprint,
+) -> Result<(), ExitError> {
+  let directory = store.load_directory_proto(&fingerprint)?.ok_or_else(|| {
+    ExitError(
+      format!("Directory with fingerprint {} not found", fingerprint),
+      ExitCode::NotFound,
+    )
+  })?;
+  make_clean_dir(&destination).map_err(|e| {
+    format!(
+      "Error making directory {:?}: {}",
+      destination,
+      e.description()
+    )
+  })?;
+  for file_node in directory.get_files() {
+    let fingerprint = &Fingerprint::from_hex_string(&file_node.get_digest().get_hash())?;
+    match store.load_file_bytes(fingerprint)? {
+      Some(bytes) => {
+        let path = destination.join(file_node.get_name());
+        File::create(&path)
+          .and_then(|mut f| f.write_all(&bytes))
+          .map_err(|e| {
+            format!("Error writing file {:?}: {}", path, e.description())
+          })?;
+      }
+      None => {
+        return Err(ExitError(
+          format!(
+            "File with fingerprint {} not found",
+            file_node.get_digest().get_hash()
+          ),
+          ExitCode::NotFound,
+        ))
+      }
+    }
+  }
+  for directory_node in directory.get_directories() {
+    materialize_directory(
+      store.clone(),
+      &destination.join(directory_node.get_name()),
+      &Fingerprint::from_hex_string(directory_node.get_digest().get_hash())?,
+    )?;
+  }
+  Ok(())
+}
+
 fn file_to_file_node(
   store: Arc<Store>,
   posix_fs: Arc<fs::PosixFS>,
@@ -308,4 +377,12 @@ fn file_name_as_utf8(path: &Path) -> Result<String, String> {
     }
     None => Err(format!("{:?} did not have a file_name", path)),
   }
+}
+
+fn make_clean_dir(path: &Path) -> Result<(), io::Error> {
+  let parent = path.parent().ok_or_else(|| {
+    io::Error::new(io::ErrorKind::NotFound, format!("{:?} had no parent", path))
+  })?;
+  std::fs::create_dir_all(parent)?;
+  std::fs::create_dir(path)
 }
