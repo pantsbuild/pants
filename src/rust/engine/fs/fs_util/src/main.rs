@@ -82,6 +82,13 @@ and the size of the serialized proto in bytes, separated by a space.",
               .about(
                 "Output the bytes of a serialized Directory proto addressed by fingerprint.",
               )
+              .arg(
+                Arg::with_name("output-format")
+                  .long("output-format")
+                  .takes_value(true)
+                  .default_value("binary")
+                  .possible_values(&["binary", "text"]),
+              )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
               )),
@@ -179,7 +186,19 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         }
         ("cat-proto", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          match store.load_directory_proto_bytes(&fingerprint)? {
+          let proto_bytes = match args.value_of("output-format").unwrap() {
+            "binary" => store.load_directory_proto_bytes(&fingerprint),
+            "text" => {
+              store.load_directory_proto(&fingerprint).map(|maybe_p| {
+                maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
+              })
+            }
+            format => Err(format!(
+              "Unexpected value of --output-format arg: {}",
+              format
+            )),
+          }?;
+          match proto_bytes {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
