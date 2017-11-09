@@ -209,6 +209,14 @@ class PytestRun(TestRunnerTaskMixin, Task):
   class InvalidShardSpecification(TaskError):
     """Indicates an invalid `--test-shard` option."""
 
+  class CoverageConfigFileInvalid(TaskError):
+    """Indicates that the supplied configuration file is unparseable
+    """
+
+  class CoverageConfigFileUnreadable(TaskError):
+    """Indicates that the supplied configuration file cannot be read from disk
+    """
+
   DEFAULT_COVERAGE_CONFIG = dedent(b"""
     [run]
     branch = True
@@ -246,8 +254,14 @@ class PytestRun(TestRunnerTaskMixin, Task):
     cp = configparser.SafeConfigParser()
     coverage_config_file = self.get_options().coverage_config_file
     if coverage_config_file is not None:
-      with io.open(coverage_config_file, 'rt') as fp:
-        cp.readfp(fp)
+      try:
+        with io.open(coverage_config_file, 'rt') as fp:
+          cp.readfp(fp)
+      except OSError as e:
+        # python cannot read this file, might be missing, or permissions are wrong
+        raise self.CoverageConfigFileUnreadable(e)
+      except configparser.Error as e:
+        raise self.CoverageConfigFileInvalid(e)
     else:
       cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
