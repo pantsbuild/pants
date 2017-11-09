@@ -19,3 +19,9 @@ python_library(
     'src/python/pants/binaries:binary_util'
   ]
 )
+
+
+python_library(
+  name='meta_rename',
+  sources=['meta_rename.py']
+)
