@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class ScalaReplIntegrationTest(PantsRunIntegrationTest):
@@ -32,6 +32,7 @@ class ScalaReplIntegrationTest(PantsRunIntegrationTest):
         repl_args=repl_args)
     return output_lines
 
+  @ensure_daemon
   def test_run_repl_direct(self):
     self.assertIn('Hello, World!', self.run_repl_helloworld())
 

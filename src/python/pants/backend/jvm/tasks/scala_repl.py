@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import sys
+
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
@@ -61,4 +63,5 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
                                               main=ScalaRepl._RUNNER_MAIN,
                                               jvm_options=jvm_options,
                                               args=[self.get_options().main] + self.args,
-                                              create_synthetic_jar=True)
+                                              create_synthetic_jar=True,
+                                              stdin=sys.stdin)

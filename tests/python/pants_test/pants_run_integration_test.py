@@ -61,12 +61,31 @@ def ensure_cached(expected_num_artifacts=None):
 
 # TODO: Remove this in 1.5.0dev0, when `--enable-v2-engine` is removed.
 def ensure_engine(f):
-  """A decorator for running an integration test with and without the v2 engine enabled via
-  temporary environment variables."""
+  """A decorator for running an integration test with and without the v2 engine enabled."""
   def wrapper(self, *args, **kwargs):
     for env_var_value in ('false', 'true'):
       with environment_as(HERMETIC_ENV='PANTS_ENABLE_V2_ENGINE', PANTS_ENABLE_V2_ENGINE=env_var_value):
         f(self, *args, **kwargs)
+  return wrapper
+
+
+def ensure_daemon(f):
+  """A decorator for running an integration test with and without the daemon enabled."""
+  def wrapper(self, *args, **kwargs):
+    for enable_daemon in ('false', 'true',):
+      with temporary_dir() as subprocess_dir:
+        env = {
+            'HERMETIC_ENV': 'PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR',
+            'PANTS_ENABLE_PANTSD': enable_daemon,
+            'PANTS_ENABLE_V2_ENGINE': enable_daemon,
+            'PANTS_SUBPROCESSDIR': subprocess_dir,
+          }
+        with environment_as(**env):
+          try:
+            f(self, *args, **kwargs)
+          finally:
+            if enable_daemon:
+              self.assert_success(self.run_pants(['kill-pantsd']))
   return wrapper
 
 

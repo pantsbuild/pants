@@ -79,7 +79,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
   _SELECT_WAIT = 1
   _PROCESS_NAME = b'java'
 
-  def __init__(self, identity, workdir, nailgun_classpath, distribution, ins=None,
+  def __init__(self, identity, workdir, nailgun_classpath, distribution,
                connect_timeout=10, connect_attempts=5, metadata_base_dir=None):
     Executor.__init__(self, distribution=distribution)
     FingerprintedProcessManager.__init__(self,
@@ -95,7 +95,6 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     self._ng_stdout = os.path.join(workdir, 'stdout')
     self._ng_stderr = os.path.join(workdir, 'stderr')
     self._nailgun_classpath = maybe_list(nailgun_classpath)
-    self._ins = ins
     self._connect_timeout = connect_timeout
     self._connect_attempts = connect_attempts
 
@@ -139,8 +138,8 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
       def command(self):
         return list(command)
 
-      def run(this, stdout=None, stderr=None, cwd=None):
-        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr)
+      def run(this, stdout=None, stderr=None, stdin=None, cwd=None):
+        nailgun = self._get_nailgun_client(jvm_options, classpath, stdout, stderr, stdin)
         try:
           logger.debug('Executing via {ng_desc}: {cmd}'.format(ng_desc=nailgun, cmd=this.cmd))
           return nailgun.execute(main, cwd, *args)
@@ -161,7 +160,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
                           old_dist=self.cmd, new_dist=self._distribution.java))
     return running, updated
 
-  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr):
+  def _get_nailgun_client(self, jvm_options, classpath, stdout, stderr, stdin):
     """This (somewhat unfortunately) is the main entrypoint to this class via the Runner. It handles
        creation of the running nailgun server as well as creation of the client."""
     classpath = self._nailgun_classpath + classpath
@@ -176,9 +175,9 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
         self.terminate()
 
       if (not running) or (running and updated):
-        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr)
+        return self._spawn_nailgun_server(new_fingerprint, jvm_options, classpath, stdout, stderr, stdin)
 
-    return self._create_ngclient(self.socket, stdout, stderr)
+    return self._create_ngclient(self.socket, stdout, stderr, stdin)
 
   def _await_socket(self, timeout):
     """Blocks for the nailgun subprocess to bind and emit a listening port in the nailgun stdout."""
@@ -197,8 +196,8 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
           raise NailgunClient.NailgunError(
             'Failed to read nailgun output after {sec} seconds!'.format(sec=timeout))
 
-  def _create_ngclient(self, port, stdout, stderr):
-    return NailgunClient(port=port, ins=self._ins, out=stdout, err=stderr, workdir=get_buildroot())
+  def _create_ngclient(self, port, stdout, stderr, stdin):
+    return NailgunClient(port=port, ins=stdin, out=stdout, err=stderr, workdir=get_buildroot())
 
   def ensure_connectable(self, nailgun):
     """Ensures that a nailgun client is connectable or raises NailgunError."""
@@ -216,7 +215,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
       attempt_count += 1
       time.sleep(self.WAIT_INTERVAL_SEC)
 
-  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr):
+  def _spawn_nailgun_server(self, fingerprint, jvm_options, classpath, stdout, stderr, stdin):
     """Synchronously spawn a new nailgun server."""
     # Truncate the nailguns stdout & stderr.
     safe_file_dump(self._ng_stdout, '')
@@ -244,7 +243,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
     logger.debug('Spawned nailgun server {i} with fingerprint={f}, pid={pid} port={port}'
                  .format(i=self._identity, f=fingerprint, pid=self.pid, port=self.socket))
 
-    client = self._create_ngclient(self.socket, stdout, stderr)
+    client = self._create_ngclient(self.socket, stdout, stderr, stdin)
     self.ensure_connectable(client)
 
     return client
