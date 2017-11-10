@@ -68,8 +68,8 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
       {shebang_clause}
     )
     """).format(name=name, entry_point=entry_point, dependencies=','.join(map(repr, dependencies)),
-                provides_clause="provides={0},".format(provides) if provides else '',
-                shebang_clause="shebang='{0}',".format(shebang) if shebang else ''))
+                provides_clause='provides={0},'.format(provides) if provides else '',
+                shebang_clause='shebang={!r},'.format(shebang) if shebang else ''))
     return self.target(Address(relpath, name).spec)
 
   def create_python_requirement_library(self, relpath, name, requirements):

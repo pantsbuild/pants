@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import json
-import logging
 import os
 import shutil
 import tempfile
@@ -18,7 +17,6 @@ from pex.pex_info import PexInfo
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_chroot import PythonChroot
 from pants.backend.python.subsystems.python_setup import PythonSetup
-from pants.backend.python.targets.python_binary import PythonBinary
 from pants.base import hash_utils
 from pants.binaries.thrift_binary import ThriftBinary
 from pants.ivy.bootstrapper import Bootstrapper
@@ -117,9 +115,7 @@ class PythonTask(Task):
     # created when that pex was built.
     pex_info = PexInfo.from_pex(path)
     # Now create a PythonChroot wrapper without dumping it.
-
-    builder = self._setup_builder(targets, path, interpreter, pex_info)
-
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
     return self.create_chroot(interpreter=interpreter,
                               builder=builder,
                               targets=targets,
@@ -139,9 +135,7 @@ class PythonTask(Task):
   def _build_chroot(self, path, interpreter, pex_info, targets, platforms,
                      extra_requirements=None, executable_file_content=None):
     """Create a PythonChroot with the specified args."""
-
-    builder = self._setup_builder(targets, path, interpreter, pex_info)
-
+    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
     with self.context.new_workunit('chroot'):
       chroot = self.create_chroot(
         interpreter=interpreter,
@@ -193,15 +187,3 @@ class PythonTask(Task):
 
     fingerprint = hash_utils.hash_all(fingerprint_components)
     return os.path.join(self.chroot_cache_dir, fingerprint)
-
-  def _setup_builder(self, targets, path, interpreter, pex_info):
-    builder = PEXBuilder(path=path, interpreter=interpreter, pex_info=pex_info, copy=True)
-
-    binary_targets = [target for target in targets if isinstance(target, PythonBinary)]
-    if len(binary_targets) == 1 and binary_targets[0].shebang:
-      builder.set_shebang(binary_targets[0].shebang)
-    elif len(binary_targets) > 1:
-      logger = logging.getLogger(__name__)
-      logger.warn('More than one binary target found. Customized Shebang will not be used!')
-
-    return builder

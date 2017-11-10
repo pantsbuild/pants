@@ -104,7 +104,7 @@ class PythonBinaryCreate(Task):
       builder = PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True)
 
       if binary_tgt.shebang:
-        self.context.log.info("Found Python binary target {} with customized shebang, using it: {}"
+        self.context.log.info('Found Python binary target {} with customized shebang, using it: {}'
                                 .format(binary_tgt.name, binary_tgt.shebang))
         builder.set_shebang(binary_tgt.shebang)
       else:
