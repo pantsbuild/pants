@@ -94,6 +94,15 @@ and the size of the serialized proto in bytes, separated by a space.",
               )),
           ),
       )
+      .subcommand(
+        SubCommand::with_name("cat")
+          .about(
+            "Output the contents of a file or Directory proto addressed by fingerprint.",
+          )
+          .arg(Arg::with_name("fingerprint").required(true).takes_value(
+            true,
+          )),
+      )
       .arg(
         Arg::with_name("local_store_path")
           .takes_value(true)
@@ -215,6 +224,24 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         (_, _) => unimplemented!(),
       }
     }
+    ("cat", Some(args)) => {
+      let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+      let v = match store.load_file_bytes(&fingerprint)? {
+        None => store.load_directory_proto_bytes(&fingerprint)?,
+        some => some,
+      };
+      match v {
+        Some(bytes) => {
+          io::stdout().write(&bytes).unwrap();
+          Ok(())
+        }
+        None => Err(ExitError(
+          format!("Fingerprint {} not found", fingerprint),
+          ExitCode::NotFound,
+        )),
+      }
+    }
+
     (_, _) => unimplemented!(),
   }
 }
