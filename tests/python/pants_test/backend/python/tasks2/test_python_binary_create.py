@@ -26,7 +26,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
   def alias_groups(self):
     return super(PythonBinaryCreateTest, self).alias_groups.merge(register_core())
 
-  def _assert_pex(self, binary, expected_output=None):
+  def _assert_pex(self, binary, expected_output=None, expected_shebang=None):
     # The easiest way to create products required by the PythonBinaryCreate task is to
     # execute the relevant tasks.
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
@@ -42,9 +42,9 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     test_task = self.create_task(task_context)
     test_task.execute()
 
-    self._check_products(task_context, binary, expected_output=expected_output)
+    self._check_products(task_context, binary, expected_output=expected_output, expected_shebang=expected_shebang)
 
-  def _check_products(self, context, binary, expected_output=None):
+  def _check_products(self, context, binary, expected_output=None, expected_shebang=None):
     pex_name = '{}.pex'.format(binary.address.target_name)
     products = context.products.get('deployable_archives')
     self.assertIsNotNone(products)
@@ -60,6 +60,12 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     output = subprocess.check_output(pex_copy)
     if expected_output:
       self.assertEqual(expected_output, output)
+
+    # Check that the pex has the expected shebang.
+    if expected_shebang:
+      with open(pex_copy, 'r') as pex:
+        line = pex.readline()
+        self.assertEqual(expected_shebang, line)
 
   def test_deployable_archive_products_simple(self):
     self.create_python_library('src/python/lib', 'lib', {'lib.py': dedent("""
@@ -92,3 +98,15 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
     binary = self.create_python_binary('src/python/bin', 'bin', 'lib.lib:main',
                                        dependencies=['src/python/lib', 'src/things'])
     self._assert_pex(binary, expected_output='data!')
+
+  def test_shebang_modified(self):
+    self.create_python_library('src/python/lib', 'lib', {'lib.py': dedent("""
+    def main():
+      print('Hello World!')
+    """)})
+
+    binary = self.create_python_binary('src/python/bin', 'bin', 'lib.lib:main',
+                                       shebang='/usr/bin/env python2',
+                                       dependencies=['src/python/lib'])
+
+    self._assert_pex(binary, expected_output='Hello World!\n', expected_shebang='#!/usr/bin/env python2\n')
