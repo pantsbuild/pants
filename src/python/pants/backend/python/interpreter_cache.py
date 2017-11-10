@@ -38,15 +38,6 @@ class PythonInterpreterCache(object):
       if cls._matches(interpreter, filters):
         yield interpreter
 
-  @classmethod
-  def select_interpreter(cls, compatibilities, allow_multiple=False):
-    """Given a set of interpreters, either return them all if ``allow_multiple`` is ``True``;
-    otherwise, return the lowest compatible interpreter.
-    """
-    if allow_multiple:
-      return compatibilities
-    return [min(compatibilities)] if compatibilities else []
-
   def __init__(self, python_setup, python_repos, logger=None):
     self._python_setup = python_setup
     self._python_repos = python_repos
@@ -81,7 +72,7 @@ class PythonInterpreterCache(object):
                       '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
                                                          ', '.join(tgts_with_compatibilities_strs)))
     # Return the lowest compatible interpreter.
-    return self.select_interpreter(allowed_interpreters)[0]
+    return min(allowed_interpreters)
 
   def _interpreter_from_path(self, path, filters):
     interpreter_dir = os.path.basename(path)
