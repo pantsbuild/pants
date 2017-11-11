@@ -5,6 +5,86 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev20 (11/10/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Allow custom definition of Python PEX shebang (#3630) (#4514)
+  `PR #3630 <https://github.com/pantsbuild/pants/pull/3630>`_
+
+* Support running python tests in the pex chroot. (#5033)
+  `PR #5033 <https://github.com/pantsbuild/pants/pull/5033>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Bump to jarjar 1.6.5 to pull in https://github.com/pantsbuild/jarjar/pull/30 (#5087)
+  `PR #5087 <https://github.com/pantsbuild/pants/pull/5087>`_
+  `PR #30, <https://github.com/pantsbuild/jarjar/pull/30,>`_
+  `PR #30 <https://github.com/pantsbuild/jarjar/pull/30>`_
+
+* Update cmake to 3.9.5 (#5072)
+  `Issue #4975#issuecomment-342562504 <https://github.com/pantsbuild/pants/issues/4975#issuecomment-342562504>`_
+  `PR #5072 <https://github.com/pantsbuild/pants/pull/5072>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `PythonInterpreterCache`. (#5089)
+  `PR #5089 <https://github.com/pantsbuild/pants/pull/5089>`_
+
+* Call wsimport script instead of using tools.jar so jax-ws will work on java 9 (#5078)
+  `PR #5078 <https://github.com/pantsbuild/pants/pull/5078>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Prepare the second release candidate. (#5088)
+  `PR #5088 <https://github.com/pantsbuild/pants/pull/5088>`_
+
+* Inline mis-documented `select_interpreter` method. (#5085)
+  `PR #5085 <https://github.com/pantsbuild/pants/pull/5085>`_
+
+* fs_util cat <fingerprint> (#5066)
+  `PR #5066 <https://github.com/pantsbuild/pants/pull/5066>`_
+
+* Add support for proxying stdin with pantsd (#5040)
+  `PR #5040 <https://github.com/pantsbuild/pants/pull/5040>`_
+
+* `fs_util directory cat-proto` supports text format output (#5083)
+  `PR #5083 <https://github.com/pantsbuild/pants/pull/5083>`_
+
+* Add a VFS impl for PosixFS. (#5079)
+  `PR #5079 <https://github.com/pantsbuild/pants/pull/5079>`_
+
+* `fs_util directory materialize` (#5075)
+  `PR #5075 <https://github.com/pantsbuild/pants/pull/5075>`_
+
+* Fix broken test due to changed git cmd line (#5076)
+  `PR #5076 <https://github.com/pantsbuild/pants/pull/5076>`_
+
+* Canonicalize path before taking its parent (#5052)
+  `PR #5052 <https://github.com/pantsbuild/pants/pull/5052>`_
+
+* Fix test compile (#5069)
+  `PR #5069 <https://github.com/pantsbuild/pants/pull/5069>`_
+  `PR #5065 <https://github.com/pantsbuild/pants/pull/5065>`_
+
+* fs_util directory cat-proto <fingerprint> (#5065)
+  `PR #5065 <https://github.com/pantsbuild/pants/pull/5065>`_
+
+* fs_util exits 2 for ENOENT (#5064)
+  `PR #5064 <https://github.com/pantsbuild/pants/pull/5064>`_
+
+* Fixup sdist release. (#5067)
+  `PR #5067 <https://github.com/pantsbuild/pants/pull/5067>`_
+
+* Fixup `./build-support/bin/release.sh -t`. (#5062)
+  `PR #5062 <https://github.com/pantsbuild/pants/pull/5062>`_
+
+
 1.4.0.dev19 (11/04/2017)
 ------------------------
 
