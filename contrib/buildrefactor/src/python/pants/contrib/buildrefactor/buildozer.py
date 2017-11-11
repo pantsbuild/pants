@@ -5,11 +5,16 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
+
+
+logger = logging.getLogger(__name__)
 
 
 class Buildozer(Task):
@@ -28,6 +33,8 @@ class Buildozer(Task):
 
     Note that buildozer assumes that BUILD files contain a name field for the target.
   """
+
+  options_scope = 'buildozer'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -62,12 +69,20 @@ class Buildozer(Task):
   def _execute_buildozer_script(self, command):
     for root in self.context.target_roots:
       address = root.address
-      buildozer_command = [self._executable, command, '//{}:{}'.format(address._spec_path, address._target_name)]
+      Buildozer.execute_binary(command, address.spec, binary=self._executable)
 
-      try:
-        subprocess.check_call(buildozer_command, cwd=get_buildroot())
-      except subprocess.CalledProcessError as err:
-        if (err.returncode == 3):
-          raise TaskError('{} ... no changes were made'.format(buildozer_command))
-        else:
-          raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+  @classmethod
+  def execute_binary(cls, command, spec, binary=None, version='0.4.5'):
+    binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
+
+    Buildozer._execute_buildozer_command([binary, command, spec])
+
+  @classmethod
+  def _execute_buildozer_command(cls, buildozer_command):
+    try:
+      subprocess.check_call(buildozer_command, cwd=get_buildroot())
+    except subprocess.CalledProcessError as err:
+      if err.returncode == 3:
+        logger.warn('{} ... no changes were made'.format(buildozer_command))
+      else:
+        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
