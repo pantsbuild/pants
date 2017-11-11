@@ -62,7 +62,8 @@ class PythonSetup(Subsystem):
     register('--artifact-cache-dir', advanced=True, default=None, metavar='<dir>',
              help='The parent directory for the python artifact cache. '
                   'If unspecified, a standard path under the workdir is used.')
-    register('--interpreter-search-paths', advanced=True, type=list, default=[], metavar='<binary-paths>',
+    register('--interpreter-search-paths', advanced=True, type=list, default=[],
+             metavar='<binary-paths>',
              help='A list of paths to search for python interpreters.')
 
   @property

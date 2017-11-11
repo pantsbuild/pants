@@ -40,27 +40,13 @@ class PythonTask(Task):
 
   def __init__(self, *args, **kwargs):
     super(PythonTask, self).__init__(*args, **kwargs)
-    self._interpreter_cache = None
-    self._interpreter = None
-
-  @property
-  def interpreter_cache(self):
-    if self._interpreter_cache is None:
-      self._interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                                       PythonRepos.global_instance(),
-                                                       logger=self.context.log.debug)
-
-      # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
-      self.context.acquire_lock()
-      try:
-        self._interpreter_cache.setup()
-      finally:
-        self.context.release_lock()
-    return self._interpreter_cache
+    self._interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
+                                                     PythonRepos.global_instance(),
+                                                     logger=self.context.log.debug)
 
   def select_interpreter_for_targets(self, targets):
     """Pick an interpreter compatible with all the specified targets."""
-    return self.interpreter_cache.select_interpreter_for_targets(targets)
+    return self._interpreter_cache.select_interpreter_for_targets(targets)
 
   @property
   def chroot_cache_dir(self):

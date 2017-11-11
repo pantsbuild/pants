@@ -18,7 +18,6 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.python.python_repos import PythonRepos
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir_for
-from pants.util.memo import memoized_method
 
 
 class PythonInterpreterFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStrategy):
@@ -49,8 +48,6 @@ class SelectInterpreter(Task):
     return [PythonInterpreter]
 
   def execute(self):
-    interpreter = None
-
     python_tgts = self.context.targets(lambda tgt: isinstance(tgt, PythonTarget))
     fs = PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
@@ -65,31 +62,13 @@ class SelectInterpreter(Task):
       if not os.path.exists(interpreter_path_file):
         self._create_interpreter_path_file(interpreter_path_file, python_tgts)
 
-    if not interpreter:
-      interpreter = self._get_interpreter(interpreter_path_file)
-
+    interpreter = self._get_interpreter(interpreter_path_file)
     self.context.products.register_data(PythonInterpreter, interpreter)
 
-  @memoized_method
-  def _interpreter_cache(self):
-    setup = PythonSetup.global_instance()
-    interpreter_cache = PythonInterpreterCache(setup,
+  def _create_interpreter_path_file(self, interpreter_path_file, targets):
+    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
                                                PythonRepos.global_instance(),
                                                logger=self.context.log.debug)
-    # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
-    self.context.acquire_lock()
-    try:
-      paths = setup.interpreter_search_paths
-      if paths:
-        interpreter_cache.setup(paths)
-      else:
-        interpreter_cache.setup()
-    finally:
-      self.context.release_lock()
-    return interpreter_cache
-
-  def _create_interpreter_path_file(self, interpreter_path_file, targets):
-    interpreter_cache = self._interpreter_cache()
     interpreter = interpreter_cache.select_interpreter_for_targets(targets)
     safe_mkdir_for(interpreter_path_file)
     with open(interpreter_path_file, 'w') as outfile:
