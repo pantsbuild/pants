@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import warnings
+import logging
 
 from collections import defaultdict
 
@@ -15,6 +15,9 @@ from pants.build_graph.target import Target
 from pants.task.task import Task
 
 from pants.contrib.buildrefactor.buildozer import Buildozer
+
+
+logger = logging.getLogger(__name__)
 
 
 class MetaRename(Task):
@@ -46,21 +49,19 @@ class MetaRename(Task):
       Target(name=self._from_address.target_name, address=self._from_address, build_graph=[], **{})
     ]
 
-    warnings.filterwarnings('error')
+    logging.disable(logging.WARNING)
 
     for concrete_target in dependee_targets:
-      try:
+      for formats in [
+        { 'from': self._from_address.spec, 'to': self._to_address.spec },
+        { 'from': ':{}'.format(self._from_address.target_name), 'to': ':{}'.format(self._to_address.target_name) }
+      ]:
         Buildozer.execute_binary(
-          'replace dependencies {} {}'.format(self._from_address.spec, self._to_address.spec),
-          spec=concrete_target.address.spec
-        )
-      except Warning:
-        Buildozer.execute_binary(
-          'replace dependencies :{} :{}'.format(self._from_address.target_name, self._to_address.target_name),
+          'replace dependencies {} {}'.format(formats['from'], formats['to']),
           spec=concrete_target.address.spec
         )
 
-    warnings.filterwarnings('default')
+    logging.disable(logging.NOTSET)
 
   def update_original_build_name(self):
     Buildozer.execute_binary('set name {}'.format(self._to_address.target_name), spec=self._from_address.spec)
