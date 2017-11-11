@@ -43,6 +43,7 @@ class PythonBinary(PythonTarget):
                repositories=None,         # pex option
                indices=None,              # pex option
                ignore_errors=False,       # pex option
+               shebang=None,              # pex option
                platforms=(),
                **kwargs):
     """
@@ -83,6 +84,7 @@ class PythonBinary(PythonTarget):
       'indices': PrimitiveField(maybe_list(indices or [])),
       'ignore_errors': PrimitiveField(bool(ignore_errors)),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
+      'shebang': PrimitiveField(shebang),
     })
 
     sources = [] if source is None else [source]
@@ -133,6 +135,10 @@ class PythonBinary(PythonTarget):
     else:
       return None
 
+  @property
+  def shebang(self):
+    return self.payload.shebang
+    
   @property
   def pexinfo(self):
     info = PexInfo.default()
