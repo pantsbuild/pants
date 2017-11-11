@@ -3,7 +3,7 @@
 
 # Use the standard python-2.7 docker Debian Wheezy image for binary compatibility with old linux
 # distros.
-FROM pantsbuild:wheezy
+FROM pantsbuild/wheezy:latest
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
