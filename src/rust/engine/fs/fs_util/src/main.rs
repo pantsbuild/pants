@@ -14,7 +14,7 @@ use fs::VFS;
 use futures::future::{Future, join_all};
 use itertools::Itertools;
 use std::error::Error;
-use std::ffi::OsStr;
+use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -88,7 +88,7 @@ and the size of the serialized proto in bytes, separated by a space.",
 absolute and a child of `root`.",
                   ),
               )
-              .arg(Arg::with_name("root").long("root").takes_value(true).help(
+              .arg(Arg::with_name("root").long("root").required(true).takes_value(true).help(
                 "Root under which source lives. The Directory proto produced will be relative to \
 this directory.",
               )),
@@ -205,7 +205,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("save", Some(args)) => {
           let (root, source) = extract_root_and_source(args).map_err(|e| {
             ExitError(
-              format!("Error parsing root and source flags: {}", e.description()),
+              format!("Error parsing root and source flags: {}", e),
               ExitCode::UnknownError,
             )
           })?;
@@ -217,8 +217,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             )?)
             .map_err(|e| format!("Error expanding globs: {}", e.description()))
             .and_then(move |paths| save_directory(store, posix_fs, paths))
-            .wait()
-            .unwrap();
+            .wait()?;
           Ok(println!("{} {}", fingerprint, size_bytes))
         }
         ("cat-proto", Some(args)) => {
@@ -278,22 +277,41 @@ fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
   fs::PosixFS::new(&root, vec![]).unwrap()
 }
 
-fn extract_root_and_source(args: &clap::ArgMatches) -> Result<(PathBuf, PathBuf), Box<Error>> {
+fn extract_root_and_source(args: &clap::ArgMatches) -> Result<(PathBuf, PathBuf), String> {
+  let root = PathBuf::from(args.value_of("root").unwrap());
   let source = Path::new(args.value_of("source").unwrap());
-  match args.value_of("root") {
-    Some(root) => {
-      let root_abs = Path::new(root).canonicalize()?;
-      if source.is_absolute() {
-        return Ok((
-          root_abs,
-          source.canonicalize()?.strip_prefix(root)?.to_path_buf(),
-        ));
-      } else {
-        // Strip /./-style components.
-        return Ok((root_abs, source.components().as_path().to_path_buf()));
-      }
+  if source.is_absolute() {
+    let root_abs = if root.is_absolute() {
+      root
+    } else {
+      std::env::current_dir()
+        .map_err(|e| {
+          format!("Error getting current directory: {}", e.description())
+        })?
+        .join(root)
+    };
+    if !source.starts_with(&root_abs) {
+      Err(format!(
+        "If source is absolute, it must be a child of root. source={:?}, root={:?}",
+        source,
+        root_abs
+      ))
+    } else {
+      let source_rel = source
+        .strip_prefix(&root_abs)
+        .map_err(|e| {
+          format!(
+            "Error stripping prefix {:?} from {:?}: {}",
+            &root_abs,
+            &source,
+            e.description()
+          )
+        })?
+        .to_path_buf();
+      Ok((root_abs, source_rel))
     }
-    None => Ok((source.canonicalize()?, PathBuf::from("."))),
+  } else {
+    Ok((root, source.to_path_buf()))
   }
 }
 
@@ -319,50 +337,43 @@ fn save_file(
 fn save_directory(
   store: Arc<Store>,
   posix_fs: Arc<fs::PosixFS>,
-  path_stats: Vec<fs::PathStat>,
+  mut path_stats: Vec<fs::PathStat>,
 ) -> BoxFuture<(Fingerprint, usize), String> {
   let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
     Vec::new();
   let mut dir_futures: Vec<BoxFuture<bazel_protos::remote_execution::DirectoryNode, String>> =
     Vec::new();
 
+  path_stats.sort_by(|a, b| a.path().cmp(b.path()));
+
   for (first_component, group) in
     &path_stats.into_iter().group_by(|s| {
       s.path().components().next().unwrap().as_os_str().to_owned()
     })
   {
-    let path_group: Vec<fs::PathStat> = group.collect();
+    let mut path_group: Vec<fs::PathStat> = group.collect();
     if path_group.len() == 1 && path_group.get(0).unwrap().path().components().count() == 1 {
       // Exactly one entry with exactly one component indicates either a file in this directory, or
       // an empty directory.
       // If the child is a non-empty directory, or a file therein, there must be multiple PathStats
       // with that prefix component, and we will handle that in the recursive save_directory call.
 
-      match path_group.get(0).unwrap() {
-        &fs::PathStat::File { ref stat, .. } => {
-          let stat = stat.clone();
+      match path_group.pop().unwrap() {
+        fs::PathStat::File { ref stat, .. } => {
+          let is_executable = stat.is_executable;
           file_futures.push(
             save_file(store.clone(), posix_fs.clone(), stat.clone())
               .and_then(move |(fingerprint, size_bytes)| {
                 let mut file_node = bazel_protos::remote_execution::FileNode::new();
-                file_node.set_name(osstring_as_utf8(&first_component).unwrap());
+                file_node.set_name(osstring_as_utf8(first_component)?);
                 file_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
-                file_node.set_is_executable(stat.is_executable);
+                file_node.set_is_executable(is_executable);
                 Ok(file_node)
               })
               .to_boxed(),
           );
         }
-        &fs::PathStat::Dir { .. } => {
-          // Because there are no children of this Dir, it must be empty.
-          let (fingerprint, size_bytes) = store
-            .record_directory(&bazel_protos::remote_execution::Directory::new())
-            .unwrap();
-          let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
-          directory_node.set_name(osstring_as_utf8(&first_component).unwrap());
-          directory_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
-          dir_futures.push(futures::future::ok(directory_node).to_boxed());
-        }
+        _ => {}
       }
     } else {
       dir_futures.push(
@@ -372,7 +383,7 @@ fn save_directory(
           paths_of_child_dir(path_group),
         ).and_then(move |(fingerprint, size_bytes)| {
           let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
-          dir_node.set_name(osstring_as_utf8(&first_component)?);
+          dir_node.set_name(osstring_as_utf8(first_component)?);
           dir_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
           Ok(dir_node)
         })
@@ -400,18 +411,14 @@ fn paths_of_child_dir(paths: Vec<fs::PathStat>) -> Vec<fs::PathStat> {
       }
       Some(match s {
         fs::PathStat::File { path, stat } => {
-          let mut components = path.components();
-          components.next();
           fs::PathStat::File {
-            path: components.as_path().to_owned(),
+            path: path.iter().skip(1).collect(),
             stat: stat,
           }
         }
         fs::PathStat::Dir { path, stat } => {
-          let mut components = path.components();
-          components.next();
           fs::PathStat::Dir {
-            path: components.as_path().to_owned(),
+            path: path.iter().skip(1).collect(),
             stat: stat,
           }
         }
@@ -480,9 +487,9 @@ pub fn fingerprint_to_digest(
   digest
 }
 
-fn osstring_as_utf8(path: &OsStr) -> Result<String, String> {
-  path.to_str().map(|e| e.to_string()).ok_or_else(|| {
-    format!("{:?}'s file_name is not representable in UTF8", path)
+fn osstring_as_utf8(path: OsString) -> Result<String, String> {
+  path.into_string().map_err(|p| {
+    format!("{:?}'s file_name is not representable in UTF8", p)
   })
 }
 
