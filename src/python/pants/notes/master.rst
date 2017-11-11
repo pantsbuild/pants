@@ -5,7 +5,7 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
-1.4.0.dev20 (11/10/2017)
+1.4.0.dev20 (11/11/2017)
 ------------------------
 
 New Features
@@ -22,7 +22,6 @@ API Changes
 
 * Bump to jarjar 1.6.5 to pull in https://github.com/pantsbuild/jarjar/pull/30 (#5087)
   `PR #5087 <https://github.com/pantsbuild/pants/pull/5087>`_
-  `PR #30, <https://github.com/pantsbuild/jarjar/pull/30,>`_
   `PR #30 <https://github.com/pantsbuild/jarjar/pull/30>`_
 
 * Update cmake to 3.9.5 (#5072)
