@@ -18,6 +18,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.task.task import TaskBase
 from pants.util.memo import memoized_property
 
@@ -140,7 +141,8 @@ class IvyTaskMixin(TaskBase):
 
       CoursierResolve.resolve(target_subset,
                               classpath_products,
-                              workunit_factory=self.context.new_workunit)
+                              workunit_factory=self.context.new_workunit,
+                              pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir)
       # results.append(self._resolve_subset(executor,
       #                                                target_subset,
       #                                                classpath_products,

@@ -32,7 +32,7 @@ class CoursierError(Exception):
 
 class CoursierResolve:
   @classmethod
-  def resolve(cls, targets, compile_classpath, workunit_factory, pinned_artifacts=None, excludes=[]):
+  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, pinned_artifacts=None, excludes=[]):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -133,7 +133,7 @@ class CoursierResolve:
     # env = os.environ.copy()
     # env['COURSIER_CACHE'] = '/Users/yic/workspace/source/.pants.d/.coursier-cache'
 
-    pants_jar_path_base = '/Users/yic/workspace/pants/.pants.d/coursier'
+    pants_jar_path_base = '{}/coursier'.format(pants_workdir)
 
     try:
       with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
