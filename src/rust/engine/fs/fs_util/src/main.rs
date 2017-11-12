@@ -104,9 +104,9 @@ and the size of the serialized proto in bytes, separated by a space.",
           )),
       )
       .arg(
-        Arg::with_name("local_store_path")
+        Arg::with_name("local-store-path")
           .takes_value(true)
-          .long("local_store_path")
+          .long("local-store-path")
           .required(true),
       )
       .get_matches(),
@@ -120,7 +120,7 @@ and the size of the serialized proto in bytes, separated by a space.",
 }
 
 fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
-  let store_dir = top_match.value_of("local_store_path").unwrap();
+  let store_dir = top_match.value_of("local-store-path").unwrap();
   let store = Arc::new(Store::new(store_dir).map_err(|e| {
     format!(
       "Failed to open/create store for directory {}: {}",
