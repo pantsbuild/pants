@@ -373,7 +373,16 @@ fn save_directory(
               .to_boxed(),
           );
         }
-        _ => {}
+        fs::PathStat::Dir { .. } => {
+          // Because there are no children of this Dir, it must be empty.
+          let (fingerprint, size_bytes) = store
+            .record_directory(&bazel_protos::remote_execution::Directory::new())
+            .unwrap();
+          let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
+          directory_node.set_name(osstring_as_utf8(first_component).unwrap());
+          directory_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
+          dir_futures.push(futures::future::ok(directory_node).to_boxed());
+        }
       }
     } else {
       dir_futures.push(
