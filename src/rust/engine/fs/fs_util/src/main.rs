@@ -80,18 +80,19 @@ protos for each directory found. Outputs a fingerprint of the canonical top-leve
 and the size of the serialized proto in bytes, separated by a space.",
               )
               .arg(
-                Arg::with_name("source")
+                Arg::with_name("globs")
                   .required(true)
                   .takes_value(true)
+                  .multiple(true)
                   .help(
-                    "Path of directory to actually ingest. Must either be relative (to `root`) or \
-absolute and a child of `root`.",
+                    "globs matching the files and directories which should be included in the \
+directory, relative to the root.",
                   ),
               )
-              .arg(Arg::with_name("root").long("root").required(true).takes_value(true).help(
-                "Root under which source lives. The Directory proto produced will be relative to \
-this directory.",
-              )),
+                .arg(Arg::with_name("root").long("root").required(true).takes_value(true).help(
+                  "Root under which the globs live. The Directory proto produced will be relative \
+to this directory.",
+                )),
           )
           .subcommand(
             SubCommand::with_name("cat-proto")
@@ -203,16 +204,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           Ok(materialize_directory(store, destination, &fingerprint)?)
         }
         ("save", Some(args)) => {
-          let (root, source) = extract_root_and_source(args).map_err(|e| {
-            ExitError(
-              format!("Error parsing root and source flags: {}", e),
-              ExitCode::UnknownError,
-            )
-          })?;
-          let posix_fs = Arc::new(make_posix_fs(root));
+          let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
           let (fingerprint, size_bytes) = posix_fs
             .expand(fs::PathGlobs::create(
-              &[format!("{}/**", source.to_str().unwrap())],
+              &args
+                .values_of("globs")
+                .unwrap()
+                .map(|s| s.to_string())
+                .collect::<Vec<String>>(),
               &[],
             )?)
             .map_err(|e| format!("Error expanding globs: {}", e.description()))
@@ -275,44 +274,6 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
 
 fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
   fs::PosixFS::new(&root, vec![]).unwrap()
-}
-
-fn extract_root_and_source(args: &clap::ArgMatches) -> Result<(PathBuf, PathBuf), String> {
-  let root = PathBuf::from(args.value_of("root").unwrap());
-  let source = Path::new(args.value_of("source").unwrap());
-  if source.is_absolute() {
-    let root_abs = if root.is_absolute() {
-      root
-    } else {
-      std::env::current_dir()
-        .map_err(|e| {
-          format!("Error getting current directory: {}", e.description())
-        })?
-        .join(root)
-    };
-    if !source.starts_with(&root_abs) {
-      Err(format!(
-        "If source is absolute, it must be a child of root. source={:?}, root={:?}",
-        source,
-        root_abs
-      ))
-    } else {
-      let source_rel = source
-        .strip_prefix(&root_abs)
-        .map_err(|e| {
-          format!(
-            "Error stripping prefix {:?} from {:?}: {}",
-            &root_abs,
-            &source,
-            e.description()
-          )
-        })?
-        .to_path_buf();
-      Ok((root_abs, source_rel))
-    }
-  } else {
-    Ok((root, source.to_path_buf()))
-  }
 }
 
 fn save_file(
