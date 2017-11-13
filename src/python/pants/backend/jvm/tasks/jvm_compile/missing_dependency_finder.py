@@ -44,6 +44,7 @@ class CompileErrorExtractor(object):
       source = safe_get_named_group(match, 'filename')
       lineno = safe_get_named_group(match, 'lineno')
       classname = safe_get_named_group(match, 'classname')
+      print(classname)
       if not classname:
         classnameonly = safe_get_named_group(match, 'classnameonly')
         packagename = safe_get_named_group(match, 'packagename')
@@ -70,6 +71,7 @@ class CompileErrorExtractor(object):
       errors.append(get_matched_error(first_match))
       start = first_match.end() + 1
 
+    print(errors)
     return errors
 
 

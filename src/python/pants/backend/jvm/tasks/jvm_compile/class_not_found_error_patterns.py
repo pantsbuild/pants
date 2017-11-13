@@ -41,4 +41,7 @@ CLASS_NOT_FOUND_ERROR_PATTERNS = [
    '\s*\[error\] Type (?P<classname>\S+) not present'),
   (r'\s*\[error\] ## Exception when compiling (?P<filename>\S+) and others\.\.\.\n'
    '\s*\[error\] java.lang.NoClassDefFoundError: (?P<classname>\S+)'),
+  
+#   TEST
+  (r'\s*\[error\] [^:]+\.scala:\d+:\d+: Symbol \'type \<none\>\.(?P<classname>\S+)\' is missing from the classpath\.\n\s*\[error\] This symbol is required by \'(?P<type>\S+) (?P<dependee_classname>\S+)\'\.\n\s*\[error\] Make sure that type (?P<classnameonly>\S+) is in your classpath and check for conflicting dependencies with `-Ylog-classpath`\.\n\s*\[error\] A full rebuild may help if \'(?P<dependee_classnameonly>\S+)\.class\' was compiled against an incompatible version of \<none\>\.(?P<packagename>\S+)\.'),
 ]

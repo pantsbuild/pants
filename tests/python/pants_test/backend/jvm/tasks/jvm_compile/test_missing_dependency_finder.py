@@ -17,43 +17,48 @@ from pants.backend.jvm.tasks.jvm_compile.missing_dependency_finder import (Class
 
 class CompileErrorExtractorTest(unittest.TestCase):
   ERROR_MESSAGES = [
+    # r"""
+    #   [error] /path/to/file/Hello.java:3:1: cannot find symbol
+    #   [error]   symbol:   class Nullable
+    #   [error]   location: package javax.annotation
+    #   [error] import javax.annotation.Nullable;""",
+    # r"""
+    #   [error] /path/to/file/Hello.java:63:1: cannot access org.apache.thrift.TBase
+    #   [error]   class file for org.apache.thrift.TBase not found""",
+    # r"""
+    #   [error] /path/to/file/Hello.java:6:1: package a.b.c does not exist
+    #   [error] import a.b.c.ImmutableMap;""",
+    # r"""
+    #   [error] /path/to/file/Hello.java:36:1: cannot find symbol
+    #   [error]   symbol:   class XYZ
+    #   [error]   location: package a.b.c""",
+    # r"""
+    #   [error] /path/to/file/Hello.java:102:1: package a.b.c does not exist
+    #   [error]     public static final A<a.b.c.XYZ> xyz = new ...;    """,
+    # r"""
+    #   [error] ## Exception when compiling /path/to/file/Hello.java and others...
+    #   [error] Type com.twitter.util.lint.Rule not present""",
+    # r"""
+    #   [error] ## Exception when compiling /path/to/file/Hello.java and others...
+    #   [error] java.lang.NoClassDefFoundError: a.b.c.XYZ""",
+    # r"""
+    #   [error] /path/to/file/Hello.scala:211:26: exception during macro expansion:
+    #   [error] java.lang.ClassNotFoundException: com.twitter.x.thrift.thriftscala.Y""",
+    # r"""
+    #   [error] /path/to/file/Hello.scala:7:33: object x is not a member of package a.b.c
+    #   [error] import a.b.c.x.Y""",
+    # r"""
+    #   java.lang.NoClassDefFoundError: org/apache/thrift/TEnum""",
+    # r"""
+    #   [error] missing or invalid dependency detected while loading class file 'Logging.class'.
+    #   [error] Could not access type Future in value com.twitter.util,""",
+    # r"""
+    #   [error] Class a.b.c.X not found - continuing with a stub.""",
     r"""
-      [error] /path/to/file/Hello.java:3:1: cannot find symbol
-      [error]   symbol:   class Nullable
-      [error]   location: package javax.annotation
-      [error] import javax.annotation.Nullable;""",
-    r"""
-      [error] /path/to/file/Hello.java:63:1: cannot access org.apache.thrift.TBase
-      [error]   class file for org.apache.thrift.TBase not found""",
-    r"""
-      [error] /path/to/file/Hello.java:6:1: package a.b.c does not exist
-      [error] import a.b.c.ImmutableMap;""",
-    r"""
-      [error] /path/to/file/Hello.java:36:1: cannot find symbol
-      [error]   symbol:   class XYZ
-      [error]   location: package a.b.c""",
-    r"""
-      [error] /path/to/file/Hello.java:102:1: package a.b.c does not exist
-      [error]     public static final A<a.b.c.XYZ> xyz = new ...;    """,
-    r"""
-      [error] ## Exception when compiling /path/to/file/Hello.java and others...
-      [error] Type com.twitter.util.lint.Rule not present""",
-    r"""
-      [error] ## Exception when compiling /path/to/file/Hello.java and others...
-      [error] java.lang.NoClassDefFoundError: a.b.c.XYZ""",
-    r"""
-      [error] /path/to/file/Hello.scala:211:26: exception during macro expansion:
-      [error] java.lang.ClassNotFoundException: com.twitter.x.thrift.thriftscala.Y""",
-    r"""
-      [error] /path/to/file/Hello.scala:7:33: object x is not a member of package a.b.c
-      [error] import a.b.c.x.Y""",
-    r"""
-      java.lang.NoClassDefFoundError: org/apache/thrift/TEnum""",
-    r"""
-      [error] missing or invalid dependency detected while loading class file 'Logging.class'.
-      [error] Could not access type Future in value com.twitter.util,""",
-    r"""
-      [error] Class a.b.c.X not found - continuing with a stub.""",
+      [error] /path/to/file/Hello.scala:34:6: Symbol 'type <none>.storehaus.Store' is missing from the classpath.
+      [error] This symbol is required by 'class com.twitter.octain.manhattan.ManhattanReadWriteStore'.
+      [error] Make sure that type Store is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+      [error] A full rebuild may help if 'ManhattanReadWriteStore.class' was compiled against an incompatible version of <none>.storehaus.""",
   ]
 
   EXPECTED_ERRORS = [
@@ -74,27 +79,29 @@ class CompileErrorExtractorTest(unittest.TestCase):
   def setUp(self):
     self.compile_error_finder = CompileErrorExtractor(CLASS_NOT_FOUND_ERROR_PATTERNS)
 
-  def test_extract_single_error(self):
-    for error_message, expected_error in zip(self.ERROR_MESSAGES, self.EXPECTED_ERRORS):
-      self.assertEqual([expected_error], self.compile_error_finder.extract(error_message))
+  # def test_extract_single_error(self):
+  #   for error_message, expected_error in zip(self.ERROR_MESSAGES, self.EXPECTED_ERRORS):
+  #     self.assertEqual([expected_error], self.compile_error_finder.extract(error_message))
 
   def test_extract_all_errors(self):
     compile_log = '\n'.join(self.ERROR_MESSAGES)
     self.assertEqual(self.EXPECTED_ERRORS,
       self.compile_error_finder.extract(compile_log))
+    raise Exception
+    self.assertEqual(1, 1)
 
 
-class StringSimilarityRankerTest(unittest.TestCase):
-  def test_rank_dependency_candidates(self):
-    not_found_classname = 'com.google.inject.Inject'
-
-    # Expect 3rdparty/jvm/com/google/inject:guice is more similar to the missing class name.
-    expected = [
-      '3rdparty/jvm/com/google/inject:guice',
-      '3rdparty/jvm/com/google/guava:guava',
-      '3rdparty/jvm/cascading:cascading-local',
-    ]
-
-    shuffled = list(expected)
-    random.shuffle(shuffled)
-    self.assertEqual(expected, StringSimilarityRanker(not_found_classname).sort(shuffled))
+# class StringSimilarityRankerTest(unittest.TestCase):
+  # def test_rank_dependency_candidates(self):
+  #   not_found_classname = 'com.google.inject.Inject'
+  #
+  #   # Expect 3rdparty/jvm/com/google/inject:guice is more similar to the missing class name.
+  #   expected = [
+  #     '3rdparty/jvm/com/google/inject:guice',
+  #     '3rdparty/jvm/com/google/guava:guava',
+  #     '3rdparty/jvm/cascading:cascading-local',
+  #   ]
+  #
+  #   shuffled = list(expected)
+  #   random.shuffle(shuffled)
+  #   self.assertEqual(expected, StringSimilarityRanker(not_found_classname).sort(shuffled))
