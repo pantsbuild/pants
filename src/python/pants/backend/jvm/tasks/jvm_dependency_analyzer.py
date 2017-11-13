@@ -83,8 +83,9 @@ class JvmDependencyAnalyzer(object):
     """Search which targets from `target`'s transitive dependencies contain `classname`."""
     targets_with_class = set()
     for target in target.closure():
-      if classname in self._target_classes(target):
-        targets_with_class.add(target)
+      for one_class in self._target_classes(target):
+        if classname in one_class:
+          targets_with_class.add(target)
 
     return targets_with_class
 
