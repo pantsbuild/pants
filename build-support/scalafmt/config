@@ -1,12 +1,11 @@
---maxColumn 100
---javaDocs
---alignStripMarginStrings false
---alignByOpenParenCallSite false
---alignByOpenParenDefnSite false
---continuationIndentCallSite 4
---continuationIndentDefnSite 4
---spacesInImportCurlyBraces false
---allowNewlineBeforeColonInMassiveReturnTypes true
---binPackParentConstructors false
---spaceAfterTripleEquals true
---alignByArrowEnumeratorGenerator true
+align.arrowEnumeratorGenerator = true
+align.openParenCallSite = false
+align.openParenDefnSite = false
+assumeStandardLibraryStripMargin = false
+binPack.parentConstructors = false
+continuationIndent.callSite = 4
+continuationIndent.defnSite = 4
+maxColumn = 100
+newlines.sometimesBeforeColonInMethodReturnType = true
+spaces.afterTripleEquals = true
+spaces.inImportCurlyBraces = false

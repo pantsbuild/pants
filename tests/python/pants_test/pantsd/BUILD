@@ -51,14 +51,14 @@ python_tests(
 )
 
 python_tests(
-  name = 'daemon',
+  name = 'pants_daemon',
   sources = ['test_pants_daemon.py'],
   coverage = ['pants.pantsd.pants_daemon'],
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/pantsd/service:pants_service',
-    'src/python/pants/util:contextutil'
+    'src/python/pants/util:contextutil',
   ]
 )
 
@@ -67,9 +67,21 @@ python_tests(
   sources = ['test_pantsd_integration.py'],
   dependencies = [
     'src/python/pants/pantsd:process_manager',
+    'src/python/pants/util:collections',
     'tests/python/pants_test:int-test',
     'tests/python/pants_test/testutils:process_test_util'
   ],
   tags = {'integration'},
-  timeout = 120
+  timeout = 600
+)
+
+python_tests(
+  name = 'watchman_launcher',
+  sources = ['test_watchman_launcher.py'],
+  coverage = ['pants.pantsd.watchman_launcher'],
+  dependencies = [
+    'tests/python/pants_test/pantsd:test_deps',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'src/python/pants/pantsd:watchman_launcher'
+  ]
 )

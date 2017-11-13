@@ -33,6 +33,16 @@ from pants.util.objects import datatype
 logger = logging.getLogger(__name__)
 
 
+def target_types_from_symbol_table(symbol_table):
+  """Given a LegacySymbolTable, return the concrete target types constructed for each alias."""
+  aliases = symbol_table.aliases()
+  target_types = dict(aliases.target_types)
+  for alias, factory in aliases.target_macro_factories.items():
+    target_type, = factory.target_types
+    target_types[alias] = target_type
+  return target_types
+
+
 class _DestWrapper(datatype('DestWrapper', ['target_types'])):
   """A wrapper for dest field of RemoteSources target.
 
@@ -52,7 +62,7 @@ class LegacyBuildGraph(BuildGraph):
   @classmethod
   def create(cls, scheduler, symbol_table):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class."""
-    return cls(scheduler, cls._get_target_types(symbol_table))
+    return cls(scheduler, target_types_from_symbol_table(symbol_table))
 
   def __init__(self, scheduler, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
@@ -68,15 +78,6 @@ class LegacyBuildGraph(BuildGraph):
   def clone_new(self):
     """Returns a new BuildGraph instance of the same type and with the same __init__ params."""
     return LegacyBuildGraph(self._scheduler, self._target_types)
-
-  @staticmethod
-  def _get_target_types(symbol_table):
-    aliases = symbol_table.aliases()
-    target_types = dict(aliases.target_types)
-    for alias, factory in aliases.target_macro_factories.items():
-      target_type, = factory.target_types
-      target_types[alias] = target_type
-    return target_types
 
   def _index(self, roots):
     """Index from the given roots into the storage provided by the base class.

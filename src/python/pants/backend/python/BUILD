@@ -69,10 +69,11 @@ python_library(
   sources = ['interpreter_cache.py'],
   dependencies = [
     '3rdparty/python:pex',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/base:exceptions',
     'src/python/pants/backend/python/targets',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/process',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:memo',
   ]
 )
 

@@ -1,0 +1,11 @@
+[package]
+version = "0.0.1"
+name = "process_execution"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+bazel_protos = { path = "bazel_protos" }
+digest = "0.6.2"
+grpcio = { git = "https://github.com/illicitonion/grpc-rs", rev = "2acabdbff71e77a14b95b0b30c6d7de516355df7" }
+protobuf = "1.4.1"
+sha2 = "0.6.0"

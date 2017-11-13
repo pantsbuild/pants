@@ -46,7 +46,7 @@ class ExecuteJavaTest(unittest.TestCase):
       mock_safe_classpath.side_effect = fake_safe_classpath
       yield mock_safe_classpath
 
-    self.runner.run.assert_called_once_with()
+    self.runner.run.assert_called_once_with(stdin=None)
     if create_synthetic_jar:
       self.executor.runner.assert_called_once_with(self.SAFE_CLASSPATH, self.TEST_MAIN,
                                                     args=None, jvm_options=None, cwd=None)

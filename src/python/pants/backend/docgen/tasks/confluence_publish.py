@@ -11,14 +11,18 @@ import textwrap
 from twitter.common.confluence import Confluence, ConfluenceError
 
 from pants.backend.docgen.targets.doc import Page
+from pants.base.deprecated import deprecated_module
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util import desktop
 from pants.util.dirutil import safe_open
 
 
+deprecated_module('1.6.0.dev0', 'Use contrib.confluence.tasks.confluence_publish.py instead')
+
 # TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come
 # from options. However if we decide against that, we should rename this ConfluencePublishBase.
+
 class ConfluencePublish(Task):
   """A task to publish Page targets to Confluence wikis."""
 

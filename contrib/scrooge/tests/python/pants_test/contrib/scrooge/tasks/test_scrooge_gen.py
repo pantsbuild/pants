@@ -42,7 +42,9 @@ class ScroogeGenTest(NailgunTaskTestBase):
     self.set_options_for_scope('thrift-defaults',
                                compiler='unchecked',
                                language='uniform',
-                               rpc_style='async')
+                               rpc_style='async',
+                               service_deps='service_deps',
+                               structs_deps='structs_deps')
 
     self.add_to_build_file('test_validate', dedent('''
       java_thrift_library(name='one',
@@ -148,8 +150,6 @@ class ScroogeGenTest(NailgunTaskTestBase):
     context = self.context(target_roots=[target])
     task = self.prepare_execute(context)
 
-    task._declares_service = lambda source: False
-
     task.gen = MagicMock()
     task.gen.return_value = {'test_smoke/a.thrift': sources}
 
@@ -176,3 +176,36 @@ class ScroogeGenTest(NailgunTaskTestBase):
 
     finally:
       Context.add_new_target = saved_add_new_target
+
+  def test_basic_deps(self):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      struct Example {
+      1: optional i64 number
+      }
+    ''')
+    self._test_dependencies_help(contents, False, False)
+
+  def test_service_deps(self):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      service MultiplicationService
+      {
+        int multiply(1:int n1, 2:int n2),
+      }''')
+    self._test_dependencies_help(contents, True, False)
+
+  def test_exception_deps(self):
+    contents = dedent('''#@namespace android org.pantsbuild.android_example
+      namespace java org.pantsbuild.example
+      exception InvalidOperation {
+        1: i32 what,
+        2: string why
+      }''')
+    self._test_dependencies_help(contents, False, True)
+
+  def _test_dependencies_help(self, contents, declares_service, declares_exception):
+    source = 'test_smoke/a.thrift'
+    self.create_file(relpath=source, contents=contents)
+    self.assertEquals(ScroogeGen._declares_service(source), declares_service)
+    self.assertEquals(ScroogeGen._declares_exception(source), declares_exception)

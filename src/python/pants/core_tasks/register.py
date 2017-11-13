@@ -49,6 +49,7 @@ def register_goals():
   Goal.register('dep-usage', 'Collect target dependency usage data.')
   Goal.register('lint', 'Find formatting errors in source code.')
   Goal.register('fmt', 'Autoformat source code.')
+  Goal.register('buildozer', 'Manipulate BUILD files.')
 
   # Register tasks.
 
@@ -59,7 +60,9 @@ def register_goals():
   # Pantsd.
   kill_pantsd = task(name='kill-pantsd', action=PantsDaemonKill)
   kill_pantsd.install()
-  kill_pantsd.install('clean-all')
+  # Kill pantsd/watchman first, so that they're not using any files
+  # in .pants.d at the time of removal.
+  kill_pantsd.install('clean-all', first=True)
 
   # Reporting server.
   # TODO: The reporting server should be subsumed into pantsd, and not run via a task.

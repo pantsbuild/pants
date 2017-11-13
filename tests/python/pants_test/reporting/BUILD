@@ -5,16 +5,18 @@ python_tests(
   sources = ['test_linkify.py'],
   dependencies = [
     'src/python/pants/reporting',
-  ]
+  ],
+  timeout = 10,
 )
 
 python_tests(
   name = 'reporting_integration',
   sources = ['test_reporting_integration.py'],
   dependencies = [
+    '3rdparty/python:parameterized',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test'
   ],
   tags = {'integration'},
-  timeout = 120,
+  timeout = 240,
 )

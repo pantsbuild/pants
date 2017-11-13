@@ -14,6 +14,9 @@ from six.moves import configparser
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
+from pants.base.deprecated import deprecated_conditional
+from pants.option.arg_splitter import GLOBAL_SCOPE_CONFIG_SECTION
+from pants.option.global_options import GlobalOptionsRegistrar
 from pants.util.eval import parse_expression
 from pants.util.meta import AbstractClass
 
@@ -53,8 +56,28 @@ class Config(AbstractClass):
       parser = cls._create_parser(seed_values)
       with open(configpath, 'r') as ini:
         parser.readfp(ini)
+      cls._transform_sections_to_global(parser, GlobalOptionsRegistrar.options_subsumed_scopes)
       single_file_configs.append(_SingleFileConfig(configpath, parser))
     return _ChainedConfig(single_file_configs)
+
+  @staticmethod
+  def _transform_sections_to_global(parser, global_subsumed_sections):
+    """Transforms section names as needed for options scope deprecation."""
+    default_keys = parser.defaults().keys()
+    for subsumed_section, removal_version in global_subsumed_sections:
+      if parser.has_section(subsumed_section):
+        deprecated_conditional(
+          lambda: True,
+          removal_version,
+          'The pants.ini options scope `[{}]` is deprecated. Please migrate options '
+          'in this scope to `[GLOBAL]`.'.format(subsumed_section)
+        )
+        if not parser.has_section(GLOBAL_SCOPE_CONFIG_SECTION):
+          parser.add_section(GLOBAL_SCOPE_CONFIG_SECTION)
+        for k, v in parser.items(subsumed_section):
+          if k not in default_keys:
+            parser.set(GLOBAL_SCOPE_CONFIG_SECTION, '_'.join((subsumed_section, k)), v)
+        parser.remove_section(subsumed_section)
 
   @classmethod
   def _create_parser(cls, seed_values=None):

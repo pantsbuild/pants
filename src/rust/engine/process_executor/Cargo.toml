@@ -4,6 +4,5 @@ name = "process_executor"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
-bazel_protos = { path = "bazel_protos" }
-protobuf = "1.4.1"
-rust-crypto = "0.2.36"
+clap = "2"
+process_execution = {path = "../process_execution"}

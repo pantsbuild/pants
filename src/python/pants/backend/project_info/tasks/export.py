@@ -316,9 +316,21 @@ class ExportTask(IvyTaskMixin, PythonTask):
       graph_info['libraries'] = self._resolve_jars_info(targets, classpath_products)
 
     if python_interpreter_targets_mapping:
-      interpreters = self.interpreter_cache.select_interpreter(
-        python_interpreter_targets_mapping.keys())
-      default_interpreter = interpreters[0]
+      # NB: We've selected a python interpreter compatible with each python target individually into
+      # the `python_interpreter_targets_mapping`. These python targets may not be compatible, ie: we
+      # could have a python target requiring 'CPython>=2.7<3' (ie: CPython-2.7.x) and another
+      # requiring 'CPython>=3.6'. To pick a default interpreter then from among these two choices
+      # is arbitrary and not to be relied on to work as a default interpreter if ever needed by the
+      # export consumer.
+      #
+      # TODO(John Sirois): consider either eliminating the 'default_interpreter' field and pressing
+      # export consumers to make their own choice of a default (if needed) or else use
+      # `select.select_interpreter_for_targets` and fail fast if there is no interpreter compatible
+      # across all the python targets in-play.
+      #
+      # For now, make our arbitrary historical choice of a default interpreter explicit and use the
+      # lowest version.
+      default_interpreter = min(python_interpreter_targets_mapping.keys())
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):

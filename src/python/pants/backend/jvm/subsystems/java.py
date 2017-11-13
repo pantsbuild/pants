@@ -21,6 +21,9 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
   """
   options_scope = 'java'
 
+  _javac_tool_name = 'javac'
+  _default_javac_spec = '//:{}'.format(_javac_tool_name)
+
   @classmethod
   def register_options(cls, register):
     super(Java, cls).register_options(register)
@@ -31,7 +34,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
     # Javac plugins can access basically all of the compiler internals, so we don't shade anything.
     # Hence the unspecified main= argument. This tool is optional, hence the empty classpath list.
     cls.register_jvm_tool(register,
-                          'javac',
+                          cls._javac_tool_name,
                           classpath=[],
                           help='Java compiler to use.  If unspecified, we use the compiler '
                                'embedded in the Java distribution we run on.')
@@ -42,40 +45,22 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
              fingerprint=True)
 
   def injectables(self, build_graph):
-    # N.B. This method would normally utilize `injectables_spec_for_key(key)` to get at
-    # static specs, but due to the need to check the buildgraph before determining whether
-    # the javac spec is valid we must handle the injectables here without poking the
-    # `injectables_spec_mapping` property.
-    javac_spec = self._javac_spec
-    if not javac_spec:
-      self._javac_exists = False
-    else:
-      javac_address = Address.parse(javac_spec)
-      self._javac_exists = True if build_graph.contains_address(javac_address) else False
-
-    toolsjar_spec = self._tools_jar_spec
-    if toolsjar_spec:
-      synthetic_address = Address.parse(toolsjar_spec)
-      if not build_graph.contains_address(synthetic_address):
-        build_graph.inject_synthetic_target(synthetic_address, ToolsJar)
-
-  @property
-  def javac_specs(self):
-    if not self._javac_spec:
-      return []
-    assert self._javac_exists is not None, (
-      'cannot access javac_specs until injectables is called'
-    )
-    return [self._javac_spec] if self._javac_exists else []
+    tools_jar_address = Address.parse(self._tools_jar_spec)
+    if not build_graph.contains_address(tools_jar_address):
+      build_graph.inject_synthetic_target(tools_jar_address, ToolsJar)
+    elif not build_graph.get_target(tools_jar_address).is_synthetic:
+      raise build_graph.ManualSyntheticTargetError(tools_jar_address)
 
   @property
   def injectables_spec_mapping(self):
     return {
       'plugin': self._plugin_dependency_specs,
-      # If no javac library is specified, this maps to None. The caller must handle
-      # this case by defaulting to the JDK's tools.jar.
-      'javac': self.javac_specs,
-      'tools.jar': [self._tools_jar_spec]
+      # Zinc directly accesses the javac tool.
+      'javac': [self._javac_spec],
+      # The ProvideToolsJar task will first attempt to use the (optional) configured
+      # javac tool, and then fall back to injecting a classpath entry linking to the current
+      # distribution's `tools.jar`.
+      'tools.jar': [self._tools_jar_spec],
     }
 
   @classmethod
@@ -93,8 +78,7 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
     opts = self.get_options()
     # TODO: These checks are a continuation of the hack that allows tests to pass without
     # caring about this subsystem.
-    self._javac_spec = getattr(opts, 'javac', None)
-    self._javac_exists = None
+    self._javac_spec = getattr(opts, 'javac', self._default_javac_spec)
     self._plugin_dependency_specs = [
       Address.parse(spec).spec for spec in getattr(opts, 'compiler_plugin_deps', [])
     ]

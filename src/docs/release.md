@@ -11,6 +11,10 @@ Deciding the "who", "what", and "when" of releasing is described on the
 [[Release Strategy|pants('src/docs:release_strategy')]] page. Note that for some
 lucky release managers, this may result in two or more releases in a particular week.
 
+A release is always prepared for each pantsbuild/pants branch by a green Travis CI run; ie: master,
+1.0.x, 1.1.x, etc. branches on https://github.com/pantsbuild/pants will have wheels created, tested
+and deployed to https://binaries.pantsbuild.org ready for use in a release.
+ 
 Once you know what to release, releasing pants involves:
 
 -   Preparing the release.
@@ -145,8 +149,8 @@ After confirming this, run.
     :::bash
     $ ./build-support/bin/release.sh -n
 
-This will perform a dry run local build of the pantsbuild.pants sdist
-and other related package sdists, install them in a virtualenv and then
+This will perform a dry run local build of the pantsbuild.pants wheel
+and other related package wheelss, install them in a virtualenv and then
 smoke test basic operations.
 
 Note that in addition to CI checking dry runs work, the release publish
@@ -162,7 +166,7 @@ Now that we've smoke-tested this release, we can publish to PyPi:
     $ ./build-support/bin/release.sh
 
 This also performs a dry run and then proceeds to upload the smoke
-tested sdists to PyPi.
+tested wheels to PyPi.
 
 Announce
 --------
@@ -191,7 +195,7 @@ Owners
 ------
 
 The following folks are set up to publish to pypi for
-pantsbuild.pants sdists:
+pantsbuild.pants wheels:
 
 Name              | Email                       | PYPI Usename
 ------------------|-----------------------------|---------------
@@ -214,10 +218,18 @@ be obtained via:
 Right now that's:
 
 - pantsbuild.pants
-- pantsbuild.pants.contrib.android
-- pantsbuild.pants.contrib.buildgen
-- pantsbuild.pants.contrib.scrooge
 - pantsbuild.pants.testinfra
+- pantsbuild.pants.contrib.android
+- pantsbuild.pants.contrib.scrooge
+- pantsbuild.pants.contrib.buildgen
+- pantsbuild.pants.contrib.go
+- pantsbuild.pants.contrib.node
+- pantsbuild.pants.contrib.python.checks
+- pantsbuild.pants.contrib.scalajs
+- pantsbuild.pants.contrib.findbugs
+- pantsbuild.pants.contrib.cpp
+- pantsbuild.pants.contrib.errorprone
+- pantsbuild.pants.contrib.jax_ws
 
 You can run the following to get a full ownership roster for each
 package :

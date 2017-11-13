@@ -101,7 +101,6 @@ class CompileErrorExtractorTest(unittest.TestCase):
     compile_log = '\n'.join(self.ERROR_MESSAGES)
     self.assertEqual(self.EXPECTED_ERRORS,
       self.compile_error_finder.extract(compile_log))
-    self.assertEqual(1, 1)
 
 
 class StringSimilarityRankerTest(unittest.TestCase):

@@ -5,6 +5,383 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev20 (11/11/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Allow custom definition of Python PEX shebang (#3630) (#4514)
+  `PR #3630 <https://github.com/pantsbuild/pants/pull/3630>`_
+
+* Support running python tests in the pex chroot. (#5033)
+  `PR #5033 <https://github.com/pantsbuild/pants/pull/5033>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Bump to jarjar 1.6.5 to pull in https://github.com/pantsbuild/jarjar/pull/30 (#5087)
+  `PR #5087 <https://github.com/pantsbuild/pants/pull/5087>`_
+  `PR #30 <https://github.com/pantsbuild/jarjar/pull/30>`_
+
+* Update cmake to 3.9.5 (#5072)
+  `Issue #4975#issuecomment-342562504 <https://github.com/pantsbuild/pants/issues/4975#issuecomment-342562504>`_
+  `PR #5072 <https://github.com/pantsbuild/pants/pull/5072>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `PythonInterpreterCache`. (#5089)
+  `PR #5089 <https://github.com/pantsbuild/pants/pull/5089>`_
+
+* Call wsimport script instead of using tools.jar so jax-ws will work on java 9 (#5078)
+  `PR #5078 <https://github.com/pantsbuild/pants/pull/5078>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Prepare the second release candidate. (#5088)
+  `PR #5088 <https://github.com/pantsbuild/pants/pull/5088>`_
+
+* Inline mis-documented `select_interpreter` method. (#5085)
+  `PR #5085 <https://github.com/pantsbuild/pants/pull/5085>`_
+
+* fs_util cat <fingerprint> (#5066)
+  `PR #5066 <https://github.com/pantsbuild/pants/pull/5066>`_
+
+* Add support for proxying stdin with pantsd (#5040)
+  `PR #5040 <https://github.com/pantsbuild/pants/pull/5040>`_
+
+* `fs_util directory cat-proto` supports text format output (#5083)
+  `PR #5083 <https://github.com/pantsbuild/pants/pull/5083>`_
+
+* Add a VFS impl for PosixFS. (#5079)
+  `PR #5079 <https://github.com/pantsbuild/pants/pull/5079>`_
+
+* `fs_util directory materialize` (#5075)
+  `PR #5075 <https://github.com/pantsbuild/pants/pull/5075>`_
+
+* Fix broken test due to changed git cmd line (#5076)
+  `PR #5076 <https://github.com/pantsbuild/pants/pull/5076>`_
+
+* Canonicalize path before taking its parent (#5052)
+  `PR #5052 <https://github.com/pantsbuild/pants/pull/5052>`_
+
+* Fix test compile (#5069)
+  `PR #5069 <https://github.com/pantsbuild/pants/pull/5069>`_
+  `PR #5065 <https://github.com/pantsbuild/pants/pull/5065>`_
+
+* fs_util directory cat-proto <fingerprint> (#5065)
+  `PR #5065 <https://github.com/pantsbuild/pants/pull/5065>`_
+
+* fs_util exits 2 for ENOENT (#5064)
+  `PR #5064 <https://github.com/pantsbuild/pants/pull/5064>`_
+
+* Fixup sdist release. (#5067)
+  `PR #5067 <https://github.com/pantsbuild/pants/pull/5067>`_
+
+* Fixup `./build-support/bin/release.sh -t`. (#5062)
+  `PR #5062 <https://github.com/pantsbuild/pants/pull/5062>`_
+
+
+1.4.0.dev19 (11/04/2017)
+------------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Pass the `color` option through to the report factory. (#5055)
+  `PR #5055 <https://github.com/pantsbuild/pants/pull/5055>`_
+
+* Output size as well as fingerprint (#5053)
+  `PR #5053 <https://github.com/pantsbuild/pants/pull/5053>`_
+
+* [pantsd] Daemon lifecycle for options changes. (#5045)
+  `PR #5045 <https://github.com/pantsbuild/pants/pull/5045>`_
+
+* Convert fs_util to use futures (#5048)
+  `PR #5048 <https://github.com/pantsbuild/pants/pull/5048>`_
+
+* PosixFS can create a Stat from a Path (#5047)
+  `PR #5047 <https://github.com/pantsbuild/pants/pull/5047>`_
+
+* PosixFS can read file contents (#5043)
+  `PR #5043 <https://github.com/pantsbuild/pants/pull/5043>`_
+
+* Bump to zinc 1.0.3. (#5049)
+  `Issue #389, <https://github.com/sbt/zinc/issues/389,>`_
+  `PR #5049 <https://github.com/pantsbuild/pants/pull/5049>`_
+
+* fs::Stat::File includes whether a file is executable (#5042)
+  `PR #5042 <https://github.com/pantsbuild/pants/pull/5042>`_
+
+* Add configurable message when missing-deps-suggest doesn't have suggestions (#5036)
+  `PR #5036 <https://github.com/pantsbuild/pants/pull/5036>`_
+
+* Use split_whitespace for parsing of cflags. (#5038)
+  `PR #5038 <https://github.com/pantsbuild/pants/pull/5038>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Set sys.argv correctly on pantsd-runner fork. (#5051)
+  `PR #5051 <https://github.com/pantsbuild/pants/pull/5051>`_
+
+* Fix JarCreate invalidation in the presence of changing resources. (#5030)
+  `PR #5030 <https://github.com/pantsbuild/pants/pull/5030>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Minor improvement on dep-usage doc (#5041)
+  `PR #5041 <https://github.com/pantsbuild/pants/pull/5041>`_
+
+* Add documentation about strict deps (#5025)
+  `PR #5025 <https://github.com/pantsbuild/pants/pull/5025>`_
+
+
+1.4.0.dev18 (10/29/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Dedup dependencies output (#5029)
+  `PR #5029 <https://github.com/pantsbuild/pants/pull/5029>`_
+
+* [simple-code-gen] extension point for injecting extra exports (#4976)
+  `PR #4976 <https://github.com/pantsbuild/pants/pull/4976>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Use the script verified identity when signing. (#5032)
+  `PR #5032 <https://github.com/pantsbuild/pants/pull/5032>`_
+
+* Have twine use the previously established pgp key during release. (#5031)
+  `PR #5031 <https://github.com/pantsbuild/pants/pull/5031>`_
+
+1.4.0.dev17 (10/27/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Move confluence related things to contrib (#4986)
+  `PR #4986 <https://github.com/pantsbuild/pants/pull/4986>`_
+
+* Add custom commands to the `buildozer` goal (#4998)
+  `PR #4998 <https://github.com/pantsbuild/pants/pull/4998>`_
+  `PR #4921 <https://github.com/pantsbuild/pants/pull/4921>`_
+  `PR #4882 <https://github.com/pantsbuild/pants/pull/4882>`_
+
+* Working implementation of jacoco. (#4978)
+  `PR #4978 <https://github.com/pantsbuild/pants/pull/4978>`_
+
+API Changes
+~~~~~~~~~~~
+* [pantsd] Launch the daemon via a subprocess call. (#5021)
+  `PR #5021 <https://github.com/pantsbuild/pants/pull/5021>`_
+
+* Fix support for custom javac definitions (#5024)
+  `PR #5024 <https://github.com/pantsbuild/pants/pull/5024>`_
+
+* Transform scopes in pants.ini that have been subsumed by global options. (#5007)
+  `PR #5007 <https://github.com/pantsbuild/pants/pull/5007>`_
+
+* Coverage isn't enabled by default (#5009)
+  `PR #5009 <https://github.com/pantsbuild/pants/pull/5009>`_
+  `PR #4881 <https://github.com/pantsbuild/pants/pull/4881>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Content-addressable {file,directory} store and utility (#5012)
+  `PR #5012 <https://github.com/pantsbuild/pants/pull/5012>`_
+
+* Use the service deps if the target declares an exception. (#5017)
+  `PR #5017 <https://github.com/pantsbuild/pants/pull/5017>`_
+
+* Pass references to Paths (#5022)
+  `PR #5022 <https://github.com/pantsbuild/pants/pull/5022>`_
+
+* Replace Blake2 with Sha256 (#5014)
+  `PR #5014 <https://github.com/pantsbuild/pants/pull/5014>`_
+
+* Revert pytest successful test caching in CI. (#5016)
+  `PR #5016 <https://github.com/pantsbuild/pants/pull/5016>`_
+
+* Fingerprint has from_hex_string, as_bytes, Display, and Debug (#5013)
+  `PR #5013 <https://github.com/pantsbuild/pants/pull/5013>`_
+
+* Fix memory leak in `./pants changed` (#5011)
+  `PR #5011 <https://github.com/pantsbuild/pants/pull/5011>`_
+
+* Prune travis cache (#5006)
+  `PR #5006 <https://github.com/pantsbuild/pants/pull/5006>`_
+
+* Utility to tee subprocess output to sys.std{out,err} and a buffer (#4967)
+  `PR #4967 <https://github.com/pantsbuild/pants/pull/4967>`_
+
+
+1.4.0.dev16 (10/20/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add `buildrefactor` to `contrib` and buildozer goal (#4921)
+  `PR #4921 <https://github.com/pantsbuild/pants/pull/4921>`_
+
+* Allow in-repo scalac plugins to have in-repo deps. (#4987)
+  `PR #4987 <https://github.com/pantsbuild/pants/pull/4987>`_
+
+* Add plugin for scalafix (#4635)
+  `PR #4635 <https://github.com/pantsbuild/pants/pull/4635>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Remove outdated doc (#4989)
+  `PR #4989 <https://github.com/pantsbuild/pants/pull/4989>`_
+
+Bugfixes
+~~~~~~~~
+
+* Invalidate parent directories (#5000)
+  `PR #5000 <https://github.com/pantsbuild/pants/pull/5000>`_
+
+* Enforce quiet option if not hardcoded (#4974)
+  `PR #4974 <https://github.com/pantsbuild/pants/pull/4974>`_
+
+* Refer to correct location of variable (#4994)
+  `PR #4994 <https://github.com/pantsbuild/pants/pull/4994>`_
+
+* Fix setting of PEX_PATH in ./pants run (v2 backend)  (#4969)
+  `PR #4969 <https://github.com/pantsbuild/pants/pull/4969>`_
+
+* Repair pytest timeout tests. (#4972)
+  `PR #4972 <https://github.com/pantsbuild/pants/pull/4972>`_
+
+* Add node_module .bin path to node / npm / yarnpkg execution path. (#4932)
+  `Issue #18233 <https://github.com/npm/npm/issues/18233>`_
+  `PR #4932 <https://github.com/pantsbuild/pants/pull/4932>`_
+  `PR #15900 <https://github.com/npm/npm/pull/15900>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Reduce time/package requirements on binary-builder shards (#4992)
+  `PR #4992 <https://github.com/pantsbuild/pants/pull/4992>`_
+
+* [pantsd] Launch the daemon via the thin client. (#4931)
+  `PR #4931 <https://github.com/pantsbuild/pants/pull/4931>`_
+
+* Extract fs and boxfuture crates (#4985)
+  `PR #4985 <https://github.com/pantsbuild/pants/pull/4985>`_
+
+* process_executor binary can do remote execution (#4980)
+  `PR #4980 <https://github.com/pantsbuild/pants/pull/4980>`_
+
+* Fix some minor textual and shell nits (#4841)
+  `PR #4841 <https://github.com/pantsbuild/pants/pull/4841>`_
+
+* Use more generic portion of `requests` exception message in tests. (#4981)
+  `PR #4981 <https://github.com/pantsbuild/pants/pull/4981>`_
+
+* Include target addresses which trigger deprecation warnings (#4979)
+  `PR #4979 <https://github.com/pantsbuild/pants/pull/4979>`_
+
+* Remote process execution works more generally (#4937)
+  `PR #4937 <https://github.com/pantsbuild/pants/pull/4937>`_
+
+* Extend timeout for cargo fetching git repos (#4971)
+  `PR #4971 <https://github.com/pantsbuild/pants/pull/4971>`_
+
+* Ignore Cargo.lock files for libraries (#4968)
+  `PR #4968 <https://github.com/pantsbuild/pants/pull/4968>`_
+
+* rm unused strategy concept from simple code gen tests (#4964)
+  `PR #4964 <https://github.com/pantsbuild/pants/pull/4964>`_
+
+* Fetch go and cmake as part of bootstrap (#4962)
+  `PR #4962 <https://github.com/pantsbuild/pants/pull/4962>`_
+  `PR #45 <https://github.com/pantsbuild/binaries/pull/45>`_
+
+* Make sure .cargo/config is respected for all cargo invocations (#4965)
+  `PR #4965 <https://github.com/pantsbuild/pants/pull/4965>`_
+
+* Restore to specifying /travis/home as a volume (#4960)
+  `PR #4960 <https://github.com/pantsbuild/pants/pull/4960>`_
+
+* Engine can request process execution via gRPC (#4929)
+  `PR #4929 <https://github.com/pantsbuild/pants/pull/4929>`_
+
+* Add back sdist generation and deployment. (#4957)
+  `PR #4957 <https://github.com/pantsbuild/pants/pull/4957>`_
+
+1.4.0.dev15 (10/7/2017)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Send timing/cache report to stderr (#4946)
+  `PR #4946 <https://github.com/pantsbuild/pants/pull/4946>`_
+
+* Allow users to tell pants where to look for python interpreters (#4930)
+  `PR #4930 <https://github.com/pantsbuild/pants/pull/4930>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `BundleIntegrationTest`. (#4953)
+  `PR #4953 <https://github.com/pantsbuild/pants/pull/4953>`_
+
+* Pin Rust version to 1.20.0 (#4941)
+  `PR #4941 <https://github.com/pantsbuild/pants/pull/4941>`_
+
+* Remove bad string (#4942)
+  `PR #4942 <https://github.com/pantsbuild/pants/pull/4942>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Load the native engine lib from a pkg_resource. (#4914)
+  `PR #4914 <https://github.com/pantsbuild/pants/pull/4914>`_
+
+* Switch from rust-crypto to sha2 (#4951)
+  `PR #4951 <https://github.com/pantsbuild/pants/pull/4951>`_
+
+* Exclude target directories from rustfmt (#4950)
+  `PR #4950 <https://github.com/pantsbuild/pants/pull/4950>`_
+
+* Update tar to a released version (#4949)
+  `PR #4949 <https://github.com/pantsbuild/pants/pull/4949>`_
+
+* Mention name of binary we can't find (#4947)
+  `PR #4947 <https://github.com/pantsbuild/pants/pull/4947>`_
+
+* Reformat rust files (#4948)
+  `PR #4948 <https://github.com/pantsbuild/pants/pull/4948>`_
+
+* Bump cffi dep to latest (1.11.1). (#4944)
+  `PR #4944 <https://github.com/pantsbuild/pants/pull/4944>`_
+
+* Upgrade gcc to cc 1.0 (#4945)
+  `PR #4945 <https://github.com/pantsbuild/pants/pull/4945>`_
+
+* Preserve soft excludes bug while removing duplicates (#4940)
+  `PR #4940 <https://github.com/pantsbuild/pants/pull/4940>`_
+
+* Move --open-with under idea-plugin to regular options (#4939)
+  `PR #4939 <https://github.com/pantsbuild/pants/pull/4939>`_
+
+* Memoize strict deps and exports (#4934)
+  `PR #4934 <https://github.com/pantsbuild/pants/pull/4934>`_
+
+* Use `uname` in place of `arch`. (#4928)
+  `PR #4928 <https://github.com/pantsbuild/pants/pull/4928>`_
+
+* Update futures to 0.1.16 and futures-cpupool to 0.1.6 (#4925)
+  `PR #4925 <https://github.com/pantsbuild/pants/pull/4925>`_
+
 1.4.0.dev14 (10/2/2017)
 -----------------------
 

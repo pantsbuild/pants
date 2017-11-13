@@ -93,8 +93,8 @@ class Cobertura(CoverageEngine):
     self._settings = settings
     options = settings.options
     self._context = settings.context
-    self._coverage = options.coverage
     self._coverage_datafile = os.path.join(settings.coverage_dir, 'cobertura.ser')
+    self._coverage_force = options.coverage_force
     touch(self._coverage_datafile)
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes
@@ -184,7 +184,7 @@ class Cobertura(CoverageEngine):
         args += ["--listOfFilesToInstrument", tmp_file.name]
 
         main = 'net.sourceforge.cobertura.instrument.InstrumentMain'
-        self._context.log.debug(
+        self._settings.log.debug(
           "executing cobertura instrumentation with the following args: {}".format(args))
         result = self._execute_java(classpath=cobertura_cp,
                                     main=main,
@@ -208,40 +208,45 @@ class Cobertura(CoverageEngine):
   def extra_jvm_options(self):
     return ['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile]
 
-  def report(self, execution_failed_exception=None):
+  def should_report(self, execution_failed_exception=None):
     if self._nothing_to_instrument:
-      self._context.log.warn('Nothing found to instrument, skipping report...')
-      return
+      self._settings.log.warn('Nothing found to instrument, skipping report...')
+      return False
     if execution_failed_exception:
-      self._context.log.warn('Test failed: {0}'.format(execution_failed_exception))
-      if self._coverage_force:
-        self._context.log.warn('Generating report even though tests failed.')
+      self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
+      if self._settings.coverage_force:
+        self._settings.log.warn('Generating report even though tests failed.')
+        return True
       else:
-        return
-    cobertura_cp = self._settings.tool_classpath('cobertura-report')
-    source_roots = {t.target_base for t in self._targets if Cobertura.is_coverage_target(t)}
-    for report_format in ['xml', 'html']:
-      report_dir = os.path.join(self._settings.coverage_dir, report_format)
-      safe_mkdir(report_dir, clean=True)
-      args = list(source_roots)
-      args += [
-        '--datafile',
-        self._coverage_datafile,
-        '--destination',
-        report_dir,
-        '--format',
-        report_format,
-      ]
-      main = 'net.sourceforge.cobertura.reporting.ReportMain'
-      result = self._execute_java(classpath=cobertura_cp,
-                                  main=main,
-                                  jvm_options=self._settings.coverage_jvm_options,
-                                  args=args,
-                                  workunit_factory=self._context.new_workunit,
-                                  workunit_name='cobertura-report-' + report_format)
-      if result != 0:
-        raise TaskError("java {0} ... exited non-zero ({1})"
-                        " 'failed to report'".format(main, result))
+        return False
+    return True
+
+  def report(self, execution_failed_exception=None):
+    if self.should_report(execution_failed_exception):
+      cobertura_cp = self._settings.tool_classpath('cobertura-report')
+      source_roots = {t.target_base for t in self._targets if Cobertura.is_coverage_target(t)}
+      for report_format in ['xml', 'html']:
+        report_dir = os.path.join(self._settings.coverage_dir, report_format)
+        safe_mkdir(report_dir, clean=True)
+        args = list(source_roots)
+        args += [
+          '--datafile',
+          self._coverage_datafile,
+          '--destination',
+          report_dir,
+          '--format',
+          report_format,
+        ]
+        main = 'net.sourceforge.cobertura.reporting.ReportMain'
+        result = self._execute_java(classpath=cobertura_cp,
+                                    main=main,
+                                    jvm_options=self._settings.coverage_jvm_options,
+                                    args=args,
+                                    workunit_factory=self._context.new_workunit,
+                                    workunit_name='cobertura-report-' + report_format)
+        if result != 0:
+          raise TaskError("java {0} ... exited non-zero ({1})"
+                          " 'failed to report'".format(main, result))
 
   def maybe_open_report(self):
     if self._settings.coverage_open:

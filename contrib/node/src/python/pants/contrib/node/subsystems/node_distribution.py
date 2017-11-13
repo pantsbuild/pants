@@ -181,7 +181,29 @@ class NodeDistribution(object):
     def __str__(self):
       return ' '.join(self.cmd)
 
-  def node_command(self, args=None):
+  def _command_gen(self, tool_installations, tool_executable, args=None, node_paths=None):
+    """Generate a Command object with requires tools installed and paths setup.
+
+    :param list tool_installations: A list of functions to install required tools.  Those functions
+      should take no parameter and return an installation path to be included in the runtime path.
+    :param tool_executable: Name of the tool to be executed.
+    :param list args: A list of arguments to be passed to the executable
+    :param list node_paths: A list of path to node_modules.  node_modules/.bin will be appended
+      to the run time path.
+    :rtype: class: `NodeDistribution.Command`
+    """
+    NODE_MODULE_BIN_DIR = 'node_modules/.bin'
+    extra_paths = []
+    for t in tool_installations:
+      extra_paths.append(t())
+    if node_paths:
+      for node_path in node_paths:
+        if not node_path.endswith(NODE_MODULE_BIN_DIR):
+          node_path = os.path.join(node_path, NODE_MODULE_BIN_DIR)
+        extra_paths.append(node_path)
+    return self.Command(executable=tool_executable, args=args, extra_paths=extra_paths)
+
+  def node_command(self, args=None, node_paths=None):
     """Creates a command that can run `node`, passing the given args to it.
 
     :param list args: An optional list of arguments to pass to `node`.
@@ -190,32 +212,23 @@ class NodeDistribution(object):
     """
     # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
     # `node` with no arguments is useful, it launches a REPL.
-    node_bin_path = self.install_node()
-    return self.Command(
-      executable=os.path.join(node_bin_path, 'node'), args=args,
-      extra_paths=[node_bin_path])
+    return self._command_gen([self.install_node], 'node', args=args, node_paths=node_paths)
 
-  def npm_command(self, args):
+  def npm_command(self, args, node_paths=None):
     """Creates a command that can run `npm`, passing the given args to it.
 
     :param list args: A list of arguments to pass to `npm`.
     :returns: An `npm` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
-    node_bin_path = self.install_node()
-    return self.Command(
-      executable=os.path.join(node_bin_path, 'npm'), args=args,
-      extra_paths=[node_bin_path])
+    return self._command_gen([self.install_node], 'npm', args=args, node_paths=node_paths)
 
-  def yarnpkg_command(self, args):
+  def yarnpkg_command(self, args, node_paths=None):
     """Creates a command that can run `yarnpkg`, passing the given args to it.
 
     :param list args: A list of arguments to pass to `yarnpkg`.
     :returns: An `yarnpkg` command that can be run later.
     :rtype: :class:`NodeDistribution.Command`
     """
-    node_bin_path = self.install_node()
-    yarnpkg_bin_path = self.install_yarnpkg()
-    return self.Command(
-      executable=os.path.join(yarnpkg_bin_path, 'yarnpkg'), args=args,
-      extra_paths=[yarnpkg_bin_path, node_bin_path])
+    return self._command_gen(
+      [self.install_node, self.install_yarnpkg], 'yarnpkg', args=args, node_paths=node_paths)

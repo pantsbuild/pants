@@ -103,7 +103,7 @@ final class JarEntryCopier {
       FieldAccessor.create(ZipEntry.class, String.class, "name");
 
   /**
-   * Copy a a jar entry to an output file without decompressing and re-compressing the entry when
+   * Copy a jar entry to an output file without decompressing and re-compressing the entry when
    * it is {@link ZipEntry#DEFLATED}.
    *
    * @param jarOut The jar file being created or appended to.

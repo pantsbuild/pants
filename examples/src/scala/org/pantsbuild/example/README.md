@@ -106,7 +106,58 @@ targets and their dependencies.
 
 Testing
 -------
+
 Scala tests are run using the `junit_tests` BUILD target.  Both Junit and ScalaTest tests are
 supported by default.  Most other scala test frameworks support running with JUnit via a base
 class/trait or via a `@RunWith` annotation; so you can use
 `junit_tests` for your scala tests as well.
+
+Formatting and Linting
+----------------------
+
+`scalafmt` and `scalafix` are installed by default in both the `fmt` and `lint` goals, but
+"semantic" scalafix rewrites are disabled by default since most deployments will prefer that the
+`lint` goal run quickly. Semantic rewrites introduce a dependency on compilation, and require an
+additional compiler plugin.
+
+### Usage
+
+To run a particular scalafix rule on targets, pass:
+
+    :::bash
+    ./pants fmt.scalafix --rules=ProcedureSyntax ${TARGETS}
+
+### Enabling semantic rewrites
+
+Enabling `scalafix` semantic rewrites involves using a compiler plugin, and passing the
+`--semantic` flag to the `scalafix` task.
+
+In a `BUILD` file at the root of the repo, define the `semanticdb` compiler plugin:
+
+    :::python
+    SCALA_REV=2.11.11
+    jar_library(
+      name = 'scalac-plugin-dep',
+      jars = [jar(org='org.scalameta', name='semanticdb-scalac_{}'.format(SCALA_REV), rev='2.0.1')],
+    )
+
+Then, reference it from `pants.ini` to load the plugin, and enable semantic rewrites to require
+compilation for `fmt` and `lint`:
+
+    :::ini
+    [compile.zinc]
+    args: [
+        # The `-S` prefix here indicates that zinc should pass this option to scalac rather than
+        # to javac (`-C` prefix).
+        '-S-Yrangepos',
+      ]
+
+    scalac_plugins: [
+        'semanticdb',
+      ]
+
+    [lint.scalafix]
+    semantic: True
+
+    [fmt.scalafix]
+    semantic: True

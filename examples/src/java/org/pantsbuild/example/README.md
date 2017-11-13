@@ -624,17 +624,23 @@ a simple 'badness' score. The "badness" score is intended to indicate both how e
 would be to remove (based on the maximum fraction used by each dependee) and how valuable it would
 be remove (based on a estimate of the transitive cost to build the dep).
 
+Stat explanation:
+
+* `max_usage`: fraction of the dependency target is being used. 0 means the target is safe to drop.
+* `cost_transitive`: the cost to bring in this target including its transitive dependencies in the build process
+* `badness`: `cost_transitive/max_usage`, so the lower the better.
+
     :::shell
-    $ ./pants dep-usage.jvm examples/src/scala/org/pantsbuild/example::
-    ...
+    $ ./pants -q dep-usage.jvm examples/src/scala/org/pantsbuild/example/hello/:
     [
-      {"badness": 4890, "max_usage": 0.3, "cost_transitive": 1630, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome"},
-      {"badness": 1098, "max_usage": 1.0, "cost_transitive": 1098, "target": "examples/src/java/org/pantsbuild/example/hello/greet"}
+      {"badness": 0, "max_usage": 1.0, "cost_transitive": 0, "target": "//:scala-library-synthetic"},
+      {"badness": 8872, "max_usage": 0.125, "cost_transitive": 1109, "target": "examples/src/java/org/pantsbuild/example/hello/greet:greet"},
+      {"badness": 16410, "max_usage": 0.1, "cost_transitive": 1641, "target": "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome"}
     ]
 
 The above example indicates that within the scope of the scala examples, the
 `examples/src/scala/org/pantsbuild/example/hello/welcome` target is the worst dependency. This is
-because it has a high transitive "cost" to build, and sees a maximum of 30% usage by its dependees.
+because it has a high transitive "cost" to build, and sees a maximum of 10% usage by its dependees.
 
 ### For global analysis
 

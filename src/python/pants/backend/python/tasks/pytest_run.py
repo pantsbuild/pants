@@ -228,7 +228,7 @@ class PytestRun(TestRunnerTaskMixin, PythonTask):
     return self.get_options().level == 'debug'
 
   def _generate_coverage_config(self, source_mappings):
-    # For the benefit of macos testing, add the 'real' path the the directory as an equivalent.
+    # For the benefit of macos testing, add the 'real' path the directory as an equivalent.
     def add_realpath(path):
       realpath = os.path.realpath(path)
       if realpath != canonical and realpath not in alternates:

@@ -73,7 +73,7 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
   def register_junit_options(register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
 
-    register('--coverage-processor', advanced=True, default='cobertura', choices=['cobertura', 'jacoco'],
+    register('--coverage-processor', advanced=True, choices=['cobertura', 'jacoco'],
              removal_hint='Only cobertura is supported for code coverage so this option can be '
                           'omitted. jacoco is here only as a placeholder, and acts as a no-op until '
                           'it is implemented.',
@@ -99,7 +99,7 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
     coverage = NoCoverage()
 
     if options.coverage or options.coverage_processor or options.is_flagged('coverage_open'):
-      if options.coverage_processor == 'cobertura':
+      if options.coverage_processor == 'cobertura' or options.coverage_processor is None:
         coverage = Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
       elif options.coverage_processor == 'jacoco':
         coverage = Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)

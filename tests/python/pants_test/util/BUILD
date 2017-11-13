@@ -11,6 +11,15 @@ python_tests(
 )
 
 python_tests(
+  name = 'collections',
+  sources = ['test_collections.py'],
+  coverage = ['pants.util.collections'],
+  dependencies = [
+    'src/python/pants/util:collections',
+  ]
+)
+
+python_tests(
   name = 'contextutil',
   sources = ['test_contextutil.py'],
   coverage = ['pants.util.contextutil'],

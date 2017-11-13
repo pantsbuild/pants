@@ -1,0 +1,3 @@
+src/*.rs
+!src/lib.rs
+Cargo.lock # See http://doc.crates.io/faq.html#why-do-binaries-have-cargolock-in-version-control-but-not-libraries

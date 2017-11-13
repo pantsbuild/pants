@@ -14,6 +14,7 @@ import pywatchman
 class StreamableWatchmanClient(pywatchman.client):
   """A watchman client subclass that provides for interruptable unilateral queries."""
 
+  WatchmanError = pywatchman.WatchmanError
   SocketTimeout = pywatchman.SocketTimeout
 
   def stream_query(self, commands):

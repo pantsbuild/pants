@@ -18,6 +18,11 @@ python_library(
 )
 
 python_library(
+  name = 'collections',
+  sources = ['collections.py'],
+)
+
+python_library(
   name = 'desktop',
   sources = ['desktop.py'],
   dependencies = [

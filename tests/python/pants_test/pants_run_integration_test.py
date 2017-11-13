@@ -22,7 +22,7 @@ from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_open
-from pants.util.process_handler import subprocess
+from pants.util.process_handler import SubprocessProcessHandler, subprocess
 from pants_test.testutils.file_test_util import check_symlinks, contains_exact_files
 
 
@@ -61,12 +61,31 @@ def ensure_cached(expected_num_artifacts=None):
 
 # TODO: Remove this in 1.5.0dev0, when `--enable-v2-engine` is removed.
 def ensure_engine(f):
-  """A decorator for running an integration test with and without the v2 engine enabled via
-  temporary environment variables."""
+  """A decorator for running an integration test with and without the v2 engine enabled."""
   def wrapper(self, *args, **kwargs):
     for env_var_value in ('false', 'true'):
       with environment_as(HERMETIC_ENV='PANTS_ENABLE_V2_ENGINE', PANTS_ENABLE_V2_ENGINE=env_var_value):
         f(self, *args, **kwargs)
+  return wrapper
+
+
+def ensure_daemon(f):
+  """A decorator for running an integration test with and without the daemon enabled."""
+  def wrapper(self, *args, **kwargs):
+    for enable_daemon in ('false', 'true',):
+      with temporary_dir() as subprocess_dir:
+        env = {
+            'HERMETIC_ENV': 'PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR',
+            'PANTS_ENABLE_PANTSD': enable_daemon,
+            'PANTS_ENABLE_V2_ENGINE': enable_daemon,
+            'PANTS_SUBPROCESSDIR': subprocess_dir,
+          }
+        with environment_as(**env):
+          try:
+            f(self, *args, **kwargs)
+          finally:
+            if enable_daemon:
+              self.assert_success(self.run_pants(['kill-pantsd']))
   return wrapper
 
 
@@ -158,7 +177,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return ret
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             build_root=None, **kwargs):
+                             build_root=None, tee_output=False, **kwargs):
 
     args = [
       '--no-pantsrc',
@@ -222,7 +241,10 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     proc = subprocess.Popen(pants_command, env=env, stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
-    (stdout_data, stderr_data) = proc.communicate(stdin_data)
+    communicate_fn = proc.communicate
+    if tee_output:
+      communicate_fn = SubprocessProcessHandler(proc).communicate_teeing_stdout_and_stderr
+    (stdout_data, stderr_data) = communicate_fn(stdin_data)
 
     return PantsResult(pants_command, proc.returncode, stdout_data.decode("utf-8"),
                        stderr_data.decode("utf-8"), workdir)

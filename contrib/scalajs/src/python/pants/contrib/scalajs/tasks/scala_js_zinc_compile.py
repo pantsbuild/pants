@@ -30,7 +30,7 @@ class ScalaJSZincCompile(BaseZincCompile):
     return ['scala_js_ir']
 
   @memoized_method
-  def extra_compile_time_classpath_elements(self):
+  def scalac_plugin_classpath_elements(self):
     return self.tool_classpath('scala-js-compiler')
 
   def select(self, target):

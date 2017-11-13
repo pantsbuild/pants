@@ -9,7 +9,36 @@ PY=$(which python2.7)
 [[ -n "${PY}" ]] || die "You must have python2.7 installed and on the path to release."
 export PY
 
+function run_local_pants() {
+  ${ROOT}/pants "$@"
+}
+
+function local_version() {
+  run_local_pants --version 2>/dev/null
+}
+
+readonly DEPLOY_DIR="${ROOT}/dist/deploy"
+readonly DEPLOY_WHEELS_PATH="wheels/pantsbuild.pants/$(local_version)"
+readonly DEPLOY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_WHEELS_PATH}"
+readonly DEPLOY_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/$(local_version)"
+
 source ${ROOT}/contrib/release_packages.sh
+
+function find_pkg() {
+  local readonly pkg_name=$1
+  local readonly search_dir=${2:-${ROOT}/dist/${pkg_name}-$(local_version)/dist}
+  find "${search_dir}" -type f -name "${pkg_name}-$(local_version)-*.whl"
+}
+
+function find_plat_name() {
+  # See: https://www.python.org/dev/peps/pep-0425/#id13
+  "${PY}" << EOF
+from __future__ import print_function
+from distutils.util import get_platform
+
+print(get_platform().replace('-', '_').replace('.', '_'))
+EOF
+}
 
 #
 # List of packages to be released
@@ -18,8 +47,9 @@ source ${ROOT}/contrib/release_packages.sh
 #
 # PKG_<NAME>=(
 #   "package.name"
-#   "build.target"
+#   "//a/build:target"
 #   "pkg_<name>_install_test"
+#   "bdist_wheel flags" # NB: this entry is optional.
 # )
 # function pkg_<name>_install_test() {
 #   ...
@@ -29,10 +59,11 @@ PKG_PANTS=(
   "pantsbuild.pants"
   "//src/python/pants:pants-packaged"
   "pkg_pants_install_test"
+  "--python-tag cp27 --plat-name $(find_plat_name)"
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants-$(local_version).tar.gz" || \
+  pip install ${PIP_ARGS} "pantsbuild.pants==$(local_version)" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
@@ -47,23 +78,22 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "${ROOT}/dist/pantsbuild.pants.testinfra-$(local_version).tar.gz" && \
+  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==$(local_version)" && \
   python -c "import pants_test"
 }
 
 # Once an individual (new) package is declared above, insert it into the array below)
-RELEASE_PACKAGES=(
+CORE_PACKAGES=(
   PKG_PANTS
   PKG_PANTS_TESTINFRA
+)
+RELEASE_PACKAGES=(
+  ${CORE_PACKAGES[*]}
   ${CONTRIB_PACKAGES[*]}
 )
 #
 # End of package declarations.
 #
-
-function run_local_pants() {
-  ${ROOT}/pants "$@"
-}
 
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
@@ -74,7 +104,7 @@ function run_local_pants() {
 function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  PANTS_PYTHON_REPOS_REPOS="['${ROOT}/dist']" pants \
+  PANTS_PYTHON_REPOS_REPOS="${DEPLOY_WHEEL_DIR}" pants \
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
@@ -109,33 +139,35 @@ function pkg_install_test_func() {
   echo ${INSTALL_TEST_FUNC}
 }
 
-function local_version() {
-  run_local_pants --version 2>/dev/null
+function bdist_wheel_flags() {
+  PACKAGE=$1
+  eval BDIST_WHEEL_FLAGS=\${$PACKAGE[3]}
+    echo ${BDIST_WHEEL_FLAGS}
 }
 
 function build_packages() {
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+
+  rm -rf "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
+  mkdir -p "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
+
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     BUILD_TARGET=$(pkg_build_target $PACKAGE)
+    BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
 
     start_travis_section "${NAME}" "Building package ${NAME}-$(local_version) with target '${BUILD_TARGET}'"
-    run_local_pants setup-py --recursive ${BUILD_TARGET} || \
+    run_local_pants setup-py \
+      --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
+        ${BUILD_TARGET} || \
       die "Failed to build package ${NAME}-$(local_version) with target '${BUILD_TARGET}'!"
+    wheel=$(find_pkg ${NAME})
+    cp -p "${wheel}" "${DEPLOY_WHEEL_DIR}/"
+    cp -p "${ROOT}/dist/${NAME}-$(local_version)/dist/${NAME}-$(local_version).tar.gz" "${DEPLOY_SDIST_DIR}/"
     end_travis_section
   done
-}
-
-function publish_packages() {
-  targets=()
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
-  do
-    targets+=($(pkg_build_target $PACKAGE))
-  done
-  start_travis_section "Publishing" "Publishing packages"
-  run_local_pants setup-py --run="sdist upload --sign --identity=$(get_pgp_keyid)" \
-    --recursive ${targets[@]} || die "Failed to publish packages!"
-  end_travis_section
 }
 
 function pre_install() {
@@ -167,6 +199,8 @@ EOM
 }
 
 function install_and_test_packages() {
+  CORE_ONLY=$1
+  shift 1
   PIP_ARGS=(
     "$@"
     --quiet
@@ -181,7 +215,14 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"
+  if [[ "${CORE_ONLY}" == "true" ]]
+  then
+    PACKAGES=("${CORE_PACKAGES[@]}")
+  else
+    PACKAGES=("${RELEASE_PACKAGES[@]}")
+  fi
+
+  for PACKAGE in "${PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
@@ -197,8 +238,9 @@ function install_and_test_packages() {
 }
 
 function dry_run_install() {
+  CORE_ONLY=$1
   build_packages && \
-  install_and_test_packages --find-links=file://${ROOT}/dist
+  install_and_test_packages "${CORE_ONLY}" --find-links="${DEPLOY_WHEEL_DIR}"
 }
 
 ALLOWED_ORIGIN_URLS=(
@@ -281,7 +323,7 @@ EOM
 )
     die "${msg}"
   fi
-  ${PY} << EOF || die
+  "${PY}" << EOF || die
 from __future__ import print_function
 
 import os
@@ -422,55 +464,111 @@ EOM
   fi
 }
 
-# Indirectly defines:
-# + RUST_OSX_MIN_VERSION: The minimum minor version of OSX supported by Rust; eg 7 for OSX 10.7.
-# + OSX_MAX_VERSION: The current latest OSX minor version; eg 12 for OSX Sierra 10.12.
-# + LIB_EXTENSION: The extension of native libraries.
-# + KERNEL: The lower-cased name of the kernel as reported by uname.
-# + OS_NAME: The name of the OS as seen by pants.
-# + OS_ID: The ID of the current OS as seen by pants.
-# Indirectly exposes:
-# + get_native_engine_version: Echoes the current native engine version.
-# + get_rust_osx_versions: Produces the osx minor versions supported by Rust one per line.
-# + get_rust_osx_ids: Produces the BinaryUtil osx os id paths supported by rust, one per line.
-# + get_rust_os_ids: Produces the BinaryUtil os id paths supported by rust, one per line.
-# Defines:
-# + CACHE_ROOT: The pants cache root dir.
-# + NATIVE_ENGINE_CACHE_DIR: The native engine binary root cache directory.
-# + NATIVE_ENGINE_CACHE_TARGET_DIR: The directory containing all versions of the native engine for
-#                                   the current OS.
-# + NATIVE_ENGINE_BINARY: The basename of the native engine binary for the current OS.
-# + NATIVE_ENGINE_VERSION_RESOURCE: The path of the resource file containing the native engine
-#                                   version hash.
-# Exposes:
-# + calculate_current_hash: Calculates the current native engine version hash and echoes it to
-#                           stdout.
-# + bootstrap_native_code: Builds target-specific native engine binaries.
-source ${ROOT}/build-support/bin/native/bootstrap.sh
-
 readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
-readonly NATIVE_ENGINE_BASE_URL=${BINARY_BASE_URL}/bin/native-engine
 
-function check_native_engine() {
-  local readonly native_engine_version=${NATIVE_ENGINE_VERSION:-$(get_native_engine_version)}
-  banner "Checking for native engine release version ${native_engine_version}"
+function list_prebuilt_wheels() {
+  wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
+  trap "rm -f ${wheel_listing}" RETURN
 
-  local readonly headers=$(mktemp -t pants-release.XXXXXX)
-  local result=0
-  for os_id in $(get_rust_os_ids)
-  do
-    local url=${NATIVE_ENGINE_BASE_URL}/${os_id}/${native_engine_version}/${NATIVE_ENGINE_BINARY}
-    echo -n "  for ${os_id} -> ${url}... "
-    curl --progress-bar --fail --head ${url} &> ${headers} && echo OK || {
-      result=$(( ${result} + 1 )) && echo FAILURE && cat ${headers} && echo
+  curl -sSL "${BINARY_BASE_URL}/?prefix=${DEPLOY_WHEELS_PATH}" > "${wheel_listing}"
+  "${PY}" << EOF
+from __future__ import print_function
+import sys
+import xml.etree.ElementTree as ET
+root = ET.parse("${wheel_listing}")
+ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
+for key in root.findall('s3:Contents/s3:Key', ns):
+  print(key.text)
+EOF
+}
+
+function fetch_prebuilt_wheels() {
+  local readonly to_dir="$1"
+
+  banner "Fetching prebuilt wheels for $(local_version)"
+  (
+    cd "${to_dir}"
+    list_prebuilt_wheels | {
+      while read path
+      do
+        echo "${BINARY_BASE_URL}/${path}:"
+        curl --progress-bar -O "${BINARY_BASE_URL}/${path}"
+      done
     }
-  done
-  rm -f ${headers}
+  )
+}
 
-  if (( ${result} != 0 ))
+function check_prebuilt_wheels() {
+  local check_dir="$1"
+  if [[ -z "${check_dir}" ]]
   then
-    die "Failed to find ${result} releases of native engine version ${native_engine_version}"
+    check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
+    trap "rm -rf ${check_dir}" RETURN
   fi
+
+  banner "Checking prebuilt wheels for $(local_version)"
+  fetch_prebuilt_wheels "${check_dir}"
+
+  local missing=()
+  for PACKAGE in "${RELEASE_PACKAGES[@]}"
+  do
+    NAME=$(pkg_name $PACKAGE)
+    packages=($(find_pkg "${NAME}" "${check_dir}"))
+    (( ${#packages[@]} > 0 )) || missing+=("${NAME}")
+
+    # Here we re-name the linux platform specific wheels we build to masquerade as manylinux1
+    # compatible wheels. We take care to support this when we generate the wheels and pypi will
+    # only accept manylinux1 linux binary wheels.
+    for package in "${packages[@]}"
+    do
+      if [[ "${package}" =~ "-linux_" ]]
+      then
+        mv -v "${package}" "${package/-linux_/-manylinux1_}"
+      fi
+    done
+  done
+
+  if (( ${#missing[@]} > 0 ))
+  then
+    echo "Failed to find prebuilt packages for:"
+    for package in "${missing[@]}"
+    do
+      echo "  ${package}"
+    done
+    die
+  fi
+}
+
+function activate_twine() {
+  local readonly venv_dir="${ROOT}/build-support/twine-deps.venv"
+
+  rm -rf "${venv_dir}"
+  "${ROOT}/build-support/virtualenv" "${venv_dir}"
+  source "${venv_dir}/bin/activate"
+  pip install twine
+}
+
+function publish_packages() {
+  # TODO(John Sirois): Remove sdist generation and twine upload when
+  # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+  # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
+  # and replace with pre-tested binary wheels we download from s3.
+  build_packages
+
+  rm -rf "${DEPLOY_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_WHEEL_DIR}"
+
+  start_travis_section "Publishing" "Publishing packages"
+
+  check_prebuilt_wheels "${DEPLOY_WHEEL_DIR}"
+
+  activate_twine
+  trap deactivate RETURN
+
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_WHEEL_DIR}"/*.whl
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_SDIST_DIR}"/*.tar.gz
+
+  end_travis_section
 }
 
 function usage() {
@@ -478,7 +576,7 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] (-h|-n|-t|-l|-o|-e)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -488,11 +586,13 @@ function usage() {
   echo " -t  Tests a live release."
   echo "       Ensures the latest packages have been propagated to PyPi"
   echo "       and can be installed in an ephemeral virtualenv."
+  echo " -c  Skips contrib during a dry or test run."
+  echo "       It is still necessary to pass -n or -t to trigger the test/dry run."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
-  echo " -e  Check that native engine binaries are deployed for this release."
+  echo " -e  Check that wheels are prebuilt for this release."
   echo
-  echo "All options (except for '-d') are mutually exclusive."
+  echo "All options (except for '-d' and '-c') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -501,15 +601,16 @@ function usage() {
   fi
 }
 
-while getopts "hdntloe" opt; do
+while getopts "hdntcloe" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
+    c) core_only="true" ;;
     l) list_packages && exit 0 ;;
     o) list_owners && exit 0 ;;
-    e) check_native_engine && exit 0 ;;
+    e) check_prebuilt_wheels && exit 0 ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
@@ -524,20 +625,20 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install && \
+    dry_run_install "${core_only}" && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
-    install_and_test_packages && \
+    install_and_test_packages "${core_only}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
   banner "Releasing packages to PyPi" && \
   (
-    check_origin && check_clean_branch && check_pgp && check_native_engine && check_owners && \
-      dry_run_install && publish_packages && tag_release && publish_docs_if_master && \
+    check_origin && check_clean_branch && check_pgp && check_owners && \
+      publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPi"
   ) || die "Failed to release packages to PyPi."
 fi

@@ -8,6 +8,7 @@ python_library(
   dependencies = [
     'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/docgen/tasks',
+    'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]

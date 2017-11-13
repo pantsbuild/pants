@@ -41,10 +41,6 @@ class SchedulerService(PantsService):
     """Surfaces the change calculator."""
     return self._graph_helper.change_calculator
 
-  def pre_fork(self):
-    """Pre-fork controls."""
-    self._scheduler.pre_fork()
-
   def setup(self, lock):
     """Service setup."""
     super(SchedulerService, self).setup(lock)
@@ -80,13 +76,11 @@ class SchedulerService(PantsService):
       self._logger.debug('processing {} files for subscription {} (first_event={})'
                          .format(len(files), subscription, is_initial_event))
 
-      if is_initial_event:
-        # Once we've seen the initial watchman event, set the internal `Event`.
-        self._ready.set()
-      else:
-        # The first watchman event is a listing of all files - ignore it.
+      # The first watchman event is a listing of all files - ignore it.
+      if not is_initial_event:
         self._handle_batch_event(files)
 
+    if not self._ready.is_set(): self._ready.set()
     self._event_queue.task_done()
 
   def warm_product_graph(self, spec_roots):

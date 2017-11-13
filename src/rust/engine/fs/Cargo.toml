@@ -1,0 +1,22 @@
+[package]
+version = "0.0.1"
+name = "fs"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+bazel_protos = { path = "../process_execution/bazel_protos" }
+boxfuture = { path = "../boxfuture" }
+digest = "0.6.2"
+futures = "0.1.16"
+futures-cpupool = "0.1.6"
+glob = "0.2.11"
+# TODO: Revert to a released version when https://github.com/KokaKiwi/rust-hex/pull/13 is released.
+hex = { git = "https://github.com/illicitonion/rust-hex", rev = "42e3c1ee5b90ec854eda00fd8e968fb6266d84df" }
+ignore = "0.1.8"
+lazy_static = "0.2.2"
+lmdb = "0.7.2"
+ordermap = "0.2.8"
+protobuf = "1.4.1"
+sha2 = "0.6.0"
+tar = "0.4.13"
+tempdir = "0.3.5"

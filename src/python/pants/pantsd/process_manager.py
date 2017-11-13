@@ -15,8 +15,10 @@ from contextlib import contextmanager
 import psutil
 
 from pants.base.build_environment import get_buildroot
-from pants.pantsd.subsystem.subprocess import Subprocess
+from pants.init.subprocess import Subprocess
+from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
+from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
 
@@ -226,7 +228,7 @@ class ProcessManager(ProcessMetadataManager):
     :param str metadata_base_dir: The overridden base directory for process metadata.
     """
     super(ProcessManager, self).__init__(metadata_base_dir)
-    self._name = name
+    self._name = name.lower().strip()
     self._pid = pid
     self._socket = socket
     self._socket_type = socket_type
@@ -243,6 +245,17 @@ class ProcessManager(ProcessMetadataManager):
   def process_name(self):
     """The logical process name. If defined, this is compared to exe_name for stale pid checking."""
     return self._process_name
+
+  @memoized_property
+  def process_lock(self):
+    """An identity-keyed inter-process lock for safeguarding lifecycle and other operations."""
+    safe_mkdir(self._metadata_base_dir)
+    return OwnerPrintingInterProcessFileLock(
+      # N.B. This lock can't key into the actual named metadata dir (e.g. `.pids/pantsd/lock`
+      # via `ProcessMetadataManager._get_metadata_dir_by_name()`) because of a need to purge
+      # the named metadata dir on startup to avoid stale metadata reads.
+      os.path.join(self._metadata_base_dir, '.lock.{}'.format(self._name))
+    )
 
   @property
   def cmdline(self):
@@ -301,8 +314,9 @@ class ProcessManager(ProcessMetadataManager):
     """Wait up to a given timeout for a process to write socket info."""
     return self.await_metadata_by_name(self._name, 'socket', timeout, self._socket_type)
 
-  def write_pid(self, pid):
+  def write_pid(self, pid=None):
     """Write the current processes PID to the pidfile location"""
+    pid = pid or os.getpid()
     self.write_metadata_by_name(self._name, 'pid', str(pid))
 
   def write_socket(self, socket_info):
@@ -312,6 +326,10 @@ class ProcessManager(ProcessMetadataManager):
   def write_named_socket(self, socket_name, socket_info):
     """A multi-tenant, named alternative to ProcessManager.write_socket()."""
     self.write_metadata_by_name(self._name, 'socket_{}'.format(socket_name), str(socket_info))
+
+  def read_named_socket(self, socket_name, socket_type):
+    """A multi-tenant, named alternative to ProcessManager.socket."""
+    return self.read_metadata_by_name(self._name, 'socket_{}'.format(socket_name), socket_type)
 
   def _as_process(self):
     """Returns a psutil `Process` object wrapping our pid.
@@ -475,12 +493,66 @@ class ProcessManager(ProcessMetadataManager):
 
   def pre_fork(self):
     """Pre-fork callback for subclasses."""
-    pass
 
   def post_fork_child(self):
     """Pre-fork child callback for subclasses."""
-    pass
 
   def post_fork_parent(self):
     """Post-fork parent callback for subclasses."""
-    pass
+
+
+class FingerprintedProcessManager(ProcessManager):
+  """A `ProcessManager` subclass that provides a general strategy for process fingerprinting."""
+
+  FINGERPRINT_KEY = 'fingerprint'
+  FINGERPRINT_CMD_KEY = None
+  FINGERPRINT_CMD_SEP = '='
+
+  @property
+  def fingerprint(self):
+    """The fingerprint of the current process.
+
+    This can either read the current fingerprint from the running process's psutil.Process.cmdline
+    (if the managed process supports that) or from the `ProcessManager` metadata.
+
+    :returns: The fingerprint of the running process as read from the process table, ProcessManager
+              metadata or `None`.
+    :rtype: string
+    """
+    return (
+      self.parse_fingerprint(self.cmdline) or
+      self.read_metadata_by_name(self.name, self.FINGERPRINT_KEY)
+    )
+
+  def parse_fingerprint(self, cmdline, key=None, sep=None):
+    """Given a psutil.Process.cmdline, parse and return a fingerprint.
+
+    :param list cmdline: The psutil.Process.cmdline of the current process.
+    :param string key: The key for fingerprint discovery.
+    :param string sep: The key/value separator for fingerprint discovery.
+    :returns: The parsed fingerprint or `None`.
+    :rtype: string or `None`
+    """
+    key = key or self.FINGERPRINT_CMD_KEY
+    if key:
+      sep = sep or self.FINGERPRINT_CMD_SEP
+      cmdline = cmdline or []
+      for cmd_part in cmdline:
+        if cmd_part.startswith('{}{}'.format(key, sep)):
+          return cmd_part.split(sep)[1]
+
+  def has_current_fingerprint(self, fingerprint):
+    """Determines if a new fingerprint is the current fingerprint of the running process.
+
+    :param string fingerprint: The new fingerprint to compare to.
+    :rtype: bool
+    """
+    return fingerprint == self.fingerprint
+
+  def needs_restart(self, fingerprint):
+    """Determines if the current ProcessManager needs to be started or restarted.
+
+    :param string fingerprint: The new fingerprint to compare to.
+    :rtype: bool
+    """
+    return self.is_dead() or not self.has_current_fingerprint(fingerprint)

@@ -16,6 +16,7 @@ from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report, ReportingError
+from pants.reporting.reporter import ReporterDestination
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
@@ -68,8 +69,9 @@ class Reporting(Subsystem):
     # Capture initial console reporting into a buffer. We'll do something with it once
     # we know what the cmd-line flag settings are.
     outfile = StringIO()
+    errfile = StringIO()
     capturing_reporter_settings = PlainTextReporter.Settings(
-      outfile=outfile, log_level=Report.INFO,
+      outfile=outfile, errfile=errfile, log_level=Report.INFO,
       color=False, indent=True, timing=False,
       cache_stats=False,
       label_format=self.get_options().console_label_format,
@@ -95,14 +97,20 @@ class Reporting(Subsystem):
   def _get_invalidation_report(self):
     return InvalidationReport() if self.get_options().invalidation_report else None
 
-  def update_reporting(self, global_options, is_quiet_task, run_tracker):
+  @staticmethod
+  def _consume_stringio(f):
+    f.flush()
+    buffered_output = f.getvalue()
+    f.close()
+    return buffered_output
+
+  def update_reporting(self, global_options, is_quiet, run_tracker):
     """Updates reporting config once we've parsed cmd-line flags."""
 
     # Get any output silently buffered in the old console reporter, and remove it.
-    old_outfile = run_tracker.report.remove_reporter('capturing').settings.outfile
-    old_outfile.flush()
-    buffered_output = old_outfile.getvalue()
-    old_outfile.close()
+    removed_reporter = run_tracker.report.remove_reporter('capturing')
+    buffered_out = self._consume_stringio(removed_reporter.settings.outfile)
+    buffered_err = self._consume_stringio(removed_reporter.settings.errfile)
 
     log_level = Report.log_level_from_string(global_options.level or 'info')
     # Ideally, we'd use terminfo or somesuch to discover whether a
@@ -111,18 +119,19 @@ class Reporting(Subsystem):
     timing = global_options.time
     cache_stats = global_options.time  # TODO: Separate flag for this?
 
-    if global_options.quiet or is_quiet_task:
+    if is_quiet:
       console_reporter = QuietReporter(run_tracker,
                                        QuietReporter.Settings(log_level=log_level, color=color,
                                                               timing=timing, cache_stats=cache_stats))
     else:
       # Set up the new console reporter.
-      settings = PlainTextReporter.Settings(log_level=log_level, outfile=sys.stdout, color=color,
-                                            indent=True, timing=timing, cache_stats=cache_stats,
+      settings = PlainTextReporter.Settings(log_level=log_level, outfile=sys.stdout, errfile=sys.stderr,
+                                            color=color, indent=True, timing=timing, cache_stats=cache_stats,
                                             label_format=self.get_options().console_label_format,
                                             tool_output_format=self.get_options().console_tool_output_format)
       console_reporter = PlainTextReporter(run_tracker, settings)
-      console_reporter.emit(buffered_output)
+      console_reporter.emit(buffered_out, dest=ReporterDestination.OUT)
+      console_reporter.emit(buffered_err, dest=ReporterDestination.ERR)
       console_reporter.flush()
     run_tracker.report.add_reporter('console', console_reporter)
 
@@ -131,12 +140,14 @@ class Reporting(Subsystem):
       safe_mkdir(global_options.logdir)
       run_id = run_tracker.run_info.get_info('id')
       outfile = open(os.path.join(global_options.logdir, '{}.log'.format(run_id)), 'w')
-      settings = PlainTextReporter.Settings(log_level=log_level, outfile=outfile, color=False,
-                                            indent=True, timing=True, cache_stats=True,
+      errfile = open(os.path.join(global_options.logdir, '{}.err.log'.format(run_id)), 'w')
+      settings = PlainTextReporter.Settings(log_level=log_level, outfile=outfile, errfile=errfile,
+                                            color=False, indent=True, timing=True, cache_stats=True,
                                             label_format=self.get_options().console_label_format,
                                             tool_output_format=self.get_options().console_tool_output_format)
       logfile_reporter = PlainTextReporter(run_tracker, settings)
-      logfile_reporter.emit(buffered_output)
+      logfile_reporter.emit(buffered_out, dest=ReporterDestination.OUT)
+      logfile_reporter.emit(buffered_err, dest=ReporterDestination.ERR)
       logfile_reporter.flush()
       run_tracker.report.add_reporter('logfile', logfile_reporter)
 

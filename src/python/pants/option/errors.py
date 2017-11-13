@@ -40,6 +40,7 @@ FrozenRegistration = mk_registration_error('Cannot register an option on a scope
                                            'on any of its inner scopes.')
 ImplicitValIsNone = mk_registration_error('Implicit value cannot be None.')
 InvalidKwarg = mk_registration_error('Invalid registration kwarg {kwarg}.')
+InvalidKwargNonGlobalScope = mk_registration_error('Invalid registration kwarg {kwarg} on non-global scope.')
 InvalidMemberType = mk_registration_error('member_type {member_type} not allowed.')
 MemberTypeNotAllowed = mk_registration_error('member_type not allowed on option with type {type_}. '
                                              'It may only be specified if type=list.')

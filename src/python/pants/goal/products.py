@@ -40,7 +40,7 @@ class UnionProducts(object):
     """Returns a copy of this UnionProducts.
 
     Edits to the copy's mappings will not affect the product mappings in the original.
-    The copy is shallow though, so edits to the the copy's product values will mutate the original's
+    The copy is shallow though, so edits to the copy's product values will mutate the original's
     product values.
 
     :API: public

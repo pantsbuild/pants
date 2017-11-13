@@ -51,7 +51,7 @@ class QuietReporter(PlainTextReporterBase):
     pass
 
   def _emit(self, s):
-    sys.stdout.write(s)
+    sys.stderr.write(s)
 
   def level_for_workunit(self, workunit, default_level):
     """Force the reporter to consider every workunit to be logging for level Report.ERROR"""

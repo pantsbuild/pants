@@ -103,6 +103,13 @@ class PythonBinaryCreate(Task):
 
       builder = PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True)
 
+      if binary_tgt.shebang:
+        self.context.log.info('Found Python binary target {} with customized shebang, using it: {}'
+                                .format(binary_tgt.name, binary_tgt.shebang))
+        builder.set_shebang(binary_tgt.shebang)
+      else:
+        self.context.log.debug('No customized shebang found for {}'.format(binary_tgt.name))
+
       # Find which targets provide sources and which specify requirements.
       source_tgts = []
       req_tgts = []

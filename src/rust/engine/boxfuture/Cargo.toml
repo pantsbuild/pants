@@ -1,0 +1,7 @@
+[package]
+version = "0.0.1"
+name = "boxfuture"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+futures = "0.1.16"

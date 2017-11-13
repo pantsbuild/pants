@@ -132,8 +132,7 @@ class PailgunServer(TCPServer):
 
     try:
       # Attempt to handle a request with the handler under the context_lock.
-      with self._context_lock():
-        handler.handle_request()
+      handler.handle_request()
     except Exception as e:
       # If that fails, (synchronously) handle the error with the error handler sans-fork.
       try:

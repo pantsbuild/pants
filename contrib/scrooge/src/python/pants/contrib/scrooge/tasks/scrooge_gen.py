@@ -13,6 +13,7 @@ from collections import defaultdict, namedtuple
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -211,11 +212,23 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     if 0 != returncode:
       raise TaskError('Scrooge compiler exited non-zero for {} ({})'.format(target, returncode))
 
-  SERVICE_PARSER = re.compile(r'^\s*service\s+(?:[^\s{]+)')
+  @staticmethod
+  def _declares_exception(source):
+    # ideally we'd use more sophisticated parsing
+    exception_parser = re.compile(r'^\s*exception\s+(?:[^\s{]+)')
+    return ScroogeGen._has_declaration(source, exception_parser)
 
-  def _declares_service(self, source):
-    with open(source) as thrift:
-      return any(line for line in thrift if self.SERVICE_PARSER.search(line))
+  @staticmethod
+  def _declares_service(source):
+    # ideally we'd use more sophisticated parsing
+    service_parser = re.compile(r'^\s*service\s+(?:[^\s{]+)')
+    return ScroogeGen._has_declaration(source, service_parser)
+
+  @staticmethod
+  def _has_declaration(source, regex):
+    source_path = os.path.join(get_buildroot(), source)
+    with open(source_path) as thrift:
+      return any(line for line in thrift if regex.search(line))
 
   def parse_gen_file_map(self, gen_file_map_path, outdir):
     d = defaultdict(set)
@@ -282,11 +295,11 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
   def _thrift_dependencies_for_target(self, target):
     dep_info = self._resolved_dep_info
-    target_declares_service = any(self._declares_service(source)
-                                  for source in target.sources_relative_to_buildroot())
+    target_declares_service_or_exception = any(self._declares_service(source) or self._declares_exception(source)
+                                               for source in target.sources_relative_to_buildroot())
     language = self._thrift_defaults.language(target)
 
-    if target_declares_service:
+    if target_declares_service_or_exception:
       return dep_info.service[language]
     else:
       return dep_info.structs[language]

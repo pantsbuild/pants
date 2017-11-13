@@ -21,7 +21,6 @@ function usage() {
   echo " -k           skip bootstrapped pants self compile check"
   echo " -m           skip sanity checks of bootstrapped pants and repo BUILD"
   echo "              files"
-  echo " -s           skip self-distribution tests"
   echo " -r           skip doc generation tests"
   echo " -j           skip core jvm tests"
   echo " -l           skip internal backends python tests"
@@ -67,7 +66,6 @@ while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
     b) skip_bootstrap="true" ;;
     k) bootstrap_compile_args=() ;;
     m) skip_sanity_checks="true" ;;
-    s) skip_distribution="true" ;;
     r) skip_docs="true" ;;
     j) skip_jvm="true" ;;
     l) skip_internal_backends="true" ;;
@@ -169,14 +167,6 @@ if [[ "${skip_lint:-false}" == "false" ]]; then
   end_travis_section
 fi
 
-if [[ "${skip_distribution:-false}" == "false" ]]; then
-  # N.B. Defer start_travis_section to those within release.sh, since we can't nest.
-  banner "Running pants distribution tests"
-  (
-    ./build-support/bin/release.sh -n
-  ) || die "Failed to create pants distributions."
-fi
-
 if [[ "${skip_docs:-false}" == "false" ]]; then
   start_travis_section "DocGen" "Running site doc generation test"
   ./build-support/bin/publish_docs.sh || die "Failed to generate site docs."
@@ -206,7 +196,7 @@ if [[ "${skip_python:-false}" == "false" ]]; then
   fi
   start_travis_section "CoreTests" "Running core python tests${shard_desc}"
   (
-    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest \
+    ./pants.pex --tag='-integration' ${PANTS_ARGS[@]} test.pytest --chroot \
       --test-pytest-test-shard=${python_unit_shard} \
       tests/python::
   ) || die "Core python test failure"

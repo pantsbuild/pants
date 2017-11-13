@@ -67,7 +67,7 @@ class GitTest(unittest.TestCase):
       self.initial_rev = subprocess.check_output(['git', 'rev-parse', 'HEAD']).strip()
       subprocess.check_call(['git', 'tag', 'first'])
       subprocess.check_call(['git', 'push', '--tags', 'depot', 'master'])
-      subprocess.check_call(['git', 'branch', '--set-upstream', 'master', 'depot/master'])
+      subprocess.check_call(['git', 'branch', '--set-upstream-to', 'depot/master'])
 
       with safe_open(self.readme_file, 'w') as readme:
         readme.write('Hello World.\u2764'.encode('utf-8'))

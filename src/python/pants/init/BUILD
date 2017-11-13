@@ -1,7 +1,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 python_library(
   dependencies=[
     ':plugins',
@@ -21,12 +20,6 @@ python_library(
     'src/python/pants/goal:run_tracker',
     'src/python/pants/logging',
     'src/python/pants/option',
-    'src/python/pants/pantsd:pants_daemon',
-    'src/python/pants/pantsd/service:fs_event_service',
-    'src/python/pants/pantsd/service:pailgun_service',
-    'src/python/pants/pantsd/service:scheduler_service',
-    'src/python/pants/pantsd/subsystem:subprocess',
-    'src/python/pants/pantsd/subsystem:watchman_launcher',
     'src/python/pants/process',
     'src/python/pants/python',
     'src/python/pants/subsystem',

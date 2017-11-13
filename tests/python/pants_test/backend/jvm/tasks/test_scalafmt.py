@@ -45,23 +45,23 @@ class ScalaFmtIntegrationTests(PantsRunIntegrationTest):
     # take a snapshot of the file which we can write out
     # after the test finishes executing.
     test_file_name = '{}/badscalastyle/BadScalaStyle.scala'.format(TEST_DIR)
-    f = open(test_file_name, 'r')
-    contents = f.read()
-    f.close()
+    with open(test_file_name, 'r') as f:
+      contents = f.read()
 
-    # format an incorrectly formatted file.
-    target = '{}/badscalastyle'.format(TEST_DIR)
-    fmt_result = self.run_pants(['fmt', target], {'fmt.scalafmt':options})
-    self.assert_success(fmt_result)
+    try:
+      # format an incorrectly formatted file.
+      target = '{}/badscalastyle'.format(TEST_DIR)
+      fmt_result = self.run_pants(['fmt', target], {'fmt.scalafmt':options})
+      self.assert_success(fmt_result)
 
-    # verify that the lint check passes.
-    test_fmt = self.run_pants(['lint', target], {'lint.scalafmt':options})
-    self.assert_success(test_fmt)
-
-    # restore the file to its original state.
-    f = open(test_file_name, 'w')
-    f.write(contents)
-    f.close()
+      # verify that the lint check passes.
+      test_fmt = self.run_pants(['lint', target], {'lint.scalafmt':options})
+      self.assert_success(test_fmt)
+    finally:
+      # restore the file to its original state.
+      f = open(test_file_name, 'w')
+      f.write(contents)
+      f.close()
 
   def test_scalafmt_ignore_resources(self):
     target = '{}/badscalastyle:as_resources'.format(TEST_DIR)

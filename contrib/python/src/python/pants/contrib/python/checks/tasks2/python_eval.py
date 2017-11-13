@@ -23,7 +23,7 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.python.python_repos import PythonRepos
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_property
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
@@ -42,6 +42,10 @@ class PythonEval(ResolveRequirementsTaskBase):
 
   _EXEC_NAME = '__pants_executable__'
   _EVAL_TEMPLATE_PATH = os.path.join('templates', 'python_eval', 'eval.py.mustache')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(PythonEval, cls).subsystem_dependencies() + (PythonRepos, PythonSetup)
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -77,18 +81,11 @@ class PythonEval(ResolveRequirementsTaskBase):
       compiled = self._compile_targets(invalidation_check.invalid_vts)
       return compiled  # Collected and returned for tests
 
-  @memoized_method
+  @memoized_property
   def _interpreter_cache(self):
-    interpreter_cache = PythonInterpreterCache(PythonSetup.global_instance(),
-                                               PythonRepos.global_instance(),
-                                               logger=self.context.log.debug)
-    # Cache setup's requirement fetching can hang if run concurrently by another pants proc.
-    self.context.acquire_lock()
-    try:
-      interpreter_cache.setup()
-    finally:
-      self.context.release_lock()
-    return interpreter_cache
+    return PythonInterpreterCache(PythonSetup.global_instance(),
+                                  PythonRepos.global_instance(),
+                                  logger=self.context.log.debug)
 
   def _compile_targets(self, invalid_vts):
     with self.context.new_workunit(name='eval-targets', labels=[WorkUnitLabel.MULTITOOL]):
@@ -171,7 +168,7 @@ class PythonEval(ResolveRequirementsTaskBase):
 
       exec_pex = PEX(exec_pex_path, interpreter)
       extra_pex_paths = [pex.path() for pex in filter(None, [reqs_pex, srcs_pex])]
-      pex = WrappedPEX(exec_pex, extra_pex_paths, interpreter)
+      pex = WrappedPEX(exec_pex, interpreter, extra_pex_paths)
 
       with self.context.new_workunit(name='eval',
                                      labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.RUN,
@@ -221,7 +218,7 @@ class PythonEval(ResolveRequirementsTaskBase):
 
   def _get_interpreter_for_target_closure(self, target):
     targets = [t for t in target.closure() if isinstance(t, PythonTarget)]
-    return self._interpreter_cache().select_interpreter_for_targets(targets)
+    return self._interpreter_cache.select_interpreter_for_targets(targets)
 
   def _resolve_requirements_for_versioned_target_closure(self, interpreter, vt):
     reqs_pex_path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity),
