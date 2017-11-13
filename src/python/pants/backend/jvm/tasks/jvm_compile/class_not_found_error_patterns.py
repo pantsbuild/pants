@@ -51,7 +51,7 @@ CLASS_NOT_FOUND_ERROR_PATTERNS = [
    r'was compiled against an incompatible version of (?P<packagename>\S+)\.'),
   # covers member types of traits not used in the extending type.
   (r'\s*\[error\] Symbol \'\S+ (?P<classname>\S+)\' is missing from the classpath\.\n\s*\[error\] This symbol is '
-   r'required by \'method (?P<dependee_classname>\S+)\.(?P<method_name>\S+)\'\.\n\s*\[error\] Make sure that \S+ '
+   r'required by \'method (?P<dependee_classname>\S+)\.(?P<method_name>[^\.]+)\'\.\n\s*\[error\] Make sure that \S+ '
    r'(?P<classnameonly>\S+) is in your classpath and check for conflicting dependencies with `-Ylog-classpath`\.\n\s*'
    r'\[error\] A full rebuild may help if \'(?P<dependee_classnameonly>\S+)\.class\' was compiled against an '
    r'incompatible version of (?P<packagename>\S+)\.'),

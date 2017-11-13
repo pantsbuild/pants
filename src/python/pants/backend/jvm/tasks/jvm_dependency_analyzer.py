@@ -86,6 +86,7 @@ class JvmDependencyAnalyzer(object):
       for one_class in self._target_classes(target):
         if classname in one_class:
           targets_with_class.add(target)
+          break
 
     return targets_with_class
 
