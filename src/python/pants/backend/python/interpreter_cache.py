@@ -85,6 +85,8 @@ class PythonInterpreterCache(object):
 
   def _interpreter_from_path(self, path, filters):
     interpreter_dir = os.path.basename(path)
+    if '-' not in interpreter_dir:
+      return None
     identity = PythonIdentity.from_path(interpreter_dir)
     try:
       executable = os.readlink(os.path.join(path, 'python'))
