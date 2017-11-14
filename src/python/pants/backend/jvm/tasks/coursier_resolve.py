@@ -125,8 +125,6 @@ class CoursierResolve:
     classifier_to_coordinates = construct_classifier_to_coordinates(resolve_args)
     for classifier, coords in classifier_to_coordinates.items():
 
-      # Add the m2 id to resolve
-
       cmd_args = list(common_args)
       if classifier:
         cmd_args.extend(['--classifier', classifier])
