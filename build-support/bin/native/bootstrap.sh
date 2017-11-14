@@ -51,12 +51,13 @@ function calculate_current_hash() {
   # sensitive to the CWD, and the `--work-tree` option doesn't seem to resolve that.
   (
    cd ${REPO_ROOT}
-   git ls-files -c -o --exclude-standard \
+   (echo "${MODE_FLAG}"
+    git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
      "${REPO_ROOT}/3rdparty/python/requirements.txt" \
-   | git hash-object -t blob --stdin-paths | fingerprint_data
+   | git hash-object -t blob --stdin-paths) | fingerprint_data
   )
 }
 
