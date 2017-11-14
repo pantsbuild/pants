@@ -112,6 +112,14 @@ class M2Coordinate(object):
     org, name, rev, classifier, ext = string_coord.split(':')
     return M2Coordinate(org, name, rev or None, classifier or None, ext or None)
 
+  @property
+  def simple_coord(self):
+    """
+    A simple version of coordiate representation with org:name:rev without classifier and ext
+    :return:
+    """
+    return '{}:{}:{}'.format(self.org, self.name, self.rev)
+
   def __eq__(self, other):
     return isinstance(other, M2Coordinate) and self._id == other._id
 
