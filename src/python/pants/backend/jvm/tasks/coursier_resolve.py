@@ -116,16 +116,14 @@ class CoursierResolve:
                 '--cache', coursier_cache_path,
                 '--json-output-file', output_fn]
 
+    def construct_classifier_to_coordinates(list_of_coords):
+      product = defaultdict(list)
+      for my_coord in list_of_coords:
+        product[my_coord.classifier or ''].append(my_coord)
+      return product
 
-    def get_coords_by_classifier(list_of_coords):
-      r = defaultdict(list)
-      for coord in list_of_coords:
-        classifier = coord.classifier or ''
-        r[classifier].append(coord)
-      return r
-
-    coords_by_classifier = get_coords_by_classifier(resolve_args)
-    for classifier, coords in coords_by_classifier.items():
+    classifier_to_coordinates = construct_classifier_to_coordinates(resolve_args)
+    for classifier, coords in classifier_to_coordinates.items():
 
       # Add the m2 id to resolve
 
