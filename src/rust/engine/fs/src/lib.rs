@@ -347,7 +347,7 @@ impl PosixFS {
         format!("Could not canonicalize root {:?}: {:?}", root, e)
       })?;
 
-    let ignore = PosixFS::create_ignore(&canonical_root, &ignore_patterns)
+    let ignore = PosixFS::create_ignore(&ignore_patterns)
       .map_err(|e| {
         format!(
           "Could not parse build ignore inputs {:?}: {:?}",
@@ -366,8 +366,8 @@ impl PosixFS {
     futures_cpupool::Builder::new().name_prefix("vfs-").create()
   }
 
-  fn create_ignore(root: &Dir, patterns: &Vec<String>) -> Result<Gitignore, ignore::Error> {
-    let mut ignore_builder = GitignoreBuilder::new(root.0.as_path());
+  fn create_ignore(patterns: &Vec<String>) -> Result<Gitignore, ignore::Error> {
+    let mut ignore_builder = GitignoreBuilder::new(&"");
     for pattern in patterns {
       ignore_builder.add_line(None, pattern.as_str())?;
     }
