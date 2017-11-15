@@ -152,7 +152,7 @@ class CoursierResolve:
 
           with open(output_fn) as f:
             read = f.read()
-            print(read)
+            # print(read)
             result = json.loads(read)
 
           # with open(workunit.output('stdout')._io.name) as f:
@@ -221,7 +221,7 @@ class CoursierResolve:
   @classmethod
   def files_by_coord(cls, result, coursier_cache_path, pants_jar_path_base):
 
-    final_result = defaultdict(list)
+    final_result = defaultdict(set)
 
     def walk(dep_map):
       for art in dep_map:
@@ -238,7 +238,7 @@ class CoursierResolve:
           resolved_jar = ResolvedJar(coord,
                                      cache_path=jar_path,
                                      pants_path=pants_path)
-          final_result[simple_coord].append(resolved_jar)
+          final_result[simple_coord].add(resolved_jar)
 
         walk(art['dependencies'])
 
