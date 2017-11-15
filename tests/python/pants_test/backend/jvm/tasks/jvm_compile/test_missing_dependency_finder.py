@@ -54,6 +54,22 @@ class CompileErrorExtractorTest(unittest.TestCase):
       [error] Could not access type Future in value com.twitter.util,""",
     r"""
       [error] Class a.b.c.X not found - continuing with a stub.""",
+    r"""
+      [error] /path/to/file/Hello.scala:34:6: Symbol 'type <none>.w.XYZ' is missing from the classpath.
+      [error] This symbol is required by 'class a.b.c.DEF'.
+      [error] Make sure that type XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+      [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of <none>.w.""",
+    r"""
+      [error] /path/to/file/Hello.scala:34:6: Symbol 'class u.v.w.XYZ' is missing from the classpath.
+      [error] This symbol is required by 'class a.b.c.DEF'.
+      [error] Make sure that class XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+      [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of u.v.w.""",
+    r"""
+      [error] Symbol 'type u.v.w.XYZ' is missing from the classpath.
+      [error] This symbol is required by 'method DEF.method'.
+      [error] Make sure that type XYZ is in your classpath and check for conflicting dependencies with `-Ylog-classpath`.
+      [error] A full rebuild may help if 'DEF.class' was compiled against an incompatible version of u.v.w.""",
+
   ]
 
   EXPECTED_ERRORS = [
@@ -69,6 +85,9 @@ class CompileErrorExtractorTest(unittest.TestCase):
     ClassNotFoundError(None, None, 'org.apache.thrift.TEnum'),
     ClassNotFoundError(None, None, 'com.twitter.util.Future'),
     ClassNotFoundError(None, None, 'a.b.c.X'),
+    ClassNotFoundError(None, None, 'w.XYZ'),
+    ClassNotFoundError(None, None, 'u.v.w.XYZ'),
+    ClassNotFoundError(None, None, 'u.v.w.XYZ'),
   ]
 
   def setUp(self):
