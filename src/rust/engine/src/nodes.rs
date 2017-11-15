@@ -79,8 +79,8 @@ impl VFS<Failure> for Context {
     self.get(Scandir(dir)).map(|res| res.0).to_boxed()
   }
 
-  fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    self.core.vfs.ignore(path, is_dir)
+  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
+    self.core.vfs.is_ignored(path, is_dir)
   }
 
   fn mk_error(msg: &str) -> Failure {

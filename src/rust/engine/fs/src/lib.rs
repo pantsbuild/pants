@@ -115,6 +115,8 @@ lazy_static! {
 
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
+
+  static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -293,15 +295,29 @@ impl PathGlob {
 #[derive(Debug)]
 pub struct PathGlobs {
   include: Vec<PathGlob>,
-  exclude: Vec<PathGlob>,
+  exclude: Arc<Gitignore>,
 }
 
 impl PathGlobs {
   pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
+    let ignore_for_exclude = if exclude.is_empty() {
+      EMPTY_IGNORE.clone()
+    } else {
+      Arc::new(create_ignore(exclude).map_err(|e| {
+        format!("Could not parse glob excludes {:?}: {:?}", exclude, e)
+      })?)
+    };
     Ok(PathGlobs {
       include: PathGlob::create(include)?,
-      exclude: PathGlob::create(exclude)?,
+      exclude: ignore_for_exclude,
     })
+  }
+
+  pub fn from_globs(include: Vec<PathGlob>) -> PathGlobs {
+    PathGlobs {
+      include: include,
+      exclude: EMPTY_IGNORE.clone(),
+    }
   }
 }
 
@@ -310,10 +326,28 @@ struct PathGlobsExpansion<T: Sized> {
   context: T,
   // Globs that have yet to be expanded, in order.
   todo: Vec<PathGlob>,
+  // Paths to exclude.
+  exclude: Arc<Gitignore>,
   // Globs that have already been expanded.
   completed: HashSet<PathGlob>,
   // Unique Paths that have been matched, in order.
   outputs: OrderMap<PathStat, ()>,
+}
+
+fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
+  let mut ignore_builder = GitignoreBuilder::new("");
+  for pattern in patterns {
+    ignore_builder.add_line(None, pattern.as_str())?;
+  }
+  ignore_builder.build()
+}
+
+fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool {
+  match ignore.matched(path, is_dir) {
+    ignore::Match::None |
+    ignore::Match::Whitelist(_) => false,
+    ignore::Match::Ignore(_) => true,
+  }
 }
 
 ///
@@ -347,14 +381,13 @@ impl PosixFS {
         format!("Could not canonicalize root {:?}: {:?}", root, e)
       })?;
 
-    let ignore = PosixFS::create_ignore(&canonical_root, &ignore_patterns)
-      .map_err(|e| {
-        format!(
-          "Could not parse build ignore inputs {:?}: {:?}",
-          ignore_patterns,
-          e
-        )
-      })?;
+    let ignore = create_ignore(&ignore_patterns).map_err(|e| {
+      format!(
+        "Could not parse build ignore inputs {:?}: {:?}",
+        ignore_patterns,
+        e
+      )
+    })?;
     Ok(PosixFS {
       root: canonical_root,
       pool: RwLock::new(None),
@@ -364,14 +397,6 @@ impl PosixFS {
 
   fn create_pool() -> CpuPool {
     futures_cpupool::Builder::new().name_prefix("vfs-").create()
-  }
-
-  fn create_ignore(root: &Dir, patterns: &Vec<String>) -> Result<Gitignore, ignore::Error> {
-    let mut ignore_builder = GitignoreBuilder::new(root.0.as_path());
-    for pattern in patterns {
-      ignore_builder.add_line(None, pattern.as_str())?;
-    }
-    ignore_builder.build()
   }
 
   fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
@@ -415,12 +440,8 @@ impl PosixFS {
     *pool = None;
   }
 
-  pub fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    match self.ignore.matched(path, is_dir) {
-      ignore::Match::None |
-      ignore::Match::Whitelist(_) => false,
-      ignore::Match::Ignore(_) => true,
-    }
+  pub fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
+    is_ignored(&self.ignore, path, is_dir)
   }
 
   pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
@@ -554,8 +575,8 @@ impl VFS<io::Error> for Arc<PosixFS> {
     PosixFS::scandir(self, &dir)
   }
 
-  fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    PosixFS::ignore(self, path, is_dir)
+  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
+    PosixFS::is_ignored(self, path, is_dir)
   }
 
   fn mk_error(msg: &str) -> io::Error {
@@ -569,7 +590,7 @@ impl VFS<io::Error> for Arc<PosixFS> {
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
-  fn ignore<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
+  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
   fn mk_error(msg: &str) -> E;
 
   ///
@@ -578,7 +599,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   ///
   /// Skips ignored paths both before and after expansion.
   ///
-  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand_multi).
+  /// TODO: Should handle symlink loops (which would exhibit as an infinite loop in expand).
   ///
   fn canonicalize(&self, symbolic_path: PathBuf, link: Link) -> BoxFuture<Option<PathStat>, E> {
     // Read the link, which may result in PathGlob(s) that match 0 or 1 Path.
@@ -590,12 +611,14 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         dest_path
           .to_str()
           .and_then(|dest_str| {
-            let escaped = Pattern::escape(dest_str);
-            PathGlob::create(&[escaped]).ok()
+            // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
+            PathGlob::create(&[Pattern::escape(dest_str)]).ok()
           })
           .unwrap_or_else(|| vec![])
       })
-      .and_then(move |link_globs| context.expand_multi(link_globs))
+      .and_then(move |link_globs| {
+        context.expand(PathGlobs::from_globs(link_globs))
+      })
       .map(|mut path_stats| {
         // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
         path_stats.pop().map(|ps| match ps {
@@ -611,9 +634,12 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
     wildcard: Pattern,
+    exclude: &Arc<Gitignore>,
   ) -> BoxFuture<Vec<PathStat>, E> {
     // List the directory.
     let context = self.clone();
+    let exclude = exclude.clone();
+
     self
       .scandir(canonical_dir)
       .and_then(move |dir_listing| {
@@ -638,18 +664,24 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 .map(|symbolic_stat_path| (symbolic_stat_path, stat))
             })
             .map(|(stat_symbolic_path, stat)| {
-              // Canonicalize matched PathStats, and filter ignored paths. Note that we ignore
-              // links both before and after expansion.
+              // Canonicalize matched PathStats, and filter paths that are ignored by either the
+              // context, or by local excludes. Note that we apply context ignore patterns to both
+              // the symbolic and canonical names of Links, but only apply local excludes to their
+              // symbolic names.
               match stat {
                 Stat::Link(l) => {
-                  if context.ignore(l.0.as_path(), false) {
+                  if context.is_ignored(l.0.as_path(), false) ||
+                    is_ignored(&exclude, l.0.as_path(), false)
+                  {
                     future::ok(None).to_boxed()
                   } else {
                     context.canonicalize(stat_symbolic_path, l)
                   }
                 }
                 Stat::Dir(d) => {
-                  let res = if context.ignore(d.0.as_path(), true) {
+                  let res = if context.is_ignored(d.0.as_path(), true) ||
+                    is_ignored(&exclude, d.0.as_path(), true)
+                  {
                     None
                   } else {
                     Some(PathStat::dir(stat_symbolic_path.to_owned(), d))
@@ -657,7 +689,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                   future::ok(res).to_boxed()
                 }
                 Stat::File(f) => {
-                  let res = if context.ignore(f.path.as_path(), false) {
+                  let res = if context.is_ignored(f.path.as_path(), false) ||
+                    is_ignored(&exclude, f.path.as_path(), false)
+                  {
                     None
                   } else {
                     Some(PathStat::file(stat_symbolic_path.to_owned(), f))
@@ -679,46 +713,27 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   ///
   /// Recursively expands PathGlobs into PathStats while applying excludes.
   ///
-  /// TODO: Eventually, it would be nice to be able to apply excludes as we go, to
-  /// avoid walking into directories that aren't relevant.
-  ///
   fn expand(&self, path_globs: PathGlobs) -> BoxFuture<Vec<PathStat>, E> {
-    self
-      .expand_multi(path_globs.include)
-      .join(self.expand_multi(path_globs.exclude))
-      .map(|(include, exclude)| {
-        // Exclude matched paths.
-        let exclude_set: HashSet<_> = exclude.into_iter().collect();
-        include
-          .into_iter()
-          .filter(|i| !exclude_set.contains(i))
-          .collect()
-      })
-      .to_boxed()
-  }
-
-  ///
-  /// Recursively expands PathGlobs into PathStats.
-  ///
-  fn expand_multi(&self, path_globs: Vec<PathGlob>) -> BoxFuture<Vec<PathStat>, E> {
-    if path_globs.is_empty() {
+    if path_globs.include.is_empty() {
       return future::ok(vec![]).to_boxed();
     }
 
     let init = PathGlobsExpansion {
       context: self.clone(),
-      todo: path_globs,
+      todo: path_globs.include,
+      exclude: path_globs.exclude,
       completed: HashSet::default(),
       outputs: OrderMap::default(),
     };
     future::loop_fn(init, |mut expansion| {
       // Request the expansion of all outstanding PathGlobs as a batch.
       let round = future::join_all({
+        let exclude = &expansion.exclude;
         let context = &expansion.context;
         expansion
           .todo
           .drain(..)
-          .map(|path_glob| context.expand_single(path_glob))
+          .map(|path_glob| context.expand_single(path_glob, exclude))
           .collect::<Vec<_>>()
       });
       round.map(move |paths_and_globs| {
@@ -754,16 +769,20 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   /// Apply a PathGlob, returning PathStats and additional PathGlobs that are needed for the
   /// expansion.
   ///
-  fn expand_single(&self, path_glob: PathGlob) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
+  fn expand_single(
+    &self,
+    path_glob: PathGlob,
+    exclude: &Arc<Gitignore>,
+  ) -> BoxFuture<(Vec<PathStat>, Vec<PathGlob>), E> {
     match path_glob {
       PathGlob::Wildcard { canonical_dir, symbolic_path, wildcard } =>
         // Filter directory listing to return PathStats, with no continuation.
-        self.directory_listing(canonical_dir, symbolic_path, wildcard)
+        self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
           .map(|path_stats| (path_stats, vec![]))
           .to_boxed(),
       PathGlob::DirWildcard { canonical_dir, symbolic_path, wildcard, remainder } =>
         // Filter directory listing and request additional PathGlobs for matched Dirs.
-        self.directory_listing(canonical_dir, symbolic_path, wildcard)
+        self.directory_listing(canonical_dir, symbolic_path, wildcard, exclude)
           .and_then(move |path_stats| {
             path_stats.into_iter()
               .filter_map(|ps| match ps {
