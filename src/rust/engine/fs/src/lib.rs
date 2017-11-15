@@ -300,14 +300,13 @@ pub struct PathGlobs {
 
 impl PathGlobs {
   pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
-    let ignore_for_exclude =
-      if exclude.is_empty() {
-        EMPTY_IGNORE.clone()
-      } else {
-        Arc::new(create_ignore(exclude).map_err(|e| {
-          format!("Could not parse glob excludes {:?}: {:?}", exclude, e)
-        })?)
-      };
+    let ignore_for_exclude = if exclude.is_empty() {
+      EMPTY_IGNORE.clone()
+    } else {
+      Arc::new(create_ignore(exclude).map_err(|e| {
+        format!("Could not parse glob excludes {:?}: {:?}", exclude, e)
+      })?)
+    };
     Ok(PathGlobs {
       include: PathGlob::create(include)?,
       exclude: ignore_for_exclude,
