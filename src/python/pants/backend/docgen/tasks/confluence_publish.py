@@ -17,7 +17,6 @@ from pants.task.task import Task
 from pants.util import desktop
 from pants.util.dirutil import safe_open
 
-
 # TODO: Rethink this. We shouldn't require subclassing this. Instead, the wiki identity should come
 # from options. However if we decide against that, we should rename this ConfluencePublishBase.
 
@@ -64,7 +63,7 @@ class ConfluencePublish(Task):
     deprecated_conditional(
       lambda: True,
       '1.6.0.dev0',
-      'pants.backend.docgen.tasks.confluence_publish.py is deprecated',
+      'pants.backend.docgen.tasks.confluence_publish.py',
       'Use contrib.confluence.tasks.confluence_publish.py instead'
     )
     pages = []
