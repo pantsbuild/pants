@@ -1,13 +1,14 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use core::TypeId;
 use externs;
-use fs::{PosixFS, Snapshots};
+use fs::{PosixFS, Snapshots, Store};
 use graph::{EntryId, Graph};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
@@ -23,6 +24,7 @@ pub struct Core {
   pub rule_graph: RuleGraph,
   pub types: Types,
   pub snapshots: Snapshots,
+  pub store: Store,
   pub vfs: PosixFS,
 }
 
@@ -37,6 +39,16 @@ impl Core {
   ) -> Core {
     let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
+
+    let store_path = work_dir.join("lmdb_store");
+    let store = std::fs::create_dir_all(&store_path)
+        .map_err(|e| format!("{:?}", e))
+        .and_then(|()| Store::new(store_path))
+        .unwrap_or_else(
+      |e| {
+        panic!("Could not initialize Store directory {:?}", e)
+      },
+    );
 
     // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
     //   see: https://github.com/pantsbuild/pants/issues/4397
@@ -60,6 +72,7 @@ impl Core {
       types: types,
       rule_graph: rule_graph,
       snapshots: snapshots,
+      store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(build_root, ignore_patterns).unwrap_or_else(|e| {

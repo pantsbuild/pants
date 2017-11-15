@@ -1,10 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-pub mod hash;
+mod hash;
+pub use hash::Fingerprint;
 mod snapshot;
 pub use snapshot::Snapshot;
-pub mod store;
+mod store;
+pub use store::{Digest, Store};
 
 extern crate bazel_protos;
 extern crate boxfuture;
@@ -39,7 +41,7 @@ use ordermap::OrderMap;
 use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
-use hash::{Fingerprint, WriterHasher};
+use hash::WriterHasher;
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

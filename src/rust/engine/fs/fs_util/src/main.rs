@@ -8,9 +8,7 @@ extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
-use fs::hash::Fingerprint;
-use fs::store::{Digest, Store};
-use fs::VFS;
+use fs::{Digest, Fingerprint, Store, VFS};
 use futures::future::{Future, join_all};
 use itertools::Itertools;
 use std::error::Error;
