@@ -115,6 +115,8 @@ lazy_static! {
 
   static ref DOUBLE_STAR: &'static str = "**";
   static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new("**").unwrap();
+
+  static ref EMPTY_IGNORE: Arc<Gitignore> = Arc::new(Gitignore::empty());
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -293,23 +295,29 @@ impl PathGlob {
 #[derive(Debug)]
 pub struct PathGlobs {
   include: Vec<PathGlob>,
-  exclude: Gitignore,
+  exclude: Arc<Gitignore>,
 }
 
 impl PathGlobs {
   pub fn create(include: &[String], exclude: &[String]) -> Result<PathGlobs, String> {
+    let ignore_for_exclude =
+      if exclude.is_empty() {
+        EMPTY_IGNORE.clone()
+      } else {
+        Arc::new(create_ignore(exclude).map_err(|e| {
+          format!("Could not parse glob excludes {:?}: {:?}", exclude, e)
+        })?)
+      };
     Ok(PathGlobs {
       include: PathGlob::create(include)?,
-      exclude: create_ignore(exclude).map_err(|e| {
-        format!("Could not parse glob excludes {:?}: {:?}", exclude, e)
-      })?,
+      exclude: ignore_for_exclude,
     })
   }
 
   pub fn from_globs(include: Vec<PathGlob>) -> PathGlobs {
     PathGlobs {
       include: include,
-      exclude: Gitignore::empty(),
+      exclude: EMPTY_IGNORE.clone(),
     }
   }
 }
@@ -328,7 +336,7 @@ struct PathGlobsExpansion<T: Sized> {
 }
 
 fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
-  let mut ignore_builder = GitignoreBuilder::new(&"");
+  let mut ignore_builder = GitignoreBuilder::new("");
   for pattern in patterns {
     ignore_builder.add_line(None, pattern.as_str())?;
   }
@@ -604,8 +612,8 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         dest_path
           .to_str()
           .and_then(|dest_str| {
-            let escaped = Pattern::escape(dest_str);
-            PathGlob::create(&[escaped]).ok()
+            // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
+            PathGlob::create(&[Pattern::escape(dest_str)]).ok()
           })
           .unwrap_or_else(|| vec![])
       })
@@ -657,8 +665,10 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
                 .map(|symbolic_stat_path| (symbolic_stat_path, stat))
             })
             .map(|(stat_symbolic_path, stat)| {
-              // Canonicalize matched PathStats, and filter ignored paths. Note that we ignore
-              // links both before and after expansion.
+              // Canonicalize matched PathStats, and filter paths that are ignored by either the
+              // context, or by local excludes. Note that we apply context ignore patterns to both
+              // the symbolic and canonical names of Links, but only apply local excludes to their
+              // symbolic names.
               match stat {
                 Stat::Link(l) => {
                   if context.is_ignored(l.0.as_path(), false) ||
@@ -712,7 +722,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
     let init = PathGlobsExpansion {
       context: self.clone(),
       todo: path_globs.include,
-      exclude: Arc::new(path_globs.exclude),
+      exclude: path_globs.exclude,
       completed: HashSet::default(),
       outputs: OrderMap::default(),
     };
