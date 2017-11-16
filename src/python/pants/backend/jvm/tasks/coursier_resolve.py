@@ -41,64 +41,61 @@ class CoursierResolve:
 
     for artifact_set, target_subset in jar_targets.items():
       jars, global_excludes = IvyUtils.calculate_classpath(target_subset)
-
-    t_subset = target_subset
-
-    org = IvyUtils.INTERNAL_ORG_NAME
-    # name = resolve_hash_name
     #
-    # extra_configurations = [conf for conf in confs if conf and conf != 'default']
+    # t_subset = target_subset
+    #
+    # org = IvyUtils.INTERNAL_ORG_NAME
+    # # name = resolve_hash_name
+    # #
+    # # extra_configurations = [conf for conf in confs if conf and conf != 'default']
 
     jars_by_key = OrderedDict()
     for jar in jars:
       jars = jars_by_key.setdefault((jar.org, jar.name), [])
       jars.append(jar)
 
-    artifact_set = PinnedJarArtifactSet(pinned_artifacts)  # Copy, because we're modifying it.
-    for jars in jars_by_key.values():
-      for i, dep in enumerate(jars):
-        direct_coord = M2Coordinate.create(dep)
-        managed_coord = artifact_set[direct_coord]
-        if direct_coord.rev != managed_coord.rev:
-          # It may be necessary to actually change the version number of the jar we want to resolve
-          # here, because overrides do not apply directly (they are exclusively transitive). This is
-          # actually a good thing, because it gives us more control over what happens.
-          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
-          jars[i] = dep.copy(rev=coord.rev)
-        elif dep.force:
-          # If this dependency is marked as 'force' and there is no version conflict, use the normal
-          # pants behavior for 'force'.
-          artifact_set.put(direct_coord)
-
-    dependencies = [IvyUtils._generate_jar_template(jars) for jars in jars_by_key.values()]
-
-    # As it turns out force is not transitive - it only works for dependencies pants knows about
-    # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
-    # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
-    # edit the generated ivy.xml and use the override feature [3] though and that does work
-    # transitively as you'd hope.
+    # artifact_set = PinnedJarArtifactSet(pinned_artifacts)  # Copy, because we're modifying it.
+    # for jars in jars_by_key.values():
+    #   for i, dep in enumerate(jars):
+    #     direct_coord = M2Coordinate.create(dep)
+    #     managed_coord = artifact_set[direct_coord]
+    #     if direct_coord.rev != managed_coord.rev:
+    #       # It may be necessary to actually change the version number of the jar we want to resolve
+    #       # here, because overrides do not apply directly (they are exclusively transitive). This is
+    #       # actually a good thing, because it gives us more control over what happens.
+    #       coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+    #       jars[i] = dep.copy(rev=coord.rev)
+    #     elif dep.force:
+    #       # If this dependency is marked as 'force' and there is no version conflict, use the normal
+    #       # pants behavior for 'force'.
+    #       artifact_set.put(direct_coord)
     #
-    # [1] http://ant.apache.org/ivy/history/2.3.0/settings/conflict-managers.html
-    # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
-    #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
-    # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    overrides = [IvyUtils._generate_override_template(_coord) for _coord in artifact_set]
+    # dependencies = [IvyUtils._generate_jar_template(jars) for jars in jars_by_key.values()]
+    #
+    # # As it turns out force is not transitive - it only works for dependencies pants knows about
+    # # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
+    # # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
+    # # edit the generated ivy.xml and use the override feature [3] though and that does work
+    # # transitively as you'd hope.
+    # #
+    # # [1] http://ant.apache.org/ivy/history/2.3.0/settings/conflict-managers.html
+    # # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
+    # #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
+    # # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
+    # overrides = [IvyUtils._generate_override_template(_coord) for _coord in artifact_set]
+    #
+    # excludes = [IvyUtils._generate_exclude_template(exclude) for exclude in excludes]
 
-    excludes = [IvyUtils._generate_exclude_template(exclude) for exclude in excludes]
-
-    resolve_args = []
+    jars_to_resolve = []
     exclude_args = set()
     for k, v in jars_by_key.items():
       for jar in v:
-        resolve_args.append(jar.coordinate)
+        jars_to_resolve.append(jar)
         for ex in jar.excludes:
           ex_arg = "{}:{}".format(ex.org, ex.name)
           exclude_args.add(ex_arg)
 
-    def get_m2_id(coord):
-      return ':'.join([coord.org, coord.name, coord.rev])
-
-    # Prepare cousier args
+    # Prepare coursier args
     exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
     output_fn = 'output.json'
     coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
@@ -116,20 +113,23 @@ class CoursierResolve:
                 '--cache', coursier_cache_path,
                 '--json-output-file', output_fn]
 
-    def construct_classifier_to_coordinates(list_of_coords):
+    def construct_classifier_to_jar(jars):
       product = defaultdict(list)
-      for my_coord in list_of_coords:
-        product[my_coord.classifier or ''].append(my_coord)
+      for jar in jars:
+        product[jar.coordinate.classifier or ''].append(jar)
       return product
 
-    classifier_to_coordinates = construct_classifier_to_coordinates(resolve_args)
-    for classifier, coords in classifier_to_coordinates.items():
+    classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
+    for classifier, jars in classifier_to_jars.items():
 
       cmd_args = list(common_args)
       if classifier:
         cmd_args.extend(['--classifier', classifier])
 
-      cmd_args.extend(get_m2_id(x) for x in coords)
+      for j in jars:
+        if j.intransitive:
+          cmd_args.append('--intransitive')
+        cmd_args.append(j.coordinate.simple_coord)
 
       # Add org:artifact to exclude
       for x in exclude_args:
@@ -184,11 +184,23 @@ class CoursierResolve:
               return transitive_jar_path_for_coord
 
             for jar in t.jar_dependencies:
-              simple_coord = jar.coordinate.simple_coord
-              if simple_coord in files_by_coord:
-                transitive_resolved_jars = get_transitive_resolved_jars(simple_coord, files_by_coord)
+
+              simple_coord_candidate = jar.coordinate.simple_coord
+              final_simple_coord = None
+              if simple_coord_candidate in files_by_coord:
+                final_simple_coord = simple_coord_candidate
+              elif simple_coord_candidate in result['conflict_resolution']:
+                final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
+              # else:
+              #   err_msg = '{} not found in resolution or in conflict_resolution'.format(simple_coord_candidate)
+              #   # logger.error(err_msg)
+              #   raise TaskError(err_msg)
+
+              if final_simple_coord:
+                transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
                 if transitive_resolved_jars:
                   compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+
               # classifier = jar.classifier if self._conf == 'default' else self._conf
               # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
               # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
