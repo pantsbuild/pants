@@ -330,6 +330,8 @@ impl Select {
   }
 }
 
+// TODO: This is a Node only because it is used as a root in the graph, but it should never be
+// requested using context.get
 impl Node for Select {
   type Output = Value;
 
@@ -586,7 +588,9 @@ struct TransitiveExpansion {
   outputs: OrderMap<Key, Value>,
 }
 
-impl SelectTransitive {
+impl Node for SelectTransitive {
+  type Output = Value;
+
   fn run(self, context: Context) -> NodeFuture<Value> {
     // Select the product holding the dependency list.
     Select {
@@ -651,6 +655,12 @@ impl SelectTransitive {
         }
       })
       .to_boxed()
+  }
+}
+
+impl From<SelectTransitive> for NodeKey {
+  fn from(n: SelectTransitive) -> Self {
+    NodeKey::SelectTransitive(n)
   }
 }
 
@@ -1059,6 +1069,7 @@ pub enum NodeKey {
   Scandir(Scandir),
   Stat(Stat),
   Select(Select),
+  SelectTransitive(SelectTransitive),
   Snapshot(Snapshot),
   Task(Task),
 }
@@ -1082,6 +1093,13 @@ impl NodeKey {
           typstr(&s.selector.product)
         )
       }
+      &NodeKey::SelectTransitive(ref s) => {
+        format!(
+          "TransitiveDependencies( {}, {})",
+          typstr(&s.selector.product),
+          typstr(&s.selector.dep_product)
+        )
+      }
       &NodeKey::Task(ref s) => {
         format!(
           "Task({}, {}, {})",
@@ -1100,6 +1118,7 @@ impl NodeKey {
     }
     match self {
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
+      &NodeKey::SelectTransitive(ref s) => typstr(&s.selector.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
@@ -1130,6 +1149,7 @@ impl Node for NodeKey {
       NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
+      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
