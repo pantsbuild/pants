@@ -4,7 +4,7 @@
 mod hash;
 pub use hash::Fingerprint;
 mod snapshot;
-pub use snapshot::Snapshot;
+pub use snapshot::{GetFileDigest, Snapshot};
 mod store;
 pub use store::{Digest, Store};
 mod pool;
@@ -18,6 +18,7 @@ extern crate futures_cpupool;
 extern crate glob;
 extern crate hex;
 extern crate ignore;
+extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
@@ -1013,6 +1014,7 @@ impl Snapshots {
 
       Ok(Snapshot {
         fingerprint: fingerprint,
+        digest: None,
         path_stats: paths,
       })
     })

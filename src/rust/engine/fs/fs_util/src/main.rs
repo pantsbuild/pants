@@ -2,17 +2,14 @@ extern crate bazel_protos;
 extern crate boxfuture;
 extern crate clap;
 extern crate fs;
-extern crate itertools;
 extern crate futures;
 extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
-use fs::{Digest, Fingerprint, Store, VFS, ResettablePool};
+use fs::{Fingerprint, GetFileDigest, ResettablePool, Snapshot, Store, VFS};
 use futures::future::{self, Future, join_all};
-use itertools::Itertools;
 use std::error::Error;
-use std::ffi::OsString;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -180,7 +177,10 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let digest = save_file(store, Arc::new(posix_fs), f).wait().unwrap();
+              let digest = FileSaver(store, Arc::new(posix_fs))
+                .digest(&f)
+                .wait()
+                .unwrap();
               Ok(println!("{} {}", digest.0, digest.1))
             }
             o => Err(
@@ -215,7 +215,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               &[],
             )?)
             .map_err(|e| format!("Error expanding globs: {}", e.description()))
-            .and_then(move |paths| save_directory(store, posix_fs, paths))
+            .and_then(move |paths| {
+              Snapshot::from_path_stats(
+                store.clone(),
+                Arc::new(FileSaver(store.clone(), posix_fs)),
+                paths,
+              )
+            })
+            .map(|snapshot| snapshot.digest.unwrap())
             .wait()?;
           Ok(println!("{} {}", digest.0, digest.1))
         }
@@ -278,124 +285,22 @@ fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::Posi
   fs::PosixFS::new(&root, pool, vec![]).unwrap()
 }
 
-fn save_file(
-  store: Arc<Store>,
-  posix_fs: Arc<fs::PosixFS>,
-  file: fs::File,
-) -> BoxFuture<Digest, String> {
-  posix_fs
-    .read_file(&file)
-    .map_err(move |err| {
-      format!("Error reading file {:?}: {}", file, err.description())
-    })
-    .and_then(move |content| store.store_file_bytes(content.content))
-    .to_boxed()
-}
+struct FileSaver(Arc<Store>, Arc<fs::PosixFS>);
 
-fn save_directory(
-  store: Arc<Store>,
-  posix_fs: Arc<fs::PosixFS>,
-  mut path_stats: Vec<fs::PathStat>,
-) -> BoxFuture<Digest, String> {
-  let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
-    Vec::new();
-  let mut dir_futures: Vec<BoxFuture<bazel_protos::remote_execution::DirectoryNode, String>> =
-    Vec::new();
-
-  path_stats.sort_by(|a, b| a.path().cmp(b.path()));
-
-  for (first_component, group) in
-    &path_stats.into_iter().group_by(|s| {
-      s.path().components().next().unwrap().as_os_str().to_owned()
-    })
-  {
-    let mut path_group: Vec<fs::PathStat> = group.collect();
-    if path_group.len() == 1 && path_group.get(0).unwrap().path().components().count() == 1 {
-      // Exactly one entry with exactly one component indicates either a file in this directory, or
-      // an empty directory.
-      // If the child is a non-empty directory, or a file therein, there must be multiple PathStats
-      // with that prefix component, and we will handle that in the recursive save_directory call.
-
-      match path_group.pop().unwrap() {
-        fs::PathStat::File { ref stat, .. } => {
-          let is_executable = stat.is_executable;
-          file_futures.push(
-            save_file(store.clone(), posix_fs.clone(), stat.clone())
-              .and_then(move |digest| {
-                let mut file_node = bazel_protos::remote_execution::FileNode::new();
-                file_node.set_name(osstring_as_utf8(first_component)?);
-                file_node.set_digest(digest.into());
-                file_node.set_is_executable(is_executable);
-                Ok(file_node)
-              })
-              .to_boxed(),
-          );
-        }
-        fs::PathStat::Dir { .. } => {
-          // Because there are no children of this Dir, it must be empty.
-          dir_futures.push(
-            store
-              .record_directory(&bazel_protos::remote_execution::Directory::new())
-              .map(move |digest| {
-                let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
-                directory_node.set_name(osstring_as_utf8(first_component).unwrap());
-                directory_node.set_digest(digest.into());
-                directory_node
-              })
-              .to_boxed(),
-          );
-        }
-      }
-    } else {
-      dir_futures.push(
-        save_directory(
-          store.clone(),
-          posix_fs.clone(),
-          paths_of_child_dir(path_group),
-        ).and_then(move |digest| {
-          let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
-          dir_node.set_name(osstring_as_utf8(first_component)?);
-          dir_node.set_digest(digest.into());
-          Ok(dir_node)
-        })
-          .to_boxed(),
-      );
-    }
-  }
-  join_all(dir_futures)
-    .join(join_all(file_futures))
-    .and_then(move |(dirs, files)| {
-      let mut directory = bazel_protos::remote_execution::Directory::new();
-      directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
-      directory.set_files(protobuf::RepeatedField::from_vec(files));
-      store.record_directory(&directory)
-    })
-    .to_boxed()
-}
-
-fn paths_of_child_dir(paths: Vec<fs::PathStat>) -> Vec<fs::PathStat> {
-  paths
-    .into_iter()
-    .filter_map(|s| {
-      if s.path().components().count() == 1 {
-        return None;
-      }
-      Some(match s {
-        fs::PathStat::File { path, stat } => {
-          fs::PathStat::File {
-            path: path.iter().skip(1).collect(),
-            stat: stat,
-          }
-        }
-        fs::PathStat::Dir { path, stat } => {
-          fs::PathStat::Dir {
-            path: path.iter().skip(1).collect(),
-            stat: stat,
-          }
-        }
+impl GetFileDigest<String> for FileSaver {
+  fn digest(&self, file: &fs::File) -> BoxFuture<fs::Digest, String> {
+    let file_copy = file.clone();
+    let store = self.0.clone();
+    self
+      .1
+      .clone()
+      .read_file(&file)
+      .map_err(move |err| {
+        format!("Error reading file {:?}: {}", file_copy, err.description())
       })
-    })
-    .collect()
+      .and_then(move |content| store.store_file_bytes(content.content))
+      .to_boxed()
+  }
 }
 
 fn materialize_directory(
@@ -486,12 +391,6 @@ fn materialize_file(
       }
     })
     .to_boxed()
-}
-
-fn osstring_as_utf8(path: OsString) -> Result<String, String> {
-  path.into_string().map_err(|p| {
-    format!("{:?}'s file_name is not representable in UTF8", p)
-  })
 }
 
 fn make_clean_dir(path: &Path) -> Result<(), io::Error> {
