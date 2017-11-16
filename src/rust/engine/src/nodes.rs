@@ -43,7 +43,7 @@ fn was_required(failure: Failure) -> Failure {
   }
 }
 
-trait GetNode {
+pub trait GetNode {
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
 }
 
@@ -282,13 +282,12 @@ impl Select {
       vec![
         self
           .get_snapshot(&context)
-          .and_then(move |snapshot|
+          .and_then(
+            move |snapshot|
             // Request the file contents of the Snapshot, and then store them.
-            context.core.snapshots.contents_for(&context.core.vfs, snapshot)
-              .then(move |files_content_res| match files_content_res {
-                Ok(files_content) => Ok(Snapshot::store_files_content(&context, &files_content)),
-                Err(e) => Err(throw(&e)),
-              }))
+            snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
+              .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
+          )
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
@@ -814,7 +813,7 @@ impl From<ReadLink> for NodeKey {
 /// A Node that represents reading a file and fingerprinting its contents.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct DigestFile(File);
+pub struct DigestFile(pub File);
 
 impl Node for DigestFile {
   type Output = hashing::Digest;
@@ -846,31 +845,6 @@ impl Node for DigestFile {
 impl From<DigestFile> for NodeKey {
   fn from(n: DigestFile) -> Self {
     NodeKey::DigestFile(n)
-  }
-}
-
-///
-/// A Node that represents consuming the stat for some path.
-///
-/// NB: Because the `Scandir` operation gets the stats for a parent directory in a single syscall,
-/// this operation results in no data, and is simply a placeholder for `Snapshot` Nodes to use to
-/// declare a dependency on the existence/content of a particular path. This makes them more error
-/// prone, unfortunately.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Stat(PathBuf);
-
-impl Node for Stat {
-  type Output = ();
-
-  fn run(self, _: Context) -> NodeFuture<()> {
-    future::ok(()).to_boxed()
-  }
-}
-
-impl From<Stat> for NodeKey {
-  fn from(n: Stat) -> Self {
-    NodeKey::Stat(n)
   }
 }
 
@@ -923,33 +897,17 @@ pub struct Snapshot {
 
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
-    // Recursively expand PathGlobs into PathStats while tracking their dependencies.
+    // Recursively expand PathGlobs into PathStats.
+    // We rely on Context::expand tracking dependencies for scandirs,
+    // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .then(move |path_stats_res| match path_stats_res {
-        Ok(path_stats) => {
-          // Declare dependencies on the relevant Stats, and then create a Snapshot.
-          let stats = future::join_all(
-            path_stats
-              .iter()
-              .map(
-                |path_stat| context.get(Stat(path_stat.path().to_owned())), // for recording only
-              )
-              .collect::<Vec<_>>(),
-          );
-          // And then create a Snapshot.
-          stats
-            .and_then(move |_| {
-              context
-                .core
-                .snapshots
-                .create(&context.core.vfs, path_stats)
-                .map_err(move |e| throw(&format!("Snapshot failed: {}", e)))
-            })
-            .to_boxed()
-        }
-        Err(e) => err(throw(&format!("PathGlobs expansion failed: {:?}", e))),
+      .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
+      .and_then(move |path_stats| {
+        fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
+          .map_err(move |e| format!("Snapshot failed: {}", e))
       })
+      .map_err(|e| throw(&e))
       .to_boxed()
   }
 
@@ -975,7 +933,7 @@ impl Snapshot {
     externs::invoke_unsafe(
       &context.core.types.construct_snapshot,
       &vec![
-        externs::store_bytes(&item.fingerprint.0),
+        externs::store_bytes(&(item.digest.0).0),
         externs::store_list(path_stats.iter().collect(), false),
       ],
     )
@@ -1138,7 +1096,6 @@ pub enum NodeKey {
   ExecuteProcess(ExecuteProcess),
   ReadLink(ReadLink),
   Scandir(Scandir),
-  Stat(Stat),
   Select(Select),
   Snapshot(Snapshot),
   Task(Task),
@@ -1157,7 +1114,6 @@ impl NodeKey {
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Stat(ref s) => format!("Stat({:?})", s.0),
       &NodeKey::Select(ref s) => {
         format!(
           "Select({}, {})",
@@ -1189,7 +1145,6 @@ impl NodeKey {
       &NodeKey::DigestFile(..) => "DigestFile".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
       &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
-      &NodeKey::Stat(..) => "Stat".to_string(),
     }
   }
 
@@ -1198,10 +1153,18 @@ impl NodeKey {
   ///
   pub fn fs_subject(&self) -> Option<&Path> {
     match self {
+      &NodeKey::DigestFile(ref s) => Some(s.0.path.as_path()),
       &NodeKey::ReadLink(ref s) => Some((s.0).0.as_path()),
       &NodeKey::Scandir(ref s) => Some((s.0).0.as_path()),
-      &NodeKey::Stat(ref s) => Some(s.0.as_path()),
-      _ => None,
+
+      // Not FS operations:
+      // Explicitly listed so that if people add new NodeKeys they need to consider whether their
+      // NodeKey represents an FS operation, and accordingly whether they need to add it to the
+      // above list or the below list.
+      &NodeKey::ExecuteProcess { .. } |
+      &NodeKey::Select { .. } |
+      &NodeKey::Snapshot { .. } |
+      &NodeKey::Task { .. } => None,
     }
   }
 }
@@ -1214,7 +1177,6 @@ impl Node for NodeKey {
       NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::ExecuteProcess(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),

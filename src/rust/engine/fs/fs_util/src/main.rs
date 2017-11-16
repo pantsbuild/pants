@@ -10,7 +10,7 @@ extern crate protobuf;
 use boxfuture::{Boxable, BoxFuture};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{GetFileDigest, ResettablePool, Snapshot, Store, VFS};
+use fs::{ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
 use futures::future::{self, Future, join_all};
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;
@@ -229,7 +229,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               let digest = FileSaver {
                 store: store.clone(),
                 posix_fs: Arc::new(posix_fs),
-              }.digest(&f)
+              }.store_by_digest(&f)
                 .wait()
                 .unwrap();
               if store_has_remote {
@@ -279,14 +279,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .and_then(move |paths| {
               Snapshot::from_path_stats(
                 store_copy.clone(),
-                Arc::new(FileSaver {
+                FileSaver {
                   store: store_copy,
                   posix_fs: posix_fs,
-                }),
+                },
                 paths,
               )
             })
-            .map(|snapshot| snapshot.digest.unwrap())
+            .map(|snapshot| snapshot.digest)
             .wait()?;
           if store_has_remote {
             store.ensure_remote_has_recursive(vec![digest]).wait()?;
@@ -374,13 +374,14 @@ fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::Posi
   fs::PosixFS::new(&root, pool, vec![]).unwrap()
 }
 
+#[derive(Clone)]
 struct FileSaver {
   store: Arc<Store>,
   posix_fs: Arc<fs::PosixFS>,
 }
 
-impl GetFileDigest<String> for FileSaver {
-  fn digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
+impl StoreFileByDigest<String> for FileSaver {
+  fn store_by_digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
     let file_copy = file.clone();
     let store = self.store.clone();
     self
