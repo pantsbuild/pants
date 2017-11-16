@@ -9,7 +9,7 @@ extern crate protobuf;
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
 use fs::hash::Fingerprint;
-use fs::store::Store;
+use fs::store::{Digest, Store};
 use fs::VFS;
 use futures::future::{Future, join_all};
 use itertools::Itertools;
@@ -179,9 +179,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let (fingerprint, size_bytes) =
-                save_file(store, Arc::new(posix_fs), f).wait().unwrap();
-              Ok(println!("{} {}", fingerprint, size_bytes))
+              let digest = save_file(store, Arc::new(posix_fs), f).wait().unwrap();
+              Ok(println!("{} {}", digest.0, digest.1))
             }
             o => Err(
               format!(
@@ -205,7 +204,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
-          let (fingerprint, size_bytes) = posix_fs
+          let digest = posix_fs
             .expand(fs::PathGlobs::create(
               &args
                 .values_of("globs")
@@ -217,7 +216,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .map_err(|e| format!("Error expanding globs: {}", e.description()))
             .and_then(move |paths| save_directory(store, posix_fs, paths))
             .wait()?;
-          Ok(println!("{} {}", fingerprint, size_bytes))
+          Ok(println!("{} {}", digest.0, digest.1))
         }
         ("cat-proto", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
@@ -280,18 +279,13 @@ fn save_file(
   store: Arc<Store>,
   posix_fs: Arc<fs::PosixFS>,
   file: fs::File,
-) -> BoxFuture<(Fingerprint, usize), String> {
+) -> BoxFuture<Digest, String> {
   posix_fs
     .read_file(&file)
     .map_err(move |err| {
       format!("Error reading file {:?}: {}", file, err.description())
     })
-    .and_then(move |content| {
-      Ok((
-        store.store_file_bytes(&content.content)?,
-        content.content.len(),
-      ))
-    })
+    .and_then(move |content| store.store_file_bytes(&content.content))
     .to_boxed()
 }
 
@@ -299,7 +293,7 @@ fn save_directory(
   store: Arc<Store>,
   posix_fs: Arc<fs::PosixFS>,
   mut path_stats: Vec<fs::PathStat>,
-) -> BoxFuture<(Fingerprint, usize), String> {
+) -> BoxFuture<Digest, String> {
   let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
     Vec::new();
   let mut dir_futures: Vec<BoxFuture<bazel_protos::remote_execution::DirectoryNode, String>> =
@@ -324,10 +318,10 @@ fn save_directory(
           let is_executable = stat.is_executable;
           file_futures.push(
             save_file(store.clone(), posix_fs.clone(), stat.clone())
-              .and_then(move |(fingerprint, size_bytes)| {
+              .and_then(move |digest| {
                 let mut file_node = bazel_protos::remote_execution::FileNode::new();
                 file_node.set_name(osstring_as_utf8(first_component)?);
-                file_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
+                file_node.set_digest(digest.into());
                 file_node.set_is_executable(is_executable);
                 Ok(file_node)
               })
@@ -336,12 +330,12 @@ fn save_directory(
         }
         fs::PathStat::Dir { .. } => {
           // Because there are no children of this Dir, it must be empty.
-          let (fingerprint, size_bytes) = store
+          let digest = store
             .record_directory(&bazel_protos::remote_execution::Directory::new())
             .unwrap();
           let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
           directory_node.set_name(osstring_as_utf8(first_component).unwrap());
-          directory_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
+          directory_node.set_digest(digest.into());
           dir_futures.push(futures::future::ok(directory_node).to_boxed());
         }
       }
@@ -351,10 +345,10 @@ fn save_directory(
           store.clone(),
           posix_fs.clone(),
           paths_of_child_dir(path_group),
-        ).and_then(move |(fingerprint, size_bytes)| {
+        ).and_then(move |digest| {
           let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
           dir_node.set_name(osstring_as_utf8(first_component)?);
-          dir_node.set_digest(fingerprint_to_digest(&fingerprint, size_bytes as i64));
+          dir_node.set_digest(digest.into());
           Ok(dir_node)
         })
           .to_boxed(),
@@ -445,16 +439,6 @@ fn materialize_directory(
     )?;
   }
   Ok(())
-}
-
-pub fn fingerprint_to_digest(
-  fingerprint: &Fingerprint,
-  size_bytes: i64,
-) -> bazel_protos::remote_execution::Digest {
-  let mut digest = bazel_protos::remote_execution::Digest::new();
-  digest.set_hash(fingerprint.to_hex());
-  digest.set_size_bytes(size_bytes);
-  digest
 }
 
 fn osstring_as_utf8(path: OsString) -> Result<String, String> {

@@ -1,5 +1,5 @@
 use bazel_protos;
-use digest::{Digest, FixedOutput};
+use digest::{Digest as DigestTrait, FixedOutput};
 use lmdb::{Database, DatabaseFlags, Environment, NO_OVERWRITE, Transaction};
 use lmdb::Error::{KeyExist, NotFound};
 use protobuf::core::Message;
@@ -53,8 +53,10 @@ impl Store {
     })
   }
 
-  pub fn store_file_bytes(&self, bytes: &[u8]) -> Result<Fingerprint, String> {
-    self.store_bytes(bytes, self.file_store.clone())
+  pub fn store_file_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
+    self.store_bytes(bytes, self.file_store.clone()).map(
+      |fingerprint| Digest(fingerprint, bytes.len()),
+    )
   }
 
   fn store_bytes(&self, bytes: &[u8], db: Database) -> Result<Fingerprint, String> {
@@ -131,7 +133,7 @@ impl Store {
   pub fn record_directory(
     &self,
     directory: &bazel_protos::remote_execution::Directory,
-  ) -> Result<(Fingerprint, usize), String> {
+  ) -> Result<Digest, String> {
     let bytes = directory.write_to_bytes().map_err(|e| {
       format!(
         "Error serializing directory proto {:?}: {}",
@@ -140,10 +142,29 @@ impl Store {
       )
     })?;
 
-    Ok((
+    Ok(Digest(
       self.store_bytes(&bytes, self.directory_store.clone())?,
       bytes.len(),
     ))
+  }
+}
+
+///
+/// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
+/// fingerprint.
+///
+/// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
+/// of needing to create an entire protobuf to pass around the two fields.
+///
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Digest(pub Fingerprint, pub usize);
+
+impl Into<bazel_protos::remote_execution::Digest> for Digest {
+  fn into(self) -> bazel_protos::remote_execution::Digest {
+    let mut digest = bazel_protos::remote_execution::Digest::new();
+    digest.set_hash(self.0.to_hex());
+    digest.set_size_bytes(self.1 as i64);
+    digest
   }
 }
 
@@ -152,7 +173,7 @@ mod tests {
   extern crate tempdir;
 
   use bazel_protos;
-  use super::{Fingerprint, Store};
+  use super::{Digest, Fingerprint, Store};
   use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
   use protobuf::Message;
   use tempdir::TempDir;
@@ -161,17 +182,20 @@ mod tests {
   const STR: &str = "European Burmese";
   const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
 
+  fn digest() -> Digest {
+    Digest(Fingerprint::from_hex_string(HASH).unwrap(), STR.len())
+  }
+
   #[test]
   fn save_file() {
     let dir = TempDir::new("store").unwrap();
 
     assert_eq!(
-      &Store::new(dir.path())
+      Store::new(dir.path())
         .unwrap()
         .store_file_bytes(STR.as_bytes())
-        .unwrap()
-        .to_hex(),
-      HASH
+        .unwrap(),
+      digest()
     );
   }
 
@@ -184,12 +208,11 @@ mod tests {
       .store_file_bytes(STR.as_bytes())
       .unwrap();
     assert_eq!(
-      &Store::new(dir.path())
+      Store::new(dir.path())
         .unwrap()
         .store_file_bytes(STR.as_bytes())
-        .unwrap()
-        .to_hex(),
-      HASH
+        .unwrap(),
+      digest()
     );
   }
 
@@ -220,12 +243,11 @@ mod tests {
     );
 
     assert_eq!(
-      &Store::new(dir.path())
+      Store::new(dir.path())
         .unwrap()
         .store_file_bytes(STR.as_bytes())
-        .unwrap()
-        .to_hex(),
-      HASH
+        .unwrap(),
+      digest()
     );
 
     assert_eq!(
@@ -245,7 +267,7 @@ mod tests {
 
     let store = Store::new(dir.path()).unwrap();
     let hash = store.store_file_bytes(&data).unwrap();
-    assert_eq!(store.load_file_bytes(&hash).unwrap().unwrap(), data);
+    assert_eq!(store.load_file_bytes(&hash.0).unwrap().unwrap(), data);
   }
 
   #[test]
@@ -333,5 +355,14 @@ mod tests {
         .unwrap(),
       None
     );
+  }
+
+  #[test]
+  fn digest_to_bazel_digest() {
+    let digest = Digest(Fingerprint::from_hex_string(HASH).unwrap(), 16);
+    let mut bazel_digest = bazel_protos::remote_execution::Digest::new();
+    bazel_digest.set_hash(HASH.to_string());
+    bazel_digest.set_size_bytes(16);
+    assert_eq!(bazel_digest, digest.into());
   }
 }
