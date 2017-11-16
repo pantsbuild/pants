@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 pub mod hash;
+mod snapshot;
+pub use snapshot::Snapshot;
 pub mod store;
 
 extern crate bazel_protos;
@@ -827,23 +829,6 @@ impl fmt::Debug for FileContent {
       self.content.len(),
       describer,
       &self.content[..len]
-    )
-  }
-}
-
-#[derive(Clone)]
-pub struct Snapshot {
-  pub fingerprint: Fingerprint,
-  pub path_stats: Vec<PathStat>,
-}
-
-impl fmt::Debug for Snapshot {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(
-      f,
-      "Snapshot({}, entries={})",
-      self.fingerprint.to_hex(),
-      self.path_stats.len()
     )
   }
 }
