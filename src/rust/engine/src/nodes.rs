@@ -60,13 +60,9 @@ impl GetNode for Context {
   /// Get the future value for the given Node implementation.
   ///
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
-    if N::is_inline() {
-      node.run(self.clone())
-    } else {
-      // TODO: Odd place for this... could do it periodically in the background?
-      maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
-      self.core.graph.get(self.entry_id, self, node)
-    }
+    // TODO: Odd place for this... could do it periodically in the background?
+    maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
+    self.core.graph.get(self.entry_id, self, node)
   }
 }
 
@@ -104,7 +100,6 @@ pub trait Node: Into<NodeKey> {
   type Output: Clone + fmt::Debug + Into<NodeResult> + TryFrom<NodeResult> + Send + 'static;
 
   fn run(self, context: Context) -> NodeFuture<Self::Output>;
-  fn is_inline() -> bool;
 }
 
 ///
@@ -383,10 +378,6 @@ impl Node for Select {
       })
       .to_boxed()
   }
-
-  fn is_inline() -> bool {
-    true
-  }
 }
 
 impl From<Select> for NodeKey {
@@ -449,7 +440,7 @@ impl SelectDependencies {
     //   https://github.com/pantsbuild/pants/issues/4020
 
     let dep_subject_key = externs::key_for(dep_subject);
-    context.get(Select {
+    Select {
       selector: selectors::Select::without_variant(self.selector.product),
       subject: dep_subject_key,
       variants: self.variants.clone(),
@@ -463,24 +454,19 @@ impl SelectDependencies {
           e.matches_subject_type(dep_subject_key.type_id().clone())
         })
         .collect(),
-    })
+    }.run(context.clone())
   }
 }
 
-impl Node for SelectDependencies {
-  type Output = Value;
-
+impl SelectDependencies {
   fn run(self, context: Context) -> NodeFuture<Value> {
-    context
-      .get(
-        // Select the product holding the dependency list.
-        Select {
-          selector: selectors::Select::without_variant(self.selector.dep_product),
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          entries: self.dep_product_entries.clone(),
-        },
-      )
+    // Select the product holding the dependency list.
+    Select {
+      selector: selectors::Select::without_variant(self.selector.dep_product),
+      subject: self.subject.clone(),
+      variants: self.variants.clone(),
+      entries: self.dep_product_entries.clone(),
+    }.run(context.clone())
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
@@ -505,16 +491,6 @@ impl Node for SelectDependencies {
         }
       })
       .to_boxed()
-  }
-
-  fn is_inline() -> bool {
-    true
-  }
-}
-
-impl From<SelectDependencies> for NodeKey {
-  fn from(n: SelectDependencies) -> Self {
-    NodeKey::SelectDependencies(n)
   }
 }
 
@@ -576,20 +552,19 @@ impl SelectTransitive {
     subject_key: Key,
   ) -> NodeFuture<(Key, Value, Vec<Value>)> {
     let field_name = self.selector.field.to_owned();
-    context
-      .get(Select {
-        selector: selectors::Select::without_variant(self.selector.product),
-        subject: subject_key,
-        variants: self.variants.clone(),
-        // NB: We're filtering out all of the entries for field types other than
-        //     subject_key's since none of them will match.
-        entries: self
-          .product_entries
-          .clone()
-          .into_iter()
-          .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
-          .collect(),
-      })
+    Select {
+      selector: selectors::Select::without_variant(self.selector.product),
+      subject: subject_key,
+      variants: self.variants.clone(),
+      // NB: We're filtering out all of the entries for field types other than
+      //     subject_key's since none of them will match.
+      entries: self
+        .product_entries
+        .clone()
+        .into_iter()
+        .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
+        .collect(),
+    }.run(context.clone())
       .map(move |product| {
         let deps = externs::project_multi(&product, &field_name);
         (subject_key, product, deps)
@@ -611,20 +586,15 @@ struct TransitiveExpansion {
   outputs: OrderMap<Key, Value>,
 }
 
-impl Node for SelectTransitive {
-  type Output = Value;
-
+impl SelectTransitive {
   fn run(self, context: Context) -> NodeFuture<Value> {
-    context
-      .get(
-        // Select the product holding the dependency list.
-        Select {
-          selector: selectors::Select::without_variant(self.selector.dep_product),
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          entries: self.dep_product_entries.clone(),
-        },
-      )
+    // Select the product holding the dependency list.
+    Select {
+      selector: selectors::Select::without_variant(self.selector.dep_product),
+      subject: self.subject.clone(),
+      variants: self.variants.clone(),
+      entries: self.dep_product_entries.clone(),
+    }.run(context.clone())
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
@@ -682,16 +652,6 @@ impl Node for SelectTransitive {
       })
       .to_boxed()
   }
-
-  fn is_inline() -> bool {
-    false
-  }
-}
-
-impl From<SelectTransitive> for NodeKey {
-  fn from(n: SelectTransitive) -> Self {
-    NodeKey::SelectTransitive(n)
-  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -733,23 +693,18 @@ impl SelectProjection {
   }
 }
 
-impl Node for SelectProjection {
-  type Output = Value;
-
+impl SelectProjection {
   fn run(self, context: Context) -> NodeFuture<Value> {
-    context
-      .get(
-        // Request the product we need to compute the subject.
-        Select {
-          selector: selectors::Select {
-            product: self.selector.input_product,
-            variant_key: None,
-          },
-          subject: self.subject.clone(),
-          variants: self.variants.clone(),
-          entries: self.input_product_entries.clone(),
-        },
-      )
+    // Request the product we need to compute the subject.
+    Select {
+      selector: selectors::Select {
+        product: self.selector.input_product,
+        variant_key: None,
+      },
+      subject: self.subject.clone(),
+      variants: self.variants.clone(),
+      entries: self.input_product_entries.clone(),
+    }.run(context.clone())
       .then(move |dep_product_res| {
         match dep_product_res {
           Ok(dep_product) => {
@@ -759,15 +714,14 @@ impl Node for SelectProjection {
               &self.selector.field,
               &self.selector.projected_subject,
             );
-            context
-              .get(Select {
-                selector: selectors::Select::without_variant(self.selector.product),
-                subject: externs::key_for(&projected_subject),
-                variants: self.variants.clone(),
-                // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
-                // subject here, because there is only one projected type.
-                entries: self.projected_entries.clone(),
-              })
+            Select {
+              selector: selectors::Select::without_variant(self.selector.product),
+              subject: externs::key_for(&projected_subject),
+              variants: self.variants.clone(),
+              // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
+              // subject here, because there is only one projected type.
+              entries: self.projected_entries.clone(),
+            }.run(context.clone())
               .then(move |output_res| {
                 // If the output product is available, return it.
                 match output_res {
@@ -781,16 +735,6 @@ impl Node for SelectProjection {
         }
       })
       .to_boxed()
-  }
-
-  fn is_inline() -> bool {
-    true
-  }
-}
-
-impl From<SelectProjection> for NodeKey {
-  fn from(n: SelectProjection) -> Self {
-    NodeKey::SelectProjection(n)
   }
 }
 
@@ -818,9 +762,6 @@ impl Node for ReadLink {
       })
       .to_boxed()
   }
-  fn is_inline() -> bool {
-    false
-  }
 }
 
 impl From<ReadLink> for NodeKey {
@@ -845,10 +786,6 @@ impl Node for Stat {
 
   fn run(self, _: Context) -> NodeFuture<()> {
     future::ok(()).to_boxed()
-  }
-
-  fn is_inline() -> bool {
-    false
   }
 }
 
@@ -882,9 +819,6 @@ impl Node for Scandir {
         Err(e) => Err(throw(&format!("Failed to scandir for {:?}: {:?}", dir, e))),
       })
       .to_boxed()
-  }
-  fn is_inline() -> bool {
-    false
   }
 }
 
@@ -1026,13 +960,12 @@ impl Node for Snapshot {
       .edges_for_inner(&self.entry)
       .expect("edges for snapshot exist.");
     // Compute and parse PathGlobs for the subject.
-    context
-      .get(Select::new(
-        context.core.types.path_globs.clone(),
-        self.subject.clone(),
-        self.variants.clone(),
-        edges,
-      ))
+    Select::new(
+      context.core.types.path_globs.clone(),
+      self.subject.clone(),
+      self.variants.clone(),
+      edges,
+    ).run(context.clone())
       .then(move |path_globs_res| match path_globs_res {
         Ok(path_globs_val) => {
           match Self::lift_path_globs(&path_globs_val) {
@@ -1043,9 +976,6 @@ impl Node for Snapshot {
         Err(failure) => err(failure),
       })
       .to_boxed()
-  }
-  fn is_inline() -> bool {
-    false
   }
 }
 
@@ -1065,9 +995,6 @@ pub struct Task {
 }
 
 impl Task {
-  ///
-  /// TODO: Can/should inline execution of all of these.
-  ///
   fn get(&self, context: &Context, selector: Selector) -> NodeFuture<Value> {
     let ref edges = context
       .core
@@ -1076,36 +1003,20 @@ impl Task {
       .expect("edges for task exist.");
     match selector {
       Selector::Select(s) => {
-        context.get(Select::new_with_selector(
-          s,
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ))
+        Select::new_with_selector(s, self.subject.clone(), self.variants.clone(), edges)
+          .run(context.clone())
       }
       Selector::SelectDependencies(s) => {
-        context.get(SelectDependencies::new(
-          s,
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ))
+        SelectDependencies::new(s, self.subject.clone(), self.variants.clone(), edges)
+          .run(context.clone())
       }
       Selector::SelectTransitive(s) => {
-        context.get(SelectTransitive::new(
-          s,
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ))
+        SelectTransitive::new(s, self.subject.clone(), self.variants.clone(), edges)
+          .run(context.clone())
       }
       Selector::SelectProjection(s) => {
-        context.get(SelectProjection::new(
-          s,
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ))
+        SelectProjection::new(s, self.subject.clone(), self.variants.clone(), edges)
+          .run(context.clone())
       }
     }
   }
@@ -1134,10 +1045,6 @@ impl Node for Task {
       })
       .to_boxed()
   }
-
-  fn is_inline() -> bool {
-    false
-  }
 }
 
 impl From<Task> for NodeKey {
@@ -1152,9 +1059,6 @@ pub enum NodeKey {
   Scandir(Scandir),
   Stat(Stat),
   Select(Select),
-  SelectDependencies(SelectDependencies),
-  SelectTransitive(SelectTransitive),
-  SelectProjection(SelectProjection),
   Snapshot(Snapshot),
   Task(Task),
 }
@@ -1178,27 +1082,6 @@ impl NodeKey {
           typstr(&s.selector.product)
         )
       }
-      &NodeKey::SelectDependencies(ref s) => {
-        format!(
-          "Dependencies({}, {})",
-          keystr(&s.subject),
-          typstr(&s.selector.product)
-        )
-      }
-      &NodeKey::SelectTransitive(ref s) => {
-        format!(
-          "TransitiveDependencies( {}, {})",
-          typstr(&s.selector.product),
-          typstr(&s.selector.dep_product)
-        )
-      }
-      &NodeKey::SelectProjection(ref s) => {
-        format!(
-          "Projection({}, {})",
-          keystr(&s.subject),
-          typstr(&s.selector.product)
-        )
-      }
       &NodeKey::Task(ref s) => {
         format!(
           "Task({}, {}, {})",
@@ -1217,9 +1100,6 @@ impl NodeKey {
     }
     match self {
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
-      &NodeKey::SelectDependencies(ref s) => typstr(&s.selector.product),
-      &NodeKey::SelectTransitive(ref s) => typstr(&s.selector.product),
-      &NodeKey::SelectProjection(ref s) => typstr(&s.selector.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
@@ -1250,16 +1130,9 @@ impl Node for NodeKey {
       NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Select(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::SelectTransitive(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::SelectDependencies(n) => n.run(context).map(|v| v.into()).to_boxed(),
-      NodeKey::SelectProjection(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Snapshot(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Task(n) => n.run(context).map(|v| v.into()).to_boxed(),
     }
-  }
-
-  fn is_inline() -> bool {
-    true
   }
 }
 
