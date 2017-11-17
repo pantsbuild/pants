@@ -42,7 +42,7 @@ class Buildozer(Task):
 
   @classmethod
   def register_options(cls, register):
-    register('--version', default='0.6.1', help='Version of buildozer.')
+    register('--version', default='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', help='Version of buildozer.')
     register('--add-dependencies', type=str, help='The dependency or dependencies to add')
     register('--remove-dependencies', type=str, help='The dependency or dependencies to remove')
     register('--command', type=str, help='A custom buildozer command to execute')
@@ -72,7 +72,7 @@ class Buildozer(Task):
       Buildozer.execute_binary(command, address.spec, binary=self._executable)
 
   @classmethod
-  def execute_binary(cls, command, spec, binary=None, version='0.6.1'):
+  def execute_binary(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c'):
     binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
 
     Buildozer._execute_buildozer_command([binary, command, spec])
