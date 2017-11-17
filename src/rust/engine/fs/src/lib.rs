@@ -356,7 +356,7 @@ fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool
 /// A wrapper around a CpuPool, to add the ability to drop the pool before forking,
 /// and then lazily re-initialize it in a new process.
 ///
-struct ResettablePool {
+pub struct ResettablePool {
   name_prefix: String,
   pool: RwLock<Option<CpuPool>>,
 }
@@ -408,7 +408,11 @@ pub struct PosixFS {
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: Vec<String>) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(
+    root: P,
+    pool: Arc<ResettablePool>,
+    ignore_patterns: Vec<String>,
+  ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -437,7 +441,7 @@ impl PosixFS {
     })?;
     Ok(PosixFS {
       root: canonical_root,
-      pool: Arc::new(ResettablePool::new("posix-fs-".to_string())),
+      pool: pool,
       ignore: ignore,
     })
   }
@@ -459,10 +463,6 @@ impl PosixFS {
       .collect::<Result<Vec<_>, io::Error>>()?;
     stats.sort_by(|s1, s2| s1.path().cmp(s2.path()));
     Ok(stats)
-  }
-
-  pub fn pre_fork(&self) {
-    self.pool.reset()
   }
 
   pub fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
@@ -1133,12 +1133,13 @@ impl Snapshots {
 mod posixfs_test {
   extern crate tempdir;
 
-  use super::{Dir, File, Link, PosixFS, Stat};
+  use super::{Dir, File, Link, PosixFS, Stat, ResettablePool};
   use futures::Future;
   use std;
   use std::io::Write;
   use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
+  use std::sync::Arc;
 
   #[test]
   fn is_executable_false() {
@@ -1164,7 +1165,7 @@ mod posixfs_test {
       &content,
       0o600,
     );
-    let fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let fs = new_posixfs(&dir.path());
     let file_content = fs.read_file(&File {
       path: path.clone(),
       is_executable: false,
@@ -1177,8 +1178,7 @@ mod posixfs_test {
   #[test]
   fn read_file_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    PosixFS::new(&dir.path(), vec![])
-      .unwrap()
+    new_posixfs(&dir.path())
       .read_file(&File {
         path: PathBuf::from("marmosets"),
         is_executable: false,
@@ -1190,7 +1190,7 @@ mod posixfs_test {
   #[test]
   fn stat_executable_file() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("photograph_marmosets");
     make_file(&dir.path().join(&path), &[], 0o700);
     assert_eq!(
@@ -1205,7 +1205,7 @@ mod posixfs_test {
   #[test]
   fn stat_nonexecutable_file() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
     assert_eq!(
@@ -1220,7 +1220,7 @@ mod posixfs_test {
   #[test]
   fn stat_dir() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
     assert_eq!(
@@ -1232,7 +1232,7 @@ mod posixfs_test {
   #[test]
   fn stat_symlink() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
 
@@ -1246,8 +1246,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_other() {
-    let posix_fs = PosixFS::new("/dev", vec![]).unwrap();
-    posix_fs.stat(PathBuf::from("null")).expect_err(
+    new_posixfs("/dev").stat(PathBuf::from("null")).expect_err(
       "Want error",
     );
   }
@@ -1255,7 +1254,7 @@ mod posixfs_test {
   #[test]
   fn stat_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     posix_fs.stat(PathBuf::from("no_marmosets")).expect_err(
       "Want error",
     );
@@ -1264,7 +1263,7 @@ mod posixfs_test {
   #[test]
   fn scandir_empty() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
     assert_eq!(posix_fs.scandir(&Dir(path)).wait().unwrap(), vec![]);
@@ -1273,7 +1272,7 @@ mod posixfs_test {
   #[test]
   fn scandir() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
 
@@ -1323,7 +1322,7 @@ mod posixfs_test {
   #[test]
   fn scandir_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     posix_fs
       .scandir(&Dir(PathBuf::from("no_marmosets_here")))
       .wait()
@@ -1331,7 +1330,7 @@ mod posixfs_test {
   }
 
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
-    let fs = PosixFS::new(path, vec![]).unwrap();
+    let fs = new_posixfs(path);
     let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
     assert_eq!(stats.len(), 1);
     match stats.get(0).unwrap() {
@@ -1346,5 +1345,13 @@ mod posixfs_test {
     let mut permissions = std::fs::metadata(path).unwrap().permissions();
     permissions.set_mode(mode);
     file.set_permissions(permissions).unwrap();
+  }
+
+  fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
+    PosixFS::new(
+      dir.as_ref(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      vec![],
+    ).unwrap()
   }
 }
