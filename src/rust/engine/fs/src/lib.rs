@@ -344,8 +344,12 @@ fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
   ignore_builder.build()
 }
 
-fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool {
-  match ignore.matched(path, is_dir) {
+fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
+  let is_dir = match stat {
+    &Stat::Dir(_) => true,
+    _ => false,
+  };
+  match ignore.matched(stat.path(), is_dir) {
     ignore::Match::None |
     ignore::Match::Whitelist(_) => false,
     ignore::Match::Ignore(_) => true,
@@ -442,8 +446,8 @@ impl PosixFS {
     *pool = None;
   }
 
-  pub fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    is_ignored(&self.ignore, path, is_dir)
+  pub fn is_ignored(&self, stat: &Stat) -> bool {
+    is_ignored(&self.ignore, stat)
   }
 
   pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
@@ -577,8 +581,8 @@ impl VFS<io::Error> for Arc<PosixFS> {
     PosixFS::scandir(self, &dir)
   }
 
-  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    PosixFS::is_ignored(self, path, is_dir)
+  fn is_ignored(&self, stat: &Stat) -> bool {
+    PosixFS::is_ignored(self, stat)
   }
 
   fn mk_error(msg: &str) -> io::Error {
@@ -592,7 +596,7 @@ impl VFS<io::Error> for Arc<PosixFS> {
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
-  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
+  fn is_ignored(&self, stat: &Stat) -> bool;
   fn mk_error(msg: &str) -> E;
 
   ///
@@ -670,35 +674,17 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               // context, or by local excludes. Note that we apply context ignore patterns to both
               // the symbolic and canonical names of Links, but only apply local excludes to their
               // symbolic names.
-              match stat {
-                Stat::Link(l) => {
-                  if context.is_ignored(l.0.as_path(), false) ||
-                    is_ignored(&exclude, l.0.as_path(), false)
-                  {
-                    future::ok(None).to_boxed()
-                  } else {
-                    context.canonicalize(stat_symbolic_path, l)
+              if context.is_ignored(&stat) || is_ignored(&exclude, &stat) {
+                future::ok(None).to_boxed()
+              } else {
+                match stat {
+                  Stat::Link(l) => context.canonicalize(stat_symbolic_path, l),
+                  Stat::Dir(d) => {
+                    future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).to_boxed()
                   }
-                }
-                Stat::Dir(d) => {
-                  let res = if context.is_ignored(d.0.as_path(), true) ||
-                    is_ignored(&exclude, d.0.as_path(), true)
-                  {
-                    None
-                  } else {
-                    Some(PathStat::dir(stat_symbolic_path.to_owned(), d))
-                  };
-                  future::ok(res).to_boxed()
-                }
-                Stat::File(f) => {
-                  let res = if context.is_ignored(f.path.as_path(), false) ||
-                    is_ignored(&exclude, f.path.as_path(), false)
-                  {
-                    None
-                  } else {
-                    Some(PathStat::file(stat_symbolic_path.to_owned(), f))
-                  };
-                  future::ok(res).to_boxed()
+                  Stat::File(f) => {
+                    future::ok(Some(PathStat::file(stat_symbolic_path.to_owned(), f))).to_boxed()
+                  }
                 }
               }
             })
