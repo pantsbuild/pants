@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use core::TypeId;
 use externs;
-use fs::{PosixFS, Snapshots, Store};
+use fs::{PosixFS, Snapshots, Store, safe_create_dir_all_ioerror};
 use graph::{EntryId, Graph};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
@@ -40,8 +40,12 @@ impl Core {
     let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
 
-    let store_path = work_dir.join("lmdb_store");
-    let store = std::fs::create_dir_all(&store_path)
+    let store_path = match std::env::home_dir() {
+      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
+      None => panic!("Could not find home dir"),
+    };
+
+    let store = safe_create_dir_all_ioerror(&store_path)
         .map_err(|e| format!("{:?}", e))
         .and_then(|()| Store::new(store_path))
         .unwrap_or_else(

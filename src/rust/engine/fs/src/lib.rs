@@ -837,7 +837,7 @@ impl fmt::Debug for FileContent {
 
 // Like std::fs::create_dir_all, except handles concurrent calls among multiple
 // threads or processes. Originally lifted from rustc.
-fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
+pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
   match fs::create_dir(path) {
     Ok(()) => return Ok(()),
     Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),

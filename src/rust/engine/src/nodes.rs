@@ -800,10 +800,6 @@ impl Node for DigestFile {
       })
       .to_boxed()
   }
-
-  fn is_inline() -> bool {
-    false
-  }
 }
 
 impl From<DigestFile> for NodeKey {
