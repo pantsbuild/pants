@@ -4,6 +4,60 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev21 (11/17/2017)
+------------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Extract resettable pool logic for reuse (#5110)
+  `PR #5110 <https://github.com/pantsbuild/pants/pull/5110>`_
+
+* Update rust to 1.21.0 (#5113)
+  `PR #5113 <https://github.com/pantsbuild/pants/pull/5113>`_
+
+* Make SelectTransitive a Node in the graph again.  (#5109)
+  `PR #5109 <https://github.com/pantsbuild/pants/pull/5109>`_
+
+* is_ignored takes a Stat, not a Path and bool (#5112)
+  `PR #5112 <https://github.com/pantsbuild/pants/pull/5112>`_
+
+* Allow file content digests to be computed and memoized in the graph (#5104)
+  `PR #5104 <https://github.com/pantsbuild/pants/pull/5104>`_
+
+* Remove inlining in favor of executing directly (#5095)
+  `PR #5095 <https://github.com/pantsbuild/pants/pull/5095>`_
+
+* Introduce a Digest type (#5103)
+  `PR #5103 <https://github.com/pantsbuild/pants/pull/5103>`_
+
+* Move snapshot to its own file (#5102)
+  `PR #5102 <https://github.com/pantsbuild/pants/pull/5102>`_
+
+* Use (git)ignore to implement excludes (#5097)
+  `PR #5097 <https://github.com/pantsbuild/pants/pull/5097>`_
+
+* Include mode in engine cache key (#5096)
+  `PR #5096 <https://github.com/pantsbuild/pants/pull/5096>`_
+
+* Update hex to 0.3.1 (#5094)
+  `PR #5094 <https://github.com/pantsbuild/pants/pull/5094>`_
+
+* Rename local_store_path arg to local-store-path (#5092)
+  `PR #5092 <https://github.com/pantsbuild/pants/pull/5092>`_
+
+* `fs_util directory save` takes root (#5074)
+  `PR #5074 <https://github.com/pantsbuild/pants/pull/5074>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Update confluence deprecation warning (#5098)
+  `PR #5098 <https://github.com/pantsbuild/pants/pull/5098>`_
+
+* Add scalac strict_dep error regexes and update logic to compare partial classnames to target closure's classes (#5093)
+  `PR #5093 <https://github.com/pantsbuild/pants/pull/5093>`_
+
 
 1.4.0.dev20 (11/11/2017)
 ------------------------
