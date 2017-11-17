@@ -274,7 +274,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
 fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
   fs::PosixFS::new(
     &root,
-    Arc::new(ResettablePool::new("test-pool-".to_string())),
+    Arc::new(ResettablePool::new("fsutil-pool-".to_string())),
     vec![],
   ).unwrap()
 }

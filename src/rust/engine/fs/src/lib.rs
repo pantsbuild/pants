@@ -31,7 +31,7 @@ use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
 
-use futures::future::{self, Future};
+use futures::future::{self, IntoFuture, Future};
 use futures_cpupool::{CpuFuture, CpuPool};
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
@@ -356,6 +356,11 @@ fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool
 /// A wrapper around a CpuPool, to add the ability to drop the pool before forking,
 /// and then lazily re-initialize it in a new process.
 ///
+/// When a process forks, the kernel clones only the thread that called fork: all other
+/// threads are effectively destroyed. If a CpuPool has live threads during a fork, it
+/// will not be able to perform any work or be dropped cleanly (it will hang instead).
+/// It's thus necessary to drop the pool before forking, and to re-create it after forking.
+///
 pub struct ResettablePool {
   name_prefix: String,
   pool: RwLock<Option<CpuPool>>,
@@ -369,12 +374,23 @@ impl ResettablePool {
     }
   }
 
-  pub fn with<T, F: FnOnce(&CpuPool) -> T>(&self, f: F) -> T {
+  ///
+  /// Delegates to `CpuPool::spawn_fn`, and shares its signature.
+  /// http://alexcrichton.com/futures-rs/futures_cpupool/struct.CpuPool.html#method.spawn_fn
+  ///
+  pub fn spawn_fn<F, R>(&self, f: F) -> CpuFuture<R::Item, R::Error>
+  where
+    F: FnOnce() -> R + Send + 'static,
+    R: IntoFuture + 'static,
+    R::Future: Send + 'static,
+    R::Item: Send + 'static,
+    R::Error: Send + 'static,
+  {
     {
       // The happy path: pool is already initialized.
       let pool_opt = self.pool.read().unwrap();
       if let Some(ref pool) = *pool_opt {
-        return f(pool);
+        return pool.spawn_fn(f);
       }
     }
     {
@@ -384,7 +400,7 @@ impl ResettablePool {
     }
 
     // Recurse to run the function under the read lock.
-    self.with(f)
+    self.spawn_fn(f)
   }
 
   pub fn reset(&self) {
@@ -475,13 +491,11 @@ impl PosixFS {
     let path_abs = self.root.0.join(&file.path);
     self
       .pool
-      .with(|pool| {
-        pool.spawn_fn(move || {
-          std::fs::File::open(&path_abs).and_then(|mut f| {
-            let mut content = Vec::new();
-            f.read_to_end(&mut content)?;
-            Ok(FileContent { path, content })
-          })
+      .spawn_fn(move || {
+        std::fs::File::open(&path_abs).and_then(|mut f| {
+          let mut content = Vec::new();
+          f.read_to_end(&mut content)?;
+          Ok(FileContent { path, content })
         })
       })
       .to_boxed()
@@ -492,26 +506,24 @@ impl PosixFS {
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
     self
       .pool
-      .with(|pool| {
-        pool.spawn_fn(move || {
-          link_abs.read_link().and_then(
-            |path_buf| if path_buf.is_absolute() {
-              Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Absolute symlink: {:?}", link_abs),
-              ))
-            } else {
-              link_parent.map(|parent| parent.join(path_buf)).ok_or_else(
-                || {
-                  io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Symlink without a parent?: {:?}", link_abs),
-                  )
-                },
-              )
-            },
-          )
-        })
+      .spawn_fn(move || {
+        link_abs.read_link().and_then(
+          |path_buf| if path_buf.is_absolute() {
+            Err(io::Error::new(
+              io::ErrorKind::InvalidData,
+              format!("Absolute symlink: {:?}", link_abs),
+            ))
+          } else {
+            link_parent.map(|parent| parent.join(path_buf)).ok_or_else(
+              || {
+                io::Error::new(
+                  io::ErrorKind::InvalidData,
+                  format!("Symlink without a parent?: {:?}", link_abs),
+                )
+              },
+            )
+          },
+        )
       })
       .to_boxed()
   }
@@ -585,9 +597,7 @@ impl PosixFS {
     let root = self.root.0.clone();
     self
       .pool
-      .with(|pool| {
-        pool.spawn_fn(move || PosixFS::scandir_sync(root, dir))
-      })
+      .spawn_fn(move || PosixFS::scandir_sync(root, dir))
       .to_boxed()
   }
 }
@@ -1064,21 +1074,19 @@ impl Snapshots {
       "Couldn't get the next temp path.",
     );
 
-    fs.pool.with(|pool| {
-      pool.spawn_fn(move || {
-        // Write the tar deterministically to a temporary file while fingerprinting.
-        let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
+    fs.pool.spawn_fn(move || {
+      // Write the tar deterministically to a temporary file while fingerprinting.
+      let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
 
-        // Rename to the final path if it does not already exist.
-        Snapshots::finalize(
-          temp_path.as_path(),
-          Snapshots::path_under_for(&dest_dir, &fingerprint).as_path(),
-        )?;
+      // Rename to the final path if it does not already exist.
+      Snapshots::finalize(
+        temp_path.as_path(),
+        Snapshots::path_under_for(&dest_dir, &fingerprint).as_path(),
+      )?;
 
-        Ok(Snapshot {
-          fingerprint: fingerprint,
-          path_stats: paths,
-        })
+      Ok(Snapshot {
+        fingerprint: fingerprint,
+        path_stats: paths,
       })
     })
   }
@@ -1112,12 +1120,10 @@ impl Snapshots {
     snapshot: Snapshot,
   ) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    fs.pool.with(|pool| {
-      pool.spawn_fn(move || {
-        let snapshot_str = format!("{:?}", snapshot);
-        Snapshots::contents_for_sync(snapshot, archive_path).map_err(|e| {
-          format!("Failed to open Snapshot {}: {:?}", snapshot_str, e)
-        })
+    fs.pool.spawn_fn(move || {
+      let snapshot_str = format!("{:?}", snapshot);
+      Snapshots::contents_for_sync(snapshot, archive_path).map_err(|e| {
+        format!("Failed to open Snapshot {}: {:?}", snapshot_str, e)
       })
     })
   }

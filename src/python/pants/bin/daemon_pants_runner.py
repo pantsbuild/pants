@@ -128,7 +128,12 @@ class DaemonPantsRunner(ProcessManager):
     self.daemonize(write_pid=False)
 
   def pre_fork(self):
-    """Pre-fork callback executed via ProcessManager.daemonize()."""
+    """Pre-fork callback executed via ProcessManager.daemonize().
+
+    The scheduler has thread pools which need to be re-initialized after a fork: this ensures that
+    when the pantsd-runner forks from pantsd, there is a working pool for any work that happens
+    in that child process.
+    """
     if self._graph_helper:
       self._graph_helper.scheduler.pre_fork()
 
