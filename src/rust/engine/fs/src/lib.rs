@@ -353,12 +353,57 @@ fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool
 }
 
 ///
+/// A wrapper around a CpuPool, to add the ability to drop the pool before forking,
+/// and then lazily re-initialize it in a new process.
+///
+struct ResettablePool {
+  name_prefix: String,
+  pool: RwLock<Option<CpuPool>>,
+}
+
+impl ResettablePool {
+  pub fn new(name_prefix: String) -> ResettablePool {
+    ResettablePool {
+      name_prefix: name_prefix,
+      pool: RwLock::new(None),
+    }
+  }
+
+  pub fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
+    {
+      let pool = self.pool.read().unwrap();
+      if pool.is_some() {
+        return pool;
+      }
+    }
+    // If we get to here, the pool is None and needs re-initializing.
+    {
+      let mut pool = self.pool.write().unwrap();
+      if pool.is_none() {
+        *pool = Some(self.new_pool());
+      }
+    }
+    self.pool.read().unwrap()
+  }
+
+  pub fn reset(&self) {
+    let mut pool = self.pool.write().unwrap();
+    *pool = None;
+  }
+
+  fn new_pool(&self) -> CpuPool {
+    futures_cpupool::Builder::new()
+      .name_prefix(self.name_prefix.clone())
+      .create()
+  }
+}
+
+///
 /// All Stats consumed or return by this type are relative to the root.
 ///
 pub struct PosixFS {
   root: Dir,
-  // The pool needs to be reinitialized after a fork, so it is protected by a lock.
-  pool: RwLock<Option<CpuPool>>,
+  pool: Arc<ResettablePool>,
   ignore: Gitignore,
 }
 
@@ -392,13 +437,9 @@ impl PosixFS {
     })?;
     Ok(PosixFS {
       root: canonical_root,
-      pool: RwLock::new(None),
+      pool: Arc::new(ResettablePool::new("posix-fs-".to_string())),
       ignore: ignore,
     })
-  }
-
-  fn create_pool() -> CpuPool {
-    futures_cpupool::Builder::new().name_prefix("vfs-").create()
   }
 
   fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
@@ -420,26 +461,8 @@ impl PosixFS {
     Ok(stats)
   }
 
-  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
-    {
-      let pool = self.pool.read().unwrap();
-      if pool.is_some() {
-        return pool;
-      }
-    }
-    // If we get to here, the pool is None and needs re-initializing.
-    {
-      let mut pool = self.pool.write().unwrap();
-      if pool.is_none() {
-        *pool = Some(PosixFS::create_pool());
-      }
-    }
-    self.pool.read().unwrap()
-  }
-
   pub fn pre_fork(&self) {
-    let mut pool = self.pool.write().unwrap();
-    *pool = None;
+    self.pool.reset()
   }
 
   pub fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
@@ -450,6 +473,7 @@ impl PosixFS {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
     self
+      .pool
       .pool()
       .as_ref()
       .expect("Uninitialized CpuPool!")
@@ -466,8 +490,9 @@ impl PosixFS {
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    let pool = self.pool();
-    pool
+    self
+      .pool
+      .pool()
       .as_ref()
       .expect("Uninitialized CpuPool!")
       .spawn_fn(move || {
@@ -559,8 +584,9 @@ impl PosixFS {
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
     let root = self.root.0.clone();
-    let pool = self.pool();
-    pool
+    self
+      .pool
+      .pool()
       .as_ref()
       .expect("Uninitialized CpuPool!")
       .spawn_fn(move || PosixFS::scandir_sync(root, dir))
@@ -1040,9 +1066,11 @@ impl Snapshots {
       "Couldn't get the next temp path.",
     );
 
-    let pool = fs.pool();
-    pool.as_ref().expect("Uninitialized CpuPool!").spawn_fn(
-      move || {
+    fs.pool
+      .pool()
+      .as_ref()
+      .expect("Uninitialized CpuPool!")
+      .spawn_fn(move || {
         // Write the tar deterministically to a temporary file while fingerprinting.
         let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
 
@@ -1056,8 +1084,7 @@ impl Snapshots {
           fingerprint: fingerprint,
           path_stats: paths,
         })
-      },
-    )
+      })
   }
 
   fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
@@ -1089,15 +1116,16 @@ impl Snapshots {
     snapshot: Snapshot,
   ) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    let pool = fs.pool();
-    pool.as_ref().expect("Uninitialized CpuPool!").spawn_fn(
-      move || {
+    fs.pool
+      .pool()
+      .as_ref()
+      .expect("Uninitialized CpuPool!")
+      .spawn_fn(move || {
         let snapshot_str = format!("{:?}", snapshot);
         Snapshots::contents_for_sync(snapshot, archive_path).map_err(|e| {
           format!("Failed to open Snapshot {}: {:?}", snapshot_str, e)
         })
-      },
-    )
+      })
   }
 }
 
