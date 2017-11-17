@@ -9,6 +9,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use hash::Fingerprint;
+use pool::ResettablePool;
 
 ///
 /// A content-addressed store of file contents, and Directories.
@@ -23,8 +24,8 @@ pub struct Store {
 
 struct InnerStore {
   env: Environment,
+  pool: Arc<ResettablePool>,
   file_store: Database,
-
   // Store directories separately from files because:
   //  1. They may have different lifetimes.
   //  2. It's nice to know whether we should be able to parse something as a proto.
@@ -32,7 +33,7 @@ struct InnerStore {
 }
 
 impl Store {
-  pub fn new<P: AsRef<Path>>(path: P) -> Result<Store, String> {
+  pub fn new<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<Store, String> {
     // 2 DBs; one for file contents, one for directories.
     let env = Environment::new()
       .set_max_dbs(2)
@@ -55,6 +56,7 @@ impl Store {
     Ok(Store {
       inner: Arc::new(InnerStore {
         env: env,
+        pool: pool,
         file_store: file_database,
         directory_store: directory_database,
       }),
@@ -181,9 +183,11 @@ mod tests {
   extern crate tempdir;
 
   use bazel_protos;
-  use super::{Digest, Fingerprint, Store};
+  use super::{Digest, Fingerprint, ResettablePool, Store};
   use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
   use protobuf::Message;
+  use std::path::Path;
+  use std::sync::Arc;
   use tempdir::TempDir;
 
 
@@ -199,8 +203,7 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .store_file_bytes(STR.as_bytes())
         .unwrap(),
       digest()
@@ -211,13 +214,11 @@ mod tests {
   fn save_file_is_idempotent() {
     let dir = TempDir::new("store").unwrap();
 
-    &Store::new(dir.path())
-      .unwrap()
+    &new_store(dir.path())
       .store_file_bytes(STR.as_bytes())
       .unwrap();
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .store_file_bytes(STR.as_bytes())
         .unwrap(),
       digest()
@@ -242,8 +243,7 @@ mod tests {
       .unwrap();
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .load_file_bytes(&fingerprint)
         .unwrap()
         .unwrap(),
@@ -251,16 +251,14 @@ mod tests {
     );
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .store_file_bytes(STR.as_bytes())
         .unwrap(),
       digest()
     );
 
     assert_eq!(
-      &Store::new(dir.path())
-        .unwrap()
+      &new_store(dir.path())
         .load_file_bytes(&fingerprint)
         .unwrap()
         .unwrap(),
@@ -273,7 +271,7 @@ mod tests {
     let data = Vec::from(STR.as_bytes());
     let dir = TempDir::new("store").unwrap();
 
-    let store = Store::new(dir.path()).unwrap();
+    let store = new_store(dir.path());
     let hash = store.store_file_bytes(&data).unwrap();
     assert_eq!(store.load_file_bytes(&hash.0).unwrap().unwrap(), data);
   }
@@ -282,8 +280,7 @@ mod tests {
   fn missing_file() {
     let dir = TempDir::new("store").unwrap();
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .load_file_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
@@ -311,8 +308,7 @@ mod tests {
     let hash = "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16";
 
     assert_eq!(
-      &Store::new(dir.path())
-        .unwrap()
+      &new_store(dir.path())
         .record_directory(&directory)
         .unwrap()
         .0
@@ -321,8 +317,7 @@ mod tests {
     );
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .load_directory_proto(&Fingerprint::from_hex_string(hash).unwrap())
         .unwrap()
         .unwrap(),
@@ -330,8 +325,7 @@ mod tests {
     );
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .load_directory_proto_bytes(&Fingerprint::from_hex_string(hash).unwrap())
         .unwrap()
         .unwrap(),
@@ -343,22 +337,19 @@ mod tests {
   fn file_is_not_directory_proto() {
     let dir = TempDir::new("store").unwrap();
 
-    Store::new(dir.path())
-      .unwrap()
+    new_store(dir.path())
       .store_file_bytes(STR.as_bytes())
       .unwrap();
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .load_directory_proto(&Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
     );
 
     assert_eq!(
-      Store::new(dir.path())
-        .unwrap()
+      new_store(dir.path())
         .load_directory_proto_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
@@ -372,5 +363,9 @@ mod tests {
     bazel_digest.set_hash(HASH.to_string());
     bazel_digest.set_size_bytes(16);
     assert_eq!(bazel_digest, digest.into());
+  }
+
+  fn new_store<P: AsRef<Path>>(dir: P) -> Store {
+    Store::new(dir, Arc::new(ResettablePool::new("test-pool-".to_string()))).unwrap()
   }
 }

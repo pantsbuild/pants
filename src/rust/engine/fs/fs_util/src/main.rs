@@ -136,7 +136,8 @@ to this directory.",
 
 fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local-store-path").unwrap();
-  let store = Arc::new(Store::new(store_dir).map_err(|e| {
+  let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
+  let store = Arc::new(Store::new(store_dir, pool.clone()).map_err(|e| {
     format!(
       "Failed to open/create store for directory {}: {}",
       store_dir,
@@ -163,15 +164,18 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
           // Canonicalize path to guarantee that a relative path has a parent.
-          let posix_fs = make_posix_fs(path
-            .canonicalize()
-            .map_err(|e| {
-              format!("Error canonicalizing path {:?}: {}", path, e.description())
-            })?
-            .parent()
-            .ok_or_else(|| {
-              format!("File being saved must have parent but {:?} did not", path)
-            })?);
+          let posix_fs = make_posix_fs(
+            path
+              .canonicalize()
+              .map_err(|e| {
+                format!("Error canonicalizing path {:?}: {}", path, e.description())
+              })?
+              .parent()
+              .ok_or_else(|| {
+                format!("File being saved must have parent but {:?} did not", path)
+              })?,
+            pool,
+          );
           let file = posix_fs
             .stat(PathBuf::from(path.file_name().unwrap()))
             .unwrap();
@@ -201,7 +205,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           Ok(materialize_directory(store, destination, &fingerprint)?)
         }
         ("save", Some(args)) => {
-          let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap()));
+          let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
           let digest = posix_fs
             .expand(fs::PathGlobs::create(
               &args
@@ -269,12 +273,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   }
 }
 
-fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
-  fs::PosixFS::new(
-    &root,
-    Arc::new(ResettablePool::new("fsutil-pool-".to_string())),
-    vec![],
-  ).unwrap()
+fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::PosixFS {
+  fs::PosixFS::new(&root, pool, vec![]).unwrap()
 }
 
 fn save_file(
