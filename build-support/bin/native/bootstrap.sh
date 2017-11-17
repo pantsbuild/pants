@@ -74,7 +74,7 @@ function ensure_native_build_prerequisites() {
   export CARGO_HOME="${rust_toolchain_root}/cargo"
   export RUSTUP_HOME="${rust_toolchain_root}/rustup"
 
-  local rust_toolchain="1.20.0"
+  local rust_toolchain="1.21.0"
 
   # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
   if [[ ! -x "${CARGO_HOME}/bin/rustup" ]]

@@ -862,10 +862,10 @@ impl RuleGraph {
             continue;
           }
           for d in diagnostics {
-            let mut msg_to_type = collated_errors.entry(rule.clone()).or_insert(
+            let msg_to_type = collated_errors.entry(rule.clone()).or_insert(
               HashMap::new(),
             );
-            let mut subject_set = msg_to_type.entry(d.reason.clone()).or_insert(
+            let subject_set = msg_to_type.entry(d.reason.clone()).or_insert(
               HashSet::new(),
             );
             subject_set.insert(d.subject_type.clone());
@@ -1002,7 +1002,7 @@ impl RuleEdges {
     if SelectKey::Nothing == select_key && !new_dependencies.is_empty() {
       panic!("Cannot specify a None selector with non-empty dependencies!")
     }
-    let mut deps_for_selector = self
+    let deps_for_selector = self
       .dependencies_by_select_key
       .entry(select_key)
       .or_insert(vec![]);
@@ -1061,7 +1061,7 @@ fn update_edges_based_on_unfulfillable_entry<K>(
         let key_entry = Entry::from(o.key().clone());
 
         let entry_subject = key_entry.subject_type();
-        let mut diagnostics = new_unfulfillable_rules.entry(key_entry.clone()).or_insert(
+        let diagnostics = new_unfulfillable_rules.entry(key_entry.clone()).or_insert(
           vec![],
         );
         diagnostics.push(Diagnostic {
@@ -1139,13 +1139,13 @@ fn add_rules_to_graph(
   }
   match entry {
     &Entry::Root(ref root_entry) => {
-      let mut edges = root_rule_dependency_edges
+      let edges = root_rule_dependency_edges
         .entry(root_entry.clone())
         .or_insert(RuleEdges::new());
       edges.add_edges_via(select_key, &dep_rules);
     }
     &Entry::InnerEntry(ref inner_entry) => {
-      let mut edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(
+      let edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(
         RuleEdges::new(),
       );
       if edges.has_edges_for(&select_key) {
