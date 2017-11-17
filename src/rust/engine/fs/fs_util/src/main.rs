@@ -8,7 +8,7 @@ extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
-use fs::{Digest, Fingerprint, Store, VFS};
+use fs::{Digest, Fingerprint, Store, VFS, ResettablePool};
 use futures::future::{Future, join_all};
 use itertools::Itertools;
 use std::error::Error;
@@ -270,7 +270,11 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
 }
 
 fn make_posix_fs<P: AsRef<Path>>(root: P) -> fs::PosixFS {
-  fs::PosixFS::new(&root, vec![]).unwrap()
+  fs::PosixFS::new(
+    &root,
+    Arc::new(ResettablePool::new("fsutil-pool-".to_string())),
+    vec![],
+  ).unwrap()
 }
 
 fn save_file(

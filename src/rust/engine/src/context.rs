@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use core::TypeId;
 use externs;
-use fs::{PosixFS, Snapshots, Store, safe_create_dir_all_ioerror};
+use fs::{PosixFS, Snapshots, Store, safe_create_dir_all_ioerror, ResettablePool};
 use graph::{EntryId, Graph};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
@@ -23,6 +23,7 @@ pub struct Core {
   pub tasks: Tasks,
   pub rule_graph: RuleGraph,
   pub types: Types,
+  pub pool: Arc<ResettablePool>,
   pub snapshots: Snapshots,
   pub store: Store,
   pub vfs: PosixFS,
@@ -69,24 +70,26 @@ impl Core {
       types.snapshots.clone(),
     );
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
+    let pool = Arc::new(ResettablePool::new("io-".to_string()));
 
     Core {
       graph: Graph::new(),
       tasks: tasks,
-      types: types,
       rule_graph: rule_graph,
+      types: types,
+      pool: pool.clone(),
       snapshots: snapshots,
       store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(build_root, ignore_patterns).unwrap_or_else(|e| {
+      vfs: PosixFS::new(build_root, pool, ignore_patterns).unwrap_or_else(|e| {
         panic!("Could not initialize VFS: {:?}", e);
       }),
     }
   }
 
   pub fn pre_fork(&self) {
-    self.vfs.pre_fork();
+    self.pool.reset();
   }
 }
 
