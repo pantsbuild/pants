@@ -150,7 +150,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          match store.load_file_bytes(&fingerprint)? {
+          match store.load_file_bytes(fingerprint)? {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
@@ -202,7 +202,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("materialize", Some(args)) => {
           let destination = Path::new(args.value_of("destination").unwrap());
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          Ok(materialize_directory(store, destination, &fingerprint)?)
+          Ok(materialize_directory(store, destination, fingerprint)?)
         }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
@@ -223,9 +223,9 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("cat-proto", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
           let proto_bytes = match args.value_of("output-format").unwrap() {
-            "binary" => store.load_directory_proto_bytes(&fingerprint),
+            "binary" => store.load_directory_proto_bytes(fingerprint),
             "text" => {
-              store.load_directory_proto(&fingerprint).map(|maybe_p| {
+              store.load_directory_proto(fingerprint).map(|maybe_p| {
                 maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
               })
             }
@@ -253,8 +253,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
     }
     ("cat", Some(args)) => {
       let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-      let v = match store.load_file_bytes(&fingerprint)? {
-        None => store.load_directory_proto_bytes(&fingerprint)?,
+      let v = match store.load_file_bytes(fingerprint)? {
+        None => store.load_directory_proto_bytes(fingerprint)?,
         some => some,
       };
       match v {
@@ -287,7 +287,7 @@ fn save_file(
     .map_err(move |err| {
       format!("Error reading file {:?}: {}", file, err.description())
     })
-    .and_then(move |content| store.store_file_bytes(&content.content))
+    .and_then(move |content| store.store_file_bytes(content.content))
     .to_boxed()
 }
 
@@ -396,9 +396,9 @@ fn paths_of_child_dir(paths: Vec<fs::PathStat>) -> Vec<fs::PathStat> {
 fn materialize_directory(
   store: Arc<Store>,
   destination: &Path,
-  fingerprint: &Fingerprint,
+  fingerprint: Fingerprint,
 ) -> Result<(), ExitError> {
-  let directory = store.load_directory_proto(&fingerprint)?.ok_or_else(|| {
+  let directory = store.load_directory_proto(fingerprint)?.ok_or_else(|| {
     ExitError(
       format!("Directory with fingerprint {} not found", fingerprint),
       ExitCode::NotFound,
@@ -412,7 +412,7 @@ fn materialize_directory(
     )
   })?;
   for file_node in directory.get_files() {
-    let fingerprint = &Fingerprint::from_hex_string(&file_node.get_digest().get_hash())?;
+    let fingerprint = Fingerprint::from_hex_string(&file_node.get_digest().get_hash())?;
     match store.load_file_bytes(fingerprint)? {
       Some(bytes) => {
         let path = destination.join(file_node.get_name());
@@ -437,7 +437,7 @@ fn materialize_directory(
     materialize_directory(
       store.clone(),
       &destination.join(directory_node.get_name()),
-      &Fingerprint::from_hex_string(directory_node.get_digest().get_hash())?,
+      Fingerprint::from_hex_string(directory_node.get_digest().get_hash())?,
     )?;
   }
   Ok(())

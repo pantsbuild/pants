@@ -63,13 +63,14 @@ impl Store {
     })
   }
 
-  pub fn store_file_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
+  pub fn store_file_bytes(&self, bytes: Vec<u8>) -> Result<Digest, String> {
+    let len = bytes.len();
     self.store_bytes(bytes, self.inner.file_store.clone()).map(
-      |fingerprint| Digest(fingerprint, bytes.len()),
+      |fingerprint| Digest(fingerprint, len),
     )
   }
 
-  fn store_bytes(&self, bytes: &[u8], db: Database) -> Result<Fingerprint, String> {
+  fn store_bytes(&self, bytes: Vec<u8>, db: Database) -> Result<Fingerprint, String> {
     let mut hasher = Sha256::default();
     hasher.input(&bytes);
     let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
@@ -89,20 +90,20 @@ impl Store {
     }
   }
 
-  pub fn load_file_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
+  pub fn load_file_bytes(&self, fingerprint: Fingerprint) -> Result<Option<Vec<u8>>, String> {
     self.load_bytes(fingerprint, self.inner.file_store.clone())
   }
 
   pub fn load_directory_proto_bytes(
     &self,
-    fingerprint: &Fingerprint,
+    fingerprint: Fingerprint,
   ) -> Result<Option<Vec<u8>>, String> {
     self.load_bytes(fingerprint, self.inner.directory_store.clone())
   }
 
   pub fn load_directory_proto(
     &self,
-    fingerprint: &Fingerprint,
+    fingerprint: Fingerprint,
   ) -> Result<Option<bazel_protos::remote_execution::Directory>, String> {
     match self.load_directory_proto_bytes(fingerprint)? {
       Some(bytes) => {
@@ -118,11 +119,11 @@ impl Store {
 
   pub fn load_bytes(
     &self,
-    fingerprint: &Fingerprint,
+    fingerprint: Fingerprint,
     db: Database,
   ) -> Result<Option<Vec<u8>>, String> {
     match self.inner.env.begin_ro_txn().and_then(|txn| {
-      txn.get(db, fingerprint).map(|v| v.to_vec())
+      txn.get(db, &fingerprint).map(|v| v.to_vec())
     }) {
       Ok(v) => Ok(Some(v)),
       Err(NotFound) => Ok(None),
@@ -151,10 +152,11 @@ impl Store {
         e.description()
       )
     })?;
+    let len = bytes.len();
 
     Ok(Digest(
-      self.store_bytes(&bytes, self.inner.directory_store.clone())?,
-      bytes.len(),
+      self.store_bytes(bytes, self.inner.directory_store.clone())?,
+      len,
     ))
   }
 }
@@ -198,14 +200,16 @@ mod tests {
     Digest(Fingerprint::from_hex_string(HASH).unwrap(), STR.len())
   }
 
+  fn str_bytes() -> Vec<u8> {
+    STR.as_bytes().to_owned()
+  }
+
   #[test]
   fn save_file() {
     let dir = TempDir::new("store").unwrap();
 
     assert_eq!(
-      new_store(dir.path())
-        .store_file_bytes(STR.as_bytes())
-        .unwrap(),
+      new_store(dir.path()).store_file_bytes(str_bytes()).unwrap(),
       digest()
     );
   }
@@ -214,13 +218,9 @@ mod tests {
   fn save_file_is_idempotent() {
     let dir = TempDir::new("store").unwrap();
 
-    &new_store(dir.path())
-      .store_file_bytes(STR.as_bytes())
-      .unwrap();
+    &new_store(dir.path()).store_file_bytes(str_bytes()).unwrap();
     assert_eq!(
-      new_store(dir.path())
-        .store_file_bytes(STR.as_bytes())
-        .unwrap(),
+      new_store(dir.path()).store_file_bytes(str_bytes()).unwrap(),
       digest()
     );
   }
@@ -244,22 +244,20 @@ mod tests {
 
     assert_eq!(
       new_store(dir.path())
-        .load_file_bytes(&fingerprint)
+        .load_file_bytes(fingerprint)
         .unwrap()
         .unwrap(),
       bogus_value
     );
 
     assert_eq!(
-      new_store(dir.path())
-        .store_file_bytes(STR.as_bytes())
-        .unwrap(),
+      new_store(dir.path()).store_file_bytes(str_bytes()).unwrap(),
       digest()
     );
 
     assert_eq!(
       &new_store(dir.path())
-        .load_file_bytes(&fingerprint)
+        .load_file_bytes(fingerprint)
         .unwrap()
         .unwrap(),
       &Vec::from(bogus_value)
@@ -268,12 +266,12 @@ mod tests {
 
   #[test]
   fn roundtrip_file() {
-    let data = Vec::from(STR.as_bytes());
+    let data = str_bytes();
     let dir = TempDir::new("store").unwrap();
 
     let store = new_store(dir.path());
-    let hash = store.store_file_bytes(&data).unwrap();
-    assert_eq!(store.load_file_bytes(&hash.0).unwrap().unwrap(), data);
+    let hash = store.store_file_bytes(data.clone()).unwrap();
+    assert_eq!(store.load_file_bytes(hash.0).unwrap().unwrap(), data);
   }
 
   #[test]
@@ -281,7 +279,7 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
     assert_eq!(
       new_store(dir.path())
-        .load_file_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
+        .load_file_bytes(Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
     );
@@ -318,7 +316,7 @@ mod tests {
 
     assert_eq!(
       new_store(dir.path())
-        .load_directory_proto(&Fingerprint::from_hex_string(hash).unwrap())
+        .load_directory_proto(Fingerprint::from_hex_string(hash).unwrap())
         .unwrap()
         .unwrap(),
       directory
@@ -326,7 +324,7 @@ mod tests {
 
     assert_eq!(
       new_store(dir.path())
-        .load_directory_proto_bytes(&Fingerprint::from_hex_string(hash).unwrap())
+        .load_directory_proto_bytes(Fingerprint::from_hex_string(hash).unwrap())
         .unwrap()
         .unwrap(),
       directory.write_to_bytes().unwrap()
@@ -337,20 +335,18 @@ mod tests {
   fn file_is_not_directory_proto() {
     let dir = TempDir::new("store").unwrap();
 
-    new_store(dir.path())
-      .store_file_bytes(STR.as_bytes())
-      .unwrap();
+    new_store(dir.path()).store_file_bytes(str_bytes()).unwrap();
 
     assert_eq!(
       new_store(dir.path())
-        .load_directory_proto(&Fingerprint::from_hex_string(HASH).unwrap())
+        .load_directory_proto(Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
     );
 
     assert_eq!(
       new_store(dir.path())
-        .load_directory_proto_bytes(&Fingerprint::from_hex_string(HASH).unwrap())
+        .load_directory_proto_bytes(Fingerprint::from_hex_string(HASH).unwrap())
         .unwrap(),
       None
     );
