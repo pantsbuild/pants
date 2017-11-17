@@ -6,6 +6,7 @@ use protobuf::core::Message;
 use sha2::Sha256;
 use std::error::Error;
 use std::path::Path;
+use std::sync::Arc;
 
 use hash::Fingerprint;
 
@@ -15,7 +16,12 @@ use hash::Fingerprint;
 /// Currently, Store only stores things locally on disk, but in the future it will gain the ability
 /// to fetch files from remote content-addressable storage too.
 ///
+#[derive(Clone)]
 pub struct Store {
+  inner: Arc<InnerStore>,
+}
+
+struct InnerStore {
   env: Environment,
   file_store: Database,
 
@@ -47,14 +53,16 @@ impl Store {
         )
       })?;
     Ok(Store {
-      env: env,
-      file_store: file_database,
-      directory_store: directory_database,
+      inner: Arc::new(InnerStore {
+        env: env,
+        file_store: file_database,
+        directory_store: directory_database,
+      }),
     })
   }
 
   pub fn store_file_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
-    self.store_bytes(bytes, self.file_store.clone()).map(
+    self.store_bytes(bytes, self.inner.file_store.clone()).map(
       |fingerprint| Digest(fingerprint, bytes.len()),
     )
   }
@@ -64,7 +72,7 @@ impl Store {
     hasher.input(&bytes);
     let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
 
-    match self.env.begin_rw_txn().and_then(|mut txn| {
+    match self.inner.env.begin_rw_txn().and_then(|mut txn| {
       txn.put(db, &fingerprint, &bytes, NO_OVERWRITE).and_then(
         |()| txn.commit(),
       )
@@ -80,14 +88,14 @@ impl Store {
   }
 
   pub fn load_file_bytes(&self, fingerprint: &Fingerprint) -> Result<Option<Vec<u8>>, String> {
-    self.load_bytes(fingerprint, self.file_store.clone())
+    self.load_bytes(fingerprint, self.inner.file_store.clone())
   }
 
   pub fn load_directory_proto_bytes(
     &self,
     fingerprint: &Fingerprint,
   ) -> Result<Option<Vec<u8>>, String> {
-    self.load_bytes(fingerprint, self.directory_store.clone())
+    self.load_bytes(fingerprint, self.inner.directory_store.clone())
   }
 
   pub fn load_directory_proto(
@@ -111,7 +119,7 @@ impl Store {
     fingerprint: &Fingerprint,
     db: Database,
   ) -> Result<Option<Vec<u8>>, String> {
-    match self.env.begin_ro_txn().and_then(|txn| {
+    match self.inner.env.begin_ro_txn().and_then(|txn| {
       txn.get(db, fingerprint).map(|v| v.to_vec())
     }) {
       Ok(v) => Ok(Some(v)),
@@ -143,7 +151,7 @@ impl Store {
     })?;
 
     Ok(Digest(
-      self.store_bytes(&bytes, self.directory_store.clone())?,
+      self.store_bytes(&bytes, self.inner.directory_store.clone())?,
       bytes.len(),
     ))
   }
