@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::HashSet;
+use std::error::Error;
 use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -771,6 +772,43 @@ impl From<ReadLink> for NodeKey {
 }
 
 ///
+/// A Node that represents reading a file and fingerprinting its contents.
+///
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct DigestFile(File);
+
+impl Node for DigestFile {
+  type Output = fs::Digest;
+
+  fn run(self, context: Context) -> NodeFuture<fs::Digest> {
+    let file = self.0.clone();
+    context
+      .core
+      .vfs
+      .read_file(&self.0)
+      .map_err(move |e| {
+        throw(&format!(
+          "Error reading file {:?}: {}",
+          file,
+          e.description()
+        ))
+      })
+      .and_then(move |c| {
+        context.core.store.store_file_bytes(&c.content).map_err(
+          |e| throw(&e),
+        )
+      })
+      .to_boxed()
+  }
+}
+
+impl From<DigestFile> for NodeKey {
+  fn from(n: DigestFile) -> Self {
+    NodeKey::DigestFile(n)
+  }
+}
+
+///
 /// A Node that represents consuming the stat for some path.
 ///
 /// NB: Because the `Scandir` operation gets the stats for a parent directory in a single syscall,
@@ -1055,6 +1093,7 @@ impl From<Task> for NodeKey {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum NodeKey {
+  DigestFile(DigestFile),
   ReadLink(ReadLink),
   Scandir(Scandir),
   Stat(Stat),
@@ -1072,6 +1111,7 @@ impl NodeKey {
       externs::id_to_str(tc.0)
     }
     match self {
+      &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
       &NodeKey::Stat(ref s) => format!("Stat({:?})", s.0),
@@ -1102,6 +1142,7 @@ impl NodeKey {
       &NodeKey::Select(ref s) => typstr(&s.selector.product),
       &NodeKey::Task(ref s) => typstr(&s.product),
       &NodeKey::Snapshot(..) => "Snapshot".to_string(),
+      &NodeKey::DigestFile(..) => "DigestFile".to_string(),
       &NodeKey::ReadLink(..) => "LinkDest".to_string(),
       &NodeKey::Scandir(..) => "DirectoryListing".to_string(),
       &NodeKey::Stat(..) => "Stat".to_string(),
@@ -1126,6 +1167,7 @@ impl Node for NodeKey {
 
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     match self {
+      NodeKey::DigestFile(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::ReadLink(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Stat(n) => n.run(context).map(|v| v.into()).to_boxed(),
       NodeKey::Scandir(n) => n.run(context).map(|v| v.into()).to_boxed(),
@@ -1139,6 +1181,7 @@ impl Node for NodeKey {
 #[derive(Clone, Debug)]
 pub enum NodeResult {
   Unit,
+  Digest(fs::Digest),
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   Snapshot(fs::Snapshot),
@@ -1160,6 +1203,12 @@ impl From<Value> for NodeResult {
 impl From<fs::Snapshot> for NodeResult {
   fn from(v: fs::Snapshot) -> Self {
     NodeResult::Snapshot(v)
+  }
+}
+
+impl From<fs::Digest> for NodeResult {
+  fn from(v: fs::Digest) -> Self {
+    NodeResult::Digest(v)
   }
 }
 
@@ -1234,6 +1283,17 @@ impl TryFrom<NodeResult> for fs::Snapshot {
   fn try_from(nr: NodeResult) -> Result<Self, ()> {
     match nr {
       NodeResult::Snapshot(v) => Ok(v),
+      _ => Err(()),
+    }
+  }
+}
+
+impl TryFrom<NodeResult> for fs::Digest {
+  type Err = ();
+
+  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+    match nr {
+      NodeResult::Digest(v) => Ok(v),
       _ => Err(()),
     }
   }
