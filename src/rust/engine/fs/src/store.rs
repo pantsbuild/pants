@@ -1,5 +1,8 @@
 use bazel_protos;
+use boxfuture::{Boxable, BoxFuture};
 use digest::{Digest as DigestTrait, FixedOutput};
+use futures::{future, Future};
+use futures_cpupool::CpuFuture;
 use lmdb::{Database, DatabaseFlags, Environment, NO_OVERWRITE, Transaction};
 use lmdb::Error::{KeyExist, NotFound};
 use protobuf::core::Message;
@@ -63,76 +66,93 @@ impl Store {
     })
   }
 
-  pub fn store_file_bytes(&self, bytes: Vec<u8>) -> Result<Digest, String> {
+  pub fn store_file_bytes(&self, bytes: Vec<u8>) -> BoxFuture<Digest, String> {
     let len = bytes.len();
-    self.store_bytes(bytes, self.inner.file_store.clone()).map(
-      |fingerprint| Digest(fingerprint, len),
-    )
+    self
+      .store_bytes(bytes, self.inner.file_store.clone())
+      .map(move |fingerprint| Digest(fingerprint, len))
+      .to_boxed()
   }
 
-  fn store_bytes(&self, bytes: Vec<u8>, db: Database) -> Result<Fingerprint, String> {
-    let mut hasher = Sha256::default();
-    hasher.input(&bytes);
-    let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
+  fn store_bytes(&self, bytes: Vec<u8>, db: Database) -> CpuFuture<Fingerprint, String> {
+    let store = self.clone();
+    self.inner.pool.spawn_fn(move || {
+      let fingerprint = {
+        let mut hasher = Sha256::default();
+        hasher.input(&bytes);
+        Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+      };
 
-    match self.inner.env.begin_rw_txn().and_then(|mut txn| {
-      txn.put(db, &fingerprint, &bytes, NO_OVERWRITE).and_then(
-        |()| txn.commit(),
-      )
-    }) {
-      Ok(()) => Ok(fingerprint),
-      Err(KeyExist) => Ok(fingerprint),
-      Err(err) => Err(format!(
-        "Error storing fingerprint {}: {}",
-        fingerprint,
-        err.description()
-      )),
-    }
+      let put_res = store.inner.env.begin_rw_txn().and_then(|mut txn| {
+        txn.put(db, &fingerprint, &bytes, NO_OVERWRITE).and_then(
+              |()| txn.commit(),
+          )
+      });
+
+      match put_res {
+        Ok(()) => Ok(fingerprint),
+        Err(KeyExist) => Ok(fingerprint),
+        Err(err) => Err(format!(
+          "Error storing fingerprint {}: {}",
+          fingerprint,
+          err.description()
+        )),
+      }
+    })
   }
 
-  pub fn load_file_bytes(&self, fingerprint: Fingerprint) -> Result<Option<Vec<u8>>, String> {
+  pub fn load_file_bytes(&self, fingerprint: Fingerprint) -> CpuFuture<Option<Vec<u8>>, String> {
     self.load_bytes(fingerprint, self.inner.file_store.clone())
   }
 
   pub fn load_directory_proto_bytes(
     &self,
     fingerprint: Fingerprint,
-  ) -> Result<Option<Vec<u8>>, String> {
+  ) -> CpuFuture<Option<Vec<u8>>, String> {
     self.load_bytes(fingerprint, self.inner.directory_store.clone())
   }
 
   pub fn load_directory_proto(
     &self,
     fingerprint: Fingerprint,
-  ) -> Result<Option<bazel_protos::remote_execution::Directory>, String> {
-    match self.load_directory_proto_bytes(fingerprint)? {
-      Some(bytes) => {
-        let mut proto = bazel_protos::remote_execution::Directory::new();
-        proto.merge_from_bytes(&bytes).map_err(|e| {
-          format!("Error deserializing proto {}: {}", fingerprint, e)
-        })?;
-        Ok(Some(proto))
-      }
-      None => Ok(None),
-    }
+  ) -> BoxFuture<Option<bazel_protos::remote_execution::Directory>, String> {
+    self
+      .load_directory_proto_bytes(fingerprint)
+      .and_then(move |res| match res {
+        Some(bytes) => {
+          let mut proto = bazel_protos::remote_execution::Directory::new();
+          proto
+            .merge_from_bytes(&bytes)
+            .map_err(|e| {
+              format!("Error deserializing proto {}: {}", fingerprint, e)
+            })
+            .and(Ok(Some(proto)))
+        }
+        None => Ok(None),
+      })
+      .to_boxed()
   }
 
   pub fn load_bytes(
     &self,
     fingerprint: Fingerprint,
     db: Database,
-  ) -> Result<Option<Vec<u8>>, String> {
-    match self.inner.env.begin_ro_txn().and_then(|txn| {
-      txn.get(db, &fingerprint).map(|v| v.to_vec())
-    }) {
-      Ok(v) => Ok(Some(v)),
-      Err(NotFound) => Ok(None),
-      Err(err) => Err(format!(
-        "Error loading fingerprint {}: {}",
-        fingerprint,
-        err.description().to_string()
-      )),
-    }
+  ) -> CpuFuture<Option<Vec<u8>>, String> {
+    let store = self.inner.clone();
+    self.inner.pool.spawn_fn(move || {
+      let get_res = store.env.begin_ro_txn().and_then(|txn| {
+        txn.get(db, &fingerprint).map(|v| v.to_vec())
+      });
+      match get_res {
+        Ok(v) => Ok(Some(v)),
+        Err(NotFound) => Ok(None),
+        Err(err) => Err(format!(
+          "Error loading fingerprint {}: {}",
+          fingerprint,
+          err.description().to_string()
+        )),
+      }
+    })
   }
 
   ///
@@ -144,20 +164,22 @@ impl Store {
   pub fn record_directory(
     &self,
     directory: &bazel_protos::remote_execution::Directory,
-  ) -> Result<Digest, String> {
-    let bytes = directory.write_to_bytes().map_err(|e| {
+  ) -> BoxFuture<Digest, String> {
+    let store = self.clone();
+    future::result(directory.write_to_bytes().map_err(|e| {
       format!(
         "Error serializing directory proto {:?}: {}",
         directory,
         e.description()
       )
-    })?;
-    let len = bytes.len();
+    })).and_then(move |bytes| {
+      let len = bytes.len();
 
-    Ok(Digest(
-      self.store_bytes(bytes, self.inner.directory_store.clone())?,
-      len,
-    ))
+      store
+        .store_bytes(bytes, store.inner.directory_store.clone())
+        .map(move |fingerprint| Digest(fingerprint, len))
+    })
+      .to_boxed()
   }
 }
 
@@ -185,6 +207,7 @@ mod tests {
   extern crate tempdir;
 
   use bazel_protos;
+  use futures::Future;
   use super::{Digest, Fingerprint, ResettablePool, Store};
   use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
   use protobuf::Message;
@@ -209,8 +232,8 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     assert_eq!(
-      new_store(dir.path()).store_file_bytes(str_bytes()).unwrap(),
-      digest()
+      new_store(dir.path()).store_file_bytes(str_bytes()).wait(),
+      Ok(digest())
     );
   }
 
@@ -218,10 +241,13 @@ mod tests {
   fn save_file_is_idempotent() {
     let dir = TempDir::new("store").unwrap();
 
-    &new_store(dir.path()).store_file_bytes(str_bytes()).unwrap();
+    new_store(dir.path())
+      .store_file_bytes(str_bytes())
+      .wait()
+      .unwrap();
     assert_eq!(
-      new_store(dir.path()).store_file_bytes(str_bytes()).unwrap(),
-      digest()
+      new_store(dir.path()).store_file_bytes(str_bytes()).wait(),
+      Ok(digest())
     );
   }
 
@@ -230,7 +256,7 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     let fingerprint = Fingerprint::from_hex_string(HASH).unwrap();
-    let bogus_value: &[u8] = &[][..];
+    let bogus_value: Vec<u8> = vec![];
 
     let env = Environment::new().set_max_dbs(1).open(dir.path()).unwrap();
     let database = env.create_db(Some("files"), DatabaseFlags::empty());
@@ -243,24 +269,18 @@ mod tests {
       .unwrap();
 
     assert_eq!(
-      new_store(dir.path())
-        .load_file_bytes(fingerprint)
-        .unwrap()
-        .unwrap(),
-      bogus_value
+      new_store(dir.path()).load_file_bytes(fingerprint).wait(),
+      Ok(Some(bogus_value.clone()))
     );
 
     assert_eq!(
-      new_store(dir.path()).store_file_bytes(str_bytes()).unwrap(),
-      digest()
+      new_store(dir.path()).store_file_bytes(str_bytes()).wait(),
+      Ok(digest())
     );
 
     assert_eq!(
-      &new_store(dir.path())
-        .load_file_bytes(fingerprint)
-        .unwrap()
-        .unwrap(),
-      &Vec::from(bogus_value)
+      new_store(dir.path()).load_file_bytes(fingerprint).wait(),
+      Ok(Some(bogus_value))
     );
   }
 
@@ -270,8 +290,8 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     let store = new_store(dir.path());
-    let hash = store.store_file_bytes(data.clone()).unwrap();
-    assert_eq!(store.load_file_bytes(hash.0).unwrap().unwrap(), data);
+    let hash = store.store_file_bytes(data.clone()).wait().unwrap();
+    assert_eq!(store.load_file_bytes(hash.0).wait(), Ok(Some(data)));
   }
 
   #[test]
@@ -280,8 +300,8 @@ mod tests {
     assert_eq!(
       new_store(dir.path())
         .load_file_bytes(Fingerprint::from_hex_string(HASH).unwrap())
-        .unwrap(),
-      None
+        .wait(),
+      Ok(None)
     );
   }
 
@@ -308,6 +328,7 @@ mod tests {
     assert_eq!(
       &new_store(dir.path())
         .record_directory(&directory)
+        .wait()
         .unwrap()
         .0
         .to_hex(),
@@ -317,17 +338,15 @@ mod tests {
     assert_eq!(
       new_store(dir.path())
         .load_directory_proto(Fingerprint::from_hex_string(hash).unwrap())
-        .unwrap()
-        .unwrap(),
-      directory
+        .wait(),
+      Ok(Some(directory.clone()))
     );
 
     assert_eq!(
       new_store(dir.path())
         .load_directory_proto_bytes(Fingerprint::from_hex_string(hash).unwrap())
-        .unwrap()
-        .unwrap(),
-      directory.write_to_bytes().unwrap()
+        .wait(),
+      Ok(Some(directory.write_to_bytes().unwrap()))
     );
   }
 
@@ -335,20 +354,23 @@ mod tests {
   fn file_is_not_directory_proto() {
     let dir = TempDir::new("store").unwrap();
 
-    new_store(dir.path()).store_file_bytes(str_bytes()).unwrap();
+    new_store(dir.path())
+      .store_file_bytes(str_bytes())
+      .wait()
+      .unwrap();
 
     assert_eq!(
       new_store(dir.path())
         .load_directory_proto(Fingerprint::from_hex_string(HASH).unwrap())
-        .unwrap(),
-      None
+        .wait(),
+      Ok(None)
     );
 
     assert_eq!(
       new_store(dir.path())
         .load_directory_proto_bytes(Fingerprint::from_hex_string(HASH).unwrap())
-        .unwrap(),
-      None
+        .wait(),
+      Ok(None)
     );
   }
 

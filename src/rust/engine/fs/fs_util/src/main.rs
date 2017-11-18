@@ -150,7 +150,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          match store.load_file_bytes(fingerprint)? {
+          match store.load_file_bytes(fingerprint).wait()? {
             Some(bytes) => {
               io::stdout().write(&bytes).unwrap();
               Ok(())
@@ -223,11 +223,13 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("cat-proto", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
           let proto_bytes = match args.value_of("output-format").unwrap() {
-            "binary" => store.load_directory_proto_bytes(fingerprint),
+            "binary" => store.load_directory_proto_bytes(fingerprint).wait(),
             "text" => {
-              store.load_directory_proto(fingerprint).map(|maybe_p| {
-                maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
-              })
+              store.load_directory_proto(fingerprint).wait().map(
+                |maybe_p| {
+                  maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
+                },
+              )
             }
             format => Err(format!(
               "Unexpected value of --output-format arg: {}",
@@ -253,8 +255,8 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
     }
     ("cat", Some(args)) => {
       let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-      let v = match store.load_file_bytes(fingerprint)? {
-        None => store.load_directory_proto_bytes(fingerprint)?,
+      let v = match store.load_file_bytes(fingerprint).wait()? {
+        None => store.load_directory_proto_bytes(fingerprint).wait()?,
         some => some,
       };
       match v {
@@ -332,13 +334,17 @@ fn save_directory(
         }
         fs::PathStat::Dir { .. } => {
           // Because there are no children of this Dir, it must be empty.
-          let digest = store
-            .record_directory(&bazel_protos::remote_execution::Directory::new())
-            .unwrap();
-          let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
-          directory_node.set_name(osstring_as_utf8(first_component).unwrap());
-          directory_node.set_digest(digest.into());
-          dir_futures.push(futures::future::ok(directory_node).to_boxed());
+          dir_futures.push(
+            store
+              .record_directory(&bazel_protos::remote_execution::Directory::new())
+              .map(move |digest| {
+                let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
+                directory_node.set_name(osstring_as_utf8(first_component).unwrap());
+                directory_node.set_digest(digest.into());
+                directory_node
+              })
+              .to_boxed(),
+          );
         }
       }
     } else {
@@ -393,17 +399,22 @@ fn paths_of_child_dir(paths: Vec<fs::PathStat>) -> Vec<fs::PathStat> {
     .collect()
 }
 
+///
+/// TODO: Stop `wait()`ing and go fully parallel.
+///
 fn materialize_directory(
   store: Arc<Store>,
   destination: &Path,
   fingerprint: Fingerprint,
 ) -> Result<(), ExitError> {
-  let directory = store.load_directory_proto(fingerprint)?.ok_or_else(|| {
-    ExitError(
-      format!("Directory with fingerprint {} not found", fingerprint),
-      ExitCode::NotFound,
-    )
-  })?;
+  let directory = store.load_directory_proto(fingerprint).wait()?.ok_or_else(
+    || {
+      ExitError(
+        format!("Directory with fingerprint {} not found", fingerprint),
+        ExitCode::NotFound,
+      )
+    },
+  )?;
   make_clean_dir(&destination).map_err(|e| {
     format!(
       "Error making directory {:?}: {}",
@@ -413,7 +424,7 @@ fn materialize_directory(
   })?;
   for file_node in directory.get_files() {
     let fingerprint = Fingerprint::from_hex_string(&file_node.get_digest().get_hash())?;
-    match store.load_file_bytes(fingerprint)? {
+    match store.load_file_bytes(fingerprint).wait()? {
       Some(bytes) => {
         let path = destination.join(file_node.get_name());
         File::create(&path)
