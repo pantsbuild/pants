@@ -67,14 +67,34 @@ class BuildozerTest(TaskTestBase):
     self.assertInFile(new_build_name, '{}/b/BUILD'.format(self.build_root))
 
   def test_multiple_addresses(self):
-    targets = ['b', 'c']
-
+    roots = ['b', 'c']
     dependency_to_add = '/l/m/n'
 
-    self._run_buildozer({ 'add_dependencies': dependency_to_add }, targets=targets)
+    self._test_add_dependencies_with_targets([dependency_to_add], roots, None)
 
-    for target in targets:
-      self.assertInFile(dependency_to_add, '{}/{}/BUILD'.format(self.build_root, target))
+  def test_implicit_name(self):
+    self.add_to_build_file('e', 'java_library()')
+
+    targets={}
+    targets['e'] = self.make_target('e')
+    roots = ['e']
+    dependency_to_add = '/o/p/q'
+
+    self._test_add_dependencies_with_targets([dependency_to_add], roots, targets)
+
+  def test_implicit_name_among_rules(self):
+    self.add_to_build_file('f', 'java_library(name="f")')
+    self.add_to_build_file('g', 'java_library(name="g")')
+    self.add_to_build_file('h', 'java_library()')
+
+    targets={}
+    targets['e'] = self.make_target('e')
+    targets['g'] = self.make_target('g')
+    targets['h'] = self.make_target('h')
+    roots = ['h']
+    dependency_to_add = '/r/s/t'
+
+    self._test_add_dependencies_with_targets([dependency_to_add], roots, targets)
 
   def _test_add_dependencies(self, spec, dependencies_to_add):
     self._run_buildozer({ 'add_dependencies': ' '.join(dependencies_to_add) })
@@ -82,19 +102,28 @@ class BuildozerTest(TaskTestBase):
     for dependency in dependencies_to_add:
       self.assertIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec)))
 
+  def _test_add_dependencies_with_targets(self, dependencies_to_add, roots, targets):
+    for dependency_to_add in dependencies_to_add:
+      self._run_buildozer({ 'add_dependencies': dependency_to_add }, roots=roots, targets=targets)
+
+    for root in roots:
+      self.assertInFile(dependency_to_add, '{}/{}/BUILD'.format(self.build_root, root))
+
   def _test_remove_dependencies(self, spec, dependencies_to_remove):
-    self._run_buildozer({ 'remove_dependencies': ' '.join(dependencies_to_remove) }, targets=[spec])
+    self._run_buildozer({ 'remove_dependencies': ' '.join(dependencies_to_remove) }, roots=[spec])
 
     for dependency in dependencies_to_remove:
       self.assertNotIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec)))
 
-  def _run_buildozer(self, options, targets=['b']):
+  def _run_buildozer(self, options, roots=['b'], targets=None):
+    targets = self.targets if targets == None else targets
+
     self.set_options(**options)
 
     target_roots = []
 
-    for root in targets:
-      target_roots.append(self.targets[root])
+    for root in roots:
+      target_roots.append(targets[root])
 
     self.create_task(self.context(target_roots=target_roots)).execute()
 
