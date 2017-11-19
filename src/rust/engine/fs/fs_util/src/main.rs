@@ -9,7 +9,7 @@ extern crate protobuf;
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
 use fs::{Digest, Fingerprint, Store, VFS, ResettablePool};
-use futures::future::{Future, join_all};
+use futures::future::{self, Future, join_all};
 use itertools::Itertools;
 use std::error::Error;
 use std::ffi::OsString;
@@ -200,9 +200,9 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
     ("directory", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("materialize", Some(args)) => {
-          let destination = Path::new(args.value_of("destination").unwrap());
+          let destination = PathBuf::from(args.value_of("destination").unwrap());
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          Ok(materialize_directory(store, destination, fingerprint)?)
+          materialize_directory(store, destination, fingerprint).wait()
         }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
@@ -399,59 +399,95 @@ fn paths_of_child_dir(paths: Vec<fs::PathStat>) -> Vec<fs::PathStat> {
     .collect()
 }
 
-///
-/// TODO: Stop `wait()`ing and go fully parallel.
-///
 fn materialize_directory(
   store: Arc<Store>,
-  destination: &Path,
+  destination: PathBuf,
   fingerprint: Fingerprint,
-) -> Result<(), ExitError> {
-  let directory = store.load_directory_proto(fingerprint).wait()?.ok_or_else(
-    || {
-      ExitError(
-        format!("Directory with fingerprint {} not found", fingerprint),
-        ExitCode::NotFound,
-      )
-    },
-  )?;
-  make_clean_dir(&destination).map_err(|e| {
+) -> BoxFuture<(), ExitError> {
+  let mkdir = make_clean_dir(&destination).map_err(|e| {
     format!(
       "Error making directory {:?}: {}",
       destination,
       e.description()
-    )
-  })?;
-  for file_node in directory.get_files() {
-    let fingerprint = Fingerprint::from_hex_string(&file_node.get_digest().get_hash())?;
-    match store.load_file_bytes(fingerprint).wait()? {
-      Some(bytes) => {
-        let path = destination.join(file_node.get_name());
-        File::create(&path)
-          .and_then(|mut f| f.write_all(&bytes))
-          .map_err(|e| {
-            format!("Error writing file {:?}: {}", path, e.description())
-          })?;
-      }
-      None => {
-        return Err(ExitError(
-          format!(
-            "File with fingerprint {} not found",
-            file_node.get_digest().get_hash()
-          ),
+    ).into()
+  });
+  match mkdir {
+    Ok(()) => {}
+    Err(e) => return future::result(Err(e)).to_boxed(),
+  };
+  store
+    .load_directory_proto(fingerprint)
+    .map_err(|e| e.into())
+    .and_then(move |directory_opt| {
+      directory_opt.ok_or_else(|| {
+        ExitError(
+          format!("Directory with fingerprint {} not found", fingerprint),
           ExitCode::NotFound,
-        ))
-      }
-    }
-  }
-  for directory_node in directory.get_directories() {
-    materialize_directory(
-      store.clone(),
-      &destination.join(directory_node.get_name()),
-      Fingerprint::from_hex_string(directory_node.get_digest().get_hash())?,
-    )?;
-  }
-  Ok(())
+        )
+      })
+    })
+    .and_then(move |mut directory| {
+      let file_futures = directory
+        .take_files()
+        .into_iter()
+        .map(|file_node| {
+          let path = destination.join(file_node.get_name());
+          materialize_file(store.clone(), path, file_node)
+        })
+        .collect::<Vec<_>>();
+      let directory_futures = directory
+        .take_directories()
+        .into_iter()
+        .map(|directory_node| {
+          let store = store.clone();
+          let path = destination.join(directory_node.get_name());
+          future::result(Fingerprint::from_hex_string(
+            directory_node.get_digest().get_hash(),
+          )).map_err(|e| e.into())
+            .and_then(move |fingerprint| {
+              materialize_directory(store, path, fingerprint)
+            })
+        })
+        .collect::<Vec<_>>();
+      join_all(file_futures)
+        .join(join_all(directory_futures))
+        .map(|_| ())
+    })
+    .to_boxed()
+}
+
+fn materialize_file(
+  store: Arc<Store>,
+  destination: PathBuf,
+  file_node: bazel_protos::remote_execution::FileNode,
+) -> BoxFuture<(), ExitError> {
+  future::result(Fingerprint::from_hex_string(
+    &file_node.get_digest().get_hash(),
+  )).map_err(|e| e.into())
+    .and_then(move |fingerprint| {
+      store
+        .load_file_bytes(fingerprint)
+        .map_err(|e| e.into())
+        .and_then(move |bytes_opt| match bytes_opt {
+          Some(bytes) => {
+            File::create(&destination)
+              .and_then(|mut f| f.write_all(&bytes))
+              .map_err(|e| {
+                format!("Error writing file {:?}: {}", destination, e.description()).into()
+              })
+          }
+          None => {
+            Err(ExitError(
+              format!(
+                "File with fingerprint {} not found",
+                file_node.get_digest().get_hash()
+              ),
+              ExitCode::NotFound,
+            ))
+          }
+        })
+    })
+    .to_boxed()
 }
 
 fn osstring_as_utf8(path: OsString) -> Result<String, String> {
