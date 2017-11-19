@@ -150,16 +150,15 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          match store.load_file_bytes(fingerprint).wait()? {
-            Some(bytes) => {
-              io::stdout().write(&bytes).unwrap();
-              Ok(())
-            }
-            None => Err(ExitError(
+          let write_result = store
+            .load_file_bytes_with(fingerprint, |bytes| io::stdout().write_all(&bytes).unwrap())
+            .wait()?;
+          write_result.ok_or_else(|| {
+            ExitError(
               format!("File with fingerprint {} not found", fingerprint),
               ExitCode::NotFound,
-            )),
-          }
+            )
+          })
         }
         ("save", Some(args)) => {
           let path = PathBuf::from(args.value_of("path").unwrap());
@@ -466,16 +465,17 @@ fn materialize_file(
   )).map_err(|e| e.into())
     .and_then(move |fingerprint| {
       store
-        .load_file_bytes(fingerprint)
+        .load_file_bytes_with(fingerprint, move |bytes| {
+          File::create(&destination)
+            .and_then(|mut f| f.write_all(bytes))
+            .map_err(|e| {
+              format!("Error writing file {:?}: {}", destination, e.description())
+            })
+        })
         .map_err(|e| e.into())
-        .and_then(move |bytes_opt| match bytes_opt {
-          Some(bytes) => {
-            File::create(&destination)
-              .and_then(|mut f| f.write_all(&bytes))
-              .map_err(|e| {
-                format!("Error writing file {:?}: {}", destination, e.description()).into()
-              })
-          }
+        .and_then(move |write_result| match write_result {
+          Some(Ok(())) => Ok(()),
+          Some(Err(e)) => Err(e.into()),
           None => {
             Err(ExitError(
               format!(

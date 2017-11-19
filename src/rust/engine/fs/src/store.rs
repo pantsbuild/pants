@@ -105,6 +105,14 @@ impl Store {
     self.load_bytes(fingerprint, self.inner.file_store.clone())
   }
 
+  pub fn load_file_bytes_with<T: Send + 'static, F: FnOnce(&[u8]) -> T + Send + 'static>(
+    &self,
+    fingerprint: Fingerprint,
+    f: F,
+  ) -> CpuFuture<Option<T>, String> {
+    self.load_bytes_with(fingerprint, self.inner.file_store.clone(), f)
+  }
+
   pub fn load_directory_proto_bytes(
     &self,
     fingerprint: Fingerprint,
@@ -133,25 +141,37 @@ impl Store {
       .to_boxed()
   }
 
-  pub fn load_bytes(
+  fn load_bytes(
     &self,
     fingerprint: Fingerprint,
     db: Database,
   ) -> CpuFuture<Option<Vec<u8>>, String> {
+    self.load_bytes_with(fingerprint, db, |bytes| Vec::from(bytes))
+  }
+
+  fn load_bytes_with<T: Send + 'static, F: FnOnce(&[u8]) -> T + Send + 'static>(
+    &self,
+    fingerprint: Fingerprint,
+    db: Database,
+    f: F,
+  ) -> CpuFuture<Option<T>, String> {
     let store = self.inner.clone();
     self.inner.pool.spawn_fn(move || {
-      let get_res = store.env.begin_ro_txn().and_then(|txn| {
-        txn.get(db, &fingerprint).map(|v| v.to_vec())
+      let ro_txn = store.env.begin_ro_txn().map_err(|err| {
+        format!(
+          "Failed to begin read transaction: {}",
+          err.description().to_string()
+        )
       });
-      match get_res {
-        Ok(v) => Ok(Some(v)),
+      ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
+        Ok(bytes) => Ok(Some(f(bytes))),
         Err(NotFound) => Ok(None),
         Err(err) => Err(format!(
           "Error loading fingerprint {}: {}",
           fingerprint,
           err.description().to_string()
         )),
-      }
+      })
     })
   }
 
