@@ -115,8 +115,8 @@ class CoursierResolve:
 
     def construct_classifier_to_jar(jars):
       product = defaultdict(list)
-      for jar in jars:
-        product[jar.coordinate.classifier or ''].append(jar)
+      for j in jars:
+        product[j.coordinate.classifier or ''].append(j)
       return product
 
     classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
