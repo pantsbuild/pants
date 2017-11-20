@@ -412,7 +412,7 @@ fn materialize_directory(
   });
   match mkdir {
     Ok(()) => {}
-    Err(e) => return future::result(Err(e)).to_boxed(),
+    Err(e) => return future::err(e).to_boxed(),
   };
   store
     .load_directory_proto(fingerprint)
@@ -425,18 +425,24 @@ fn materialize_directory(
         )
       })
     })
-    .and_then(move |mut directory| {
+    .and_then(move |directory| {
       let file_futures = directory
-        .take_files()
-        .into_iter()
+        .get_files()
+        .iter()
         .map(|file_node| {
+          let store = store.clone();
           let path = destination.join(file_node.get_name());
-          materialize_file(store.clone(), path, file_node)
+          future::result(Fingerprint::from_hex_string(
+            file_node.get_digest().get_hash(),
+          )).map_err(|e| e.into())
+            .and_then(move |fingerprint| {
+              materialize_file(store, path, fingerprint)
+            })
         })
         .collect::<Vec<_>>();
       let directory_futures = directory
-        .take_directories()
-        .into_iter()
+        .get_directories()
+        .iter()
         .map(|directory_node| {
           let store = store.clone();
           let path = destination.join(directory_node.get_name());
@@ -458,34 +464,26 @@ fn materialize_directory(
 fn materialize_file(
   store: Arc<Store>,
   destination: PathBuf,
-  file_node: bazel_protos::remote_execution::FileNode,
+  fingerprint: Fingerprint,
 ) -> BoxFuture<(), ExitError> {
-  future::result(Fingerprint::from_hex_string(
-    &file_node.get_digest().get_hash(),
-  )).map_err(|e| e.into())
-    .and_then(move |fingerprint| {
-      store
-        .load_file_bytes_with(fingerprint, move |bytes| {
-          File::create(&destination)
-            .and_then(|mut f| f.write_all(bytes))
-            .map_err(|e| {
-              format!("Error writing file {:?}: {}", destination, e.description())
-            })
+  store
+    .load_file_bytes_with(fingerprint, move |bytes| {
+      File::create(&destination)
+        .and_then(|mut f| f.write_all(bytes))
+        .map_err(|e| {
+          format!("Error writing file {:?}: {}", destination, e.description())
         })
-        .map_err(|e| e.into())
-        .and_then(move |write_result| match write_result {
-          Some(Ok(())) => Ok(()),
-          Some(Err(e)) => Err(e.into()),
-          None => {
-            Err(ExitError(
-              format!(
-                "File with fingerprint {} not found",
-                file_node.get_digest().get_hash()
-              ),
-              ExitCode::NotFound,
-            ))
-          }
-        })
+    })
+    .map_err(|e| e.into())
+    .and_then(move |write_result| match write_result {
+      Some(Ok(())) => Ok(()),
+      Some(Err(e)) => Err(e.into()),
+      None => {
+        Err(ExitError(
+          format!("File with fingerprint {} not found", fingerprint),
+          ExitCode::NotFound,
+        ))
+      }
     })
     .to_boxed()
 }
