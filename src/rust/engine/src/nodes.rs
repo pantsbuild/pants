@@ -796,7 +796,7 @@ impl Node for DigestFile {
         ))
       })
       .and_then(move |c| {
-        context.core.store.store_file_bytes(&c.content).map_err(
+        context.core.store.store_file_bytes(c.content).map_err(
           |e| throw(&e),
         )
       })

@@ -41,6 +41,8 @@ impl Core {
     let mut snapshots_dir = PathBuf::from(work_dir);
     snapshots_dir.push("snapshots");
 
+    let pool = Arc::new(ResettablePool::new("io-".to_string()));
+
     let store_path = match std::env::home_dir() {
       Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
       None => panic!("Could not find home dir"),
@@ -48,7 +50,7 @@ impl Core {
 
     let store = safe_create_dir_all_ioerror(&store_path)
         .map_err(|e| format!("{:?}", e))
-        .and_then(|()| Store::new(store_path))
+        .and_then(|()| Store::new(store_path, pool.clone()))
         .unwrap_or_else(
       |e| {
         panic!("Could not initialize Store directory {:?}", e)
@@ -70,7 +72,6 @@ impl Core {
       types.snapshots.clone(),
     );
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
-    let pool = Arc::new(ResettablePool::new("io-".to_string()));
 
     Core {
       graph: Graph::new(),
