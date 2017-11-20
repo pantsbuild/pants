@@ -75,8 +75,7 @@ class BuildozerTest(TaskTestBase):
   def test_implicit_name(self):
     self.add_to_build_file('e', 'java_library()')
 
-    targets={}
-    targets['e'] = self.make_target('e')
+    targets = { 'e': self.make_target('e') }
     roots = ['e']
     dependency_to_add = '/o/p/q'
 
@@ -87,10 +86,7 @@ class BuildozerTest(TaskTestBase):
     self.add_to_build_file('g', 'java_library(name="g")')
     self.add_to_build_file('h', 'java_library()')
 
-    targets={}
-    targets['e'] = self.make_target('e')
-    targets['g'] = self.make_target('g')
-    targets['h'] = self.make_target('h')
+    targets = { 'e': self.make_target('e'), 'g': self.make_target('g'), 'h': self.make_target('h') }
     roots = ['h']
     dependency_to_add = '/r/s/t'
 
