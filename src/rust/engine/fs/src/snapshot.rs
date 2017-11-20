@@ -166,20 +166,20 @@ fn osstring_as_utf8(path: OsString) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+  extern crate testutil;
   extern crate tempdir;
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::Future;
   use tempdir::TempDir;
+  use self::testutil::make_file;
 
-  use super::super::{Digest, Dir, File, Fingerprint, GetFileDigest, PathStat, PosixFS,
-                     ResettablePool, Snapshot, Stat, Store};
+  use super::super::{Digest, File, Fingerprint, GetFileDigest, PathGlobs, PathStat, PosixFS,
+                     ResettablePool, Snapshot, Store, VFS};
 
   use std;
   use std::error::Error;
-  use std::io::Write;
-  use std::os::unix::fs::PermissionsExt;
-  use std::path::{Path, PathBuf};
+  use std::path::PathBuf;
   use std::sync::Arc;
 
   const STR: &str = "European Burmese";
@@ -202,12 +202,7 @@ mod tests {
     let file_name = PathBuf::from("roland");
     make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
-    let path_stats = vec![
-      PathStat::file(
-        file_name.clone(),
-        downcast_file_stat(posix_fs.stat(file_name.clone()).unwrap())
-      ),
-    ];
+    let path_stats = expand_all_sorted(posix_fs);
     // TODO: Inline when only used once
     let fingerprint = Fingerprint::from_hex_string(
       "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
@@ -233,12 +228,7 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(cats)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
-    let path_stats = vec![
-      PathStat::file(
-        roland.clone(),
-        downcast_file_stat(posix_fs.stat(roland).unwrap())
-      ),
-    ];
+    let path_stats = expand_all_sorted(posix_fs);
     // TODO: Inline when only used once
     let fingerprint = Fingerprint::from_hex_string(
       "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
@@ -267,31 +257,16 @@ mod tests {
     std::fs::create_dir_all(&dir.path().join(&dogs)).unwrap();
     std::fs::create_dir_all(&dir.path().join(&llamas)).unwrap();
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
-    let dogs_path_stat = PathStat::dir(
-      dogs.clone(),
-      downcast_dir_stat(posix_fs.stat(dogs).unwrap()),
-    );
-    let cats_roland_path_stat = PathStat::file(
-      roland.clone(),
-      downcast_file_stat(posix_fs.stat(roland).unwrap()),
-    );
-    let llamas_path_stat = PathStat::dir(
-      llamas.clone(),
-      downcast_dir_stat(posix_fs.stat(llamas).unwrap()),
-    );
 
-    let path_stats = vec![
-      dogs_path_stat.clone(),
-      cats_roland_path_stat.clone(),
-      llamas_path_stat.clone(),
-    ];
-    let sorted_path_stats = vec![cats_roland_path_stat, dogs_path_stat, llamas_path_stat];
+    let sorted_path_stats = expand_all_sorted(posix_fs);
+    let mut unsorted_path_stats = sorted_path_stats.clone();
+    unsorted_path_stats.reverse();
     // TODO: Inline when only used once
     let fingerprint = Fingerprint::from_hex_string(
       "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
     ).unwrap();
     assert_eq!(
-      Snapshot::from_path_stats(store, digester, path_stats.clone())
+      Snapshot::from_path_stats(store, digester, unsorted_path_stats)
         .wait()
         .unwrap(),
       Snapshot {
@@ -320,28 +295,12 @@ mod tests {
     }
   }
 
-  // Ripped from lib.rs's test module
-  // TODO: Work out how to share things across tests
-  fn make_file(path: &Path, contents: &[u8], mode: u32) {
-    let mut file = std::fs::File::create(&path).unwrap();
-    file.write(contents).unwrap();
-    let mut permissions = std::fs::metadata(path).unwrap().permissions();
-    permissions.set_mode(mode);
-    file.set_permissions(permissions).unwrap();
-  }
-
-  // TODO: Is there a better way to do this?
-  fn downcast_file_stat(stat: Stat) -> File {
-    match stat {
-      Stat::File(file) => Some(file),
-      _ => None,
-    }.unwrap()
-  }
-
-  fn downcast_dir_stat(stat: Stat) -> Dir {
-    match stat {
-      Stat::Dir(dir) => Some(dir),
-      _ => None,
-    }.unwrap()
+  fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
+    let mut v = posix_fs
+      .expand(PathGlobs::create(&["**".to_owned()], &vec![]).unwrap())
+      .wait()
+      .unwrap();
+    v.sort_by(|a, b| a.path().cmp(b.path()));
+    v
   }
 }

@@ -177,8 +177,10 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .unwrap();
           match file {
             fs::Stat::File(f) => {
-              let digest = FileSaver(store, Arc::new(posix_fs))
-                .digest(&f)
+              let digest = FileSaver {
+                store: store,
+                posix_fs: Arc::new(posix_fs),
+              }.digest(&f)
                 .wait()
                 .unwrap();
               Ok(println!("{} {}", digest.0, digest.1))
@@ -218,7 +220,10 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .and_then(move |paths| {
               Snapshot::from_path_stats(
                 store.clone(),
-                Arc::new(FileSaver(store.clone(), posix_fs)),
+                Arc::new(FileSaver {
+                  store: store.clone(),
+                  posix_fs: posix_fs,
+                }),
                 paths,
               )
             })
@@ -285,15 +290,17 @@ fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::Posi
   fs::PosixFS::new(&root, pool, vec![]).unwrap()
 }
 
-struct FileSaver(Arc<Store>, Arc<fs::PosixFS>);
+struct FileSaver {
+  store: Arc<Store>,
+  posix_fs: Arc<fs::PosixFS>,
+}
 
 impl GetFileDigest<String> for FileSaver {
   fn digest(&self, file: &fs::File) -> BoxFuture<fs::Digest, String> {
     let file_copy = file.clone();
-    let store = self.0.clone();
+    let store = self.store.clone();
     self
-      .1
-      .clone()
+      .posix_fs
       .read_file(&file)
       .map_err(move |err| {
         format!("Error reading file {:?}: {}", file_copy, err.description())
