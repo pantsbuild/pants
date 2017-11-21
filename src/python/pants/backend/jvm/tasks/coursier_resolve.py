@@ -31,6 +31,7 @@ class CoursierError(Exception):
 
 
 class CoursierResolve:
+  # TODO(wisechengyi): add conf support
   @classmethod
   def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, pinned_artifacts=None, excludes=[]):
     manager = JarDependencyManagement.global_instance()
@@ -51,40 +52,8 @@ class CoursierResolve:
 
     jars_by_key = OrderedDict()
     for jar in jars:
-      jars = jars_by_key.setdefault((jar.org, jar.name), [])
-      jars.append(jar)
-
-    # artifact_set = PinnedJarArtifactSet(pinned_artifacts)  # Copy, because we're modifying it.
-    # for jars in jars_by_key.values():
-    #   for i, dep in enumerate(jars):
-    #     direct_coord = M2Coordinate.create(dep)
-    #     managed_coord = artifact_set[direct_coord]
-    #     if direct_coord.rev != managed_coord.rev:
-    #       # It may be necessary to actually change the version number of the jar we want to resolve
-    #       # here, because overrides do not apply directly (they are exclusively transitive). This is
-    #       # actually a good thing, because it gives us more control over what happens.
-    #       coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
-    #       jars[i] = dep.copy(rev=coord.rev)
-    #     elif dep.force:
-    #       # If this dependency is marked as 'force' and there is no version conflict, use the normal
-    #       # pants behavior for 'force'.
-    #       artifact_set.put(direct_coord)
-    #
-    # dependencies = [IvyUtils._generate_jar_template(jars) for jars in jars_by_key.values()]
-    #
-    # # As it turns out force is not transitive - it only works for dependencies pants knows about
-    # # directly (declared in BUILD files - present in generated ivy.xml). The user-level ivy docs
-    # # don't make this clear [1], but the source code docs do (see isForce docs) [2]. I was able to
-    # # edit the generated ivy.xml and use the override feature [3] though and that does work
-    # # transitively as you'd hope.
-    # #
-    # # [1] http://ant.apache.org/ivy/history/2.3.0/settings/conflict-managers.html
-    # # [2] https://svn.apache.org/repos/asf/ant/ivy/core/branches/2.3.0/
-    # #     src/java/org/apache/ivy/core/module/descriptor/DependencyDescriptor.java
-    # # [3] http://ant.apache.org/ivy/history/2.3.0/ivyfile/override.html
-    # overrides = [IvyUtils._generate_override_template(_coord) for _coord in artifact_set]
-    #
-    # excludes = [IvyUtils._generate_exclude_template(exclude) for exclude in excludes]
+      jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
+      jars_for_the_key.append(jar)
 
     jars_to_resolve = []
     exclude_args = set()
@@ -92,7 +61,7 @@ class CoursierResolve:
       for jar in v:
         jars_to_resolve.append(jar)
         for ex in jar.excludes:
-          ex_arg = "{}:{}".format(ex.org, ex.name)
+          ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
           exclude_args.add(ex_arg)
 
     # Prepare coursier args
@@ -120,6 +89,8 @@ class CoursierResolve:
       return product
 
     classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
+
+    # Coursier calls need to be divided by classifier because coursier treats it globally.
     for classifier, jars in classifier_to_jars.items():
 
       cmd_args = list(common_args)
@@ -131,18 +102,18 @@ class CoursierResolve:
           cmd_args.append('--intransitive')
         cmd_args.append(j.coordinate.simple_coord)
 
-      # Add org:artifact to exclude
-      for x in exclude_args:
-        cmd_args.append('-E')
-        cmd_args.append(x)
+      exclude_file = 'excludes.txt'
+      with open(exclude_file, 'w') as f:
+        f.write('\n'.join(exclude_args).encode('utf8'))
+
+      cmd_args.append('--soft-exclude-file')
+      cmd_args.append(exclude_file)
 
       cmd_str = ' '.join(cmd_args)
       logger.info(cmd_str)
 
       try:
         with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
-          # ret = runner.run(stdout=workunit.output('stdout'), stderr=workunit.output('stderr'))
-          # output = subprocess.check_output(cmd_args, stderr=workunit.output('stderr'))
 
           return_code = subprocess.call(cmd_args,
                                         stdout=workunit.output('stdout'),
@@ -151,31 +122,22 @@ class CoursierResolve:
           workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
           with open(output_fn) as f:
-            read = f.read()
-            # print(read)
-            result = json.loads(read)
-
-          # with open(workunit.output('stdout')._io.name) as f:
-          #   stdout = f.read()
+            result = json.loads(f.read())
 
           if return_code:
             raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
       except subprocess.CalledProcessError as e:
-        raise CoursierError()
+        raise CoursierError(e)
 
       else:
         flattened_resolution = cls.flatten_resolution_by_root(result)
         files_by_coord = cls.files_by_coord(result, coursier_cache_path, pants_jar_path_base)
 
-        # resolved_jars = cls.parse_jar_paths(coursier_cache_path, pants_jar_path_base, stdout)
-
         for t in targets:
           if isinstance(t, JarLibrary):
 
             def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
-              # TODO: currently resolved jars matching the simple coord will be collected,
-              # need to only collect the ones that are matching exactly.
               transitive_jar_path_for_coord = []
               if my_simple_coord in flattened_resolution:
                 for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
@@ -184,7 +146,6 @@ class CoursierResolve:
               return transitive_jar_path_for_coord
 
             for jar in t.jar_dependencies:
-
               simple_coord_candidate = jar.coordinate.simple_coord
               final_simple_coord = None
               if simple_coord_candidate in files_by_coord:

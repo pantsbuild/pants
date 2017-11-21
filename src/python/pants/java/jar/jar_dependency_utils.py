@@ -116,7 +116,8 @@ class M2Coordinate(object):
   def simple_coord(self):
     """
     A simple version of coordinate representation with org:name:rev without classifier and ext
-    :return:
+
+    :return: org:name:version
     """
     return '{}:{}:{}'.format(self.org, self.name, self.rev)
 

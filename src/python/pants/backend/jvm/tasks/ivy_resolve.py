@@ -50,6 +50,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
+    register('--resolver', choices=['ivy', 'coursier'], default='ivy', help='Pick a resolver.')
     cls.register_jvm_tool(register,
                           'xalan',
                           classpath=[
