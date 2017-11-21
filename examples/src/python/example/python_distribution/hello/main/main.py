@@ -7,10 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from example.python_distribution.hello.superhello import superhello
+from sample import hello
 
 
 if __name__ == '__main__':
-  greetees = sys.argv[1:] or ['world']
-  for greetee in greetees:
-    print(superhello(greetee))
+  hello.hello()

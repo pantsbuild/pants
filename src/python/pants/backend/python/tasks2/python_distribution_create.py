@@ -41,6 +41,3 @@ class PythonDistributionCreate(Task):
   def _create_distribution(self, source_dir, results_dir, setup_file):
     """Create a .pex file containing an inline wheel for the specified folder and setup.py."""
     pass
-
-
-

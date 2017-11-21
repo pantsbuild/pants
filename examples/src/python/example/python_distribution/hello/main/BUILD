@@ -5,7 +5,7 @@
 
 python_binary(
   dependencies=[
-    'examples/src/python/example/python_distribution/hello/superhello:superhello',
+    'examples/src/python/example/python_distribution/hello/hello2:sample',
   ],
   source='main.py',
 )

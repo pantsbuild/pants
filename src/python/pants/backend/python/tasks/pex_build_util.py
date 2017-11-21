@@ -15,8 +15,8 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_distribution import PythonDistribution
+from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
@@ -130,14 +130,14 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
 
 
 def build_python_distribution_from_target(target, workdir):
-  # grab setup.py, cpp sources, python from target and place into a temp dir for packaging
+  
   pydist_workdir = os.path.join(workdir, '.pydistworkdir')
   safe_mkdir(pydist_workdir)
   prevdir = os.getcwd()
   os.chdir(pydist_workdir)
   pex_name = "%s.pex" % target.name
-  #import pdb;pdb.set_trace()
-  args = ['/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/hello2', "-o", pex_name]
+  
+  args = ['--disable-cache', '/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/hello2', '-o', pex_name]
   try:
     pex_main.main(args=args)
   except SystemExit as e:
@@ -152,7 +152,6 @@ def build_python_distribution_from_target(target, workdir):
   safe_mkdir(os.path.join(pydist_workdir, pex_name + '_chroot'))
   zip_ref.extractall(os.path.join(pydist_workdir, pex_name + '_chroot'))
   zip_ref.close()
-
 
   contents = os.listdir(os.path.join(pydist_workdir, pex_name + '_chroot', '.deps'))
   import pdb;pdb.set_trace()

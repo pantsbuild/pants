@@ -1,9 +1,9 @@
-"""A setuptools based setup module.
+# coding=utf-8
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-See:
-https://packaging.python.org/en/latest/distributing.html
-https://github.com/pypa/sampleproject
-"""
+from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
+                        unicode_literals, with_statement)
 
 # Always prefer setuptools over distutils
 from setuptools import setup, find_packages

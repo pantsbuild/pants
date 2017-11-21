@@ -12,10 +12,10 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
+from pants.backend.python.tasks2.pex_build_util import (dump_python_distibutions, dump_requirements,
+                                                        dump_sources, has_python_and_c_sources,
                                                         has_python_requirements, has_python_sources,
-                                                        has_resources, has_python_and_c_sources,
-                                                        dump_python_distibutions)
+                                                        has_resources)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes

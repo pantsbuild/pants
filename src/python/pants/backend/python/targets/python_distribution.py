@@ -32,7 +32,7 @@ class PythonDistribution(PythonTarget):
   			       source=None,
                setup_file=None,
                repositories=None,
-               directory=None,
+               package_dir=None,
                platforms=(),
                **kwargs):
     payload = Payload()
@@ -40,7 +40,7 @@ class PythonDistribution(PythonTarget):
       'setup_file': PrimitiveField(setup_file),
       'repositories': PrimitiveField(maybe_list(repositories or [])),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
-      'directory': PrimitiveField(directory),
+      'package_dir': PrimitiveField(package_dir),
     })
 
     sources = [] if source is None else [source]
@@ -58,8 +58,8 @@ class PythonDistribution(PythonTarget):
     def repositories(self):
       return self.payload.repositories
 
-    def directory(self):
-      return self.payload.directory
+    def package_dir(self):
+      return self.payload.package_dir
 
 
 
