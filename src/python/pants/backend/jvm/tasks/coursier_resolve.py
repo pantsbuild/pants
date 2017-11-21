@@ -8,20 +8,19 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import logging
 import os
-
-from pants.util.process_handler import subprocess
 # import subprocess
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement, PinnedJarArtifactSet
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.dirutil import safe_mkdir
+from pants.util.process_handler import subprocess
 
 logger = logging.getLogger(__name__)
 
@@ -131,8 +130,8 @@ class CoursierResolve:
         raise CoursierError(e)
 
       else:
-        flattened_resolution = cls.flatten_resolution_by_root(result)
-        files_by_coord = cls.files_by_coord(result, coursier_cache_path, pants_jar_path_base)
+        flattened_resolution = cls._flatten_resolution_by_root(result)
+        files_by_coord = cls._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
         for t in targets:
           if isinstance(t, JarLibrary):
@@ -172,8 +171,11 @@ class CoursierResolve:
         # return flattened_resolution
 
   @classmethod
-  def flatten_resolution_by_root(cls, result):
+  def _flatten_resolution_by_root(cls, result):
     """
+    Flatten the resolution by root dependencies. If we want to resolve X and Y, and X->A->B, and Y -> C,
+    the result will be {X: [A, B], Y: [C]}
+
     :param result: see a nested dict capturing the resolution.
     :return: a flattened view with the top artifact as the roots.
     """
@@ -192,7 +194,15 @@ class CoursierResolve:
     return flat_result
 
   @classmethod
-  def files_by_coord(cls, result, coursier_cache_path, pants_jar_path_base):
+  def _map_coord_to_resolved_jars(cls, result, coursier_cache_path, pants_jar_path_base):
+    """
+    Flatten the file paths corresponding to the coordinate from the nested json.
+
+    :param result: coursier json output
+    :param coursier_cache_path: coursier cache location
+    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :return: a map form simple coordinate to a set of resolved jars.
+    """
 
     final_result = defaultdict(set)
 
