@@ -30,25 +30,21 @@ class CoursierError(Exception):
 
 
 class CoursierResolve:
+  """
+  Experimental 3rdparty resolver using coursier.
+  """
 
-  # TODO(wisechengyi): add conf support
+  # TODO(wisechengyi):
+  # 1. Add conf support
+  # 2. Pinned artifact support
   @classmethod
-  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options,  pinned_artifacts=None, excludes=[]):
+  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options,  pinned_artifacts=None):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
 
-    assert len(jar_targets) == 1
-
     for artifact_set, target_subset in jar_targets.items():
       jars, global_excludes = IvyUtils.calculate_classpath(target_subset)
-      #
-      # t_subset = target_subset
-      #
-      # org = IvyUtils.INTERNAL_ORG_NAME
-      # # name = resolve_hash_name
-      # #
-      # # extra_configurations = [conf for conf in confs if conf and conf != 'default']
 
       jars_by_key = OrderedDict()
       for jar in jars:
@@ -61,7 +57,7 @@ class CoursierResolve:
         for jar in v:
           jars_to_resolve.append(jar)
           for ex in jar.excludes:
-            # `--` means exclude.
+            # `--` means exclude. See --soft-exclude-file in coursier
             ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
             exclude_args.add(ex_arg)
 
@@ -85,7 +81,7 @@ class CoursierResolve:
 
       classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
-      # Coursier calls need to be divided by classifier because coursier treats it globally.
+      # Coursier calls need to be divided by classifier because coursier treats classifier option globally.
       for classifier, jars in classifier_to_jars.items():
 
         cmd_args = list(common_args)
@@ -151,21 +147,11 @@ class CoursierResolve:
                   final_simple_coord = simple_coord_candidate
                 elif simple_coord_candidate in result['conflict_resolution']:
                   final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
-                # else:
-                #   err_msg = '{} not found in resolution or in conflict_resolution'.format(simple_coord_candidate)
-                #   # logger.error(err_msg)
-                #   raise TaskError(err_msg)
 
                 if final_simple_coord:
                   transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
                   if transitive_resolved_jars:
                     compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
-
-                # classifier = jar.classifier if self._conf == 'default' else self._conf
-                # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
-                # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-                #   for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-                #     resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
 
           # This return value is not important
           # return flattened_resolution
