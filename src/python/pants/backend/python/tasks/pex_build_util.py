@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import zipfile
 
 from pex.bin import pex as pex_main
 from pex.fetcher import Fetcher
@@ -133,21 +134,16 @@ def build_python_distribution_from_target(target, workdir):
   
   pydist_workdir = os.path.join(workdir, '.pydistworkdir')
   safe_mkdir(pydist_workdir)
-  prevdir = os.getcwd()
-  os.chdir(pydist_workdir)
   pex_name = "%s.pex" % target.name
   
   args = ['--disable-cache', '/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/superhello', '-o', pex_name]
   try:
     pex_main.main(args=args)
   except SystemExit as e:
-    error_code = e.code
     raise TaskError(e)
   except Exception as e:
-    exception = e
     raise TaskError(e)
 
-  import zipfile
   zip_ref = zipfile.ZipFile(os.path.join(pydist_workdir, pex_name), 'r')
   safe_mkdir(os.path.join(pydist_workdir, pex_name + '_chroot'))
   zip_ref.extractall(os.path.join(pydist_workdir, pex_name + '_chroot'))
@@ -157,7 +153,6 @@ def build_python_distribution_from_target(target, workdir):
   whl_file = [wheel for wheel in contents if target.name in wheel]
   whl_location = os.path.join(pydist_workdir, pex_name + '_chroot', '.deps', whl_file[0])
 
-  os.chdir(prevdir)
   return whl_location
 
 
