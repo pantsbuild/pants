@@ -37,13 +37,10 @@ class GoImportMetaTagReader(Subsystem):
       >""", flags=re.VERBOSE)
 
   @classmethod
-  def find_meta_tag(cls, page_html):
+  def find_meta_tags(cls, page_html):
     """Returns the content of the meta tag if found inside of the provided HTML."""
 
-    matched = cls._META_IMPORT_REGEX.search(page_html)
-    if matched:
-      return matched.groups()
-    return None, None, None
+    return cls._META_IMPORT_REGEX.findall(page_html)
 
   @memoized_method
   def get_imported_repo(self, import_path):
@@ -65,13 +62,13 @@ class GoImportMetaTagReader(Subsystem):
     if not page_data:
       return None
 
-    root, vcs, url = self.find_meta_tag(page_data.text)
-    if root and vcs and url:
-      # Check to make sure returned root is an exact match to the provided import path. If it is
-      # not then run a recursive check on the returned and return the values provided by that call.
-      if root == import_path:
-        return ImportedRepo(root, vcs, url)
-      elif import_path.startswith(root):
-        return self.get_imported_repo(root)
+    for (root, vcs, url) in self.find_meta_tags(page_data.text):
+      if root and vcs and url:
+        # Check to make sure returned root is an exact match to the provided import path. If it is
+        # not then run a recursive check on the returned and return the values provided by that call.
+        if root == import_path:
+          return ImportedRepo(root, vcs, url)
+        elif import_path.startswith(root):
+          return self.get_imported_repo(root)
 
     return None
