@@ -137,7 +137,7 @@ def build_python_distribution_from_target(target, workdir):
   os.chdir(pydist_workdir)
   pex_name = "%s.pex" % target.name
   
-  args = ['--disable-cache', '/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/hello2', '-o', pex_name]
+  args = ['--disable-cache', '/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/superhello', '-o', pex_name]
   try:
     pex_main.main(args=args)
   except SystemExit as e:
@@ -154,7 +154,6 @@ def build_python_distribution_from_target(target, workdir):
   zip_ref.close()
 
   contents = os.listdir(os.path.join(pydist_workdir, pex_name + '_chroot', '.deps'))
-  import pdb;pdb.set_trace()
   whl_file = [wheel for wheel in contents if target.name in wheel]
   whl_location = os.path.join(pydist_workdir, pex_name + '_chroot', '.deps', whl_file[0])
 

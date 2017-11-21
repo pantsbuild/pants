@@ -12,7 +12,7 @@ from distutils.core import Extension
 c_module = Extension('super_greet', sources=['c/super_greet.c'])
 
 setup(
-    name='superhello2',
+    name='superhello',
     version='1.0.0',
     ext_modules=[c_module],
     packages=find_packages(),

@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from sample import hello
+from hello_package import hello
 
 
 if __name__ == '__main__':
