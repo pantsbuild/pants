@@ -50,7 +50,14 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
+
+    # TODO(wisechengyi): coursier related flags, need to separate these out,
+    # or generalize `IvyResolve` to `ThirdPartyResolve`
     register('--resolver', choices=['ivy', 'coursier'], default='ivy', help='Pick a resolver.')
+    register('--coursier-fetch-options', type=list, fingerprint=True,
+             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+
+
     cls.register_jvm_tool(register,
                           'xalan',
                           classpath=[

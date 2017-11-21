@@ -142,7 +142,8 @@ class IvyTaskMixin(TaskBase):
         CoursierResolve.resolve(target_subset,
                                 classpath_products,
                                 workunit_factory=self.context.new_workunit,
-                                pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir)
+                                pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
+                                coursier_fetch_options=self.get_options().coursier_fetch_options)
       else:
         results.append(self._resolve_subset(executor,
                                                        target_subset,

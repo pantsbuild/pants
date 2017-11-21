@@ -30,9 +30,10 @@ class CoursierError(Exception):
 
 
 class CoursierResolve:
+
   # TODO(wisechengyi): add conf support
   @classmethod
-  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, pinned_artifacts=None, excludes=[]):
+  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options,  pinned_artifacts=None, excludes=[]):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -41,134 +42,133 @@ class CoursierResolve:
 
     for artifact_set, target_subset in jar_targets.items():
       jars, global_excludes = IvyUtils.calculate_classpath(target_subset)
-    #
-    # t_subset = target_subset
-    #
-    # org = IvyUtils.INTERNAL_ORG_NAME
-    # # name = resolve_hash_name
-    # #
-    # # extra_configurations = [conf for conf in confs if conf and conf != 'default']
+      #
+      # t_subset = target_subset
+      #
+      # org = IvyUtils.INTERNAL_ORG_NAME
+      # # name = resolve_hash_name
+      # #
+      # # extra_configurations = [conf for conf in confs if conf and conf != 'default']
 
-    jars_by_key = OrderedDict()
-    for jar in jars:
-      jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
-      jars_for_the_key.append(jar)
+      jars_by_key = OrderedDict()
+      for jar in jars:
+        jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
+        jars_for_the_key.append(jar)
 
-    jars_to_resolve = []
-    exclude_args = set()
-    for k, v in jars_by_key.items():
-      for jar in v:
-        jars_to_resolve.append(jar)
-        for ex in jar.excludes:
-          ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
-          exclude_args.add(ex_arg)
+      jars_to_resolve = []
+      exclude_args = set()
+      for k, v in jars_by_key.items():
+        for jar in v:
+          jars_to_resolve.append(jar)
+          for ex in jar.excludes:
+            # `--` means exclude.
+            ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
+            exclude_args.add(ex_arg)
 
-    # Prepare coursier args
-    exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
-    output_fn = 'output.json'
-    coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
-    pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
+      # Prepare coursier args
+      exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
+      output_fn = 'output.json'
+      coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
+      pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
-    common_args = ['bash',
-                exe,
-                'fetch',
-                '-r', 'https://artifactory-ci.twitter.biz/libs-releases-local/',
-                '-r', 'https://artifactory-ci.twitter.biz/repo1.maven.org',
-                '-r', 'https://artifactory-ci.twitter.biz/java-virtual',
-                # '-r', 'https://artifactory.twitter.biz/java-virtual',
-                '--no-default', # no default repo
-                '-n', '20',
-                '--cache', coursier_cache_path,
-                '--json-output-file', output_fn]
+      common_args = ['bash',
+                     exe,
+                     'fetch',
+                     '--cache', coursier_cache_path,
+                     '--json-output-file', output_fn] + coursier_fetch_options
 
-    def construct_classifier_to_jar(jars):
-      product = defaultdict(list)
-      for j in jars:
-        product[j.coordinate.classifier or ''].append(j)
-      return product
+      def construct_classifier_to_jar(jars):
+        product = defaultdict(list)
+        for j in jars:
+          product[j.coordinate.classifier or ''].append(j)
+        return product
 
-    classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
+      classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
-    # Coursier calls need to be divided by classifier because coursier treats it globally.
-    for classifier, jars in classifier_to_jars.items():
+      # Coursier calls need to be divided by classifier because coursier treats it globally.
+      for classifier, jars in classifier_to_jars.items():
 
-      cmd_args = list(common_args)
-      if classifier:
-        cmd_args.extend(['--classifier', classifier])
+        cmd_args = list(common_args)
+        if classifier:
+          cmd_args.extend(['--classifier', classifier])
 
-      for j in jars:
-        if j.intransitive:
-          cmd_args.append('--intransitive')
-        cmd_args.append(j.coordinate.simple_coord)
+        for j in jars:
+          if j.intransitive:
+            cmd_args.append('--intransitive')
+          cmd_args.append(j.coordinate.simple_coord)
 
-      exclude_file = 'excludes.txt'
-      with open(exclude_file, 'w') as f:
-        f.write('\n'.join(exclude_args).encode('utf8'))
+        exclude_file = 'excludes.txt'
+        with open(exclude_file, 'w') as f:
+          f.write('\n'.join(exclude_args).encode('utf8'))
 
-      cmd_args.append('--soft-exclude-file')
-      cmd_args.append(exclude_file)
+        cmd_args.append('--soft-exclude-file')
+        cmd_args.append(exclude_file)
 
-      cmd_str = ' '.join(cmd_args)
-      logger.info(cmd_str)
+        for ex in global_excludes:
+          cmd_args.append('-E')
+          cmd_args.append('{}:{}'.format(ex.org, ex.name))
 
-      try:
-        with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+        cmd_str = ' '.join(cmd_args)
+        logger.info(cmd_str)
 
-          return_code = subprocess.call(cmd_args,
-                                        stdout=workunit.output('stdout'),
-                                        stderr=workunit.output('stderr'))
+        try:
+          with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
 
-          workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+            return_code = subprocess.call(cmd_args,
+                                          stdout=workunit.output('stdout'),
+                                          stderr=workunit.output('stderr'))
 
-          with open(output_fn) as f:
-            result = json.loads(f.read())
+            workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
-          if return_code:
-            raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+            with open(output_fn) as f:
+              result = json.loads(f.read())
 
-      except subprocess.CalledProcessError as e:
-        raise CoursierError(e)
+            if return_code:
+              raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-      else:
-        flattened_resolution = cls._flatten_resolution_by_root(result)
-        files_by_coord = cls._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+        except subprocess.CalledProcessError as e:
+          raise CoursierError(e)
 
-        for t in targets:
-          if isinstance(t, JarLibrary):
+        else:
+          flattened_resolution = cls._flatten_resolution_by_root(result)
+          files_by_coord = cls._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
-            def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
-              transitive_jar_path_for_coord = []
-              if my_simple_coord in flattened_resolution:
-                for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
-                  transitive_jar_path_for_coord.extend(resolved_jars[c])
+          for t in targets:
+            if isinstance(t, JarLibrary):
 
-              return transitive_jar_path_for_coord
+              def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
+                transitive_jar_path_for_coord = []
+                if my_simple_coord in flattened_resolution:
+                  for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
+                    transitive_jar_path_for_coord.extend(resolved_jars[c])
 
-            for jar in t.jar_dependencies:
-              simple_coord_candidate = jar.coordinate.simple_coord
-              final_simple_coord = None
-              if simple_coord_candidate in files_by_coord:
-                final_simple_coord = simple_coord_candidate
-              elif simple_coord_candidate in result['conflict_resolution']:
-                final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
-              # else:
-              #   err_msg = '{} not found in resolution or in conflict_resolution'.format(simple_coord_candidate)
-              #   # logger.error(err_msg)
-              #   raise TaskError(err_msg)
+                return transitive_jar_path_for_coord
 
-              if final_simple_coord:
-                transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
-                if transitive_resolved_jars:
-                  compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+              for jar in t.jar_dependencies:
+                simple_coord_candidate = jar.coordinate.simple_coord
+                final_simple_coord = None
+                if simple_coord_candidate in files_by_coord:
+                  final_simple_coord = simple_coord_candidate
+                elif simple_coord_candidate in result['conflict_resolution']:
+                  final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
+                # else:
+                #   err_msg = '{} not found in resolution or in conflict_resolution'.format(simple_coord_candidate)
+                #   # logger.error(err_msg)
+                #   raise TaskError(err_msg)
 
-              # classifier = jar.classifier if self._conf == 'default' else self._conf
-              # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
-              # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
-              #   for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
-              #     resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
+                if final_simple_coord:
+                  transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
+                  if transitive_resolved_jars:
+                    compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
 
-        # This return value is not important
-        # return flattened_resolution
+                # classifier = jar.classifier if self._conf == 'default' else self._conf
+                # jar_module_ref = IvyModuleRef(jar.org, jar.name, jar.rev, classifier, jar.ext)
+                # for module_ref in self.traverse_dependency_graph(jar_module_ref, create_collection, memo):
+                #   for artifact_path in self._artifacts_by_ref[module_ref.unversioned]:
+                #     resolved_jars.add(to_resolved_jar(module_ref, artifact_path))
+
+          # This return value is not important
+          # return flattened_resolution
 
   @classmethod
   def _flatten_resolution_by_root(cls, result):
