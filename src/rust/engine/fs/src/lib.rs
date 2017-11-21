@@ -4,7 +4,7 @@
 mod hash;
 pub use hash::Fingerprint;
 mod snapshot;
-pub use snapshot::Snapshot;
+pub use snapshot::{GetFileDigest, Snapshot};
 mod store;
 pub use store::{Digest, Store};
 mod pool;
@@ -18,6 +18,7 @@ extern crate futures_cpupool;
 extern crate glob;
 extern crate hex;
 extern crate ignore;
+extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
@@ -1013,6 +1014,7 @@ impl Snapshots {
 
       Ok(Snapshot {
         fingerprint: fingerprint,
+        digest: None,
         path_stats: paths,
       })
     })
@@ -1059,12 +1061,12 @@ impl Snapshots {
 #[cfg(test)]
 mod posixfs_test {
   extern crate tempdir;
+  extern crate testutil;
 
   use super::{Dir, File, Link, PosixFS, Stat, ResettablePool};
   use futures::Future;
+  use self::testutil::make_file;
   use std;
-  use std::io::Write;
-  use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
   use std::sync::Arc;
 
@@ -1264,14 +1266,6 @@ mod posixfs_test {
       &super::Stat::File(File { is_executable: got, .. }) => assert_eq!(want_is_executable, got),
       other => panic!("Expected file, got {:?}", other),
     }
-  }
-
-  fn make_file(path: &Path, contents: &[u8], mode: u32) {
-    let mut file = std::fs::File::create(&path).unwrap();
-    file.write(contents).unwrap();
-    let mut permissions = std::fs::metadata(path).unwrap().permissions();
-    permissions.set_mode(mode);
-    file.set_permissions(permissions).unwrap();
   }
 
   fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {

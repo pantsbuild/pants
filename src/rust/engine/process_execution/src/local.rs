@@ -24,9 +24,11 @@ pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessR
 
 #[cfg(test)]
 mod tests {
+  extern crate testutil;
+
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_locally};
   use std::collections::BTreeMap;
-  use test_utils::{owned_string_vec, as_byte_owned_vec};
+  use self::testutil::{owned_string_vec, as_byte_owned_vec};
 
   #[test]
   #[cfg(unix)]
