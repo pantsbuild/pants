@@ -4,5 +4,5 @@
 # Like Hello world, but built with Pants. This time, with both C++ and Py sources
 
 python_distribution(
-  name='sample'
+  name='superhello2'
 )
