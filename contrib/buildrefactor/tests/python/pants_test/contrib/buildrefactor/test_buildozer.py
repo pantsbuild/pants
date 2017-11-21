@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import re
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -55,7 +56,7 @@ class BuildozerTest(TaskTestBase):
     new_build_name = 'b_2'
 
     self._run_buildozer({ 'command': 'set name {}'.format(new_build_name) })
-    self.assertInFile(new_build_name, '{}/b/BUILD'.format(self.build_root))
+    self.assertInFile(new_build_name, os.path.join(self.build_root, 'b/BUILD'))
 
   def test_execute_binary(self):
     init_subsystem(BinaryUtil.Factory)
@@ -64,7 +65,7 @@ class BuildozerTest(TaskTestBase):
 
     Buildozer.execute_binary('set name {}'.format(new_build_name), spec=Address.parse('b').spec)
 
-    self.assertInFile(new_build_name, '{}/b/BUILD'.format(self.build_root))
+    self.assertInFile(new_build_name, os.path.join(self.build_root, 'b/BUILD'))
 
   def test_multiple_addresses(self):
     roots = ['b', 'c']
@@ -96,23 +97,32 @@ class BuildozerTest(TaskTestBase):
     self._run_buildozer({ 'add_dependencies': ' '.join(dependencies_to_add) })
 
     for dependency in dependencies_to_add:
-      self.assertIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec)))
+      self.assertIn(dependency, self._build_file_dependencies(os.path.join(self.build_root, spec, 'BUILD')))
 
   def _test_add_dependencies_with_targets(self, dependencies_to_add, roots, targets):
+    """
+    Test that a dependency is (or dependencies are) added to a BUILD file with buildozer.
+    This can run on multiple context roots and multiple target objects.
+    """
     for dependency_to_add in dependencies_to_add:
       self._run_buildozer({ 'add_dependencies': dependency_to_add }, roots=roots, targets=targets)
 
     for root in roots:
-      self.assertInFile(dependency_to_add, '{}/{}/BUILD'.format(self.build_root, root))
+      self.assertInFile(dependency_to_add, os.path.join(self.build_root, root, 'BUILD'))
 
   def _test_remove_dependencies(self, spec, dependencies_to_remove):
     self._run_buildozer({ 'remove_dependencies': ' '.join(dependencies_to_remove) }, roots=[spec])
 
     for dependency in dependencies_to_remove:
-      self.assertNotIn(dependency, self._build_file_dependencies('{}/{}/BUILD'.format(self.build_root, spec)))
+      self.assertNotIn(dependency, self._build_file_dependencies(os.path.join(self.build_root, spec, 'BUILD')))
 
   def _run_buildozer(self, options, roots=['b'], targets=None):
-    targets = self.targets if targets == None else targets
+    """Run buildozer on the specified context roots and target objects.
+
+    roots -- the context roots supplied to buildozer (default ['b'])
+    targets -- the targets buildozer will run on (defaults to self.targets)
+    """
+    targets = self.targets if targets is None else targets
 
     self.set_options(**options)
 
