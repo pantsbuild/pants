@@ -62,6 +62,8 @@ class GoImportMetaTagReader(Subsystem):
     if not page_data:
       return None
 
+    # Return the first match, rather than doing some kind of longest prefix search.
+    # Hopefully no one returns multiple valid go-import meta tags.
     for (root, vcs, url) in self.find_meta_tags(page_data.text):
       if root and vcs and url:
         # Check to make sure returned root is an exact match to the provided import path. If it is
