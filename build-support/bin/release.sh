@@ -16,14 +16,12 @@ function run_local_pants() {
 function compute_version_suffix() {
   local readonly sha=$1
   if [[ -z "${SUFFIXED_VERSION}" ]]; then
-    >&2 echo "building without a suffix"
     echo ""
   else
     # Python requires integer version suffixes.
     local readonly short_sha=${sha:0:8}
     local readonly sha_decimal=$((16#${short_sha}))
     local readonly abs_sha_decimal=${sha_decimal#-}
-    >&2 echo "building with suffix ${abs_sha_decimal}"
     echo "+${abs_sha_decimal}"
   fi
 }
@@ -36,9 +34,9 @@ readonly PANTS_VERSION_SUFFIX="$(compute_version_suffix "${HEAD_SHA}")"
 readonly PANTS_VERSION="$(run_local_pants --version 2>/dev/null)${PANTS_VERSION_SUFFIX}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
-readonly DEPLOY_WHEELS_PATH="wheels/pantsbuild.pants/${PANTS_VERSION}"
+readonly DEPLOY_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
 readonly DEPLOY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_WHEELS_PATH}"
-readonly DEPLOY_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${PANTS_VERSION}"
+readonly DEPLOY_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
 
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 
@@ -166,9 +164,9 @@ function bdist_wheel_flags() {
 }
 
 function pants_version_reset() {
-  pushd ${ROOT}
+  pushd ${ROOT} > /dev/null
     git checkout -- ${VERSION_FILE}
-  popd
+  popd > /dev/null
 }
 
 function pants_version_set() {
@@ -182,7 +180,6 @@ function pants_version_set() {
 function build_packages() {
   # TODO(John Sirois): Remove sdist generation and twine upload when
   # https://github.com/pantsbuild/pants/issues/4956 is resolved.
-
 
   rm -rf "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
   mkdir -p "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
