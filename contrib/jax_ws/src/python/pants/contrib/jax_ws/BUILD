@@ -11,5 +11,6 @@ contrib_plugin(
   ],
   distribution_name='pantsbuild.pants.contrib.jax_ws',
   description='JAX-WS Pants plugin',
+  build_file_aliases=True,
   register_goals=True,
 )
