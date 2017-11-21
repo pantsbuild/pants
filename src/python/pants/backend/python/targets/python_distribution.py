@@ -5,9 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+
+from pex.pex_info import PexInfo
+from six import string_types
+from twitter.common.collections import maybe_list
+
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
-
+from pants.base.payload import Payload
+from pants.base.payload_field import PrimitiveField
 
 class PythonDistribution(PythonTarget):
   """A Python distribution containing c/cpp extensions.
@@ -26,17 +32,18 @@ class PythonDistribution(PythonTarget):
   			       source=None,
                setup_file=None,
                repositories=None,
+               directory=None,
                platforms=(),
                **kwargs):
-
-  	payload = Payload()
+    payload = Payload()
     payload.add_fields({
       'setup_file': PrimitiveField(setup_file),
       'repositories': PrimitiveField(maybe_list(repositories or [])),
       'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
+      'directory': PrimitiveField(directory),
     })
 
-  	sources = [] if source is None else [source]
+    sources = [] if source is None else [source]
     super(PythonDistribution, self).__init__(sources=sources, payload=payload, **kwargs)
 
     @property
@@ -50,5 +57,9 @@ class PythonDistribution(PythonTarget):
     @property
     def repositories(self):
       return self.payload.repositories
+
+    def directory(self):
+      return self.payload.directory
+
 
 

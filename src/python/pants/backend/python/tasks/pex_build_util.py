@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pex.bin import pex as pex_main
 from pex.fetcher import Fetcher
 from pex.platforms import Platform
 from pex.resolver import resolve
@@ -15,12 +16,14 @@ from twitter.common.collections import OrderedSet
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
+from pants.util.dirutil import safe_mkdir
 
 
 def is_python_target(tgt):
@@ -32,6 +35,10 @@ def is_python_target(tgt):
 
 def has_python_sources(tgt):
   return is_python_target(tgt) and tgt.has_sources()
+
+
+def has_python_and_c_sources(tgt):
+  return isinstance(tgt, PythonDistribution)
 
 
 def has_resources(tgt):
@@ -113,7 +120,6 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
 
   # Resolve the requirements into distributions.
   distributions = _resolve_multi(interpreter, reqs_to_build, platforms, find_links)
-
   locations = set()
   for platform, dists in distributions.items():
     for dist in dists:
@@ -121,6 +127,60 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
         log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
         builder.add_distribution(dist)
       locations.add(dist.location)
+
+
+def build_python_distribution_from_target(target, workdir):
+  # grab setup.py, cpp sources, python from target and place into a temp dir for packaging
+  pydist_workdir = os.path.join(workdir, '.pydistworkdir')
+  safe_mkdir(pydist_workdir)
+  prevdir = os.getcwd()
+  os.chdir(pydist_workdir)
+  pex_name = "%s.pex" % target.name
+  #import pdb;pdb.set_trace()
+  args = ['/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/hello2', "-o", pex_name]
+  try:
+    pex_main.main(args=args)
+  except SystemExit as e:
+    error_code = e.code
+    raise TaskError(e)
+  except Exception as e:
+    exception = e
+    raise TaskError(e)
+
+  import zipfile
+  zip_ref = zipfile.ZipFile(os.path.join(pydist_workdir, pex_name), 'r')
+  safe_mkdir(os.path.join(pydist_workdir, pex_name + '_chroot'))
+  zip_ref.extractall(os.path.join(pydist_workdir, pex_name + '_chroot'))
+  zip_ref.close()
+
+
+  contents = os.listdir(os.path.join(pydist_workdir, pex_name + '_chroot', '.deps'))
+  import pdb;pdb.set_trace()
+  whl_file = [wheel for wheel in contents if target.name in wheel]
+  whl_location = os.path.join(pydist_workdir, pex_name + '_chroot', '.deps', whl_file[0])
+
+  os.chdir(prevdir)
+  return whl_location
+
+
+def dump_python_distibutions(builder, dist_targets, workdir, log):
+  # de-dup all dist targets.
+  dist_targets_set = OrderedSet()
+  for tgt in dist_targets:
+    dist_targets_set.add(tgt)
+
+  # build whl for target using pex wheel installer
+  locations = set()
+  for tgt in dist_targets_set:
+    locations.add(build_python_distribution_from_target(tgt, workdir))
+
+  # dump prebuilt wheels into pex builder
+  for location in locations:
+    log.debug('  Dumping distribution: .../{}'.format(os.path.basename(location)))
+    builder.add_dist_location(location)
+
+  # by this point, the whl built from python_distribution should be available for use in the
+  # produced binary
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):

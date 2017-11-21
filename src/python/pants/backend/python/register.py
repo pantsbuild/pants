@@ -11,6 +11,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -34,6 +35,7 @@ def build_file_aliases():
       PythonBinary.alias(): PythonBinary,
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,
+      PythonDistribution.alias(): TargetMacro.Factory.wrap(PythonDistribution.create, PythonDistribution),
       'python_requirement_library': PythonRequirementLibrary,
       Resources.alias(): Resources,
     },

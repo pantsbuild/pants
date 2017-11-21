@@ -12,9 +12,10 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_sources,
-                                                       has_python_requirements, has_python_sources,
-                                                       has_resources)
+from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
+                                                        has_python_requirements, has_python_sources,
+                                                        has_resources, has_python_and_c_sources,
+                                                        dump_python_distibutions)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -113,6 +114,7 @@ class PythonBinaryCreate(Task):
       # Find which targets provide sources and which specify requirements.
       source_tgts = []
       req_tgts = []
+      python_dist_targets = []
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
@@ -122,11 +124,15 @@ class PythonBinaryCreate(Task):
               builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
+        elif has_python_and_c_sources(tgt):
+          python_dist_targets.append(tgt)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
         dump_sources(builder, tgt, self.context.log)
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
+      if python_dist_targets:
+        dump_python_distibutions(builder, python_dist_targets, self.workdir, self.context.log)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
