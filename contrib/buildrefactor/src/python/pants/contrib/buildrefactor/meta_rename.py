@@ -31,8 +31,8 @@ class MetaRename(Task):
   def register_options(cls, register):
     super(MetaRename, cls).register_options(register)
 
-    register('--from', type=str, advanced=True, default=None, help='The old dependency name to change')
-    register('--to', type=str, advanced=True, default=None, help='The new name for the dependency')
+    register('--from', type=str, default=None, help='The old dependency name to change')
+    register('--to', type=str, default=None, help='The new name for the dependency')
 
   def __init__(self, *args, **kwargs):
     super(MetaRename, self).__init__(*args, **kwargs)
