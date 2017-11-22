@@ -9,6 +9,5 @@ import sys
 
 from hello_package import hello
 
-
 if __name__ == '__main__':
   hello.hello()

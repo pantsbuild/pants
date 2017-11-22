@@ -135,8 +135,9 @@ def build_python_distribution_from_target(target, workdir):
   pydist_workdir = os.path.join(workdir, '.pydistworkdir')
   safe_mkdir(pydist_workdir)
   pex_name = "%s.pex" % target.name
-  
-  args = ['--disable-cache', '/Users/clivingston/workspace/pants/examples/src/python/example/python_distribution/hello/superhello', '-o', pex_name]
+  path_to_target = os.path.dirname(target.address.rel_path)
+
+  args = ['--disable-cache', path_to_target, '-o', os.path.join(pydist_workdir, pex_name)]
   try:
     pex_main.main(args=args)
   except SystemExit as e:
@@ -144,16 +145,20 @@ def build_python_distribution_from_target(target, workdir):
   except Exception as e:
     raise TaskError(e)
 
+  # unzip into a chroot within the python dist workdir
   zip_ref = zipfile.ZipFile(os.path.join(pydist_workdir, pex_name), 'r')
-  safe_mkdir(os.path.join(pydist_workdir, pex_name + '_chroot'))
-  zip_ref.extractall(os.path.join(pydist_workdir, pex_name + '_chroot'))
+  fingerprint = target.payload.fingerprint()
+  safe_mkdir(os.path.join(pydist_workdir, fingerprint))
+  zip_ref.extractall(os.path.join(pydist_workdir, fingerprint))
   zip_ref.close()
 
-  contents = os.listdir(os.path.join(pydist_workdir, pex_name + '_chroot', '.deps'))
-  whl_file = [wheel for wheel in contents if target.name in wheel]
-  whl_location = os.path.join(pydist_workdir, pex_name + '_chroot', '.deps', whl_file[0])
-
-  return whl_location
+  # read the contents from .deps of the chroot to obtain the whl location
+  chroot_deps_contents = os.listdir(os.path.join(pydist_workdir, fingerprint, '.deps'))
+  if chroot_deps_contents:
+    whl_dist = chroot_deps_contents[0]  # TODO: find better way to grab .whl from chroot 
+    whl_location = os.path.join(pydist_workdir, fingerprint, '.deps', whl_dist)
+    return whl_location
+  return None
 
 
 def dump_python_distibutions(builder, dist_targets, workdir, log):
@@ -165,7 +170,9 @@ def dump_python_distibutions(builder, dist_targets, workdir, log):
   # build whl for target using pex wheel installer
   locations = set()
   for tgt in dist_targets_set:
-    locations.add(build_python_distribution_from_target(tgt, workdir))
+    whl_location = build_python_distribution_from_target(tgt, workdir)
+    if whl_location:
+      locations.add(whl_location)
 
   # dump prebuilt wheels into pex builder
   for location in locations:

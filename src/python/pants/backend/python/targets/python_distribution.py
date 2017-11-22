@@ -25,41 +25,16 @@ class PythonDistribution(PythonTarget):
   def alias(cls):
     return 'python_distribution'
 
-  default_sources_globs = '*.(c|cpp|h|py)'
-
 
   def __init__(self,
-  			       source=None,
-               setup_file=None,
-               repositories=None,
-               package_dir=None,
                platforms=(),
                **kwargs):
     payload = Payload()
     payload.add_fields({
-      'setup_file': PrimitiveField(setup_file),
-      'repositories': PrimitiveField(maybe_list(repositories or [])),
-      'platforms': PrimitiveField(tuple(maybe_list(platforms or []))),
-      'package_dir': PrimitiveField(package_dir),
+      'platforms': PrimitiveField(tuple(maybe_list(platforms or [])))
     })
-
-    sources = [] if source is None else [source]
-    super(PythonDistribution, self).__init__(sources=sources, payload=payload, **kwargs)
-
-    @property
-    def setup_file(self):
-      return self.payload.setup_file
+    super(PythonDistribution, self).__init__(sources=[], payload=payload, **kwargs)
 
     @property
     def platforms(self):
       return self.payload.platforms
-
-    @property
-    def repositories(self):
-      return self.payload.repositories
-
-    def package_dir(self):
-      return self.payload.package_dir
-
-
-
