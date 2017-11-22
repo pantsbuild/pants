@@ -15,7 +15,6 @@ use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
-use handles::maybe_drain_handles;
 use rule_graph;
 use selectors::{self, Selector};
 use tasks;
@@ -54,17 +53,6 @@ fn was_required(failure: Failure) -> Failure {
 
 trait GetNode {
   fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output>;
-}
-
-impl GetNode for Context {
-  ///
-  /// Get the future value for the given Node implementation.
-  ///
-  fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
-    self.core.graph.get(self.entry_id, self, node)
-  }
 }
 
 impl VFS<Failure> for Context {
