@@ -11,7 +11,7 @@ import traceback
 
 from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer
 
-from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
+from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
 from pants.util.socket import RecvBufferedSocket
 
@@ -83,8 +83,8 @@ class PailgunHandler(PailgunHandlerBase):
   def handle_error(self, exc=None):
     """Error handler for failed calls to handle()."""
     if exc:
-      NailgunProtocol.write_chunk(self.request, ChunkType.STDERR, traceback.format_exc())
-    NailgunProtocol.write_chunk(self.request, ChunkType.EXIT, '1')
+      NailgunProtocol.send_stderr(self.request, traceback.format_exc())
+    NailgunProtocol.send_exit(self.request, '1')
 
 
 class PailgunServer(TCPServer):

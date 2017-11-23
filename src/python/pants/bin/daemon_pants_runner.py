@@ -21,6 +21,7 @@ from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.contextutil import HardSystemExit, stdio_as
+from pants.util.socket import teardown_socket
 
 
 class DaemonExiter(Exiter):
@@ -29,28 +30,36 @@ class DaemonExiter(Exiter):
   def __init__(self, socket):
     super(DaemonExiter, self).__init__()
     self._socket = socket
+    self._finalizer = None
 
-  def _shutdown_socket(self):
-    """Shutdown and close the connected socket."""
-    try:
-      self._socket.shutdown(socket.SHUT_WR)
-    except socket.error:
-      pass
-    finally:
-      self._socket.close()
+  def set_finalizer(self, finalizer):
+    """Sets a finalizer that will be called before exiting."""
+    self._finalizer = finalizer
 
   def exit(self, result=0, msg=None):
     """Exit the runtime."""
+    if self._finalizer:
+      try:
+        self._finalizer()
+      except Exception as e:
+        try:
+          NailgunProtocol.send_stderr(
+            self._socket,
+            '\nUnexpected exception in finalizer: {!r}\n'.format(e)
+          )
+        except Exception:
+          pass
+
     try:
       # Write a final message to stderr if present.
       if msg:
-        NailgunProtocol.write_chunk(self._socket, ChunkType.STDERR, msg)
+        NailgunProtocol.send_stderr(self._socket, msg)
 
       # Send an Exit chunk with the result.
-      NailgunProtocol.write_chunk(self._socket, ChunkType.EXIT, str(result).encode('ascii'))
+      NailgunProtocol.send_exit(self._socket, str(result).encode('ascii'))
 
       # Shutdown the connected socket.
-      self._shutdown_socket()
+      teardown_socket(self._socket)
     finally:
       # N.B. Assuming a fork()'d child, cause os._exit to be called here to avoid the routine
       # sys.exit behavior (via `pants.util.contextutil.hard_exit_handler()`).
@@ -62,6 +71,8 @@ class DaemonPantsRunner(ProcessManager):
 
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
+
+  JOIN_TIMEOUT = 5
 
   def __init__(self, socket, exiter, args, env, graph_helper, deferred_exception=None):
     """
@@ -100,10 +111,22 @@ class DaemonPantsRunner(ProcessManager):
     # for the remainder of the protocol), and threads to copy from stdout/stderr pipes onto the
     # socket.
     with NailgunStreamStdinReader.open(sock, isatty=stdin_isatty) as stdin,\
-         NailgunStreamWriter.open(sock, ChunkType.STDOUT, None, isatty=stdout_isatty) as stdout,\
-         NailgunStreamWriter.open(sock, ChunkType.STDERR, None, isatty=stderr_isatty) as stderr:
-      with stdio_as(stdout=stdout, stderr=stderr, stdin=stdin):
-        yield
+         NailgunStreamWriter.open(sock,
+                                  ChunkType.STDOUT,
+                                  None,
+                                  isatty=stdout_isatty) as (stdout, stdout_writer),\
+         NailgunStreamWriter.open(sock,
+                                  ChunkType.STDERR,
+                                  None,
+                                  isatty=stderr_isatty) as (stderr, stderr_writer),\
+         stdio_as(stdout=stdout, stderr=stderr, stdin=stdin):
+      # N.B. This will be passed to and called by the `DaemonExiter` prior to sending any
+      # exit chunks, to avoid any socket shutdown vs write races.
+      def finalizer():
+        for thread in (stdout_writer, stderr_writer):
+          thread.stop()
+          thread.join(self.JOIN_TIMEOUT)
+      yield finalizer
 
   def _setup_sigint_handler(self):
     """Sets up a control-c signal handler for the daemon runner context."""
@@ -154,14 +177,17 @@ class DaemonPantsRunner(ProcessManager):
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
     # Broadcast our pid to the remote client so they can send us signals (i.e. SIGINT).
-    NailgunProtocol.write_chunk(self._socket, ChunkType.PID, bytes(os.getpid()))
+    NailgunProtocol.send_pid(self._socket, bytes(os.getpid()))
 
     # Setup a SIGINT signal handler.
     self._setup_sigint_handler()
 
     # Invoke a Pants run with stdio redirected.
-    with self._nailgunned_stdio(self._socket):
+    with self._nailgunned_stdio(self._socket) as finalizer:
       try:
+        # Setup the Exiter's finalizer.
+        self._exiter.set_finalizer(finalizer)
+
         # Clean global state.
         clean_global_runtime_state(reset_subsystem=True)
 

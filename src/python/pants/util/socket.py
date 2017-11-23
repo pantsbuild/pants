@@ -8,6 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import errno
 import io
 import select
+import socket
+
+
+def teardown_socket(socket):
+  """Shuts down and closes a socket."""
+  try:
+    socket.shutdown(socket.SHUT_WR)
+  except socket.error:
+    pass
+  finally:
+    socket.close()
 
 
 def safe_select(*args, **kwargs):

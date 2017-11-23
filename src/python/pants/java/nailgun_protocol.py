@@ -224,6 +224,11 @@ class NailgunProtocol(object):
     cls.write_chunk(sock, ChunkType.EXIT, payload)
 
   @classmethod
+  def send_pid(cls, sock, pid):
+    """Send the PID chunk over the specified socket."""
+    cls.write_chunk(sock, ChunkType.PID, pid)
+
+  @classmethod
   def isatty_to_env(cls, stdin, stdout, stderr):
     """Generate nailgun tty capability environment variables based on checking a set of fds.
 
