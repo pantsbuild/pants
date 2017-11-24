@@ -7,5 +7,8 @@
 # only be a single BUILD file in a given directory.
 
 python_distribution(
-  name='superhello'
+  name='superhello',
+  dependencies=[
+	'3rdparty/python:tensorflow'
+  ]
 )
