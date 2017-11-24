@@ -8,19 +8,23 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import json
 import logging
 import os
-# import subprocess
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.util.dirutil import safe_mkdir
 from pants.util.process_handler import subprocess
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +33,91 @@ class CoursierError(Exception):
   pass
 
 
-class CoursierResolve:
+class CoursierResolve(NailgunTask):
+  """
+  # TODO(wisechengyi):
+  # 1. Add conf support
+  # 2. Pinned artifact support
+  # 3. forced version
+  """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(CoursierResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem.scoped(cls),)
+
+  @classmethod
+  def product_types(cls):
+    return ['compile_classpath']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(CoursierResolve, cls).prepare(options, round_manager)
+    round_manager.require_data('java')
+    round_manager.require_data('scala')
+
+  @classmethod
+  def register_options(cls, register):
+    super(CoursierResolve, cls).register_options(register)
+    register('--coursier-fetch-options', type=list, fingerprint=True,
+             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+
+  def execute(self):
+    """Resolves the specified confs for the configured targets and returns an iterator over
+    tuples of (conf, jar path).
+    """
+
+    jvm_resolve_subsystem = JvmResolveSubsystem.scoped_instance(self)
+    if jvm_resolve_subsystem.get_options().resolver != 'coursier':
+      return
+
+    executor = self.create_java_executor()
+    compile_classpath = self.context.products.get_data('compile_classpath',
+                                                       init_func=ClasspathProducts.init_func(
+                                                         self.get_options().pants_workdir))
+    results = self.resolve_helper(executor=executor,
+                                  targets=self.context.targets(),
+                                  classpath_products=compile_classpath,
+                                  confs=['default'])
+
   """
   Experimental 3rdparty resolver using coursier.
   """
 
-  # TODO(wisechengyi):
-  # 1. Add conf support
-  # 2. Pinned artifact support
+  def resolve_helper(self, executor, targets, classpath_products, confs=None, extra_args=None,
+              invalidate_dependents=False):
+    """Resolves external classpath products (typically jars) for the given targets.
+
+    :API: public
+
+    :param executor: A java executor to run ivy with.
+    :type executor: :class:`pants.java.executor.Executor`
+    :param targets: The targets to resolve jvm dependencies for.
+    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
+    :param classpath_products: The classpath products to populate with the results of the resolve.
+    :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
+    :param confs: The ivy configurations to resolve; ('default',) by default.
+    :type confs: :class:`collections.Iterable` of string
+    :param extra_args: Any extra command line arguments to pass to ivy.
+    :type extra_args: list of string
+    :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
+                                        resolved.
+    :returns: The results of each of the resolves run by this call.
+    :rtype: list of IvyResolveResult
+    """
+    confs = confs or ('default',)
+    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
+    results = []
+    for artifact_set, target_subset in targets_by_sets.items():
+      CoursierResolve.resolve(target_subset,
+                              classpath_products,
+                              workunit_factory=self.context.new_workunit,
+                              pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
+                              coursier_fetch_options=self.get_options().coursier_fetch_options,
+                              taskbase=self)
+
+
   @classmethod
-  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options,  pinned_artifacts=None):
+  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options,  taskbase, pinned_artifacts=None):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -67,7 +146,8 @@ class CoursierResolve:
       coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
       pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
-      common_args = ['bash',
+      common_args = [
+                      'bash',
                      exe,
                      'fetch',
                      '--cache', coursier_cache_path,
@@ -109,6 +189,14 @@ class CoursierResolve:
 
         try:
           with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+
+            # return_code = taskbase.runjava(
+            #   classpath='/Users/yic/workspace/coursier_dev/cli/target/scala-2.11/proguard/coursier-standalone-with-bootstrap.jar',
+            #   main='coursier.cli.Coursier',
+            #   args=cmd_args,
+            #   # jvm_options=self.get_options().jvm_options,
+            #   # to let stdout/err through, but don't print tool's label.
+            #   workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
 
             return_code = subprocess.call(cmd_args,
                                           stdout=workunit.output('stdout'),

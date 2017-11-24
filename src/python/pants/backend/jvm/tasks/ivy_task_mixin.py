@@ -138,20 +138,13 @@ class IvyTaskMixin(TaskBase):
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
     results = []
     for artifact_set, target_subset in targets_by_sets.items():
-      if self.get_options().resolver == 'coursier':
-        CoursierResolve.resolve(target_subset,
-                                classpath_products,
-                                workunit_factory=self.context.new_workunit,
-                                pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
-                                coursier_fetch_options=self.get_options().coursier_fetch_options)
-      else:
-        results.append(self._resolve_subset(executor,
-                                                       target_subset,
-                                                       classpath_products,
-                                                       confs=confs,
-                                                       extra_args=extra_args,
-                                                       invalidate_dependents=invalidate_dependents,
-                                                       pinned_artifacts=artifact_set))
+      results.append(self._resolve_subset(executor,
+                                          target_subset,
+                                          classpath_products,
+                                          confs=confs,
+                                          extra_args=extra_args,
+                                          invalidate_dependents=invalidate_dependents,
+                                          pinned_artifacts=artifact_set))
     return results
 
   def ivy_classpath(self, targets, silent=True, workunit_name=None):
