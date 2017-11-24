@@ -160,7 +160,7 @@ def register_goals():
 
   # Dependency resolution.
   task(name='ivy', action=IvyResolve).install('resolve', first=True)
-  task(name='coursier', action=CoursierResolve).install('resolve', first=True)
+  task(name='coursier', action=CoursierResolve).install('resolve')
   task(name='ivy-imports', action=IvyImports).install('imports')
   task(name='unpack-jars', action=UnpackJars).install()
   task(name='ivy', action=IvyOutdated).install('outdated')
