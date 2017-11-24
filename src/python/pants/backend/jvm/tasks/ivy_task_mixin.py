@@ -13,12 +13,10 @@ from pants.backend.jvm.ivy_utils import NO_RESOLVE_RUN_RESULT, IvyFetchStep, Ivy
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.ivy.ivy_subsystem import IvySubsystem
-from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.task.task import TaskBase
 from pants.util.memo import memoized_property
 
@@ -139,12 +137,12 @@ class IvyTaskMixin(TaskBase):
     results = []
     for artifact_set, target_subset in targets_by_sets.items():
       results.append(self._resolve_subset(executor,
-                                          target_subset,
-                                          classpath_products,
-                                          confs=confs,
-                                          extra_args=extra_args,
-                                          invalidate_dependents=invalidate_dependents,
-                                          pinned_artifacts=artifact_set))
+                                                     target_subset,
+                                                     classpath_products,
+                                                     confs=confs,
+                                                     extra_args=extra_args,
+                                                     invalidate_dependents=invalidate_dependents,
+                                                     pinned_artifacts=artifact_set))
     return results
 
   def ivy_classpath(self, targets, silent=True, workunit_name=None):
