@@ -128,6 +128,7 @@ function run_cargo() {
 function _wait_noisily() {
   "$@" &
   pid=$!
+  trap 'kill ${pid} ; exit 130' SIGINT
 
   i=0
   while ps -p "${pid}" >/dev/null 2>/dev/null; do
@@ -137,6 +138,8 @@ function _wait_noisily() {
   done
 
   wait "${pid}"
+
+  trap - SIGINT
 }
 
 function _build_native_code() {
@@ -145,7 +148,12 @@ function _build_native_code() {
   # Sometimes fetching a large git repo dependency can take more than 10 minutes.
   # This times out on travis, because nothing is printed to stdout/stderr in that time.
   # Pre-fetch those git repos and keep writing to stdout as we do.
-  _wait_noisily run_cargo fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
+  # First run_cargo -V to ensure that cargo is installed.
+  run_cargo -V >/dev/null
+  # Then noisily wait for a cargo fetch. This is not using run_cargo so that the process which is
+  # killed by _wait_noisily on ^C is the cargo process itself, rather than a rustup wrapper which
+  # spawns a separate cargo process.
+  _wait_noisily "${CARGO_HOME}/bin/cargo" fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
   run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
