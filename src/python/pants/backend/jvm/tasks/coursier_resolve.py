@@ -44,8 +44,6 @@ class CoursierResolve(NailgunTask):
 
   # TODO(wisechengyi):
   # 1. Add conf support
-  # 2. Pinned artifact support
-  # 3. forced version
   """
 
   @classmethod
