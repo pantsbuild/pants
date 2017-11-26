@@ -2,7 +2,7 @@
 
 # We use some subshell pipelines to collect target lists, make sure target collection failing
 # fails the build.
-set -o pipefail
+set -ox pipefail
 
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 cd ${REPO_ROOT}
@@ -29,7 +29,7 @@ function usage() {
   echo "              if running core python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -a           skip android targets when running tests"
+  echo " -a           skip android targets when running tests and lint"
   echo " -n           skip contrib python tests"
   echo " -e           skip rust tests"
   echo " -y SHARD_NUMBER/TOTAL_SHARDS"
@@ -162,7 +162,9 @@ fi
 if [[ "${skip_lint:-false}" == "false" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
-    ./pants.pex ${PANTS_ARGS[@]} lint contrib:: examples:: src:: tests:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} \
+    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
 fi
