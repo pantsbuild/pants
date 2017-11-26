@@ -193,7 +193,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 0/2 "${SHARD}" --exclude-target-regexp='contrib/android'
 
     - os: linux
       dist: trusty
@@ -222,7 +222,7 @@ matrix:
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
-        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}"
+        - ./build-support/bin/ci.sh -x -efkmrcjlpt -y 1/2 "${SHARD}" --exclude-target-regexp='contrib/android'
 
     - os: linux
       dist: trusty
