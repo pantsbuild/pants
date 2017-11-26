@@ -5,9 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import json
 import logging
 import os
+import shutil
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
@@ -18,13 +20,15 @@ from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.net.http.fetcher import Fetcher
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.util.dirutil import safe_mkdir
+from pants.util.contextutil import temporary_file
+from pants.util.dirutil import safe_mkdir, touch
 from pants.util.process_handler import subprocess
-
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,8 @@ class CoursierError(Exception):
 
 class CoursierResolve(NailgunTask):
   """
+  Experimental 3rdparty resolver using coursier.
+
   # TODO(wisechengyi):
   # 1. Add conf support
   # 2. Pinned artifact support
@@ -58,8 +64,10 @@ class CoursierResolve(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(CoursierResolve, cls).register_options(register)
-    register('--coursier-fetch-options', type=list, fingerprint=True,
+    register('--fetch-options', type=list, fingerprint=True,
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+    register('--bootstrap-jar-url', advanced=True, default='https://dl.dropboxusercontent.com/s/nc5hxyhsvwp9k4j/coursier-cli.jar?dl=0',
+             help='Location to download a bootstrap version of Coursier.')
 
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
@@ -70,54 +78,25 @@ class CoursierResolve(NailgunTask):
     if jvm_resolve_subsystem.get_options().resolver != 'coursier':
       return
 
+    coursier_jar = self._bootstrap_coursier(self.get_options().bootstrap_jar_url)
+
     executor = self.create_java_executor()
-    compile_classpath = self.context.products.get_data('compile_classpath',
-                                                       init_func=ClasspathProducts.init_func(
-                                                         self.get_options().pants_workdir))
-    results = self.resolve_helper(executor=executor,
-                                  targets=self.context.targets(),
-                                  classpath_products=compile_classpath,
-                                  confs=['default'])
+    classpath_products = self.context.products.get_data('compile_classpath',
+                                                        init_func=ClasspathProducts.init_func(
+                                                          self.get_options().pants_workdir))
 
-  """
-  Experimental 3rdparty resolver using coursier.
-  """
-
-  def resolve_helper(self, executor, targets, classpath_products, confs=None, extra_args=None,
-              invalidate_dependents=False):
-    """Resolves external classpath products (typically jars) for the given targets.
-
-    :API: public
-
-    :param executor: A java executor to run ivy with.
-    :type executor: :class:`pants.java.executor.Executor`
-    :param targets: The targets to resolve jvm dependencies for.
-    :type targets: :class:`collections.Iterable` of :class:`pants.build_graph.target.Target`
-    :param classpath_products: The classpath products to populate with the results of the resolve.
-    :type classpath_products: :class:`pants.backend.jvm.tasks.classpath_products.ClasspathProducts`
-    :param confs: The ivy configurations to resolve; ('default',) by default.
-    :type confs: :class:`collections.Iterable` of string
-    :param extra_args: Any extra command line arguments to pass to ivy.
-    :type extra_args: list of string
-    :param bool invalidate_dependents: `True` to invalidate dependents of targets that needed to be
-                                        resolved.
-    :returns: The results of each of the resolves run by this call.
-    :rtype: list of IvyResolveResult
-    """
-    confs = confs or ('default',)
-    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(targets)
+    confs = ['default']
+    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
     results = []
     for artifact_set, target_subset in targets_by_sets.items():
-      CoursierResolve.resolve(target_subset,
-                              classpath_products,
-                              workunit_factory=self.context.new_workunit,
-                              pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
-                              coursier_fetch_options=self.get_options().coursier_fetch_options,
-                              taskbase=self)
+      self.resolve(coursier_jar,
+                   target_subset,
+                   classpath_products,
+                   workunit_factory=self.context.new_workunit,
+                   pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
+                   coursier_fetch_options=self.get_options().fetch_options)
 
-
-  @classmethod
-  def resolve(cls, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options,  taskbase, pinned_artifacts=None):
+  def resolve(self, coursier_jar, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options, pinned_artifacts=None):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -141,14 +120,14 @@ class CoursierResolve(NailgunTask):
             exclude_args.add(ex_arg)
 
       # Prepare coursier args
-      exe = '/Users/yic/workspace/coursier_dev/cli/target/pack/bin/coursier'
+      exe = 'dist/coursier-cli.jar'
       output_fn = 'output.json'
       coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
       pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
       common_args = [
-                      'bash',
-                     exe,
+                      # 'bash',
+                     # exe,
                      'fetch',
                      '--cache', coursier_cache_path,
                      '--json-output-file', output_fn] + coursier_fetch_options
@@ -173,12 +152,13 @@ class CoursierResolve(NailgunTask):
             cmd_args.append('--intransitive')
           cmd_args.append(j.coordinate.simple_coord)
 
-        exclude_file = 'excludes.txt'
-        with open(exclude_file, 'w') as f:
-          f.write('\n'.join(exclude_args).encode('utf8'))
+        if exclude_args:
+          exclude_file = 'excludes.txt'
+          with open(exclude_file, 'w') as f:
+            f.write('\n'.join(exclude_args).encode('utf8'))
 
-        cmd_args.append('--soft-exclude-file')
-        cmd_args.append(exclude_file)
+          cmd_args.append('--soft-exclude-file')
+          cmd_args.append(exclude_file)
 
         for ex in global_excludes:
           cmd_args.append('-E')
@@ -188,34 +168,34 @@ class CoursierResolve(NailgunTask):
         logger.info(cmd_str)
 
         try:
-          with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+          # with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
 
-            # return_code = taskbase.runjava(
-            #   classpath='/Users/yic/workspace/coursier_dev/cli/target/scala-2.11/proguard/coursier-standalone-with-bootstrap.jar',
-            #   main='coursier.cli.Coursier',
-            #   args=cmd_args,
-            #   # jvm_options=self.get_options().jvm_options,
-            #   # to let stdout/err through, but don't print tool's label.
-            #   workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
+          return_code = self.runjava(
+            classpath=[coursier_jar],
+            main='coursier.cli.Coursier',
+            args=cmd_args,
+            # jvm_options=self.get_options().jvm_options,
+            # to let stdout/err through, but don't print tool's label.
+            workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
 
-            return_code = subprocess.call(cmd_args,
-                                          stdout=workunit.output('stdout'),
-                                          stderr=workunit.output('stderr'))
+          # return_code = subprocess.call(cmd_args,
+          #                               stdout=workunit.output('stdout'),
+          #                               stderr=workunit.output('stderr'))
 
-            workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+          # workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
-            with open(output_fn) as f:
-              result = json.loads(f.read())
+          with open(output_fn) as f:
+            result = json.loads(f.read())
 
-            if return_code:
-              raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+          if return_code:
+            raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
         except subprocess.CalledProcessError as e:
           raise CoursierError(e)
 
         else:
-          flattened_resolution = cls._flatten_resolution_by_root(result)
-          files_by_coord = cls._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+          flattened_resolution = self._flatten_resolution_by_root(result)
+          files_by_coord = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
           for t in targets:
             if isinstance(t, JarLibrary):
@@ -306,3 +286,32 @@ class CoursierResolve(NailgunTask):
   def to_m2_coord(cls, coord_str, classifier=''):
     # TODO: currently assuming everything is a jar and no classifier
     return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
+
+  def _bootstrap_coursier(self, bootstrap_url):
+
+    coursier_bootstrap_dir = os.path.join(self.get_options().pants_bootstrapdir,
+                                     'tools', 'jvm', 'coursier')
+
+    bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
+
+    # options = self._ivy_subsystem.get_options()
+    if not os.path.exists(bootstrap_jar_path):
+      with temporary_file() as bootstrap_jar:
+        fetcher = Fetcher(get_buildroot())
+        checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
+        try:
+          logger.info('\nDownloading {}'.format(bootstrap_url))
+          # TODO: Capture the stdout of the fetcher, instead of letting it output
+          # to the console directly.
+          fetcher.download(bootstrap_url,
+                           listener=fetcher.ProgressListener().wrap(checksummer),
+                           path_or_fd=bootstrap_jar,
+                           timeout_secs=2)
+          logger.info('sha1: {}'.format(checksummer.checksum))
+          bootstrap_jar.close()
+          touch(bootstrap_jar_path)
+          shutil.move(bootstrap_jar.name, bootstrap_jar_path)
+        except fetcher.Error as e:
+          raise self.Error('Problem fetching the ivy bootstrap jar! {}'.format(e))
+
+    return bootstrap_jar_path
