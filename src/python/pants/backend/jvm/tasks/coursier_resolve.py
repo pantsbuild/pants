@@ -30,6 +30,7 @@ from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir, touch
 from pants.util.process_handler import subprocess
 
+
 logger = logging.getLogger(__name__)
 
 
