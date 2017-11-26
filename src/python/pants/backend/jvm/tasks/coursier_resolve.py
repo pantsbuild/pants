@@ -246,9 +246,6 @@ class CoursierResolve(NailgunTask):
                   if transitive_resolved_jars:
                     compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
 
-          # This return value is not important
-          # return flattened_resolution
-
   @classmethod
   def _flatten_resolution_by_root(cls, result):
     """
