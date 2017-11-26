@@ -123,7 +123,7 @@ class CoursierResolve(NailgunTask):
       # Prepare coursier args
       exe = 'dist/coursier-cli.jar'
       output_fn = 'output.json'
-      coursier_cache_path = '/Users/yic/.cache/pants/coursier/'
+      coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
       pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
       common_args = [
