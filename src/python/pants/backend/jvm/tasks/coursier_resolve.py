@@ -96,54 +96,70 @@ class CoursierResolve(NailgunTask):
                    pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
                    coursier_fetch_options=self.get_options().fetch_options)
 
+  @staticmethod
+  def _compute_jars_to_resolve_and_to_exclude(jars, artifact_set, manager):
+    """
+
+    :param jars_by_key:
+    :param artifact_set:
+    :param manager:
+    :return:
+    """
+    jars_by_key = OrderedDict()
+    for jar in jars:
+      jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
+      jars_for_the_key.append(jar)
+
+    jars_to_resolve = []
+    exclude_args = set()
+
+    for k, jar_list in jars_by_key.items():
+      for i, dep in enumerate(jar_list):
+        direct_coord = M2Coordinate.create(dep)
+        managed_coord = artifact_set[direct_coord] if artifact_set else direct_coord
+        if direct_coord.rev != managed_coord.rev:
+          # It may be necessary to actually change the version number of the jar we want to resolve
+          # here, because overrides do not apply directly (they are exclusively transitive). This is
+          # actually a good thing, because it gives us more control over what happens.
+          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+
+          # Once a version is settled, we force it anyway
+          jar_list[i] = dep.copy(rev=coord.rev, force=True)
+
+      jars_to_resolve.extend(jar_list)
+      for jar in jar_list:
+        for ex in jar.excludes:
+          # `--` means exclude. See --soft-exclude-file in coursier
+          ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
+          exclude_args.add(ex_arg)
+
+    return jars_to_resolve, exclude_args
+
   def resolve(self, coursier_jar, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
 
     for artifact_set, target_subset in jar_targets.items():
-      jars, global_excludes = IvyUtils.calculate_classpath(target_subset)
+      raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
-      jars_by_key = OrderedDict()
-      for jar in jars:
-        jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
-        jars_for_the_key.append(jar)
-
-      jars_to_resolve = []
-      exclude_args = set()
-      for k, jar_list in jars_by_key.items():
-        for i, dep in enumerate(jar_list):
-          direct_coord = M2Coordinate.create(dep)
-          managed_coord = artifact_set[direct_coord] if artifact_set else direct_coord
-          if direct_coord.rev != managed_coord.rev:
-            # It may be necessary to actually change the version number of the jar we want to resolve
-            # here, because overrides do not apply directly (they are exclusively transitive). This is
-            # actually a good thing, because it gives us more control over what happens.
-            coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
-
-            # Once a version is settled, we force it anyway
-            jar_list[i] = dep.copy(rev=coord.rev, force=True)
-
-        for jar in jar_list:
-          jars_to_resolve.append(jar)
-          for ex in jar.excludes:
-            # `--` means exclude. See --soft-exclude-file in coursier
-            ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
-            exclude_args.add(ex_arg)
+      jars_to_resolve, local_exclude_args = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps, artifact_set, manager)
 
       # Prepare coursier args
       output_fn = 'output.json'
       coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
       pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
-      common_args = ['fetch', '-t',
+      common_args = ['fetch',
+                     # Print the resolution tree
+                     '-t',
                      '--cache', coursier_cache_path,
                      '--json-output-file', output_fn] + coursier_fetch_options
 
       def construct_classifier_to_jar(jars):
         product = defaultdict(list)
-        for j in jars:
-          product[j.coordinate.classifier or ''].append(j)
+        for x in jars:
+          product[x.coordinate.classifier or ''].append(x)
         return product
 
       classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
@@ -169,10 +185,10 @@ class CoursierResolve(NailgunTask):
             cmd_args.append('-V')
             cmd_args.append(j.coordinate.simple_coord)
 
-        if exclude_args:
+        if local_exclude_args:
           exclude_file = 'excludes.txt'
           with open(exclude_file, 'w') as f:
-            f.write('\n'.join(exclude_args).encode('utf8'))
+            f.write('\n'.join(local_exclude_args).encode('utf8'))
 
           cmd_args.append('--soft-exclude-file')
           cmd_args.append(exclude_file)
@@ -193,7 +209,7 @@ class CoursierResolve(NailgunTask):
             args=cmd_args,
             # jvm_options=self.get_options().jvm_options,
             # to let stdout/err through, but don't print tool's label.
-            workunit_labels=[WorkUnitLabel.COMPILER, WorkUnitLabel.SUPPRESS_LABEL])
+            workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
           # return_code = subprocess.call(cmd_args,
           #                               stdout=workunit.output('stdout'),
