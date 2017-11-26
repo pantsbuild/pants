@@ -96,7 +96,7 @@ class CoursierResolve(NailgunTask):
                    pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
                    coursier_fetch_options=self.get_options().fetch_options)
 
-  def resolve(self, coursier_jar, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options, pinned_artifacts=None):
+  def resolve(self, coursier_jar, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options):
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -111,8 +111,20 @@ class CoursierResolve(NailgunTask):
 
       jars_to_resolve = []
       exclude_args = set()
-      for k, v in jars_by_key.items():
-        for jar in v:
+      for k, jar_list in jars_by_key.items():
+        for i, dep in enumerate(jar_list):
+          direct_coord = M2Coordinate.create(dep)
+          managed_coord = artifact_set[direct_coord] if artifact_set else direct_coord
+          if direct_coord.rev != managed_coord.rev:
+            # It may be necessary to actually change the version number of the jar we want to resolve
+            # here, because overrides do not apply directly (they are exclusively transitive). This is
+            # actually a good thing, because it gives us more control over what happens.
+            coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+
+            # Once a version is settled, we force it anyway
+            jar_list[i] = dep.copy(rev=coord.rev, force=True)
+
+        for jar in jar_list:
           jars_to_resolve.append(jar)
           for ex in jar.excludes:
             # `--` means exclude. See --soft-exclude-file in coursier
@@ -124,7 +136,7 @@ class CoursierResolve(NailgunTask):
       coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
       pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
-      common_args = ['fetch',
+      common_args = ['fetch', '-t',
                      '--cache', coursier_cache_path,
                      '--json-output-file', output_fn] + coursier_fetch_options
 
@@ -137,16 +149,25 @@ class CoursierResolve(NailgunTask):
       classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
       # Coursier calls need to be divided by classifier because coursier treats classifier option globally.
-      for classifier, jars in classifier_to_jars.items():
+      for classifier, classified_jars in classifier_to_jars.items():
 
         cmd_args = list(common_args)
         if classifier:
           cmd_args.extend(['--classifier', classifier])
 
-        for j in jars:
+        for j in classified_jars:
+          if not j.rev:
+            continue
+
           if j.intransitive:
             cmd_args.append('--intransitive')
+
           cmd_args.append(j.coordinate.simple_coord)
+
+          # Force requires specifying the coord again with -V
+          if j.force:
+            cmd_args.append('-V')
+            cmd_args.append(j.coordinate.simple_coord)
 
         if exclude_args:
           exclude_file = 'excludes.txt'
@@ -211,6 +232,14 @@ class CoursierResolve(NailgunTask):
                   final_simple_coord = simple_coord_candidate
                 elif simple_coord_candidate in result['conflict_resolution']:
                   final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
+                # Unspecified version, looking for org:name match.
+                elif jar.rev is None:
+                  for coord in files_by_coord.keys():
+                    (org, name, _) = coord.split(':')
+                    if org == jar.org and name == jar.name:
+                      final_simple_coord = coord
+                      break
+
 
                 if final_simple_coord:
                   transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
@@ -280,7 +309,7 @@ class CoursierResolve(NailgunTask):
 
   @classmethod
   def to_m2_coord(cls, coord_str, classifier=''):
-    # TODO: currently assuming everything is a jar and no classifier
+    # TODO: currently assuming all packaging is a jar
     return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
 
   def _bootstrap_coursier(self, bootstrap_url):
@@ -290,7 +319,6 @@ class CoursierResolve(NailgunTask):
 
     bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
 
-    # options = self._ivy_subsystem.get_options()
     if not os.path.exists(bootstrap_jar_path):
       with temporary_file() as bootstrap_jar:
         fetcher = Fetcher(get_buildroot())
