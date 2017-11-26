@@ -112,7 +112,7 @@ matrix:
       env:
         - SHARD="Various pants self checks and lint"
       script:
-        - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
+        - ./build-support/bin/ci.sh -x -acejlpn 'Various pants self checks and lint'
 
     - os: linux
       dist: trusty
