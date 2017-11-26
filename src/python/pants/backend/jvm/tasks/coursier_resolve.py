@@ -214,6 +214,11 @@ class CoursierResolve(NailgunTask):
           flattened_resolution = self._flatten_resolution_by_root(result)
           files_by_coord = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
+          org_name_to_org_name_rev = {}
+          for coord in files_by_coord.keys():
+            (org, name, _) = coord.split(':')
+            org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
+
           for t in targets:
             if isinstance(t, JarLibrary):
 
@@ -232,14 +237,11 @@ class CoursierResolve(NailgunTask):
                   final_simple_coord = simple_coord_candidate
                 elif simple_coord_candidate in result['conflict_resolution']:
                   final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
-                # Unspecified version, looking for org:name match.
-                elif jar.rev is None:
-                  for coord in files_by_coord.keys():
-                    (org, name, _) = coord.split(':')
-                    if org == jar.org and name == jar.name:
-                      final_simple_coord = coord
-                      break
-
+                # If still not found, look for org:name match.
+                else:
+                  org_name = '{}:{}'.format(jar.org, jar.name)
+                  if org_name in org_name_to_org_name_rev:
+                    final_simple_coord = org_name_to_org_name_rev[org_name]
 
                 if final_simple_coord:
                   transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
