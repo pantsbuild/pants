@@ -19,6 +19,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       ivy_report_dir = '{workdir}/ivy-report'.format(workdir=workdir)
       pants_run = self.run_pants_with_workdir([
+          '--resolver-resolver=ivy',
           'compile',
           'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
           '--resolve-ivy-report',
@@ -36,6 +37,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_ivy_args(self):
     pants_run = self.run_pants([
+        '--resolver-resolver=ivy',
         'resolve',
         '--resolve-ivy-args=-blablabla',
         'examples/src/scala::'
@@ -45,6 +47,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_ivy_confs_success(self):
     pants_run = self.run_pants([
+        '--resolver-resolver=ivy',
         'resolve',
         '--resolve-ivy-confs=default',
         '--resolve-ivy-confs=sources',
@@ -55,6 +58,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_ivy_confs_failure(self):
     pants_run = self.run_pants([
+        '--resolver-resolver=ivy',
         'resolve',
         '--resolve-ivy-confs=parampampam',
         '3rdparty:junit'
@@ -64,6 +68,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
   def test_ivy_confs_ini_failure(self):
     pants_ini_config = {'resolve.ivy': {'confs': 'parampampam'}}
     pants_run = self.run_pants([
+        '--resolver-resolver=ivy',
         'resolve',
         '3rdparty:junit'
     ], config=pants_ini_config)
@@ -100,8 +105,12 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
   def test_generates_no_report_if_no_resolve_performed(self):
     with temporary_dir() as ivy_report_dir:
-      run = self.run_pants(['resolve', 'src/java/org/pantsbuild/junit/annotations', '--resolve-ivy-report',
-                             '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
+      run = self.run_pants([
+        '--resolver-resolver=ivy',
+        'resolve',
+        'src/java/org/pantsbuild/junit/annotations',
+        '--resolve-ivy-report',
+        '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
       self.assert_success(run)
 
       html_report_file, listdir = self._find_html_report(ivy_report_dir)
@@ -117,7 +126,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       def run_pants(command):
         return self.run_pants_with_workdir(command, workdir, config=config)
       with temporary_dir() as ivy_report_dir:
-        first_run = run_pants(['resolve', '3rdparty:junit', '--resolve-ivy-report',
+        first_run = run_pants(['--resolver-resolver=ivy', 'resolve', '3rdparty:junit', '--resolve-ivy-report',
                                '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
         self.assert_success(first_run)
 
@@ -132,7 +141,8 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       run_pants(['clean-all'])
 
       with temporary_dir() as ivy_report_dir:
-        fetch_run = run_pants(['resolve', '3rdparty:junit', '--resolve-ivy-report',
+        fetch_run = run_pants(['--resolver-resolver=ivy',
+                               'resolve', '3rdparty:junit', '--resolve-ivy-report',
                                '--resolve-ivy-outdir={reportdir}'.format(reportdir=ivy_report_dir)])
         self.assert_success(fetch_run)
 
