@@ -81,14 +81,13 @@ class CoursierResolve(NailgunTask):
 
     coursier_jar = self._bootstrap_coursier(self.get_options().bootstrap_jar_url)
 
-    executor = self.create_java_executor()
+    # executor = self.create_java_executor()
     classpath_products = self.context.products.get_data('compile_classpath',
                                                         init_func=ClasspathProducts.init_func(
                                                           self.get_options().pants_workdir))
 
-    confs = ['default']
+    # confs = ['default']
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
-    results = []
     for artifact_set, target_subset in targets_by_sets.items():
       self.resolve(coursier_jar,
                    target_subset,
@@ -121,15 +120,11 @@ class CoursierResolve(NailgunTask):
             exclude_args.add(ex_arg)
 
       # Prepare coursier args
-      exe = 'dist/coursier-cli.jar'
       output_fn = 'output.json'
       coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
       pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
 
-      common_args = [
-                      # 'bash',
-                     # exe,
-                     'fetch',
+      common_args = ['fetch',
                      '--cache', coursier_cache_path,
                      '--json-output-file', output_fn] + coursier_fetch_options
 
