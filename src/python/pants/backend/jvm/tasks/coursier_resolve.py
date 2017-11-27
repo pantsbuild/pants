@@ -367,6 +367,6 @@ class CoursierResolve(NailgunTask):
           touch(bootstrap_jar_path)
           shutil.move(bootstrap_jar.name, bootstrap_jar_path)
         except fetcher.Error as e:
-          raise self.Error('Problem fetching the ivy bootstrap jar! {}'.format(e))
+          raise self.Error('Problem fetching the coursier bootstrap jar! {}'.format(e))
 
     return bootstrap_jar_path
