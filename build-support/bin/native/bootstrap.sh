@@ -94,8 +94,11 @@ function ensure_native_build_prerequisites() {
   if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
     "${CARGO_HOME}/bin/cargo" install protobuf >&2
   fi
-  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]]; then
-    "${CARGO_HOME}/bin/cargo" install grpcio-compiler >&2
+  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]] || ! grep '^"grpcio-compiler .*eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4' "${CARGO_HOME}/.crates.toml" >/dev/null 2>/dev/null; then
+    # Force install of a version we know is compatible with the version of grpc we use.
+    # There hasn't been a release since the changes we depend on (https://github.com/pingcap/grpc-rs/pull/101)
+    # so we need to manually mess with versions here.
+    "${CARGO_HOME}/bin/cargo" install --force --git=https://github.com/illicitonion/grpc-rs --rev=eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4 grpcio-compiler >&2
   fi
   if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
     "${CARGO_HOME}/bin/cargo" install rustfmt >&2
