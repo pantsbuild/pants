@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import sys
 from abc import abstractmethod, abstractproperty
 from contextlib import contextmanager
 
@@ -67,7 +66,7 @@ class Executor(AbstractClass):
       raise NotImplementedError
 
     @abstractmethod
-    def run(self, stdout=None, stderr=None, stdin=None, cwd=None):
+    def run(self, stdout=None, stderr=None, cwd=None):
       """Runs the configured java command.
 
       If there is a problem executing tha java program subclasses should raise Executor.Error.
@@ -75,20 +74,16 @@ class Executor(AbstractClass):
 
       :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
       :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
-      :param stdin:  An optional stream to receive stdin from; stdin is not propagated
-        by default.
       :param string cwd: optionally set the working directory
       """
       raise NotImplementedError
 
     @abstractmethod
-    def spawn(self, stdout=None, stderr=None, stdin=None, cwd=None):
+    def spawn(self, stdout=None, stderr=None, cwd=None):
       """Spawns the configured java command.
 
       :param stdout: An optional stream to pump stdout to; defaults to `sys.stdout`.
       :param stderr: An optional stream to pump stderr to; defaults to `sys.stderr`.
-      :param stdin:  An optional stream to receive stdin from; stdin is not propagated
-        by default.
       :param string cwd: optionally set the working directory
       """
       raise NotImplementedError
@@ -163,10 +158,10 @@ class CommandLineGrabber(Executor):
       def command(_):
         return list(self._command)
 
-      def run(_, stdout=None, stderr=None, stdin=None):
+      def run(_, stdout=None, stderr=None):
         return 0
 
-      def spawn(_, stdout=None, stderr=None, stdin=None):
+      def spawn(_, stdout=None, stderr=None):
         return None
 
     return Runner()
@@ -223,11 +218,11 @@ class SubprocessExecutor(Executor):
       def command(_):
         return list(command)
 
-      def spawn(_, stdout=None, stderr=None, stdin=None):
-        return self._spawn(command, cwd, stdout=stdout, stderr=stderr, stdin=stdin)
+      def spawn(_, stdout=None, stderr=None):
+        return self._spawn(command, cwd, stdout=stdout, stderr=stderr)
 
-      def run(_, stdout=None, stderr=None, stdin=None):
-        return self._spawn(command, cwd, stdout=stdout, stderr=stderr, stdin=stdin).wait()
+      def run(_, stdout=None, stderr=None):
+        return self._spawn(command, cwd, stdout=stdout, stderr=stderr).wait()
 
     return Runner()
 
@@ -244,16 +239,11 @@ class SubprocessExecutor(Executor):
     cmd = self._create_command(*self._scrub_args(classpath, main, jvm_options, args, cwd=cwd))
     return self._spawn(cmd, cwd, **subprocess_args)
 
-  def _spawn(self, cmd, cwd, stdout=None, stderr=None, stdin=None, **subprocess_args):
-    # NB: Only stdout and stderr have non-None defaults: callers that want to capture
-    # stdin should pass it explicitly.
-    stdout = stdout or sys.stdout
-    stderr = stderr or sys.stderr
+  def _spawn(self, cmd, cwd, **subprocess_args):
     with self._maybe_scrubbed_env():
       logger.debug('Executing: {cmd} args={args} at cwd={cwd}'
                    .format(cmd=' '.join(cmd), args=subprocess_args, cwd=cwd))
       try:
-        return subprocess.Popen(cmd, cwd=cwd, stdin=stdin, stdout=stdout, stderr=stderr,
-                                **subprocess_args)
+        return subprocess.Popen(cmd, cwd=cwd, **subprocess_args)
       except OSError as e:
         raise self.Error('Problem executing {0}: {1}'.format(self._distribution.java, e))

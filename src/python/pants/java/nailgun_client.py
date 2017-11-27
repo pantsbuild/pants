@@ -12,7 +12,7 @@ import signal
 import socket
 import sys
 
-from pants.java.nailgun_io import NailgunStreamWriter
+from pants.java.nailgun_io import NailgunStreamReader
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.util.socket import RecvBufferedSocket
 
@@ -25,23 +25,19 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
     self._sock = sock
-    if in_fd:
-      self._input_writer = NailgunStreamWriter(in_fd, self._sock,
-                                               ChunkType.STDIN, ChunkType.STDIN_EOF)
-    else:
-      self._input_writer = None
+    self._input_reader = NailgunStreamReader(in_fd, self._sock) if in_fd else None
     self._stdout = out_fd
     self._stderr = err_fd
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
 
-  def _maybe_start_input_writer(self):
-    if self._input_writer:
-      self._input_writer.start()
+  def _maybe_start_input_reader(self):
+    if self._input_reader:
+      self._input_reader.start()
 
-  def _maybe_stop_input_writer(self):
-    if self._input_writer:
-      self._input_writer.stop()
+  def _maybe_stop_input_reader(self):
+    if self._input_reader:
+      self._input_reader.stop()
 
   def _write_flush(self, fd, payload=None):
     """Write a payload to a given fd (if provided) and flush the fd."""
@@ -71,13 +67,13 @@ class NailgunClientSession(NailgunProtocol):
         elif chunk_type == ChunkType.PID:
           self.remote_pid = int(payload)
         elif chunk_type == ChunkType.START_READING_INPUT:
-          self._maybe_start_input_writer()
+          self._maybe_start_input_reader()
         else:
           raise self.ProtocolError('received unexpected chunk {} -> {}'.format(chunk_type, payload))
     finally:
       # Bad chunk types received from the server can throw NailgunProtocol.ProtocolError in
-      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamWriter is always stopped.
-      self._maybe_stop_input_writer()
+      # NailgunProtocol.iter_chunks(). This ensures the NailgunStreamReader is always stopped.
+      self._maybe_stop_input_reader()
 
   def execute(self, working_dir, main_class, *arguments, **environment):
     # Send the nailgun request.
