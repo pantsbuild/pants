@@ -15,7 +15,7 @@ from collections import defaultdict
 from twitter.common.collections import OrderedDict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
+from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement, PinnedJarArtifactSet
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
@@ -103,6 +103,10 @@ class CoursierResolve(NailgunTask):
     :param manager:
     :return:
     """
+
+    if artifact_set is None:
+      artifact_set = PinnedJarArtifactSet()
+
     jars_by_key = OrderedDict()
     for jar in jars:
       jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
@@ -111,18 +115,24 @@ class CoursierResolve(NailgunTask):
     jars_to_resolve = []
     exclude_args = set()
 
+    untouched_pinned_artifact = set(M2Coordinate.create(x) for x in artifact_set)
+
     for k, jar_list in jars_by_key.items():
       for i, dep in enumerate(jar_list):
         direct_coord = M2Coordinate.create(dep)
-        managed_coord = artifact_set[direct_coord] if artifact_set else direct_coord
-        if direct_coord.rev != managed_coord.rev:
-          # It may be necessary to actually change the version number of the jar we want to resolve
-          # here, because overrides do not apply directly (they are exclusively transitive). This is
-          # actually a good thing, because it gives us more control over what happens.
-          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
 
-          # Once a version is settled, we force it anyway
-          jar_list[i] = dep.copy(rev=coord.rev, force=True)
+        if direct_coord in artifact_set:
+          managed_coord = artifact_set[direct_coord]
+          untouched_pinned_artifact.remove(managed_coord)
+
+          if direct_coord.rev != managed_coord.rev:
+            # It may be necessary to actually change the version number of the jar we want to resolve
+            # here, because overrides do not apply directly (they are exclusively transitive). This is
+            # actually a good thing, because it gives us more control over what happens.
+            coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
+
+            # Once a version is settled, we force it anyway
+            jar_list[i] = dep.copy(rev=coord.rev, force=True)
 
       jars_to_resolve.extend(jar_list)
       for jar in jar_list:
@@ -131,7 +141,7 @@ class CoursierResolve(NailgunTask):
           ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
           exclude_args.add(ex_arg)
 
-    return jars_to_resolve, exclude_args
+    return jars_to_resolve, exclude_args, untouched_pinned_artifact
 
   def resolve(self, coursier_jar, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options):
     manager = JarDependencyManagement.global_instance()
@@ -141,7 +151,7 @@ class CoursierResolve(NailgunTask):
     for artifact_set, target_subset in jar_targets.items():
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
-      jars_to_resolve, local_exclude_args = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps, artifact_set, manager)
+      jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps, artifact_set, manager)
 
       # Prepare coursier args
       output_fn = 'output.json'
@@ -183,6 +193,10 @@ class CoursierResolve(NailgunTask):
             cmd_args.append('-V')
             cmd_args.append(j.coordinate.simple_coord)
 
+        for j in pinned_coords:
+          cmd_args.append('-V')
+          cmd_args.append(j.simple_coord)
+
         if local_exclude_args:
           exclude_file = 'excludes.txt'
           with open(exclude_file, 'w') as f:
@@ -191,9 +205,11 @@ class CoursierResolve(NailgunTask):
           cmd_args.append('--soft-exclude-file')
           cmd_args.append(exclude_file)
 
+        # TODO(wisechengyi): exclude the whole org
         for ex in global_excludes:
-          cmd_args.append('-E')
-          cmd_args.append('{}:{}'.format(ex.org, ex.name))
+          if ex.org and ex.name:
+            cmd_args.append('-E')
+            cmd_args.append('{}:{}'.format(ex.org, ex.name))
 
         cmd_str = ' '.join(cmd_args)
         logger.info(cmd_str)
