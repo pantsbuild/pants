@@ -91,11 +91,23 @@ function ensure_native_build_prerequisites() {
   # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
   "${CARGO_HOME}/bin/rustup" override set "${rust_toolchain}" >&2
 
+  # Sometimes fetching a large git repo dependency can take more than 10 minutes.
+  # This times out on travis, because nothing is printed to stdout/stderr in that time.
+  # Pre-fetch those git repos and keep writing to stdout as we do.
+  # Noisily wait for a cargo fetch. This is not using run_cargo so that the process which is
+  # killed by _wait_noisily on ^C is the cargo process itself, rather than a rustup wrapper which
+  # spawns a separate cargo process.
+  # We need to do this before we install grpcio-compiler to pre-fetch its repo.
+  _wait_noisily "${CARGO_HOME}/bin/cargo" fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
+
   if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
     "${CARGO_HOME}/bin/cargo" install protobuf >&2
   fi
-  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]]; then
-    "${CARGO_HOME}/bin/cargo" install grpcio-compiler >&2
+  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]] || ! grep '^"grpcio-compiler .*eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4' "${CARGO_HOME}/.crates.toml" >/dev/null 2>/dev/null; then
+    # Force install of a version we know is compatible with the version of grpc we use.
+    # There hasn't been a release since the changes we depend on (https://github.com/pingcap/grpc-rs/pull/101)
+    # so we need to manually mess with versions here.
+    "${CARGO_HOME}/bin/cargo" install --force --git=https://github.com/illicitonion/grpc-rs --rev=eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4 grpcio-compiler >&2
   fi
   if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
     "${CARGO_HOME}/bin/cargo" install rustfmt >&2
@@ -145,15 +157,6 @@ function _wait_noisily() {
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
-  # Sometimes fetching a large git repo dependency can take more than 10 minutes.
-  # This times out on travis, because nothing is printed to stdout/stderr in that time.
-  # Pre-fetch those git repos and keep writing to stdout as we do.
-  # First run_cargo -V to ensure that cargo is installed.
-  run_cargo -V >/dev/null
-  # Then noisily wait for a cargo fetch. This is not using run_cargo so that the process which is
-  # killed by _wait_noisily on ^C is the cargo process itself, rather than a rustup wrapper which
-  # spawns a separate cargo process.
-  _wait_noisily "${CARGO_HOME}/bin/cargo" fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
   run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
