@@ -45,11 +45,12 @@ class CoursierResolve(NailgunTask):
 
   # TODO(wisechengyi):
   # 1. Add conf support
+  # 2. Add relative url support
   """
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CoursierResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem.scoped(cls),)
+    return super(CoursierResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def product_types(cls):
@@ -74,7 +75,7 @@ class CoursierResolve(NailgunTask):
     tuples of (conf, jar path).
     """
 
-    jvm_resolve_subsystem = JvmResolveSubsystem.scoped_instance(self)
+    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
     if jvm_resolve_subsystem.get_options().resolver != 'coursier':
       return
 

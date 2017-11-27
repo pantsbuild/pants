@@ -27,7 +27,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem.scoped(cls),)
+    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def register_options(cls, register):
@@ -87,7 +87,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
-    jvm_resolve_subsystem = JvmResolveSubsystem.scoped_instance(self)
+    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
     if jvm_resolve_subsystem.get_options().resolver != 'ivy':
       return
 
