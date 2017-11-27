@@ -12,6 +12,7 @@ target(
     ':check_published_deps',
     ':checkstyle',
     ':classmap',
+    ':coursier_resolve',
     ':detect_duplicates',
     ':ivy_imports',
     ':ivy_outdated',
@@ -209,6 +210,7 @@ python_library(
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
+    'src/python/pants/backend/jvm/subsystems:resolve_subsystem'
   ],
 )
 
@@ -242,6 +244,23 @@ python_library(
     'src/python/pants/ivy',
     'src/python/pants/java/jar',
     'src/python/pants/util:memo',
+  ],
+)
+
+python_library(
+  name = 'coursier_resolve',
+  sources = ['coursier_resolve.py'],
+  dependencies = [
+    ':classpath_products',
+    ':nailgun_task',
+    'src/python/pants/backend/jvm:ivy_utils',
+    'src/python/pants/java/jar',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/invalidation',
+    'src/python/pants/util:desktop',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:strutil',
+    'src/python/pants/backend/jvm/subsystems:resolve_subsystem'
   ],
 )
 

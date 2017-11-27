@@ -11,6 +11,7 @@ import time
 from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -23,6 +24,10 @@ from pants.util.strutil import safe_shlex_split
 
 
 class IvyResolve(IvyTaskMixin, NailgunTask):
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
 
   @classmethod
   def register_options(cls, register):
@@ -50,6 +55,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
+
     cls.register_jvm_tool(register,
                           'xalan',
                           classpath=[
@@ -81,6 +87,10 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
+    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
+    if jvm_resolve_subsystem.get_options().resolver != 'ivy':
+      return
+
     executor = self.create_java_executor()
     targets = self.context.targets()
     compile_classpath = self.context.products.get_data('compile_classpath',

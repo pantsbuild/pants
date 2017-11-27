@@ -34,6 +34,8 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
+      # TODO(wisechengyi): https://github.com/coursier/coursier/issues/698
+      'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
     ]
 
     # Targets that are intended to fail
@@ -90,8 +92,13 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/python/interpreter_selection.*'
     ]
 
+    simply_skip = [
+      # Already tested at pants_test.backend.jvm.targets.test_jar_dependency_integration.JarDependencyIntegrationTest
+      'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects'
+    ]
+
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
-                          timeout_targets + deliberately_conflicting_targets)
+                          timeout_targets + deliberately_conflicting_targets + simply_skip)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
 
