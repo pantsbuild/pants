@@ -179,7 +179,7 @@ impl Tasks {
     let mut task = self.preparing.take().expect(
       "Must `begin()` a task creation before ending it!",
     );
-    let mut tasks = self.tasks.entry(task.product.clone()).or_insert_with(
+    let tasks = self.tasks.entry(task.product.clone()).or_insert_with(
       || Vec::new(),
     );
     assert!(

@@ -26,7 +26,7 @@ pub fn run_command_remote(
   let channel = || grpcio::ChannelBuilder::new(env.clone()).connect(addr);
   let execution_client = bazel_protos::remote_execution_grpc::ExecutionClient::new(channel());
 
-  let initial_result = map_grpc_result(execution_client.execute(execute_request))?;
+  let initial_result = map_grpc_result(execution_client.execute(&execute_request))?;
 
   match extract_execute_response(&initial_result)? {
     Some(value) => {
@@ -40,9 +40,7 @@ pub fn run_command_remote(
   operation_request.set_name(initial_result.get_name().to_string());
   loop {
     // TODO: Use some better looping-frequency strategy than a tight-loop.
-    // TODO: Stop cloning the request when https://github.com/pingcap/grpc-rs/pull/101 is merged.
-    let operation_result =
-      map_grpc_result(operation_client.get_operation(operation_request.clone()))?;
+    let operation_result = map_grpc_result(operation_client.get_operation(&operation_request))?;
 
     let result = extract_execute_response(&operation_result)?;
 
@@ -141,10 +139,12 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
 
 #[cfg(test)]
 mod tests {
+  extern crate testutil;
+
   use bazel_protos;
   use protobuf::{self, Message, ProtobufEnum};
   use test_server;
-  use test_utils::{owned_string_vec, as_byte_owned_vec};
+  use self::testutil::{owned_string_vec, as_byte_owned_vec};
 
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_remote};
   use std::collections::BTreeMap;

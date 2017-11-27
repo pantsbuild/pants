@@ -10,8 +10,6 @@ pub mod local;
 pub mod remote;
 #[cfg(test)]
 mod test_server;
-#[cfg(test)]
-mod test_utils;
 
 ///
 /// A process to be executed.

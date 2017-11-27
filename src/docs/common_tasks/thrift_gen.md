@@ -20,8 +20,8 @@ If you need to compile a Scala or Java [[library target|pants('src/docs/common_t
 
 There are two types of Thrift target definitions that you will find in `BUILD` files in existing projects:
 
-* `java_thrift_library` (for Scala and Java) and `python_thrift_library`
-* `create_thrift_libraries`
+* `java_thrift_library` (for Scala and Java)
+* `python_thrift_library` (for Python)
 
 You can use the `gen` and `compile` goals directly with `java_thrift_library` targets. Thus, you could target a `BUILD` file containing this definition...
 
@@ -35,4 +35,9 @@ You can use the `gen` and `compile` goals directly with `java_thrift_library` ta
     ::bash
     $ ./pants gen myproject/src/main/thrift:thrift-java
 
-`create_thrift_libraries` targets work somewhat differently, however.
+To learn more about Thrift, check out the [[Thrift Example docs|pants('examples/src/thrift/org/pantsbuild/example:readme')]].
+
+See Also
+--------
+
+- [[Thrift Example docs|pants('examples/src/thrift/org/pantsbuild/example:readme')]]

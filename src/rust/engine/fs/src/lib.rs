@@ -1,8 +1,14 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-pub mod hash;
-pub mod store;
+mod hash;
+pub use hash::Fingerprint;
+mod snapshot;
+pub use snapshot::{GetFileDigest, Snapshot};
+mod store;
+pub use store::{Digest, Store};
+mod pool;
+pub use pool::ResettablePool;
 
 extern crate bazel_protos;
 extern crate boxfuture;
@@ -12,6 +18,7 @@ extern crate futures_cpupool;
 extern crate glob;
 extern crate hex;
 extern crate ignore;
+extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
@@ -24,20 +31,20 @@ extern crate tempdir;
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use std::sync::{Arc, Mutex};
 use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
 
 use futures::future::{self, Future};
-use futures_cpupool::{CpuFuture, CpuPool};
+use futures_cpupool::CpuFuture;
 use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ordermap::OrderMap;
 use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
-use hash::{Fingerprint, WriterHasher};
+use hash::WriterHasher;
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -342,8 +349,12 @@ fn create_ignore(patterns: &[String]) -> Result<Gitignore, ignore::Error> {
   ignore_builder.build()
 }
 
-fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool {
-  match ignore.matched(path, is_dir) {
+fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
+  let is_dir = match stat {
+    &Stat::Dir(_) => true,
+    _ => false,
+  };
+  match ignore.matched(stat.path(), is_dir) {
     ignore::Match::None |
     ignore::Match::Whitelist(_) => false,
     ignore::Match::Ignore(_) => true,
@@ -355,13 +366,16 @@ fn is_ignored<P: AsRef<Path>>(ignore: &Gitignore, path: P, is_dir: bool) -> bool
 ///
 pub struct PosixFS {
   root: Dir,
-  // The pool needs to be reinitialized after a fork, so it is protected by a lock.
-  pool: RwLock<Option<CpuPool>>,
+  pool: Arc<ResettablePool>,
   ignore: Gitignore,
 }
 
 impl PosixFS {
-  pub fn new<P: AsRef<Path>>(root: P, ignore_patterns: Vec<String>) -> Result<PosixFS, String> {
+  pub fn new<P: AsRef<Path>>(
+    root: P,
+    pool: Arc<ResettablePool>,
+    ignore_patterns: Vec<String>,
+  ) -> Result<PosixFS, String> {
     let root: &Path = root.as_ref();
     let canonical_root = root
       .canonicalize()
@@ -390,13 +404,9 @@ impl PosixFS {
     })?;
     Ok(PosixFS {
       root: canonical_root,
-      pool: RwLock::new(None),
+      pool: pool,
       ignore: ignore,
     })
-  }
-
-  fn create_pool() -> CpuPool {
-    futures_cpupool::Builder::new().name_prefix("vfs-").create()
   }
 
   fn scandir_sync(root: PathBuf, dir_relative_to_root: Dir) -> Result<Vec<Stat>, io::Error> {
@@ -418,39 +428,15 @@ impl PosixFS {
     Ok(stats)
   }
 
-  fn pool(&self) -> RwLockReadGuard<Option<CpuPool>> {
-    {
-      let pool = self.pool.read().unwrap();
-      if pool.is_some() {
-        return pool;
-      }
-    }
-    // If we get to here, the pool is None and needs re-initializing.
-    {
-      let mut pool = self.pool.write().unwrap();
-      if pool.is_none() {
-        *pool = Some(PosixFS::create_pool());
-      }
-    }
-    self.pool.read().unwrap()
-  }
-
-  pub fn pre_fork(&self) {
-    let mut pool = self.pool.write().unwrap();
-    *pool = None;
-  }
-
-  pub fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    is_ignored(&self.ignore, path, is_dir)
+  pub fn is_ignored(&self, stat: &Stat) -> bool {
+    is_ignored(&self.ignore, stat)
   }
 
   pub fn read_file(&self, file: &File) -> BoxFuture<FileContent, io::Error> {
     let path = file.path.clone();
     let path_abs = self.root.0.join(&file.path);
     self
-      .pool()
-      .as_ref()
-      .expect("Uninitialized CpuPool!")
+      .pool
       .spawn_fn(move || {
         std::fs::File::open(&path_abs).and_then(|mut f| {
           let mut content = Vec::new();
@@ -464,10 +450,8 @@ impl PosixFS {
   pub fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, io::Error> {
     let link_parent = link.0.parent().map(|p| p.to_owned());
     let link_abs = self.root.0.join(link.0.as_path()).to_owned();
-    let pool = self.pool();
-    pool
-      .as_ref()
-      .expect("Uninitialized CpuPool!")
+    self
+      .pool
       .spawn_fn(move || {
         link_abs.read_link().and_then(
           |path_buf| if path_buf.is_absolute() {
@@ -557,10 +541,8 @@ impl PosixFS {
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
     let dir = dir.to_owned();
     let root = self.root.0.clone();
-    let pool = self.pool();
-    pool
-      .as_ref()
-      .expect("Uninitialized CpuPool!")
+    self
+      .pool
       .spawn_fn(move || PosixFS::scandir_sync(root, dir))
       .to_boxed()
   }
@@ -575,8 +557,8 @@ impl VFS<io::Error> for Arc<PosixFS> {
     PosixFS::scandir(self, &dir)
   }
 
-  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool {
-    PosixFS::is_ignored(self, path, is_dir)
+  fn is_ignored(&self, stat: &Stat) -> bool {
+    PosixFS::is_ignored(self, stat)
   }
 
   fn mk_error(msg: &str) -> io::Error {
@@ -590,7 +572,7 @@ impl VFS<io::Error> for Arc<PosixFS> {
 pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
   fn read_link(&self, link: Link) -> BoxFuture<PathBuf, E>;
   fn scandir(&self, dir: Dir) -> BoxFuture<Vec<Stat>, E>;
-  fn is_ignored<P: AsRef<Path>>(&self, path: P, is_dir: bool) -> bool;
+  fn is_ignored(&self, stat: &Stat) -> bool;
   fn mk_error(msg: &str) -> E;
 
   ///
@@ -668,35 +650,17 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
               // context, or by local excludes. Note that we apply context ignore patterns to both
               // the symbolic and canonical names of Links, but only apply local excludes to their
               // symbolic names.
-              match stat {
-                Stat::Link(l) => {
-                  if context.is_ignored(l.0.as_path(), false) ||
-                    is_ignored(&exclude, l.0.as_path(), false)
-                  {
-                    future::ok(None).to_boxed()
-                  } else {
-                    context.canonicalize(stat_symbolic_path, l)
+              if context.is_ignored(&stat) || is_ignored(&exclude, &stat) {
+                future::ok(None).to_boxed()
+              } else {
+                match stat {
+                  Stat::Link(l) => context.canonicalize(stat_symbolic_path, l),
+                  Stat::Dir(d) => {
+                    future::ok(Some(PathStat::dir(stat_symbolic_path.to_owned(), d))).to_boxed()
                   }
-                }
-                Stat::Dir(d) => {
-                  let res = if context.is_ignored(d.0.as_path(), true) ||
-                    is_ignored(&exclude, d.0.as_path(), true)
-                  {
-                    None
-                  } else {
-                    Some(PathStat::dir(stat_symbolic_path.to_owned(), d))
-                  };
-                  future::ok(res).to_boxed()
-                }
-                Stat::File(f) => {
-                  let res = if context.is_ignored(f.path.as_path(), false) ||
-                    is_ignored(&exclude, f.path.as_path(), false)
-                  {
-                    None
-                  } else {
-                    Some(PathStat::file(stat_symbolic_path.to_owned(), f))
-                  };
-                  future::ok(res).to_boxed()
+                  Stat::File(f) => {
+                    future::ok(Some(PathStat::file(stat_symbolic_path.to_owned(), f))).to_boxed()
+                  }
                 }
               }
             })
@@ -831,26 +795,9 @@ impl fmt::Debug for FileContent {
   }
 }
 
-#[derive(Clone)]
-pub struct Snapshot {
-  pub fingerprint: Fingerprint,
-  pub path_stats: Vec<PathStat>,
-}
-
-impl fmt::Debug for Snapshot {
-  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    write!(
-      f,
-      "Snapshot({}, entries={})",
-      self.fingerprint.to_hex(),
-      self.path_stats.len()
-    )
-  }
-}
-
 // Like std::fs::create_dir_all, except handles concurrent calls among multiple
 // threads or processes. Originally lifted from rustc.
-fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
+pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
   match fs::create_dir(path) {
     Ok(()) => return Ok(()),
     Err(ref e) if e.kind() == io::ErrorKind::AlreadyExists => return Ok(()),
@@ -1055,24 +1002,22 @@ impl Snapshots {
       "Couldn't get the next temp path.",
     );
 
-    let pool = fs.pool();
-    pool.as_ref().expect("Uninitialized CpuPool!").spawn_fn(
-      move || {
-        // Write the tar deterministically to a temporary file while fingerprinting.
-        let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
+    fs.pool.spawn_fn(move || {
+      // Write the tar deterministically to a temporary file while fingerprinting.
+      let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
 
-        // Rename to the final path if it does not already exist.
-        Snapshots::finalize(
-          temp_path.as_path(),
-          Snapshots::path_under_for(&dest_dir, &fingerprint).as_path(),
-        )?;
+      // Rename to the final path if it does not already exist.
+      Snapshots::finalize(
+        temp_path.as_path(),
+        Snapshots::path_under_for(&dest_dir, &fingerprint).as_path(),
+      )?;
 
-        Ok(Snapshot {
-          fingerprint: fingerprint,
-          path_stats: paths,
-        })
-      },
-    )
+      Ok(Snapshot {
+        fingerprint: fingerprint,
+        digest: None,
+        path_stats: paths,
+      })
+    })
   }
 
   fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
@@ -1104,28 +1049,26 @@ impl Snapshots {
     snapshot: Snapshot,
   ) -> CpuFuture<Vec<FileContent>, String> {
     let archive_path = self.path_for(&snapshot.fingerprint);
-    let pool = fs.pool();
-    pool.as_ref().expect("Uninitialized CpuPool!").spawn_fn(
-      move || {
-        let snapshot_str = format!("{:?}", snapshot);
-        Snapshots::contents_for_sync(snapshot, archive_path).map_err(|e| {
-          format!("Failed to open Snapshot {}: {:?}", snapshot_str, e)
-        })
-      },
-    )
+    fs.pool.spawn_fn(move || {
+      let snapshot_str = format!("{:?}", snapshot);
+      Snapshots::contents_for_sync(snapshot, archive_path).map_err(|e| {
+        format!("Failed to open Snapshot {}: {:?}", snapshot_str, e)
+      })
+    })
   }
 }
 
 #[cfg(test)]
 mod posixfs_test {
   extern crate tempdir;
+  extern crate testutil;
 
-  use super::{Dir, File, Link, PosixFS, Stat};
+  use super::{Dir, File, Link, PosixFS, Stat, ResettablePool};
   use futures::Future;
+  use self::testutil::make_file;
   use std;
-  use std::io::Write;
-  use std::os::unix::fs::PermissionsExt;
   use std::path::{Path, PathBuf};
+  use std::sync::Arc;
 
   #[test]
   fn is_executable_false() {
@@ -1151,7 +1094,7 @@ mod posixfs_test {
       &content,
       0o600,
     );
-    let fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let fs = new_posixfs(&dir.path());
     let file_content = fs.read_file(&File {
       path: path.clone(),
       is_executable: false,
@@ -1164,8 +1107,7 @@ mod posixfs_test {
   #[test]
   fn read_file_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    PosixFS::new(&dir.path(), vec![])
-      .unwrap()
+    new_posixfs(&dir.path())
       .read_file(&File {
         path: PathBuf::from("marmosets"),
         is_executable: false,
@@ -1177,7 +1119,7 @@ mod posixfs_test {
   #[test]
   fn stat_executable_file() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("photograph_marmosets");
     make_file(&dir.path().join(&path), &[], 0o700);
     assert_eq!(
@@ -1192,7 +1134,7 @@ mod posixfs_test {
   #[test]
   fn stat_nonexecutable_file() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
     assert_eq!(
@@ -1207,7 +1149,7 @@ mod posixfs_test {
   #[test]
   fn stat_dir() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
     assert_eq!(
@@ -1219,7 +1161,7 @@ mod posixfs_test {
   #[test]
   fn stat_symlink() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("marmosets");
     make_file(&dir.path().join(&path), &[], 0o600);
 
@@ -1233,8 +1175,7 @@ mod posixfs_test {
 
   #[test]
   fn stat_other() {
-    let posix_fs = PosixFS::new("/dev", vec![]).unwrap();
-    posix_fs.stat(PathBuf::from("null")).expect_err(
+    new_posixfs("/dev").stat(PathBuf::from("null")).expect_err(
       "Want error",
     );
   }
@@ -1242,7 +1183,7 @@ mod posixfs_test {
   #[test]
   fn stat_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     posix_fs.stat(PathBuf::from("no_marmosets")).expect_err(
       "Want error",
     );
@@ -1251,7 +1192,7 @@ mod posixfs_test {
   #[test]
   fn scandir_empty() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("empty_enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
     assert_eq!(posix_fs.scandir(&Dir(path)).wait().unwrap(), vec![]);
@@ -1260,7 +1201,7 @@ mod posixfs_test {
   #[test]
   fn scandir() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     let path = PathBuf::from("enclosure");
     std::fs::create_dir(dir.path().join(&path)).unwrap();
 
@@ -1310,7 +1251,7 @@ mod posixfs_test {
   #[test]
   fn scandir_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
-    let posix_fs = PosixFS::new(&dir.path(), vec![]).unwrap();
+    let posix_fs = new_posixfs(&dir.path());
     posix_fs
       .scandir(&Dir(PathBuf::from("no_marmosets_here")))
       .wait()
@@ -1318,7 +1259,7 @@ mod posixfs_test {
   }
 
   fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
-    let fs = PosixFS::new(path, vec![]).unwrap();
+    let fs = new_posixfs(path);
     let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
     assert_eq!(stats.len(), 1);
     match stats.get(0).unwrap() {
@@ -1327,11 +1268,11 @@ mod posixfs_test {
     }
   }
 
-  fn make_file(path: &Path, contents: &[u8], mode: u32) {
-    let mut file = std::fs::File::create(&path).unwrap();
-    file.write(contents).unwrap();
-    let mut permissions = std::fs::metadata(path).unwrap().permissions();
-    permissions.set_mode(mode);
-    file.set_permissions(permissions).unwrap();
+  fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
+    PosixFS::new(
+      dir.as_ref(),
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      vec![],
+    ).unwrap()
   }
 }
