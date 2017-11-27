@@ -15,7 +15,8 @@ from collections import defaultdict
 from twitter.common.collections import OrderedDict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
-from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement, PinnedJarArtifactSet
+from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
+                                                                    PinnedJarArtifactSet)
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
@@ -221,7 +222,7 @@ class CoursierResolve(NailgunTask):
             classpath=[coursier_jar],
             main='coursier.cli.Coursier',
             args=cmd_args,
-            # jvm_options=self.get_options().jvm_options,
+            jvm_options=self.get_options().jvm_options,
             # to let stdout/err through, but don't print tool's label.
             workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
