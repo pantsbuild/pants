@@ -18,11 +18,7 @@ function compute_version_suffix() {
   if [[ -z "${SUFFIXED_VERSION}" ]]; then
     echo ""
   else
-    # Python requires integer version suffixes.
-    local readonly short_sha=${sha:0:8}
-    local readonly sha_decimal=$((16#${short_sha}))
-    local readonly abs_sha_decimal=${sha_decimal#-}
-    echo "+${abs_sha_decimal}"
+    echo "+${sha:0:8}"
   fi
 }
 
