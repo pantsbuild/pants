@@ -27,6 +27,14 @@ def lines_to_set(str_or_list):
     return set(x for x in str(str_or_list).split('\n') if x)
 
 
+def create_file_in(worktree, path, content):
+  """Creates a file in the given worktree, and returns its path."""
+  write_path = os.path.join(worktree, path)
+  with safe_open(write_path, 'w') as f:
+    f.write(dedent(content))
+  return write_path
+
+
 @contextmanager
 def mutated_working_copy(files_to_mutate, to_append='\n '):
   """Given a list of files, append whitespace to each of them to trigger a git diff - then reset."""
@@ -80,10 +88,7 @@ def create_isolated_git_repo():
   with temporary_dir(root_dir=get_buildroot()) as worktree:
     def create_file(path, content):
       """Creates a file in the isolated git repo."""
-      write_path = os.path.join(worktree, path)
-      with safe_open(write_path, 'w') as f:
-        f.write(dedent(content))
-      return write_path
+      return create_file_in(worktree, path, content)
 
     def copy_into(path, to_path=None):
       """Copies a file from the real git repo into the isolated git repo."""
@@ -418,6 +423,13 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, TestGenerator):
       pants_run = self.run_pants(['changed'])
       self.assert_success(pants_run)
       self.assertEqual(pants_run.stdout_data.strip(), 'src/python/sources:sources')
+
+  def test_changed_in_directory_without_build_file(self):
+    with create_isolated_git_repo() as worktree:
+      create_file_in(worktree, 'new-project/README.txt', 'This is important.')
+      pants_run = self.run_pants(['list', '--changed-parent=HEAD'])
+      self.assert_success(pants_run)
+      self.assertEqual(pants_run.stdout_data.strip(), '')
 
   def test_list_changed(self):
     deleted_file = 'src/python/sources/sources.py'

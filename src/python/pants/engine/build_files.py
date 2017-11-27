@@ -240,8 +240,10 @@ def addresses_from_address_families(address_mapper, address_families, spec):
      - there were no matching AddressFamilies, or
      - the Spec matches no addresses for SingleAddresses.
   """
-  if not address_families:
-    raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
+
+  def raise_if_empty_address_families():
+    if not address_families:
+      raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
 
   def exclude_address(address):
     if address_mapper.exclude_patterns:
@@ -249,20 +251,22 @@ def addresses_from_address_families(address_mapper, address_families, spec):
       return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
     return False
 
-  if type(spec) in (DescendantAddresses, SiblingAddresses, AscendantAddresses):
-    addresses = tuple(a
-                      for af in address_families
-                      for a in af.addressables.keys()
-                      if not exclude_address(a))
+  def all_included_addresses():
+    return (a
+            for af in address_families
+            for a in af.addressables.keys()
+            if not exclude_address(a))
+
+  if type(spec) in (DescendantAddresses, SiblingAddresses):
+    raise_if_empty_address_families()
+    addresses = tuple(all_included_addresses())
   elif type(spec) is SingleAddress:
-    # TODO Could assert len(address_families) == 1, as it should always be true in this case.
-    addresses = tuple(a
-                      for af in address_families
-                      for a in af.addressables.keys()
-                      if a.target_name == spec.name and not exclude_address(a))
-    if not addresses:
-      if len(address_families) == 1:
-        _raise_did_you_mean(address_families[0], spec.name)
+    raise_if_empty_address_families()
+    addresses = tuple(a for a in all_included_addresses() if a.target_name == spec.name)
+    if not addresses and len(address_families) == 1:
+      _raise_did_you_mean(address_families[0], spec.name)
+  elif type(spec) is AscendantAddresses:
+    addresses = tuple(all_included_addresses())
   else:
     raise ValueError('Unrecognized Spec type: {}'.format(spec))
 
