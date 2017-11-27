@@ -91,6 +91,15 @@ function ensure_native_build_prerequisites() {
   # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
   "${CARGO_HOME}/bin/rustup" override set "${rust_toolchain}" >&2
 
+  # Sometimes fetching a large git repo dependency can take more than 10 minutes.
+  # This times out on travis, because nothing is printed to stdout/stderr in that time.
+  # Pre-fetch those git repos and keep writing to stdout as we do.
+  # Noisily wait for a cargo fetch. This is not using run_cargo so that the process which is
+  # killed by _wait_noisily on ^C is the cargo process itself, rather than a rustup wrapper which
+  # spawns a separate cargo process.
+  # We need to do this before we install grpcio-compiler to pre-fetch its repo.
+  _wait_noisily "${CARGO_HOME}/bin/cargo" fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
+
   if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
     "${CARGO_HOME}/bin/cargo" install protobuf >&2
   fi
@@ -148,15 +157,6 @@ function _wait_noisily() {
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
-  # Sometimes fetching a large git repo dependency can take more than 10 minutes.
-  # This times out on travis, because nothing is printed to stdout/stderr in that time.
-  # Pre-fetch those git repos and keep writing to stdout as we do.
-  # First run_cargo -V to ensure that cargo is installed.
-  run_cargo -V >/dev/null
-  # Then noisily wait for a cargo fetch. This is not using run_cargo so that the process which is
-  # killed by _wait_noisily on ^C is the cargo process itself, rather than a rustup wrapper which
-  # spawns a separate cargo process.
-  _wait_noisily "${CARGO_HOME}/bin/cargo" fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
   run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
