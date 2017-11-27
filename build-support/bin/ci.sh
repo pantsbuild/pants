@@ -163,7 +163,7 @@ if [[ "${skip_lint:-false}" == "false" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
     ./pants.pex ${PANTS_ARGS[@]} \
-    --build-ignore=$SKIP_ANDROID_PATTERN test.pytest \
+    --build-ignore=$SKIP_ANDROID_PATTERN \
     lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
