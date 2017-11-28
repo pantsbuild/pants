@@ -554,7 +554,7 @@ class JvmCompile(NailgunTaskBase):
       raise TaskError("Compilation failure: {}".format(e))
 
   def _record_compile_classpath(self, classpath, targets, outdir):
-    relative_classpaths = [os.path.relpath(path) for path in classpath]
+    relative_classpaths = [fast_relpath(path, self.get_options().pants_workdir) for path in classpath]
     text = '\n'.join(relative_classpaths)
     for target in targets:
       path = os.path.join(outdir, 'compile_classpath', '{}.txt'.format(target.id))
