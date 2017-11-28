@@ -67,7 +67,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
       <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
       <url name="benjyw/binhost">
-        <artifact pattern="https://github.com/benjyw/binhost/raw/master/[organisation]/${kythe.artifact}" />
+        <artifact pattern="https://github.com/benjyw/binhost/raw/99702052db865e0229998afbf19b5503d11225d3/[organisation]/${kythe.artifact}" />
       </url>
     </chain>
   </resolvers>
