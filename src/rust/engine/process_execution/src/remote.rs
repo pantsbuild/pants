@@ -141,10 +141,12 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
 
 #[cfg(test)]
 mod tests {
+  extern crate testutil;
+
   use bazel_protos;
   use protobuf::{self, Message, ProtobufEnum};
   use test_server;
-  use test_utils::{owned_string_vec, as_byte_owned_vec};
+  use self::testutil::{owned_string_vec, as_byte_owned_vec};
 
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_remote};
   use std::collections::BTreeMap;

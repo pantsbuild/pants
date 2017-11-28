@@ -138,9 +138,13 @@ PKG_JAXWS=(
   "pkg_jax_ws_install_test"
 )
 function pkg_jax_ws_install_test() {
+  # Ensure our goal and target are installed and exposed.
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.jax_ws==$(local_version)']" \
       --explain gen | grep "jax-ws" &> /dev/null
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.jax_ws==$(local_version)']" \
+      targets | grep "jax_ws_library" &> /dev/null
 }
 
 # Once individual (new) package is declared above, insert it into the array below)

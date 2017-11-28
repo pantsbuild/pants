@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -38,7 +40,7 @@ class MetaRenameTest(TaskTestBase):
     init_subsystem(BinaryUtil.Factory)
 
     self.meta_rename.execute()
-    self.assertInFile(self.new_name, '{}/{}/BUILD'.format(self.build_root, self.spec_path))
+    self.assertInFile(self.new_name, os.path.join(self.build_root, self.spec_path, 'BUILD'))
 
   def test_update_dependee_references(self):
     init_subsystem(BinaryUtil.Factory)
@@ -46,4 +48,4 @@ class MetaRenameTest(TaskTestBase):
     self.meta_rename.execute()
 
     for target in ['a', 'b', 'c']:
-      self.assertInFile(self.new_name, '{}/{}/BUILD'.format(self.build_root, target))
+      self.assertInFile(self.new_name, os.path.join(self.build_root, target, 'BUILD'))
