@@ -71,7 +71,6 @@ class TestSetupPyInterpreter(SetupPyTestBase):
     return cls.PythonPathInspectableSetupPy
 
   def test_setuptools_version(self):
-    self.create_file('src/python/foo/__init__.py')
     self.create_python_library(
       relpath='src/python/foo/commands',
       name='commands',
@@ -108,7 +107,10 @@ class TestSetupPyInterpreter(SetupPyTestBase):
         name='foo',
         version='0.0.0',
       )
-      """)
+      """),
+      source_contents_map={
+        'src/python/foo/__init__.py': "",
+      },
     )
     self.set_options(run='print_sys_path')
 
