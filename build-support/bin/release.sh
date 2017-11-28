@@ -30,9 +30,9 @@ readonly PANTS_VERSION_SUFFIX="$(compute_version_suffix "${HEAD_SHA}")"
 readonly PANTS_VERSION="$(run_local_pants --version 2>/dev/null)${PANTS_VERSION_SUFFIX}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
-readonly DEPLOY_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
-readonly DEPLOY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_WHEELS_PATH}"
-readonly DEPLOY_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
+readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
+readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
+readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
 
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 
@@ -118,7 +118,7 @@ RELEASE_PACKAGES=(
 function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  PANTS_PYTHON_REPOS_REPOS="${DEPLOY_WHEEL_DIR}" pants \
+  PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}" pants \
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
@@ -173,12 +173,12 @@ function pants_version_set() {
   echo "${version}" > "${VERSION_FILE}"
 }
 
-function build_packages() {
+function build_pants_packages() {
   # TODO(John Sirois): Remove sdist generation and twine upload when
   # https://github.com/pantsbuild/pants/issues/4956 is resolved.
 
-  rm -rf "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
-  mkdir -p "${DEPLOY_WHEEL_DIR}" "${DEPLOY_SDIST_DIR}"
+  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
 
   pants_version_set "${PANTS_VERSION}"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
@@ -193,8 +193,8 @@ function build_packages() {
         ${BUILD_TARGET} || \
       die "Failed to build package ${NAME}-${PANTS_VERSION} with target '${BUILD_TARGET}'!"
     wheel=$(find_pkg ${NAME})
-    cp -p "${wheel}" "${DEPLOY_WHEEL_DIR}/"
-    cp -p "${ROOT}/dist/${NAME}-${PANTS_VERSION}/dist/${NAME}-${PANTS_VERSION}.tar.gz" "${DEPLOY_SDIST_DIR}/"
+    cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/"
+    cp -p "${ROOT}/dist/${NAME}-${PANTS_VERSION}/dist/${NAME}-${PANTS_VERSION}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/"
     end_travis_section
   done
   pants_version_reset
@@ -269,8 +269,8 @@ function install_and_test_packages() {
 
 function dry_run_install() {
   CORE_ONLY=$1
-  build_packages && \
-  install_and_test_packages "${CORE_ONLY}" --find-links="${DEPLOY_WHEEL_DIR}"
+  build_pants_packages && \
+  install_and_test_packages "${CORE_ONLY}" --find-links="${DEPLOY_PANTS_WHEEL_DIR}"
 }
 
 ALLOWED_ORIGIN_URLS=(
@@ -453,7 +453,7 @@ function list_prebuilt_wheels() {
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
   trap "rm -f ${wheel_listing}" RETURN
 
-  curl -sSL "${BINARY_BASE_URL}/?prefix=${DEPLOY_WHEELS_PATH}" > "${wheel_listing}"
+  curl -sSL "${BINARY_BASE_URL}/?prefix=${DEPLOY_PANTS_WHEELS_PATH}" > "${wheel_listing}"
   "${PY}" << EOF
 from __future__ import print_function
 import sys
@@ -536,20 +536,20 @@ function publish_packages() {
   # https://github.com/pantsbuild/pants/issues/4956 is resolved.
   # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
   # and replace with pre-tested binary wheels we download from s3.
-  build_packages
+  build_pants_packages
 
-  rm -rf "${DEPLOY_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_WHEEL_DIR}"
+  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}"
 
   start_travis_section "Publishing" "Publishing packages"
 
-  check_prebuilt_wheels "${DEPLOY_WHEEL_DIR}"
+  check_prebuilt_wheels "${DEPLOY_PANTS_WHEEL_DIR}"
 
   activate_twine
   trap deactivate RETURN
 
-  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_WHEEL_DIR}"/*.whl
-  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_SDIST_DIR}"/*.tar.gz
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}"/*.whl
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}"/*.tar.gz
 
   end_travis_section
 }
