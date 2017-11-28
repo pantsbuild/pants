@@ -12,7 +12,7 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.tasks2.pex_build_util import (dump_python_distibutions, dump_requirements,
+from pants.backend.python.tasks2.pex_build_util import (dump_python_distributions, dump_requirements,
                                                         dump_sources, has_python_and_c_sources,
                                                         has_python_requirements, has_python_sources,
                                                         has_resources)
@@ -131,8 +131,10 @@ class PythonBinaryCreate(Task):
       for tgt in source_tgts:
         dump_sources(builder, tgt, self.context.log)
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
+
+      # Dump python_distributions, if any, into builder's chroot.
       if python_dist_targets:
-        dump_python_distibutions(builder, python_dist_targets, self.workdir, self.context.log)
+        dump_python_distributions(builder, python_dist_targets, self.workdir, self.context.log)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))

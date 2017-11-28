@@ -6,8 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import super_greet
-import tensorflow
 
 def hello():
-  print(tensorflow)
   print(super_greet.super_greet())

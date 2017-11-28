@@ -133,12 +133,13 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
 
 
 def build_python_distribution_from_target(target, workdir):
-  
-  pydist_workdir = os.path.join(workdir, '.pydistworkdir')
+  # Create a temporary working directory, pydistworkdir
+  pydist_workdir = os.path.join(workdir, 'pydistworkdir')
   safe_mkdir(pydist_workdir)
   pex_name = "%s.pex" % target.name
   path_to_target = os.path.dirname(target.address.rel_path)
 
+  # disable cache to ensure reproducible runs
   args = ['--disable-cache', path_to_target, '-o', os.path.join(pydist_workdir, pex_name)]
   try:
     pex_main.main(args=args)
@@ -167,26 +168,30 @@ def build_python_distribution_from_target(target, workdir):
   return None
 
 
-def dump_python_distibutions(builder, dist_targets, workdir, log):
-  # de-dup all dist targets.
-  dist_targets_set = OrderedSet()
-  for tgt in dist_targets:
-    dist_targets_set.add(tgt)
+def dump_python_distributions(builder, dist_targets, workdir, log):
+  """Dump python distribution targets into a given builder
+
+  :param builder: Dump the python_distributions into this builder.
+  :param dist_targets: PythonDistribution targets to dump
+  :param workdir: Working directory for python targets (./pantsd/python)
+  :param log: Use this logger.
+  """
 
   # build whl for target using pex wheel installer
   locations = set()
-  for tgt in dist_targets_set:
+  for tgt in dist_targets:
     whl_location = build_python_distribution_from_target(tgt, workdir)
     if whl_location:
       locations.add(whl_location)
 
-  # dump prebuilt wheels into pex builder
+  # dump wheels into pex builder
+  # After this block, the whls built from python_distribution should be available
+  # for use in the produced binary
   for location in locations:
     log.debug('  Dumping distribution: .../{}'.format(os.path.basename(location)))
     builder.add_dist_location(location)
 
-  # by this point, the whl built from python_distribution should be available for use in the
-  # produced binary
+
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):

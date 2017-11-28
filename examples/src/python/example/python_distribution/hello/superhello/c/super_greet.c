@@ -1,4 +1,3 @@
-
 #include <Python.h>
 
 static PyObject * super_greet(PyObject *self, PyObject *args) {
