@@ -5,8 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import glob
 import os
 import zipfile
+import shutil
 
 from pex.bin import pex as pex_main
 from pex.fetcher import Fetcher
@@ -144,6 +146,10 @@ def build_python_distribution_from_target(target, workdir):
     raise TaskError(e)
   except Exception as e:
     raise TaskError(e)
+
+  # clean up egg-info created by setup.py
+  for path in glob.glob(os.path.join(path_to_target, '*.egg-info')):
+    shutil.rmtree(path)
 
   # unzip into a chroot within the python dist workdir
   zip_ref = zipfile.ZipFile(os.path.join(pydist_workdir, pex_name), 'r')
