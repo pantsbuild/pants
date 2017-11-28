@@ -26,10 +26,6 @@ from pants.util.strutil import safe_shlex_split
 class IvyResolve(IvyTaskMixin, NailgunTask):
 
   @classmethod
-  def subsystem_dependencies(cls):
-    return super(IvyResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
-
-  @classmethod
   def register_options(cls, register):
     super(IvyResolve, cls).register_options(register)
     register('--override', type=list,
@@ -55,7 +51,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
-
     cls.register_jvm_tool(register,
                           'xalan',
                           classpath=[
