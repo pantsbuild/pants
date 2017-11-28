@@ -489,8 +489,9 @@ function list_prebuilt_wheels() {
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
   trap "rm -f ${wheel_listing}" RETURN
 
-  curl -sSL "${BINARY_BASE_URL}/?prefix=${DEPLOY_PANTS_WHEELS_PATH}" > "${wheel_listing}"
-  "${PY}" << EOF
+  for wheels_path in "${DEPLOY_PANTS_WHEELS_PATH}" "${DEPLOY_3RDPARTY_WHEELS_PATH}"; do
+    curl -sSL "${BINARY_BASE_URL}/?prefix=${wheels_path}" > "${wheel_listing}"
+    "${PY}" << EOF
 from __future__ import print_function
 import sys
 import xml.etree.ElementTree as ET
@@ -499,6 +500,7 @@ ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
 for key in root.findall('s3:Contents/s3:Key', ns):
   print(key.text)
 EOF
+ done
 }
 
 function fetch_prebuilt_wheels() {
@@ -511,13 +513,16 @@ function fetch_prebuilt_wheels() {
       while read path
       do
         echo "${BINARY_BASE_URL}/${path}:"
-        curl --progress-bar -O "${BINARY_BASE_URL}/${path}"
+        local dest="${to_dir}/${path}"
+        mkdir -p "$(dirname "${dest}")"
+        curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${path}"
       done
     }
   )
 }
 
-function check_prebuilt_wheels() {
+function fetch_and_check_prebuilt_wheels() {
+  # Fetches wheels from S3 into subdirectories of the given directory.
   local check_dir="$1"
   if [[ -z "${check_dir}" ]]
   then
@@ -574,12 +579,12 @@ function publish_packages() {
   # and replace with pre-tested binary wheels we download from s3.
   build_pants_packages
 
-  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}"
+  rm -rf "${DEPLOY_DIR}"
+  mkdir -p "${DEPLOY_DIR}"
 
   start_travis_section "Publishing" "Publishing packages"
 
-  check_prebuilt_wheels "${DEPLOY_PANTS_WHEEL_DIR}"
+  fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
 
   activate_twine
   trap deactivate RETURN
@@ -633,7 +638,7 @@ while getopts "hdntcloe" opt; do
     c) core_only="true" ;;
     l) list_packages && exit 0 ;;
     o) list_owners && exit 0 ;;
-    e) check_prebuilt_wheels && exit 0 ;;
+    e) fetch_and_check_prebuilt_wheels && exit 0 ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
