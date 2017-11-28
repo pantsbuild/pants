@@ -30,7 +30,9 @@ readonly PANTS_VERSION_SUFFIX="$(compute_version_suffix "${HEAD_SHA}")"
 readonly PANTS_VERSION="$(run_local_pants --version 2>/dev/null)${PANTS_VERSION_SUFFIX}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
+readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}/${PANTS_VERSION}"
 readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
+readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
 
@@ -105,9 +107,15 @@ RELEASE_PACKAGES=(
   ${CORE_PACKAGES[*]}
   ${CONTRIB_PACKAGES[*]}
 )
+
 #
 # End of package declarations.
 #
+
+REQUIREMENTS_3RDPARTY_FILES=(
+  "3rdparty/python/requirements.txt"
+  "3rdparty/python/twitter/commons/requirements.txt"
+)
 
 # When we do (dry-run) testing, we need to run the packaged pants.
 # It doesn't have internal backend plugins so when we execute it
@@ -173,6 +181,26 @@ function pants_version_set() {
   echo "${version}" > "${VERSION_FILE}"
 }
 
+function build_3rdparty_packages() {
+  # Builds whls for 3rdparty dependencies of pants.
+
+  rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}"
+
+  local req_args=""
+  for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
+    req_args="${req_args} -r ${ROOT}/$req_file"
+  done
+
+  start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
+  activate_tmp_venv
+
+  pip wheel --wheel-dir=${DEPLOY_3RDPARTY_WHEEL_DIR} ${req_args}
+
+  deactivate
+  end_travis_section
+}
+
 function build_pants_packages() {
   # TODO(John Sirois): Remove sdist generation and twine upload when
   # https://github.com/pantsbuild/pants/issues/4956 is resolved.
@@ -200,11 +228,15 @@ function build_pants_packages() {
   pants_version_reset
 }
 
-function pre_install() {
-  start_travis_section "SetupVenv" "Setting up virtualenv"
+function activate_tmp_venv() {
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
   ${ROOT}/build-support/virtualenv $VENV_DIR && \
   source $VENV_DIR/bin/activate
+}
+
+function pre_install() {
+  start_travis_section "SetupVenv" "Setting up virtualenv"
+  activate_tmp_venv
   end_travis_section
 }
 
@@ -235,7 +267,7 @@ function install_and_test_packages() {
     "$@"
     --quiet
 
-    # Make sure we go out and hit pypi to get the new packages.
+    # Prefer remote or `--find-links` packages to cache contents.
     --no-cache-dir
   )
 
@@ -268,9 +300,13 @@ function install_and_test_packages() {
 }
 
 function dry_run_install() {
+  # Build a complete set of whls, and then ensure that we can install pants using only whls.
   CORE_ONLY=$1
   build_pants_packages && \
-  install_and_test_packages "${CORE_ONLY}" --find-links="${DEPLOY_PANTS_WHEEL_DIR}"
+  build_3rdparty_packages && \
+  install_and_test_packages "${CORE_ONLY}" \
+    --only-binary=:all: \
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}" -f "${DEPLOY_PANTS_WHEEL_DIR}"
 }
 
 ALLOWED_ORIGIN_URLS=(
