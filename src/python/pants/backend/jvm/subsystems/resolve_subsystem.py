@@ -23,5 +23,4 @@ class JvmResolveSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(JvmResolveSubsystem, cls).register_options(register)
-    # TODO(benjy): Options to specify the JVM version?
     register('--resolver', choices=['ivy', 'coursier'], default='ivy', help='Pick a resolver.')
