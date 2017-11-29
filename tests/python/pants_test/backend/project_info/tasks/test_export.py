@@ -454,5 +454,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         }
 
         export_json = self.execute_export_json(**options)
-        self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
-                         export_json['preferred_jvm_distributions']['java9999'])
+        self.assertEqual(strict_home, export_json['preferred_jvm_distributions']['java9999']['strict'],
+                         "strict home does not match")
+
+        # Since it is non-strict, it can be either.
+        self.assertIn(export_json['preferred_jvm_distributions']['java9999']['non_strict'],
+                      [non_strict_home, strict_home],
+                      "non-strict home does not match")
