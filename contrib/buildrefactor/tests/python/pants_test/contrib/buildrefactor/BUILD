@@ -36,6 +36,13 @@ python_tests(
   ]
 )
 
+python_tests(
+  name='print_target_integration',
+  sources=['test_print_target_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ]
+)
 
 python_tests(
   name='meta_rename_integration',
@@ -53,3 +60,4 @@ python_tests(
     'tests/python/pants_test:int-test',
   ]
 )
+

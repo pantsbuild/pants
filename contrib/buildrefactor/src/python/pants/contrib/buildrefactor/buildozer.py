@@ -72,17 +72,31 @@ class Buildozer(Task):
       Buildozer.execute_binary(command, address.spec, binary=self._executable)
 
   @classmethod
-  def execute_binary(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c'):
+  def execute_binary(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False):
     binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
-
-    Buildozer._execute_buildozer_command([binary, command, spec])
+    Buildozer._execute_buildozer_command([binary, command, spec], suppress_warnings, output=False)
 
   @classmethod
-  def _execute_buildozer_command(cls, buildozer_command):
-    try:
-      subprocess.check_call(buildozer_command, cwd=get_buildroot())
-    except subprocess.CalledProcessError as err:
-      if err.returncode == 3:
-        logger.warn('{} ... no changes were made'.format(buildozer_command))
-      else:
-        raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+  def return_buildozer_output(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False):
+    binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
+    return Buildozer._execute_buildozer_command([binary, command, spec], suppress_warnings, output=True)
+
+  @classmethod
+  def _execute_buildozer_command(cls, buildozer_command, suppress_warnings, output):
+    if not output:
+      try:
+        subprocess.check_call(buildozer_command, cwd=get_buildroot())
+      except subprocess.CalledProcessError as err:
+        if err.returncode == 3:
+          if not suppress_warnings:
+            logger.warn('{} ... no changes were made'.format(buildozer_command))
+        else:
+          raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
+    else:
+      try:
+        subprocess.check_output(buildozer_command, cwd=get_buildroot(), stderr=subprocess.STDOUT)
+      except subprocess.CalledProcessError as err:
+        if err.returncode == 3:
+          return err.output
+        else:
+          raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))

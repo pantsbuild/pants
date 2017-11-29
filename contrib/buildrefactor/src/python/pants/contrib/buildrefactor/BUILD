@@ -25,3 +25,9 @@ python_library(
   name='meta_rename',
   sources=['meta_rename.py']
 )
+
+
+python_library(
+  name='print_target',
+  sources=['print_target.py']
+)
