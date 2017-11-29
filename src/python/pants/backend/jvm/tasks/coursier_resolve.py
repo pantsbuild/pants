@@ -27,6 +27,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.net.http.fetcher import Fetcher
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.task.task import TaskBase
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir, touch
 from pants.util.process_handler import subprocess
@@ -39,62 +40,10 @@ class CoursierError(Exception):
   pass
 
 
-class CoursierResolve(NailgunTask):
-  """
-  Experimental 3rdparty resolver using coursier.
-
-  # TODO(wisechengyi):
-  # 1. Add conf support
-  # 2. Add relative url support
-  """
-
+class CoursierMixin(TaskBase):
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CoursierResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
-
-  @classmethod
-  def product_types(cls):
-    return ['compile_classpath']
-
-  @classmethod
-  def prepare(cls, options, round_manager):
-    super(CoursierResolve, cls).prepare(options, round_manager)
-    round_manager.require_data('java')
-    round_manager.require_data('scala')
-
-  @classmethod
-  def register_options(cls, register):
-    super(CoursierResolve, cls).register_options(register)
-    register('--fetch-options', type=list, fingerprint=True,
-             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
-    register('--bootstrap-jar-url', advanced=True, default='https://dl.dropboxusercontent.com/s/nc5hxyhsvwp9k4j/coursier-cli.jar?dl=0',
-             help='Location to download a bootstrap version of Coursier.')
-
-  def execute(self):
-    """Resolves the specified confs for the configured targets and returns an iterator over
-    tuples of (conf, jar path).
-    """
-
-    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
-    if jvm_resolve_subsystem.get_options().resolver != 'coursier':
-      return
-
-    coursier_jar = self._bootstrap_coursier(self.get_options().bootstrap_jar_url)
-
-    # executor = self.create_java_executor()
-    classpath_products = self.context.products.get_data('compile_classpath',
-                                                        init_func=ClasspathProducts.init_func(
-                                                          self.get_options().pants_workdir))
-
-    # confs = ['default']
-    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
-    for artifact_set, target_subset in targets_by_sets.items():
-      self.resolve(coursier_jar,
-                   target_subset,
-                   classpath_products,
-                   workunit_factory=self.context.new_workunit,
-                   pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
-                   coursier_fetch_options=self.get_options().fetch_options)
+    return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement,)
 
   @staticmethod
   def _compute_jars_to_resolve_and_to_exclude(jars, artifact_set, manager):
@@ -145,7 +94,10 @@ class CoursierResolve(NailgunTask):
 
     return jars_to_resolve, exclude_args, untouched_pinned_artifact
 
-  def resolve(self, coursier_jar, targets, compile_classpath, workunit_factory, pants_workdir, coursier_fetch_options):
+  def resolve(self, targets, compile_classpath, pants_workdir, coursier_fetch_options):
+
+    coursier_jar = self._bootstrap_coursier(self.get_options().bootstrap_jar_url)
+
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -153,7 +105,9 @@ class CoursierResolve(NailgunTask):
     for artifact_set, target_subset in jar_targets.items():
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
-      jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps, artifact_set, manager)
+      jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
+                                                                                                        artifact_set,
+                                                                                                        manager)
 
       # Prepare coursier args
       output_fn = 'output.json'
@@ -346,7 +300,7 @@ class CoursierResolve(NailgunTask):
   def _bootstrap_coursier(self, bootstrap_url):
 
     coursier_bootstrap_dir = os.path.join(self.get_options().pants_bootstrapdir,
-                                     'tools', 'jvm', 'coursier')
+                                          'tools', 'jvm', 'coursier')
 
     bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
 
@@ -370,3 +324,58 @@ class CoursierResolve(NailgunTask):
           raise self.Error('Problem fetching the coursier bootstrap jar! {}'.format(e))
 
     return bootstrap_jar_path
+
+
+class CoursierResolve(CoursierMixin, NailgunTask):
+  """
+  Experimental 3rdparty resolver using coursier.
+
+  # TODO(wisechengyi):
+  # 1. Add conf support
+  # 2. Add relative url support
+  """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(CoursierResolve, cls).subsystem_dependencies() + (JvmResolveSubsystem,)
+
+  @classmethod
+  def product_types(cls):
+    return ['compile_classpath']
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    super(CoursierResolve, cls).prepare(options, round_manager)
+    round_manager.require_data('java')
+    round_manager.require_data('scala')
+
+  @classmethod
+  def register_options(cls, register):
+    super(CoursierResolve, cls).register_options(register)
+    register('--fetch-options', type=list, fingerprint=True,
+             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+    register('--bootstrap-jar-url', advanced=True,
+             default='https://dl.dropboxusercontent.com/s/nc5hxyhsvwp9k4j/coursier-cli.jar?dl=0',
+             help='Location to download a bootstrap version of Coursier.')
+
+  def execute(self):
+    """Resolves the specified confs for the configured targets and returns an iterator over
+    tuples of (conf, jar path).
+    """
+
+    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
+    if jvm_resolve_subsystem.get_options().resolver != 'coursier':
+      return
+
+    # executor = self.create_java_executor()
+    classpath_products = self.context.products.get_data('compile_classpath',
+                                                        init_func=ClasspathProducts.init_func(
+                                                          self.get_options().pants_workdir))
+
+    # confs = ['default']
+    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
+    for artifact_set, target_subset in targets_by_sets.items():
+      self.resolve(target_subset,
+                   classpath_products,
+                   pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
+                   coursier_fetch_options=self.get_options().fetch_options)
