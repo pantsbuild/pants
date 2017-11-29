@@ -253,6 +253,7 @@ python_library(
   dependencies = [
     ':classpath_products',
     ':nailgun_task',
+    'src/python/pants/backend/jvm/tasks/coursier',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/java/jar',
     'src/python/pants/base:exceptions',

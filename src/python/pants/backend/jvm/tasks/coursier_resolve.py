@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import hashlib
 import json
 import logging
 import os
-import shutil
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
@@ -20,14 +18,12 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsystem
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from pants.net.http.fetcher import Fetcher
-from pants.util.contextutil import temporary_file
-from pants.util.dirutil import safe_mkdir, touch
+from pants.util.dirutil import safe_mkdir
 from pants.util.process_handler import subprocess
 
 
@@ -40,19 +36,13 @@ class CoursierError(Exception):
 
 class CoursierMixin(NailgunTask):
 
-
   @classmethod
   def register_options(cls, register):
     super(CoursierMixin, cls).register_options(register)
-    register('--fetch-options', type=list, fingerprint=True,
-             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
-    register('--bootstrap-jar-url', advanced=True,
-             default='https://dl.dropboxusercontent.com/s/nc5hxyhsvwp9k4j/coursier-cli.jar?dl=0',
-             help='Location to download a bootstrap version of Coursier.')
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement,)
+    return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement, CoursierSubsystem)
 
   @staticmethod
   def _compute_jars_to_resolve_and_to_exclude(jars, artifact_set, manager):
@@ -105,9 +95,9 @@ class CoursierMixin(NailgunTask):
 
   def resolve(self, targets, compile_classpath):
 
-    coursier_fetch_options = self.get_options().fetch_options
+    coursier_subsystem_instance = CoursierSubsystem.global_instance()
 
-    coursier_jar = self._bootstrap_coursier(self.get_options().bootstrap_jar_url)
+    coursier_jar = coursier_subsystem_instance.bootstrap_coursier()
 
     manager = JarDependencyManagement.global_instance()
 
@@ -129,7 +119,7 @@ class CoursierMixin(NailgunTask):
                      # Print the resolution tree
                      '-t',
                      '--cache', coursier_cache_path,
-                     '--json-output-file', output_fn] + coursier_fetch_options
+                     '--json-output-file', output_fn] + coursier_subsystem_instance.get_options().fetch_options
 
       def construct_classifier_to_jar(jars):
         product = defaultdict(list)
@@ -307,34 +297,6 @@ class CoursierMixin(NailgunTask):
   def to_m2_coord(cls, coord_str, classifier=''):
     # TODO: currently assuming all packaging is a jar
     return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
-
-  def _bootstrap_coursier(self, bootstrap_url):
-
-    coursier_bootstrap_dir = os.path.join(self.get_options().pants_bootstrapdir,
-                                          'tools', 'jvm', 'coursier')
-
-    bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
-
-    if not os.path.exists(bootstrap_jar_path):
-      with temporary_file() as bootstrap_jar:
-        fetcher = Fetcher(get_buildroot())
-        checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
-        try:
-          logger.info('\nDownloading {}'.format(bootstrap_url))
-          # TODO: Capture the stdout of the fetcher, instead of letting it output
-          # to the console directly.
-          fetcher.download(bootstrap_url,
-                           listener=fetcher.ProgressListener().wrap(checksummer),
-                           path_or_fd=bootstrap_jar,
-                           timeout_secs=2)
-          logger.info('sha1: {}'.format(checksummer.checksum))
-          bootstrap_jar.close()
-          touch(bootstrap_jar_path)
-          shutil.move(bootstrap_jar.name, bootstrap_jar_path)
-        except fetcher.Error as e:
-          raise self.Error('Problem fetching the coursier bootstrap jar! {}'.format(e))
-
-    return bootstrap_jar_path
 
 
 class CoursierResolve(CoursierMixin):
