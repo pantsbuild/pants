@@ -14,6 +14,7 @@ from textwrap import dedent
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -178,6 +179,9 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def execute_export(self, *specs, **options_overrides):
     options = {
+      JvmResolveSubsystem.options_scope: {
+        'resolver': 'ivy'
+      },
       JvmPlatform.options_scope: {
         'default_platform': 'java6',
         'platforms': {
