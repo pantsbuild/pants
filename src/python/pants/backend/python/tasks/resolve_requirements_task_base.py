@@ -29,7 +29,7 @@ class ResolveRequirementsTaskBase(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
 
-  def resolve_requirements(self, req_libs):
+  def resolve_requirements(self, req_libs, python_dist_targets=None):
     with self.invalidated(req_libs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
@@ -47,10 +47,13 @@ class ResolveRequirementsTaskBase(Task):
       # to cover the empty case.
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
-          self._build_requirements_pex(interpreter, safe_path, req_libs)
+          self._build_requirements_pex(interpreter, safe_path, req_libs,
+                                       python_dist_targets=python_dist_targets)
     return PEX(path, interpreter=interpreter)
 
-  def _build_requirements_pex(self, interpreter, path, req_libs):
+  def _build_requirements_pex(self, interpreter, path, req_libs, python_dist_targets=None
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
+    if python_dist_targets:
+      dump_python_distributions(builder, python_dist_targets, self.workdir, self.context.log)
     builder.freeze()

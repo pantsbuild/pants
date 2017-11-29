@@ -5,8 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+<<<<<<< 21acbf1ada8ce9d58eb5095e3e5c573b0626cf04:src/python/pants/backend/python/tasks/resolve_requirements.py
 from pants.backend.python.tasks.pex_build_util import has_python_requirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
+=======
+from pants.backend.python.tasks2.pex_build_util import has_python_requirements, has_python_and_c_sources
+from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
+>>>>>>> First stab at run task:src/python/pants/backend/python/tasks2/resolve_requirements.py
 
 
 class ResolveRequirements(ResolveRequirementsTaskBase):
