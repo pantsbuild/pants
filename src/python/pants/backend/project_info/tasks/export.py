@@ -14,11 +14,13 @@ from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
+from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
@@ -29,15 +31,13 @@ from pants.build_graph.resources import Resources
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
-from pants.option.errors import OptionsError
-from pants.option.ranked_value import RankedValue
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add tdesai to reviews for this file.
-class ExportTask(IvyTaskMixin, PythonTask):
+class ExportTaskBase(PythonTask):
   """Base class for generating a json-formattable blob of data about the target graph.
 
   Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
@@ -59,7 +59,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExportTask, cls).subsystem_dependencies() + (DistributionLocator, JvmPlatform)
+    return super(ExportTaskBase, cls).subsystem_dependencies() + (DistributionLocator, JvmPlatform)
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -95,7 +95,7 @@ class ExportTask(IvyTaskMixin, PythonTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ExportTask, cls).register_options(register)
+    super(ExportTaskBase, cls).register_options(register)
     register('--libraries', default=True, type=bool,
              help='Causes libraries to be output.')
     register('--libraries-sources', type=bool,
@@ -104,37 +104,21 @@ class ExportTask(IvyTaskMixin, PythonTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
-    # Required by IvyTaskMixin.
-    # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
-    # See also https://github.com/pantsbuild/pants/issues/3200.
-    register('--jvm-options', type=list, metavar='<option>...',
-             help='Run Ivy with these extra jvm options.')
+    # # Required by IvyTaskMixin.
+    # # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
+    # # See also https://github.com/pantsbuild/pants/issues/3200.
+    # register('--jvm-options', type=list, metavar='<option>...',
+    #          help='Run Ivy with these extra jvm options.')
 
   @classmethod
   def prepare(cls, options, round_manager):
-    super(ExportTask, cls).prepare(options, round_manager)
+    super(ExportTaskBase, cls).prepare(options, round_manager)
     if options.libraries or options.libraries_sources or options.libraries_javadocs:
       round_manager.require_data('java')
       round_manager.require_data('scala')
 
   def resolve_jars(self, targets):
-    executor = SubprocessExecutor(DistributionLocator.cached())
-    confs = []
-    if self.get_options().libraries:
-      confs.append('default')
-    if self.get_options().libraries_sources:
-      confs.append('sources')
-    if self.get_options().libraries_javadocs:
-      confs.append('javadoc')
-
-    compile_classpath = None
-    if confs:
-      compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
-      self.resolve(executor=executor,
-                   targets=targets,
-                   classpath_products=compile_classpath,
-                   confs=confs)
-    return compile_classpath
+    raise NotImplementedError
 
   def generate_targets_map(self, targets, classpath_products=None):
     """Generates a dictionary containing all pertinent information about the target graph.
@@ -163,16 +147,16 @@ class ExportTask(IvyTaskMixin, PythonTask):
       """
       def get_target_type(target):
         if target.is_test:
-          return ExportTask.SourceRootTypes.TEST
+          return ExportTaskBase.SourceRootTypes.TEST
         else:
           if (isinstance(target, Resources) and
               target in resource_target_map and
               resource_target_map[target].is_test):
-            return ExportTask.SourceRootTypes.TEST_RESOURCE
+            return ExportTaskBase.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
-            return ExportTask.SourceRootTypes.RESOURCE
+            return ExportTaskBase.SourceRootTypes.RESOURCE
           else:
-            return ExportTask.SourceRootTypes.SOURCE
+            return ExportTaskBase.SourceRootTypes.SOURCE
 
       info = {
         'targets': [],
@@ -379,7 +363,59 @@ class ExportTask(IvyTaskMixin, PythonTask):
     return set(map(root_package_prefix, target.sources_relative_to_source_root()))
 
 
-class Export(ExportTask, ConsoleTask):
+class ExportTaskV1(IvyTaskMixin, ExportTaskBase):
+
+  @classmethod
+  def register_options(cls, register):
+    super(ExportTaskV1, cls).register_options(register)
+    # Required by IvyTaskMixin.
+    # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
+    # See also https://github.com/pantsbuild/pants/issues/3200.
+    register('--jvm-options', type=list, metavar='<option>...',
+             help='Run Ivy with these extra jvm options.')
+
+
+  def resolve_jars(self, targets):
+    executor = SubprocessExecutor(DistributionLocator.cached())
+    confs = []
+    if self.get_options().libraries:
+      confs.append('default')
+    if self.get_options().libraries_sources:
+      confs.append('sources')
+    if self.get_options().libraries_javadocs:
+      confs.append('javadoc')
+
+    compile_classpath = None
+    if confs:
+      compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
+      self.resolve(executor=executor,
+                   targets=targets,
+                   classpath_products=compile_classpath,
+                   confs=confs)
+
+    return compile_classpath
+
+
+class ExportTaskV2(CoursierMixin, ExportTaskBase):
+
+  def resolve_jars(self, targets):
+    confs = []
+    if self.get_options().libraries:
+      confs.append('default')
+    if self.get_options().libraries_sources:
+      confs.append('sources')
+    if self.get_options().libraries_javadocs:
+      confs.append('javadoc')
+
+    compile_classpath = None
+    if confs:
+      compile_classpath = ClasspathProducts(self.get_options().pants_workdir)
+      self.resolve(targets, compile_classpath)
+
+    return compile_classpath
+
+
+class Export(ExportTaskV1, ConsoleTask):
   """Export project information in JSON format.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
@@ -392,9 +428,39 @@ class Export(ExportTask, ConsoleTask):
              help='Causes output to be a single line of JSON.')
 
   def __init__(self, *args, **kwargs):
-    super(ExportTask, self).__init__(*args, **kwargs)
+    super(ExportTaskV1, self).__init__(*args, **kwargs)
 
   def console_output(self, targets, classpath_products=None):
+    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
+    if jvm_resolve_subsystem.get_options().resolver != 'ivy':
+      return ['']
+
+    graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)
+    if self.get_options().formatted:
+      return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()
+    else:
+      return [json.dumps(graph_info)]
+
+class ExportV2(ExportTaskV2, ConsoleTask):
+  """Export project information in JSON format.
+
+  Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
+  """
+
+  @classmethod
+  def register_options(cls, register):
+    super(ExportV2, cls).register_options(register)
+    register('--formatted', type=bool, implicit_value=False,
+             help='Causes output to be a single line of JSON.')
+
+  def __init__(self, *args, **kwargs):
+    super(ExportTaskV2, self).__init__(*args, **kwargs)
+
+  def console_output(self, targets, classpath_products=None):
+    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
+    if jvm_resolve_subsystem.get_options().resolver != 'coursier':
+      return ['']
+
     graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)
     if self.get_options().formatted:
       return json.dumps(graph_info, indent=4, separators=(',', ': ')).splitlines()

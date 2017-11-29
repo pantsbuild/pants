@@ -26,8 +26,6 @@ from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.net.http.fetcher import Fetcher
-from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.task.task import TaskBase
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir, touch
 from pants.util.process_handler import subprocess
@@ -40,7 +38,18 @@ class CoursierError(Exception):
   pass
 
 
-class CoursierMixin(TaskBase):
+class CoursierMixin(NailgunTask):
+
+
+  @classmethod
+  def register_options(cls, register):
+    super(CoursierMixin, cls).register_options(register)
+    register('--fetch-options', type=list, fingerprint=True,
+             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
+    register('--bootstrap-jar-url', advanced=True,
+             default='https://dl.dropboxusercontent.com/s/nc5hxyhsvwp9k4j/coursier-cli.jar?dl=0',
+             help='Location to download a bootstrap version of Coursier.')
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement,)
@@ -94,7 +103,9 @@ class CoursierMixin(TaskBase):
 
     return jars_to_resolve, exclude_args, untouched_pinned_artifact
 
-  def resolve(self, targets, compile_classpath, pants_workdir, coursier_fetch_options):
+  def resolve(self, targets, compile_classpath):
+
+    coursier_fetch_options = self.get_options().fetch_options
 
     coursier_jar = self._bootstrap_coursier(self.get_options().bootstrap_jar_url)
 
@@ -112,7 +123,7 @@ class CoursierMixin(TaskBase):
       # Prepare coursier args
       output_fn = 'output.json'
       coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
-      pants_jar_path_base = os.path.join(pants_workdir, 'coursier')
+      pants_jar_path_base = os.path.join(self.get_options().pants_workdir, 'coursier')
 
       common_args = ['fetch',
                      # Print the resolution tree
@@ -326,7 +337,7 @@ class CoursierMixin(TaskBase):
     return bootstrap_jar_path
 
 
-class CoursierResolve(CoursierMixin, NailgunTask):
+class CoursierResolve(CoursierMixin):
   """
   Experimental 3rdparty resolver using coursier.
 
@@ -352,11 +363,6 @@ class CoursierResolve(CoursierMixin, NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(CoursierResolve, cls).register_options(register)
-    register('--fetch-options', type=list, fingerprint=True,
-             help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
-    register('--bootstrap-jar-url', advanced=True,
-             default='https://dl.dropboxusercontent.com/s/nc5hxyhsvwp9k4j/coursier-cli.jar?dl=0',
-             help='Location to download a bootstrap version of Coursier.')
 
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
@@ -375,7 +381,4 @@ class CoursierResolve(CoursierMixin, NailgunTask):
     # confs = ['default']
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
     for artifact_set, target_subset in targets_by_sets.items():
-      self.resolve(target_subset,
-                   classpath_products,
-                   pants_workdir=self.context.options.for_scope(GLOBAL_SCOPE).pants_workdir,
-                   coursier_fetch_options=self.get_options().fetch_options)
+      self.resolve(target_subset, classpath_products)
