@@ -104,6 +104,8 @@ class ExportTaskBase(PythonTask):
              help='Causes libraries with javadocs to be output.')
     register('--sources', type=bool,
              help='Causes sources to be output.')
+    register('--formatted', type=bool, implicit_value=False,
+             help='Causes output to be a single line of JSON.')
     # # Required by IvyTaskMixin.
     # # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
     # # See also https://github.com/pantsbuild/pants/issues/3200.
@@ -421,12 +423,6 @@ class Export(ExportTaskV1, ConsoleTask):
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """
 
-  @classmethod
-  def register_options(cls, register):
-    super(Export, cls).register_options(register)
-    register('--formatted', type=bool, implicit_value=False,
-             help='Causes output to be a single line of JSON.')
-
   def __init__(self, *args, **kwargs):
     super(ExportTaskV1, self).__init__(*args, **kwargs)
 
@@ -441,18 +437,12 @@ class Export(ExportTaskV1, ConsoleTask):
     else:
       return [json.dumps(graph_info)]
 
+
 class ExportV2(ExportTaskV2, ConsoleTask):
   """Export project information in JSON format.
 
   Intended for exporting project information for IDE, such as the IntelliJ Pants plugin.
   """
-
-  @classmethod
-  def register_options(cls, register):
-    super(ExportV2, cls).register_options(register)
-    register('--formatted', type=bool, implicit_value=False,
-             help='Causes output to be a single line of JSON.')
-
   def __init__(self, *args, **kwargs):
     super(ExportTaskV2, self).__init__(*args, **kwargs)
 
