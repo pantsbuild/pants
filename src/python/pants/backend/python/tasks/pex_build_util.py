@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import glob
 import os
-import zipfile
 import shutil
+import zipfile
 
 from pex.bin import pex as pex_main
 from pex.fetcher import Fetcher

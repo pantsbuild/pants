@@ -11,7 +11,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks.pex_build_util import dump_requirements
+from pants.backend.python.tasks2.pex_build_util import dump_python_distributions, dump_requirements
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -51,7 +51,7 @@ class ResolveRequirementsTaskBase(Task):
                                        python_dist_targets=python_dist_targets)
     return PEX(path, interpreter=interpreter)
 
-  def _build_requirements_pex(self, interpreter, path, req_libs, python_dist_targets=None
+  def _build_requirements_pex(self, interpreter, path, req_libs, python_dist_targets=None):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
     if python_dist_targets:
