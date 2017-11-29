@@ -9,7 +9,7 @@ from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.project_info.tasks.eclipse_gen import EclipseGen
 from pants.backend.project_info.tasks.ensime_gen import EnsimeGen
-from pants.backend.project_info.tasks.export import Export, ExportV2
+from pants.backend.project_info.tasks.export import Export
 from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.backend.project_info.tasks.idea_gen import IdeaGen
 from pants.backend.project_info.tasks.idea_plugin_gen import IdeaPluginGen
@@ -27,7 +27,7 @@ def register_goals():
   task(name='idea-plugin', action=IdeaPluginGen).install()
   task(name='eclipse', action=EclipseGen).install()
   task(name='ensime', action=EnsimeGen).install()
-  task(name='export', action=ExportV2).install()
+  task(name='export', action=Export).install()
 
   task(name='depmap', action=Depmap).install()
   task(name='dependencies', action=Dependencies).install()

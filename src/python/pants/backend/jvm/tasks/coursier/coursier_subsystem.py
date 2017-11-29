@@ -17,6 +17,7 @@ from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import touch
 
+
 logger = logging.getLogger(__name__)
 
 
