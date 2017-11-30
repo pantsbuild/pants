@@ -21,11 +21,12 @@ readonly PANTS_STABLE_VERSION="$(run_local_pants --version 2>/dev/null)"
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
-readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}/${PANTS_UNSTABLE_VERSION}"
-readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_UNSTABLE_VERSION}"
+readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}"
+readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}"
+readonly DEPLOY_PANTS_SDIST_PATH="sdists/pantsbuild.pants/${HEAD_SHA}"
 readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
-readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_UNSTABLE_VERSION}"
+readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_SDIST_PATH}"
 
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 
@@ -60,13 +61,15 @@ PKG_PANTS=(
   "--python-tag cp27 --plat-name $(find_plat_name)"
 )
 function pkg_pants_install_test() {
+  local version=$1
+  shift
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} || \
+  pip install ${PIP_ARGS} "pantsbuild.pants==${version}" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "${PANTS_UNSTABLE_VERSION}" ]] || die "Installed version of pants does match local version!"
+     == "${version}" ]] || die "Installed version of pants does match requested version!"
 }
 
 PKG_PANTS_TESTINFRA=(
@@ -75,8 +78,10 @@ PKG_PANTS_TESTINFRA=(
   "pkg_pants_testinfra_install_test"
 )
 function pkg_pants_testinfra_install_test() {
+  local version=$1
+  shift
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} && \
+  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${version}" && \
   python -c "import pants_test"
 }
 
@@ -189,7 +194,7 @@ function build_pants_packages() {
   local version=$1
 
   rm -rf "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
 
   pants_version_set "${version}"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
@@ -204,8 +209,8 @@ function build_pants_packages() {
         ${BUILD_TARGET} || \
       die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     wheel=$(find_pkg ${NAME})
-    cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/"
-    cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/"
+    cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
+    cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
     end_travis_section
   done
   pants_version_reset
@@ -266,7 +271,7 @@ function install_and_test_packages() {
     NAME=$(pkg_name $PACKAGE)
     INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
     PIP_ARGS=(
-      "${NAME}==${VERSION}"
+      "${VERSION}"
       "$@"
       --quiet
       # Prefer remote or `--find-links` packages to cache contents.
@@ -284,12 +289,13 @@ function install_and_test_packages() {
 
 function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
-  CORE_ONLY=$1
-  build_pants_packages "${PANTS_UNSTABLE_VERSION}" && \
+  local CORE_ONLY=$1
+  local VERSION="${PANTS_UNSTABLE_VERSION}"
+  build_pants_packages "${VERSION}" && \
   build_3rdparty_packages && \
-  install_and_test_packages "${PANTS_UNSTABLE_VERSION}" "${CORE_ONLY}" \
+  install_and_test_packages "${VERSION}" "${CORE_ONLY}" \
     --only-binary=:all: \
-    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}" -f "${DEPLOY_PANTS_WHEEL_DIR}"
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
 ALLOWED_ORIGIN_URLS=(
@@ -511,6 +517,15 @@ EOM
 )
     die "${msg}"
   fi
+}
+
+function stabilize_whl() {
+  local input_whl=$1
+  local output_version=$2
+
+  local dest_dir=`dirname "${input_whl}"`
+  run_local_pants -q run src/python/pants/releases:reversion -- \
+     "${input_wheel}" "${dest_dir}" "${output_version}"
 }
 
 readonly BINARY_BASE_URL=https://binaries.pantsbuild.org

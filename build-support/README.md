@@ -20,6 +20,5 @@ function pkg_<name>_install_test() {
 }
 ```
 
-The arguments to the `pkg_<name>_install_test` function will always begin with
-a requirements `name=version` string for the package, followed by any additional
-arguments that should be passed to pip (if pip is used to test the package).
+The arguments to the `pkg_<name>_install_test` function are the version string to test,
+follow be zero or more pip args (for use if pip is going to be used to test the package).
