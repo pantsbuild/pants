@@ -63,7 +63,7 @@ PKG_PANTS=(
 function pkg_pants_install_test() {
   local version=$1
   shift
-  PIP_ARGS="$@"
+  local PIP_ARGS="$@"
   pip install ${PIP_ARGS} "pantsbuild.pants==${version}" || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
@@ -80,7 +80,7 @@ PKG_PANTS_TESTINFRA=(
 function pkg_pants_testinfra_install_test() {
   local version=$1
   shift
-  PIP_ARGS="$@"
+  local PIP_ARGS="$@"
   pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${version}" && \
   python -c "import pants_test"
 }
@@ -113,7 +113,7 @@ REQUIREMENTS_3RDPARTY_FILES=(
 function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
-  PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}" pants \
+  pants \
     --no-verify-config \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
@@ -170,9 +170,10 @@ function pants_version_set() {
 
 function build_3rdparty_packages() {
   # Builds whls for 3rdparty dependencies of pants.
+  local version=$1
 
   rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
 
   local req_args=""
   for req_file in "${REQUIREMENTS_3RDPARTY_FILES[@]}"; do
@@ -182,7 +183,7 @@ function build_3rdparty_packages() {
   start_travis_section "3rdparty" "Building 3rdparty whls from ${REQUIREMENTS_3RDPARTY_FILES[@]}"
   activate_tmp_venv
 
-  pip wheel --wheel-dir=${DEPLOY_3RDPARTY_WHEEL_DIR} ${req_args}
+  pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" ${req_args}
 
   deactivate
   end_travis_section
@@ -249,13 +250,22 @@ EOM
 }
 
 function install_and_test_packages() {
-  VERSION=$1
-  CORE_ONLY=$2
+  local VERSION=$1
+  local CORE_ONLY=$2
   shift 2
+  local PIP_ARGS=(
+    "${VERSION}"
+    "$@"
+    --quiet
+    # Prefer remote or `--find-links` packages to cache contents.
+    --no-cache-dir
+  )
+
+  echo "PIP_ARGS: ${PIP_ARGS[@]}"
 
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
-  # Make sure we install fresh plugins since pants uses a fixed version number between releases.
+  # Avoid caching plugin installs.
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
@@ -266,23 +276,18 @@ function install_and_test_packages() {
     PACKAGES=("${RELEASE_PACKAGES[@]}")
   fi
 
+  export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for PACKAGE in "${PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
-    PIP_ARGS=(
-      "${VERSION}"
-      "$@"
-      --quiet
-      # Prefer remote or `--find-links` packages to cache contents.
-      --no-cache-dir
-    )
 
     start_travis_section "${NAME}" "Installing and testing package ${NAME}-${VERSION}"
-    eval $INSTALL_TEST_FUNC  ${PIP_ARGS[@]} || \
+    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} || \
       die "Failed to install and test package ${NAME}-${VERSION}!"
     end_travis_section
   done
+  unset PANTS_PYTHON_REPOS_REPOS
 
   post_install || die "Failed to deactivate virtual env while testing ${NAME}-${VERSION}!"
 }
@@ -292,7 +297,7 @@ function dry_run_install() {
   local CORE_ONLY=$1
   local VERSION="${PANTS_UNSTABLE_VERSION}"
   build_pants_packages "${VERSION}" && \
-  build_3rdparty_packages && \
+  build_3rdparty_packages "${VERSION}" && \
   install_and_test_packages "${VERSION}" "${CORE_ONLY}" \
     --only-binary=:all: \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
