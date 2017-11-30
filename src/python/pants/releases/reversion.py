@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import argparse
 import base64
+import fnmatch
 import glob
 import hashlib
 import json
@@ -33,6 +34,10 @@ def replace_in_file(workspace, src_file_path, from_str, to_str):
   if src_file_path != dst_file_path:
     os.unlink(os.path.join(workspace, src_file_path))
   return dst_file_path
+
+
+def any_match(globs, filename):
+  return any(fnmatch.fnmatch(filename, g) for g in globs)
 
 
 def locate_dist_info_dir(workspace):
@@ -69,7 +74,7 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
     else:
       mutated_files.add(dst)
   if not dst_record_file:
-    raise Exception('Malformed whl: `{}` was not rewritten.'.format(src_record_file))
+    raise Exception('Malformed whl or bad globs: `{}` was not rewritten.'.format(src_record_file))
 
   output_records = []
   for line in read_file(os.path.join(workspace, dst_record_file)).strip().split('\n'):
@@ -106,11 +111,12 @@ def reversion(args):
     for src_filename in src_filenames:
       if os.path.isdir(os.path.join(workspace, src_filename)):
         continue
-      dst_filename = replace_in_file(workspace, src_filename, input_version, args.target_version)
-      if dst_filename is not None:
-        refingerprint.append((src_filename, dst_filename))
-      else:
-        dst_filename = src_filename
+      dst_filename = src_filename
+      if any_match(args.glob, src_filename):
+        rewritten = replace_in_file(workspace, src_filename, input_version, args.target_version)
+        if rewritten is not None:
+          dst_filename = rewritten
+          refingerprint.append((src_filename, dst_filename))
       dst_filenames.append(dst_filename)
 
     # Refingerprint relevant entries in the RECORD file under their new names.
@@ -129,8 +135,8 @@ def reversion(args):
 def main():
   """Given an input whl file and target version, create a copy of the whl with that version.
 
-  This is accomplished via a ton of string replacement: if the input version is not sufficiently
-  long, false positives and corruption are very likely.
+  This is accomplished via string replacement in files matching a list of globs. Pass the
+  optional `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
   """
   parser = argparse.ArgumentParser()
   parser.add_argument('whl_file',
@@ -139,6 +145,12 @@ def main():
                       help='The destination directory for the output whl.')
   parser.add_argument('target_version',
                       help='The target version of the output whl.')
+  parser.add_argument('--glob', action='append',
+                      default=[
+                        '*.dist-info/*',
+                        '*-nspkg.pth',
+                      ],
+                      help='Globs (fnmatch) to rewrite within the whl: may be specified multiple times.')
   args = parser.parse_args()
   reversion(args)
 
