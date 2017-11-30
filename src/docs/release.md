@@ -138,23 +138,7 @@ the release manager may also need to do a release from a stable branch.*
     6. Execute the release as described later on this page.
     7. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
 
-2. Tag the release
-------------------
-
-Once your PR to update the version and release notes has landed in the relevant branch (either
-`master`, or the stable release branch you're using), check out the SHA representing the version
-bump and run:
-
-    :::bash
-    $ ./build-support/bin/tag.sh
-
-...which will create a git tag based on the version, and push it to pantsbuild/pants.
-
-The pushed tag will kick off a travis release build: once the first two shards of the travis
-build have completed (the OSX and Linux binary builder shards), you can proceed to the next
-step of the release.
-
-3. (Optional) Dry Run
+2. (Optional) Dry Run
 ---------------------
 
 A dry run is not strictly required since CI includes one, but you might
@@ -173,7 +157,7 @@ Note that in addition to CI checking dry runs work, the release publish
 flow also performs a mandatory dry run so executing a dry run separately
 is not required.
 
-4. Publish to PyPi
+3. Publish to PyPi
 ------------------
 
 Now that we've smoke-tested this release, we can publish to PyPi:
@@ -184,7 +168,7 @@ Now that we've smoke-tested this release, we can publish to PyPi:
 This also performs a dry run and then proceeds to upload the smoke
 tested wheels to PyPi.
 
-5. Announce
+4. Announce
 -----------
 
 Check PyPi to ensure everything looks good. The [pantsbuild.pants

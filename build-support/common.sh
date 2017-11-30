@@ -68,43 +68,6 @@ function ensure_file_exists() {
   fi
 }
 
-function get_branch() {
-  git branch | grep -E '^\* ' | cut -d' ' -f2-
-}
-
-function check_clean_branch() {
-  banner "Checking for a clean branch"
-
-  pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
-  branch=$(get_branch)
-  [[ -z "$(git status --porcelain)" &&
-     $branch =~ $pattern
-  ]] || die "You are not on a clean branch."
-}
-
-function check_pgp() {
-  banner "Checking pgp setup"
-
-  msg=$(cat << EOM
-You must configure your release signing pgp key.
-
-You can configure the key by running:
-  git config --add user.signingkey [key id]
-
-Key id should be the id of the pgp key you have registered with pypi.
-EOM
-)
-  get_pgp_keyid &> /dev/null || die "${msg}"
-  echo "Found the following key for release signing:"
-  gpg -k $(get_pgp_keyid)
-  read -p "Is this the correct key? [Yn]: " answer
-  [[ "${answer:-y}" =~ [Yy]([Ee][Ss])? ]] || die "${msg}"
-}
-
-function get_pgp_keyid() {
-  git config --get user.signingkey
-}
-
 # Prevent bootstrapping failure due to unrecognized flag:
 # https://github.com/pantsbuild/pants/issues/78
 function set_archflags() {
