@@ -5,5 +5,5 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
 futures = "0.1.16"
-grpcio = { git = "https://github.com/illicitonion/grpc-rs", rev = "2acabdbff71e77a14b95b0b30c6d7de516355df7" }
+grpcio = { git = "https://github.com/illicitonion/grpc-rs", rev = "eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4", features = ["secure"] }
 protobuf = "1.4.1"
