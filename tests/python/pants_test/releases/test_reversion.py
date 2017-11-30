@@ -50,7 +50,7 @@ class ReversionTest(PantsRunIntegrationTest):
       self.assert_success(self.run_pants(command))
       self.assertTrue(os.path.isfile(output_whl_file))
 
-      # Confirm that it can be conssumed.
+      # Confirm that it can be consumed.
       output_pex_file = os.path.join(dest_dir, 'out.pex')
       pex_main.main([
         '--disable-cache',
