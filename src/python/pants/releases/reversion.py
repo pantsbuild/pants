@@ -13,8 +13,8 @@ import json
 import os
 import zipfile
 
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import read_file, safe_file_dump
-from pants.util.contextutil import temporary_dir, open_zip
 
 
 def replace_in_file(workspace, src_file_path, from_str, to_str):
