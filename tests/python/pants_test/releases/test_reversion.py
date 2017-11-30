@@ -9,6 +9,7 @@ import os
 import shutil
 
 import requests
+from pex.bin import pex as pex_main
 
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
@@ -20,10 +21,11 @@ class ReversionTest(PantsRunIntegrationTest):
     with temporary_dir() as dest_dir:
       # Download an input whl.
       # TODO: Not happy about downloading things. Attempted to:
-      #  ./pants setup-py bdist_wheel -w $dest_dir
+      #  ./pants setup-py --run="bdist_wheel" $target
       # but was unable to locate the output whl in the context of a test (perhaps due to
       # mismatched cwd?)
-      input_name = 'virtualenv-15.1.0-py2.py3-none-any.whl'
+      name_template ='virtualenv-{}-py2.py3-none-any.whl'
+      input_name = name_template.format('15.1.0')
       url = (
           'https://files.pythonhosted.org/packages/6f/86/'
           '3dc328ee7b1a6419ebfac7896d882fba83c48e3561d22ddddf38294d3e83/{}'.format(input_name)
@@ -33,6 +35,9 @@ class ReversionTest(PantsRunIntegrationTest):
         shutil.copyfileobj(requests.get(url, stream=True).raw, f)
 
       # Rewrite it.
+      output_version = '9.1.9'
+      output_name = name_template.format(output_version)
+      output_whl_file = os.path.join(dest_dir, output_name)
       command = [
           'run',
           '-q',
@@ -40,8 +45,16 @@ class ReversionTest(PantsRunIntegrationTest):
           '--',
           input_whl_file,
           dest_dir,
-          '9.1.9',
+          output_version,
         ]
       self.assert_success(self.run_pants(command))
+      self.assertTrue(os.path.isfile(output_whl_file))
 
-      # TODO: confirm usable.
+      # Confirm that it can be conssumed.
+      output_pex_file = os.path.join(dest_dir, 'out.pex')
+      pex_main.main([
+        '--disable-cache',
+        '-o', output_pex_file,
+        output_whl_file,
+      ])
+      self.assertTrue(os.path.isfile(output_pex_file))

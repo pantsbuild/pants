@@ -77,13 +77,14 @@ def rewrite_record_file(workspace, src_record_file, mutated_file_tuples):
     raise Exception('Malformed whl or bad globs: `{}` was not rewritten.'.format(src_record_file))
 
   output_records = []
-  for line in read_file(os.path.join(workspace, dst_record_file)).strip().split('\n'):
-    filename, fingerprint_str, size_str = line.strip().rsplit(',', 3)
+  for line in read_file(os.path.join(workspace, dst_record_file)).splitlines():
+    filename, fingerprint_str, size_str = line.rsplit(',', 3)
     if filename in mutated_files:
       fingerprint_str, size_str = fingerprint_file(workspace, filename)
-      output_records.append(','.join((filename, fingerprint_str, size_str)))
+      output_line = ','.join((filename, fingerprint_str, size_str))
     else:
-      output_records.append(line)
+      output_line = line
+    output_records.append(output_line)
 
   safe_file_dump(os.path.join(workspace, dst_record_file), '\r\n'.join(output_records) + '\r\n')
 
