@@ -524,13 +524,19 @@ EOM
   fi
 }
 
-function stabilize_whl() {
-  local input_whl=$1
-  local output_version=$2
+function reversion_whls() {
+  # Reversions all whls from an input directory to an output directory.
+  # Adds one pants-specific glob to match the `VERSION` file in `pantsbuild.pants`.
+  local src_dir=$1
+  local dest_dir=$2
+  local output_version=$3
 
-  local dest_dir=`dirname "${input_whl}"`
-  run_local_pants -q run src/python/pants/releases:reversion -- \
-     "${input_wheel}" "${dest_dir}" "${output_version}"
+  for whl in `ls -1 "${src_dir}"/*.whl`; do
+    run_local_pants -q run src/python/pants/releases:reversion -- \
+      --glob='pants/VERSION' \
+      "${whl}" "${dest_dir}" "${output_version}" \
+      || die "Could not reversion whl ${whl} to ${output_version}"
+  done
 }
 
 readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
@@ -629,18 +635,23 @@ function publish_packages() {
   # and replace with pre-tested binary wheels we download from s3.
   build_pants_packages "${PANTS_STABLE_VERSION}"
 
-  rm -rf "${DEPLOY_DIR}"
-  mkdir -p "${DEPLOY_DIR}"
+  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
+  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"
 
-  start_travis_section "Publishing" "Publishing packages"
+  start_travis_section "Publishing" "Publishing packages for ${PANTS_STABLE_VERSION}"
 
+  # Fetch unstable wheels, and then reversion them from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION.
   fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  reversion_whls \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}" \
+    "${PANTS_STABLE_VERSION}"
 
   activate_twine
   trap deactivate RETURN
 
-  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}"/*.whl
-  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}"/*.tar.gz
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}"/*.whl
+  twine upload --sign --identity=$(get_pgp_keyid) "${DEPLOY_PANTS_SDIST_DIR}/${PANTS_STABLE_VERSION}"/*.tar.gz
 
   end_travis_section
 }
