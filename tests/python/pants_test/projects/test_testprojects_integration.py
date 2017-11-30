@@ -34,8 +34,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/thriftdeptest',
       # TODO(Eric Ayers): I don't understand why this fails
       'testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command',
-      # TODO(wisechengyi): https://github.com/coursier/coursier/issues/698
-      'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
     ]
 
     # Targets that are intended to fail
