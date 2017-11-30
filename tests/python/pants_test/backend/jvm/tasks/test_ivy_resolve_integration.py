@@ -80,7 +80,7 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
     # using the version information from the previous, rather than doing a resolve.
 
     with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
-      config = {'cache': {'write_to': [cache_dir],'read_from': [cache_dir]}}
+      config = {'cache': {'write_to': [cache_dir],'read_from': [cache_dir]}, 'resolver': {'resolver': 'ivy'}}
 
       def run_pants(command):
         return self.run_pants_with_workdir(command, workdir, config=config)
