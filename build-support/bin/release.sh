@@ -13,28 +13,19 @@ function run_local_pants() {
   ${ROOT}/pants "$@"
 }
 
-function compute_version_suffix() {
-  local readonly sha=$1
-  if [[ -z "${SUFFIXED_VERSION}" ]]; then
-    echo ""
-  else
-    echo "+${sha:0:8}"
-  fi
-}
-
 # NB: Pants core should not have the ability to change its own version, so we compute the
 # suffix here, and pass it into the `pants-releases` subsystem in order to affect generated
 # setup_py definitions.
 readonly HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_VERSION_SUFFIX="$(compute_version_suffix "${HEAD_SHA}")"
-readonly PANTS_VERSION="$(run_local_pants --version 2>/dev/null)${PANTS_VERSION_SUFFIX}"
+readonly PANTS_STABLE_VERSION="$(run_local_pants --version 2>/dev/null)"
+readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
-readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}/${PANTS_VERSION}"
-readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
+readonly DEPLOY_3RDPARTY_WHEELS_PATH="wheels/3rdparty/${HEAD_SHA}/${PANTS_UNSTABLE_VERSION}"
+readonly DEPLOY_PANTS_WHEELS_PATH="wheels/pantsbuild.pants/${HEAD_SHA}/${PANTS_UNSTABLE_VERSION}"
 readonly DEPLOY_3RDPARTY_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_3RDPARTY_WHEELS_PATH}"
 readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
-readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_VERSION}"
+readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/sdists/pantsbuild.pants/${HEAD_SHA}/${PANTS_UNSTABLE_VERSION}"
 
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 
@@ -42,8 +33,8 @@ source ${ROOT}/contrib/release_packages.sh
 
 function find_pkg() {
   local readonly pkg_name=$1
-  local readonly search_dir=${2:-${ROOT}/dist/${pkg_name}-${PANTS_VERSION}/dist}
-  find "${search_dir}" -type f -name "${pkg_name}-${PANTS_VERSION}-*.whl"
+  local readonly search_dir=${2:-${ROOT}/dist/${pkg_name}-${PANTS_UNSTABLE_VERSION}/dist}
+  find "${search_dir}" -type f -name "${pkg_name}-${PANTS_UNSTABLE_VERSION}-*.whl"
 }
 
 function find_plat_name() {
@@ -59,17 +50,8 @@ EOF
 #
 # List of packages to be released
 #
-# Each package definition is of form:
-#
-# PKG_<NAME>=(
-#   "package.name"
-#   "//a/build:target"
-#   "pkg_<name>_install_test"
-#   "bdist_wheel flags" # NB: this entry is optional.
-# )
-# function pkg_<name>_install_test() {
-#   ...
-# }
+# See build-support/README.md for more information on the format of each
+# `PKG_$NAME` definition.
 #
 PKG_PANTS=(
   "pantsbuild.pants"
@@ -79,12 +61,12 @@ PKG_PANTS=(
 )
 function pkg_pants_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants==${PANTS_VERSION}" || \
+  pip install ${PIP_ARGS} || \
     die "pip install of pantsbuild.pants failed!"
   execute_packaged_pants_with_internal_backends list src:: || \
     die "'pants list src::' failed in venv!"
   [[ "$(execute_packaged_pants_with_internal_backends --version 2>/dev/null)" \
-     == "${PANTS_VERSION}" ]] || die "Installed version of pants does match local version!"
+     == "${PANTS_UNSTABLE_VERSION}" ]] || die "Installed version of pants does match local version!"
 }
 
 PKG_PANTS_TESTINFRA=(
@@ -94,7 +76,7 @@ PKG_PANTS_TESTINFRA=(
 )
 function pkg_pants_testinfra_install_test() {
   PIP_ARGS="$@"
-  pip install ${PIP_ARGS} "pantsbuild.pants.testinfra==${PANTS_VERSION}" && \
+  pip install ${PIP_ARGS} && \
   python -c "import pants_test"
 }
 
@@ -204,25 +186,26 @@ function build_3rdparty_packages() {
 function build_pants_packages() {
   # TODO(John Sirois): Remove sdist generation and twine upload when
   # https://github.com/pantsbuild/pants/issues/4956 is resolved.
+  local version=$1
 
   rm -rf "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
   mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}" "${DEPLOY_PANTS_SDIST_DIR}"
 
-  pants_version_set "${PANTS_VERSION}"
+  pants_version_set "${version}"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
     BUILD_TARGET=$(pkg_build_target $PACKAGE)
     BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
 
-    start_travis_section "${NAME}" "Building package ${NAME}-${PANTS_VERSION} with target '${BUILD_TARGET}'"
+    start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
     run_local_pants setup-py \
       --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
         ${BUILD_TARGET} || \
-      die "Failed to build package ${NAME}-${PANTS_VERSION} with target '${BUILD_TARGET}'!"
+      die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     wheel=$(find_pkg ${NAME})
     cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/"
-    cp -p "${ROOT}/dist/${NAME}-${PANTS_VERSION}/dist/${NAME}-${PANTS_VERSION}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/"
+    cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/"
     end_travis_section
   done
   pants_version_reset
@@ -261,17 +244,11 @@ EOM
 }
 
 function install_and_test_packages() {
-  CORE_ONLY=$1
-  shift 1
-  PIP_ARGS=(
-    "$@"
-    --quiet
+  VERSION=$1
+  CORE_ONLY=$2
+  shift 2
 
-    # Prefer remote or `--find-links` packages to cache contents.
-    --no-cache-dir
-  )
-
-  pre_install || die "Failed to setup virtualenv while testing ${NAME}-${PANTS_VERSION}!"
+  pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
   # Make sure we install fresh plugins since pants uses a fixed version number between releases.
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
@@ -288,23 +265,29 @@ function install_and_test_packages() {
   do
     NAME=$(pkg_name $PACKAGE)
     INSTALL_TEST_FUNC=$(pkg_install_test_func $PACKAGE)
+    PIP_ARGS=(
+      "${NAME}==${VERSION}"
+      "$@"
+      --quiet
+      # Prefer remote or `--find-links` packages to cache contents.
+      --no-cache-dir
+    )
 
-    start_travis_section "${NAME}" "Installing and testing package ${NAME}-${PANTS_VERSION}"
-    eval $INSTALL_TEST_FUNC ${PIP_ARGS[@]} || \
-      die "Failed to install and test package ${NAME}-${PANTS_VERSION}!"
+    start_travis_section "${NAME}" "Installing and testing package ${NAME}-${VERSION}"
+    eval $INSTALL_TEST_FUNC  ${PIP_ARGS[@]} || \
+      die "Failed to install and test package ${NAME}-${VERSION}!"
     end_travis_section
   done
 
-  post_install || die "Failed to deactivate virtual env while testing ${NAME}-${PANTS_VERSION}!"
-
+  post_install || die "Failed to deactivate virtual env while testing ${NAME}-${VERSION}!"
 }
 
 function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
   CORE_ONLY=$1
-  build_pants_packages && \
+  build_pants_packages "${PANTS_UNSTABLE_VERSION}" && \
   build_3rdparty_packages && \
-  install_and_test_packages "${CORE_ONLY}" \
+  install_and_test_packages "${PANTS_UNSTABLE_VERSION}" "${CORE_ONLY}" \
     --only-binary=:all: \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}" -f "${DEPLOY_PANTS_WHEEL_DIR}"
 }
@@ -413,7 +396,7 @@ EOF
 }
 
 function tag_release() {
-  release_version="${PANTS_VERSION}" && \
+  release_version="${PANTS_STABLE_VERSION}" && \
   tag_name="release_${release_version}" && \
   git tag -f \
     --local-user=$(get_pgp_keyid) \
@@ -433,7 +416,7 @@ function publish_docs_if_master() {
 
 function list_packages() {
   echo "Releases the following source distributions to PyPi."
-  version="${PANTS_VERSION}"
+  version="${PANTS_STABLE_VERSION}"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     echo "  $(pkg_name $PACKAGE)-${version}"
@@ -553,7 +536,7 @@ EOF
 function fetch_prebuilt_wheels() {
   local readonly to_dir="$1"
 
-  banner "Fetching prebuilt wheels for ${PANTS_VERSION}"
+  banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   (
     cd "${to_dir}"
     list_prebuilt_wheels | {
@@ -577,7 +560,7 @@ function fetch_and_check_prebuilt_wheels() {
     trap "rm -rf ${check_dir}" RETURN
   fi
 
-  banner "Checking prebuilt wheels for ${PANTS_VERSION}"
+  banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
   fetch_prebuilt_wheels "${check_dir}"
 
   local missing=()
@@ -624,7 +607,7 @@ function publish_packages() {
   # https://github.com/pantsbuild/pants/issues/4956 is resolved.
   # NB: We need this step to generate sdists. It also generates wheels locally, but we nuke them
   # and replace with pre-tested binary wheels we download from s3.
-  build_pants_packages
+  build_pants_packages "${PANTS_STABLE_VERSION}"
 
   rm -rf "${DEPLOY_DIR}"
   mkdir -p "${DEPLOY_DIR}"
@@ -706,7 +689,7 @@ elif [[ "${dry_run}" == "true" ]]; then
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
-    install_and_test_packages "${core_only}" && \
+    install_and_test_packages "${PANTS_STABLE_VERSION}" "${core_only}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
