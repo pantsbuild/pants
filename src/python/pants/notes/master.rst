@@ -4,7 +4,7 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.4.0.dev22 (11/30/2017)
+1.4.0.dev22 (12/01/2017)
 ------------------------
 
 API Changes
@@ -48,9 +48,6 @@ Bugfixes
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-* Build suffixed pants wheels for non-releases (#5118)
-  `PR #5118 <https://github.com/pantsbuild/pants/pull/5118>`_
 
 * Build suffixed pants wheels for non-releases (#5118)
   `PR #5118 <https://github.com/pantsbuild/pants/pull/5118>`_
