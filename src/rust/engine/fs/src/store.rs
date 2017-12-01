@@ -370,7 +370,6 @@ mod tests {
   use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
   use protobuf::Message;
   use sha2::Sha256;
-  use std::collections::HashMap;
   use std::path::Path;
   use std::sync::Arc;
   use tempdir::TempDir;
@@ -557,7 +556,7 @@ mod tests {
   fn missing_file_local_and_remote() {
     let dir = TempDir::new("store").unwrap();
 
-    let cas = new_empty_cas();
+    let cas = StubCAS::empty();
 
     assert_eq!(
       new_store(dir.path(), Some(cas.address()))
@@ -708,7 +707,7 @@ mod tests {
   fn missing_directory_local_and_remote() {
     let dir = TempDir::new("store").unwrap();
 
-    let cas = new_empty_cas();
+    let cas = StubCAS::empty();
 
     assert_eq!(
       new_store(dir.path(), Some(cas.address()))
@@ -722,7 +721,7 @@ mod tests {
   fn load_file_grpc_error() {
     let dir = TempDir::new("store").unwrap();
 
-    let cas = StubCAS::new(-1, HashMap::new());
+    let cas = StubCAS::always_errors();
 
     let error = new_store(dir.path(), Some(cas.address()))
       .load_file_bytes(fingerprint())
@@ -738,7 +737,7 @@ mod tests {
   fn load_directory_grpc_error() {
     let dir = TempDir::new("store").unwrap();
 
-    let cas = StubCAS::new(-1, HashMap::new());
+    let cas = StubCAS::always_errors();
 
     let error = new_store(dir.path(), Some(cas.address()))
       .load_directory_proto(directory_fingerprint())
@@ -852,9 +851,5 @@ mod tests {
       chunk_size_bytes as i64,
       vec![(fingerprint(), str_bytes())].into_iter().collect(),
     )
-  }
-
-  fn new_empty_cas() -> StubCAS {
-    StubCAS::new(10, HashMap::new())
   }
 }

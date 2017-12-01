@@ -44,6 +44,14 @@ impl StubCAS {
     cas
   }
 
+  pub fn empty() -> StubCAS {
+    StubCAS::new(1024, HashMap::new())
+  }
+
+  pub fn always_errors() -> StubCAS {
+    StubCAS::new(-1, HashMap::new())
+  }
+
   ///
   /// The address on which this server is listening over insecure HTTP transport.
   ///
