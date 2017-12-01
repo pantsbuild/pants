@@ -31,8 +31,14 @@ python_library(
   name='version',
   sources=['version.py'],
   dependencies = [
-    "3rdparty/python:packaging",
+    '3rdparty/python:packaging',
+    ':version-resource',
   ]
+)
+
+resources(
+  name='version-resource',
+  sources=['VERSION'],
 )
 
 page(name='changelog',

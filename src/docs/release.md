@@ -22,8 +22,8 @@ Once you know what to release, releasing pants involves:
 -   Publishing the release to PyPi.
 -   Announce the release on pants-devel.
 
-Prerequisites
--------------
+0. Prerequisites
+----------------
 
 There are several things that require one-time setup in order to be
 able to perform pants releases.  The release script checks that all
@@ -80,8 +80,8 @@ script fail:
     If you have another name for it, you should `git remote rename othername origin` before running
     the release script, and rename it back afterwards.
 
-Prepare Release
----------------
+1. Prepare Release
+------------------
 
 Pants and the common libraries are published to the [Python Package
 Index](https://pypi.python.org/pypi) per the Python community
@@ -91,8 +91,8 @@ Although the build and publish are automated, the version bumping, changelog edi
 and CONTRIBUTORS management are not. Changelog edits and CONTRIBUTOR updates always
 occur in master, while version changes generally only occur in the relevant release branch.
 
-Releasing from different release branches
------------------------------------------
+### Releasing from different release branches
+
 Every week we do a release from master.  In most cases we will use the `dev` naming convention
 detailed in [Release Strategy](http://www.pantsbuild.org/release_strategy.html). When we are
 ready to create a new stable branch we will release under the `rc` naming convention instead of
@@ -100,8 +100,8 @@ ready to create a new stable branch we will release under the `rc` naming conven
 1.1.0dev2, 1.1.0rc0, 1.2.0dev0, 1.2.0dev1, 1.2.0rc0, 1.3.0dev0. *In addition to a release from master
 the release manager may also need to do a release from a stable branch.*
 
-* ###Preparation for the release from the master branch
-    1. Edit the version number in `src/python/pants/version.py`
+#### Preparing a release from the master branch
+    1. Edit the version number in `src/python/pants/VERSION`
     2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week (can use
        `build-support/bin/release-changelog-helper.sh` to get a head start).
     3. If this release is also a release candidate then:
@@ -123,7 +123,7 @@ the release manager may also need to do a release from a stable branch.*
        master for your release. For example if you were releasing `1.2.0rc0`, create the branch
        `1.2.x` from your release commit.
 
-* ###Preparation for the release from the stable branch
+#### Preparing a release from a stable branch
   See [Release Strategy](http://www.pantsbuild.org/release_strategy.html) for more details about
   whether a release is needed from a stable branch.
     1. Cherry pick [changes labelled needs-cherrypick][needs-cherrypick]
@@ -134,12 +134,12 @@ the release manager may also need to do a release from a stable branch.*
        For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
     3. Create and land a review for the notes changes in master.
     4. Cherry pick the merged notes changes from master to the release branch.
-    5. In your release branch: edit and commit the version number in `src/python/pants/version.py`.
+    5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
     6. Execute the release as described later on this page.
     7. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
 
-Dry Run (Optional)
-------------------
+2. (Optional) Dry Run
+---------------------
 
 A dry run is not strictly required since CI includes one, but you might
 like to try one anyway; if so, releases should only be published from
@@ -157,8 +157,8 @@ Note that in addition to CI checking dry runs work, the release publish
 flow also performs a mandatory dry run so executing a dry run separately
 is not required.
 
-Publish to PyPi
----------------
+3. Publish to PyPi
+------------------
 
 Now that we've smoke-tested this release, we can publish to PyPi:
 
@@ -168,8 +168,8 @@ Now that we've smoke-tested this release, we can publish to PyPi:
 This also performs a dry run and then proceeds to upload the smoke
 tested wheels to PyPi.
 
-Announce
---------
+4. Announce
+-----------
 
 Check PyPi to ensure everything looks good. The [pantsbuild.pants
 package index page](https://pypi.python.org/pypi/pantsbuild.pants)
