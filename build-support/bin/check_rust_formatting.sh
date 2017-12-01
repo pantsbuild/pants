@@ -5,7 +5,7 @@ source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
 
 ensure_native_build_prerequisites >/dev/null
 
-files=( $(find "${NATIVE_ROOT}" -name '*.rs' -not -wholename '*/bazel_protos/*' -not -wholename '*/target/*') "${NATIVE_ROOT}/process_execution/bazel_protos/src/lib.rs" )
+files=( $(find "${NATIVE_ROOT}" -name '*.rs' -not -wholename '*/bazel_protos/*' -not -wholename '*/target/*') "${NATIVE_ROOT}/process_execution/bazel_protos/src/verification.rs" )
 cmd=( "${CARGO_HOME}/bin/rustfmt" --config-path="${NATIVE_ROOT}/rustfmt.toml" )
 
 bad_files=( $(${cmd[*]} ${files[*]} --write-mode=diff 2>/dev/null | awk '$0 ~ /^Diff in/ {print $3}' | sort -u ; exit ${PIPESTATUS[0]}) )
