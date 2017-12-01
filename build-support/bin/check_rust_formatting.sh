@@ -18,7 +18,8 @@ case $? in
     exit 0
     ;;
   *)
-    echo >&2 "An error occured while checking the formatting of rust files. Try running \`${cmd[*]} --write-mode=diff ${files[*]}\` to investigate."
+    echo >&2 "An error occured while checking the formatting of rust files. Try running \`${cmd[*]} --write-mode=diff ${files[*]}\` to investigate. Its error is:"
+    ${cmd[*]} --write-mode=diff ${files[*]} >/dev/null
     exit 1
     ;;
 esac
