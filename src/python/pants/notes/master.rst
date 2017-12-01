@@ -4,6 +4,69 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev22 (11/30/2017)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Refer to Buildozer 0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c (#5107)
+  `PR #5107 <https://github.com/pantsbuild/pants/pull/5107>`_
+  `PR #154 <https://github.com/bazelbuild/buildtools/pull/154>`_
+
+New Features
+~~~~~~~~~~~~
+
+* go fetching handles multiple meta tags (#5119)
+  `PR #5119 <https://github.com/pantsbuild/pants/pull/5119>`_
+
+* Snapshots can be captured as store-backed Directories as well as tar files. (#5105)
+  `PR #5105 <https://github.com/pantsbuild/pants/pull/5105>`_
+
+Bugfixes
+~~~~~~~~
+
+* Re-generate protos if the proto compiler changes (#5138)
+  `PR #5138 <https://github.com/pantsbuild/pants/pull/5138>`_
+
+* Update gRPC to fix OSX compile issues (#5135)
+  `Issue #4975 <https://github.com/pantsbuild/pants/issues/4975>`_
+  `PR #5135 <https://github.com/pantsbuild/pants/pull/5135>`_
+
+* Use a particular git SHA to stabilize binary fetching. (#5137)
+  `PR #5137 <https://github.com/pantsbuild/pants/pull/5137>`_
+
+* Remove requirement for root build file in `changed` (#5134)
+  `PR #5134 <https://github.com/pantsbuild/pants/pull/5134>`_
+
+* Kill background cargo fetch on ^C (#5128)
+  `Issue #5125 <https://github.com/pantsbuild/pants/issues/5125>`_
+  `PR #5128 <https://github.com/pantsbuild/pants/pull/5128>`_
+
+* Expose `jax_ws_library` target in `jax_ws` plugin. (#5122)
+  `PR #5122 <https://github.com/pantsbuild/pants/pull/5122>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Build suffixed pants wheels for non-releases (#5118)
+  `PR #5118 <https://github.com/pantsbuild/pants/pull/5118>`_
+
+* Build suffixed pants wheels for non-releases (#5118)
+  `PR #5118 <https://github.com/pantsbuild/pants/pull/5118>`_
+
+* Change meta-rename options to non-advanced (#5124)
+  `PR #5124 <https://github.com/pantsbuild/pants/pull/5124>`_
+
+* Remove GetNode trait (#5123)
+  `PR #5123 <https://github.com/pantsbuild/pants/pull/5123>`_
+
+* Async Store (#5117)
+  `PR #5117 <https://github.com/pantsbuild/pants/pull/5117>`_
+
+* Fix references to missing content (copied from internal doc). (#5015)
+  `PR #5015 <https://github.com/pantsbuild/pants/pull/5015>`_
+
 1.4.0.dev21 (11/17/2017)
 ------------------------
 

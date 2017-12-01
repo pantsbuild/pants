@@ -101,42 +101,45 @@ ready to create a new stable branch we will release under the `rc` naming conven
 the release manager may also need to do a release from a stable branch.*
 
 #### Preparing a release from the master branch
-    1. Edit the version number in `src/python/pants/VERSION`
-    2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week (can use
-       `build-support/bin/release-changelog-helper.sh` to get a head start).
-    3. If this release is also a release candidate then:
-         * Create the corresponding notes file for that release, initialized with notes for all
-           `dev` releases in the series. <br/>
-           _For example if you were releasing `1.2.0rc0` you would need to
-           create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0devX` release notes._
-         * Add the file to pants.ini in the branch_notes section.
-         * Add the new notes file to `src/docs/docsite.json`.
-         * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
-       For additional information on generating documentation see the
-       [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
-    4. Bring the CONTRIBUTORS roster (from master) in
-       [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
-       up to date by running `build-support/bin/contributors.sh`.
-    5. Create and land a review for changes in the master branch.
-    6. Execute the release as described later on this page.
-    7. Finally, if creating a release candidate, create the stable branch from the commit in
-       master for your release. For example if you were releasing `1.2.0rc0`, create the branch
-       `1.2.x` from your release commit.
+
+1. Edit the version number in `src/python/pants/VERSION`
+2. Update `src/python/pants/notes/master.rst` to reflect the changes for this week (can use
+   `build-support/bin/release-changelog-helper.sh` to get a head start).
+3. If this release is also a release candidate then:
+     * Create the corresponding notes file for that release, initialized with notes for all
+       `dev` releases in the series. <br/>
+       _For example if you were releasing `1.2.0rc0` you would need to
+       create `src/python/pants/notes/1.2.x.rst` and include all `1.2.0devX` release notes._
+     * Add the file to pants.ini in the branch_notes section.
+     * Add the new notes file to `src/docs/docsite.json`.
+     * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
+   For additional information on generating documentation see the
+   [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
+4. Bring the CONTRIBUTORS roster (from master) in
+   [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
+   up to date by running `build-support/bin/contributors.sh`.
+5. Create and land a review for changes in the master branch.
+6. Execute the release as described later on this page.
+7. Finally, if creating a release candidate, create the stable branch from the commit in
+   master for your release. For example if you were releasing `1.2.0rc0`, create the branch
+   `1.2.x` from your release commit.
 
 #### Preparing a release from a stable branch
-  See [Release Strategy](http://www.pantsbuild.org/release_strategy.html) for more details about
-  whether a release is needed from a stable branch.
-    1. Cherry pick [changes labelled needs-cherrypick][needs-cherrypick]
-       for the relevant milestone directly to the stable branch.  Note that these pull requests must have been merged into
-       master, and therefore will already be closed.
-    2. In master, update `src/python/pants/notes/*.rst` to reflect all patches that were
-       cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
-       For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
-    3. Create and land a review for the notes changes in master.
-    4. Cherry pick the merged notes changes from master to the release branch.
-    5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
-    6. Execute the release as described later on this page.
-    7. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
+
+See [Release Strategy](http://www.pantsbuild.org/release_strategy.html) for more details about
+whether a release is needed from a stable branch.
+
+1. Cherry pick [changes labelled needs-cherrypick][needs-cherrypick]
+    for the relevant milestone directly to the stable branch.  Note that these pull requests must have been merged into
+    master, and therefore will already be closed.
+2. In master, update `src/python/pants/notes/*.rst` to reflect all patches that were
+    cherry-picked (can use `build-support/bin/release-changelog-helper.sh` to get a head start).
+    For example if you were releasing 1.2.0rc1 you would edit `src/python/pants/notes/1.2.x.rst`.
+3. Create and land a review for the notes changes in master.
+4. Cherry pick the merged notes changes from master to the release branch.
+5. In your release branch: edit and commit the version number in `src/python/pants/VERSION`.
+6. Execute the release as described later on this page.
+7. Remove the [needs-cherrypick][needs-cherrypick] label from the changes cherry-picked into the new release.
 
 2. (Optional) Dry Run
 ---------------------
