@@ -9,3 +9,6 @@ pub mod operations_grpc;
 pub mod remote_execution;
 pub mod remote_execution_grpc;
 pub mod status;
+
+mod verification;
+pub use verification::verify_directory_canonical;
