@@ -14,8 +14,10 @@ use std::collections::HashSet;
 
 pub fn verify_directory_canonical(directory: &remote_execution::Directory) -> Result<(), String> {
   verify_no_unknown_fields(directory)?;
-  verify_names_good(directory.get_files())?;
-  verify_names_good(directory.get_directories())?;
+  verify_nodes(directory.get_files(), |n| n.get_name(), |n| n.get_digest())?;
+  verify_nodes(directory.get_directories(), |n| n.get_name(), |n| {
+    n.get_digest()
+  })?;
   let file_names: HashSet<&str> = directory
     .get_files()
     .iter()
@@ -31,30 +33,39 @@ pub fn verify_directory_canonical(directory: &remote_execution::Directory) -> Re
   Ok(())
 }
 
-fn verify_names_good<T: HasNameAndDigest>(things: &[T]) -> Result<(), String> {
-  let mut prev: Option<&T> = None;
-  for thing in things {
-    verify_no_unknown_fields(thing)?;
-    verify_no_unknown_fields(thing.get_digest())?;
-    if thing.get_name().contains("/") {
+fn verify_nodes<Node, GetName, GetDigest>(
+  nodes: &[Node],
+  get_name: GetName,
+  get_digest: GetDigest,
+) -> Result<(), String>
+where
+  Node: protobuf::Message,
+  GetName: Fn(&Node) -> &str,
+  GetDigest: Fn(&Node) -> &remote_execution::Digest,
+{
+  let mut prev: Option<&Node> = None;
+  for node in nodes {
+    verify_no_unknown_fields(node)?;
+    verify_no_unknown_fields(get_digest(node))?;
+    if get_name(node).contains("/") {
       return Err(format!(
         "All children must have one path segment, but found {}",
-        thing.get_name()
+        get_name(node)
       ));
     }
     match prev {
       Some(p) => {
-        if thing.get_name() <= p.get_name() {
+        if get_name(node) <= get_name(p) {
           return Err(format!(
             "Children must be sorted and unique, but {} was before {}",
-            p.get_name(),
-            thing.get_name()
+            get_name(p),
+            get_name(node)
           ));
         }
       }
       None => {}
     }
-    prev = Some(thing);
+    prev = Some(node);
   }
   Ok(())
 }
@@ -67,31 +78,6 @@ fn verify_no_unknown_fields(message: &protobuf::Message) -> Result<(), String> {
     ));
   }
   return Ok(());
-}
-
-trait HasNameAndDigest: protobuf::Message {
-  fn get_digest(&self) -> &remote_execution::Digest;
-  fn get_name(&self) -> &str;
-}
-
-impl HasNameAndDigest for remote_execution::DirectoryNode {
-  fn get_digest(&self) -> &remote_execution::Digest {
-    self.get_digest()
-  }
-
-  fn get_name(&self) -> &str {
-    self.get_name()
-  }
-}
-
-impl HasNameAndDigest for remote_execution::FileNode {
-  fn get_digest(&self) -> &remote_execution::Digest {
-    self.get_digest()
-  }
-
-  fn get_name(&self) -> &str {
-    self.get_name()
-  }
 }
 
 #[cfg(test)]
