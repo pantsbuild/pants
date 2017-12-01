@@ -13,9 +13,8 @@ from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 
 class PythonDistribution(PythonTarget):
-  """A Python distribution containing c/cpp extensions.
+  """A Python distribution.
 
-  :API: public
   """
 
   @classmethod
@@ -23,15 +22,6 @@ class PythonDistribution(PythonTarget):
     return 'python_distribution'
 
 
-  def __init__(self,
-               platforms=(),
-               **kwargs):
+  def __init__(self, **kwargs):
     payload = Payload()
-    payload.add_fields({
-      'platforms': PrimitiveField(tuple(maybe_list(platforms or [])))
-    })
     super(PythonDistribution, self).__init__(sources=[], payload=payload, **kwargs)
-
-    @property
-    def platforms(self):
-      return self.payload.platforms

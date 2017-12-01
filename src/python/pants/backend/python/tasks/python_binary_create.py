@@ -14,9 +14,8 @@ from pex.pex_info import PexInfo
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks2.pex_build_util import (dump_python_distributions,
                                                         dump_requirements, dump_sources,
-                                                        has_python_and_c_sources,
                                                         has_python_requirements, has_python_sources,
-                                                        has_resources)
+                                                        has_resources, is_local_python_dist)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -125,7 +124,7 @@ class PythonBinaryCreate(Task):
               builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
-        elif has_python_and_c_sources(tgt):
+        elif is_local_python_dist(tgt):
           python_dist_targets.append(tgt)
 
       # Dump everything into the builder's chroot.

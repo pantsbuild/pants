@@ -40,7 +40,7 @@ def has_python_sources(tgt):
   return is_python_target(tgt) and tgt.has_sources()
 
 
-def has_python_and_c_sources(tgt):
+def is_local_python_dist(tgt):
   return isinstance(tgt, PythonDistribution)
 
 
@@ -165,14 +165,15 @@ def build_python_distribution_from_target(target, workdir):
     whl_dist = chroot_deps_contents[0]  # TODO: find better way to grab .whl from chroot 
     whl_location = os.path.join(pydist_workdir, fingerprint, '.deps', whl_dist)
     return whl_location
-  return None
+  else:
+    raise TaskError('Failed to package python distribution for target: %s', target.name)
 
 
 def dump_python_distributions(builder, dist_targets, workdir, log):
   """Dump python distribution targets into a given builder
 
   :param builder: Dump the python_distributions into this builder.
-  :param dist_targets: PythonDistribution targets to dump
+  :param dist_targets: A list of `PythonDistribution` targets to build.
   :param workdir: Working directory for python targets (./pantsd/python)
   :param log: Use this logger.
   """
@@ -181,6 +182,8 @@ def dump_python_distributions(builder, dist_targets, workdir, log):
   locations = set()
   for tgt in dist_targets:
     whl_location = build_python_distribution_from_target(tgt, workdir)
+    if whl_location in locations:
+      raise TaskError('Two wheels of the same name have been created: %s.', whl_location)
     if whl_location:
       locations.add(whl_location)
 

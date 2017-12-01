@@ -29,7 +29,13 @@ class ResolveRequirementsTaskBase(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
 
-  def resolve_requirements(self, req_libs, python_dist_targets=None):
+  def resolve_requirements(self, req_libs, local_python_dist_targets=None):
+    """Requirements resolution for PEX files.
+
+    :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
+    :param local_python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
+    :returns a PEX containing target requirements and any specified python dist targets.
+    """
     with self.invalidated(req_libs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
@@ -48,12 +54,12 @@ class ResolveRequirementsTaskBase(Task):
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
           self._build_requirements_pex(interpreter, safe_path, req_libs,
-                                       python_dist_targets=python_dist_targets)
+                                       local_python_dist_targets=local_python_dist_targets)
     return PEX(path, interpreter=interpreter)
 
-  def _build_requirements_pex(self, interpreter, path, req_libs, python_dist_targets=None):
+  def _build_requirements_pex(self, interpreter, path, req_libs, local_python_dist_targets=None):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
-    if python_dist_targets:
-      dump_python_distributions(builder, python_dist_targets, self.workdir, self.context.log)
+    if local_python_dist_targets:
+      dump_python_distributions(builder, local_python_dist_targets, self.workdir, self.context.log)
     builder.freeze()
