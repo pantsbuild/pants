@@ -393,7 +393,7 @@ class Target(AbstractTarget):
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
-    self._cached_exports_map = {}
+    self._cached_exports_addresses = None
     if no_cache:
       self.add_labels('no_cache')
     if kwargs:
@@ -474,7 +474,7 @@ class Target(AbstractTarget):
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
-    self._cached_exports_map = {}
+    self._cached_exports_addresses = None
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -726,26 +726,26 @@ class Target(AbstractTarget):
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
 
+  @property
   def export_addresses(self):
-    exports = self._cached_exports_map.get(dep_context, None)
+    exports = self._cached_exports_addresses
     if exports is None:
 
-      addresses = tuple()
+      exports = tuple()
       for export_spec in getattr(self, 'export_specs', tuple()):
         if isinstance(export_spec, Target):
-          addresses += (export_spec.address,)
+          exports += (export_spec.address,)
         else:
-          addresses += (export_spec,)
+          exports += (Address.parse(export_spec, relative_to=self.address.spec_path),)
 
       dep_addresses = {d.address for d in self.dependencies}
-      invalid_export_specs = [a.spec for a in addresses if a not in dep_addresses]
+      invalid_export_specs = [a.spec for a in exports if a not in dep_addresses]
       if len(invalid_export_specs) > 0:
         raise TargetDefinitionException(
             self,
             'Invalid exports: these exports must also be dependencies\n  {}'.format('\n  '.join(invalid_export_specs)))
 
-      exports = addresses
-      self._cached_exports_map[dep_context] = exports
+      self._cached_exports_addresses = exports
     return exports
 
   def strict_dependencies(self, dep_context):
@@ -767,8 +767,6 @@ class Target(AbstractTarget):
       def pred(target, dep):
         if type(target) in dep_context.alias_types:
           return True
-        if respect_intransitive and not dep.transitive:
-          return False
         if not dep.scope.in_scope(
             include_scopes=include_scopes,
             exclude_scopes=exclude_scopes):
@@ -776,8 +774,10 @@ class Target(AbstractTarget):
 
         if target is self: # then just include all the direct deps.
           return True
-        if dep.address in target.export_addresses() or \
-           dep.is_synthetic and (dep.concrete_derived_from.address in target.export_addresses()):
+        if respect_intransitive and not dep.transitive:
+          return False
+        if dep.address in target.export_addresses or \
+           dep.is_synthetic and (dep.concrete_derived_from.address in target.export_addresses):
           return True
 
         return False
