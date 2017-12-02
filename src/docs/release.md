@@ -72,9 +72,6 @@ script fail:
         username: <fill me in>
         password: <fill me in>
         EOF
-        
-  - The release script requires Bash 4.  If you're on MacOS you may have to run `brew install bash`,
-    as the Bash that ships with MacOS is ancient.
     
   - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
     If you have another name for it, you should `git remote rename othername origin` before running
