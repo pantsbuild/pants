@@ -271,10 +271,6 @@ class Target(AbstractTarget):
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
   @classmethod
-  def _closure_predicate(cls, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
-    return None
-
-  @classmethod
   def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
       return None
@@ -313,10 +309,6 @@ class Target(AbstractTarget):
 
     build_graph = target_roots[0]._build_graph
     addresses = [target.address for target in target_roots]
-    leveled_predicate = cls._closure_predicate(include_scopes=include_scopes,
-                                               exclude_scopes=exclude_scopes,
-                                               respect_intransitive=respect_intransitive)
-
     dep_predicate = cls._closure_dep_predicate(target_roots,
                                                include_scopes=include_scopes,
                                                exclude_scopes=exclude_scopes,
@@ -328,13 +320,11 @@ class Target(AbstractTarget):
         addresses=addresses,
         work=closure.add,
         postorder=postorder,
-        leveled_predicate=leveled_predicate,
         dep_predicate=dep_predicate,
       )
     else:
       closure.update(build_graph.transitive_subgraph_of_addresses_bfs(
         addresses=addresses,
-        leveled_predicate=leveled_predicate,
         dep_predicate=dep_predicate,
       ))
 
@@ -764,20 +754,20 @@ class Target(AbstractTarget):
       respect_intransitive = closure_kwargs.get('respect_intransitive')
       include_scopes = closure_kwargs.get('include_scopes')
       exclude_scopes = closure_kwargs.get('exclude_scopes')
-      def pred(target, dep):
-        if type(target) in dep_context.alias_types:
+      def predicate(source, dependency):
+        if type(source) in dep_context.alias_types:
           return True
-        if not dep.scope.in_scope(
+        if not dependency.scope.in_scope(
             include_scopes=include_scopes,
             exclude_scopes=exclude_scopes):
           return False
 
-        if target is self: # then just include all the direct deps.
+        if source is self: # then just include all the direct deps.
           return True
-        if respect_intransitive and not dep.transitive:
+        if respect_intransitive and not dependency.transitive:
           return False
-        if dep.address in target.export_addresses or \
-           dep.is_synthetic and (dep.concrete_derived_from.address in target.export_addresses):
+        if dependency.address in source.export_addresses or \
+           dependency.is_synthetic and (dependency.concrete_derived_from.address in source.export_addresses):
           return True
 
         return False
@@ -785,7 +775,7 @@ class Target(AbstractTarget):
 
       result = self._build_graph.transitive_subgraph_of_addresses_bfs(
         addresses=[self.address],
-        dep_predicate=pred
+        dep_predicate=predicate
       )
 
       strict_deps = OrderedSet()
