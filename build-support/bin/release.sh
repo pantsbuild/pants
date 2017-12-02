@@ -702,10 +702,6 @@ function usage() {
   echo " -e  Check that wheels are prebuilt for this release."
   echo
   echo "All options (except for '-d' and '-c') are mutually exclusive."
-  echo
-  echo "There is one environment variable that significantly affects behaviour: setting"
-  echo "SUFFIXED_VERSION to a non-empty value will cause all commands to operate on a"
-  echo "git HEAD-SHA suffixed version of pants."
 
   if (( $# > 0 )); then
     die "$@"
