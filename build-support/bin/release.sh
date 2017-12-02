@@ -600,7 +600,25 @@ function fetch_and_check_prebuilt_wheels() {
   do
     NAME=$(pkg_name $PACKAGE)
     packages=($(find_pkg "${NAME}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
-    (( ${#packages[@]} > 0 )) || missing+=("${NAME}")
+    if [ ${#packages[@]} -eq 0 ]; then
+      missing+=("${NAME}")
+      continue
+    fi
+
+    # Confirm that if the package is not cross platform that we have whls for two platforms.
+    local cross_platform=""
+    for package in "${packages[@]}"
+    do
+      if [[ "${package}" =~ "-none-any.whl" ]]
+      then
+        cross_platform="true"
+      fi
+    done
+
+    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 2 ]; then
+      missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
+      continue
+    fi
 
     # Here we re-name the linux platform specific wheels we build to masquerade as manylinux1
     # compatible wheels. We take care to support this when we generate the wheels and pypi will

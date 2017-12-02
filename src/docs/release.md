@@ -163,7 +163,8 @@ is not required.
 3. Publish to PyPi
 ------------------
 
-Now that we've smoke-tested this release, we can publish to PyPi:
+Once the first two travis shards (the "binary builder" shards) have completed for your
+release commit, you can publish to PyPi:
 
     :::bash
     $ ./build-support/bin/release.sh
