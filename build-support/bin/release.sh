@@ -34,8 +34,9 @@ source ${ROOT}/contrib/release_packages.sh
 
 function find_pkg() {
   local readonly pkg_name=$1
-  local readonly search_dir=${2:-${ROOT}/dist/${pkg_name}-${PANTS_UNSTABLE_VERSION}/dist}
-  find "${search_dir}" -type f -name "${pkg_name}-${PANTS_UNSTABLE_VERSION}-*.whl"
+  local readonly version=$2
+  local readonly search_dir=$3
+  find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
 }
 
 function find_plat_name() {
@@ -205,13 +206,14 @@ function build_pants_packages() {
     BDIST_WHEEL_FLAGS=$(bdist_wheel_flags $PACKAGE)
 
     start_travis_section "${NAME}" "Building package ${NAME}-${version} with target '${BUILD_TARGET}'"
-    run_local_pants setup-py \
-      --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
-        ${BUILD_TARGET} || \
-      die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
-    wheel=$(find_pkg ${NAME})
-    cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-    cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
+    (
+      run_local_pants setup-py \
+        --run="sdist bdist_wheel ${BDIST_WHEEL_FLAGS:---python-tag py27}" \
+          ${BUILD_TARGET} && \
+      wheel=$(find_pkg ${NAME} ${version} "${ROOT}/dist") && \
+      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}" && \
+      cp -p "${ROOT}/dist/${NAME}-${version}/dist/${NAME}-${version}.tar.gz" "${DEPLOY_PANTS_SDIST_DIR}/${version}"
+    ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     end_travis_section
   done
   pants_version_reset
@@ -260,8 +262,6 @@ function install_and_test_packages() {
     # Prefer remote or `--find-links` packages to cache contents.
     --no-cache-dir
   )
-
-  echo "PIP_ARGS: ${PIP_ARGS[@]}"
 
   pre_install || die "Failed to setup virtualenv while testing ${NAME}-${VERSION}!"
 
@@ -473,20 +473,19 @@ function list_owners() {
 }
 
 function check_owner() {
-   username="$1"
-   package_name="$2"
+  username=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  package_name="$2"
 
-   for owner in $(get_owners ${package_name})
-   do
-     # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
-     # Note that the ^^ case operator requires bash 4.  If you're on a Mac you may need to brew
-     # install bash, as the version that comes with MacOS is ancient.
-     if [[ "${username^^}" == "${owner^^}" ]]
-     then
-       return 0
-     fi
-   done
-   return 1
+  for owner in $(get_owners ${package_name})
+  do
+    # NB: A case-insensitive comparison is done since pypi is case-insensitive wrt usernames.
+    owner=$(echo "${owner}" | tr '[:upper:]' '[:lower:]')
+    if [[ "${username}" == "${owner}" ]]
+    then
+      return 0
+    fi
+  done
+  return 1
 }
 
 function check_owners() {
@@ -542,6 +541,7 @@ function reversion_whls() {
 readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
 
 function list_prebuilt_wheels() {
+  # List prebuilt wheels as tab-separated tuples of filename and URL-encoded name.
   wheel_listing="$(mktemp -t pants.wheels.XXXXX)"
   trap "rm -f ${wheel_listing}" RETURN
 
@@ -550,11 +550,14 @@ function list_prebuilt_wheels() {
     "${PY}" << EOF
 from __future__ import print_function
 import sys
+import urllib
 import xml.etree.ElementTree as ET
 root = ET.parse("${wheel_listing}")
 ns = {'s3': 'http://s3.amazonaws.com/doc/2006-03-01/'}
 for key in root.findall('s3:Contents/s3:Key', ns):
-  print(key.text)
+  # Because filenames may contain characters that have different meanings
+  # in URLs (namely '+'), # print the key both as url-encoded and as a file path.
+  print('{}\t{}'.format(key.text, urllib.quote_plus(key.text)))
 EOF
  done
 }
@@ -566,12 +569,15 @@ function fetch_prebuilt_wheels() {
   (
     cd "${to_dir}"
     list_prebuilt_wheels | {
-      while read path
+      while read path_tuple
       do
-        echo "${BINARY_BASE_URL}/${path}:"
-        local dest="${to_dir}/${path}"
+        local file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
+        local url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
+        echo "${BINARY_BASE_URL}/${url_path}:"
+        local dest="${to_dir}/${file_path}"
         mkdir -p "$(dirname "${dest}")"
-        curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${path}"
+        curl --fail --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
+          || die "Could not fetch ${dest}."
       done
     }
   )
@@ -593,7 +599,7 @@ function fetch_and_check_prebuilt_wheels() {
   for PACKAGE in "${RELEASE_PACKAGES[@]}"
   do
     NAME=$(pkg_name $PACKAGE)
-    packages=($(find_pkg "${NAME}" "${check_dir}"))
+    packages=($(find_pkg "${NAME}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
     (( ${#packages[@]} > 0 )) || missing+=("${NAME}")
 
     # Here we re-name the linux platform specific wheels we build to masquerade as manylinux1
