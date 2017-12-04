@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import json
 import logging
 import os
@@ -17,10 +18,12 @@ from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependenc
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsystem
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
+from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.dirutil import safe_mkdir
@@ -93,7 +96,18 @@ class CoursierMixin(NailgunTask):
 
     return jars_to_resolve, exclude_args, untouched_pinned_artifact
 
+  def cache_target_dirs(self):
+    return True
+
   def resolve(self, targets, compile_classpath):
+    """
+
+    :param targets: a collection of targets to do 3rdparty resolve against
+    :param compile_classpath: classpath product that holds the resolution result. IMPORTANT: this parameter will be changed.
+    :return:
+    """
+
+    fingerprint_strategy = CouriserResolveFingerprintStrategy([])
 
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
 
@@ -106,134 +120,172 @@ class CoursierMixin(NailgunTask):
     for artifact_set, target_subset in jar_targets.items():
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
-      jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
-                                                                                                        artifact_set,
-                                                                                                        manager)
+      with self.invalidated(target_subset,
+                            invalidate_dependents=False,
+                            silent=False,
+                            fingerprint_strategy=fingerprint_strategy) as invalidation_check:
 
-      # Prepare coursier args
-      output_fn = 'output.json'
-      coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
-      pants_jar_path_base = os.path.join(self.get_options().pants_workdir, 'coursier')
+        target_resolution_filename = 'coursier_resolve.json'
+        if not invalidation_check.invalid_vts:
+          self._load_result_from_cache(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
+          return
 
-      common_args = ['fetch',
-                     # Print the resolution tree
-                     '-t',
-                     '--cache', coursier_cache_path,
-                     '--json-output-file', output_fn] + coursier_subsystem_instance.get_options().fetch_options
+        for vt in invalidation_check.all_vts:
+          if isinstance(vt.target, JarLibrary):
+            vt.force_invalidate()
 
-      def construct_classifier_to_jar(jars):
-        product = defaultdict(list)
-        for x in jars:
-          product[x.coordinate.classifier or ''].append(x)
-        return product
+        jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
+                                                                                                          artifact_set,
+                                                                                                          manager)
+        # Prepare coursier args
+        output_fn = 'output.json'
+        coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
+        pants_jar_path_base = os.path.join(self.get_options().pants_workdir, 'coursier')
 
-      classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
+        common_args = ['fetch',
+                       # Print the resolution tree
+                       '-t',
+                       '--cache', coursier_cache_path,
+                       '--json-output-file', output_fn] + coursier_subsystem_instance.get_options().fetch_options
 
-      # Coursier calls need to be divided by classifier because coursier treats classifier option globally.
-      for classifier, classified_jars in classifier_to_jars.items():
+        def construct_classifier_to_jar(jars):
+          product = defaultdict(list)
+          for x in jars:
+            product[x.coordinate.classifier or ''].append(x)
+          return product
 
-        cmd_args = list(common_args)
-        if classifier:
-          cmd_args.extend(['--classifier', classifier])
+        classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
-        for j in classified_jars:
-          if not j.rev:
-            continue
+        # Coursier calls need to be divided by classifier because coursier treats classifier option globally.
+        for classifier, classified_jars in classifier_to_jars.items():
 
-          if j.intransitive:
-            cmd_args.append('--intransitive')
+          cmd_args = self.construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
+                                             local_exclude_args, pinned_coords)
 
-          cmd_args.append(j.coordinate.simple_coord)
+          cmd_str = ' '.join(cmd_args)
+          logger.info(cmd_str)
 
-          # Force requires specifying the coord again with -V
-          if j.force:
-            cmd_args.append('-V')
-            cmd_args.append(j.coordinate.simple_coord)
+          try:
+            # with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
 
-        for j in pinned_coords:
-          cmd_args.append('-V')
-          cmd_args.append(j.simple_coord)
+            return_code = self.runjava(
+              classpath=[coursier_jar],
+              main='coursier.cli.Coursier',
+              args=cmd_args,
+              jvm_options=self.get_options().jvm_options,
+              # to let stdout/err through, but don't print tool's label.
+              workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
-        if local_exclude_args:
-          exclude_file = 'excludes.txt'
-          with open(exclude_file, 'w') as f:
-            f.write('\n'.join(local_exclude_args).encode('utf8'))
+            # return_code = subprocess.call(cmd_args,
+            #                               stdout=workunit.output('stdout'),
+            #                               stderr=workunit.output('stderr'))
 
-          cmd_args.append('--soft-exclude-file')
-          cmd_args.append(exclude_file)
+            # workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
-        # TODO(wisechengyi): exclude the whole org
-        for ex in global_excludes:
-          if ex.org and ex.name:
-            cmd_args.append('-E')
-            cmd_args.append('{}:{}'.format(ex.org, ex.name))
+            with open(output_fn) as f:
+              result = json.loads(f.read())
 
-        cmd_str = ' '.join(cmd_args)
-        logger.info(cmd_str)
+            if return_code:
+              raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-        try:
-          # with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+          except subprocess.CalledProcessError as e:
+            raise CoursierError(e)
 
-          return_code = self.runjava(
-            classpath=[coursier_jar],
-            main='coursier.cli.Coursier',
-            args=cmd_args,
-            jvm_options=self.get_options().jvm_options,
-            # to let stdout/err through, but don't print tool's label.
-            workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+          else:
+            flattened_resolution = self._flatten_resolution_by_root(result)
+            files_by_coord = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
-          # return_code = subprocess.call(cmd_args,
-          #                               stdout=workunit.output('stdout'),
-          #                               stderr=workunit.output('stderr'))
+            org_name_to_org_name_rev = {}
+            for coord in files_by_coord.keys():
+              (org, name, _) = coord.split(':')
+              org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
+            for vt in invalidation_check.all_vts:
+              t = vt.target
+            # for t in targets:
+              if isinstance(t, JarLibrary):
 
-          # workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+                def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
+                  transitive_jar_path_for_coord = []
+                  if my_simple_coord in flattened_resolution:
+                    for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
+                      transitive_jar_path_for_coord.extend(resolved_jars[c])
 
-          with open(output_fn) as f:
-            result = json.loads(f.read())
+                  return transitive_jar_path_for_coord
 
-          if return_code:
-            raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+                for jar in t.jar_dependencies:
+                  simple_coord_candidate = jar.coordinate.simple_coord
+                  final_simple_coord = None
+                  if simple_coord_candidate in files_by_coord:
+                    final_simple_coord = simple_coord_candidate
+                  elif simple_coord_candidate in result['conflict_resolution']:
+                    final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
+                  # If still not found, look for org:name match.
+                  else:
+                    org_name = '{}:{}'.format(jar.org, jar.name)
+                    if org_name in org_name_to_org_name_rev:
+                      final_simple_coord = org_name_to_org_name_rev[org_name]
 
-        except subprocess.CalledProcessError as e:
-          raise CoursierError(e)
+                  if final_simple_coord:
+                    transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
+                    if transitive_resolved_jars:
+                      compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
 
-        else:
-          flattened_resolution = self._flatten_resolution_by_root(result)
-          files_by_coord = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+        self._write_result_to_cache(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
 
-          org_name_to_org_name_rev = {}
-          for coord in files_by_coord.keys():
-            (org, name, _) = coord.split(':')
-            org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
+  def _write_result_to_cache(self, compile_classpath, all_vts, target_resolution_filename):
+    # TODO(wisechengyi): currently the path contains abs path, so need to remove that before
+    # cache can be shared across machines.
+    for vt in all_vts:
+      t = vt.target
+      if isinstance(t, JarLibrary):
+        with open(os.path.join(vt.results_dir, target_resolution_filename), 'w') as f:
+          f.write(json.dumps(compile_classpath.get_for_target(t)))
+        vt.update()
 
-          for t in targets:
-            if isinstance(t, JarLibrary):
+  def _load_result_from_cache(self, compile_classpath, all_vts, target_resolution_filename):
+    for vt in all_vts:
+      t = vt.target
+      if isinstance(t, JarLibrary):
+        # compile_classpath.add_jars_for_targets
+        with open(os.path.join(vt.results_dir, target_resolution_filename), 'r') as f:
+          tuples = json.loads(f.read())
+          compile_classpath.add_for_targets([t], tuples)
 
-              def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
-                transitive_jar_path_for_coord = []
-                if my_simple_coord in flattened_resolution:
-                  for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
-                    transitive_jar_path_for_coord.extend(resolved_jars[c])
+  def construct_cmd_args(self, classified_jars, classifier, common_args, global_excludes, local_exclude_args,
+                         pinned_coords):
+    cmd_args = list(common_args)
+    if classifier:
+      cmd_args.extend(['--classifier', classifier])
+    for j in classified_jars:
+      if not j.rev:
+        continue
 
-                return transitive_jar_path_for_coord
+      if j.intransitive:
+        cmd_args.append('--intransitive')
 
-              for jar in t.jar_dependencies:
-                simple_coord_candidate = jar.coordinate.simple_coord
-                final_simple_coord = None
-                if simple_coord_candidate in files_by_coord:
-                  final_simple_coord = simple_coord_candidate
-                elif simple_coord_candidate in result['conflict_resolution']:
-                  final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
-                # If still not found, look for org:name match.
-                else:
-                  org_name = '{}:{}'.format(jar.org, jar.name)
-                  if org_name in org_name_to_org_name_rev:
-                    final_simple_coord = org_name_to_org_name_rev[org_name]
+      cmd_args.append(j.coordinate.simple_coord)
 
-                if final_simple_coord:
-                  transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
-                  if transitive_resolved_jars:
-                    compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+      # Force requires specifying the coord again with -V
+      if j.force:
+        cmd_args.append('-V')
+        cmd_args.append(j.coordinate.simple_coord)
+    for j in pinned_coords:
+      cmd_args.append('-V')
+      cmd_args.append(j.simple_coord)
+    if local_exclude_args:
+      exclude_file = 'excludes.txt'
+      with open(exclude_file, 'w') as f:
+        f.write('\n'.join(local_exclude_args).encode('utf8'))
+
+      cmd_args.append('--soft-exclude-file')
+      cmd_args.append(exclude_file)
+
+    # TODO(wisechengyi): support exclusion on the whole org
+    for ex in global_excludes:
+      if ex.org and ex.name:
+        cmd_args.append('-E')
+        cmd_args.append('{}:{}'.format(ex.org, ex.name))
+    return cmd_args
 
   @classmethod
   def _flatten_resolution_by_root(cls, result):
@@ -344,3 +396,43 @@ class CoursierResolve(CoursierMixin):
     targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
     for artifact_set, target_subset in targets_by_sets.items():
       self.resolve(target_subset, classpath_products)
+
+
+class CouriserResolveFingerprintStrategy(FingerprintStrategy):
+
+  def __init__(self, confs):
+    super(CouriserResolveFingerprintStrategy, self).__init__()
+    self._confs = sorted(confs or [])
+
+  def compute_fingerprint(self, target):
+    hash_elements_for_target = []
+    if isinstance(target, JarLibrary):
+      managed_jar_artifact_set = JarDependencyManagement.global_instance().for_target(target)
+      if managed_jar_artifact_set:
+        hash_elements_for_target.append(str(managed_jar_artifact_set.id))
+
+      hash_elements_for_target.append(target.payload.fingerprint())
+    elif isinstance(target, JvmTarget) and target.payload.excludes:
+      hash_elements_for_target.append(target.payload.fingerprint(field_keys=('excludes',)))
+    else:
+      pass
+
+    if not hash_elements_for_target:
+      return None
+
+    hasher = hashlib.sha1()
+    hasher.update(target.payload.fingerprint())
+
+    for conf in self._confs:
+      hasher.update(conf)
+
+    for element in hash_elements_for_target:
+      hasher.update(element)
+
+    return hasher.hexdigest()
+
+  def __hash__(self):
+    return hash((type(self), '-'.join(self._confs)))
+
+  def __eq__(self, other):
+    return type(self) == type(other) and self._confs == other._confs

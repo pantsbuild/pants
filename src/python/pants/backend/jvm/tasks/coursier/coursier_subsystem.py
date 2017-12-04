@@ -28,6 +28,9 @@ class CoursierSubsystem(Subsystem):
   """
   options_scope = 'coursier'
 
+  class Error(Exception):
+    """Indicates an error bootstrapping coursier."""
+
   @classmethod
   def register_options(cls, register):
     super(CoursierSubsystem, cls).register_options(register)
