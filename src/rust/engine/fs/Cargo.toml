@@ -10,6 +10,7 @@ digest = "0.6.2"
 futures = "0.1.16"
 futures-cpupool = "0.1.6"
 glob = "0.2.11"
+grpcio = { git = "https://github.com/illicitonion/grpc-rs", rev = "eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4", features = ["secure"] }
 hex = "0.3.1"
 ignore = "0.3.1"
 itertools = "0.7.2"
