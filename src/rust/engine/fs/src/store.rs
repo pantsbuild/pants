@@ -190,13 +190,13 @@ impl Store {
     self
       .load_bytes_local_with(fingerprint, db, f.clone())
       .and_then(move |maybe_bytes| match maybe_bytes {
-        Some(value) => future::ok(Some(value)).to_boxed() as BoxFuture<_, _>,
+        Some(value) => future::ok(Some(value)).to_boxed(),
         None => {
           match grpc_env {
             Some(GrpcEnvironment { address, env }) => {
               store.load_bytes_remote_with(fingerprint, db, f, &address, env)
             }
-            None => future::ok(None).to_boxed() as BoxFuture<_, _>,
+            None => future::ok(None).to_boxed(),
           }
         }
       })
