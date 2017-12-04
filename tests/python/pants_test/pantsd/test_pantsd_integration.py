@@ -197,7 +197,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _):
       pantsd_run(['help'])
       checker.await_pantsd()
-      for _ in xrange(attempts):
+      for _ in range(attempts):
         pantsd_run(['help'])
         checker.assert_running()
         assert_no_process_exists_by_command('pantsd-runner')

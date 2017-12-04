@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import io
 import os
 import select
-import socket
 import threading
 from contextlib import contextmanager
 
@@ -21,7 +20,6 @@ def _pipe(isatty):
   r_fd, w_fd = os.openpty() if isatty else os.pipe()
   with os.fdopen(r_fd, 'r') as r, os.fdopen(w_fd, 'w') as w:
     yield (r, w)
-
 
 
 class _StoppableDaemonThread(threading.Thread):
