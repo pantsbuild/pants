@@ -403,6 +403,195 @@ mod local {
   }
 }
 
+mod remote {
+  use super::{Digest, EntryType};
+
+  use bazel_protos;
+  use boxfuture::{Boxable, BoxFuture};
+  use futures::{future, Future, Stream};
+  use grpcio;
+  use std::sync::Arc;
+
+  use hash::Fingerprint;
+
+  #[derive(Clone)]
+  pub struct ByteStore {
+    address: String,
+    env: Arc<grpcio::Environment>,
+  }
+
+  impl ByteStore {
+    pub fn new(address: String) -> ByteStore {
+      // TODO: Pass through a parallelism configuration option here.
+      ByteStore {
+        address: address,
+        env: Arc::new(grpcio::Environment::new(1)),
+      }
+    }
+  }
+
+
+  impl super::ByteStore for ByteStore {
+    fn store_bytes(&self, _entry_type: EntryType, _bytes: Vec<u8>) -> BoxFuture<Digest, String> {
+      unimplemented!()
+    }
+
+    fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+      &self,
+      _entry_type: EntryType,
+      fingerprint: Fingerprint,
+      f: Arc<F>,
+    ) -> BoxFuture<Option<T>, String> {
+      let channel = grpcio::ChannelBuilder::new(self.env.clone()).connect(&self.address);
+      let client = bazel_protos::bytestream_grpc::ByteStreamClient::new(channel);
+      let stream = client.read(&{
+        let mut req = bazel_protos::bytestream::ReadRequest::new();
+        // TODO: Pass a size around, or resolve that we don't need to.
+        req.set_resource_name(format!("/blobs/{}/{}", fingerprint, -1));
+        req.set_read_offset(0);
+        // 0 means no limit.
+        req.set_read_limit(0);
+        req
+      });
+
+      // We shouldn't have to pass around the client here, it's a workaround for
+      // https://github.com/pingcap/grpc-rs/issues/123
+      future::ok(client)
+        .join(stream.map(|r| r.data).concat2())
+        .map(|(_client, bytes)| Some(bytes))
+        .or_else(|e| match e {
+          grpcio::Error::RpcFailure(grpcio::RpcStatus {
+                                      status: grpcio::RpcStatusCode::NotFound, ..
+                                    }) => Ok(None),
+          _ => Err(format!("Error making CAS read request: {:?}", e)),
+        })
+        .map(move |maybe_bytes| {
+          maybe_bytes.map(|bytes: Vec<u8>| f(&bytes))
+        })
+        .to_boxed()
+    }
+  }
+
+  #[cfg(test)]
+  mod tests {
+
+    extern crate tempdir;
+
+    use super::ByteStore;
+    use super::super::super::test_cas::StubCAS;
+    use protobuf::Message;
+
+    use super::super::tests::{directory, directory_fingerprint, fingerprint,
+                              load_directory_proto_bytes, load_file_bytes, new_cas, str_bytes};
+
+    #[test]
+    fn loads_file() {
+      let cas = new_cas(10);
+
+      assert_eq!(
+        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()).unwrap(),
+        Some(str_bytes())
+      );
+    }
+
+
+    #[test]
+    fn missing_file() {
+      let cas = StubCAS::empty();
+
+      assert_eq!(
+        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        Ok(None)
+      );
+    }
+
+    #[test]
+    fn load_directory() {
+      let cas = new_cas(10);
+
+      assert_eq!(
+        load_directory_proto_bytes(&ByteStore::new(cas.address()), directory_fingerprint()),
+        Ok(Some(directory().write_to_bytes().unwrap()))
+      );
+    }
+
+    #[test]
+    fn missing_directory() {
+      let cas = StubCAS::empty();
+
+      assert_eq!(
+        load_directory_proto_bytes(&ByteStore::new(cas.address()), directory_fingerprint()),
+        Ok(None)
+      );
+    }
+
+    #[test]
+    fn load_file_grpc_error() {
+      let cas = StubCAS::always_errors();
+
+      let error = load_file_bytes(&ByteStore::new(cas.address()), fingerprint())
+        .expect_err("Want error");
+      assert!(
+        error.contains("StubCAS is configured to always fail"),
+        format!("Bad error message, got: {}", error)
+      )
+    }
+
+    #[test]
+    fn load_directory_grpc_error() {
+      let cas = StubCAS::always_errors();
+
+      let error =
+        load_directory_proto_bytes(&ByteStore::new(cas.address()), directory_fingerprint())
+          .expect_err("Want error");
+      assert!(
+        error.contains("StubCAS is configured to always fail"),
+        format!("Bad error message, got: {}", error)
+      )
+    }
+
+    #[test]
+    fn fetch_less_than_one_chunk() {
+      let cas = new_cas(str_bytes().len() + 1);
+
+      assert_eq!(
+        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        Ok(Some(str_bytes()))
+      )
+    }
+
+    #[test]
+    fn fetch_exactly_one_chunk() {
+      let cas = new_cas(str_bytes().len());
+
+      assert_eq!(
+        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        Ok(Some(str_bytes()))
+      )
+    }
+
+    #[test]
+    fn fetch_multiple_chunks_exact() {
+      let cas = new_cas(1);
+
+      assert_eq!(
+        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        Ok(Some(str_bytes()))
+      )
+    }
+
+    #[test]
+    fn fetch_multiple_chunks_nonfactor() {
+      let cas = new_cas(9);
+
+      assert_eq!(
+        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        Ok(Some(str_bytes()))
+      )
+    }
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::{ByteStore, Digest, EntryType, Fingerprint};
