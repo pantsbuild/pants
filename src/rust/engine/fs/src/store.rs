@@ -274,8 +274,9 @@ impl Store {
               _ => {}
             }
           }
+          let result = Some(f(&bytes));
           store_copy
-                  .store_bytes(bytes.clone(), db)
+                  .store_bytes(bytes, db)
                   .and_then(move |retrieved_fingerprint| {
                     if retrieved_fingerprint == fingerprint {
                       Ok(())
@@ -287,9 +288,7 @@ impl Store {
                           fingerprint,
                           retrieved_fingerprint))
                     }
-                  }).map(move |()| {
-                Some(f(&bytes))
-              }).to_boxed()
+                  }).map(move |()| result).to_boxed()
         }
         None => future::ok(None).to_boxed() as BoxFuture<_, _>,
       })
