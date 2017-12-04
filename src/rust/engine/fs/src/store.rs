@@ -257,10 +257,10 @@ impl Store {
     let store_copy = self.clone();
     let directory_db = self.inner.directory_store;
 
-    // TODO: Work out why not wrapping this in a future::done(... .wait()) errors in gRPC channel
-    // creation.
-    future::done(stream.map(|r| r.data).concat2().wait())
-      .map(|bytes: Vec<u8>| Some(bytes))
+    // We shouldn't have to pass around the client here, it's a workaround for
+    // https://github.com/pingcap/grpc-rs/issues/123
+    future::ok(client).join(stream.map(|r| r.data).concat2())
+      .map(|(_client, bytes)| Some(bytes))
       .or_else(|e| match e {
         grpcio::Error::RpcFailure(grpcio::RpcStatus {
                                     status: grpcio::RpcStatusCode::NotFound, ..
