@@ -189,7 +189,7 @@ impl Store {
     let f = Arc::new(f);
     self
       .load_bytes_local_with(fingerprint, db, f.clone())
-      .map(move |maybe_bytes| match maybe_bytes {
+      .and_then(move |maybe_bytes| match maybe_bytes {
         Some(value) => future::ok(Some(value)).to_boxed() as BoxFuture<_, _>,
         None => {
           match grpc_env {
@@ -200,8 +200,6 @@ impl Store {
           }
         }
       })
-      .to_boxed()
-      .flatten()
       .to_boxed()
   }
 
