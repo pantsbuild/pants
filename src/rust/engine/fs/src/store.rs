@@ -10,7 +10,7 @@ use protobuf::core::Message;
 use sha2::Sha256;
 use std::error::Error;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use hash::Fingerprint;
 use pool::ResettablePool;
@@ -133,7 +133,7 @@ impl Store {
     self.load_bytes(fingerprint, self.inner.file_store.clone())
   }
 
-  pub fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + 'static>(
+  pub fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     fingerprint: Fingerprint,
     f: F,
@@ -177,7 +177,7 @@ impl Store {
     self.load_bytes_with(fingerprint, db, |bytes| Vec::from(bytes))
   }
 
-  fn load_bytes_with<T: Send + 'static + Sized, F: Fn(&[u8]) -> T + Send + 'static>(
+  fn load_bytes_with<T: Send + 'static + Sized, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     fingerprint: Fingerprint,
     db: Database,
@@ -186,7 +186,7 @@ impl Store {
     let grpc_env = self.inner.grpc_env.clone();
     let store = self.clone();
 
-    let f = Arc::new(Mutex::new(f));
+    let f = Arc::new(f);
     self
       .load_bytes_local_with(fingerprint, db, f.clone())
       .map(move |maybe_bytes| match maybe_bytes {
@@ -205,11 +205,11 @@ impl Store {
       .to_boxed()
   }
 
-  fn load_bytes_local_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + 'static>(
+  fn load_bytes_local_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     fingerprint: Fingerprint,
     db: Database,
-    f: Arc<Mutex<F>>,
+    f: Arc<F>,
   ) -> CpuFuture<Option<T>, String> {
     let store = self.inner.clone();
     self.inner.pool.spawn_fn(move || {
@@ -220,10 +220,7 @@ impl Store {
         )
       });
       ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
-        Ok(bytes) => {
-          let f = f.lock().unwrap();
-          Ok(Some(f(bytes)))
-        }
+        Ok(bytes) => Ok(Some(f(bytes))),
         Err(NotFound) => Ok(None),
         Err(err) => Err(format!(
           "Error loading fingerprint {}: {}",
@@ -234,11 +231,11 @@ impl Store {
     })
   }
 
-  fn load_bytes_remote_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + 'static>(
+  fn load_bytes_remote_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     fingerprint: Fingerprint,
     db: Database,
-    f: Arc<Mutex<F>>,
+    f: Arc<F>,
     cas_address: &str,
     env: Arc<grpcio::Environment>,
   ) -> BoxFuture<Option<T>, String> {
@@ -259,7 +256,8 @@ impl Store {
 
     // We shouldn't have to pass around the client here, it's a workaround for
     // https://github.com/pingcap/grpc-rs/issues/123
-    future::ok(client).join(stream.map(|r| r.data).concat2())
+    future::ok(client)
+      .join(stream.map(|r| r.data).concat2())
       .map(|(_client, bytes)| Some(bytes))
       .or_else(|e| match e {
         grpcio::Error::RpcFailure(grpcio::RpcStatus {
@@ -267,7 +265,7 @@ impl Store {
                                   }) => Ok(None),
         _ => Err(format!("Error making CAS read request: {:?}", e)),
       })
-      .and_then(move |maybe_bytes: Option<Vec<u8>>| match maybe_bytes {
+      .and_then(move |maybe_bytes| match maybe_bytes {
         Some(bytes) => {
           if db == directory_db {
             match Store::validate_directory(&bytes) {
@@ -292,7 +290,6 @@ impl Store {
                           retrieved_fingerprint))
                     }
                   }).map(move |()| {
-                let f = f.lock().unwrap();
                 Some(f(&bytes))
               }).to_boxed()
         }
