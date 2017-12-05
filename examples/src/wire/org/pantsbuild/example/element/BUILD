@@ -3,7 +3,8 @@
 
 java_wire_library(
   sources=[
-    'elements.proto', # Order matters here.
+    # Order matters here.
+    'elements.proto',
     'compound.proto',
   ],
   dependencies=[
