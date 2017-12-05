@@ -9,6 +9,7 @@ use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
 use fs::{Fingerprint, GetFileDigest, ResettablePool, Snapshot, Store, VFS};
 use futures::future::{self, Future, join_all};
+use protobuf::Message;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, Write};
@@ -234,13 +235,15 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("cat-proto", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
           let proto_bytes = match args.value_of("output-format").unwrap() {
-            "binary" => store.load_directory_proto_bytes(fingerprint).wait(),
+            "binary" => {
+              store.load_directory(fingerprint).wait().map(|maybe_d| {
+                maybe_d.map(|d| d.write_to_bytes().unwrap())
+              })
+            }
             "text" => {
-              store.load_directory_proto(fingerprint).wait().map(
-                |maybe_p| {
-                  maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
-                },
-              )
+              store.load_directory(fingerprint).wait().map(|maybe_p| {
+                maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
+              })
             }
             format => Err(format!(
               "Unexpected value of --output-format arg: {}",
@@ -266,8 +269,21 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
     }
     ("cat", Some(args)) => {
       let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-      let v = match store.load_file_bytes(fingerprint).wait()? {
-        None => store.load_directory_proto_bytes(fingerprint).wait()?,
+      let v = match store
+        .load_file_bytes_with(fingerprint, |bytes| Vec::from(bytes))
+        .wait()? {
+        None => {
+          store
+            .load_directory(fingerprint)
+            .map(|maybe_dir| {
+              maybe_dir.map(|dir| {
+                dir.write_to_bytes().expect(
+                  "Error serializing Directory proto",
+                )
+              })
+            })
+            .wait()?
+        }
         some => some,
       };
       match v {
@@ -327,7 +343,7 @@ fn materialize_directory(
     Err(e) => return future::err(e).to_boxed(),
   };
   store
-    .load_directory_proto(fingerprint)
+    .load_directory(fingerprint)
     .map_err(|e| e.into())
     .and_then(move |directory_opt| {
       directory_opt.ok_or_else(|| {

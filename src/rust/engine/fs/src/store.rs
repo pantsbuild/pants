@@ -49,11 +49,11 @@ impl Store {
   pub fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     fingerprint: Fingerprint,
-    f: Arc<F>,
+    f: F,
   ) -> BoxFuture<Option<T>, String> {
     self.local.load_file_bytes_with(
       fingerprint.clone(),
-      f.clone(),
+      Arc::new(f),
     )
   }
 
