@@ -27,13 +27,12 @@ from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.source.source_root import SourceRootConfig
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir, safe_rm_oldest_items_in_dir
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.meta import AbstractClass, classproperty
 
 
-class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
+class TaskBase(Optionable, AbstractClass):
   """Defines a lifecycle that prepares a task for execution and provides the base machinery
   needed to execute it.
 
@@ -59,40 +58,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   """
   options_scope_category = ScopeInfo.TASK
 
-  # We set this explicitly on the synthetic subclass, so that it shares a stable name with
-  # its superclass, which is not necessary for regular use, but can be convenient in tests.
-  _stable_name = None
-
-  @classmethod
-  def implementation_version(cls):
-    """
-    :API: public
-    """
-    return [('TaskBase', 2)]
-
-  @classmethod
-  @memoized_method
-  def implementation_version_str(cls):
-    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_version()])
-
-  @classmethod
-  @memoized_method
-  def implementation_version_slug(cls):
-    return sha1(cls.implementation_version_str().encode('utf-8')).hexdigest()[:12]
-
-  @classmethod
-  def stable_name(cls):
-    """The stable name of this task type.
-
-    We synthesize subclasses of the task types at runtime, and these synthesized subclasses
-    may have random names (e.g., in tests), so this gives us a stable name to use across runs,
-    e.g., in artifact cache references.
-    """
-    return cls._stable_name or cls._compute_stable_name()
-
-  @classmethod
-  def _compute_stable_name(cls):
-    return '{}_{}'.format(cls.__module__, cls.__name__).replace('.', '_')
+  implementation_versions = [('TaskBase', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -111,14 +77,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     return []
-
-  @classmethod
-  def supports_passthru_args(cls):
-    """Subclasses may override to indicate that they can use passthru args.
-
-    :API: public
-    """
-    return False
 
   @classmethod
   def _scoped_options(cls, options):
@@ -184,6 +142,18 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   @memoized_property
   def _build_invalidator(self):
     return BuildInvalidator.Factory.create(build_task=self.fingerprint)
+
+  def _fingerprint(self):
+    hasher = sha1()
+    for scope_info in self.known_scope_infos():
+      pairs = self.context.options.get_fingerprintable_for_scope(
+        scope_info.scope,
+        include_passthru=self.supports_passthru_args())
+      for (option_type, option_val) in pairs:
+        fp = self._options_fingerprinter.fingerprint(option_type, option_val)
+        if fp is not None:
+          hasher.update(fp)
+    return str(hasher.hexdigest())
 
   def get_options(self):
     """Returns the option values for this task's scope.
@@ -255,7 +225,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     if not self.target_filtering_enabled:
       return initial_targets
-    else: 
+    else:
       return self._filter_targets(initial_targets)
 
   def _filter_targets(self, targets):
@@ -294,6 +264,8 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     safe_mkdir(versioned_workdir)
     return versioned_workdir
 
+  # TODO: move some stuff back to Task, and move some of the new subsystem dependency stuff to
+  # Optionable!
   def _options_fingerprint(self, scope):
     options_hasher = sha1()
     options_hasher.update(scope.encode('utf-8'))

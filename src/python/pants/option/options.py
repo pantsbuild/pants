@@ -89,7 +89,7 @@ class Options(object):
 
     Also adds any deprecated scopes.
     """
-    ret = {GlobalOptionsRegistrar.get_scope_info()}
+    ret = set(GlobalOptionsRegistrar.known_scope_infos())
     original_scopes = set()
     for si in scope_infos:
       ret.add(si)
@@ -283,20 +283,6 @@ class Options(object):
     deprecated_scope = self.known_scope_to_info[scope].deprecated_scope
     if deprecated_scope:
       self.get_parser(deprecated_scope).register(*args, **kwargs)
-
-  def registration_function_for_optionable(self, optionable_class):
-    """Returns a function for registering options on the given scope."""
-    self._assert_not_frozen()
-    # TODO(benjy): Make this an instance of a class that implements __call__, so we can
-    # docstring it, and so it's less weird than attatching properties to a function.
-    def register(*args, **kwargs):
-      kwargs['registering_class'] = optionable_class
-      self.register(optionable_class.options_scope, *args, **kwargs)
-    # Clients can access the bootstrap option values as register.bootstrap.
-    register.bootstrap = self.bootstrap_option_values()
-    # Clients can access the scope as register.scope.
-    register.scope = optionable_class.options_scope
-    return register
 
   def get_parser(self, scope):
     """Returns the parser for the given scope, so code can register on it directly."""

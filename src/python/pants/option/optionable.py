@@ -8,11 +8,14 @@ import functools
 import re
 from abc import abstractproperty
 from builtins import str
+from hashlib import sha1
 
 from pants.engine.selectors import Get
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import AbstractClass, classproperty
+from pants.util.memo import memoized_method, memoized_property
 
 
 def _construct_optionable(optionable_factory):
@@ -54,6 +57,21 @@ class OptionableFactory(AbstractClass):
       )
 
 
+class SubsystemDependency(namedtuple('_SubsystemDependency', ('subsystem_cls', 'scope'))):
+  def subsystem_dependency_joined_scope(self):
+    return self.subsystem_cls.subscope(self.scope)
+
+
+class SubsystemClientError(Exception): pass
+
+
+class Register(namedtuple('_Register', ('options', 'optionable', 'bootstrap', 'scope'))):
+  def __call__(self, *args, **kwargs):
+    kwargs['registering_class'] = self.optionable
+    # print('args: {}, kwargs: {}'.format(args, kwargs))
+    self.options.register(self.scope, *args, **kwargs)
+
+
 class Optionable(OptionableFactory, AbstractClass):
   """A mixin for classes that can register options on some scope."""
 
@@ -67,6 +85,155 @@ class Optionable(OptionableFactory, AbstractClass):
   # a valid semver).
   deprecated_options_scope = None
   deprecated_options_scope_removal_version = None
+
+  implementation_versions = []
+
+  @classmethod
+  @memoized_method
+  def implementation_version_str(cls):
+    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_versions])
+
+  @classmethod
+  @memoized_method
+  def implementation_version_slug(cls):
+    return sha1(cls.implementation_version_str().encode('utf-8')).hexdigest()[:12]
+
+  # We set this explicitly on the synthetic subclass, so that it shares a stable name with
+  # its superclass, which is not necessary for regular use, but can be convenient in tests.
+  _stable_name = None
+  @classmethod
+  def stable_name(cls):
+    """The stable name of this task type.
+
+    We synthesize subclasses of the task types at runtime, and these synthesized subclasses
+    may have random names (e.g., in tests), so this gives us a stable name to use across runs,
+    e.g., in artifact cache references.
+    """
+    return cls._stable_name or cls._compute_stable_name()
+
+  @classmethod
+  def _compute_stable_name(cls):
+    return '{}_{}'.format(cls.__module__, cls.__name__).replace('.', '_')
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    """The subsystems this object uses.
+
+    Override to specify your subsystem dependencies. Always add them to your superclass's value.
+
+    Note: Do not call this directly to retrieve dependencies. See subsystem_dependencies_iter().
+
+    :return: A tuple of SubsystemDependency instances.
+             In the common case where you're an optionable and you want to get an instance scoped
+             to you, call subsystem_cls.scoped(cls) to get an appropriate SubsystemDependency.
+             As a convenience, you may also provide just a subsystem_cls, which is shorthand for
+             SubsystemDependency(subsystem_cls, GLOBAL SCOPE) and indicates that we want to use
+             the global instance of that subsystem.
+    """
+    return tuple()
+
+  @classmethod
+  def subsystem_dependencies_iter(cls):
+    """Iterate over the direct subsystem dependencies of this Optionable."""
+    for dep in cls.subsystem_dependencies():
+      if isinstance(dep, SubsystemDependency):
+        yield dep
+      else:
+        yield SubsystemDependency(dep, GLOBAL_SCOPE, removal_version=None, removal_hint=None)
+
+  @classmethod
+  def subsystem_closure_iter(cls):
+    """Iterate over the transitive closure of subsystem dependencies of this Optionable.
+
+    :rtype: :class:`collections.Iterator` of :class:`SubsystemDependency`
+    :raises: :class:`pants.subsystem.subsystem_client_mixin.SubsystemClientMixin.CycleException`
+             if a dependency cycle is detected.
+    """
+    seen = set()
+    dep_path = OrderedSet()
+
+    def iter_subsystem_closure(subsystem_cls):
+      if subsystem_cls in dep_path:
+        raise cls.CycleException(list(dep_path) + [subsystem_cls])
+      dep_path.add(subsystem_cls)
+
+      for dep in subsystem_cls.subsystem_dependencies_iter():
+        if dep not in seen:
+          seen.add(dep)
+          yield dep
+          for d in iter_subsystem_closure(dep.subsystem_cls):
+            yield d
+
+      dep_path.remove(subsystem_cls)
+
+    for dep in iter_subsystem_closure(cls):
+      yield dep
+
+  class CycleException(Exception):
+    """Thrown when a circular subsystem dependency is detected."""
+
+    def __init__(self, cycle):
+      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
+        '{} scope: {}'.format(optionable_cls, optionable_cls.options_scope)
+        for optionable_cls in cycle))
+      super(SubsystemClientMixin.CycleException, self).__init__(message)
+
+  def _options(self):
+    return None
+
+  @classmethod
+  def subscope(cls, scope):
+    if cls.options_scope is None or cls.options_scope_category is None:
+      raise OptionsError(
+        '{} must set options_scope and options_scope_category.'.format(cls.__name__))
+    cls.validate_scope_name(cls.options_scope)
+    if scope is None:
+      raise OptionsError('TODO: err msg')
+    if scope == GLOBAL_SCOPE:
+      ret = cls.options_scope
+    else:
+      ret = '{0}.{1}'.format(cls.options_scope, scope)
+    cls.validate_scope_name(ret)
+    return ret
+
+  @classmethod
+  def get_scope_info(cls, subscope=None):
+    """Returns a ScopeInfo instance representing this Optionable's options scope."""
+    if subscope is None:
+      combined_scope = cls.options_scope
+    else:
+      combined_scope = cls.subscope(subscope)
+    return ScopeInfo(combined_scope, cls.options_scope_category, cls)
+
+  # FIXME: add subscope arg and make this recursive!
+  @classmethod
+  def known_scope_infos(cls):
+    """Yields ScopeInfo for all known scopes for this task, in no particular order."""
+    # The task's own scope.
+    yield cls.get_scope_info()
+    # The scopes of any task-specific subsystems it uses.
+    for dep in cls.subsystem_closure_iter():
+      if not dep.scope == GLOBAL_SCOPE:
+        yield dep.subsystem_cls.get_scope_info(subscope=dep.scope)
+
+  def _fingerprint(self):
+    return None
+
+  @memoized_property
+  def fingerprint(self):
+    hasher = sha1()
+    hasher.update(self.stable_name())
+    hasher.update(self.implementation_version_str())
+    for scope_info in self.known_scope_infos():
+      hasher.update(str(scope_info))
+    prev_fingerprint = self._fingerprint()
+    if prev_fingerprint is not None:
+      hasher.update(prev_fingerprint)
+    return str(hasher.hexdigest())
+
+  @classmethod
+  def supports_passthru_args(cls):
+    return False
 
   _scope_name_component_re = re.compile(r'^(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*$')
 
@@ -86,13 +253,17 @@ class Optionable(OptionableFactory, AbstractClass):
                          'Replace in code with a new scope name consisting of dash-separated-words, '
                          'with words consisting only of lower-case letters and digits.'.format(s))
 
+  _scope_name_re = re.compile(r'(?:(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*(?:\.(?:[a-z0-9])+(?:-(?:[a-z0-9])+)*)*)?')
+
   @classmethod
-  def get_scope_info(cls):
-    """Returns a ScopeInfo instance representing this Optionable's options scope."""
-    if cls.options_scope is None or cls.options_scope_category is None:
-      raise OptionsError(
-        '{} must set options_scope and options_scope_category.'.format(cls.__name__))
-    return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
+  def is_valid_scope_name(cls, s):
+    return s is None or cls._scope_name_re.match(s) is not None
+
+  @classmethod
+  def validate_scope_name(cls, s):
+    if not cls.is_valid_scope_name(cls.options_scope):
+      raise OptionsError('Options scope "{}" is not valid:\n'
+                         'TODO: err msg'.format(cls.options_scope))
 
   @classmethod
   def subscope(cls, scope):
@@ -135,7 +306,7 @@ class Optionable(OptionableFactory, AbstractClass):
 
     Subclasses should not generally need to override this method.
     """
-    cls.register_options(options.registration_function_for_optionable(cls))
+    cls.register_options(Register(options, cls, options.bootstrap_option_values(), cls.options_scope))
 
   def __init__(self):
     # Check that the instance's class defines options_scope.

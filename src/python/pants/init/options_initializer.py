@@ -81,6 +81,7 @@ class OptionsInitializer(object):
     :returns: An Options object representing the full set of runtime options.
     """
     # Now that plugins and backends are loaded, we can gather the known scopes.
+    known_scope_infos = set(GlobalOptionsRegistrar.known_scope_infos())
 
     # Gather the optionables that are not scoped to any other.  All known scopes are reachable
     # via these optionables' known_scope_infos() methods.
@@ -90,6 +91,19 @@ class OptionsInitializer(object):
       build_configuration.optionables() |
       set(Goal.get_optionables())
     )
+    for ss in subsystems:
+      known_scope_infos |= set(ss.known_scope_infos())
+
+    # Add scopes for all tasks in all goals.
+    for goal in Goal.all():
+      known_scope_infos |= set(filter(None, goal.known_scope_infos()))
+
+    # Now that we have the known scopes we can get the full options.
+    options = options_bootstrapper.get_full_options(known_scope_infos)
+    self._register_options(subsystems, options)
+
+    # Make the options values available to all subsystems.
+    Subsystem.set_options(options)
 
     # Now that we have the known scopes we can get the full options. `get_full_options` will
     # sort and de-duplicate these for us.

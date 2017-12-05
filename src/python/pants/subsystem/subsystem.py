@@ -6,16 +6,16 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import inspect
 
-from pants.option.optionable import Optionable
+from pants.build_graph.address import Address
+from pants.option.optionable import Optionable, SubsystemDependency
 from pants.option.scope import ScopeInfo
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, SubsystemDependency
 
 
 class SubsystemError(Exception):
   """An error in a subsystem."""
 
 
-class Subsystem(SubsystemClientMixin, Optionable):
+class Subsystem(Optionable):
   """A separable piece of functionality that may be reused across multiple tasks or other code.
 
   Subsystems encapsulate the configuration and initialization of things like JVMs,
