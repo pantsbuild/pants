@@ -55,7 +55,6 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
              fingerprint=True,
              help='If specified, all artifact revisions matching this pattern will be treated as '
                   'mutable unless a matching artifact explicitly marks mutable as False.')
-
     cls.register_jvm_tool(register,
                           'xalan',
                           classpath=[
@@ -87,8 +86,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
     """
-    jvm_resolve_subsystem = JvmResolveSubsystem.global_instance()
-    if jvm_resolve_subsystem.get_options().resolver != 'ivy':
+    if JvmResolveSubsystem.global_instance().get_options().resolver != 'ivy':
       return
 
     executor = self.create_java_executor()

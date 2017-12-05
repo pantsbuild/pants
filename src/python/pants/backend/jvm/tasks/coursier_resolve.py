@@ -96,7 +96,7 @@ class CoursierMixin(NailgunTask):
       jars_to_resolve.extend(jar_list)
       for jar in jar_list:
         for ex in jar.excludes:
-          # `--` means exclude. See --soft-exclude-file in coursier
+          # `--` means exclude. See --soft-exclude-file in `coursier fetch --help`
           ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
           exclude_args.add(ex_arg)
 

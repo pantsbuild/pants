@@ -106,11 +106,6 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
              help='Causes sources to be output.')
     register('--formatted', type=bool, implicit_value=False,
              help='Causes output to be a single line of JSON.')
-    # # Required by IvyTaskMixin.
-    # # TODO: Remove this once IvyTaskMixin registers an --ivy-jvm-options option.
-    # # See also https://github.com/pantsbuild/pants/issues/3200.
-    # register('--jvm-options', type=list, metavar='<option>...',
-    #          help='Run Ivy with these extra jvm options.')
 
   @classmethod
   def prepare(cls, options, round_manager):
