@@ -11,6 +11,8 @@ from builtins import str
 from hashlib import sha1
 
 from pants.engine.selectors import Get
+from twitter.common.collections import OrderedSet
+
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
@@ -87,6 +89,14 @@ class Optionable(OptionableFactory, AbstractClass):
   deprecated_options_scope_removal_version = None
 
   implementation_versions = []
+
+  class CycleException(Exception):
+    """Thrown when a circular dependency is detected."""
+
+    def __init__(self, cycle):
+      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
+          '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
+      super(Optionable.CycleException, self).__init__(message)
 
   @classmethod
   @memoized_method
@@ -216,19 +226,38 @@ class Optionable(OptionableFactory, AbstractClass):
       if not dep.scope == GLOBAL_SCOPE:
         yield dep.subsystem_cls.get_scope_info(subscope=dep.scope)
 
-  def _fingerprint(self):
-    return None
+  @classmethod
+  def closure_scope_info_strs(cls):
+    q = [(ss, OrderedSet()) for ss in cls.subsystem_dependencies_iter()]
+    known_subsystem_types = set()
+    if cls.options_scope is None:
+      raise Exception('TODO: err msg (cls: {})'.format(cls))
+    known_scopes = set([cls.options_scope])
+
+    while len(q) > 0:
+      (sdep, ss_path) = q.pop()
+      (ss, _) = sdep
+      if ss in ss_path:
+        cycle = list(ss_path) + [ss]
+        raise cls.CycleException(cycle)
+      if ss not in known_subsystem_types:
+        known_subsystem_types.add(ss)
+        joined_scope = sdep.subsystem_dependency_joined_scope()
+        if joined_scope in known_scopes:
+          raise Exception('TODO: err msg (joined_scope: {})'.format(joined_scope))
+        known_scopes.add(joined_scope)
+      for dep in ss.subsystem_dependencies_iter():
+        q.append((dep, ss_path | [ss]))
+
+    return known_scopes
 
   @memoized_property
   def fingerprint(self):
     hasher = sha1()
     hasher.update(self.stable_name())
     hasher.update(self.implementation_version_str())
-    for scope_info in self.known_scope_infos():
-      hasher.update(str(scope_info))
-    prev_fingerprint = self._fingerprint()
-    if prev_fingerprint is not None:
-      hasher.update(prev_fingerprint)
+    for scope_info in self.closure_scope_info_strs():
+      hasher.update(scope_info)
     return str(hasher.hexdigest())
 
   @classmethod

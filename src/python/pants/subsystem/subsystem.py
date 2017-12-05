@@ -45,6 +45,12 @@ class Subsystem(Optionable):
         'Subsystem "{}" not initialized for scope "{}". '
         'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
 
+  class NoMappingForKey(Exception):
+    """Thrown when a mapping doesn't exist for a given injectables key."""
+
+  class TooManySpecsForKey(Exception):
+    """Thrown when a mapping contains multiple specs when a singular spec is expected."""
+
   @classmethod
   def is_subsystem_type(cls, obj):
     return inspect.isclass(obj) and issubclass(obj, cls)

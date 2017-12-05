@@ -143,11 +143,13 @@ class TaskBase(Optionable, AbstractClass):
   def _build_invalidator(self):
     return BuildInvalidator.Factory.create(build_task=self.fingerprint)
 
-  def _fingerprint(self):
+  @memoized_property
+  def fingerprint(self):
     hasher = sha1()
-    for scope_info in self.known_scope_infos():
+    hasher.update(super(TaskBase, self).fingerprint)
+    for scope_info in self.closure_scope_info_strs():
       pairs = self.context.options.get_fingerprintable_for_scope(
-        scope_info.scope,
+        scope_info,
         include_passthru=self.supports_passthru_args())
       for (option_type, option_val) in pairs:
         fp = self._options_fingerprinter.fingerprint(option_type, option_val)
