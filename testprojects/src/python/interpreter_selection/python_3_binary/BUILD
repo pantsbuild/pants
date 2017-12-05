@@ -37,5 +37,6 @@ python_tests(
   ],
   dependencies=[
     ':main'
-  ]
+  ],
+  compatibility=['CPython>3']
 )

@@ -141,7 +141,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
         with safe_concurrent_creation(path) as safe_path:
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
-          # Add interpreter compatibility constraints from relevant targets
+          # Add target interpreter compatibilities to pex info
           for rt in relevant_targets:
             for constraint in rt.compatibility:
               builder.add_interpreter_constraint(constraint)

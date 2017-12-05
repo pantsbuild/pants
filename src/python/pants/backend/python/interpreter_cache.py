@@ -42,10 +42,10 @@ class PythonInterpreterCache(object):
 
   @property
   def pex_python_path_list(self):
-    """Returns a list of paths to Python interpreter binaries as defined by a
+    """A list of paths to Python interpreter binaries as defined by a
       PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc', or ./.pexrc'.
       PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
-      that a pex can be built and run against.
+      that a pex can be built and ran against.
 
       :return: paths to interpreters as specified by PEX_PYTHON_PATH
       :rtype: list
@@ -151,10 +151,10 @@ class PythonInterpreterCache(object):
     if not any(filters) and not pex_python_path_interpreters:
       filters = self._python_setup.interpreter_constraints
     setup_paths = (paths
-                   or self.pex_python_path_list
+                   or pex_python_path_interpreters
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
-    
+
     def unsatisfied_filters(interpreters):
       return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
 

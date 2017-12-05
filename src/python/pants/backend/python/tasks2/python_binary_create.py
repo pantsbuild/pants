@@ -120,7 +120,7 @@ class PythonBinaryCreate(Task):
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
-          # Add target interpreter compatibilities to pex info
+          # Add target's interpreter compatibility constraints to pex info
           for constraint in tgt.compatibility:
             builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
