@@ -9,8 +9,10 @@ from pants.goal.task_registrar import TaskRegistrar as task
 
 from pants.contrib.buildrefactor.buildozer import Buildozer
 from pants.contrib.buildrefactor.meta_rename import MetaRename
+from pants.contrib.buildrefactor.meta_relocate import MetaRelocate
 
 
 def register_goals():
   task(name='buildozer', action=Buildozer).install('buildozer')
   task(name='meta-rename', action=MetaRename).install('meta-rename')
+  task(name='meta-relocate', action=MetaRelocate).install('meta-relocate')

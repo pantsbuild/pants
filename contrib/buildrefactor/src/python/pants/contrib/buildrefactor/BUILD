@@ -25,3 +25,8 @@ python_library(
   name='meta_rename',
   sources=['meta_rename.py']
 )
+
+python_library(
+  name='meta_relocate',
+  sources=['meta_relocate.py']
+)
