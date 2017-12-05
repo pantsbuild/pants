@@ -144,14 +144,14 @@ class PythonInterpreterCache(object):
     :returns: A list of cached interpreters
     :rtype: list of :class:`pex.interpreter.PythonInterpreter`
     """
-    pex_python_path_interpreters = self.pex_python_path_list
+    pex_python_path_interpreter_paths = self.pex_python_path_list
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    if not any(filters) and not pex_python_path_interpreters:
+    if not any(filters) and not pex_python_path_interpreter_paths:
       filters = self._python_setup.interpreter_constraints
     setup_paths = (paths
-                   or pex_python_path_interpreters
+                   or pex_python_path_interpreter_paths
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
 

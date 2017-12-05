@@ -5,7 +5,7 @@
 # To successfully build and run this binary target, the user will need to define a 
 # .pexrc file in /etx/pexrc, ~/.pexrc, or in a .pexrc in the pants root dir. The pexrc 
 # will need to contain a PEX_PYTHON_PATH variable containing an absolute path to a 
-# python 3 interpreter 
+# python 3 interpreter.
 #
 # An example of a PEX_PYTHON_PATH variable in a pexrc:
 # 	PEX_PYTHON_PATH=/path/to/python2.7:/path/to/python3.6
