@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import os
+import pickle
 from collections import defaultdict
 
 from twitter.common.collections import OrderedDict
@@ -26,6 +27,7 @@ from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
+from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
 from pants.util.process_handler import subprocess
 
@@ -38,6 +40,10 @@ class CoursierError(Exception):
 
 
 class CoursierMixin(NailgunTask):
+
+  @classmethod
+  def implementation_version(cls):
+    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 0)]
 
   @classmethod
   def register_options(cls, register):
@@ -107,8 +113,6 @@ class CoursierMixin(NailgunTask):
     :return:
     """
 
-    fingerprint_strategy = CouriserResolveFingerprintStrategy([])
-
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
 
     coursier_jar = coursier_subsystem_instance.bootstrap_coursier()
@@ -123,24 +127,27 @@ class CoursierMixin(NailgunTask):
       with self.invalidated(target_subset,
                             invalidate_dependents=False,
                             silent=False,
-                            fingerprint_strategy=fingerprint_strategy) as invalidation_check:
+                            fingerprint_strategy=CouriserResolveFingerprintStrategy([])) as invalidation_check:
 
         target_resolution_filename = 'coursier_resolve.json'
         if not invalidation_check.invalid_vts:
           self._load_result_from_cache(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
           return
 
-        for vt in invalidation_check.all_vts:
-          if isinstance(vt.target, JarLibrary):
-            vt.force_invalidate()
-
         jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
                                                                                                           artifact_set,
                                                                                                           manager)
         # Prepare coursier args
-        output_fn = 'output.json'
         coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
         pants_jar_path_base = os.path.join(self.get_options().pants_workdir, 'coursier')
+        safe_mkdir(pants_jar_path_base)
+
+        coursier_workdir = os.path.join(self.get_options().pants_workdir, 'tmp')
+        safe_mkdir(coursier_workdir)
+
+
+        with temporary_file(coursier_workdir, cleanup=False) as f:
+          output_fn = f.name
 
         common_args = ['fetch',
                        # Print the resolution tree
@@ -159,14 +166,14 @@ class CoursierMixin(NailgunTask):
         # Coursier calls need to be divided by classifier because coursier treats classifier option globally.
         for classifier, classified_jars in classifier_to_jars.items():
 
-          cmd_args = self.construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
-                                             local_exclude_args, pinned_coords)
+          cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
+                                              local_exclude_args, pinned_coords, coursier_workdir)
 
           cmd_str = ' '.join(cmd_args)
           logger.info(cmd_str)
 
           try:
-            # with workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+            # with self.context.workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
 
             return_code = self.runjava(
               classpath=[coursier_jar],
@@ -182,11 +189,11 @@ class CoursierMixin(NailgunTask):
 
             # workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
-            with open(output_fn) as f:
-              result = json.loads(f.read())
-
             if return_code:
               raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+
+            with open(output_fn) as f:
+              result = json.loads(f.read())
 
           except subprocess.CalledProcessError as e:
             raise CoursierError(e)
@@ -239,7 +246,7 @@ class CoursierMixin(NailgunTask):
       t = vt.target
       if isinstance(t, JarLibrary):
         with open(os.path.join(vt.results_dir, target_resolution_filename), 'w') as f:
-          f.write(json.dumps(compile_classpath.get_for_target(t)))
+          pickle.dump(compile_classpath.get_artifact_classpath_entries_for_targets([t]), f)
         vt.update()
 
   def _load_result_from_cache(self, compile_classpath, all_vts, target_resolution_filename):
@@ -248,11 +255,11 @@ class CoursierMixin(NailgunTask):
       if isinstance(t, JarLibrary):
         # compile_classpath.add_jars_for_targets
         with open(os.path.join(vt.results_dir, target_resolution_filename), 'r') as f:
-          tuples = json.loads(f.read())
-          compile_classpath.add_for_targets([t], tuples)
+          tuples_conf_artifact_classpath = pickle.load(f)
+          compile_classpath.add_elements_for_target(t, tuples_conf_artifact_classpath)
 
-  def construct_cmd_args(self, classified_jars, classifier, common_args, global_excludes, local_exclude_args,
-                         pinned_coords):
+  def _construct_cmd_args(self, classified_jars, classifier, common_args, global_excludes, local_exclude_args,
+                          pinned_coords, coursier_workdir):
     cmd_args = list(common_args)
     if classifier:
       cmd_args.extend(['--classifier', classifier])
@@ -269,16 +276,21 @@ class CoursierMixin(NailgunTask):
       if j.force:
         cmd_args.append('-V')
         cmd_args.append(j.coordinate.simple_coord)
+
+    # Force pinned coordinates
     for j in pinned_coords:
       cmd_args.append('-V')
       cmd_args.append(j.simple_coord)
-    if local_exclude_args:
-      exclude_file = 'excludes.txt'
-      with open(exclude_file, 'w') as f:
-        f.write('\n'.join(local_exclude_args).encode('utf8'))
 
-      cmd_args.append('--soft-exclude-file')
-      cmd_args.append(exclude_file)
+    if local_exclude_args:
+
+      with temporary_file(coursier_workdir, cleanup=False) as f:
+        exclude_file = f.name
+        with open(exclude_file, 'w') as ex_f:
+          ex_f.write('\n'.join(local_exclude_args).encode('utf8'))
+
+        cmd_args.append('--soft-exclude-file')
+        cmd_args.append(exclude_file)
 
     # TODO(wisechengyi): support exclusion on the whole org
     for ex in global_excludes:

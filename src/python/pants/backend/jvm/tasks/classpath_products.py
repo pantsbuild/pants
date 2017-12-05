@@ -300,7 +300,7 @@ class ClasspathProducts(object):
 
   def add_for_target(self, target, classpath_elements):
     """Adds classpath path elements to the products of the provided target."""
-    self._add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
+    self.add_elements_for_target(target, self._wrap_path_elements(classpath_elements))
 
   def add_jars_for_targets(self, targets, conf, resolved_jars):
     """Adds jar classpath elements to the products of the provided targets.
@@ -315,7 +315,7 @@ class ClasspathProducts(object):
       classpath_entries.append((conf, cp_entry))
 
     for target in targets:
-      self._add_elements_for_target(target, classpath_entries)
+      self.add_elements_for_target(target, classpath_entries)
 
   def add_excludes_for_targets(self, targets):
     """Add excludes from the provided targets.
@@ -445,7 +445,7 @@ class ClasspathProducts(object):
   def _wrap_path_elements(self, classpath_elements):
     return [(element[0], ClasspathEntry(element[1])) for element in classpath_elements]
 
-  def _add_elements_for_target(self, target, elements):
+  def add_elements_for_target(self, target, elements):
     self._validate_classpath_tuples(elements, target)
     self._classpaths.add_for_target(target, elements)
 
