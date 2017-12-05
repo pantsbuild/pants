@@ -441,6 +441,9 @@ class CouriserResolveFingerprintStrategy(FingerprintStrategy):
     for element in hash_elements_for_target:
       hasher.update(element)
 
+    # Just in case so we do not get collision with ivy cache
+    hasher.update('coursier')
+
     return hasher.hexdigest()
 
   def __hash__(self):
