@@ -21,6 +21,7 @@ import org.junit.runner.notification.RunListener;
 import org.pantsbuild.tools.junit.lib.AllFailingTest;
 import org.pantsbuild.tools.junit.lib.AllPassingTest;
 import org.pantsbuild.tools.junit.lib.ExceptionInSetupTest;
+import org.pantsbuild.tools.junit.lib.LogOutputInTeardownTest;
 import org.pantsbuild.tools.junit.lib.OutputModeTest;
 
 import static org.hamcrest.CoreMatchers.containsString;
@@ -251,5 +252,13 @@ public class ConsoleRunnerImplTest {
     String output = runTest(AllPassingTest.class, true);
     assertThat(output, containsString("OK (4 tests)"));
     assertThat(output, containsString("java.io.IOException: Bogus IOException"));
+  }
+
+  @Test
+  public void testOutputAfterTestFinished() {
+    outputMode = ConsoleRunnerImpl.OutputMode.ALL;
+    String output = runTest(LogOutputInTeardownTest.class);
+    assertThat(output, containsString("Output in tearDown"));
+    assertThat(output, containsString("OK (1 test)"));
   }
 }

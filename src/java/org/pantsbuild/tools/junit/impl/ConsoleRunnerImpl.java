@@ -303,6 +303,8 @@ public class ConsoleRunnerImpl {
 
     @Override
     public void testFinished(Description description) throws Exception {
+      swappableOut.swap(swappableOut.getOriginal());
+      swappableErr.swap(swappableErr.getOriginal());
       suiteCaptures.get(description.getTestClass()).close();
       if (caseCaptures.containsKey(description)) {
         caseCaptures.remove(description).close();
