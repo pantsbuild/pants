@@ -41,5 +41,7 @@ III.) The operation below should be done on MASTER. Publish a jar with:
 3) looks ok? do it:
 yes | ./pants publish.jar --no-dryrun src/java/org/pantsbuild/tools/junit
 
+4) Follow the steps at https://www.pantsbuild.org/release_jvm.html to promote the jar to Maven Central.
+
 IV.) Switch back to a dev branch. Make a change that bumps the revision number in BUILD.tools and
 un-@Ignores any tests temporarily ignored in step I.
