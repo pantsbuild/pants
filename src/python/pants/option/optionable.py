@@ -88,7 +88,12 @@ class Optionable(OptionableFactory, AbstractClass):
   deprecated_options_scope = None
   deprecated_options_scope_removal_version = None
 
-  implementation_versions = []
+  @classmethod
+  def implementation_versions(cls):
+    """
+    :API: public
+    """
+    return []
 
   class CycleException(Exception):
     """Thrown when a circular dependency is detected."""
@@ -101,7 +106,7 @@ class Optionable(OptionableFactory, AbstractClass):
   @classmethod
   @memoized_method
   def implementation_version_str(cls):
-    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_versions])
+    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_versions()])
 
   @classmethod
   @memoized_method
