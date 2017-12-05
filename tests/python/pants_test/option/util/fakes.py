@@ -120,7 +120,8 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def scope_to_flags(self):
       return {}
 
-    def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
+    def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False,
+                                      fingerprint_key=None, invert=False):
       """Returns a list of fingerprintable (option type, option value) pairs for
       the given scope.
 
@@ -131,6 +132,10 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
                                     fingerprintable options.
       """
+      if fingerprint_key is not None:
+        raise Exception('fingerprint key not none: {}'.format(fingerprint_key))
+      if invert is True:
+        raise Exception('invert is true')
       pairs = []
       if include_passthru:
         pu_args = self.passthru_args_for_scope(bottom_scope)
