@@ -86,7 +86,7 @@ function pkg_pants_testinfra_install_test() {
   python -c "import pants_test"
 }
 
-# O/nce an individual (new) package is declared above, insert it into the array below)
+# Once an individual (new) package is declared above, insert it into the array below)
 CORE_PACKAGES=(
   PKG_PANTS
   PKG_PANTS_TESTINFRA
