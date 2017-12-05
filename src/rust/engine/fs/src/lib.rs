@@ -16,6 +16,7 @@ extern crate digest;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
+extern crate grpcio;
 extern crate hex;
 extern crate ignore;
 extern crate itertools;
