@@ -141,6 +141,7 @@ class TaskBase(Optionable, AbstractClass):
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
     self._force_invalidated = False
 
+  # TODO: which fingerprint to use????
   @memoized_property
   def _build_invalidator(self):
     return BuildInvalidator.Factory.create(build_task=self.fingerprint)
