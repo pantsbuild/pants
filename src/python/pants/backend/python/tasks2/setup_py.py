@@ -31,6 +31,7 @@ from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree, safe_walk
+from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
@@ -231,7 +232,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
     #     3rdparty since these may be introduced by exported subgraphs we discover in later steps!
     # 2.) Determine the owner of each target collected in 1 by walking the ancestor chain to find
     #     the closest exported target.  The ancestor chain is just all targets whose spec path is
-    #     a prefix of th descendant.  In other words, all targets in descendant's BUILD file family
+    #     a prefix of the descendant.  In other words, all targets in descendant's BUILD file family
     #     (its siblings), all targets in its parent directory BUILD file family, and so on.
     # 3.) Finally walk the exported target once more, replacing each visited dependency with its
     #     owner.
@@ -242,11 +243,15 @@ class ExportedTargetDependencyCalculator(AbstractClass):
 
     owner_by_owned_python_target = OrderedDict()
 
+    # Only check ownership on the original target graph.
+    original_exported_target = exported_target.derived_from
+
     def collect_potentially_owned_python_targets(current):
-      owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
+      if current.is_original:
+        owner_by_owned_python_target[current] = None  # We can't know the owner in the 1st pass.
       return (current == exported_target) or not self.is_exported(current)
 
-    self._walk(exported_target, collect_potentially_owned_python_targets)
+    self._walk(original_exported_target, collect_potentially_owned_python_targets)
 
     for owned in owner_by_owned_python_target:
       if self.requires_export(owned) and not self.is_exported(owned):
@@ -288,7 +293,7 @@ class ExportedTargetDependencyCalculator(AbstractClass):
         return owner == exported_target or not self.requires_export(current)
 
     self._walk(exported_target, collect_reduced_dependencies)
-    return reduced_dependencies
+    return OrderedSet(d for d in reduced_dependencies if d.is_original)
 
 
 class SetupPy(Task):
@@ -458,6 +463,11 @@ class SetupPy(Task):
     self._run = self.get_options().run
     self._recursive = self.get_options().recursive
 
+  @memoized_property
+  def derived_by_original(self):
+    derived = self.context.targets(predicate=lambda t: not t.is_original)
+    return {t.derived_from: t for t in derived}
+
   def write_contents(self, root_target, reduced_dependencies, chroot):
     """Write contents of the target."""
     def write_target_source(target, src):
@@ -475,11 +485,14 @@ class SetupPy(Task):
                       os.path.join(self.SOURCE_ROOT, src, '__init__.py'))
 
     def write_target(target):
-      for rel_source in target.sources_relative_to_buildroot():
+      # We want to operate on the final sources target owns, so we potentially replace it with
+      # the target derived from it (by a codegen task).
+      subject = self.derived_by_original.get(target, target)
+      for rel_source in subject.sources_relative_to_buildroot():
         abs_source_path = os.path.join(get_buildroot(), rel_source)
-        abs_source_root_path = os.path.join(get_buildroot(), target.target_base)
+        abs_source_root_path = os.path.join(get_buildroot(), subject.target_base)
         source_root_relative_path = os.path.relpath(abs_source_path, abs_source_root_path)
-        write_target_source(target, source_root_relative_path)
+        write_target_source(subject, source_root_relative_path)
 
     write_target(root_target)
     for dependency in reduced_dependencies:
@@ -576,24 +589,14 @@ class SetupPy(Task):
     return setup_dir, reduced_deps
 
   def execute(self):
-    # We operate on the target roots, except that we replace codegen targets with their
-    # corresponding synthetic targets, since those have the generated sources that actually
-    # get published. Note that the "provides" attributed is copied from the original target
-    # to the synthetic target,  so that the latter can be used as a direct stand-in for the
-    # former here.
-    preliminary_targets = set(t for t in self.context.target_roots if self.has_provides(t))
-    targets = set(preliminary_targets)
-    for t in self.context.targets():
-      # A non-codegen target has derived_from equal to itself, so we check is_original
-      # to ensure that the synthetic targets take precedence.
-      # We check that the synthetic target has the same "provides" as the original, because
-      # there are other synthetic targets in play (e.g., resources targets) to which this
-      # substitution logic must not apply.
-      if (t.derived_from in preliminary_targets and not t.is_original and
-          self.has_provides(t) and t.provides == t.derived_from.provides):
-        targets.discard(t.derived_from)
-        targets.add(t)
-    if not targets:
+    # We drive creation of setup.py distributions from the original target graph, grabbing codegen'd
+    # sources when needed.
+    def is_exported_python_target(t):
+      return t.is_original and self.has_provides(t)
+
+    exported_python_targets = OrderedSet(t for t in self.context.target_roots
+                                         if is_exported_python_target(t))
+    if not exported_python_targets:
       raise TaskError('setup-py target(s) must provide an artifact.')
 
     dist_dir = self.get_options().pants_distdir
@@ -605,23 +608,24 @@ class SetupPy(Task):
 
     created = {}
 
-    def create(target):
-      if target not in created:
-        self.context.log.info('Creating setup.py project for {}'.format(target))
-        setup_dir, dependencies = self.create_setup_py(target, dist_dir)
-        created[target] = setup_dir
+    def create(exported_python_target):
+      if exported_python_target not in created:
+        self.context.log.info('Creating setup.py project for {}'.format(exported_python_target))
+        subject = self.derived_by_original.get(exported_python_target, exported_python_target)
+        setup_dir, dependencies = self.create_setup_py(subject, dist_dir)
+        created[exported_python_target] = setup_dir
         if self._recursive:
           for dep in dependencies:
-            if self.has_provides(dep):
+            if is_exported_python_target(dep):
               create(dep)
 
-    for target in targets:
-      create(target)
+    for exported_python_target in exported_python_targets:
+      create(exported_python_target)
 
     interpreter = self.context.products.get_data(PythonInterpreter)
     python_dists = self.context.products.register_data(self.PYTHON_DISTS_PRODUCT, {})
-    for target in reversed(sort_targets(created.keys())):
-      setup_dir = created.get(target)
+    for exported_python_target in reversed(sort_targets(created.keys())):
+      setup_dir = created.get(exported_python_target)
       if setup_dir:
         if not self._run:
           self.context.log.info('Running packager against {}'.format(setup_dir))
@@ -631,9 +635,9 @@ class SetupPy(Task):
           self.context.log.info('Writing {}'.format(sdist_path))
           shutil.move(setup_runner.sdist(), sdist_path)
           safe_rmtree(setup_dir)
-          python_dists[target] = sdist_path
+          python_dists[exported_python_target] = sdist_path
         else:
           self.context.log.info('Running {} against {}'.format(self._run, setup_dir))
           setup_runner = SetupPyRunner(setup_dir, self._run, interpreter=interpreter)
           setup_runner.run()
-          python_dists[target] = setup_dir
+          python_dists[exported_python_target] = setup_dir
