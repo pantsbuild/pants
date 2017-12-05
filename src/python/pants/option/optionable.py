@@ -59,18 +59,16 @@ class OptionableFactory(AbstractClass):
       )
 
 
-class SubsystemDependency(namedtuple('_SubsystemDependency', ('subsystem_cls', 'scope'))):
+class SubsystemDependency(datatype('_SubsystemDependency', ('subsystem_cls', 'scope'))):
   def subsystem_dependency_joined_scope(self):
     return self.subsystem_cls.subscope(self.scope)
 
 
 class SubsystemClientError(Exception): pass
 
-
-class Register(namedtuple('_Register', ('options', 'optionable', 'bootstrap', 'scope'))):
+class Register(datatype('_Register', ('options', 'optionable', 'bootstrap', 'scope'))):
   def __call__(self, *args, **kwargs):
     kwargs['registering_class'] = self.optionable
-    # print('args: {}, kwargs: {}'.format(args, kwargs))
     self.options.register(self.scope, *args, **kwargs)
 
 
@@ -88,8 +86,9 @@ class Optionable(OptionableFactory, AbstractClass):
   deprecated_options_scope = None
   deprecated_options_scope_removal_version = None
 
+  # TODO: rename to `implementation_versions` and make into a `classproperty`!
   @classmethod
-  def implementation_versions(cls):
+  def implementation_version(cls):
     """
     :API: public
     """
@@ -106,7 +105,7 @@ class Optionable(OptionableFactory, AbstractClass):
   @classmethod
   @memoized_method
   def implementation_version_str(cls):
-    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_versions()])
+    return '.'.join(['_'.join(map(str, x)) for x in cls.implementation_versions])
 
   @classmethod
   @memoized_method
@@ -241,7 +240,7 @@ class Optionable(OptionableFactory, AbstractClass):
 
     while len(q) > 0:
       (sdep, ss_path) = q.pop()
-      (ss, _) = sdep
+      ss = sdep.subsystem_cls
       if ss in ss_path:
         cycle = list(ss_path) + [ss]
         raise cls.CycleException(cycle)

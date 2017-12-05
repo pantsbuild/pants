@@ -109,15 +109,19 @@ required a product type:
 Task Implementation Versioning
 ------------------------------
 
-Tasks may optionally specify an implementation version.  This is useful to be sure that cached
-objects from previous runs of pants using an older version are not used.  If you change a task
-class in a way that will impact its outputs you should update the version.  Implementation
-versions are set with the class method implementation_version.
+Any
+[`Optionable`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/option/optionable.py),
+including any `Task`, may optionally specify an implementation version. This is
+useful to be sure that cached objects from previous runs of pants using an older
+version are not used.  If you change a task class in a way that will impact its
+outputs you should update the version.  Implementation versions are set with the
+class method `implementation_version()`:
 
     :::python
     Class FooTask(Task):
       @classmethod
       def implementation_version(cls):
+        # NB: make sure to always append to the super class's implementation_version()!
         return super(FooTask, cls).implementation_version() + [('FooTask', 1)]
 
 We store both a version number and the name of the class in order to disambiguate changes in

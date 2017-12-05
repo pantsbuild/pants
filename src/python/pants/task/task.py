@@ -59,8 +59,8 @@ class TaskBase(Optionable, AbstractClass):
   options_scope_category = ScopeInfo.TASK
 
   @classmethod
-  def implementation_versions(cls):
-    return super(TaskBase, cls).implementation_versions() + [('TaskBase', 2)]
+  def implementation_version(cls):
+    return super(TaskBase, cls).implementation_version() + [('TaskBase', 2)]
 
   @classmethod
   def subsystem_dependencies(cls):

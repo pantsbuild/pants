@@ -40,8 +40,8 @@ class Subsystem(Optionable):
   options_scope_category = ScopeInfo.SUBSYSTEM
 
   @classmethod
-  def implementation_versions(cls):
-    return super(Subsystem, cls).implementation_versions() + [('Subsystem', 0)]
+  def implementation_version(cls):
+    return super(Subsystem, cls).implementation_version() + [('Subsystem', 0)]
 
   class UninitializedSubsystemError(SubsystemError):
     def __init__(self, class_name, scope):

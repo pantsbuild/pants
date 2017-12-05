@@ -92,7 +92,7 @@ class OptionsInitializer(object):
       set(Goal.get_optionables())
     )
     for ss in subsystems:
-      known_scope_infos |= set(ss.known_scope_infos())
+      known_scope_infos.update(ss.known_scope_infos())
 
     # Add scopes for all tasks in all goals.
     for goal in Goal.all():
