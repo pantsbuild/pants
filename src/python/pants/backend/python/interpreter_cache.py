@@ -11,6 +11,7 @@ import shutil
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
+from pex.variables import Variables
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
@@ -39,19 +40,21 @@ class PythonInterpreterCache(object):
       if cls._matches(interpreter, filters):
         yield interpreter
 
-   @property
-   def pex_python_path_list(self):
-     """Returns a list of paths to Python interpreter binaries as defined by
-        PEX_PYTHON_PATH defined in either in '/etc/pexrc' or './.pexrc'.
+  @property
+  def pex_python_path_list(self):
+    """Returns a list of paths to Python interpreter binaries as defined by a
+      PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc', or ./.pexrc'.
+      PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
+      that a pex can be built and run against.
 
-        PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
-        that a pex can be built or run against.
-     """
-     ret = Variables.from_rc().get('PEX_PYTHON_PATH', '')
-     if ret:
-       return ret.split(os.pathsep)
-     else:
-       return []
+      :return: paths to interpreters as specified by PEX_PYTHON_PATH
+      :rtype: list
+    """
+    ppp = Variables.from_rc().get('PEX_PYTHON_PATH', '')
+    if ppp:
+      return ppp.split(os.pathsep)
+    else:
+      return []
 
   def __init__(self, python_setup, python_repos, logger=None):
     self._python_setup = python_setup
@@ -145,13 +148,13 @@ class PythonInterpreterCache(object):
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    if not any(filters) or not pex_python_path_interpreters:
+    if not any(filters) and not pex_python_path_interpreters:
       filters = self._python_setup.interpreter_constraints
     setup_paths = (paths
-                   or pex_python_path_list
+                   or self.pex_python_path_list
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
-
+    
     def unsatisfied_filters(interpreters):
       return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
 
