@@ -184,7 +184,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @memoized_method
   def _build_invalidator(self, root=False):
-    build_task = None if root else self.stable_name()
+    build_task = None if root else self.fingerprint
     return BuildInvalidator.Factory.create(build_task=build_task)
 
   def get_options(self):
@@ -238,6 +238,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     hasher = sha1()
+    hasher.update(self.stable_name())
     hasher.update(self._options_fingerprint(self.options_scope))
     hasher.update(self.implementation_version_str())
     # TODO: this is not recursive, but should be: see #2739
