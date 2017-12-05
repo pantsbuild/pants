@@ -167,7 +167,7 @@ impl Store {
     let maybe_remote = self.remote.clone();
     self
       .local
-      .load_bytes_with(entry_type.clone(), fingerprint.clone(), f_local)
+      .load_bytes_with(entry_type, fingerprint.clone(), f_local)
       .and_then(move |maybe_local_value| match maybe_local_value {
         Some(value_result) => {
           future::done(value_result.map(|v| Some(v))).to_boxed() as BoxFuture<_, _>
@@ -176,9 +176,11 @@ impl Store {
           match maybe_remote {
             Some(remote) => {
               remote
-                .load_bytes_with(entry_type.clone(), fingerprint, move |bytes: &[u8]| {
-                  Vec::from(bytes)
-                })
+                .load_bytes_with(
+                  entry_type,
+                  fingerprint,
+                  move |bytes: &[u8]| Vec::from(bytes),
+                )
                 .and_then(move |maybe_bytes: Option<Vec<u8>>| match maybe_bytes {
                   Some(bytes) => {
                     future::done(f_remote(&bytes))
@@ -212,7 +214,7 @@ impl Store {
 }
 
 // Only public for testing.
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub enum EntryType {
   Directory,
   File,
