@@ -103,6 +103,10 @@ class PythonBinaryCreate(Task):
 
       builder = PEXBuilder(path=tmpdir, interpreter=interpreter, pex_info=pex_info, copy=True)
 
+      # Add binary target's interpreter compatibility to pex info
+      for constraint in binary_tgt.compatibility:
+        builder.add_interpreter_constraint(constraint)
+
       if binary_tgt.shebang:
         self.context.log.info('Found Python binary target {} with customized shebang, using it: {}'
                                 .format(binary_tgt.name, binary_tgt.shebang))
@@ -116,6 +120,9 @@ class PythonBinaryCreate(Task):
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
+          # Add target interpreter compatibilities to pex info
+          for constraint in tgt.compatibility:
+            builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
 
