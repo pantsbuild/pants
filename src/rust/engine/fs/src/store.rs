@@ -30,12 +30,18 @@ impl Into<bazel_protos::remote_execution::Digest> for Digest {
 ///
 /// A content-addressed store of file contents, and Directories.
 ///
-/// Currently, Store only stores things locally on disk, but in the future it will gain the ability
-/// to fetch files from remote content-addressable storage too.
+/// Store keeps content on disk, and can optionally delegate to backfill its on-disk storage by
+/// fetching files from a remote server which implements the gRPC bytestream interface
+/// (see https://github.com/googleapis/googleapis/blob/master/google/bytestream/bytestream.proto)
+/// as specified by the gRPC remote execution interface (see
+/// https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/)
+///
+/// In the future, it will gain the ability to write back to the gRPC server, too.
 ///
 #[derive(Clone)]
 pub struct Store {
   local: local::ByteStore,
+  remote: Option<remote::ByteStore>,
 }
 
 // Note that Store doesn't implement ByteStore because it operates at a higher level of abstraction,
@@ -43,26 +49,58 @@ pub struct Store {
 // This has the nice property that Directories can be trusted to be valid and canonical.
 // We may want to re-visit this if we end up wanting to handle local/remote/merged interchangably.
 impl Store {
-  pub fn new<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<Store, String> {
-    Ok(Store { local: local::ByteStore::new(path, pool)? })
+  ///
+  /// Make a store which only uses its local storage.
+  ///
+  pub fn local_only<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<Store, String> {
+    Ok(Store {
+      local: local::ByteStore::new(path, pool)?,
+      remote: None,
+    })
+  }
+
+  ///
+  /// Make a store which uses local storage, and if it is missing a value which it tries to load,
+  /// will attempt to back-fill its local storage from a remote CAS.
+  ///
+  pub fn backfills_from_remote<P: AsRef<Path>>(
+    path: P,
+    pool: Arc<ResettablePool>,
+    cas_address: String,
+  ) -> Result<Store, String> {
+    Ok(Store {
+      local: local::ByteStore::new(path, pool)?,
+      remote: Some(remote::ByteStore::new(cas_address)),
+    })
   }
 
   pub fn store_file_bytes(&self, bytes: Vec<u8>) -> BoxFuture<Digest, String> {
     self.local.store_bytes(EntryType::File, bytes)
   }
 
+  ///
+  /// Loads the bytes of the file with the passed fingerprint, and returns the result of applying f
+  /// to that value.
+  ///
   pub fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     fingerprint: Fingerprint,
     f: F,
   ) -> BoxFuture<Option<T>, String> {
-    self.local.load_bytes_with(
+    let f_local = Arc::new(f);
+    let f_remote = f_local.clone();
+    self.load_bytes_with(
       EntryType::File,
-      fingerprint.clone(),
-      Arc::new(f),
+      fingerprint,
+      move |v: &[u8]| Ok(f_local(v)),
+      move |v: &[u8]| Ok(f_remote(v)),
     )
   }
 
+  ///
+  /// Save the bytes of the Directory proto, without regard for any of the contents of any FileNodes
+  /// or DirectoryNodes therein (i.e. does not require that its children are already stored).
+  ///
   pub fn record_directory(
     &self,
     directory: &bazel_protos::remote_execution::Directory,
@@ -74,24 +112,107 @@ impl Store {
       .to_boxed()
   }
 
+  ///
+  /// Guarantees that if an Ok Some value is returned, it is valid, and canonical, and its
+  /// fingerprint exactly matches that which is requested. Will return an Err if it would return a
+  /// non-canonical Directory.
+  ///
   pub fn load_directory(
     &self,
     fingerprint: Fingerprint,
   ) -> BoxFuture<Option<bazel_protos::remote_execution::Directory>, String> {
-    self.local.load_bytes_with(
+    let fingerprint_copy = fingerprint.clone();
+    let fingerprint_copy2 = fingerprint.clone();
+    self.load_bytes_with(
       EntryType::Directory,
-      fingerprint,
-      Arc::new(|bytes: &[u8]| {
+      fingerprint.clone(),
+      move |bytes: &[u8]| {
         let mut directory = bazel_protos::remote_execution::Directory::new();
-        directory.merge_from_bytes(bytes).expect(
-          "LMDB corruption: Directory bytes were not valid",
-        );
-        directory
-      }),
+        directory.merge_from_bytes(bytes).map_err(|e| {
+          format!(
+            "LMDB corruption: Directory bytes for {} were not valid: {:?}",
+            fingerprint_copy,
+            e
+          )
+        })?;
+        Ok(directory)
+      },
+      move |bytes: &[u8]| {
+        let mut directory = bazel_protos::remote_execution::Directory::new();
+        directory.merge_from_bytes(bytes).map_err(|e| {
+          format!(
+            "CAS returned Directory proto for {} which was not valid: {:?}",
+            fingerprint_copy2,
+            e
+          )
+        })?;
+        bazel_protos::verify_directory_canonical(&directory)?;
+        Ok(directory)
+      },
     )
+  }
+
+  fn load_bytes_with<
+    T: Send + 'static,
+    FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+    FRemote: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+  >(
+    &self,
+    entry_type: EntryType,
+    fingerprint: Fingerprint,
+    f_local: FLocal,
+    f_remote: FRemote,
+  ) -> BoxFuture<Option<T>, String> {
+    let local = self.local.clone();
+    let maybe_remote = self.remote.clone();
+    self
+      .local
+      .load_bytes_with(entry_type.clone(), fingerprint.clone(), f_local)
+      .and_then(move |maybe_local_value| match maybe_local_value {
+        Some(value_result) => {
+          future::done(value_result.map(|v| Some(v))).to_boxed() as BoxFuture<_, _>
+        }
+        None => {
+          match maybe_remote {
+            Some(remote) => {
+              remote
+                .load_bytes_with(entry_type.clone(), fingerprint, move |bytes: &[u8]| {
+                  Vec::from(bytes)
+                })
+                .and_then(move |maybe_bytes: Option<Vec<u8>>| match maybe_bytes {
+                  Some(bytes) => {
+                    future::done(f_remote(&bytes))
+                      .and_then(move |value| {
+                        local.store_bytes(entry_type, bytes).and_then(
+                          move |digest| if digest.0 ==
+                            fingerprint
+                          {
+                            Ok(Some(value))
+                          } else {
+                            Err(format!(
+                              "CAS gave wrong fingerprint: expected {}, got {}",
+                              fingerprint,
+                              digest.0
+                            ))
+                          },
+                        )
+                      })
+                      .to_boxed()
+                  }
+                  None => future::ok(None).to_boxed() as BoxFuture<_, _>,
+                })
+                .to_boxed()
+            }
+            None => future::ok(None).to_boxed() as BoxFuture<_, _>,
+          }
+        }
+      })
+      .to_boxed()
   }
 }
 
+// Only public for testing.
+#[derive(Clone)]
 pub enum EntryType {
   Directory,
   File,
@@ -109,7 +230,7 @@ pub trait ByteStore {
     &self,
     entry_type: EntryType,
     fingerprint: Fingerprint,
-    f: Arc<F>,
+    f: F,
   ) -> BoxFuture<Option<T>, String>;
 }
 
@@ -219,7 +340,7 @@ mod local {
       &self,
       entry_type: EntryType,
       fingerprint: Fingerprint,
-      f: Arc<F>,
+      f: F,
     ) -> BoxFuture<Option<T>, String> {
       let db = match entry_type {
         EntryType::Directory => self.inner.directory_store,
@@ -252,9 +373,7 @@ mod local {
   }
 
   #[cfg(test)]
-  mod tests {
-    extern crate tempdir;
-
+  pub mod tests {
     use futures::Future;
     use super::{ByteStore, EntryType, Fingerprint, ResettablePool};
     use super::super::ByteStore as _ByteStore;
@@ -397,7 +516,7 @@ mod local {
       );
     }
 
-    fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
+    pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
       ByteStore::new(dir, Arc::new(ResettablePool::new("test-pool-".to_string()))).unwrap()
     }
   }
@@ -440,7 +559,7 @@ mod remote {
       &self,
       _entry_type: EntryType,
       fingerprint: Fingerprint,
-      f: Arc<F>,
+      f: F,
     ) -> BoxFuture<Option<T>, String> {
       let channel = grpcio::ChannelBuilder::new(self.env.clone()).connect(&self.address);
       let client = bazel_protos::bytestream_grpc::ByteStreamClient::new(channel);
@@ -594,18 +713,25 @@ mod remote {
 
 #[cfg(test)]
 mod tests {
-  use super::{ByteStore, Digest, EntryType, Fingerprint};
+  use super::{ByteStore, Digest, EntryType, Fingerprint, Store, local};
   use super::super::test_cas::StubCAS;
 
   use bazel_protos;
+  use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
+  use pool::ResettablePool;
   use protobuf::Message;
+  use sha2::Sha256;
+  use std::path::Path;
   use std::sync::Arc;
+  use tempdir::TempDir;
 
   pub const STR: &str = "European Burmese";
   pub const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
   pub const DIRECTORY_HASH: &str = "63949aa823baf765eff07b946050d76e\
 c0033144c785a94d3ebd82baa931cd16";
+  const EMPTY_DIRECTORY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb924\
+27ae41e4649b934ca495991b7852b855";
 
   pub fn fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(HASH).unwrap()
@@ -645,11 +771,7 @@ c0033144c785a94d3ebd82baa931cd16";
     fingerprint: Fingerprint,
   ) -> Result<Option<Vec<u8>>, String> {
     store
-      .load_bytes_with(
-        EntryType::File,
-        fingerprint,
-        Arc::new(|bytes: &[u8]| bytes.to_vec()),
-      )
+      .load_bytes_with(EntryType::File, fingerprint, |bytes: &[u8]| bytes.to_vec())
       .wait()
   }
 
@@ -661,7 +783,7 @@ c0033144c785a94d3ebd82baa931cd16";
       .load_bytes_with(
         EntryType::Directory,
         fingerprint,
-        Arc::new(|bytes: &[u8]| bytes.to_vec()),
+        |bytes: &[u8]| bytes.to_vec(),
       )
       .wait()
   }
@@ -680,6 +802,14 @@ c0033144c785a94d3ebd82baa931cd16";
     )
   }
 
+  fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
+    Store::backfills_from_remote(
+      dir,
+      Arc::new(ResettablePool::new("test-pool-".to_string())),
+      cas_address,
+    ).unwrap()
+  }
+
   #[test]
   fn digest_to_bazel_digest() {
     let digest = Digest(Fingerprint::from_hex_string(HASH).unwrap(), 16);
@@ -687,5 +817,273 @@ c0033144c785a94d3ebd82baa931cd16";
     bazel_digest.set_hash(HASH.to_string());
     bazel_digest.set_size_bytes(16);
     assert_eq!(bazel_digest, digest.into());
+  }
+
+  #[test]
+  fn load_file_prefers_local() {
+    let dir = TempDir::new("store").unwrap();
+
+    local::tests::new_store(dir.path())
+      .store_bytes(EntryType::File, str_bytes())
+      .wait()
+      .expect("Store failed");
+
+    let cas = new_cas(1024);
+    assert_eq!(
+      new_store(dir.path(), cas.address())
+        .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
+        .wait(),
+      Ok(Some(str_bytes()))
+    );
+    assert_eq!(0, cas.request_count());
+  }
+
+  #[test]
+  fn load_directory_prefers_local() {
+    let dir = TempDir::new("store").unwrap();
+
+    local::tests::new_store(dir.path())
+      .store_bytes(EntryType::Directory, directory().write_to_bytes().unwrap())
+      .wait()
+      .expect("Store failed");
+
+    let cas = new_cas(1024);
+    assert_eq!(
+      new_store(dir.path(), cas.address())
+        .load_directory(directory_fingerprint())
+        .wait(),
+      Ok(Some(directory()))
+    );
+    assert_eq!(0, cas.request_count());
+  }
+
+  #[test]
+  fn load_file_falls_back_and_backfills() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = new_cas(1024);
+    assert_eq!(
+      new_store(dir.path(), cas.address())
+        .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
+        .wait(),
+      Ok(Some(str_bytes())),
+      "Read from CAS"
+    );
+    assert_eq!(1, cas.request_count());
+    assert_eq!(
+      local::tests::new_store(dir.path())
+        .load_bytes_with(
+          EntryType::File,
+          fingerprint(),
+          |bytes: &[u8]| Vec::from(bytes),
+        )
+        .wait(),
+      Ok(Some(str_bytes())),
+      "Read from local cache"
+    );
+  }
+
+  #[test]
+  fn load_directory_falls_back_and_backfills() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = new_cas(1024);
+    assert_eq!(
+      new_store(dir.path(), cas.address())
+        .load_directory(directory_fingerprint())
+        .wait(),
+      Ok(Some(directory()))
+    );
+    assert_eq!(1, cas.request_count());
+    assert_eq!(
+      local::tests::new_store(dir.path())
+        .load_bytes_with(
+          EntryType::Directory,
+          directory_fingerprint(),
+          |bytes: &[u8]| Vec::from(bytes),
+        )
+        .wait(),
+      Ok(Some(directory().write_to_bytes().unwrap()))
+    );
+  }
+
+  #[test]
+  fn load_file_missing_is_none() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = StubCAS::empty();
+    assert_eq!(
+      new_store(dir.path(), cas.address())
+        .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
+        .wait(),
+      Ok(None)
+    );
+    assert_eq!(1, cas.request_count());
+  }
+
+  #[test]
+  fn load_directory_missing_is_none() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = StubCAS::empty();
+    assert_eq!(
+      new_store(dir.path(), cas.address())
+        .load_directory(directory_fingerprint())
+        .wait(),
+      Ok(None)
+    );
+    assert_eq!(1, cas.request_count());
+  }
+
+
+  #[test]
+  fn load_file_remote_error_is_error() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = StubCAS::always_errors();
+    let error = new_store(dir.path(), cas.address())
+      .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
+      .wait()
+      .expect_err("Want error");
+    assert_eq!(1, cas.request_count());
+    assert!(
+      error.contains("StubCAS is configured to always fail"),
+      "Bad error message"
+    );
+  }
+
+  #[test]
+  fn load_directory_remote_error_is_error() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = StubCAS::always_errors();
+    let error = new_store(dir.path(), cas.address())
+      .load_directory(fingerprint())
+      .wait()
+      .expect_err("Want error");
+    assert_eq!(1, cas.request_count());
+    assert!(
+      error.contains("StubCAS is configured to always fail"),
+      "Bad error message"
+    );
+  }
+
+  #[test]
+  fn malformed_remote_directory_is_error() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = new_cas(1024);
+    new_store(dir.path(), cas.address())
+      .load_directory(fingerprint())
+      .wait()
+      .expect_err("Want error");
+
+    assert_eq!(
+      local::tests::new_store(dir.path())
+        .load_bytes_with(EntryType::Directory, fingerprint(), |bytes: &[u8]| {
+          Vec::from(bytes)
+        })
+        .wait(),
+      Ok(None)
+    );
+  }
+
+  #[test]
+  fn non_canonical_remote_directory_is_error() {
+    let mut directory = directory();
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("roland".to_string());
+      file.set_digest({
+        let mut digest = bazel_protos::remote_execution::Digest::new();
+        digest.set_hash(HASH.to_string());
+        digest.set_size_bytes(STR.len() as i64);
+        digest
+      });
+      file
+    });
+    let directory_bytes = directory.write_to_bytes().unwrap();
+    let directory_fingerprint = {
+      let mut hasher = Sha256::default();
+      hasher.input(&directory_bytes);
+      Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
+    };
+
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = StubCAS::new(
+      1024,
+      vec![(directory_fingerprint.clone(), directory_bytes.clone())]
+        .into_iter()
+        .collect(),
+    );
+    new_store(dir.path(), cas.address())
+      .load_directory(directory_fingerprint.clone())
+      .wait()
+      .expect_err("Want error");
+
+    assert_eq!(
+      local::tests::new_store(dir.path())
+        .load_bytes_with(
+          EntryType::Directory,
+          directory_fingerprint,
+          |bytes: &[u8]| Vec::from(bytes),
+        )
+        .wait(),
+      Ok(None)
+    );
+  }
+
+  #[test]
+  fn wrong_remote_file_bytes_is_error() {
+    let dir = TempDir::new("store").unwrap();
+
+    let cas = StubCAS::new(
+      1024,
+      vec![(fingerprint(), directory().write_to_bytes().unwrap())]
+        .into_iter()
+        .collect(),
+    );
+    new_store(dir.path(), cas.address())
+      .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
+      .wait()
+      .expect_err("Want error");
+
+    assert_eq!(
+      local::tests::new_store(dir.path())
+        .load_bytes_with(
+          EntryType::File,
+          fingerprint(),
+          |bytes: &[u8]| Vec::from(bytes),
+        )
+        .wait(),
+      Ok(None)
+    );
+  }
+
+  #[test]
+  fn wrong_remote_directory_bytes_is_error() {
+    let dir = TempDir::new("store").unwrap();
+    let empty_fingerprint = Fingerprint::from_hex_string(EMPTY_DIRECTORY_HASH).unwrap();
+
+    let cas = StubCAS::new(
+      1024,
+      vec![(empty_fingerprint, directory().write_to_bytes().unwrap())]
+        .into_iter()
+        .collect(),
+    );
+    new_store(dir.path(), cas.address())
+      .load_file_bytes_with(empty_fingerprint, |bytes| Vec::from(bytes))
+      .wait()
+      .expect_err("Want error");
+
+    assert_eq!(
+      local::tests::new_store(dir.path())
+        .load_bytes_with(EntryType::File, empty_fingerprint, |bytes: &[u8]| {
+          Vec::from(bytes)
+        })
+        .wait(),
+      Ok(None)
+    );
   }
 }

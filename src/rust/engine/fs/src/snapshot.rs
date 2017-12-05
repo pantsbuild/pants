@@ -186,8 +186,9 @@ mod tests {
 
   fn setup() -> (Arc<Store>, TempDir, Arc<PosixFS>, Arc<FileSaver>) {
     let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
+    // TODO: Pass a remote CAS address through.
     let store = Arc::new(
-      Store::new(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap(),
+      Store::local_only(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap(),
     );
     let dir = TempDir::new("root").unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
