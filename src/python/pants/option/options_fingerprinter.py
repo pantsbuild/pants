@@ -38,7 +38,8 @@ class OptionsFingerprinter(object):
 
   @classmethod
   def combined_options_fingerprint_for_scope(cls, scope, options, fingerprint_key=None,
-                                             invert=None, build_graph=None):
+                                             invert=None, build_graph=None,
+                                             include_passthru=False):
     """Given options and a scope, compute a combined fingerprint for the scope.
 
     :param string scope: The scope to fingerprint.
@@ -47,11 +48,14 @@ class OptionsFingerprinter(object):
     :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
     :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
                                    target options.
+    :param bool include_passthru: Whether to include passthru args captured by
+                                  `scope` in the fingerprintable options.
     """
     fingerprinter = cls(build_graph)
     hasher = sha1()
     for (option_type, option_value) in options.get_fingerprintable_for_scope(
       scope,
+      include_passthru=include_passthru,
       fingerprint_key=fingerprint_key,
       invert=invert
     ):

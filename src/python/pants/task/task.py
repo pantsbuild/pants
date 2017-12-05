@@ -179,7 +179,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._task_name = type(self).__name__
     self._cache_key_errors = set()
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
-    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
     self._force_invalidated = False
 
   @memoized_method
@@ -216,16 +215,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    pairs = self.context.options.get_fingerprintable_for_scope(
+    return OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
+      self.context.options,
+      build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args()
     )
-    hasher = sha1()
-    for (option_type, option_val) in pairs:
-      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-      if fp is not None:
-        hasher.update(fp)
-    return hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
