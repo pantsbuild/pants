@@ -272,16 +272,12 @@ class TaskBase(Optionable, AbstractClass):
   # TODO: move some stuff back to Task, and move some of the new subsystem dependency stuff to
   # Optionable!
   def _options_fingerprint(self, scope):
-    options_hasher = sha1()
-    options_hasher.update(scope.encode('utf-8'))
-    options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
+    return OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args(),
     )
-    options_hasher.update(options_fp.encode('utf-8'))
-    return options_hasher.hexdigest() if PY3 else options_hasher.hexdigest().decode('utf-8')
 
   @memoized_property
   def fingerprint(self):

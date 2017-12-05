@@ -32,30 +32,35 @@ class OptionsFingerprinter(object):
   """
 
   @classmethod
-  def combined_options_fingerprint_for_scope(cls, scope, options,
-                                             build_graph=None, **kwargs):
+  def combined_options_fingerprint_for_scope(cls, scope, options, fingerprint_key=None,
+                                             invert=None, build_graph=None,
+                                             include_passthru=False):
     """Given options and a scope, compute a combined fingerprint for the scope.
 
     :param string scope: The scope to fingerprint.
     :param Options options: The `Options` object to fingerprint.
     :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
                                    target options.
-    :param dict **kwargs: Keyword parameters passed on to
-                          `Options#get_fingerprintable_for_scope`.
+    :param bool include_passthru: Whether to include passthru args captured by
+                                  `scope` in the fingerprintable options.
     :return: Hexadecimal string representing the fingerprint for all `options`
              values in `scope`.
     """
     fingerprinter = cls(build_graph)
     hasher = sha1()
-    pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
-    for (option_type, option_value) in pairs:
-      fingerprint = fingerprinter.fingerprint(option_type, option_value)
-      if fingerprint is None:
-        # This isn't necessarily a good value to be using here, but it preserves behavior from
-        # before the commit which added it. I suspect that using the empty string would be
-        # reasonable too, but haven't done any archaeology to check.
-        fingerprint = 'None'
-      hasher.update(fingerprint.encode('utf-8'))
+    for (option_type, option_value) in options.get_fingerprintable_for_scope(
+      scope,
+      include_passthru=include_passthru,
+      fingerprint_key=fingerprint_key,
+      invert=invert
+    ):
+      hasher.update(
+        # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
+        # so we always cast to bytes here.
+        six.binary_type(
+          fingerprinter.fingerprint(option_type, option_value)
+        )
+      )
     return hasher.hexdigest()
 
   def __init__(self, build_graph=None):
