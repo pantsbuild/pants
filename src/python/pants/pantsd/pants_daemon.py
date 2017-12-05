@@ -97,7 +97,6 @@ class PantsDaemon(FingerprintedProcessManager):
         build_root,
         bootstrap_options_values.pants_workdir,
         bootstrap_options_values.level.upper(),
-        legacy_graph_helper.scheduler.lock,
         services,
         port_map,
         bootstrap_options_values.pants_subprocessdir,
@@ -143,7 +142,7 @@ class PantsDaemon(FingerprintedProcessManager):
         dict(pailgun=pailgun_service.pailgun_port)
       )
 
-  def __init__(self, native, build_root, work_dir, log_level, lock, services, socket_map,
+  def __init__(self, native, build_root, work_dir, log_level, services, socket_map,
                metadata_base_dir, bootstrap_options=None):
     """
     :param Native native: A `Native` instance.
@@ -158,13 +157,14 @@ class PantsDaemon(FingerprintedProcessManager):
     self._build_root = build_root
     self._work_dir = work_dir
     self._log_level = log_level
-    self._lock = lock
     self._services = services
     self._socket_map = socket_map
     self._bootstrap_options = bootstrap_options
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
+    # A lock to guard the service thread lifecycles.
+    self._lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
     self._exiter = Exiter()

@@ -310,8 +310,7 @@ class LocalScheduler(object):
                rules,
                project_tree,
                native,
-               include_trace_on_error=True,
-               graph_lock=None):
+               include_trace_on_error=True):
     """
     :param goals: A dict from a goal name to a product type. A goal is just an alias for a
            particular (possibly synthetic) product.
@@ -321,13 +320,10 @@ class LocalScheduler(object):
     :param native: An instance of engine.native.Native.
     :param include_trace_on_error: Include the trace through the graph upon encountering errors.
     :type include_trace_on_error: bool
-    :param graph_lock: A re-entrant lock to use for guarding access to the internal product Graph
-                       instance. Defaults to creating a new threading.RLock().
     """
     self._products_by_goal = goals
     self._project_tree = project_tree
     self._include_trace_on_error = include_trace_on_error
-    self._product_graph_lock = graph_lock or threading.RLock()
     self._run_count = 0
 
     # Create the ExternContext, and the native Scheduler.
@@ -349,15 +345,10 @@ class LocalScheduler(object):
 
     self._scheduler.assert_ruleset_valid()
 
-  @property
-  def lock(self):
-    return self._product_graph_lock
-
   def trace(self):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
-    with self._product_graph_lock:
-      for line in self._scheduler.graph_trace():
-        yield line
+    for line in self._scheduler.graph_trace():
+      yield line
 
   def visualize_graph_to_file(self, filename):
     """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -365,8 +356,7 @@ class LocalScheduler(object):
     :param iterable roots: An iterable of the root nodes to begin the graph walk from.
     :param str filename: The filename to output the graphviz output to.
     """
-    with self._product_graph_lock:
-      self._scheduler.visualize_graph_to_file(filename)
+    self._scheduler.visualize_graph_to_file(filename)
 
   def visualize_rule_graph_to_file(self, filename):
     self._scheduler.visualize_rule_graph_to_file(filename)
@@ -407,12 +397,11 @@ class LocalScheduler(object):
     """Returns the roots for the given ExecutionRequest as a list of tuples of:
          ((subject, product), State)
     """
-    with self._product_graph_lock:
-      if self._execution_request is not execution_request:
-        raise AssertionError(
-          "Multiple concurrent executions are not supported! {} vs {}".format(
-            self._execution_request, execution_request))
-      return self._scheduler.root_entries(execution_request)
+    if self._execution_request is not execution_request:
+      raise AssertionError(
+        "Multiple concurrent executions are not supported! {} vs {}".format(
+          self._execution_request, execution_request))
+    return self._scheduler.root_entries(execution_request)
 
   def invalidate_files(self, direct_filenames):
     """Calls `Graph.invalidate_files()` against an internal product Graph instance."""
@@ -420,14 +409,12 @@ class LocalScheduler(object):
     # so we always need to invalidate the direct parent as well.
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
-    with self._product_graph_lock:
-      invalidated = self._scheduler.invalidate(filenames)
-      logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
-      return invalidated
+    invalidated = self._scheduler.invalidate(filenames)
+    logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
+    return invalidated
 
   def node_count(self):
-    with self._product_graph_lock:
-      return self._scheduler.graph_len()
+    return self._scheduler.graph_len()
 
   def _execution_add_roots(self, execution_request):
     if self._execution_request is not None:
@@ -446,30 +433,28 @@ class LocalScheduler(object):
     by this method are intended to be executed in multiple threads, and then satisfied by the
     scheduling thread.
     """
+    start_time = time.time()
+    # Reset execution, and add any roots from the request.
+    self._execution_add_roots(execution_request)
+    # Execute in native engine.
+    execution_stat = self._scheduler.run_and_return_stat()
+    # Receive execution statistics.
+    runnable_count = execution_stat.runnable_count
+    scheduling_iterations = execution_stat.scheduling_iterations
 
-    with self._product_graph_lock:
-      start_time = time.time()
-      # Reset execution, and add any roots from the request.
-      self._execution_add_roots(execution_request)
-      # Execute in native engine.
-      execution_stat = self._scheduler.run_and_return_stat()
-      # Receive execution statistics.
-      runnable_count = execution_stat.runnable_count
-      scheduling_iterations = execution_stat.scheduling_iterations
+    if self._scheduler.visualize_to_dir() is not None:
+      name = 'run.{}.dot'.format(self._run_count)
+      self._run_count += 1
+      self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
 
-      if self._scheduler.visualize_to_dir() is not None:
-        name = 'run.{}.dot'.format(self._run_count)
-        self._run_count += 1
-        self.visualize_graph_to_file(os.path.join(self._scheduler.visualize_to_dir(), name))
-
-      logger.debug(
-        'ran %s scheduling iterations and %s runnables in %f seconds. '
-        'there are %s total nodes.',
-        scheduling_iterations,
-        runnable_count,
-        time.time() - start_time,
-        self._scheduler.graph_len()
-      )
+    logger.debug(
+      'ran %s scheduling iterations and %s runnables in %f seconds. '
+      'there are %s total nodes.',
+      scheduling_iterations,
+      runnable_count,
+      time.time() - start_time,
+      self._scheduler.graph_len()
+    )
 
   def execute(self, execution_request):
     """Executes the requested build and returns the resulting root entries.
