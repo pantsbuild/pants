@@ -6,30 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from contextlib import contextmanager
 
-from twitter.common.collections import OrderedSet
-
-from pants.backend.jvm.ivy_utils import IvyInfo, IvyModule, IvyModuleRef, IvyResolveResult
-from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
-                                                                    PinnedJarArtifactSet)
-from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
 from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
-from pants.backend.jvm.tasks.ivy_resolve import IvyResolve
-from pants.backend.jvm.tasks.ivy_task_mixin import IvyResolveFingerprintStrategy
-from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants.task.task import Task
-from pants.util.contextutil import temporary_dir, temporary_file_path
-from pants.util.dirutil import safe_delete
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.tasks.task_test_base import ensure_cached
 
 
 def strip_workdir(dir, classpath):
@@ -96,52 +80,59 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     conf, path = winning_cp[0]
     self.assertEqual('default', conf)
     self.assertEqual('guava-16.0.1.jar', os.path.basename(path))
+
+  # @ensure_cached(CoursierResolve, expected_num_artifacts=1)
+  # def test_resolve_multiple_artifacts(self):
+  #   def coordinates_for(cp):
+  #     return {resolved_jar.coordinate for conf, resolved_jar in cp}
+  #
+  #   no_classifier = JarDependency('junit', 'junit', rev='4.12')
+  #   classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
+  #
+  #   no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
+  #   classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier])
+  #   classifier_and_no_classifier_lib = self.make_target('//:c', JarLibrary,
+  #                                                       jars=[classifier, no_classifier])
+  #
+  #   compile_classpath = self.resolve([no_classifier_lib,
+  #                                     classifier_lib,
+  #                                     classifier_and_no_classifier_lib])
+  #
+  #   no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
+  #   classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
+  #   classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
+  #     classifier_and_no_classifier_lib.closure(bfs=True))
+  #
+  #   print('no cp', no_classifier_cp)
+  #   print('cp', classifier_cp)
+  #   print('both', classifier_and_no_classifier_cp)
+  #
+  #   classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
+  #
+  #
+  #   self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
+  #   self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
+  #
+  #   self.assertNotIn(classifier.coordinate, coordinates_for(no_classifier_cp))
+  #   self.assertIn(no_classifier.coordinate, coordinates_for(no_classifier_cp))
+  #
+  #   self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
+  #   self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
 #
-#   @ensure_cached(IvyResolve, expected_num_artifacts=1)
-#   def test_resolve_multiple_artifacts(self):
-#     def coordinates_for(cp):
-#       return {resolved_jar.coordinate for conf, resolved_jar in cp}
-#
-#     no_classifier = JarDependency('junit', 'junit', rev='4.12')
-#     classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
-#
-#     no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
-#     classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier])
-#     classifier_and_no_classifier_lib = self.make_target('//:c', JarLibrary,
-#                                                         jars=[classifier, no_classifier])
-#
-#     compile_classpath = self.resolve([no_classifier_lib,
-#                                       classifier_lib,
-#                                       classifier_and_no_classifier_lib])
-#     no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
-#     classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
-#     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
-#       classifier_and_no_classifier_lib.closure(bfs=True))
-#
-#     classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
-#     self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
-#     self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
-#
-#     self.assertNotIn(classifier.coordinate, coordinates_for(no_classifier_cp))
-#     self.assertIn(no_classifier.coordinate, coordinates_for(no_classifier_cp))
-#
-#     self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
-#     self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
-#
-#   @ensure_cached(IvyResolve, expected_num_artifacts=1)
-#   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
-#     junit_jar_lib = self._make_junit_target()
-#
-#     excluding_target = self.make_target('//:b', JavaLibrary, sources=[],
-#                                         excludes=[Exclude('junit', 'junit')])
-#     compile_classpath = self.resolve([junit_jar_lib, excluding_target])
-#
-#     junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
-#     excluding_cp = compile_classpath.get_for_target(excluding_target)
-#
-#     self.assertEquals(0, len(junit_jar_cp))
-#     self.assertEquals(0, len(excluding_cp))
-#
+  @ensure_cached(CoursierResolve, expected_num_artifacts=2)
+  def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
+    junit_jar_lib = self._make_junit_target()
+
+    excluding_target = self.make_target('//:b', JavaLibrary, sources=[],
+                                        excludes=[Exclude('junit', 'junit')])
+    compile_classpath = self.resolve([junit_jar_lib, excluding_target])
+
+    junit_jar_cp = compile_classpath.get_for_target(junit_jar_lib)
+    excluding_cp = compile_classpath.get_for_target(excluding_target)
+
+    self.assertEquals(2, len(junit_jar_cp))
+    self.assertEquals(0, len(excluding_cp))
+
 #   @ensure_cached(IvyResolve, expected_num_artifacts=0)
 #   def test_resolve_no_deps(self):
 #     # Resolve a library with no deps, and confirm that the empty product is created.
@@ -365,10 +356,10 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 #         with open(raw_classpath_path) as f:
 #           self.assertNotIn('non-existent-file', f.read())
 #
-#   def _make_junit_target(self):
-#     junit_dep = JarDependency('junit', 'junit', rev='4.12')
-#     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
-#     return junit_jar_lib
+  def _make_junit_target(self):
+    junit_dep = JarDependency('junit', 'junit', rev='4.12')
+    junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
+    return junit_jar_lib
 #
 #   def _find_resolve_workdir(self, workdir):
 #     ivy_dir = os.path.join(workdir, 'ivy')
