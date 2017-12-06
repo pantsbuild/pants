@@ -11,15 +11,22 @@ from contextlib import contextmanager
 from mock import MagicMock
 from psutil.tests import safe_remove
 
+from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
+                                                                    PinnedJarArtifactSet)
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
+from pants.backend.jvm.targets.jvm_target import JvmTarget
+from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
+from pants.backend.jvm.tasks.coursier_resolve import (CouriserResolveFingerprintStrategy,
+                                                      CoursierResolve)
 from pants.base.exceptions import TaskError
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
-from pants_test.tasks.task_test_base import ensure_cached
+from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
 def strip_workdir(dir, classpath):
@@ -214,167 +221,10 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
       task.runjava.assert_called()
 
-#
-#   def test_fetch_has_same_resolved_jars_as_resolve(self):
-#     junit_jar_lib = self._make_junit_target()
-#
-#     with self._temp_cache_dir():
-#       with self._temp_workdir() as resolve_workdir:
-#         resolve_classpath = self.resolve([junit_jar_lib])
-#
-#       # Now do a second resolve with a fresh work directory.
-#       with self._temp_workdir() as fetch_workdir:
-#         fetch_classpath = self.resolve([junit_jar_lib])
-#
-#       self._assert_classpath_equal_for_target(junit_jar_lib,
-#                                               fetch_classpath, fetch_workdir,
-#                                               resolve_classpath, resolve_workdir)
-#
-#   def test_loading_valid_resolve(self):
-#     junit_jar_lib = self._make_junit_target()
-#
-#     # Initial resolve does a resolve and populates elements.
-#     context1 = self.context(target_roots=[junit_jar_lib])
-#     self.execute(context1)
-#
-#     # Second resolve should check files and do no ivy call.
-#     context2 = self.context(target_roots=[junit_jar_lib])
-#     task = self.prepare_execute(context2)
-#     task._do_resolve = self.fail
-#     task.execute()
-#
-#     self.assertEqual(context1.products.get_data('compile_classpath'),
-#                      context2.products.get_data('compile_classpath'))
-#
-#   def test_invalid_frozen_resolve_file_runs_resolve(self):
-#     junit_jar_lib = self._make_junit_target()
-#
-#     with self._temp_workdir() as workdir:
-#       self.resolve([junit_jar_lib])
-#
-#       # Find the resolution work dir.
-#       ivy_workdir = os.path.join(workdir, 'ivy')
-#       ivy_subdirs = os.listdir(ivy_workdir)
-#       ivy_subdirs.remove('jars')
-#       self.assertEqual(1, len(ivy_subdirs))
-#       resolve_workdir = os.path.join(ivy_workdir, ivy_subdirs[0])
-#
-#       # Remove a required file for a simple load to force a fetch.
-#       resolve_report = os.path.join(resolve_workdir, 'resolve-report-default.xml')
-#       self._assertIsFile(resolve_report)
-#       safe_delete(resolve_report)
-#
-#       # Open resolution.json, and make it invalid json.
-#       frozen_resolve_filename = os.path.join(resolve_workdir, 'resolution.json')
-#       with open(frozen_resolve_filename, 'w') as f:
-#         f.write('not json!')
-#
-#       self.resolve([junit_jar_lib])
-#
-#       self._assertIsFile(resolve_report)
-#
-#   def test_after_a_successful_fetch_load_from_fetch(self):
-#     junit_jar_lib = self._make_junit_target()
-#
-#     with self._temp_cache_dir():
-#       with self._temp_workdir():
-#         self.resolve([junit_jar_lib])
-#
-#       # Now do a second resolve with a fresh work directory.
-#       # This will re-use the cached resolve.
-#
-#       with self._temp_workdir() as fetch_workdir:
-#         fetch_classpath = self.resolve([junit_jar_lib])
-#               # We then do a 3rd resolve which will load the results of that fetch rather
-#               # than redoing the fetch.
-#         fetch_load_classpath = self.resolve([junit_jar_lib])
-#
-#         self._assert_classpath_equal_for_target(junit_jar_lib,
-#                                                 fetch_load_classpath, fetch_workdir,
-#                                                 fetch_classpath, fetch_workdir)
-#
-#   def test_fetch_jar_with_url_specified(self):
-#     # Resolve a jar with a URL, with fresh ivy cache dirs to ensure that it won't get cached.
-#     # Run a fetch with a fresh workdir.
-#     # The fetch should still pick up the correct file.
-#     with self._temp_cache_dir(), temporary_file_path() as jarfile:
-#       jar_with_url = JarDependency('org1', 'name1', rev='1234', url='file://{}'.format(jarfile))
-#       jar_lib = self.make_target('//:a', JarLibrary, jars=[jar_with_url])
-#
-#       with self._temp_workdir() as workdir, self._temp_ivy_cache_dir():
-#         self.resolve([jar_lib])
-#         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
-#
-#       with self._temp_workdir() as workdir, self._temp_ivy_cache_dir():
-#         fetch_classpath = self.resolve([jar_lib])
-#
-#         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
-#
-#         report_path = os.path.join(ivy_resolve_workdir, 'fetch-report-default.xml')
-#         self._assertIsFile(report_path)
-#
-#         _unused_conf, lib_symlink = fetch_classpath.get_for_target(jar_lib)[0]
-#         with open(jarfile) as jarfile_f:
-#           with open(lib_symlink) as symlink_f:
-#             self.assertTrue(jarfile_f.read() == symlink_f.read(),
-#                             'Expected linked jar and original to match.')
-#
-#   def test_when_a_report_for_a_conf_is_missing_fall_back_to_fetch(self):
-#     junit_jar_lib = self._make_junit_target()
-#     with self._temp_cache_dir():
-#       with self._temp_workdir():
-#         self.resolve([junit_jar_lib])
-#
-#       with self._temp_workdir() as workdir:
-#         self.resolve([junit_jar_lib])
-#
-#         # Remove report from workdir.
-#         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
-#         report_path = os.path.join(ivy_resolve_workdir, 'fetch-report-default.xml')
-#         safe_delete(report_path)
-#
-#         self.resolve([junit_jar_lib])
-#
-#         self._assertIsFile(report_path)
-#
-#   def test_when_symlink_cachepath_fails_on_load_due_to_missing_file_trigger_fetch(self):
-#     jar_lib = self._make_junit_target()
-#
-#     with self._temp_cache_dir():
-#       # resolve.
-#       with self._temp_workdir():
-#         self.resolve([jar_lib])
-#
-#       with self._temp_workdir() as workdir:
-#         # Initial fetch.
-#         self.resolve([jar_lib])
-#
-#         # Add pointer to cachepath that points to a non-existent file.
-#         ivy_resolve_workdir = self._find_resolve_workdir(workdir)
-#         raw_classpath_path = os.path.join(ivy_resolve_workdir, 'classpath.raw')
-#         with open(raw_classpath_path, 'a') as raw_f:
-#           raw_f.write(os.pathsep)
-#           raw_f.write(os.path.join('non-existent-file'))
-#
-#         self.resolve([jar_lib])
-#
-#         # The raw_classpath should be re-created because the previous resolve became invalid.
-#         with open(raw_classpath_path) as f:
-#           self.assertNotIn('non-existent-file', f.read())
-#
   def _make_junit_target(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])
     return junit_jar_lib
-#
-#   def _find_resolve_workdir(self, workdir):
-#     ivy_dir = os.path.join(workdir, 'ivy')
-#     ivy_dir_subdirs = os.listdir(ivy_dir)
-#     ivy_dir_subdirs.remove('jars')  # Ignore the jars directory.
-#     self.assertEqual(1, len(ivy_dir_subdirs), 'There should only be the resolve directory.')
-#     print('>>> got dir {}'.format(ivy_dir_subdirs))
-#     ivy_resolve_workdir = ivy_dir_subdirs[0]
-#     return os.path.join(ivy_dir, ivy_resolve_workdir)
 
   @contextmanager
   def _temp_workdir(self):
@@ -385,144 +235,113 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       yield workdir
     self._test_workdir = old_workdir
     self.set_options_for_scope('', pants_workdir=old_workdir)
-#
-#   @contextmanager
-#   def _temp_ivy_cache_dir(self):
-#     # We also reset the Bootstrapper since it hangs on to a ivy subsystem.
-#     old_instance = Bootstrapper._INSTANCE
-#     try:
-#       with temporary_dir() as ivy_cache_dir:
-#         Bootstrapper.reset_instance()
-#         # We set a temp ivy cache to ensure that the ivy we're using won't cache the temporary jar.
-#         self.set_options_for_scope('ivy', cache_dir=ivy_cache_dir)
-#         yield ivy_cache_dir
-#     finally:
-#       Bootstrapper._INSTANCE = old_instance
-#
-#   @contextmanager
-#   def _temp_cache_dir(self):
-#     with temporary_dir() as cache_dir:
-#       self.set_options_for_scope('cache.{}'.format(self.options_scope),
-#                                  read_from=[cache_dir],
-#                                  write_to=[cache_dir])
-#       yield
-#
-#   def _assert_classpath_equal_for_target(self, target, actual_classpath_product, actual_workdir,
-#                                          expected_classpath_product, expected_workdir):
-#     self.assertEqual(
-#       strip_workdir(expected_workdir, expected_classpath_product.get_for_target(target)),
-#       strip_workdir(actual_workdir, actual_classpath_product.get_for_target(target)))
-#
-#   def _assertIsFile(self, path):
-#     self.assertTrue(os.path.isfile(path),
-#                     'Expected {} to exist as a file'.format(path))
 
-#
-# class EmptyTask(Task):
-#   @classmethod
-#   def register_options(cls, register):
-#     register('--a', type=bool, default=False, fingerprint=True)
-#
-#   @property
-#   def fingerprint(self):
-#     # NB: The fake options object doesn't contribute to fingerprinting, so this class redefines
-#     #     fingerprint.
-#     if self.get_options().a:
-#       return "a"
-#     else:
-#       return "b"
-#
-#   def execute(self):
-#     pass
-#
-#
-# class IvyResolveFingerprintStrategyTest(TaskTestBase):
-#
-#   @classmethod
-#   def task_type(cls):
-#     return EmptyTask
-#
-#   def setUp(self):
-#     super(IvyResolveFingerprintStrategyTest, self).setUp()
-#     init_subsystem(JarDependencyManagement)
-#
-#   def tearDown(self):
-#     super(IvyResolveFingerprintStrategyTest, self).tearDown()
-#
-#   def set_artifact_set_for(self, managed_jar_target, artifact_set):
-#     JarDependencyManagement.global_instance()._artifact_set_map[
-#       managed_jar_target.id] = artifact_set
-#
-#   def test_target_target_is_none(self):
-#     confs = ()
-#     strategy = IvyResolveFingerprintStrategy(confs)
-#
-#     target = self.make_target(':just-target')
-#
-#     self.assertIsNone(strategy.compute_fingerprint(target))
-#
-#   def test_jvm_target_without_excludes_is_none(self):
-#     confs = ()
-#     strategy = IvyResolveFingerprintStrategy(confs)
-#
-#     target_without_excludes = self.make_target(':jvm-target', target_type=JvmTarget)
-#
-#     self.assertIsNone(strategy.compute_fingerprint(target_without_excludes))
-#
-#   def test_jvm_target_with_excludes_is_hashed(self):
-#     confs = ()
-#     strategy = IvyResolveFingerprintStrategy(confs)
-#
-#     target_with_excludes = self.make_target(':jvm-target', target_type=JvmTarget,
-#                                                excludes=[Exclude('org.some')])
-#
-#     self.assertIsNotNone(strategy.compute_fingerprint(target_with_excludes))
-#
-#   def test_jar_library_with_one_jar_is_hashed(self):
-#     confs = ()
-#     strategy = IvyResolveFingerprintStrategy(confs)
-#
-#     jar_library = self.make_target(':jar-library', target_type=JarLibrary,
-#                                    jars=[JarDependency('org.some', 'name')])
-#
-#     self.assertIsNotNone(strategy.compute_fingerprint(jar_library))
-#
-#   def test_identical_jar_libraries_with_same_jar_dep_management_artifacts_match(self):
-#     confs = ()
-#     strategy = IvyResolveFingerprintStrategy(confs)
-#
-#     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
-#                                artifacts=[JarDependency('org.some', 'name')])
-#     self.set_artifact_set_for(managed_jar_deps, PinnedJarArtifactSet())
-#
-#     jar_lib_1 = self.make_target(':jar-lib-1', target_type=JarLibrary,
-#                                    jars=[JarDependency('org.some', 'name')],
-#                                    managed_dependencies=':managed')
-#
-#
-#     jar_lib_2 = self.make_target(':jar-lib-2', target_type=JarLibrary,
-#                               jars=[JarDependency('org.some', 'name')],
-#                               managed_dependencies=':managed')
-#
-#     self.assertEqual(strategy.compute_fingerprint(jar_lib_1),
-#                      strategy.compute_fingerprint(jar_lib_2))
-#
-#   def test_identical_jar_libraries_with_differing_managed_deps_differ(self):
-#     confs = ()
-#     strategy = IvyResolveFingerprintStrategy(confs)
-#
-#     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
-#                                artifacts=[JarDependency('org.some', 'name')])
-#     self.set_artifact_set_for(managed_jar_deps, PinnedJarArtifactSet())
-#
-#     jar_lib_with_managed_deps = self.make_target(':jar-lib-1', target_type=JarLibrary,
-#                                    jars=[JarDependency('org.some', 'name')],
-#                                    managed_dependencies=':managed')
-#
-#
-#     jar_lib_without_managed_deps = self.make_target(':jar-lib-no-managed-dep',
-#                                                     target_type=JarLibrary,
-#                                                     jars=[JarDependency('org.some', 'name')])
-#
-#     self.assertNotEqual(strategy.compute_fingerprint(jar_lib_with_managed_deps),
-#                         strategy.compute_fingerprint(jar_lib_without_managed_deps))
+
+class EmptyTask(Task):
+  @classmethod
+  def register_options(cls, register):
+    register('--a', type=bool, default=False, fingerprint=True)
+
+  @property
+  def fingerprint(self):
+    # NB: The fake options object doesn't contribute to fingerprinting, so this class redefines
+    #     fingerprint.
+    if self.get_options().a:
+      return "a"
+    else:
+      return "b"
+
+  def execute(self):
+    pass
+
+
+class CoursierResolveFingerprintStrategyTest(TaskTestBase):
+
+  @classmethod
+  def task_type(cls):
+    return EmptyTask
+
+  def setUp(self):
+    super(CoursierResolveFingerprintStrategyTest, self).setUp()
+    init_subsystem(JarDependencyManagement)
+
+  def tearDown(self):
+    super(CoursierResolveFingerprintStrategyTest, self).tearDown()
+
+  def set_artifact_set_for(self, managed_jar_target, artifact_set):
+    JarDependencyManagement.global_instance()._artifact_set_map[
+      managed_jar_target.id] = artifact_set
+
+  def test_target_target_is_none(self):
+    confs = ()
+    strategy = CouriserResolveFingerprintStrategy(confs)
+
+    target = self.make_target(':just-target')
+
+    self.assertIsNone(strategy.compute_fingerprint(target))
+
+  def test_jvm_target_without_excludes_is_none(self):
+    confs = ()
+    strategy = CouriserResolveFingerprintStrategy(confs)
+
+    target_without_excludes = self.make_target(':jvm-target', target_type=JvmTarget)
+
+    self.assertIsNone(strategy.compute_fingerprint(target_without_excludes))
+
+  def test_jvm_target_with_excludes_is_hashed(self):
+    confs = ()
+    strategy = CouriserResolveFingerprintStrategy(confs)
+
+    target_with_excludes = self.make_target(':jvm-target', target_type=JvmTarget,
+                                               excludes=[Exclude('org.some')])
+
+    self.assertIsNotNone(strategy.compute_fingerprint(target_with_excludes))
+
+  def test_jar_library_with_one_jar_is_hashed(self):
+    confs = ()
+    strategy = CouriserResolveFingerprintStrategy(confs)
+
+    jar_library = self.make_target(':jar-library', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')])
+
+    self.assertIsNotNone(strategy.compute_fingerprint(jar_library))
+
+  def test_identical_jar_libraries_with_same_jar_dep_management_artifacts_match(self):
+    confs = ()
+    strategy = CouriserResolveFingerprintStrategy(confs)
+
+    managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
+                               artifacts=[JarDependency('org.some', 'name')])
+    self.set_artifact_set_for(managed_jar_deps, PinnedJarArtifactSet())
+
+    jar_lib_1 = self.make_target(':jar-lib-1', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')],
+                                   managed_dependencies=':managed')
+
+
+    jar_lib_2 = self.make_target(':jar-lib-2', target_type=JarLibrary,
+                              jars=[JarDependency('org.some', 'name')],
+                              managed_dependencies=':managed')
+
+    self.assertEqual(strategy.compute_fingerprint(jar_lib_1),
+                     strategy.compute_fingerprint(jar_lib_2))
+
+  def test_identical_jar_libraries_with_differing_managed_deps_differ(self):
+    confs = ()
+    strategy = CouriserResolveFingerprintStrategy(confs)
+
+    managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
+                               artifacts=[JarDependency('org.some', 'name')])
+    self.set_artifact_set_for(managed_jar_deps, PinnedJarArtifactSet())
+
+    jar_lib_with_managed_deps = self.make_target(':jar-lib-1', target_type=JarLibrary,
+                                   jars=[JarDependency('org.some', 'name')],
+                                   managed_dependencies=':managed')
+
+
+    jar_lib_without_managed_deps = self.make_target(':jar-lib-no-managed-dep',
+                                                    target_type=JarLibrary,
+                                                    jars=[JarDependency('org.some', 'name')])
+
+    self.assertNotEqual(strategy.compute_fingerprint(jar_lib_with_managed_deps),
+                        strategy.compute_fingerprint(jar_lib_without_managed_deps))
