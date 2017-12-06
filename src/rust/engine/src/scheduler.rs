@@ -36,7 +36,7 @@ impl ExecutionRequest {
 }
 
 ///
-/// Represents the state of an execution of (a subgraph of) a Graph.
+/// Represents the state of an execution of a Graph.
 ///
 pub struct Scheduler {
   pub core: Arc<Core>,
@@ -122,7 +122,7 @@ impl Scheduler {
   }
 
   ///
-  /// Starting from existing roots, execute a graph to completion.
+  /// Compute the results for roots in the given request.
   ///
   pub fn execute<'e>(&mut self, request: &'e ExecutionRequest) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
     // Bootstrap tasks for the roots, and then wait for all of them.

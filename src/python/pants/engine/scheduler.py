@@ -267,6 +267,15 @@ class WrappedNativeScheduler(object):
                                                self._to_key(subject),
                                                self._to_constraint(product))
 
+  def visualize_to_dir(self):
+    return self._native.visualize_to_dir
+
+  def to_keys(self, subjects):
+    return list(self._to_key(subject) for subject in subjects)
+
+  def pre_fork(self):
+    self._native.lib.scheduler_pre_fork(self._scheduler)
+
   def run_and_return_roots(self, execution_request):
     raw_roots = self._native.lib.execution_execute(self._scheduler, execution_request.native)
     try:
@@ -285,15 +294,6 @@ class WrappedNativeScheduler(object):
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
-
-  def visualize_to_dir(self):
-    return self._native.visualize_to_dir
-
-  def to_keys(self, subjects):
-    return list(self._to_key(subject) for subject in subjects)
-
-  def pre_fork(self):
-    self._native.lib.scheduler_pre_fork(self._scheduler)
 
 
 class LocalScheduler(object):
