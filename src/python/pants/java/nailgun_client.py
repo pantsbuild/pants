@@ -25,11 +25,14 @@ class NailgunClientSession(NailgunProtocol):
 
   def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
     self._sock = sock
+    self._input_writer = None
     if in_fd:
-      self._input_writer = NailgunStreamWriter(in_fd, self._sock,
-                                               ChunkType.STDIN, ChunkType.STDIN_EOF)
-    else:
-      self._input_writer = None
+      self._input_writer = NailgunStreamWriter(
+        (in_fd,),
+        self._sock,
+        (ChunkType.STDIN,),
+        ChunkType.STDIN_EOF
+      )
     self._stdout = out_fd
     self._stderr = err_fd
     self._exit_on_broken_pipe = exit_on_broken_pipe
@@ -42,6 +45,7 @@ class NailgunClientSession(NailgunProtocol):
   def _maybe_stop_input_writer(self):
     if self._input_writer:
       self._input_writer.stop()
+      self._input_writer.join()
 
   def _write_flush(self, fd, payload=None):
     """Write a payload to a given fd (if provided) and flush the fd."""

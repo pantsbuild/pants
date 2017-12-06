@@ -9,6 +9,7 @@ import datetime
 import os
 import signal
 import sys
+import time
 from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
@@ -71,8 +72,6 @@ class DaemonPantsRunner(ProcessManager):
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
 
-  JOIN_TIMEOUT = 5
-
   def __init__(self, socket, exiter, args, env, graph_helper, deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
@@ -109,22 +108,21 @@ class DaemonPantsRunner(ProcessManager):
     # Launch a thread to read stdin data from the socket (the only messages expected from the client
     # for the remainder of the protocol), and threads to copy from stdout/stderr pipes onto the
     # socket.
-    with NailgunStreamStdinReader.open(sock, isatty=stdin_isatty) as stdin,\
-         NailgunStreamWriter.open(sock,
-                                  ChunkType.STDOUT,
-                                  None,
-                                  isatty=stdout_isatty) as (stdout, stdout_writer),\
-         NailgunStreamWriter.open(sock,
-                                  ChunkType.STDERR,
-                                  None,
-                                  isatty=stderr_isatty) as (stderr, stderr_writer),\
+    with NailgunStreamWriter.open_multi(
+           sock,
+           (ChunkType.STDOUT, ChunkType.STDERR),
+           None,
+           (stdout_isatty, stderr_isatty)
+         ) as ((stdout, stderr), writer),\
+         NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin,\
          stdio_as(stdout=stdout, stderr=stderr, stdin=stdin):
-      # N.B. This will be passed to and called by the `DaemonExiter` prior to sending any
-      # exit chunks, to avoid any socket shutdown vs write races.
+      # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
+      # exit chunk, to avoid any socket shutdown vs write races.
       def finalizer():
-        for thread in (stdout_writer, stderr_writer):
-          thread.stop()
-          thread.join(self.JOIN_TIMEOUT)
+        # HACK: Sleep 1ms from the main thread to free the GIL.
+        time.sleep(.001)
+        writer.stop()
+        writer.join()
       yield finalizer
 
   def _setup_sigint_handler(self):
