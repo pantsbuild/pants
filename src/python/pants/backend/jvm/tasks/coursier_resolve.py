@@ -268,7 +268,9 @@ class CoursierMixin(NailgunTask):
         with open(os.path.join(vt.results_dir, target_resolution_filename), 'r') as f:
           tuples_conf_artifact_classpath = pickle.load(f)
           for conf, artifact_classpath in tuples_conf_artifact_classpath:
-            if not os.path.exists(artifact_classpath.path) or not os.path.exists(artifact_classpath.cache_path):
+            if not os.path.exists(artifact_classpath.path) \
+                or not os.path.exists(artifact_classpath.cache_path) \
+                or not os.path.exists(os.path.realpath(artifact_classpath.cache_path)):
               print("cache verification failed")
               return False
             temp_store.append((t, tuples_conf_artifact_classpath))

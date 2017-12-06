@@ -49,7 +49,7 @@ class CoursierTest(BaseTest):
     }, flat_resolution)
 
   def test_coord_to_resolved_jars(self):
-    with temporary_dir() as pants_dir:
+    with temporary_dir() as coursier_cache_path, temporary_dir() as pants_path:
       coord_to_jars = CoursierResolve._map_coord_to_resolved_jars({
         "conflict_resolution": {},
         "dependencies": [
@@ -58,7 +58,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/com/thoughtworks/paranamer/paranamer/2.3/paranamer-2.3-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": []
@@ -68,7 +68,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/slf4j/slf4j-api/1.6.4/slf4j-api-1.6.4-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": []
@@ -78,7 +78,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/xerial/snappy/snappy-java/1.0.4.1/snappy-java-1.0.4.1-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": []
@@ -88,7 +88,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/apache/commons/commons-compress/1.4.1/commons-compress-1.4.1-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": [
@@ -97,7 +97,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/tukaani/xz/1.0/xz-1.0-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": []
@@ -109,7 +109,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/apache/avro/avro/1.7.4/avro-1.7.4-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": [
@@ -118,7 +118,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/com/thoughtworks/paranamer/paranamer/2.3/paranamer-2.3-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": []
@@ -128,7 +128,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/apache/commons/commons-compress/1.4.1/commons-compress-1.4.1-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": [
@@ -137,7 +137,7 @@ class CoursierTest(BaseTest):
                     "files": [
                       [
                         "sources",
-                        "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/tukaani/xz/1.0/xz-1.0-sources.jar"
+                        pants_path
                       ]
                     ],
                     "dependencies": []
@@ -149,7 +149,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/codehaus/jackson/jackson-core-asl/1.8.8/jackson-core-asl-1.8.8-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": []
@@ -159,7 +159,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/codehaus/jackson/jackson-mapper-asl/1.8.8/jackson-mapper-asl-1.8.8-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": [
@@ -168,7 +168,7 @@ class CoursierTest(BaseTest):
                     "files": [
                       [
                         "sources",
-                        "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/codehaus/jackson/jackson-core-asl/1.8.8/jackson-core-asl-1.8.8-sources.jar"
+                        pants_path
                       ]
                     ],
                     "dependencies": []
@@ -180,7 +180,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/slf4j/slf4j-api/1.6.4/slf4j-api-1.6.4-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": []
@@ -190,7 +190,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/xerial/snappy/snappy-java/1.0.4.1/snappy-java-1.0.4.1-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": []
@@ -202,7 +202,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/tukaani/xz/1.0/xz-1.0-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": []
@@ -212,7 +212,7 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/codehaus/jackson/jackson-mapper-asl/1.8.8/jackson-mapper-asl-1.8.8-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": [
@@ -221,7 +221,7 @@ class CoursierTest(BaseTest):
                 "files": [
                   [
                     "sources",
-                    "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/codehaus/jackson/jackson-core-asl/1.8.8/jackson-core-asl-1.8.8-sources.jar"
+                    pants_path
                   ]
                 ],
                 "dependencies": []
@@ -233,17 +233,17 @@ class CoursierTest(BaseTest):
             "files": [
               [
                 "sources",
-                "/Users/yic/.cache/pants/coursier/https/repo1.maven.org/maven2/org/codehaus/jackson/jackson-core-asl/1.8.8/jackson-core-asl-1.8.8-sources.jar"
+                pants_path
               ]
             ],
             "dependencies": []
           }
         ]
       },
-        pants_dir,
+        coursier_cache_path,
         # It is okay to use a hardcoded location here because we are only symlink somewhere in pants_dir into it,
         # so it does not matter whether it exists.
-        '/Users/yic/.cache/pants/coursier')
+        pants_path)
 
       compress = coord_to_jars['org.apache.commons:commons-compress:1.4.1']
       self.assertEqual(1, len(compress))
