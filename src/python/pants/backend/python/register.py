@@ -36,6 +36,7 @@ def build_file_aliases():
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,
       PythonDistribution.alias(): TargetMacro.Factory.wrap(PythonDistribution.create, PythonDistribution),
+      'python_dist': PythonDistribution,
       'python_requirement_library': PythonRequirementLibrary,
       Resources.alias(): Resources,
     },

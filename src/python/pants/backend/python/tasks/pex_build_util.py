@@ -22,7 +22,6 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
@@ -193,21 +192,9 @@ def build_python_distribution(dist_tgt, interpreter, workdir, log):
   for source in sources:
     shutil.copyfile(os.path.join(buildroot, source), os.path.join(tmp_dir_for_dist, source))
 
-  # build the whl from pex API using tempdir and get its location
-  install_dir = os.path.join(dist_target_dir, 'dist')
-  if not install_dir:
-    safe_mkdir(install_dir)
-  setup_runner = SetupPyRunner(tmp_dir_for_dist, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
-  setup_runner.run()
 
-  # return the location of the whl on disk (somewhere in pantsd or dist)
-  dists = os.listdir(self.install_tmp)
-  if len(dists) == 0:
-    raise TaskError('No distributions were produced by python_create_distribution task.')
-  elif len(dists) > 1:
-    raise TaskError('Ambiguous whls found: %s' % (' '.join(dists)))
-  else:
-    return os.path.join(self.install_tmp, dists[0])
+  return (tmp_dir_for_dist, install_dir)
+  
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):

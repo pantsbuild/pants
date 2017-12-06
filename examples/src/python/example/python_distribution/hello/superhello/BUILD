@@ -4,11 +4,12 @@
 # Like Hello world, but built with a python_distribution.
 # python_distribution allows you to use setup.py to depend on C/C++ extensions.
 
-python_distribution(
+python_dist(
   name='superhello',
   sources=[
   	'super_greet.c',
-  	'hello.py',
+  	'hello_package/hello.py',
+  	'hello_package/__init__.py',
   	'setup.py'
   ]
 )

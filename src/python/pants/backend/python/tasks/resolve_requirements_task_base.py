@@ -11,7 +11,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.pex_build_util import dump_python_distributions, dump_requirements
+from pants.backend.python.tasks2.pex_build_util import dump_requirements
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation

@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 
 from twitter.common.collections import maybe_list
 
@@ -63,11 +64,7 @@ class PythonDistribution(Target):
       except ValueError as e:
         raise TargetDefinitionException(self, str(e))
 
-
     @classmethod
-    def alias(cls):
+    def get_alias(cls):
       return 'python_dist'
 
-    def __init__(self, **kwargs):
-      payload = Payload()
-      super(PythonDistribution, self).__init__(sources=[], payload=payload, **kwargs)
