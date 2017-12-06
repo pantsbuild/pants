@@ -7,13 +7,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.subsystems.zinc import Zinc
+from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.source.source_root import SourceRootConfig
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
+from pants_test.base.context_utils import create_context_from_options
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -61,7 +65,11 @@ class NonExecutingTask(Task):
   def implementation_version(cls):
     return cls._impls
 
-  options_scope = 'non_executing_task'
+  @classmethod
+  def supports_passthru_args(cls):
+    return True
+
+  options_scope = GLOBAL_SCOPE
 
   def execute(self): pass
 
@@ -69,14 +77,17 @@ class NonExecutingTask(Task):
     self.context = context
     self._workdir = workdir
 
+  _deps = ()
+  @classmethod
+  def subsystem_dependencies(cls):
+    return cls._deps
+
 class OtherNonExecutingTask(NonExecutingTask):
   _other_impls = []
 
   @classmethod
   def implementation_version(cls):
     return super(OtherNonExecutingTask, cls).implementation_version() + cls._other_impls
-
-  options_scope = 'other_non_executing_task'
 
 class TaskTest(TaskTestBase):
 
@@ -117,13 +128,15 @@ class TaskTest(TaskTestBase):
   def _make_subtask(self, name='A', scope=GLOBAL_SCOPE, cls=NonExecutingTask, **kwargs):
     return self._new_subtask(name, scope, cls, **kwargs)
 
-  def _subtask_to_fp(self, subtask):
-    context = super(TaskTestBase, self).context(options={}, for_task_types=[NonExecutingTask])
+  def _subtask_to_fp(self, subtask, options={}):
+    context = super(TaskTest, self).context(
+      options=options,
+      for_task_types=[NonExecutingTask])
     workdir = self.test_workdir
     return subtask(context, workdir).fingerprint
 
-  def _subtask_fp(self, **kwargs):
-    return self._subtask_to_fp(self._make_subtask(**kwargs))
+  def _subtask_fp(self, options={}, **kwargs):
+    return self._subtask_to_fp(self._make_subtask(**kwargs), options=options)
 
   def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
     content = content or self._file_contents
@@ -262,11 +275,13 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
 
-  def test_fingerprint_implementation_version(self):
-    # Identity
+  def test_fingerprint_identity(self):
     fpA = self._subtask_fp()
-    fpA_v2 = self._subtask_fp()
-    self.assertEqual(fpA, fpA_v2)
+    fpB = self._subtask_fp()
+    self.assertEqual(fpA, fpB)
+
+  def test_fingerprint_implementation_version(self):
+    fpA = self._subtask_fp()
 
     # Using an implementation_version() should be different than nothing
     fpA_with_version = self._subtask_fp(_impls=[('asdf', 0)])
@@ -303,6 +318,119 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(fpB_new_typeA_with_version, fpB_same_version)
     fpB_new_typeA_same_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
     self.assertEqual(fpB_new_typeA_with_version, fpB_new_typeA_same_version)
+
+  def test_fingerprint_stable_name(self):
+    # the same tasks should have the same stable_name
+    typeA = self._make_subtask(name='asdf')
+    fpA = self._subtask_to_fp(typeA)
+    typeA_v2 = self._make_subtask(name='asdf')
+    fpA_v2 = self._subtask_to_fp(typeA_v2)
+    self.assertEqual(fpA, fpA_v2)
+
+    # the same _stable_name means the same stable_name()
+    typeA_stable = self._make_subtask(name='asdf', _stable_name='wow')
+    fpA_stable = self._subtask_to_fp(typeA_stable)
+    self.assertNotEqual(fpA_stable, fpA)
+    typeA_stable_v2 = self._make_subtask(name='asdf')
+    typeA_stable_v2._stable_name = 'wow'
+    fpA_stable_v2 = self._subtask_to_fp(typeA_stable_v2)
+    self.assertEqual(fpA_stable, fpA_stable_v2)
+    # _stable_name subsumes the class name
+    self.assertNotEqual(fpA_stable_v2, fpA)
+
+    typeB = self._make_subtask(_stable_name='wow')
+    fpB = self._subtask_to_fp(typeB)
+    typeB_v2 = self._make_subtask()
+    typeB_v2._stable_name = 'wow'
+    fpB_v2 = self._subtask_to_fp(typeB_v2)
+    self.assertEqual(fpB, fpB_v2)
+    self.assertNotEqual(fpB, fpA)
+    self.assertEqual(fpB, fpA_stable)
+
+  def test_fingerprint_options_scope(self):
+    fpA = self._subtask_fp(scope='xxx')
+    fpB = self._subtask_fp(scope='yyy')
+    fpC = self._subtask_fp(scope='xxx')
+    self.assertEqual(fpA, fpC)
+    self.assertNotEqual(fpA, fpB)
+
+    fpD = self._subtask_fp()
+    fpDeps = self._subtask_fp(_deps=(Zinc.global_instance(),))
+    self.assertNotEqual(fpD, fpDeps)
+    fpDeps_v2 = self._subtask_fp(_deps=(Zinc.global_instance(),))
+    self.assertEqual(fpDeps, fpDeps_v2)
+
+    fpDeps_opts_global = self._subtask_fp(
+      scope=GLOBAL_SCOPE,
+      options={GLOBAL_SCOPE: {'colors': False}})
+    self.assertNotEqual(fpDeps_opts_global, fpD)
+    fpDeps_opts_global_v2 = self._subtask_fp(
+      scope=GLOBAL_SCOPE,
+      options={GLOBAL_SCOPE: {'colors': False}})
+    self.assertEqual(fpDeps_opts_global_v2, fpDeps_opts_global)
+
+    fpDeps_opts_empty = self._subtask_fp(
+      options={GLOBAL_SCOPE: {'some-random-arg': []}},
+      _deps=(Zinc.global_instance(),))
+    self.assertEqual(fpDeps_opts_empty, fpDeps)
+    fpDeps_opts_empty_scoped = self._subtask_fp(
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertNotEqual(fpDeps_opts_empty_scoped, fpDeps)
+    fpDeps_opts_scoped = self._subtask_fp(
+      options={'compile.zinc': {}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertEqual(fpDeps_opts_scoped, fpDeps_opts_empty_scoped)
+    fpDeps_opts_scoped_v2 = self._subtask_fp(
+      options={'compile.zinc': {}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertEqual(fpDeps_opts_scoped_v2, fpDeps_opts_scoped)
+    fpDeps_opts_dbg = self._subtask_fp(
+      options={'compile': {'debug-symbols': True}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_empty)
+    self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_scoped)
+    fpDeps_opts_dbg_v2 = self._subtask_fp(
+      options={'compile.zinc': {'debug-symbols': True}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertEqual(fpDeps_opts_dbg_v2, fpDeps_opts_dbg)
+    fpDeps_opts_compile_empty = self._subtask_fp(
+      options={'compile.zinc': {'some-random-arg': []}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    # some-random-arg is not registered in the compile.zinc scope,
+    self.assertNotEqual(fpDeps_opts_compile_empty, fpDeps_opts_empty)
+    self.assertEqual(fpDeps_opts_compile_empty, fpDeps_opts_scoped)
+    fpDeps_opts_dbg_compile = self._subtask_fp(
+      options={'compile.zinc': {'debug-symbols': True}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_compile_empty)
+    self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_dbg)
+    fpDeps_opts_dbg_compile_v2 = self._subtask_fp(
+      options={'compile.zinc': {'debug-symbols': True}},
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertEqual(fpDeps_opts_dbg_compile_v2, fpDeps_opts_dbg_compile)
+
+    fpDeps_opts_dbg_compile_with_global = self._subtask_fp(
+      options={
+        GLOBAL_SCOPE: {'colors': False},
+        'compile.zinc': {'debug-symbols': True}
+      },
+      _deps=(Zinc.scoped(JvmCompile),))
+    self.assertNotEqual(fpDeps_opts_dbg_compile_with_global, fpDeps_opts_dbg_compile)
+
+    fpDeps_extra = self._subtask_fp(
+      options={'compile.zinc': {'debug-symbols': True}},
+      _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
+    self.assertNotEqual(fpDeps_extra, fpDeps_opts_dbg_compile)
+    fpDeps_new_scope = self._subtask_fp(
+      options={'compile.zinc': {'debug-symbols': True}},
+      scope='xxx',
+      _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
+    self.assertNotEqual(fpDeps_new_scope, fpDeps_extra)
+    fpDeps_new_scope_v2 = self._subtask_fp(
+      options={'compile.zinc': {'debug-symbols': True}},
+      scope='xxx',
+      _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
+    self.assertEqual(fpDeps_new_scope_v2, fpDeps_new_scope)
 
   def test_execute_cleans_invalid_result_dirs(self):
     # Regression test to protect task.execute() from returning invalid dirs.
