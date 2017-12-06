@@ -25,7 +25,7 @@ from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsyste
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
-from pants.base.workunit import WorkUnitLabel, WorkUnit
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
