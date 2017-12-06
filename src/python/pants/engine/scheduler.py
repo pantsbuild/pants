@@ -410,7 +410,7 @@ class LocalScheduler(object):
     filenames = set(direct_filenames)
     filenames.update(os.path.dirname(f) for f in direct_filenames)
     invalidated = self._scheduler.invalidate(filenames)
-    logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
+    logger.info('invalidated %d nodes for: %s', invalidated, filenames)
     return invalidated
 
   def node_count(self):

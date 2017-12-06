@@ -15,7 +15,7 @@ use futures::future::{self, Future};
 use externs;
 use boxfuture::{BoxFuture, Boxable};
 use context::ContextFactory;
-use core::{Failure, FNV, Noop};
+use core::{Failure, FNV, Noop, throw};
 use nodes::{Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
 
@@ -150,23 +150,19 @@ struct InnerGraph {
 
 impl InnerGraph {
   fn entry(&self, node: &EntryKey) -> Option<&Entry> {
-    self.entry_id(node).map(|&id| self.entry_for_id(id))
+    self.entry_id(node).and_then(|&id| self.entry_for_id(id))
   }
 
   fn entry_id(&self, node: &EntryKey) -> Option<&EntryId> {
     self.nodes.get(node)
   }
 
-  fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.pg.node_weight(id).unwrap_or_else(|| {
-      panic!("Invalid EntryId: {:?}", id)
-    })
+  fn entry_for_id(&self, id: EntryId) -> Option<&Entry> {
+    self.pg.node_weight(id)
   }
 
-  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.pg.node_weight_mut(id).unwrap_or_else(|| {
-      panic!("Invalid EntryId: {:?}", id)
-    })
+  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry> {
+    self.pg.node_weight_mut(id)
   }
 
   fn ensure_entry(&mut self, node: EntryKey) -> EntryId {
@@ -342,7 +338,7 @@ impl InnerGraph {
     let predicate = |_| true;
 
     for eid in self.walk(root_entries, false) {
-      let entry = self.entry_for_id(eid);
+      let entry = self.entry_for_id(eid).expect("Under graph lock.");
       let node_str = entry.format::<NodeKey>();
 
       // Write the node header.
@@ -353,7 +349,7 @@ impl InnerGraph {
       )));
 
       for dep_id in self.pg.neighbors(eid) {
-        let dep_entry = self.entry_for_id(dep_id);
+        let dep_entry = self.entry_for_id(dep_id).expect("Under graph lock.");
         if !predicate(dep_entry) {
           continue;
         }
@@ -375,7 +371,10 @@ impl InnerGraph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |eid: EntryId| -> bool {
-      match self.entry_for_id(eid).peek::<NodeKey>() {
+      match self
+        .entry_for_id(eid)
+        .expect("Under graph lock.")
+        .peek::<NodeKey>() {
         None |
         Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(..))) => false,
@@ -395,7 +394,7 @@ impl InnerGraph {
     };
 
     let _format = |eid: EntryId, level: Level| -> String {
-      let entry = self.entry_for_id(eid);
+      let entry = self.entry_for_id(eid).expect("Under graph lock.");
       let indent = _indent(level);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
       if is_one_level_above_bottom(eid) {
@@ -497,7 +496,15 @@ impl Graph {
 
       // Declare the dep, and return the state of the destination.
       inner.pg.add_edge(src_id, dst_id, ());
-      inner.entry_for_id_mut(dst_id).state(context, dst_id)
+      inner
+        .entry_for_id_mut(dst_id)
+        .map(|entry| entry.state(context, dst_id))
+        .unwrap_or_else(|| {
+          // TODO: Add an explicit Failure type for invalidation which signals retry.
+          let f: BoxFuture<_, _> = future::err(throw("File inputs changed during execution."))
+            .to_boxed();
+          f.shared()
+        })
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -513,7 +520,10 @@ impl Graph {
     let state = {
       let mut inner = self.inner.lock().unwrap();
       let id = inner.ensure_entry(EntryKey::Valid(node.into()));
-      inner.entry_for_id_mut(id).state(context, id)
+      inner
+        .entry_for_id_mut(id)
+        .expect("Under graph lock.")
+        .state(context, id)
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()

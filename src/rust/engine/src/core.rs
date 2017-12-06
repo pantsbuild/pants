@@ -182,3 +182,13 @@ impl fmt::Debug for Noop {
     })
   }
 }
+
+pub fn throw(msg: &str) -> Failure {
+  Failure::Throw(
+    externs::create_exception(msg),
+    format!(
+      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+      msg
+    ).to_string(),
+  )
+}
