@@ -5,7 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 from textwrap import dedent
+
+import six
 
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
@@ -31,9 +34,29 @@ class ApacheThriftPyGenTest(TaskTestBase):
     self.assertEqual(1, len(synthetic_targets))
     return synthetic_targets[0]
 
+  def init_py_path(self, target, package_rel_dir):
+    return os.path.join(self.build_root, target.target_base, package_rel_dir, '__init__.py')
+
+  def assert_ns_package(self, target, package_rel_dir):
+    with open(self.init_py_path(target, package_rel_dir)) as fp:
+      self.assertEqual(b"__import__('pkg_resources').declare_namespace(__name__)",
+                       fp.read().strip())
+
+  def assert_leaf_package(self, target, package_rel_dir, *services):
+    # We know thrift controls exported package symbols using `__all__`; so reading this out of the
+    # `__init__.py` is enough to show we haven't trampled non-trivial thrift-generated `__init__.py`
+    # files.
+
+    symbols = {}
+    with open(self.init_py_path(target, package_rel_dir), 'rb') as fp:
+      six.exec_(fp.read(), symbols)
+
+    self.assertIn('__all__', symbols)
+    self.assertEqual(sorted(('constants', 'ttypes') + services), sorted(symbols['__all__']))
+
   def test_single_namespace(self):
     self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
-    namespace py foo
+    namespace py foo.bar
 
     const i32 THINGCONSTANT = 42
 
@@ -45,18 +68,24 @@ class ApacheThriftPyGenTest(TaskTestBase):
                            target_type=PythonThriftLibrary,
                            sources=['one.thrift'])
     synthetic_target = self.generate_single_thrift_target(one)
-    self.assertEqual({'foo/__init__.py', 'foo/ThingService-remote',
-                      'foo/ThingService.py', 'foo/ttypes.py', 'foo/constants.py'},
+    self.assertEqual({'foo/__init__.py',
+                      'foo/bar/__init__.py',
+                      'foo/bar/ThingService-remote',
+                      'foo/bar/ThingService.py',
+                      'foo/bar/ttypes.py',
+                      'foo/bar/constants.py'},
                      set(synthetic_target.sources_relative_to_source_root()))
+    self.assert_ns_package(synthetic_target, 'foo')
+    self.assert_leaf_package(synthetic_target, 'foo/bar', 'ThingService')
 
   def test_nested_namespaces(self):
     self.create_file('src/thrift/com/foo/one.thrift', contents=dedent("""
-    namespace py foo
+    namespace py foo.bar
 
     struct One {}
     """))
     self.create_file('src/thrift/com/foo/bar/two.thrift', contents=dedent("""
-    namespace py foo.bar
+    namespace py foo.bar.baz
 
     struct Two {}
     """))
@@ -64,6 +93,14 @@ class ApacheThriftPyGenTest(TaskTestBase):
                            target_type=PythonThriftLibrary,
                            sources=['one.thrift', 'bar/two.thrift'])
     synthetic_target = self.generate_single_thrift_target(one)
-    self.assertEqual({'foo/__init__.py', 'foo/ttypes.py', 'foo/constants.py',
-                      'foo/bar/__init__.py', 'foo/bar/ttypes.py', 'foo/bar/constants.py'},
+    self.assertEqual({'foo/__init__.py',
+                      'foo/bar/__init__.py',
+                      'foo/bar/constants.py',
+                      'foo/bar/ttypes.py',
+                      'foo/bar/baz/__init__.py',
+                      'foo/bar/baz/constants.py',
+                      'foo/bar/baz/ttypes.py'},
                      set(synthetic_target.sources_relative_to_source_root()))
+    self.assert_ns_package(synthetic_target, 'foo')
+    self.assert_leaf_package(synthetic_target, 'foo/bar')
+    self.assert_leaf_package(synthetic_target, 'foo/bar/baz')

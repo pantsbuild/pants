@@ -3,6 +3,7 @@
 
 python_tests(
   dependencies=[
+    '3rdparty/python:six',
     'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/python/targets:python',
     'tests/python/pants_test/tasks:task_test_base',
