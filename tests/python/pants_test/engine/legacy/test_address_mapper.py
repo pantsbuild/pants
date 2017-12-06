@@ -60,6 +60,7 @@ class LegacyAddressMapperTest(unittest.TestCase):
     scheduler, _, _ = EngineInitializer.setup_legacy_graph(
       [],
       work_dir,
+      build_file_imports_behavior='allow',
       build_root=build_root,
       native=self._native
     )

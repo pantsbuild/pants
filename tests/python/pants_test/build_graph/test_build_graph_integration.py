@@ -19,3 +19,51 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(['compile', os.path.join(prefix, 'cycle1')])
         self.assert_failure(pants_run)
         self.assertIn('Cycle detected', pants_run.stderr_data)
+
+  def test_banned_module_import(self):
+    pants_run = self.run_pants([
+      '--build-file-imports=error',
+      'run',
+      'testprojects/src/python/build_file_imports_module:hello',
+    ])
+    self.assert_failure(pants_run)
+    self.assertIn('testprojects/src/python/build_file_imports_module/BUILD', pants_run.stderr_data)
+    self.assertIn('import os.path', pants_run.stderr_data)
+
+  def test_warn_module_import(self):
+    pants_run = self.run_pants([
+      '--build-file-imports=warn',
+      'run',
+      'testprojects/src/python/build_file_imports_module:hello',
+    ])
+    self.assert_success(pants_run)
+    self.assertIn('Hello\n', pants_run.stdout_data)
+    self.assertIn('testprojects/src/python/build_file_imports_module/BUILD', pants_run.stderr_data)
+    self.assertIn('import os.path', pants_run.stderr_data)
+
+  def test_banned_function_import(self):
+    pants_run = self.run_pants([
+      '--build-file-imports=error',
+      'run',
+      'testprojects/src/python/build_file_imports_function:hello',
+    ])
+    self.assert_failure(pants_run)
+    self.assertIn('import os.path', pants_run.stderr_data)
+
+  def test_allowed_module_import(self):
+    pants_run = self.run_pants([
+      '--build-file-imports=allow',
+      'run',
+      'testprojects/src/python/build_file_imports_module:hello',
+    ])
+    self.assert_success(pants_run)
+    self.assertIn('Hello\n', pants_run.stdout_data)
+
+  def test_allowed_function_import(self):
+    pants_run = self.run_pants([
+      '--build-file-imports=allow',
+      'run',
+      'testprojects/src/python/build_file_imports_function:hello',
+    ])
+    self.assert_success(pants_run)
+    self.assertIn('Hello\n', pants_run.stdout_data)

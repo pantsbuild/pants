@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 
 import six
@@ -14,7 +15,7 @@ from pants.base.parse_context import ParseContext
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
 from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
-from pants.engine.parser import Parser
+from pants.engine.parser import ParseError, Parser
 from pants.util.memo import memoized_property
 
 
@@ -28,16 +29,20 @@ class LegacyPythonCallbacksParser(Parser):
   macros and target factories.
   """
 
-  def __init__(self, symbol_table, aliases):
+  def __init__(self, symbol_table, aliases, build_file_imports_behavior):
     """
     :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
       additional aliases.
     :type symbol_table: :class:`pants.engine.parser.SymbolTable`
     :param aliases: Additional BuildFileAliases to register.
     :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+      import statements. Valid values: "allow", "warn", "error".
+    :type build_file_imports_behavior: string
     """
     super(LegacyPythonCallbacksParser, self).__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
+    self._build_file_import_behavior = build_file_imports_behavior
 
   @staticmethod
   def _generate_symbols(symbol_table, aliases):
@@ -125,5 +130,35 @@ class LegacyPythonCallbacksParser(Parser):
     # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
-    six.exec_(python, dict(self._symbols))
+
+    symbols = dict(self._symbols)
+    if self._build_file_import_behavior != 'allow':
+      # This is not secure sandboxing, because people could replace __import__ again themselves
+      # if they wanted (and there are plenty of other ways to escape a python "sandbox"), but it
+      # should be sufficient to tell the casual user that they're doing something wrong.
+      builtins = dict(__builtins__)
+      if self._build_file_import_behavior == 'warn':
+        import_hook = lambda import_name, *args: _warn_on_import(__import__, filepath, import_name, *args)
+      elif self._build_file_import_behavior == 'error':
+        import_hook = _fail_on_import
+      else:
+        raise ParseError("Didn't know what to do for build_file_import_behavior value {}".format(
+          self._build_file_import_behavior
+        ))
+      builtins['__import__'] = import_hook
+      symbols['__builtins__'] = builtins
+
+    six.exec_(python, symbols)
     return list(self._parse_context._storage.objects)
+
+
+def _warn_on_import(import_builtin, filepath, import_name, *args):
+  logger = logging.getLogger(__name__)
+  logger.warn('BUILD file at {} tried to import {} - import statements should be avoided'.format(
+    filepath, import_name
+  ))
+  return import_builtin(import_name, *args)
+
+
+def _fail_on_import(name, *args):
+  raise ParseError('import statements have been banned, but tried to import {}'.format(name))

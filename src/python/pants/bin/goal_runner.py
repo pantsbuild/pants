@@ -101,6 +101,7 @@ class GoalRunnerFactory(object):
         graph_helper = EngineInitializer.setup_legacy_graph(
           pants_ignore_patterns,
           workdir,
+          self._global_options.build_file_imports,
           native=native,
           build_file_aliases=self._build_config.registered_aliases(),
           build_ignore_patterns=build_ignore_patterns,
