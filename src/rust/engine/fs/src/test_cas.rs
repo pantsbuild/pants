@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use bazel_protos;
 use futures;
@@ -14,6 +14,7 @@ use Fingerprint;
 ///
 pub struct StubCAS {
   server_transport: grpcio::Server,
+  request_count: Arc<Mutex<usize>>,
 }
 
 impl StubCAS {
@@ -27,9 +28,11 @@ impl StubCAS {
   ///                        for correctness.
   pub fn new(chunk_size_bytes: i64, blobs: HashMap<Fingerprint, Vec<u8>>) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
+    let request_count = Arc::new(Mutex::new(0));
     let responder = StubCASResponder {
       chunk_size_bytes,
       blobs,
+      request_count: request_count.clone(),
     };
     let mut server_transport = grpcio::ServerBuilder::new(env)
       .register_service(bazel_protos::bytestream_grpc::create_byte_stream(
@@ -40,7 +43,10 @@ impl StubCAS {
       .unwrap();
     server_transport.start();
 
-    let cas = StubCAS { server_transport };
+    let cas = StubCAS {
+      server_transport,
+      request_count,
+    };
     cas
   }
 
@@ -59,12 +65,17 @@ impl StubCAS {
     let bind_addr = self.server_transport.bind_addrs().first().unwrap();
     format!("{}:{}", bind_addr.0, bind_addr.1)
   }
+
+  pub fn request_count(&self) -> usize {
+    self.request_count.lock().unwrap().clone()
+  }
 }
 
 #[derive(Clone, Debug)]
 pub struct StubCASResponder {
   chunk_size_bytes: i64,
   blobs: HashMap<Fingerprint, Vec<u8>>,
+  pub request_count: Arc<Mutex<usize>>,
 }
 
 impl StubCASResponder {
@@ -137,6 +148,10 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
     req: bazel_protos::bytestream::ReadRequest,
     sink: grpcio::ServerStreamingSink<bazel_protos::bytestream::ReadResponse>,
   ) {
+    {
+      let mut request_count = self.request_count.lock().unwrap();
+      *request_count = *request_count + 1;
+    }
     match self.read_internal(req) {
       Ok(response) => {
         self.send(
