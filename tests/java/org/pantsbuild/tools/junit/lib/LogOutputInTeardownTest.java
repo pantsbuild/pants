@@ -15,7 +15,17 @@ public class LogOutputInTeardownTest {
   }
 
   @Test
-  public void test() {
+  public void testOne() {
+    Assert.assertTrue(true);
+  }
+
+  @Test
+  public void testTwo() {
+    Assert.assertTrue(true);
+  }
+
+  @Test
+  public void testThree() {
     Assert.assertTrue(true);
   }
 }
