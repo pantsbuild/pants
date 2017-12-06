@@ -135,7 +135,7 @@ to this directory.",
 fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local-store-path").unwrap();
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
-  let store = Arc::new(Store::new(store_dir, pool.clone()).map_err(|e| {
+  let store = Arc::new(Store::local_only(store_dir, pool.clone()).map_err(|e| {
     format!(
       "Failed to open/create store for directory {}: {}",
       store_dir,
