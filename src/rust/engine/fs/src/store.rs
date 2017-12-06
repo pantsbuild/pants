@@ -87,6 +87,9 @@ impl Store {
     fingerprint: Fingerprint,
     f: F,
   ) -> BoxFuture<Option<T>, String> {
+    // No transformation or verification is needed for files, so we pass in a pair of functions
+    // which always succeed, whether the underlying bytes are coming from a local or remote store.
+    // Unfortunately, we need to be a little verbose to do this.
     let f_local = Arc::new(f);
     let f_remote = f_local.clone();
     self.load_bytes_with(
@@ -126,6 +129,8 @@ impl Store {
     self.load_bytes_with(
       EntryType::Directory,
       fingerprint.clone(),
+      // Trust that locally stored values were canonical when they were written into the CAS,
+      // don't bother to check this, as it's slightly expensive.
       move |bytes: &[u8]| {
         let mut directory = bazel_protos::remote_execution::Directory::new();
         directory.merge_from_bytes(bytes).map_err(|e| {
@@ -137,6 +142,8 @@ impl Store {
         })?;
         Ok(directory)
       },
+      // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
+      // into our local store.
       move |bytes: &[u8]| {
         let mut directory = bazel_protos::remote_execution::Directory::new();
         directory.merge_from_bytes(bytes).map_err(|e| {
