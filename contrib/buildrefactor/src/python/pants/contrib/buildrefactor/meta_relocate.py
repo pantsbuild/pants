@@ -61,7 +61,7 @@ class MetaRelocate(Task):
 
   def add_to_BUILD(self):
     with open('{}/BUILD'.format(self._to_address.spec_path), "a") as dest_file:
-      dest_file.write(Buildozer.return_print_target(spec = '{}:{}'.format(self.target.target_base, self.target.name)))
+      dest_file.write(Buildozer.return_buildozer_output('print rule', spec = '{}:{}'.format(self.target.target_base, self.target.name)))
 
   def remove_from_BUILD(self):
     Buildozer.execute_binary('delete', spec = '{}:{}'.format(self.target.target_base, self.target.name))

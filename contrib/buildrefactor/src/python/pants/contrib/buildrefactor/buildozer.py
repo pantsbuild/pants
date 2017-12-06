@@ -88,12 +88,12 @@ class Buildozer(Task):
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
 
   @classmethod
-  def return_print_target(cls, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False):
+  def return_buildozer_output(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False):
     binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
-    return Buildozer._execute_return_print_target([binary, 'print rule', spec], suppress_warnings)
+    return Buildozer._execute_return_buildozer_output([binary, command, spec], suppress_warnings)
 
   @classmethod
-  def _execute_return_print_target(cls, buildozer_command, suppress_warnings):
+  def _execute_return_buildozer_output(cls, buildozer_command, suppress_warnings):
     try:
       subprocess.check_output(buildozer_command, cwd=get_buildroot(), stderr=subprocess.STDOUT)
     except subprocess.CalledProcessError as err:
