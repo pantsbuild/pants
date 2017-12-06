@@ -215,12 +215,16 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    return OptionsFingerprinter.combined_options_fingerprint_for_scope(
+    options_hasher = sha1()
+    options_hasher.update(scope)
+    options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
       include_passthru=self.supports_passthru_args()
     )
+    options_hasher.update(options_fp)
+    return options_hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
@@ -234,12 +238,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     hasher = sha1()
     hasher.update(self.stable_name())
-    hasher.update(self.options_scope)
     hasher.update(self._options_fingerprint(self.options_scope))
     hasher.update(self.implementation_version_str())
     # TODO: this is not recursive, but should be: see #2739
     for dep in self.subsystem_dependencies_iter():
-      hasher.update(dep.options_scope())
       hasher.update(self._options_fingerprint(dep.options_scope()))
     return str(hasher.hexdigest())
 
