@@ -10,6 +10,9 @@ pub use store::{Digest, Store};
 mod pool;
 pub use pool::ResettablePool;
 
+#[cfg(test)]
+pub mod test_cas;
+
 extern crate bazel_protos;
 extern crate boxfuture;
 extern crate digest;
