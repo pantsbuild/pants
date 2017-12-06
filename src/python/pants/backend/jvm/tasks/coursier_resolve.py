@@ -25,7 +25,7 @@ from pants.backend.jvm.tasks.coursier.coursier_subsystem import CoursierSubsyste
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
-from pants.base.workunit import WorkUnitLabel
+from pants.base.workunit import WorkUnitLabel, WorkUnit
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
@@ -173,27 +173,27 @@ class CoursierMixin(NailgunTask):
           logger.info(cmd_str)
 
           try:
-            # with self.context.workunit_factory(name='coursier', labels=[WorkUnitLabel.TOOL], cmd=cmd_str) as workunit:
+            with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
 
-            return_code = self.runjava(
-              classpath=[coursier_jar],
-              main='coursier.cli.Coursier',
-              args=cmd_args,
-              jvm_options=self.get_options().jvm_options,
-              # to let stdout/err through, but don't print tool's label.
-              workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+              return_code = self.runjava(
+                classpath=[coursier_jar],
+                main='coursier.cli.Coursier',
+                args=cmd_args,
+                jvm_options=self.get_options().jvm_options,
+                # to let stdout/err through, but don't print tool's label.
+                workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
-            # return_code = subprocess.call(cmd_args,
-            #                               stdout=workunit.output('stdout'),
-            #                               stderr=workunit.output('stderr'))
+              # return_code = subprocess.call(cmd_args,
+              #                               stdout=workunit.output('stdout'),
+              #                               stderr=workunit.output('stderr'))
 
-            # workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+              workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
-            if return_code:
-              raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+              if return_code:
+                raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-            with open(output_fn) as f:
-              result = json.loads(f.read())
+              with open(output_fn) as f:
+                result = json.loads(f.read())
 
           except subprocess.CalledProcessError as e:
             raise CoursierError(e)
@@ -235,7 +235,7 @@ class CoursierMixin(NailgunTask):
                   if final_simple_coord:
                     transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
                     if transitive_resolved_jars:
-                      compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+                      compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
 
         self._write_result_to_cache(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
 
