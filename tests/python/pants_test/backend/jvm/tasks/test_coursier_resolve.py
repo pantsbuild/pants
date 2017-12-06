@@ -29,10 +29,6 @@ from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
 
 
-def strip_workdir(dir, classpath):
-  return [(conf, path[len(dir):]) for conf, path in classpath]
-
-
 class CoursierResolveTest(JvmToolTaskTestBase):
   """Tests for the class CoursierResolve."""
 
@@ -237,29 +233,28 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.set_options_for_scope('', pants_workdir=old_workdir)
 
 
-class EmptyTask(Task):
-  @classmethod
-  def register_options(cls, register):
-    register('--a', type=bool, default=False, fingerprint=True)
-
-  @property
-  def fingerprint(self):
-    # NB: The fake options object doesn't contribute to fingerprinting, so this class redefines
-    #     fingerprint.
-    if self.get_options().a:
-      return "a"
-    else:
-      return "b"
-
-  def execute(self):
-    pass
-
-
 class CoursierResolveFingerprintStrategyTest(TaskTestBase):
+
+  class EmptyTask(Task):
+    @classmethod
+    def register_options(cls, register):
+      register('--a', type=bool, default=False, fingerprint=True)
+
+    @property
+    def fingerprint(self):
+      # NB: The fake options object doesn't contribute to fingerprinting, so this class redefines
+      #     fingerprint.
+      if self.get_options().a:
+        return "a"
+      else:
+        return "b"
+
+    def execute(self):
+      pass
 
   @classmethod
   def task_type(cls):
-    return EmptyTask
+    return cls.EmptyTask
 
   def setUp(self):
     super(CoursierResolveFingerprintStrategyTest, self).setUp()
