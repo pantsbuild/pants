@@ -234,10 +234,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     """
     hasher = sha1()
     hasher.update(self.stable_name())
+    hasher.update(self.options_scope)
     hasher.update(self._options_fingerprint(self.options_scope))
     hasher.update(self.implementation_version_str())
     # TODO: this is not recursive, but should be: see #2739
     for dep in self.subsystem_dependencies_iter():
+      hasher.update(dep.options_scope())
       hasher.update(self._options_fingerprint(dep.options_scope()))
     return str(hasher.hexdigest())
 
