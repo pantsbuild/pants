@@ -122,6 +122,7 @@ class CoursierMixin(NailgunTask):
     jar_targets = manager.targets_by_artifact_set(targets)
 
     for artifact_set, target_subset in jar_targets.items():
+      # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
       with self.invalidated(target_subset,

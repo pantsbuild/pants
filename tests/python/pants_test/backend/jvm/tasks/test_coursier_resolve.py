@@ -87,6 +87,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEqual('default', conf)
     self.assertEqual('guava-16.0.1.jar', os.path.basename(path))
 
+    # TODO(wisechengyi): this is a valid test case for testing classifiers
     # @ensure_cached(CoursierResolve, expected_num_artifacts=1)
     # def test_resolve_multiple_artifacts(self):
     #   def coordinates_for(cp):
