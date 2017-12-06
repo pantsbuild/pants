@@ -22,6 +22,7 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
@@ -169,32 +170,44 @@ def build_python_distribution_from_target(target, workdir):
     raise TaskError('Failed to package python distribution for target: %s', target.name)
 
 
-def dump_python_distributions(builder, dist_targets, workdir, log):
+def build_python_distribution(dist_tgt, interpreter, workdir, log):
   """Dump python distribution targets into a given builder
 
-  :param builder: Dump the python_distributions into this builder.
-  :param dist_targets: A list of `PythonDistribution` targets to build.
-  :param workdir: Working directory for python targets (./pantsd/python)
-  :param log: Use this logger.
   """
+  # make directory based on fingerprint in workdir
+  local_dists_workdir = os.path.join(workdir, 'local_dists')
+  if not os.path.exists(local_dists_workdir):
+    safe_mkdir(local_dists_workdir)
 
-  # build whl for target using pex wheel installer
-  locations = set()
-  for tgt in dist_targets:
-    whl_location = build_python_distribution_from_target(tgt, workdir)
-    if whl_location in locations:
-      raise TaskError('Two wheels of the same name have been created: %s.', whl_location)
-    if whl_location:
-      locations.add(whl_location)
+  fingerprint = dist_tgt.payload.fingerprint()
+  dist_target_dir = os.path.join(local_dists_workdir, fingerprint)
+  if not os.path.exists(dist_target_dir):
+    safe_mkdir(dist_target_dir)
 
-  # dump wheels into pex builder
-  # After this block, the whls built from python_distribution should be available
-  # for use in the produced binary
-  for location in locations:
-    log.debug('  Dumping distribution: .../{}'.format(os.path.basename(location)))
-    builder.add_dist_location(location)
+  tmp_dir_for_dist = os.path.join(workdir, 'tmp')
+  if not tmp_dir_for_dist:
+    safe_mkdir(tmp_dir_for_dist)
 
+  # copy sources and setup.py to this temp dir
+  sources = dist_tgt.sources_relative_to_buildroot()
+  for source in sources:
+    shutil.copyfile(os.path.join(buildroot, source), os.path.join(tmp_dir_for_dist, source))
 
+  # build the whl from pex API using tempdir and get its location
+  install_dir = os.path.join(dist_target_dir, 'dist')
+  if not install_dir:
+    safe_mkdir(install_dir)
+  setup_runner = SetupPyRunner(tmp_dir_for_dist, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
+  setup_runner.run()
+
+  # return the location of the whl on disk (somewhere in pantsd or dist)
+  dists = os.listdir(self.install_tmp)
+  if len(dists) == 0:
+    raise TaskError('No distributions were produced by python_create_distribution task.')
+  elif len(dists) > 1:
+    raise TaskError('Ambiguous whls found: %s' % (' '.join(dists)))
+  else:
+    return os.path.join(self.install_tmp, dists[0])
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):

@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 from distutils.core import Extension
 
 
-c_module = Extension(str('super_greet'), sources=[str('c/super_greet.c')])
+c_module = Extension(str('super_greet'), sources=[str('super_greet.c')])
 
 setup(
     name='superhello',

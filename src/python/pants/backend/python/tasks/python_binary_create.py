@@ -133,8 +133,10 @@ class PythonBinaryCreate(Task):
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Dump python_distributions, if any, into builder's chroot.
-      if python_dist_targets:
-        dump_python_distributions(builder, python_dist_targets, self.workdir, self.context.log)
+      built_dists = self.context.products.get_data('python_dists')
+      if built_dists:
+        for dist in built_dists:
+          builder.add_location(dist)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
