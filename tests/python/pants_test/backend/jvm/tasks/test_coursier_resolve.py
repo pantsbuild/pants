@@ -6,12 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.coursier_resolve import CoursierResolve
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
+from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
 
@@ -58,9 +60,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
   # 2 artifacts because each target will store its own result
   @ensure_cached(CoursierResolve, expected_num_artifacts=2)
   def test_resolve_conflicted(self):
-    # Create jar_libraries with different versions of the same dep: this will cause
-    # a pre-ivy "eviction" in IvyUtils.generate_ivy, but the same case can be triggered
-    # due to an ivy eviction where the declared version loses to a transitive version.
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
     winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
     losing_lib = self.make_target('//:a', JarLibrary, jars=[losing_dep])
@@ -133,64 +132,26 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEquals(2, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
 
-#   @ensure_cached(IvyResolve, expected_num_artifacts=0)
-#   def test_resolve_no_deps(self):
-#     # Resolve a library with no deps, and confirm that the empty product is created.
-#     target = self.make_target('//:a', JavaLibrary, sources=[])
-#     self.assertTrue(self.resolve([target]))
-#
-#   @ensure_cached(IvyResolve, expected_num_artifacts=1)
-#   def test_resolve_symlinked_cache(self):
-#     """Test to make sure resolve works when --ivy-cache-dir is a symlinked path.
-#
-#     When ivy returns the path to a resolved jar file, it might be the realpath to the jar file,
-#     not the symlink'ed path we are expecting for --ivy-cache-dir.  Make sure that resolve correctly
-#     recognizes these as belonging in the cache dir and lookups for either the symlinked cache
-#     dir or the realpath to the cache dir are recognized.
-#     """
-#     with temporary_dir() as realcachedir:
-#       with temporary_dir() as symlinkdir:
-#         symlink_cache_dir = os.path.join(symlinkdir, 'symlinkedcache')
-#         os.symlink(realcachedir, symlink_cache_dir)
-#         self.set_options_for_scope('ivy', cache_dir=symlink_cache_dir)
-#
-#         dep = JarDependency('commons-lang', 'commons-lang', '2.5')
-#         jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
-#         # Confirm that the deps were added to the appropriate targets.
-#         compile_classpath = self.resolve([jar_lib])
-#         self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
-#
-#   @ensure_cached(IvyResolve, expected_num_artifacts=1)
-#   def test_ivy_classpath(self):
-#     # Testing the IvyTaskMixin entry point used by bootstrap for jvm tools.
-#
-#     junit_jar_lib = self._make_junit_target()
-#
-#     task = self.prepare_execute(self.context())
-#     classpath = task.ivy_classpath([junit_jar_lib])
-#
-#     self.assertEquals(2, len(classpath))
-#
-#   def test_second_resolve_reuses_existing_resolution_files(self):
-#     junit_jar_lib = self._make_junit_target()
-#     with self._temp_workdir():
-#       # Initial resolve does a resolve and populates elements.
-#       initial_context = self.context(target_roots=[junit_jar_lib])
-#       self.execute(initial_context)
-#
-#       # Second resolve should check files and do no ivy call.
-#       load_context = self.context(target_roots=[junit_jar_lib])
-#       task = self.prepare_execute(load_context)
-#
-#       def fail(*arg, **kwargs):
-#         self.fail("Unexpected call to ivy.")
-#       task._do_resolve = fail
-#
-#       task.execute()
-#
-#       self.assertEqual(initial_context.products.get_data('compile_classpath'),
-#                        load_context.products.get_data('compile_classpath'))
-#
+  @ensure_cached(CoursierResolve, expected_num_artifacts=0)
+  def test_resolve_no_deps(self):
+    # Resolve a library with no deps, and confirm that the empty product is created.
+    target = self.make_target('//:a', JavaLibrary, sources=[])
+    self.assertTrue(self.resolve([target]))
+
+  def test_second_noop_does_not_invoke_coursier(self):
+    junit_jar_lib = self._make_junit_target()
+    with self._temp_workdir():
+      # Initial resolve does a resolve and populates elements.
+      initial_context = self.context(target_roots=[junit_jar_lib])
+      task = self.execute(initial_context)
+
+      # Second resolve should check files and do no coursier call.
+      def fail(*arg, **kwargs):
+        self.fail("Unexpected call to coursier.")
+
+      task.runjava = fail
+      task.execute()
+
 #   def test_when_symlink_cachepath_fails_on_load_due_to_missing_file_trigger_resolve(self):
 #     jar_lib = self._make_junit_target()
 #     with self._temp_workdir() as workdir:
@@ -369,16 +330,16 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 #     print('>>> got dir {}'.format(ivy_dir_subdirs))
 #     ivy_resolve_workdir = ivy_dir_subdirs[0]
 #     return os.path.join(ivy_dir, ivy_resolve_workdir)
-#
-#   @contextmanager
-#   def _temp_workdir(self):
-#     old_workdir = self.options['']['pants_workdir']
-#     with temporary_dir() as workdir:
-#       self.set_options_for_scope('', pants_workdir=workdir)
-#       self._test_workdir = workdir
-#       yield workdir
-#     self._test_workdir = old_workdir
-#     self.set_options_for_scope('', pants_workdir=old_workdir)
+
+  @contextmanager
+  def _temp_workdir(self):
+    old_workdir = self.options['']['pants_workdir']
+    with temporary_dir() as workdir:
+      self.set_options_for_scope('', pants_workdir=workdir)
+      self._test_workdir = workdir
+      yield workdir
+    self._test_workdir = old_workdir
+    self.set_options_for_scope('', pants_workdir=old_workdir)
 #
 #   @contextmanager
 #   def _temp_ivy_cache_dir(self):
