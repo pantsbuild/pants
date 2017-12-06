@@ -43,7 +43,7 @@ class MetaRelocate(Task):
     self.target = self.context.target_roots[0]
 
   def execute(self):
-    # self.update_dependee_references()
+    self.update_dependee_references()
     if self.target.has_sources:
       self.move_sources()
     self.add_to_BUILD()
@@ -54,10 +54,6 @@ class MetaRelocate(Task):
 
     for key in sources_dict.keys():
       for source in sources_dict[key]:
-        #source_file = source.split('/')[-1]
-        #source_file = source_path[-1]
-        #new_path = self._to_address.spec_path + '/' + source.split('/')[-1]
-        #new_path = '{}/{}'.format(self._to_address.spec_path, source.split('/')[-1])
         try:
           os.rename(source, '{}/{}'.format(self._to_address.spec_path, source.split('/')[-1]))
         except OSError as err:

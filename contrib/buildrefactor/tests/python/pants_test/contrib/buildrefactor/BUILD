@@ -53,3 +53,12 @@ python_tests(
     'tests/python/pants_test:int-test',
   ]
 )
+
+python_tests(
+  name='meta_relocate_integration',
+  sources=['test_meta_relocate_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+  ]
+)
+
