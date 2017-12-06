@@ -50,6 +50,7 @@ enum RawStateTag {
   Return = 1,
   Throw = 2,
   Noop = 3,
+  Invalidated = 4,
 }
 
 #[repr(C)]
@@ -73,6 +74,10 @@ impl RawNode {
       Some(Err(Failure::Noop(noop))) => (
         RawStateTag::Noop as u8,
         externs::create_exception(&format!("{:?}", noop)),
+      ),
+      Some(Err(Failure::Invalidated)) => (
+        RawStateTag::Invalidated as u8,
+        externs::create_exception("Node was Invalidated"),
       ),
     };
 

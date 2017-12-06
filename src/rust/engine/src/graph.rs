@@ -15,7 +15,7 @@ use futures::future::{self, Future};
 use externs;
 use boxfuture::{BoxFuture, Boxable};
 use context::ContextFactory;
-use core::{Failure, FNV, Noop, throw};
+use core::{Failure, FNV, Noop};
 use nodes::{Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
 
@@ -314,6 +314,7 @@ impl InnerGraph {
       None |
       Some(Err(Failure::Noop(_))) => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = viz_colors.len();
         viz_colors
@@ -376,6 +377,7 @@ impl InnerGraph {
         .expect("Under graph lock.")
         .peek::<NodeKey>() {
         None |
+        Some(Err(Failure::Invalidated)) => false,
         Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(..))) => false,
         Some(Ok(_)) => true,
@@ -413,6 +415,7 @@ impl InnerGraph {
             )
           }
           Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+          Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -500,10 +503,7 @@ impl Graph {
         .entry_for_id_mut(dst_id)
         .map(|entry| entry.state(context, dst_id))
         .unwrap_or_else(|| {
-          // TODO: Add an explicit Failure type for invalidation which signals retry.
-          let f: BoxFuture<_, _> = future::err(throw("File inputs changed during execution."))
-            .to_boxed();
-          f.shared()
+          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
         })
     };
 

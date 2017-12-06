@@ -160,7 +160,12 @@ impl fmt::Debug for Value {
 
 #[derive(Debug, Clone)]
 pub enum Failure {
+  /// A Node failed because a filesystem change invalidated it or its inputs.
+  /// A root requestor should usually immediately retry their request.
+  Invalidated,
+  /// There was no valid combination of rules to satisfy a request.
   Noop(Noop),
+  /// A rule raised an exception.
   Throw(Value, String),
 }
 

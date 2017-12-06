@@ -210,6 +210,7 @@ impl Select {
               }
               continue;
             }
+            i @ Failure::Invalidated => return Err(i),
             f @ Failure::Throw(..) => return Err(f),
           }
         }
