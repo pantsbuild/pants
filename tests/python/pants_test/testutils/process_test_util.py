@@ -19,7 +19,7 @@ def assert_no_process_exists_by_command(name):
       cmdline = proc.cmdline()
       if name in ''.join(cmdline):
         raise ProcessStillRunning(
-          'a {} process was detected at PID {} (cmdline={})'.format(name, proc.pid(), cmdline)
+          'a {} process was detected at PID {} (cmdline={})'.format(name, proc.pid, cmdline)
         )
     except (psutil.NoSuchProcess, psutil.AccessDenied):
       pass

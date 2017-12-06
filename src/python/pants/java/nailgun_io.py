@@ -14,7 +14,6 @@ from contextlib import contextmanager
 from contextlib2 import ExitStack
 
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
-from pants.util.socket import teardown_socket
 
 
 @contextmanager
@@ -123,7 +122,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
     """
     super(NailgunStreamWriter, self).__init__()
-    self._in_files = in_files
+    self._in_files = list(in_files[:])
     self._socket = sock
     self._chunk_eof_type = chunk_eof_type
     self._buf_size = buf_size or io.DEFAULT_BUFFER_SIZE
@@ -166,7 +165,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
         yield write_handles, writer
 
   def run(self):
-    while not self.is_stopped:
+    while self._in_files and not self.is_stopped:
       readable, _, errored = select.select(self._in_files, [], self._in_files, self._select_timeout)
 
       if readable:
@@ -180,13 +179,14 @@ class NailgunStreamWriter(_StoppableDaemonThread):
               if self._chunk_eof_type is not None:
                 NailgunProtocol.write_chunk(self._socket, self._chunk_eof_type)
             finally:
-              return
-
-          NailgunProtocol.write_chunk(
-            self._socket,
-            self._fileno_chunk_type_map[fileno],
-            data
-          )
+              self._in_files.remove(fh)
+          else:
+            NailgunProtocol.write_chunk(
+              self._socket,
+              self._fileno_chunk_type_map[fileno],
+              data
+            )
 
       if errored:
-        return
+        for fh in errored:
+          self._in_files.remove(fh)

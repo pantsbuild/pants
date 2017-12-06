@@ -119,8 +119,7 @@ class DaemonPantsRunner(ProcessManager):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
       def finalizer():
-        # HACK: Sleep 1ms from the main thread to free the GIL.
-        time.sleep(.001)
+        time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
         writer.stop()
         writer.join()
       yield finalizer

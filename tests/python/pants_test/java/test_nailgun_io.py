@@ -38,8 +38,12 @@ class TestNailgunStreamWriter(unittest.TestCase):
   def setUp(self):
     self.in_file = FakeFile()
     self.mock_socket = mock.Mock()
-    self.writer = NailgunStreamWriter(self.in_file, self.mock_socket,
-                                      ChunkType.STDIN, ChunkType.STDIN_EOF)
+    self.writer = NailgunStreamWriter(
+      (self.in_file,),
+      self.mock_socket,
+      (ChunkType.STDIN,),
+      ChunkType.STDIN_EOF
+    )
 
   def test_stop(self):
     self.assertFalse(self.writer.is_stopped)
