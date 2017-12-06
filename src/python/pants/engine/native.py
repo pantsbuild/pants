@@ -106,11 +106,7 @@ typedef RunnableComplete (*extern_ptr_invoke_runnable)(ExternContext*, Value*, V
 
 typedef void Tasks;
 typedef void Scheduler;
-
-typedef struct {
-  uint64_t runnable_count;
-  uint64_t scheduling_iterations;
-} ExecutionStat;
+typedef void ExecutionRequest;
 
 typedef struct {
   Key             subject;
@@ -186,15 +182,17 @@ Scheduler* scheduler_create(Tasks*,
 void scheduler_pre_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
 
+
+ExecutionRequest* execution_request_create(void);
+void execution_request_destroy(ExecutionRequest*);
+
 uint64_t graph_len(Scheduler*);
 uint64_t graph_invalidate(Scheduler*, BufferBuffer);
-void graph_visualize(Scheduler*, char*);
-void graph_trace(Scheduler*, char*);
+void graph_visualize(Scheduler*, ExecutionRequest*, char*);
+void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
-void execution_reset(Scheduler*);
-void execution_add_root_select(Scheduler*, Key, TypeConstraint);
-ExecutionStat execution_execute(Scheduler*);
-RawNodes* execution_roots(Scheduler*);
+void execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
+RawNodes* execution_execute(Scheduler*, ExecutionRequest*);
 
 Value validator_run(Scheduler*);
 
@@ -660,6 +658,9 @@ class Native(object):
 
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
+
+  def new_execution_request(self):
+    return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
 
   def new_scheduler(self,
                     tasks,
