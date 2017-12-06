@@ -11,6 +11,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.cache.cache_setup import CacheSetup
+from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -54,6 +55,18 @@ class DummyTask(Task):
         vt.update()
       return vt, was_valid
 
+class NonExecutingTask(Task):
+  _implementation_version_list = []
+  @classmethod
+  def implementation_version(cls):
+    return super(NonExecutingTask, cls).implementation_version() + cls._implementation_version_list
+
+  options_scope = 'non_executing_task'
+
+  def execute(self): pass
+
+  def __init__(self, context, workdir):
+    self.context = context
 
 class TaskTest(TaskTestBase):
 
@@ -85,6 +98,10 @@ class TaskTest(TaskTestBase):
     task = self.create_task(context)
     task._incremental = incremental
     return task, target
+
+  def _new_subtask(self, name, options_scope, task_type):
+    subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
+    return type(subclass_name, (task_type,), {'options_scope': options_scope})
 
   def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
     content = content or self._file_contents
@@ -222,6 +239,26 @@ class TaskTest(TaskTestBase):
     self.assertContent(vtB, two)
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
+
+  def test_fingerprint_updates(self):
+    subs = [sdep.subsystem_cls for sdep in NonExecutingTask.subsystem_dependencies_iter()]
+    options = {
+      GLOBAL_SCOPE: {
+        'pinger_timeout': 0,
+        'pinger_tries': 1,
+      },
+    }
+    context = self.context(options=options,for_task_types=[NonExecutingTask], for_subsystems=subs)
+    workdir = self.test_workdir
+
+    fpA = self._new_subtask('A', GLOBAL_SCOPE, NonExecutingTask)(context, workdir).fingerprint
+    fpA_v2 = self._new_subtask('A', GLOBAL_SCOPE, NonExecutingTask)(context, workdir).fingerprint
+    self.assertEqual(fpA, fpA_v2)
+
+    task_typeA_with_version = self._new_subtask('A', GLOBAL_SCOPE, NonExecutingTask)
+    task_typeA_with_version._implementation_version_list = [('NonExecutingTask', 0)]
+    fpA_with_version = task_typeA_with_version(context, workdir).fingerprint
+    self.assertNotEqual(fpA_with_version, fpA)
 
   def test_execute_cleans_invalid_result_dirs(self):
     # Regression test to protect task.execute() from returning invalid dirs.
