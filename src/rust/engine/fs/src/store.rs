@@ -175,45 +175,44 @@ impl Store {
     self
       .local
       .load_bytes_with(entry_type, fingerprint.clone(), f_local)
-      .and_then(move |maybe_local_value| match maybe_local_value {
-        Some(value_result) => {
+      .and_then(move |maybe_local_value| match (
+        maybe_local_value,
+        maybe_remote,
+      ) {
+        (Some(value_result), _) => {
           future::done(value_result.map(|v| Some(v))).to_boxed() as BoxFuture<_, _>
         }
-        None => {
-          match maybe_remote {
-            Some(remote) => {
-              remote
-                .load_bytes_with(
-                  entry_type,
-                  fingerprint,
-                  move |bytes: &[u8]| Vec::from(bytes),
-                )
-                .and_then(move |maybe_bytes: Option<Vec<u8>>| match maybe_bytes {
-                  Some(bytes) => {
-                    future::done(f_remote(&bytes))
-                      .and_then(move |value| {
-                        local.store_bytes(entry_type, bytes).and_then(
-                          move |digest| if digest.0 ==
-                            fingerprint
-                          {
-                            Ok(Some(value))
-                          } else {
-                            Err(format!(
-                              "CAS gave wrong fingerprint: expected {}, got {}",
-                              fingerprint,
-                              digest.0
-                            ))
-                          },
-                        )
-                      })
-                      .to_boxed()
-                  }
-                  None => future::ok(None).to_boxed() as BoxFuture<_, _>,
-                })
-                .to_boxed()
-            }
-            None => future::ok(None).to_boxed() as BoxFuture<_, _>,
-          }
+        (None, None) => future::ok(None).to_boxed() as BoxFuture<_, _>,
+        (None, Some(remote)) => {
+          remote
+            .load_bytes_with(
+              entry_type,
+              fingerprint,
+              move |bytes: &[u8]| Vec::from(bytes),
+            )
+            .and_then(move |maybe_bytes: Option<Vec<u8>>| match maybe_bytes {
+              Some(bytes) => {
+                future::done(f_remote(&bytes))
+                  .and_then(move |value| {
+                    local.store_bytes(entry_type, bytes).and_then(
+                      move |digest| if digest.0 ==
+                        fingerprint
+                      {
+                        Ok(Some(value))
+                      } else {
+                        Err(format!(
+                          "CAS gave wrong fingerprint: expected {}, got {}",
+                          fingerprint,
+                          digest.0
+                        ))
+                      },
+                    )
+                  })
+                  .to_boxed()
+              }
+              None => future::ok(None).to_boxed() as BoxFuture<_, _>,
+            })
+            .to_boxed()
         }
       })
       .to_boxed()
