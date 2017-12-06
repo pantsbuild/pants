@@ -10,6 +10,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import org.junit.After;
 import org.junit.Before;
@@ -31,7 +33,7 @@ import static org.junit.Assert.fail;
 
 /**
  * These tests are similar to the tests in ConsoleRunnerTest but they create a ConosoleRunnerImpl
- * directory so they can capture the output more easily and test assertions based on the output.
+ * directory so they can capture and make assertions on the output.
  */
 public class ConsoleRunnerImplTest {
 
@@ -82,7 +84,7 @@ public class ConsoleRunnerImplTest {
   }
 
   private String runTest(Class testClass) {
-    return runTests(Lists.newArrayList(testClass.getCanonicalName()), false);
+    return runTest(testClass, false);
   }
 
   private String runTest(Class testClass, boolean shouldFail) {
@@ -92,6 +94,13 @@ public class ConsoleRunnerImplTest {
   private String runTests(List<String> tests, boolean shouldFail) {
     ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     PrintStream outputStream = new PrintStream(outContent);
+
+    // Clean log files
+    for (File file : outdir.listFiles()) {
+      if (file.getName().endsWith("txt")) {
+        file.delete();
+      }
+    }
 
     ConsoleRunnerImpl runner = new ConsoleRunnerImpl(
         failFast,
@@ -189,6 +198,8 @@ public class ConsoleRunnerImplTest {
     assertThat(output, containsString("testFails(org.pantsbuild.tools.junit.lib.OutputModeTest)"));
     assertThat(output, containsString("testErrors(org.pantsbuild.tools.junit.lib.OutputModeTest)"));
     assertThat(output, containsString("Tests run: 3,  Failures: 2"));
+    String testLogContents = getTestLogContents(OutputModeTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Output from passing test"));
 
     outputMode = ConsoleRunnerImpl.OutputMode.FAILURE_ONLY;
     output = runTest(OutputModeTest.class, true);
@@ -200,6 +211,8 @@ public class ConsoleRunnerImplTest {
     assertThat(output, containsString("testFails(org.pantsbuild.tools.junit.lib.OutputModeTest)"));
     assertThat(output, containsString("testErrors(org.pantsbuild.tools.junit.lib.OutputModeTest)"));
     assertThat(output, containsString("Tests run: 3,  Failures: 2"));
+    testLogContents = getTestLogContents(OutputModeTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Output from passing test"));
 
     outputMode = ConsoleRunnerImpl.OutputMode.NONE;
     output = runTest(OutputModeTest.class, true);
@@ -211,6 +224,8 @@ public class ConsoleRunnerImplTest {
     assertThat(output, containsString("testFails(org.pantsbuild.tools.junit.lib.OutputModeTest)"));
     assertThat(output, containsString("testErrors(org.pantsbuild.tools.junit.lib.OutputModeTest)"));
     assertThat(output, containsString("Tests run: 3,  Failures: 2"));
+    testLogContents = getTestLogContents(OutputModeTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Output from passing test"));
   }
 
   @Test
@@ -259,6 +274,32 @@ public class ConsoleRunnerImplTest {
     outputMode = ConsoleRunnerImpl.OutputMode.ALL;
     String output = runTest(LogOutputInTeardownTest.class);
     assertThat(output, containsString("Output in tearDown"));
-    assertThat(output, containsString("OK (1 test)"));
+    assertThat(output, containsString("OK (3 tests)"));
+    String testLogContents = getTestLogContents(LogOutputInTeardownTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Output in tearDown"));
+
+    outputMode = ConsoleRunnerImpl.OutputMode.FAILURE_ONLY;
+    output = runTest(LogOutputInTeardownTest.class);
+    assertThat(output, not(containsString("Output in tearDown")));
+    assertThat(output, containsString("OK (3 tests)"));
+    testLogContents = getTestLogContents(LogOutputInTeardownTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Output in tearDown"));
+
+    outputMode = ConsoleRunnerImpl.OutputMode.NONE;
+    output = runTest(LogOutputInTeardownTest.class);
+    assertThat(output, not(containsString("Output in tearDown")));
+    assertThat(output, containsString("OK (3 tests)"));
+    testLogContents = getTestLogContents(LogOutputInTeardownTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Output in tearDown"));
+  }
+
+  private String getTestLogContents(Class testClass, String extension) {
+    try {
+      return new String(
+          Files.readAllBytes(Paths.get(outdir.getPath(), testClass.getCanonicalName() + extension)),
+          Charsets.UTF_8);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
