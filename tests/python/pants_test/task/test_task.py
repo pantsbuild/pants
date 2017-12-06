@@ -56,10 +56,10 @@ class DummyTask(Task):
       return vt, was_valid
 
 class NonExecutingTask(Task):
-  _implementation_version_list = []
+  _impls = []
   @classmethod
   def implementation_version(cls):
-    return super(NonExecutingTask, cls).implementation_version() + cls._implementation_version_list
+    return cls._impls
 
   options_scope = 'non_executing_task'
 
@@ -67,6 +67,16 @@ class NonExecutingTask(Task):
 
   def __init__(self, context, workdir):
     self.context = context
+    self._workdir = workdir
+
+class OtherNonExecutingTask(NonExecutingTask):
+  _other_impls = []
+
+  @classmethod
+  def implementation_version(cls):
+    return super(OtherNonExecutingTask, cls).implementation_version() + cls._other_impls
+
+  options_scope = 'other_non_executing_task'
 
 class TaskTest(TaskTestBase):
 
@@ -99,9 +109,21 @@ class TaskTest(TaskTestBase):
     task._incremental = incremental
     return task, target
 
-  def _new_subtask(self, name, options_scope, task_type):
+  def _new_subtask(self, name, options_scope, task_type, **kwargs):
     subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
-    return type(subclass_name, (task_type,), {'options_scope': options_scope})
+    kwargs['options_scope'] = options_scope
+    return type(subclass_name, (task_type,), kwargs)
+
+  def _make_subtask(self, name='A', scope=GLOBAL_SCOPE, cls=NonExecutingTask, **kwargs):
+    return self._new_subtask(name, scope, cls, **kwargs)
+
+  def _subtask_to_fp(self, subtask):
+    context = super(TaskTestBase, self).context(options={}, for_task_types=[NonExecutingTask])
+    workdir = self.test_workdir
+    return subtask(context, workdir).fingerprint
+
+  def _subtask_fp(self, **kwargs):
+    return self._subtask_to_fp(self._make_subtask(**kwargs))
 
   def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
     content = content or self._file_contents
@@ -240,25 +262,47 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
 
-  def test_fingerprint_updates(self):
-    subs = [sdep.subsystem_cls for sdep in NonExecutingTask.subsystem_dependencies_iter()]
-    options = {
-      GLOBAL_SCOPE: {
-        'pinger_timeout': 0,
-        'pinger_tries': 1,
-      },
-    }
-    context = self.context(options=options,for_task_types=[NonExecutingTask], for_subsystems=subs)
-    workdir = self.test_workdir
-
-    fpA = self._new_subtask('A', GLOBAL_SCOPE, NonExecutingTask)(context, workdir).fingerprint
-    fpA_v2 = self._new_subtask('A', GLOBAL_SCOPE, NonExecutingTask)(context, workdir).fingerprint
+  def test_fingerprint_implementation_version(self):
+    # Identity
+    fpA = self._subtask_fp()
+    fpA_v2 = self._subtask_fp()
     self.assertEqual(fpA, fpA_v2)
 
-    task_typeA_with_version = self._new_subtask('A', GLOBAL_SCOPE, NonExecutingTask)
-    task_typeA_with_version._implementation_version_list = [('NonExecutingTask', 0)]
-    fpA_with_version = task_typeA_with_version(context, workdir).fingerprint
+    # Using an implementation_version() should be different than nothing
+    fpA_with_version = self._subtask_fp(_impls=[('asdf', 0)])
     self.assertNotEqual(fpA_with_version, fpA)
+
+    # Should return same fingerprint for same implementation_version()
+    fpA_same_version = self._subtask_fp(_impls=[('asdf', 0)])
+    self.assertEqual(fpA_same_version, fpA_with_version)
+
+    # Different fingerprint for different implementation_version()
+    fpA_new_version = self._subtask_fp(_impls=[('asdf', 1)])
+    self.assertNotEqual(fpA_new_version, fpA)
+
+    # Append implementation_version() from super
+    fpB = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)])
+    fpB_v2 = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)])
+    self.assertEqual(fpB, fpB_v2)
+    # The same chain of implementation_version() should result in the same fingerprint
+    fpB_with_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
+    self.assertNotEqual(fpB, fpB_with_version)
+    fpB_same_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
+    self.assertEqual(fpB_with_version, fpB_same_version)
+    # Same implementation_version() for NonExecutingTask, different for
+    # OtherNonExecutingTask should result in a different fingerprint
+    fpB_new_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 1)])
+    self.assertNotEqual(fpB_new_version, fpB_with_version)
+
+    # Same implementation_version() for OtherNonExecutingTask, different for
+    # NonExecutingTask should result in a different fingerprint
+    fpB_new_typeA = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)])
+    self.assertNotEqual(fpB_new_typeA, fpB)
+    fpB_new_typeA_with_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
+    self.assertNotEqual(fpB_new_typeA_with_version, fpB_new_typeA)
+    self.assertNotEqual(fpB_new_typeA_with_version, fpB_same_version)
+    fpB_new_typeA_same_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
+    self.assertEqual(fpB_new_typeA_with_version, fpB_new_typeA_same_version)
 
   def test_execute_cleans_invalid_result_dirs(self):
     # Regression test to protect task.execute() from returning invalid dirs.
