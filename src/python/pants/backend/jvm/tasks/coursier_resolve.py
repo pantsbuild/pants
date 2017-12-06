@@ -131,8 +131,10 @@ class CoursierMixin(NailgunTask):
 
         target_resolution_filename = 'coursier_resolve.json'
         if not invalidation_check.invalid_vts:
-          self._load_result_from_cache(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
-          return
+          success = self._load_result_from_cache(compile_classpath, invalidation_check.all_vts,
+                                               target_resolution_filename)
+          if success:
+            return
 
         jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
                                                                                                           artifact_set,
@@ -250,13 +252,32 @@ class CoursierMixin(NailgunTask):
         vt.update()
 
   def _load_result_from_cache(self, compile_classpath, all_vts, target_resolution_filename):
+    """
+
+    :param compile_classpath:
+    :param all_vts:
+    :param target_resolution_filename:
+    :return: True if success; False if any of the classpath is not valid anymore.
+    """
+    temp_store = []
+
     for vt in all_vts:
       t = vt.target
       if isinstance(t, JarLibrary):
         # compile_classpath.add_jars_for_targets
         with open(os.path.join(vt.results_dir, target_resolution_filename), 'r') as f:
           tuples_conf_artifact_classpath = pickle.load(f)
-          compile_classpath.add_elements_for_target(t, tuples_conf_artifact_classpath)
+          for conf, artifact_classpath in tuples_conf_artifact_classpath:
+            if not os.path.exists(artifact_classpath.path) or not os.path.exists(artifact_classpath.cache_path):
+              print("cache verification failed")
+              return False
+            temp_store.append((t, tuples_conf_artifact_classpath))
+
+    # If all artifacts path are valid, add them to compile_classpath
+    for t, tuples_conf_artifact_classpath in temp_store:
+      compile_classpath.add_elements_for_target(t, tuples_conf_artifact_classpath)
+    print("cache verified")
+    return True
 
   def _construct_cmd_args(self, classified_jars, classifier, common_args, global_excludes, local_exclude_args,
                           pinned_coords, coursier_workdir):

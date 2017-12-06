@@ -288,6 +288,7 @@ python_tests(
   sources = ['test_coursier_resolve.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    '3rdparty/python:mock',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
