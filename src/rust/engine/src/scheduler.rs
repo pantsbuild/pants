@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 use futures::future::{self, Future};
 
+use boxfuture::Boxable;
 use context::{Context, ContextFactory, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Key, TypeConstraint, TypeId, throw, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
-use nodes::{NodeKey, Select};
+use nodes::{NodeFuture, NodeKey, Select};
 use rule_graph;
 use selectors;
 
@@ -99,6 +100,28 @@ impl Scheduler {
   }
 
   ///
+  /// Attempts to complete a Node, recovering from `Failure::Invalidated` up to `count` times.
+  ///
+  /// In common usage, graph entries won't be repeatedly invalidated, but in a case where they
+  /// were (say by an automated process changing files under pants), we'd want to eventually
+  /// give up.
+  ///
+  fn create(core: Arc<Core>, root: Root, count: usize) -> NodeFuture<Value> {
+    if count == 0 {
+      future::err(throw("Exhausted retries due to changed files.")).to_boxed()
+    } else {
+      core
+        .graph
+        .create(root.clone(), &core)
+        .or_else(move |e| match e {
+          Failure::Invalidated => Scheduler::create(core, root, count - 1),
+          x => future::err(x).to_boxed()
+        })
+        .to_boxed()
+    }
+  }
+
+  ///
   /// Starting from existing roots, execute a graph to completion.
   ///
   pub fn execute<'e>(&mut self, request: &'e ExecutionRequest) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
@@ -112,10 +135,7 @@ impl Scheduler {
         .roots
         .iter()
         .map(|root| {
-          self
-            .core
-            .graph
-            .create(root.clone(), &self.core)
+          Scheduler::create(self.core.clone(), root.clone(), 8)
             .then::<_, Result<Result<Value, Failure>, ()>>(move |r| {
               externs::log(
                 LogLevel::Debug,
