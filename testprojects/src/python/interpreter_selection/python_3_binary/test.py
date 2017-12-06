@@ -9,10 +9,7 @@ import sys
 
 from interpreter_selection.python_3_binary.main import main
 
-
-# A simple example to test a python 3 binary target
-# Note that 1/2 = 0 in python 2 and 1/2 = 0.5 in python 3
-
 def test_main():
   print(sys.executable)
+  # Note that 1/2 = 0 in python 2 and 1/2 = 0.5 in python 3
   assert main() == 0.5

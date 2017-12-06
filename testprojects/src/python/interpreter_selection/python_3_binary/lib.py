@@ -13,4 +13,7 @@ import sys
 def say_something():
   print('I am a python 3 library method.')
   assert 1/2 == 0.5
-  return 1/2  # for testing the `./pants run` task
+
+  # Return 1/2 for testing the `./pants run` task
+  # Note that 1/2 = 0 in python 2 and 1/2 = 0.5 in python 3
+  return 1/2  

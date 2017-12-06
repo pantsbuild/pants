@@ -1,7 +1,7 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# This BUILD file is intended to be an example of python 3 compatibile targets.
+# This BUILD file is intended to be an example of python 3 compatible targets.
 # To successfully build and run this binary target, the user will need to define a 
 # .pexrc file in /etx/pexrc, ~/.pexrc, or in a .pexrc in the pants root dir. The pexrc 
 # will need to contain a PEX_PYTHON_PATH variable containing an absolute path to a 
@@ -20,7 +20,7 @@ python_binary(
   source='main.py',
   compatibility=['CPython>3'],
   dependencies=[
-  ':lib'
+    ':lib'
   ]
 )
 

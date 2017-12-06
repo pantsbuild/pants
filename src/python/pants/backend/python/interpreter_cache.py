@@ -40,15 +40,15 @@ class PythonInterpreterCache(object):
       if cls._matches(interpreter, filters):
         yield interpreter
 
-  @property
-  def pex_python_path_list(self):
+  @memoized_property
+  def pex_python_paths(self):
     """A list of paths to Python interpreter binaries as defined by a
-      PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc', or ./.pexrc'.
-      PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
-      that a pex can be built and ran against.
+    PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc', or ./.pexrc'.
+    PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
+    that a pex can be built and ran against.
 
-      :return: paths to interpreters as specified by PEX_PYTHON_PATH
-      :rtype: list
+    :return: paths to interpreters as specified by PEX_PYTHON_PATH
+    :rtype: list
     """
     ppp = Variables.from_rc().get('PEX_PYTHON_PATH', '')
     if ppp:
@@ -144,14 +144,14 @@ class PythonInterpreterCache(object):
     :returns: A list of cached interpreters
     :rtype: list of :class:`pex.interpreter.PythonInterpreter`
     """
-    pex_python_path_interpreter_paths = self.pex_python_path_list
+    pex_python_paths = self.pex_python_paths
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    if not any(filters) and not pex_python_path_interpreter_paths:
+    if not any(filters):
       filters = self._python_setup.interpreter_constraints
     setup_paths = (paths
-                   or pex_python_path_interpreter_paths
+                   or pex_python_paths
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
 

@@ -14,10 +14,10 @@ from interpreter_selection.python_3_binary.lib import say_something
 
 
 def main():
-	v = sys.version_info
-	print(sys.executable)
-	print('%d.%d.%d' % v[0:3])
-	return say_something()
+  v = sys.version_info
+  print(sys.executable)
+  print('%d.%d.%d' % v[0:3])
+  return say_something()
 
 if __name__ == '__main__':
 	main()
