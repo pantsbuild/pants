@@ -18,6 +18,16 @@ from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.pytest_prep import PytestPrep
+from pants.backend.python.tasks2.pytest_run import PytestRun
+from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
+from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
+from pants.backend.python.tasks2.python_repl import PythonRepl
+from pants.backend.python.tasks2.python_run import PythonRun
+from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
+from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
+from pants.backend.python.tasks2.setup_py import SetupPy
 from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
@@ -60,6 +70,7 @@ def register_goals():
   task(name='pytest-prep', action=PytestPrep).install('test')
   task(name='pytest', action=PytestRun).install('test')
   task(name='py', action=PythonRepl).install('repl')
+  task(name='python-dists', action=PythonCreateDistributions).install()
   task(name='setup-py', action=SetupPy).install()
   task(name='py', action=PythonBinaryCreate).install('binary')
   task(name='isort', action=IsortPythonTask).install('fmt')

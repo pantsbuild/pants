@@ -20,6 +20,7 @@ from twitter.common.collections import OrderedSet
 from twitter.common.dirutil.chroot import Chroot
 
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.build_environment import get_buildroot
@@ -588,9 +589,9 @@ class SetupPy(Task):
 
   def execute(self):
     # We drive creation of setup.py distributions from the original target graph, grabbing codegen'd
-    # sources when needed.
+    # sources when needed. We ignore PythonDistribution targets.
     def is_exported_python_target(t):
-      return t.is_original and self.has_provides(t)
+      return t.is_original and self.has_provides(t) and not isinstance(t, PythonDistribution)
 
     exported_python_targets = OrderedSet(t for t in self.context.target_roots
                                          if is_exported_python_target(t))

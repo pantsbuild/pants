@@ -9,6 +9,7 @@ import os
 
 from twitter.common.collections import maybe_list
 
+from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target

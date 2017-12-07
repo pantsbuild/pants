@@ -188,13 +188,19 @@ def build_python_distribution(dist_tgt, interpreter, workdir, log):
     safe_mkdir(tmp_dir_for_dist)
 
   # copy sources and setup.py to this temp dir
-  sources = dist_tgt.sources_relative_to_buildroot()
+  sources = dist_tgt.sources_relative_to_target_base()
   for source in sources:
-    shutil.copyfile(os.path.join(buildroot, source), os.path.join(tmp_dir_for_dist, source))
+    ### NOTE: LEFT OFF AT NEEDING TO GET SOURCES RELATIVE TO TARGET ADDRESS FOR
+    ### LINE 196. LINE 187 TAKES CARE OF GETTING RELATIVE TO TARGET FOR TMP_DIR_FOR_DIST
+    path_to_source = os.path.join(tmp_dir_for_dist, source)
+    import pdb;pdb.set_trace()
+    if not os.path.exists(os.path.dirname(path_to_source)):
+      os.makedirs(os.path.dirname(path_to_source))
+
+    shutil.copyfile(os.path.join(get_buildroot(), source), path_to_source)
 
 
-  return (tmp_dir_for_dist, install_dir)
-  
+  return tmp_dir_for_dist  
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):

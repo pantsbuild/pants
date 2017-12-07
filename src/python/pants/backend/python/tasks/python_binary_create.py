@@ -43,6 +43,7 @@ class PythonBinaryCreate(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data('python')  # For codegen.
+    round_manager.require_data('python-dists')
 
   @staticmethod
   def is_binary(target):
@@ -132,7 +133,8 @@ class PythonBinaryCreate(Task):
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Dump python_distributions, if any, into builder's chroot.
-      built_dists = self.context.products.get_data('python_dists')
+      built_dists = self.context.products.get_data('python-dists')
+      import pdb;pdb.set_trace()
       if built_dists:
         for dist in built_dists:
           builder.add_location(dist)

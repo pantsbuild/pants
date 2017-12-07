@@ -12,7 +12,8 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.tasks2.pex_build_util import (dump_python_distributions,
+from pants.backend.python.targets.python_distribution import PythonDistribution
+from pants.backend.python.tasks2.pex_build_util import (build_python_distribution,
                                                         dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
                                                         has_resources, is_local_python_dist)
@@ -31,7 +32,7 @@ class PythonCreateDistributions(Task):
 
   @classmethod
   def product_types(cls):
-    return ['python_dists']
+    return ['python-dists']
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -61,16 +62,11 @@ class PythonCreateDistributions(Task):
         names[name] = dist_target
 
       with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
-        
+        import pdb;pdb.set_trace
         for vt in invalidation_check.all_vts:
-          pex_path = os.path.join(vt.results_dir, '{}.pex'.format(vt.target.name))
-          if not vt.valid:
-            self.context.log.debug('cache for {} is invalid, rebuilding'.format(vt.target))
-            built_dists.add(self._create_dist(vt.target)). # vt.results dir
-          else:
-            self.context.log.debug('using cache for {}'.format(vt.target))
+          built_dists.add(self._create_dist(vt.target)) # vt.results dir
 
-    self.context.products.register_data('python_dists', built_dists)
+    self.context.products.register_data('python-dists', built_dists)
 
   def _create_dist(self, dist_tgt):
     """Create a .whl file for the specified python_distribution target."""
@@ -78,13 +74,13 @@ class PythonCreateDistributions(Task):
     
     whl_location = ''
     # build whl from python_dist target
-    dist_target_dir, install_dir = build_python_distribution(dist_tgt, interpreter, self.workdir, self.context.log)
+    dist_target_dir = build_python_distribution(dist_tgt, interpreter, self.workdir, self.context.log)
     
     # build the whl from pex API using tempdir and get its location
     install_dir = os.path.join(dist_target_dir, 'dist')
-    if not install_dir:
+    if not os.path.exists(install_dir):
       safe_mkdir(install_dir)
-    setup_runner = SetupPyRunner(tmp_dir_for_dist, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
+    setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
     setup_runner.run()
 
     # return the location of the whl on disk (somewhere in pantsd or dist)
