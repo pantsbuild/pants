@@ -235,7 +235,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.9', result['version'])
+    self.assertEqual('1.0.10', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
