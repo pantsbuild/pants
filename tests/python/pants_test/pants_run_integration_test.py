@@ -68,6 +68,7 @@ def ensure_engine(f):
         f(self, *args, **kwargs)
   return wrapper
 
+
 def ensure_resolver(f):
   """A decorator for running an integration test with ivy and coursier as the resolver."""
   def wrapper(self, *args, **kwargs):
@@ -76,6 +77,7 @@ def ensure_resolver(f):
         f(self, *args, **kwargs)
 
   return wrapper
+
 
 def ensure_daemon(f):
   """A decorator for running an integration test with and without the daemon enabled."""
