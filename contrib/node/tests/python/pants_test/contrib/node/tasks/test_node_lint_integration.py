@@ -16,3 +16,25 @@ class NodeLintIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
 
     self.assert_success(pants_run)
+
+  def test_lint_success_with_ignore(self):
+    path = 'contrib/node/tests/node/javascriptstyle-empty/index.js'
+    content = 'const console = require(\'console\');\nconsole.log("Double Quotes");\n'
+
+    with self.temporary_file_content(path, content):
+      command = ['lint',
+                 'contrib/node/tests/node/javascriptstyle-empty']
+      pants_run = self.run_pants(command=command)
+
+      self.assert_success(pants_run)
+
+  def test_lint_failure_without_ignore(self):
+    path = 'contrib/node/tests/node/javascriptstyle-empty/not_ignored_index.js'
+    content = 'const console = require(\'console\');\nconsole.log("Double Quotes");\n'
+
+    with self.temporary_file_content(path, content):
+      command = ['lint',
+                 'contrib/node/tests/node/javascriptstyle-empty']
+      pants_run = self.run_pants(command=command)
+
+      self.assert_failure(pants_run)
