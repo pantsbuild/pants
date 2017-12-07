@@ -2,5 +2,5 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_remote_library(
-  rev='6807e777504f54ad073ecef66747de158294b639',
+    rev = "6807e777504f54ad073ecef66747de158294b639",
 )

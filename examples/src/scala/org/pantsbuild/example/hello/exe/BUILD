@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  dependencies=[
-    'examples/src/scala/org/pantsbuild/example/hello/welcome:welcome',
-  ],
-  source='Exe.scala',
-  main='org.pantsbuild.example.hello.exe.Exe',
+    main = "org.pantsbuild.example.hello.exe.Exe",
+    source = "Exe.scala",
+    dependencies = [
+        "examples/src/scala/org/pantsbuild/example/hello/welcome",
+    ],
 )

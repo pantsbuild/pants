@@ -1,9 +1,9 @@
 scala_library(
-  sources=globs('*')
+    sources = globs("*"),
 )
 
 resources(
-  name='as_resources',
-  sources=globs('*'),
-  description='Depends on the same sources as the target above, but as resources.'
+    name = "as_resources",
+    sources = globs("*"),
+    description = "Depends on the same sources as the target above, but as resources.",
 )

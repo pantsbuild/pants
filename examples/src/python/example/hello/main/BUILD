@@ -4,8 +4,8 @@
 # Like Hello world, but built with Pants.
 
 python_binary(
-  dependencies=[
-    'examples/src/python/example/hello/greet:greet',
-  ],
-  source='main.py',
+    source = "main.py",
+    dependencies = [
+        "examples/src/python/example/hello/greet",
+    ],
 )

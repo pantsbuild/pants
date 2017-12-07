@@ -4,10 +4,10 @@
 # Shows java working with jaxb generations.
 
 junit_tests(
-  sources=['UseJaxbTest.java',],
-  dependencies=[
-    '3rdparty:junit',
-    'examples/src/java/org/pantsbuild/example/jaxb/reader',
-    'examples/src/resources/org/pantsbuild/example/jaxb',
-  ],
+    sources = ["UseJaxbTest.java"],
+    dependencies = [
+        "3rdparty:junit",
+        "examples/src/java/org/pantsbuild/example/jaxb/reader",
+        "examples/src/resources/org/pantsbuild/example/jaxb",
+    ],
 )

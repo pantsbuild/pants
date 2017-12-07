@@ -1,11 +1,27 @@
-SOURCES=['p', 'a', 'n', 't', 's', 'b', 'u', 'i', 'l', 'd', 'p', 'a', 'n', 't', 's']
+SOURCES = [
+    "p",
+    "a",
+    "n",
+    "t",
+    "s",
+    "b",
+    "u",
+    "i",
+    "l",
+    "d",
+    "p",
+    "a",
+    "n",
+    "t",
+    "s",
+]
 
 resources(
-  name='literal',
-  sources=SOURCES,
+    name = "literal",
+    sources = SOURCES,
 )
 
 resources(
-  name='globs',
-  sources=globs(*SOURCES),
+    name = "globs",
+    sources = globs(*SOURCES),
 )

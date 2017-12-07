@@ -1,50 +1,86 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-target(name = 'scala-js-cli', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:cli'])
-target(name = 'scala-js-compiler', dependencies=[
-  'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
-  'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-])
-target(name = 'scala-js-library', dependencies=['contrib/scalajs/3rdparty/jvm/org/scala-js:library'])
+target(
+    name = "scala-js-cli",
+    dependencies = ["contrib/scalajs/3rdparty/jvm/org/scala-js:cli"],
+)
+
+target(
+    name = "scala-js-compiler",
+    dependencies = [
+        "contrib/scalajs/3rdparty/jvm/org/scala-js:compiler",
+        "contrib/scalajs/3rdparty/jvm/org/scala-js:library",
+    ],
+)
+
+target(
+    name = "scala-js-library",
+    dependencies = ["contrib/scalajs/3rdparty/jvm/org/scala-js:library"],
+)
 
 # NB: The scrooge tools do not mix their classpaths with the sources they interact with, and
 # therefore they do not need to use the `scala-platform` via scala_jar.
-jar_library(name = 'scrooge-gen',
-            jars = [
-              jar(org='com.twitter', name='scrooge-generator_2.11', rev='3.20.0',
-                        excludes=[
-                          # scrooge requires libthrift 0.5.0-1 which is not available on
-                          # the default maven repos. Force scrooge to use thrift-0.6.1, which
-                          # is compatible, instead.
-                          exclude(org = 'org.apache.thrift', name = 'libthrift')
-                        ])
+jar_library(
+    name = "scrooge-gen",
+    jars = [
+        jar(
+            name = "scrooge-generator_2.11",
+            org = "com.twitter",
+            rev = "3.20.0",
+            excludes = [
+                # scrooge requires libthrift 0.5.0-1 which is not available on
+                # the default maven repos. Force scrooge to use thrift-0.6.1, which
+                # is compatible, instead.
+                exclude(
+                    name = "libthrift",
+                    org = "org.apache.thrift",
+                ),
             ],
-            dependencies = [
-              '3rdparty:thrift-0.6.1',
-            ])
+        ),
+    ],
+    dependencies = [
+        "3rdparty:thrift-0.6.1",
+    ],
+)
 
-jar_library(name = 'scrooge-linter',
-            jars = [
-              jar(org='com.twitter', name='scrooge-linter_2.11', rev='3.20.0',
-                        excludes=[
-                          exclude(org = 'org.apache.thrift', name = 'libthrift')
-                        ])
+jar_library(
+    name = "scrooge-linter",
+    jars = [
+        jar(
+            name = "scrooge-linter_2.11",
+            org = "com.twitter",
+            rev = "3.20.0",
+            excludes = [
+                exclude(
+                    name = "libthrift",
+                    org = "org.apache.thrift",
+                ),
             ],
-            dependencies = [
-              '3rdparty:thrift-0.6.1',
-            ])
-
+        ),
+    ],
+    dependencies = [
+        "3rdparty:thrift-0.6.1",
+    ],
+)
 
 # Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
 # (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
 # for more info.
 jar_library(
-  name='kythe-extractor',
-  jars = [jar(org='kythe', name='extractors/javac_extractor', rev='v0.0.26-snowchain3')]
+    name = "kythe-extractor",
+    jars = [jar(
+        name = "extractors/javac_extractor",
+        org = "kythe",
+        rev = "v0.0.26-snowchain3",
+    )],
 )
 
 jar_library(
-  name='kythe-indexer',
-  jars = [jar(org='kythe', name='indexers/java_indexer', rev='v0.0.26-snowchain3')]
+    name = "kythe-indexer",
+    jars = [jar(
+        name = "indexers/java_indexer",
+        org = "kythe",
+        rev = "v0.0.26-snowchain3",
+    )],
 )

@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'jar_dependency_utils',
-  sources = ['test_jar_dependency_utils.py'],
-  dependencies = [
-    'src/python/pants/java/jar',
-  ]
+    name = "jar_dependency_utils",
+    sources = ["test_jar_dependency_utils.py"],
+    dependencies = [
+        "src/python/pants/java/jar",
+    ],
 )

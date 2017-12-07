@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 scala_library(
-  provides=scala_artifact(
-    org='org.pantsbuild',
-    name='zinc-options',
-    repo=public,
-    publication_metadata=pants_library('The SBT incremental compiler for nailgun')
-  ),
-  strict_deps=True,
-  platform='java8',
+    platform = "java8",
+    provides = scala_artifact(
+        name = "zinc-options",
+        org = "org.pantsbuild",
+        publication_metadata = pants_library("The SBT incremental compiler for nailgun"),
+        repo = public,
+    ),
+    strict_deps = True,
 )

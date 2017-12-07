@@ -2,15 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 scala_library(
-  java_sources=[
-    'testprojects/src/java/org/pantsbuild/testproject/javasources',
-    'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet:greet'
-  ],
-  sources = rglobs('*.scala')
+    sources = rglobs("*.scala"),
+    java_sources = [
+        "testprojects/src/java/org/pantsbuild/testproject/javasources",
+        "testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet:greet",
+    ],
 )
 
-benchmark(name='benchmark',
-  dependencies=[
-  ],
-  sources=rglobs('org/pantsbuild/testproject/javasources/*.scala')
+benchmark(
+    name = "benchmark",
+    sources = rglobs("org/pantsbuild/testproject/javasources/*.scala"),
+    dependencies = [
+    ],
 )

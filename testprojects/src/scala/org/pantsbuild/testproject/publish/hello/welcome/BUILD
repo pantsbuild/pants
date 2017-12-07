@@ -4,10 +4,12 @@
 # Seq-friendly wrapper for Java "greet" library: greet everything in a seq.
 
 scala_library(
-  dependencies=[
-    'testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet:greet',
-  ],
-  provides = scala_artifact(org='org.pantsbuild.testproject.publish.hello',
-                            name='welcome',
-                            repo=testing,),
+    provides = scala_artifact(
+        name = "welcome",
+        org = "org.pantsbuild.testproject.publish.hello",
+        repo = testing,
+    ),
+    dependencies = [
+        "testprojects/src/java/org/pantsbuild/testproject/publish/hello/greet",
+    ],
 )

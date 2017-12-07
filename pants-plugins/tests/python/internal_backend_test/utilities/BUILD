@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  dependencies=[
-    'pants-plugins/src/python/internal_backend/utilities:plugin',
-    'src/python/pants/base:revision',
-  ],
+    dependencies = [
+        "pants-plugins/src/python/internal_backend/utilities:plugin",
+        "src/python/pants/base:revision",
+    ],
 )

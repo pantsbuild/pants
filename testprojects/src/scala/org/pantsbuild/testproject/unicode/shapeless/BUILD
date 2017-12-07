@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 scala_library(
-  dependencies = [
-    '3rdparty:shapeless',
-  ],
+    dependencies = [
+        "3rdparty:shapeless",
+    ],
 )

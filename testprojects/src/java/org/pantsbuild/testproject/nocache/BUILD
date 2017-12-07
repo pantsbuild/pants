@@ -2,10 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  sources = ['Hello.java'],
-  no_cache = True
+    sources = ["Hello.java"],
+    no_cache = True,
 )
 
-java_library(name='cache_me',
-  sources = ['Goodbye.java'],
+java_library(
+    name = "cache_me",
+    sources = ["Goodbye.java"],
 )

@@ -6,9 +6,11 @@
 # It also has no explicit sources, so it defaults to the sources implied
 # by the target type, in this case "globs('*.java')".
 java_library(
-  dependencies = [], # A more realistic example would depend on other libs,
-                     # but this "hello world" is pretty simple.
-  provides = artifact(org='org.pantsbuild.example',
-                      name='hello-greet',
-                      repo=public,),
+    # but this "hello world" is pretty simple.
+    provides = artifact(
+        name = "hello-greet",
+        org = "org.pantsbuild.example",
+        repo = public,
+    ),
+    dependencies = [],  # A more realistic example would depend on other libs,
 )

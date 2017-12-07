@@ -4,5 +4,5 @@
 # This is here to test a common use-case in maven-style directory structures, wherein targets in
 # root directories exist purely to consolidate targets in other locations.
 target(
-  dependencies=['testprojects/src/protobuf/org/pantsbuild/testproject/proto-ordering:protos'],
+    dependencies = ["testprojects/src/protobuf/org/pantsbuild/testproject/proto-ordering:protos"],
 )

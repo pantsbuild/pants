@@ -1,27 +1,27 @@
 java_library(
-  name='A',
-  sources = ['A.java'],
+    name = "A",
+    sources = ["A.java"],
 )
 
 java_library(
-  name='B',
-  sources = ['B.java'],
-  dependencies=[':A'],
-  exports=[':A'],
-  strict_deps=True,
+    name = "B",
+    sources = ["B.java"],
+    strict_deps = True,
+    dependencies = [":A"],
+    exports = [":A"],
 )
 
 java_library(
-  name='C',
-  sources = ['C.java'],
-  dependencies=[':B'],
-  exports=[':B'],
-  strict_deps=True,
+    name = "C",
+    sources = ["C.java"],
+    strict_deps = True,
+    dependencies = [":B"],
+    exports = [":B"],
 )
 
 java_library(
-  name='D',
-  sources = ['D.java'],
-  dependencies=[':C'],
-  strict_deps=True,
+    name = "D",
+    sources = ["D.java"],
+    strict_deps = True,
+    dependencies = [":C"],
 )

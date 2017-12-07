@@ -3,8 +3,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 cpp_library(
-  sources=[
-    'hello.cc',
-    'hello.h',
-  ],
+    sources = [
+        "hello.cc",
+        "hello.h",
+    ],
 )

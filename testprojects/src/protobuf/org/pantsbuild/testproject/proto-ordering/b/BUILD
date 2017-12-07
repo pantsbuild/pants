@@ -2,5 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_protobuf_library(
-  sources=['zestproto3.proto', 'testproto4.proto',],
+    sources = [
+        # These files are intentionally sorted non-alphabetically.
+        # A test asserts that source ordering is significant.
+        "zestproto3.proto",
+        "testproto4.proto",
+    ],
 )

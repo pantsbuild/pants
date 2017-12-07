@@ -1,298 +1,299 @@
 page(
-  name='1.0',
-  source='1.0.md',
+    name = "1.0",
+    source = "1.0.md",
 )
 
 page(
-  name='3rdparty',
-  source='3rdparty.md',
-  links=[
-    'examples/src/java/org/pantsbuild/example:3rdparty_jvm',
-    'examples/src/python/example:3rdparty_py',
-  ],
+    name = "3rdparty",
+    source = "3rdparty.md",
+    links = [
+        "examples/src/java/org/pantsbuild/example:3rdparty_jvm",
+        "examples/src/python/example:3rdparty_py",
+    ],
 )
 
 page(
-  name='announce_201409',
-  source='announce_201409.md',
+    name = "announce_201409",
+    source = "announce_201409.md",
 )
 
 page(
-  name='build_files',
-  source='build_files.md',
-  links=[
-    ':first_tutorial',
-  ]
+    name = "build_files",
+    source = "build_files.md",
+    links = [
+        ":first_tutorial",
+    ],
 )
 
 page(
-  name='committers',
-  source='committers.md',
+    name = "committers",
+    source = "committers.md",
 )
 
 page(
-  name='common_tasks',
-  source='common_tasks/index.md',
+    name = "common_tasks",
+    source = "common_tasks/index.md",
 )
 
 page(
-    name='community',
-    source='community.md',
+    name = "community",
+    source = "community.md",
 )
 
 page(
-  name='first_concepts',
-  source='first_concepts.md',
-  links=[
-    ':first_tutorial',
-  ]
+    name = "first_concepts",
+    source = "first_concepts.md",
+    links = [
+        ":first_tutorial",
+    ],
 )
 
 page(
-  name='first_tutorial',
-  source='first_tutorial.md',
-  links=[
-    ':first_concepts',
-    ':invoking',
-    'examples/src/java/org/pantsbuild/example:readme',
-    'examples/src/python/example:readme',
-  ]
+    name = "first_tutorial",
+    source = "first_tutorial.md",
+    links = [
+        ":first_concepts",
+        ":invoking",
+        "examples/src/java/org/pantsbuild/example:readme",
+        "examples/src/python/example:readme",
+    ],
 )
 
 page(
-  name='ide_support',
-  source='ide_support.md',
+    name = "ide_support",
+    source = "ide_support.md",
 )
 
 page(
-  name='index',
-  source='index.md',
-  links=[
-    ':3rdparty',
-    ':1.0',
-    ':announce_201409',
-    ':build_files',
-    ':common_tasks',
-    ':first_concepts',
-    ':first_tutorial',
-    ':install',
-    ':invoking',
-    ':options',
-    ':powered_by',
-    ':dev',
-    ':setup_repo',
-    ':target_addresses',
-    ':tshoot',
-    ':ide_support',
-    ':why_use_pants',
-    'examples/src/java/org/pantsbuild/example:page',
-    'examples/src/java/org/pantsbuild/example:readme',
-    'examples/src/python/example:readme',
-    'examples/src/thrift/org/pantsbuild/example:readme',
-    ])
-
-page(
-  name='invoking',
-  source='invoking.md',
-  links=[
-    ':first_tutorial',
-    ':options',
-    ':target_addresses',
-  ]
+    name = "index",
+    source = "index.md",
+    links = [
+        ":1.0",
+        ":3rdparty",
+        ":announce_201409",
+        ":build_files",
+        ":common_tasks",
+        ":dev",
+        ":first_concepts",
+        ":first_tutorial",
+        ":ide_support",
+        ":install",
+        ":invoking",
+        ":options",
+        ":powered_by",
+        ":setup_repo",
+        ":target_addresses",
+        ":tshoot",
+        ":why_use_pants",
+        "examples/src/java/org/pantsbuild/example:page",
+        "examples/src/java/org/pantsbuild/example:readme",
+        "examples/src/python/example:readme",
+        "examples/src/thrift/org/pantsbuild/example:readme",
+    ],
 )
 
 page(
-  name='install',
-  source='install.md',
-  links=[
-    ':setup_repo',
-    ':options',
-  ]
+    name = "invoking",
+    source = "invoking.md",
+    links = [
+        ":first_tutorial",
+        ":options",
+        ":target_addresses",
+    ],
 )
 
 page(
-    name='options',
-    source='options.md',
+    name = "install",
+    source = "install.md",
+    links = [
+        ":options",
+        ":setup_repo",
+    ],
 )
 
 page(
-  name='powered_by',
-  source='powered_by.md',
+    name = "options",
+    source = "options.md",
 )
 
 page(
-    name='reporting_server',
-    source='reporting_server.md',
+    name = "powered_by",
+    source = "powered_by.md",
 )
 
 page(
-  name='setup_repo',
-  source='setup_repo.md',
-  links=[
-    ':build_files',
-    ':first_concepts',
-    ':options',
-    ':dev_tasks',
-    ':dev_tasks_publish_extras',
-    ':howto_contribute',
-    ':howto_plugin',
-  ]
+    name = "reporting_server",
+    source = "reporting_server.md",
 )
 
 page(
-  name='target_addresses',
-  source='target_addresses.md'
+    name = "setup_repo",
+    source = "setup_repo.md",
+    links = [
+        ":build_files",
+        ":dev_tasks",
+        ":dev_tasks_publish_extras",
+        ":first_concepts",
+        ":howto_contribute",
+        ":howto_plugin",
+        ":options",
+    ],
 )
 
 page(
-  name='tshoot',
-  source='tshoot.md',
-  links=[
-    ':community',
-    ':reporting_server',
-    ':howto_ask',
-  ]
+    name = "target_addresses",
+    source = "target_addresses.md",
 )
 
 page(
-  name='dev',
-  source='dev.md',
-  links=[
-    ':committers',
-    ':dev_tasks',
-    ':dev_tasks_publish_extras',
-    ':docs',
-    ':export',
-    ':howto_ask',
-    ':howto_contribute',
-    ':howto_develop',
-    ':howto_plugin',
-    ':intellij',
-    ':internals',
-    ':release',
-    ':release_jvm',
-    ':release_strategy',
-    ':styleguide',
-  ]
+    name = "tshoot",
+    source = "tshoot.md",
+    links = [
+        ":community",
+        ":howto_ask",
+        ":reporting_server",
+    ],
 )
 
 page(
-  name='release_strategy',
-  source='release_strategy.md',
-  links=[
-    ':deprecation_policy',
-    ':howto_contribute',
-    ':release',
-  ],
+    name = "dev",
+    source = "dev.md",
+    links = [
+        ":committers",
+        ":dev_tasks",
+        ":dev_tasks_publish_extras",
+        ":docs",
+        ":export",
+        ":howto_ask",
+        ":howto_contribute",
+        ":howto_develop",
+        ":howto_plugin",
+        ":intellij",
+        ":internals",
+        ":release",
+        ":release_jvm",
+        ":release_strategy",
+        ":styleguide",
+    ],
 )
 
 page(
-  name='dev_tasks',
-  source='dev_tasks.md',
-  links=[
-    ':howto_plugin',
-    'src/docs:invoking',
-  ],
+    name = "release_strategy",
+    source = "release_strategy.md",
+    links = [
+        ":deprecation_policy",
+        ":howto_contribute",
+        ":release",
+    ],
 )
 
 page(
-  name='dev_tasks_publish_extras',
-  source='dev_tasks_publish_extras.md',
+    name = "dev_tasks",
+    source = "dev_tasks.md",
+    links = [
+        ":howto_plugin",
+        ":invoking",
+    ],
 )
 
 page(
-  name='deprecation_policy',
-  source='deprecation_policy.md',
+    name = "dev_tasks_publish_extras",
+    source = "dev_tasks_publish_extras.md",
 )
 
 page(
-  name='docs',
-  source='docs.md',
+    name = "deprecation_policy",
+    source = "deprecation_policy.md",
 )
 
 page(
-  name='export',
-  source='export.md',
+    name = "docs",
+    source = "docs.md",
 )
 
 page(
-  name='howto_ask',
-  source='howto_ask.md',
+    name = "export",
+    source = "export.md",
 )
 
 page(
-  name='howto_contribute',
-  source='howto_contribute.md',
-  links=[
-    ':docs',
-    ':howto_ask',
-    ':howto_develop',
-    ':internals',
-    ':styleguide',
-  ]
+    name = "howto_ask",
+    source = "howto_ask.md",
 )
 
 page(
-  name='howto_develop',
-  source='howto_develop.md',
-  links=[
-    ':howto_contribute',
-    'src/docs:first_tutorial',
-  ]
+    name = "howto_contribute",
+    source = "howto_contribute.md",
+    links = [
+        ":docs",
+        ":howto_ask",
+        ":howto_develop",
+        ":internals",
+        ":styleguide",
+    ],
 )
 
 page(
-  name='howto_plugin',
-  source='howto_plugin.md',
-  links=[
-    ':docs',
-    ':howto_develop',
-  ]
+    name = "howto_develop",
+    source = "howto_develop.md",
+    links = [
+        ":first_tutorial",
+        ":howto_contribute",
+    ],
 )
 
 page(
-  name='intellij',
-  source='intellij.md',
-  links=[
-    'src/docs:ide_support',
-  ])
-
-page(
-  name='internals',
-  source='internals.md',
-  links=[
-    ':dev_tasks',
-    'src/docs:first_concepts',
-    'src/docs:dev_tasks',
-  ]
+    name = "howto_plugin",
+    source = "howto_plugin.md",
+    links = [
+        ":docs",
+        ":howto_develop",
+    ],
 )
 
 page(
-  name='release',
-  source='release.md',
-  links=[
-    ':release_jvm',
-    ':release_strategy',
-  ]
+    name = "intellij",
+    source = "intellij.md",
+    links = [
+        ":ide_support",
+    ],
 )
 
 page(
-  name='release_jvm',
-  source='release_jvm.md',
-  links=[
-    'examples/src/java/org/pantsbuild/example:publish',
-  ]
+    name = "internals",
+    source = "internals.md",
+    links = [
+        ":dev_tasks",
+        ":first_concepts",
+    ],
 )
 
 page(
-  name='styleguide',
-  source='styleguide.md',
-  links=[
-    ':howto_contribute',
-  ]
+    name = "release",
+    source = "release.md",
+    links = [
+        ":release_jvm",
+        ":release_strategy",
+    ],
 )
 
 page(
-  name='why_use_pants',
-  source='why_use_pants.md'
+    name = "release_jvm",
+    source = "release_jvm.md",
+    links = [
+        "examples/src/java/org/pantsbuild/example:publish",
+    ],
+)
+
+page(
+    name = "styleguide",
+    source = "styleguide.md",
+    links = [
+        ":howto_contribute",
+    ],
+)
+
+page(
+    name = "why_use_pants",
+    source = "why_use_pants.md",
 )

@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(
-  sources=[
-    'org/pantsbuild/duplicates/FirstTest.java'
-  ],
-  dependencies=[
-    '3rdparty:junit',
-    'testprojects/maven_layout/junit_resource_collision/onedir/src/test/resources',
-  ],
-  cwd='testprojects/maven_layout/junit_resource_collision/onedir',
+    sources = [
+        "org/pantsbuild/duplicates/FirstTest.java",
+    ],
+    cwd = "testprojects/maven_layout/junit_resource_collision/onedir",
+    dependencies = [
+        "3rdparty:junit",
+        "testprojects/maven_layout/junit_resource_collision/onedir/src/test/resources",
+    ],
 )

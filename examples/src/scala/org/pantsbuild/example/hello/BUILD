@@ -2,7 +2,7 @@
 #Please do not remove this BUILD file
 
 target(
-  dependencies = [
-   'examples/src/scala/org/pantsbuild/example/hello/exe:exe',
-  ]
+    dependencies = [
+        "examples/src/scala/org/pantsbuild/example/hello/exe",
+    ],
 )

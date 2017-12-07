@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  basename='wire-roots-example',
-  dependencies=[
-    'examples/src/wire/org/pantsbuild/example/roots',
-  ],
-  source='WireRootsExample.java',
-  main='org.pantsbuild.example.wire.roots.WireRootsExample',
+    basename = "wire-roots-example",
+    main = "org.pantsbuild.example.wire.roots.WireRootsExample",
+    source = "WireRootsExample.java",
+    dependencies = [
+        "examples/src/wire/org/pantsbuild/example/roots",
+    ],
 )
-

@@ -2,16 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jar_library(
-  name='hamcrest-core',
-  jars=[
-    jar(org='org.hamcrest', name='hamcrest-core', rev='1.3'),
-  ],
+    name = "hamcrest-core",
+    jars = [
+        jar(
+            name = "hamcrest-core",
+            org = "org.hamcrest",
+            rev = "1.3",
+        ),
+    ],
 )
 
 jar_library(
-  name='hamcrest-library',
-  jars=[
-    jar(org='org.hamcrest', name='hamcrest-library', rev='1.3'),
-  ],
+    name = "hamcrest-library",
+    jars = [
+        jar(
+            name = "hamcrest-library",
+            org = "org.hamcrest",
+            rev = "1.3",
+        ),
+    ],
 )
-

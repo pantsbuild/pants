@@ -1,6 +1,15 @@
-jar_library(name='jmh',
-  jars=[
-    jar(org='org.openjdk.jmh', name='jmh-core', rev='1.12'),
-    jar(org='org.openjdk.jmh', name='jmh-generator-annprocess', rev='1.12'),
-  ],
+jar_library(
+    name = "jmh",
+    jars = [
+        jar(
+            name = "jmh-core",
+            org = "org.openjdk.jmh",
+            rev = "1.12",
+        ),
+        jar(
+            name = "jmh-generator-annprocess",
+            org = "org.openjdk.jmh",
+            rev = "1.12",
+        ),
+    ],
 )

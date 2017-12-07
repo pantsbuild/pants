@@ -1,16 +1,16 @@
 scala_library(
-  name='fatal',
-  fatal_warnings=True,
-  sources=['Warning.scala'],
+    name = "fatal",
+    sources = ["Warning.scala"],
+    fatal_warnings = True,
 )
 
 scala_library(
-  name='nonfatal',
-  fatal_warnings=False,
-  sources=['Warning.scala'],
+    name = "nonfatal",
+    sources = ["Warning.scala"],
+    fatal_warnings = False,
 )
 
 scala_library(
-  name='defaultfatal',
-  sources=['Warning.scala'],
+    name = "defaultfatal",
+    sources = ["Warning.scala"],
 )

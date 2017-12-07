@@ -2,10 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  source='ExampleAntlr4.java',
-  main='org.pantsbuild.example.antlr4.ExampleAntlr4',
-  dependencies=[
-    'examples/src/antlr/org/pantsbuild/example/exp:exp_antlr4',
-  ],
-  strict_deps=False,
+    main = "org.pantsbuild.example.antlr4.ExampleAntlr4",
+    source = "ExampleAntlr4.java",
+    strict_deps = False,
+    dependencies = [
+        "examples/src/antlr/org/pantsbuild/example/exp:exp_antlr4",
+    ],
 )

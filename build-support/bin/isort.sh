@@ -33,4 +33,5 @@ do
   esac
 done
 
+# TODO: Add --exclude-target-regexp=.*testprojects.* once it's been fixed to only exclude roots.
 ./pants -q --changed-parent=master fmt.isort -- ${isort_args[@]}
