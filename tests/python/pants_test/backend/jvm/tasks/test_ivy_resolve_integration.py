@@ -97,8 +97,6 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       second_export_result = run_pants(['export', '3rdparty:junit'])
 
       # Using the fetch pattern should result in the same export information.
-      print('a', first_export_result.stdout_data)
-      print('b', second_export_result.stdout_data)
       self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
       # TODO(wisechengyi): this assertion is likely incorrect because the second run
       # should be validated and should not trigger any ivy resolve or fetch action.
