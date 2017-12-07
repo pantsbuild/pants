@@ -114,6 +114,12 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
       round_manager.require_data('java')
       round_manager.require_data('scala')
 
+  # TODO(wisechengyi): it is unclear why this needs to be specified in order for
+  # pants_test.backend.jvm.tasks.test_ivy_resolve_integration.IvyResolveIntegrationTest#test_ivy_bimodal_resolve_caching to pass
+  @property
+  def cache_target_dirs(self):
+    pass
+
   def resolve_jars(self, targets):
     executor = SubprocessExecutor(DistributionLocator.cached())
     confs = []

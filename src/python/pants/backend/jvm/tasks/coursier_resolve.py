@@ -102,6 +102,7 @@ class CoursierMixin(NailgunTask):
 
     return jars_to_resolve, exclude_args, untouched_pinned_artifact
 
+  @property
   def cache_target_dirs(self):
     return True
 
