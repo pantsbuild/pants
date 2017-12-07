@@ -394,6 +394,10 @@ class Export(ExportTask, ConsoleTask):
   def __init__(self, *args, **kwargs):
     super(ExportTask, self).__init__(*args, **kwargs)
 
+  @property
+  def cache_target_dirs(self):
+    return JvmResolveSubsystem.global_instance().get_options().resolver == 'coursier'
+
   def console_output(self, targets, classpath_products=None):
     graph_info = self.generate_targets_map(targets, classpath_products=classpath_products)
     if self.get_options().formatted:
