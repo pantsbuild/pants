@@ -2,20 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-    name = "X",
-)
-
-java_library(
     name = "A",
-    dependencies = [":X"],
+    dependencies = ["testprojects/tests/java/org/pantsbuild/testproject/buildrefactor/x:X"],
 )
 
 java_library(
     name = "B",
-    dependencies = [":X"],
+    dependencies = ["testprojects/tests/java/org/pantsbuild/testproject/buildrefactor/x:X"],
 )
 
 java_library(
     name = "C",
-    dependencies = [":X"],
+    dependencies = ["testprojects/tests/java/org/pantsbuild/testproject/buildrefactor/x:X"],
 )

@@ -72,9 +72,12 @@ class Buildozer(Task):
       Buildozer.execute_binary(command, address.spec, binary=self._executable)
 
   @classmethod
-  def execute_binary(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False):
+  def execute_binary(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False, return_flag = False):
     binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
-    Buildozer._execute_buildozer_command([binary, command, spec], suppress_warnings)
+    if return_flag:
+      return Buildozer._execute_return_buildozer_output([binary, command, spec], suppress_warnings)
+    else:
+      Buildozer._execute_buildozer_command([binary, command, spec], suppress_warnings)
 
   @classmethod
   def _execute_buildozer_command(cls, buildozer_command, suppress_warnings):
@@ -86,11 +89,6 @@ class Buildozer(Task):
           logger.warn('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
-
-  @classmethod
-  def return_buildozer_output(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', suppress_warnings=False):
-    binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
-    return Buildozer._execute_return_buildozer_output([binary, command, spec], suppress_warnings)
 
   @classmethod
   def _execute_return_buildozer_output(cls, buildozer_command, suppress_warnings):

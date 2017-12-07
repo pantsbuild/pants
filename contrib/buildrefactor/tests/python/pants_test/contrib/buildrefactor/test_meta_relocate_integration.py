@@ -14,9 +14,15 @@ class MetaRelocateIntegrationTest(PantsRunIntegrationTest):
     pre_dependees_run = self.run_pants(['dependees',
       'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
 
+    pre_target_original_location_run = self.run_pants(['list',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
+
     self.run_pants(['meta-relocate',
       '--to=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor/x:X',
       'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
+
+    post_target_new_location_run = self.run_pants(['list',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor/x:X'])
 
     self.run_pants(['meta-relocate',
       '--to=testprojects/tests/java/org/pantsbuild/testproject/buildrefactor',
@@ -25,5 +31,10 @@ class MetaRelocateIntegrationTest(PantsRunIntegrationTest):
     post_dependees_run = self.run_pants(['dependees',
       'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
 
+    final_target_original_location_run = self.run_pants(['list',
+      'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
+
     self.assertEquals(pre_dependees_run.stdout_data, post_dependees_run.stdout_data)
+    self.assertEquals(pre_target_original_location_run.stdout_data, post_target_new_location_run.stdout_data)
+    self.assertEquals(pre_target_original_location_run.stdout_data, final_target_original_location_run.stdout_data)
     
