@@ -8,11 +8,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import time
 
+from pex.testing import ensure_python_interpreter
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class PytestRunIntegrationTest(PantsRunIntegrationTest):
+  testproject = 'testprojects/src/python/interpreter_selection'
+
   def test_pytest_run_timeout_succeeds(self):
     pants_run = self.run_pants(['clean-all',
                                 'test.pytest',
@@ -95,3 +100,27 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
       # We won't see a profile at prof itself because PANTS_PROFILE wasn't set when the
       # current process started.
       self.assertTrue(os.path.exists('{}.0'.format(prof)))
+
+  def test_pants_test_interpreter_selection_with_pexrc(self):
+    """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
+    defined in a pexrc file on disk.
+
+    Note that both pants run and pants test use the python_execution_task_base module, so
+    the similar integration tests in test_python_run_integration.py take care of validating
+    that the proper interpreter was used for exexuting the targets (there is no way of doing that here).
+    """
+    py27 = ensure_python_interpreter('2.7.10')
+    py36 = ensure_python_interpreter('3.6.3')
+    with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
+      with temporary_dir() as interpreters_cache:
+        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+        pants_run_27 = self.run_pants(
+          command=['test', '{}:test_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_27)
+        pants_run_3 = self.run_pants(
+          command=['test', '{}:test_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_3)

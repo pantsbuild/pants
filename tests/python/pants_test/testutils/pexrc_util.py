@@ -23,15 +23,21 @@ def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
   :param interpreter_paths (list): a list of paths to interpreter binaries to include on 
   PEX_PYTHON_PATH.
   """
-  pexrc_path = os.path.join(pexrc_dir, '.pexrc')
+  if not os.path.exists(pexrc_dir):
+    raise IOError('Directory for pexrc %s does not exist. Please create it. Note that this '
+                  'directory must be either /etc, your home directory, or '
+                  'os.path.dirname(sys.argv[0]) to ensure a valid pexrc location.', pexrc_dir)
+  if pexrc_dir == '/etc':
+    pexrc_filename = 'pexrc'
+  else:
+    pexrc_filename = '.pexrc'
+  pexrc_path = os.path.join(pexrc_dir, pexrc_filename)
 
-  # preserve .pexrc if it already exists in pexrc_dir
-  temp_dir = ''
+  temp_pexrc = ''
+  # preserve .pexrc if it already exists in pexrc_dir.
   if os.path.exists(pexrc_path):
-    with temporary_dir(cleanup=False) as td:
-      temp_dir = td
-      temp_pexrc = os.path.join(temp_dir, '.pexrc')
-      shutil.copyfile(pexrc_path, temp_pexrc)
+    temp_pexrc = os.path.join(pexrc_dir, '.pexrc.bak')
+    shutil.copyfile(pexrc_path, temp_pexrc)
 
   # write a temp .pexrc in pexrc_dir
   with open(pexrc_path, 'w') as pexrc:
@@ -40,8 +46,7 @@ def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
 
   # cleanup temporary .pexrc
   os.remove(pexrc_path)
-
-  # replace .pexrc if it was there before and cleanup temp directory
-  if os.path.exists(temp_dir):
+  # replace .pexrc if it was there before
+  if os.path.exists(temp_pexrc):
     shutil.copyfile(temp_pexrc, pexrc_path)
-    shutil.rmtree(temp_dir, ignore_errors=True)
+    os.remove(temp_pexrc)

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import mock
 from pex.interpreter import PythonIdentity, PythonInterpreter
+from pex.testing import ensure_python_interpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -14,6 +15,7 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
 from pants.base.exceptions import TaskError
 from pants_test.tasks.task_test_base import TaskTestBase
+from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class SelectInterpreterTest(TaskTestBase):

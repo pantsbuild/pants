@@ -2,9 +2,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
-
 import sys
 
 from interpreter_selection.python_3_selection_testing.lib_py3 import say_something

@@ -2,12 +2,6 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
-                        unicode_literals, with_statement)
-
-import sys
-
-
 # A simple example to include in a python 3 binary target
 
 def say_something():
@@ -19,4 +13,5 @@ def say_something():
   	ret = reduce
   except NameError:
   	ret = None
+  assert ret == None
   return ret 

@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pex.pex_bootstrapper import get_pex_info
 from pex.testing import ensure_python_interpreter
 
 from pants.util.contextutil import temporary_dir
@@ -60,7 +61,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
     self.assertEquals(var_val, pants_run.stdout_data.strip())
 
-  def test_interpreter_selection_with_pexrc(self):
+  def test_pants_run_interpreter_selection_with_pexrc(self):
     py27 = ensure_python_interpreter('2.7.10')
     py36 = ensure_python_interpreter('3.6.3')
     with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
@@ -71,11 +72,42 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
           config=pants_ini_config
         )
         self.assert_success(pants_run_27)
+        assert py27 in pants_run_27.stdout_data
         pants_run_3 = self.run_pants(
           command=['run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
           config=pants_ini_config
         )
         self.assert_success(pants_run_3)
+        assert py36 in pants_run_3.stdout_data
+
+  def test_pants_binary_interpreter_selection_with_pexrc(self):
+    py27 = ensure_python_interpreter('2.7.10')
+    py36 = ensure_python_interpreter('3.6.3')
+    with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
+      with temporary_dir() as interpreters_cache:
+        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+        pants_run_27 = self.run_pants(
+          command=['binary', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_27)
+        pants_run_3 = self.run_pants(
+          command=['binary', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_3)
+
+    # Ensure proper interpreter constraints were passed to built pexes.
+    py2_pex = os.path.join(os.getcwd(), 'dist', 'main_py2.pex')
+    py3_pex = os.path.join(os.getcwd(), 'dist', 'main_py3.pex')
+    py2_info = get_pex_info(py2_pex)
+    py3_info = get_pex_info(py3_pex)
+    assert 'CPython<3' in py2_info.interpreter_constraints
+    assert 'CPython>3' in py3_info.interpreter_constraints
+
+    # Cleanup created pexes.
+    os.remove(py2_pex)
+    os.remove(py3_pex)
 
   def _maybe_run_version(self, version):
     if self.has_python_version(version):

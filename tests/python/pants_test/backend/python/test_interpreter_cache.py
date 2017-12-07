@@ -140,7 +140,7 @@ class TestInterpreterCache(BaseTest):
                        'interpreter cache path contains tmp dirs!')
 
   def test_pex_python_paths(self):
-     """Test pex python path helper method of PythonInterpreterCache."""
+    """Test pex python path helper method of PythonInterpreterCache."""
     with self._setup_test() as (cache, cache_path):
       py27 = ensure_python_interpreter('2.7.10')
       py36 = ensure_python_interpreter('3.6.3')
@@ -151,6 +151,7 @@ class TestInterpreterCache(BaseTest):
   def test_interpereter_cache_setup_using_pex_python_paths(self): 
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
     with mock.patch.object(PythonInterpreterCache, 'pex_python_paths') as mock_pex_python_paths:
+      # Target python 2 for interpreter cache.
       with self._setup_test(constraints=['<3', '<2.7.14'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
         py27 = ensure_python_interpreter('2.7.10')
         py36 = ensure_python_interpreter('3.6.3')
@@ -158,8 +159,8 @@ class TestInterpreterCache(BaseTest):
         interpereters = cache.setup()
         self.assertEqual(len(interpereters), 1)
         self.assertEqual(interpereters[0].binary, py27)
-
-      with self._setup_test(constraints=['CPython>3', '<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
+      # Target python 3 for interpreter cache.
+      with self._setup_test(constraints=['>3', '<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
         py27 = ensure_python_interpreter('2.7.10')
         py36 = ensure_python_interpreter('3.6.3')
         mock_pex_python_paths.return_value = ':'.join([py27, py36])
