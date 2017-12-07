@@ -7,17 +7,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from interpreter_selection.python_3_binary.lib import say_something
 
+# A simple example to include in a python 2 binary target
 
-# A simple example to test building/running/testing a python 3 binary target
-
-
-def main():
-  v = sys.version_info
-  print(sys.executable)
-  print('%d.%d.%d' % v[0:3])
-  return say_something()
-
-if __name__ == '__main__':
-	main()
+def say_something():
+  print('I am a python 2 library method.')
+  # Return reduce function for testing purposes.
+  # Note that reduce exists as a built-in in Python 2 and
+  # does not exist in Python 3
+  return reduce

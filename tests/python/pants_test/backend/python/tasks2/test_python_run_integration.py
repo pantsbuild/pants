@@ -5,8 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
+from pex.testing import ensure_python_interpreter
+
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
@@ -54,6 +59,23 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command, extra_env={var_key: var_val})
     self.assert_success(pants_run)
     self.assertEquals(var_val, pants_run.stdout_data.strip())
+
+  def test_interpreter_selection_with_pexrc(self):
+    py27 = ensure_python_interpreter('2.7.10')
+    py36 = ensure_python_interpreter('3.6.3')
+    with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
+      with temporary_dir() as interpreters_cache:
+        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+        pants_run_27 = self.run_pants(
+          command=['run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_27)
+        pants_run_3 = self.run_pants(
+          command=['run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_3)
 
   def _maybe_run_version(self, version):
     if self.has_python_version(version):

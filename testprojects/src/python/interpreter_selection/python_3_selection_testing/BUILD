@@ -16,27 +16,53 @@
 # 
 
 python_binary(
-  name='main',
-  source='main.py',
+  name='main_py3',
+  source='main_py3.py',
   compatibility=['CPython>3'],
   dependencies=[
-    ':lib'
+    ':lib_py3'
   ]
 )
 
 python_library(
-  name='lib',
-  sources=['lib.py'],
+  name='lib_py3',
+  sources=['lib_py3.py'],
   compatibility=['CPython>3']
 )
 
 python_tests(
-  name='test',
+  name='test_py3',
   sources=[
-    'test.py',
+    'test_py3.py',
   ],
   dependencies=[
-    ':main'
+    ':main_py3'
   ],
   compatibility=['CPython>3']
+)
+
+python_binary(
+  name='main_py2',
+  source='main_py2.py',
+  compatibility=['CPython<3'],
+  dependencies=[
+    ':lib_py2'
+  ]
+)
+
+python_library(
+  name='lib_py2',
+  sources=['lib_py2.py'],
+  compatibility=['CPython<3']
+)
+
+python_tests(
+  name='test_py2',
+  sources=[
+    'test_py2.py',
+  ],
+  dependencies=[
+    ':main_py2'
+  ],
+  compatibility=['CPython<3']
 )

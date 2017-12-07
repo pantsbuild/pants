@@ -59,5 +59,7 @@ python_tests(
     'src/python/pants/python',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
+    'tests/python/pants_test/testutils:pexrc_util',
   ],
+  timeout=600
 )

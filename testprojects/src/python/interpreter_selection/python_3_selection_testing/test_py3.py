@@ -7,9 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import sys
 
-from interpreter_selection.python_3_binary.main import main
+from interpreter_selection.python_3_selection_testing.main_py3 import main
 
 def test_main():
   print(sys.executable)
-  # Note that 1/2 = 0 in python 2 and 1/2 = 0.5 in python 3
-  assert main() == 0.5
+  # Note that reduce exists as a built-in in Python 2 and
+  # does not exist in Python 3
+  ret = main()
+  assert ret == None

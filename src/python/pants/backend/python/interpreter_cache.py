@@ -31,13 +31,14 @@ def _safe_link(src, dst):
 
 class PythonInterpreterCache(object):
   @staticmethod
-  def _matches(interpreter, filters):
-    return any(interpreter.identity.matches(filt) for filt in filters)
+  def _matches(interpreter, filters, meet_all_constraints=False):
+    check = all if meet_all_constraints else any
+    return check(interpreter.identity.matches(filt) for filt in filters)
 
   @classmethod
-  def _matching(cls, interpreters, filters):
+  def _matching(cls, interpreters, filters, meet_all_constraints=False):
     for interpreter in interpreters:
-      if cls._matches(interpreter, filters):
+      if cls._matches(interpreter, filters, meet_all_constraints):
         yield interpreter
 
   @memoized_property
@@ -80,7 +81,7 @@ class PythonInterpreterCache(object):
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
     for target in tgts_with_compatibilities:
-      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
+      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility, meet_all_constraints=True))
       allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
@@ -124,7 +125,7 @@ class PythonInterpreterCache(object):
 
   def _setup_paths(self, paths, filters):
     """Find interpreters under paths, and cache them."""
-    for interpreter in self._matching(PythonInterpreter.all(paths), filters):
+    for interpreter in self._matching(PythonInterpreter.all(paths), filters, meet_all_constraints=True):
       identity_str = str(interpreter.identity)
       cache_path = os.path.join(self._cache_dir, identity_str)
       pi = self._interpreter_from_path(cache_path, filters)
@@ -148,15 +149,14 @@ class PythonInterpreterCache(object):
     # We filter the interpreter cache itself (and not just the interpreters we pull from it)
     # because setting up some python versions (e.g., 3<=python<3.3) crashes, and this gives us
     # an escape hatch.
-    if not any(filters):
-      filters = self._python_setup.interpreter_constraints
+    filters = filters if any(filters) else self._python_setup.interpreter_constraints
     setup_paths = (paths
                    or pex_python_paths
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
 
     def unsatisfied_filters(interpreters):
-      return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
+      return filter(lambda f: len(list(self._matching(interpreters, [f], meet_all_constraints=True))) == 0, filters)
 
     interpreters = []
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
@@ -167,7 +167,7 @@ class PythonInterpreterCache(object):
     for filt in unsatisfied_filters(interpreters):
       self._logger('No valid interpreters found for {}!'.format(filt))
 
-    matches = list(self._matching(interpreters, filters))
+    matches = list(self._matching(interpreters, filters, meet_all_constraints=True))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
 
