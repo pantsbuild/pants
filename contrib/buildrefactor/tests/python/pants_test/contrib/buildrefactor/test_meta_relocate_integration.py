@@ -35,6 +35,6 @@ class MetaRelocateIntegrationTest(PantsRunIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/buildrefactor:X'])
 
     self.assertEquals(pre_dependees_run.stdout_data, post_dependees_run.stdout_data)
-    self.assertEquals(pre_target_original_location_run.stdout_data, post_target_new_location_run.stdout_data)
+    self.assertNotEqual(pre_target_original_location_run.stdout_data, post_target_new_location_run.stdout_data)
     self.assertEquals(pre_target_original_location_run.stdout_data, final_target_original_location_run.stdout_data)
     
