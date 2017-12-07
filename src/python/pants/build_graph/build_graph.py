@@ -12,6 +12,7 @@ from collections import OrderedDict, defaultdict, deque
 
 from twitter.common.collections import OrderedSet
 
+from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.target import Target
@@ -319,14 +320,23 @@ class BuildGraph(AbstractClass):
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
-    :param function leveled_predicate: Behaves identically to predicate, but takes the depth of the
-      target in the search tree as a second parameter, and it is checked just before a dependency is
-      expanded. Deprecated
     :param function dep_predicate: Takes two parameters, the current target and the dependency of
       the current target. If this parameter is not given, no dependencies will be filtered
       when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
       will not be expanded.
+    :param function leveled_predicate: Deprecated. Behaves identically to predicate, but takes the depth of the
+      target in the search tree as a second parameter, and it is checked just before a dependency is
+      expanded.
     """
+    deprecated_conditional(
+      lambda: leveled_predicate is not None,
+      '1.6.0.dev0',
+      'leveled_predicate',
+      '''
+      Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
+      '''
+    )
+
     if leveled_predicate and dep_predicate:
       raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
     # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
@@ -424,7 +434,11 @@ class BuildGraph(AbstractClass):
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
-    :param function leveled_predicate: Behaves identically to predicate, but takes the depth of the
+    :param function dep_predicate: Takes two parameters, the current target and the dependency of
+      the current target. If this parameter is not given, no dependencies will be filtered
+      when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
+      will not be expanded.
+    :param function leveled_predicate: Deprecated. Behaves identically to predicate, but takes the depth of the
       target in the search tree as a second parameter, and it is checked just before a dependency is
       expanded.
     """
@@ -444,10 +458,22 @@ class BuildGraph(AbstractClass):
       out of the closure.  If it is given, any Target which fails the predicate will not be
       walked, nor will its dependencies.  Thus predicate effectively trims out any subgraph
       that would only be reachable through Targets that fail the predicate.
-    :param function leveled_predicate: Behaves identically to predicate, but takes the depth of the
+    :param function dep_predicate: Takes two parameters, the current target and the dependency of
+      the current target. If this parameter is not given, no dependencies will be filtered
+      when traversing the closure. If it is given, when the predicate fails, the edge to the dependency
+      will not be expanded.
+    :param function leveled_predicate: Deprecated. Behaves identically to predicate, but takes the depth of the
       target in the search tree as a second parameter, and it is checked just before a dependency is
       expanded.
     """
+    deprecated_conditional(
+      lambda: leveled_predicate is not None,
+      '1.6.0.dev0',
+      'leveled_predicate',
+      '''
+      Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
+      '''
+    )
     if leveled_predicate and dep_predicate:
       raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
     ordered_closure = OrderedSet()
