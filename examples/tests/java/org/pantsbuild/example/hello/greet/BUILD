@@ -4,8 +4,8 @@
 # Test the Hello World example's "greet" library
 
 junit_tests(
-  dependencies=[
-    'examples/src/java/org/pantsbuild/example/hello/greet',
-    'examples/src/resources/org/pantsbuild/example/hello',
-  ],
+    dependencies = [
+        "examples/src/java/org/pantsbuild/example/hello/greet",
+        "examples/src/resources/org/pantsbuild/example/hello",
+    ],
 )

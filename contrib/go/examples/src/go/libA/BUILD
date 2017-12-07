@@ -2,8 +2,8 @@
 # To re-generate run: `pants buildgen.go --materialize --remote`
 
 go_library(
-  dependencies=[
-    'contrib/go/examples/src/go/libB',
-    'contrib/go/examples/src/go/libC',
-  ]
+    dependencies = [
+        "contrib/go/examples/src/go/libB",
+        "contrib/go/examples/src/go/libC",
+    ],
 )

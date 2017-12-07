@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 scala_library(
-  dependencies = [
-    'testprojects/src/thrift/org/pantsbuild/testproject:thrift-java',
-  ],
-  sources = rglobs('*.scala')
+    sources = rglobs("*.scala"),
+    dependencies = [
+        "testprojects/src/thrift/org/pantsbuild/testproject:thrift-java",
+    ],
 )

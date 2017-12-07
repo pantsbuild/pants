@@ -3,25 +3,25 @@
 # package.json enough to get this benefit without any duplication.
 
 node_module(
-  sources=globs('package.json', 'checkarg', 'src/*.js', 'test/*.js'),
-  dependencies=[
-    'contrib/node/examples/3rdparty/node/babel-core',
-    'contrib/node/examples/3rdparty/node/babel-cli',
-    'contrib/node/examples/3rdparty/node/mocha',
-  ]
+    sources = globs("package.json", "checkarg", "src/*.js", "test/*.js"),
+    dependencies = [
+        "contrib/node/examples/3rdparty/node/babel-cli",
+        "contrib/node/examples/3rdparty/node/babel-core",
+        "contrib/node/examples/3rdparty/node/mocha",
+    ],
 )
 
 node_test(
-  name='unit',
-  dependencies=[
-    ':server-project'
-  ]
+    name = "unit",
+    dependencies = [
+        ":server-project",
+    ],
 )
 
 node_test(
-  name='checkarg',
-  script_name='checkarg',
-  dependencies=[
-    ':server-project'
-  ]
+    name = "checkarg",
+    script_name = "checkarg",
+    dependencies = [
+        ":server-project",
+    ],
 )

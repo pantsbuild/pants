@@ -4,10 +4,9 @@
 #  annotation_processor() target to test resource mapping
 
 annotation_processor(
-  sources=globs('*.java'),
-  processors=['org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor'],
-  dependencies=[
-    '3rdparty:guava',
-  ],
+    sources = globs("*.java"),
+    processors = ["org.pantsbuild.testproject.annotation.processor.ResourceMappingProcessor"],
+    dependencies = [
+        "3rdparty:guava",
+    ],
 )
-

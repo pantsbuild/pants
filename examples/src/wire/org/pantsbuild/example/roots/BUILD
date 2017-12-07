@@ -2,15 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_wire_library(
-  sources=[
-    'foo.proto',
-    'bar.proto',
-    'foobar.proto',
-  ],
-  dependencies=[],
-  roots = [
-    'org.pantsbuild.example.roots.Bar',
-    'org.pantsbuild.example.roots.Foobar',
-    'org.pantsbuild.example.roots.Fooboo',
-  ],
+    sources = [
+        "foo.proto",
+        "bar.proto",
+        "foobar.proto",
+    ],
+    roots = [
+        "org.pantsbuild.example.roots.Bar",
+        "org.pantsbuild.example.roots.Foobar",
+        "org.pantsbuild.example.roots.Fooboo",
+    ],
+    dependencies = [],
 )

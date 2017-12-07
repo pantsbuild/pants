@@ -5,6 +5,7 @@
 #   testprojects/tests/resources/org/pantsbuild/testproject/bundleresources:resources
 # for the purposes of resource ordering testing.
 
-resources(name='resources',
-  sources=['resources.txt'],
+resources(
+    name = "resources",
+    sources = ["resources.txt"],
 )

@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  sources=rglobs('*.java'),
-  dependencies=[
-    'testprojects/src/scala/org/pantsbuild/testproject/javasources',
-  ]
+    sources = rglobs("*.java"),
+    dependencies = [
+        "testprojects/src/scala/org/pantsbuild/testproject/javasources",
+    ],
 )

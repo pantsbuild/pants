@@ -3,12 +3,11 @@
 
 # This doesn't test much. It shows Pants-ly using Thrift from Python, though.
 
-python_tests(name='usethrift',
-  sources=['use_thrift_test.py',],
-  dependencies=[
-    'examples/src/thrift/org/pantsbuild/example/distance:distance-python',
-    'examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-python',
-  ],
+python_tests(
+    name = "usethrift",
+    sources = ["use_thrift_test.py"],
+    dependencies = [
+        "examples/src/thrift/org/pantsbuild/example/distance:distance-python",
+        "examples/src/thrift/org/pantsbuild/example/precipitation:precipitation-python",
+    ],
 )
-
-

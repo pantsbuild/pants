@@ -14,154 +14,280 @@
 # Production libs
 #
 
-jar_library(name='args4j',
-            jars=[
-              jar('args4j', 'args4j', '2.33')
-            ])
+jar_library(
+    name = "args4j",
+    jars = [
+        jar("args4j", "args4j", "2.33"),
+    ],
+)
 
-jar_library(name='guava',
-            jars=[
-              jar('com.google.guava', 'guava', '18.0',
-                  apidocs='http://google.github.io/guava/releases/18.0/api/docs/')
-            ])
+jar_library(
+    name = "guava",
+    jars = [
+        jar(
+            "com.google.guava",
+            "guava",
+            "18.0",
+            apidocs = "http://google.github.io/guava/releases/18.0/api/docs/",
+        ),
+    ],
+)
 
-jar_library(name='jansi',
-            jars=[
-              jar('org.fusesource.jansi', 'jansi', '1.11'),
-            ])
+jar_library(
+    name = "jansi",
+    jars = [
+        jar("org.fusesource.jansi", "jansi", "1.11"),
+    ],
+)
 
-jar_library(name='jsr305',
-            jars=[
-              jar('com.google.code.findbugs', 'jsr305', '3.0.2'),
+jar_library(
+    name = "jsr305",
+    jars = [
+        jar("com.google.code.findbugs", "jsr305", "3.0.2"),
+    ],
+    scope = "compile",
+)
+
+jar_library(
+    name = "checkstyle",
+    jars = [
+        jar(
+            name = "checkstyle",
+            org = "com.puppycrawl.tools",
+            rev = "5.5",
+            excludes = [
+                exclude(
+                    name = "google-collections",
+                    org = "com.google.collections",
+                ),
             ],
-            scope='compile')
+        ),
+    ],
+    dependencies = [
+        # Needs this as the replacement for the excluded google-collections.
+        ":guava",
+    ],
+)
 
-jar_library(name='checkstyle',
-            jars = [
-              jar(org='com.puppycrawl.tools', name='checkstyle', rev='5.5',
-                  excludes=[
-                    exclude(org='com.google.collections', name='google-collections'),
-                  ])
+jar_library(
+    name = "commons-lang",
+    jars = [
+        jar(
+            name = "commons-lang",
+            org = "commons-lang",
+            rev = "2.5",
+        ),
+    ],
+)
+
+jar_library(
+    name = "cucumber-java",
+    jars = [
+        jar(
+            name = "cucumber-java",
+            org = "info.cukes",
+            rev = "1.1.7",
+        ),
+    ],
+)
+
+jar_library(
+    name = "ivy",
+    jars = [
+        jar(
+            name = "ivy",
+            org = "org.apache.ivy",
+            rev = "2.4.0",
+        ),
+    ],
+)
+
+jar_library(
+    name = "log4j",
+    jars = [
+        jar(
+            name = "log4j",
+            org = "log4j",
+            rev = "1.2.15",
+            excludes = [
+                exclude(
+                    name = "jline",
+                    org = "jline",
+                ),
+                exclude(
+                    name = "jms",
+                    org = "javax.jms",
+                ),
+                exclude(
+                    name = "jmxtools",
+                    org = "com.sun.jdmk",
+                ),
+                exclude(
+                    name = "jmxri",
+                    org = "com.sun.jmx",
+                ),
             ],
-            dependencies = [
-              # Needs this as the replacement for the excluded google-collections.
-              ':guava',
-            ])
+        ),
+    ],
+)
 
-jar_library(name='commons-lang',
-            jars = [
-              jar(org='commons-lang', name='commons-lang', rev='2.5'),
-            ])
+jar_library(
+    name = "protobuf-2.4.1",
+    jars = [
+        jar(
+            name = "protobuf-java",
+            org = "com.google.protobuf",
+            rev = "2.4.1",
+        ),
+    ],
+    # javac requires protobuf to be present in order to compile the MessageBuilders API.
+    scope = "forced",
+)
 
-jar_library(name='cucumber-java',
-            jars=[
-              jar(org='info.cukes', name='cucumber-java', rev='1.1.7'),
-            ])
+target(
+    name = "protobuf-java",
+    dependencies = [":protobuf-2.4.1"],
+)
 
-jar_library(name='ivy',
-            jars=[
-              jar(org='org.apache.ivy', name='ivy', rev='2.4.0'),
-            ])
+jar_library(
+    name = "protobuf-test-import",
+    jars = [
+        jar(
+            name = "protolib-test",
+            org = "com.squareup.testing.protolib",
+            rev = "1.0.1",
+        ),
+    ],
+)
 
-jar_library(name='log4j',
-            jars = [
-              jar(org='log4j', name='log4j', rev='1.2.15',
-                  excludes=[
-                    exclude(org='jline', name='jline'),
-                    exclude(org='javax.jms', name='jms'),
-                    exclude(org='com.sun.jdmk', name='jmxtools'),
-                    exclude(org='com.sun.jmx', name='jmxri'),
-                  ])
-            ])
+jar_library(
+    name = "scrooge-core",
+    jars = [
+        # used by scrooge-generator in BUILD.tools:scrooge-gen
+        scala_jar(
+            name = "scrooge-core",
+            org = "com.twitter",
+            rev = "3.20.0",
+        ),
+    ],
+)
 
-jar_library(name='protobuf-2.4.1',
-            jars = [
-              jar(org='com.google.protobuf', name='protobuf-java', rev='2.4.1'),
-            ],
-            # javac requires protobuf to be present in order to compile the MessageBuilders API.
-            scope='forced',)
+jar_library(
+    name = "shapeless",
+    jars = [
+        scala_jar(
+            name = "shapeless",
+            org = "com.chuusai",
+            rev = "2.2.5",
+        ),
+    ],
+)
 
-target(name='protobuf-java', dependencies = [':protobuf-2.4.1'])
-
-jar_library(name='protobuf-test-import',
-            jars = [
-              jar(org='com.squareup.testing.protolib', name='protolib-test', rev='1.0.1'),
-            ])
-
-jar_library(name='scrooge-core',
-            jars = [
-              # used by scrooge-generator in BUILD.tools:scrooge-gen
-              scala_jar(org='com.twitter', name='scrooge-core', rev='3.20.0'),
-            ])
-
-jar_library(name='shapeless',
-            jars=[
-              scala_jar(org='com.chuusai', name='shapeless', rev='2.2.5'),
-            ])
-
-jar_library(name='slf4j-api',
-            jars = [
-              jar(org='org.slf4j', name='slf4j-api', rev='1.6.1'),
-            ])
+jar_library(
+    name = "slf4j-api",
+    jars = [
+        jar(
+            name = "slf4j-api",
+            org = "org.slf4j",
+            rev = "1.6.1",
+        ),
+    ],
+)
 
 # NB: we have two versions of thrift here due to scrooge requiring one version while apache
 # thrift requires another. This is not usually recommended.
-jar_library(name='libthrift-0.9.2',
-            jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.9.2')
-            ],
-            # javac uses undeclared types to build the MessageBuilder API.
-            scope='forced',)
+jar_library(
+    name = "libthrift-0.9.2",
+    jars = [
+        jar(
+            name = "libthrift",
+            org = "org.apache.thrift",
+            rev = "0.9.2",
+        ),
+    ],
+    # javac uses undeclared types to build the MessageBuilder API.
+    scope = "forced",
+)
 
-target(name='thrift-0.9.2', dependencies = [':libthrift-0.9.2'])
+target(
+    name = "thrift-0.9.2",
+    dependencies = [":libthrift-0.9.2"],
+)
 
-jar_library(name='libthrift-0.6.1',
-            jars = [
-              jar(org='org.apache.thrift', name='libthrift', rev='0.6.1')
-            ])
+jar_library(
+    name = "libthrift-0.6.1",
+    jars = [
+        jar(
+            name = "libthrift",
+            org = "org.apache.thrift",
+            rev = "0.6.1",
+        ),
+    ],
+)
 
-target(name='thrift-0.6.1',
-       dependencies = [
-         ':commons-lang',
-         ':libthrift-0.6.1',
-         ':slf4j-api',
-       ])
-
+target(
+    name = "thrift-0.6.1",
+    dependencies = [
+        ":commons-lang",
+        ":libthrift-0.6.1",
+        ":slf4j-api",
+    ],
+)
 
 ###############
 # Test support
 #
 
-jar_library(name='easymock',
-            jars=[
-              jar('org.easymock', 'easymock', '3.4')
-            ])
+jar_library(
+    name = "easymock",
+    jars = [
+        jar("org.easymock", "easymock", "3.4"),
+    ],
+)
 
-jar_library(name='gson',
-            jars = [
-              jar(org='com.google.code.gson', name='gson', rev='2.3.1')
-            ])
+jar_library(
+    name = "gson",
+    jars = [
+        jar(
+            name = "gson",
+            org = "com.google.code.gson",
+            rev = "2.3.1",
+        ),
+    ],
+)
 
-jar_library(name='guava-testlib',
-            jars=[
-              jar('com.google.guava', 'guava-testlib', '18.0')
-            ])
+jar_library(
+    name = "guava-testlib",
+    jars = [
+        jar("com.google.guava", "guava-testlib", "18.0"),
+    ],
+)
 
-jar_library(name='junit',
-            jars=[
-              jar('junit', 'junit', '4.12')
-            ],
-            # junit is frequently used only for its annotations.
-            scope='forced',)
+jar_library(
+    name = "junit",
+    jars = [
+        jar("junit", "junit", "4.12"),
+    ],
+    # junit is frequently used only for its annotations.
+    scope = "forced",
+)
 
-jar_library(name='scalatest',
-            jars=[
-              scala_jar('org.scalatest', 'scalatest', '3.0.0')
-            ])
+jar_library(
+    name = "scalatest",
+    jars = [
+        scala_jar("org.scalatest", "scalatest", "3.0.0"),
+    ],
+)
 
-jar_library(name='wire-runtime',
-            jars=[
-              jar(org='com.squareup.wire', name='wire-runtime', rev='1.8.0'),
-            ],
-            # javac uses undeclared types to build the MessageBuilder API.
-            scope='forced',)
+jar_library(
+    name = "wire-runtime",
+    jars = [
+        jar(
+            name = "wire-runtime",
+            org = "com.squareup.wire",
+            rev = "1.8.0",
+        ),
+    ],
+    # javac uses undeclared types to build the MessageBuilder API.
+    scope = "forced",
+)

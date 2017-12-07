@@ -3,16 +3,15 @@
 
 # see test_idea_integration.py
 java_library(
-  name='code',
-  sources = ['ResourcesAndCode.java'],
-  dependencies=[
-      ':readme',
-      'testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource',
-   ],
+    name = "code",
+    sources = ["ResourcesAndCode.java"],
+    dependencies = [
+        ":readme",
+        "testprojects/src/resources/org/pantsbuild/testproject/ideacodeandresources:resource",
+    ],
 )
 
 resources(
-  name='readme',
-  sources=['README.md'],
+    name = "readme",
+    sources = ["README.md"],
 )
-

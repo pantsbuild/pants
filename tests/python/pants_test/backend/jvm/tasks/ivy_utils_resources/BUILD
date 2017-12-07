@@ -1,1 +1,1 @@
-files(sources=globs('*.xml'))
+files(sources = globs("*.xml"))

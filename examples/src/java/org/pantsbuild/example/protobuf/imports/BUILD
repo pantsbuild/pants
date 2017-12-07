@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  basename='protobuf-imports-example',
-  dependencies=[
-    'examples/src/protobuf/org/pantsbuild/example/imports',
-    '3rdparty:protobuf-java',
-  ],
-  source='ExampleProtobufImports.java',
-  main='org.pantsbuild.example.protobuf.imports.ExampleProtobufImports',
+    basename = "protobuf-imports-example",
+    main = "org.pantsbuild.example.protobuf.imports.ExampleProtobufImports",
+    source = "ExampleProtobufImports.java",
+    dependencies = [
+        "3rdparty:protobuf-java",
+        "examples/src/protobuf/org/pantsbuild/example/imports",
+    ],
 )

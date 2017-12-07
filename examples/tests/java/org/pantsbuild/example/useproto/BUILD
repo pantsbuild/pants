@@ -4,10 +4,10 @@
 # Tests functionality of protoc generating java code.
 
 junit_tests(
-  sources=['UseProtoTest.java',],
-  dependencies=[
-    '3rdparty:junit',
-    '3rdparty:protobuf-java',
-    'examples/src/protobuf/org/pantsbuild/example/distance',
-  ],
+    sources = ["UseProtoTest.java"],
+    dependencies = [
+        "3rdparty:junit",
+        "3rdparty:protobuf-java",
+        "examples/src/protobuf/org/pantsbuild/example/distance",
+    ],
 )

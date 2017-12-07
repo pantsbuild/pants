@@ -1,47 +1,47 @@
 scala_library(
-  name='A',
-  sources = ['A.scala'],
+    name = "A",
+    sources = ["A.scala"],
 )
 
 scala_library(
-  name='B',
-  sources = ['B.scala'],
-  dependencies=[':A'],
-  exports=[':A'],
-  strict_deps=True,
+    name = "B",
+    sources = ["B.scala"],
+    strict_deps = True,
+    dependencies = [":A"],
+    exports = [":A"],
 )
 
 scala_library(
-  name='C',
-  sources = ['C.scala'],
-  dependencies=[':B'],
-  exports=[':B'],
-  strict_deps=True,
+    name = "C",
+    sources = ["C.scala"],
+    strict_deps = True,
+    dependencies = [":B"],
+    exports = [":B"],
 )
 
 scala_library(
-  name='D',
-  sources = ['D.scala'],
-  dependencies=[':C'],
-  strict_deps=True,
+    name = "D",
+    sources = ["D.scala"],
+    strict_deps = True,
+    dependencies = [":C"],
 )
 
 target(
-  name='TB',
-  dependencies=[':B'],
+    name = "TB",
+    dependencies = [":B"],
 )
 
 scala_library(
-  name='TC',
-  sources = ['C.scala'],
-  dependencies=[':TB'],
-  exports=[':TB'],
-  strict_deps=True,
+    name = "TC",
+    sources = ["C.scala"],
+    strict_deps = True,
+    dependencies = [":TB"],
+    exports = [":TB"],
 )
 
 scala_library(
-  name='TD',
-  sources = ['D.scala'],
-  dependencies=[':TC'],
-  strict_deps=True,
+    name = "TD",
+    sources = ["D.scala"],
+    strict_deps = True,
+    dependencies = [":TC"],
 )

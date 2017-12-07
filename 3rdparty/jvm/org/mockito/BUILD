@@ -2,8 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jar_library(
-  name='mockito-core',
-  jars=[
-    jar(org='org.mockito', name='mockito-core', rev='2.7.21'),
-  ],
+    name = "mockito-core",
+    jars = [
+        jar(
+            name = "mockito-core",
+            org = "org.mockito",
+            rev = "2.7.21",
+        ),
+    ],
 )

@@ -2,5 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 resources(
-  sources=['org/pantsbuild/duplicates/textfile.txt'],
+    sources = ["org/pantsbuild/duplicates/textfile.txt"],
 )

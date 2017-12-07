@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 jvm_binary(
-  basename='jaxb-example',
-  dependencies=[
-    'examples/src/java/org/pantsbuild/example/jaxb/reader',
-    'examples/src/resources/org/pantsbuild/example/jaxb',
-  ],
-  source='ExampleJaxb.java',
-  main='org.pantsbuild.example.jaxb.main.ExampleJaxb',
+    basename = "jaxb-example",
+    main = "org.pantsbuild.example.jaxb.main.ExampleJaxb",
+    source = "ExampleJaxb.java",
+    dependencies = [
+        "examples/src/java/org/pantsbuild/example/jaxb/reader",
+        "examples/src/resources/org/pantsbuild/example/jaxb",
+    ],
 )

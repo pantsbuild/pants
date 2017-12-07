@@ -4,11 +4,11 @@
 # Demonstrates compiling code with a unicode classes
 
 jvm_binary(
-  basename = 'unicode-testproject',
-  dependencies = [
-    'testprojects/src/java/org/pantsbuild/testproject/unicode/cucumber',
-    'testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless',
-  ],
-  source = 'CucumberMain.java',
-  main = 'org.pantsbuild.testproject.unicode.main.CucumberMain',
+    basename = "unicode-testproject",
+    main = "org.pantsbuild.testproject.unicode.main.CucumberMain",
+    source = "CucumberMain.java",
+    dependencies = [
+        "testprojects/src/java/org/pantsbuild/testproject/unicode/cucumber",
+        "testprojects/src/scala/org/pantsbuild/testproject/unicode/shapeless",
+    ],
 )

@@ -6,29 +6,34 @@
 # Note that the target has no explicit name, so it defaults to the name
 # of the directory, in this case 'main'.
 jvm_app(
-  basename = 'hello-example',
-  dependencies = [
-    ':main-bin'
-  ],
-  bundles = [
-    bundle(relative_to='config', fileset=globs('config/*'))
-  ]
+    basename = "hello-example",
+    bundles = [
+        bundle(
+            fileset = globs("config/*"),
+            relative_to = "config",
+        ),
+    ],
+    dependencies = [
+        ":main-bin",
+    ],
 )
 
 # The binary, the "runnable" part:
 
-jvm_binary(name = 'main-bin',
-  dependencies = [
-    'examples/src/java/org/pantsbuild/example/hello/greet',
-    'examples/src/resources/org/pantsbuild/example/hello',
-  ],
-  source = 'HelloMain.java',
-  main = 'org.pantsbuild.example.hello.main.HelloMain',
-  basename = 'hello-example',
+jvm_binary(
+    name = "main-bin",
+    basename = "hello-example",
+    main = "org.pantsbuild.example.hello.main.HelloMain",
+    source = "HelloMain.java",
+    dependencies = [
+        "examples/src/java/org/pantsbuild/example/hello/greet",
+        "examples/src/resources/org/pantsbuild/example/hello",
+    ],
 )
 
 # README page:
 
-page(name="readme",
-  source="README.md")
-
+page(
+    name = "readme",
+    source = "README.md",
+)

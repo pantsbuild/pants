@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 junit_tests(
-  sources=['HtmlReportTest.java'],
-  dependencies=[
-    '3rdparty:junit'
-  ],
+    sources = ["HtmlReportTest.java"],
+    dependencies = [
+        "3rdparty:junit",
+    ],
 )

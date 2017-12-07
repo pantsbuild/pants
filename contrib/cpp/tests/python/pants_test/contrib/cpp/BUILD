@@ -3,27 +3,27 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name='cpp_integration',
-  sources=[
-    'test_cpp_integration.py'
-  ],
-  dependencies=[
-    'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-  tags={'integration'},
+    name = "cpp_integration",
+    sources = [
+        "test_cpp_integration.py",
+    ],
+    tags = {"integration"},
+    dependencies = [
+        "contrib/cpp/src/python/pants/contrib/cpp/toolchain",
+        "src/python/pants/util:contextutil",
+        "tests/python/pants_test:int-test",
+    ],
 )
 
 python_tests(
-  name='cpp_toolchain',
-  sources=[
-    'test_cpp_toolchain.py',
-  ],
-  dependencies=[
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'contrib/cpp/src/python/pants/contrib/cpp/toolchain:toolchain',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-  ],
+    name = "cpp_toolchain",
+    sources = [
+        "test_cpp_toolchain.py",
+    ],
+    dependencies = [
+        "3rdparty/python/twitter/commons:twitter.common.collections",
+        "contrib/cpp/src/python/pants/contrib/cpp/toolchain",
+        "src/python/pants/util:contextutil",
+        "src/python/pants/util:dirutil",
+    ],
 )

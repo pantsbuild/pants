@@ -2,12 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_wire_library(
-  sources=[
-    # Order matters here.
-    'elements.proto',
-    'compound.proto',
-  ],
-  dependencies=[
-    'examples/src/wire/org/pantsbuild/example/temperature',
-  ],
+    sources = [
+        # Order matters here.
+        "elements.proto",
+        "compound.proto",
+    ],
+    dependencies = [
+        "examples/src/wire/org/pantsbuild/example/temperature",
+    ],
 )

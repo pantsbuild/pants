@@ -3,15 +3,14 @@
 
 # see test_idea_integration.py
 java_library(
-  name='lib',
-  sources = ['LibraryExample.java'],
+    name = "lib",
+    sources = ["LibraryExample.java"],
 )
 
 junit_tests(
-  name='test',
-  sources = ['TestExample.java'],
-  dependencies = [
-    '3rdparty:junit',
-  ]
+    name = "test",
+    sources = ["TestExample.java"],
+    dependencies = [
+        "3rdparty:junit",
+    ],
 )
-

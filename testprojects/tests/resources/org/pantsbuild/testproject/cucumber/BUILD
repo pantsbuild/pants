@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 resources(
-  sources=[
-    'badnames.feature',
-    'demo.feature',
-  ],
+    sources = [
+        "badnames.feature",
+        "demo.feature",
+    ],
 )

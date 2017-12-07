@@ -7,49 +7,54 @@
 # just reference their Shadow counterparts, to demonstrate what happens when the Shadow class does
 # not match up with what the Common class expects.
 
-jvm_binary(name='one',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
-  main='org.pantsbuild.testproject.provided_patching.UseShadow',
-  dependencies=[
-    'testprojects/maven_layout/provided_patching/two/src/main/java:common',
-    'testprojects/maven_layout/provided_patching/one/src/main/java:shadow',
-  ],
+jvm_binary(
+    name = "one",
+    main = "org.pantsbuild.testproject.provided_patching.UseShadow",
+    source = "src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java",
+    dependencies = [
+        "testprojects/maven_layout/provided_patching/one/src/main/java:shadow",
+        "testprojects/maven_layout/provided_patching/two/src/main/java:common",
+    ],
 )
 
-jvm_binary(name='two',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
-  main='org.pantsbuild.testproject.provided_patching.UseShadow',
-  dependencies=[
-    'testprojects/maven_layout/provided_patching/three/src/main/java:common',
-    'testprojects/maven_layout/provided_patching/two/src/main/java:shadow',
-  ],
+jvm_binary(
+    name = "two",
+    main = "org.pantsbuild.testproject.provided_patching.UseShadow",
+    source = "src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java",
+    dependencies = [
+        "testprojects/maven_layout/provided_patching/three/src/main/java:common",
+        "testprojects/maven_layout/provided_patching/two/src/main/java:shadow",
+    ],
 )
 
-jvm_binary(name='three',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
-  main='org.pantsbuild.testproject.provided_patching.UseShadow',
-  dependencies=[
-    'testprojects/maven_layout/provided_patching/one/src/main/java:common',
-    'testprojects/maven_layout/provided_patching/three/src/main/java:shadow',
-  ],
+jvm_binary(
+    name = "three",
+    main = "org.pantsbuild.testproject.provided_patching.UseShadow",
+    source = "src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java",
+    dependencies = [
+        "testprojects/maven_layout/provided_patching/one/src/main/java:common",
+        "testprojects/maven_layout/provided_patching/three/src/main/java:shadow",
+    ],
 )
 
-jvm_binary(name='fail',
-  source='src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java',
-  main='org.pantsbuild.testproject.provided_patching.UseShadow',
-  dependencies=[
-    'testprojects/maven_layout/provided_patching/one/src/main/java:common',
-  ],
+jvm_binary(
+    name = "fail",
+    main = "org.pantsbuild.testproject.provided_patching.UseShadow",
+    source = "src/main/java/org/pantsbuild/testproject/provided_patching/UseShadow.java",
+    dependencies = [
+        "testprojects/maven_layout/provided_patching/one/src/main/java:common",
+    ],
 )
 
-junit_tests(name='test',
-  sources=[
-    'src/test/java/org/pantsbuild/testproject/provided_patching/ShadowTest.java',
-  ],
-  dependencies=[
-    '3rdparty:junit',
-    'testprojects/maven_layout/provided_patching/one/src/main/java:common',
-    'testprojects/maven_layout/provided_patching/three/src/main/java:common',
-    provided('testprojects/maven_layout/provided_patching/two/src/main/java:shadow'),
-  ],
+junit_tests(
+    name = "test",
+    sources = [
+        "src/test/java/org/pantsbuild/testproject/provided_patching/ShadowTest.java",
+    ],
+    dependencies = [
+        "3rdparty:junit",
+        "testprojects/maven_layout/provided_patching/one/src/main/java:common",
+        "testprojects/maven_layout/provided_patching/three/src/main/java:common",
+        provided("testprojects/maven_layout/provided_patching/two/src/main/java:shadow"),
+    ],
 )

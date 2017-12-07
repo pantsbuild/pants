@@ -4,7 +4,7 @@
 #  Example of annotation_processor() target
 
 java_library(
-  sources=['Example.java'],
-  # Is used by an annotation processor.
-  scope='compile',
+    sources = ["Example.java"],
+    # Is used by an annotation processor.
+    scope = "compile",
 )

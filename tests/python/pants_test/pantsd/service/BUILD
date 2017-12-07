@@ -2,31 +2,31 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'pants_service',
-  sources = ['test_pants_service.py'],
-  coverage = ['pants.pantsd.service.pants_service'],
-  dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:pants_service'
-  ]
+    name = "pants_service",
+    sources = ["test_pants_service.py"],
+    coverage = ["pants.pantsd.service.pants_service"],
+    dependencies = [
+        "src/python/pants/pantsd/service:pants_service",
+        "tests/python/pants_test/pantsd:test_deps",
+    ],
 )
 
 python_tests(
-  name = 'fs_event_service',
-  sources = ['test_fs_event_service.py'],
-  coverage = ['pants.pantsd.service.fs_event_service'],
-  dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:fs_event_service'
-  ]
+    name = "fs_event_service",
+    sources = ["test_fs_event_service.py"],
+    coverage = ["pants.pantsd.service.fs_event_service"],
+    dependencies = [
+        "src/python/pants/pantsd/service:fs_event_service",
+        "tests/python/pants_test/pantsd:test_deps",
+    ],
 )
 
 python_tests(
-  name = 'pailgun_service',
-  sources = ['test_pailgun_service.py'],
-  coverage = ['pants.pantsd.service.pailgun_service'],
-  dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:pailgun_service'
-  ]
+    name = "pailgun_service",
+    sources = ["test_pailgun_service.py"],
+    coverage = ["pants.pantsd.service.pailgun_service"],
+    dependencies = [
+        "src/python/pants/pantsd/service:pailgun_service",
+        "tests/python/pants_test/pantsd:test_deps",
+    ],
 )

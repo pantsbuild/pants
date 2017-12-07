@@ -2,14 +2,14 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 contrib_plugin(
-  name='plugin',
-  dependencies=[
-    'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks:python',
-    'contrib/python/src/python/pants/contrib/python/checks/tasks2',
-    'src/python/pants/goal:task_registrar',
-  ],
-  distribution_name='pantsbuild.pants.contrib.python.checks',
-  description='Additional python lints and checks.',
-  register_goals=True,
+    name = "plugin",
+    description = "Additional python lints and checks.",
+    distribution_name = "pantsbuild.pants.contrib.python.checks",
+    register_goals = True,
+    dependencies = [
+        "contrib/python/src/python/pants/contrib/python/checks/tasks:python",
+        "contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all",
+        "contrib/python/src/python/pants/contrib/python/checks/tasks2",
+        "src/python/pants/goal:task_registrar",
+    ],
 )

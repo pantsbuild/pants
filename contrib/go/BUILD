@@ -2,6 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 page(
-  name='go_readme',
-  source='README.md',
+    name = "go_readme",
+    source = "README.md",
 )

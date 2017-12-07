@@ -2,50 +2,50 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 contrib_plugin(
-  name='plugin',
-  dependencies=[
-    'contrib/android/src/python/pants/contrib/android/targets:android',
-    'contrib/android/src/python/pants/contrib/android/tasks:all',
-    'src/python/pants/build_graph',
-    'src/python/pants/goal:task_registrar',
-  ],
-  distribution_name='pantsbuild.pants.contrib.android',
-  description='Android Pants plugin',
-  additional_classifiers=[
-    'Topic :: Software Development :: Code Generators'
-  ],
-  build_file_aliases=True,
-  register_goals=True,
+    name = "plugin",
+    additional_classifiers = [
+        "Topic :: Software Development :: Code Generators",
+    ],
+    build_file_aliases = True,
+    description = "Android Pants plugin",
+    distribution_name = "pantsbuild.pants.contrib.android",
+    register_goals = True,
+    dependencies = [
+        "contrib/android/src/python/pants/contrib/android/targets:android",
+        "contrib/android/src/python/pants/contrib/android/tasks:all",
+        "src/python/pants/build_graph",
+        "src/python/pants/goal:task_registrar",
+    ],
 )
 
 python_library(
-  name='android_config_util',
-  sources =['android_config_util.py'],
-  dependencies=[
-    'src/python/pants/util:dirutil',
-  ]
+    name = "android_config_util",
+    sources = ["android_config_util.py"],
+    dependencies = [
+        "src/python/pants/util:dirutil",
+    ],
 )
 
 python_library(
-  name='android_distribution',
-  sources=['distribution/android_distribution.py'],
-  dependencies=[
-    'src/python/pants/util:dirutil',
-  ]
+    name = "android_distribution",
+    sources = ["distribution/android_distribution.py"],
+    dependencies = [
+        "src/python/pants/util:dirutil",
+    ],
 )
 
 python_library(
-  name='keystore_resolver',
-  sources=['keystore/keystore_resolver.py'],
-  dependencies=[
-    'src/python/pants/option',
-  ]
+    name = "keystore_resolver",
+    sources = ["keystore/keystore_resolver.py"],
+    dependencies = [
+        "src/python/pants/option",
+    ],
 )
 
 python_library(
-  name='android_manifest_parser',
-  sources =['android_manifest_parser.py'],
-  dependencies=[
-    'src/python/pants/util:xml_parser',
-  ]
+    name = "android_manifest_parser",
+    sources = ["android_manifest_parser.py"],
+    dependencies = [
+        "src/python/pants/util:xml_parser",
+    ],
 )

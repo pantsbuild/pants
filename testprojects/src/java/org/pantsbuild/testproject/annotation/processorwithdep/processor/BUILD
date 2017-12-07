@@ -4,17 +4,21 @@
 #  annotation_processor() target to test generating java code
 
 annotation_processor(
-  sources = globs('*.java'),
-  processors = ['org.pantsbuild.testproject.annotation.processorwithdep.processor.ProcessorWithDep'],
-  dependencies = [
-    'testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep/hellomaker',
-    ':javapoet',
-  ],
+    sources = globs("*.java"),
+    processors = ["org.pantsbuild.testproject.annotation.processorwithdep.processor.ProcessorWithDep"],
+    dependencies = [
+        ":javapoet",
+        "testprojects/src/java/org/pantsbuild/testproject/annotation/processorwithdep/hellomaker",
+    ],
 )
 
 jar_library(
-  name = 'javapoet',
-  jars = [
-    jar(org='com.squareup', name='javapoet', rev='1.2.0'),
-  ],
+    name = "javapoet",
+    jars = [
+        jar(
+            name = "javapoet",
+            org = "com.squareup",
+            rev = "1.2.0",
+        ),
+    ],
 )

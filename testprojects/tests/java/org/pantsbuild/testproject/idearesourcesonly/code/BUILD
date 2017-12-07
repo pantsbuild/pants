@@ -3,9 +3,9 @@
 
 # see test_idea_integration.py
 junit_tests(
-  sources=['TestCode.java'],
-  dependencies=[
-    '3rdparty:junit',
-    'testprojects/tests/resources/org/pantsbuild/testproject/idearesourcesonly:resource',
-  ],
+    sources = ["TestCode.java"],
+    dependencies = [
+        "3rdparty:junit",
+        "testprojects/tests/resources/org/pantsbuild/testproject/idearesourcesonly:resource",
+    ],
 )

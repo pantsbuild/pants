@@ -3,15 +3,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 android_binary(
-  sources=rglobs('src/*.java'),
-  manifest='AndroidManifest.xml',
-  dependencies = [
-    ':resources',
-  ],
+    sources = rglobs("src/*.java"),
+    manifest = "AndroidManifest.xml",
+    dependencies = [
+        ":resources",
+    ],
 )
 
 android_resources(
-  name='resources',
-  manifest='AndroidManifest.xml',
-  resource_dir='res'
+    name = "resources",
+    manifest = "AndroidManifest.xml",
+    resource_dir = "res",
 )

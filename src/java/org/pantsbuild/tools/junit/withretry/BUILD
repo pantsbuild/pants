@@ -2,16 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-  provides=artifact(
-    org='org.pantsbuild',
-    name='junit-runner-withretry',
-    repo=public,
-    publication_metadata=pants_library("""
+    platform = "java7",
+    provides = artifact(
+        name = "junit-runner-withretry",
+        org = "org.pantsbuild",
+        publication_metadata = pants_library("""
       Provides an org.junit.runner.Runner that supports retries of failing tests.
-    """)
-  ),
-  dependencies=[
-    '3rdparty:junit',
-  ],
-  platform='java7',
+    """),
+        repo = public,
+    ),
+    dependencies = [
+        "3rdparty:junit",
+    ],
 )

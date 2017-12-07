@@ -2,13 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  dependencies=[
-    ':text',
-  ],
-  sources=globs('*.py'),
+    sources = globs("*.py"),
+    dependencies = [
+        ":text",
+    ],
 )
 
 resources(
-  name='text',
-  sources=globs('*.txt'),
+    name = "text",
+    sources = globs("*.txt"),
 )

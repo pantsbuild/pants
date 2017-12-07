@@ -1,3 +1,3 @@
 resources(
-  sources=['world.txt'],
+    sources = ["world.txt"],
 )
