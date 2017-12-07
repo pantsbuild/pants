@@ -16,6 +16,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug)]
 enum ExitCode {
@@ -144,7 +145,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store = {
     let store_result = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        Store::backfills_from_remote(store_dir, pool.clone(), cas_address.to_owned())
+        Store::backfills_from_remote(
+          store_dir,
+          pool.clone(),
+          cas_address.to_owned(),
+          1,
+          10 * 1024 * 1024,
+          Duration::from_secs(30),
+        )
       }
       None => Store::local_only(store_dir, pool.clone()),
     };
