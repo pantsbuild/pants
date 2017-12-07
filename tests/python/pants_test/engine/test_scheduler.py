@@ -56,7 +56,7 @@ class SchedulerTest(unittest.TestCase):
     """Execute the given request and return roots as a list of ((subject, product), value) tuples."""
     result = self.scheduler.execute(build_request)
     self.assertIsNone(result.error)
-    return self.scheduler.root_entries(build_request)
+    return result.root_products
 
   def request(self, goals, *subjects):
     return self.scheduler.build_request(goals=goals, subjects=subjects)
@@ -221,7 +221,7 @@ class SchedulerTest(unittest.TestCase):
 
     with temporary_dir() as td:
       output_path = os.path.join(td, 'output.dot')
-      self.scheduler.visualize_graph_to_file(output_path)
+      self.scheduler.visualize_graph_to_file(build_request, output_path)
       with open(output_path, 'rb') as fh:
         graphviz_output = fh.read().strip()
 
@@ -255,11 +255,12 @@ class SchedulerTraceTest(unittest.TestCase):
     ]
 
     scheduler = create_native_scheduler(rules)
+    request = scheduler._native.new_execution_request()
     subject = B()
-    scheduler.add_root_selection(subject, A)
-    scheduler.run_and_return_stat()
+    scheduler.add_root_selection(request, subject, A)
+    _ = scheduler.run_and_return_roots(request)
 
-    trace = '\n'.join(scheduler.graph_trace())
+    trace = '\n'.join(scheduler.graph_trace(request))
     # NB removing location info to make trace repeatable
     trace = remove_locations_from_traceback(trace)
 

@@ -60,20 +60,15 @@ class SchedulerTestBase(object):
                           self._native,
                           include_trace_on_error=include_trace_on_error)
 
-  def execute_request(self, scheduler, product, *subjects):
-    """Creates, runs, and returns an ExecutionRequest for the given product and subjects."""
-    request = scheduler.execution_request([product], subjects)
-    res = scheduler.execute(request)
-    if res.error:
-      raise res.error
-    return request
-
   def execute(self, scheduler, product, *subjects):
     """Runs an ExecutionRequest for the given product and subjects, and returns the result value."""
-    request = self.execute_request(scheduler, product, *subjects)
-    states = [state for _, state in scheduler.root_entries(request)]
+    request = scheduler.execution_request([product], subjects)
+    result = scheduler.execute(request)
+    if result.error:
+      raise result.error
+    states = [state for _, state in result.root_products]
     if any(type(state) is not Return for state in states):
       with temporary_file_path(cleanup=False, suffix='.dot') as dot_file:
-        scheduler.visualize_graph_to_file(dot_file)
+        scheduler.visualize_graph_to_file(request, dot_file)
         raise ValueError('At least one request failed: {}. Visualized as {}'.format(states, dot_file))
     return list(state.value for state in states)

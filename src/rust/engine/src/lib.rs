@@ -394,7 +394,7 @@ pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
 pub extern "C" fn graph_visualize(
   scheduler_ptr: *mut Scheduler,
   execution_request_ptr: *mut ExecutionRequest,
-  path_ptr: *const raw::c_char
+  path_ptr: *const raw::c_char,
 ) {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
@@ -402,9 +402,11 @@ pub extern "C" fn graph_visualize(
       let path = PathBuf::from(path_str);
       // TODO: This should likely return an error condition to python.
       //   see https://github.com/pantsbuild/pants/issues/4025
-      scheduler.visualize(execution_request, path.as_path()).unwrap_or_else(|e| {
-        println!("Failed to visualize to {}: {:?}", path.display(), e);
-      });
+      scheduler
+        .visualize(execution_request, path.as_path())
+        .unwrap_or_else(|e| {
+          println!("Failed to visualize to {}: {:?}", path.display(), e);
+        });
     })
   })
 }
@@ -413,15 +415,17 @@ pub extern "C" fn graph_visualize(
 pub extern "C" fn graph_trace(
   scheduler_ptr: *mut Scheduler,
   execution_request_ptr: *mut ExecutionRequest,
-  path_ptr: *const raw::c_char
+  path_ptr: *const raw::c_char,
 ) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
-      scheduler.trace(execution_request, path.as_path()).unwrap_or_else(|e| {
-        println!("Failed to write trace to {}: {:?}", path.display(), e);
-      });
+      scheduler
+        .trace(execution_request, path.as_path())
+        .unwrap_or_else(|e| {
+          println!("Failed to write trace to {}: {:?}", path.display(), e);
+        });
     });
   });
 }

@@ -277,12 +277,10 @@ class WrappedNativeScheduler(object):
     self._native.lib.scheduler_pre_fork(self._scheduler)
 
   def run_and_return_roots(self, execution_request):
-    raw_roots = self._native.lib.execution_execute(self._scheduler, execution_request.native)
+    raw_roots = self._native.lib.execution_execute(self._scheduler, execution_request)
     try:
       roots = []
-      for root, raw_root in zip(execution_request.roots,
-                                self._native.unpack(raw_roots.nodes_ptr,
-                                                    raw_roots.nodes_len)):
+      for raw_root in self._native.unpack(raw_roots.nodes_ptr, raw_roots.nodes_len):
         if raw_root.state_tag is 1:
           state = Return(self._from_value(raw_root.state_value))
         elif raw_root.state_tag in (2, 3, 4):
@@ -290,7 +288,7 @@ class WrappedNativeScheduler(object):
         else:
           raise ValueError(
             'Unrecognized State type `{}` on: {}'.format(raw_root.state_tag, raw_root))
-        roots.append((root, state))
+        roots.append(state)
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
@@ -416,7 +414,8 @@ class LocalScheduler(object):
     scheduling thread.
     """
     start_time = time.time()
-    roots = self._scheduler.run_and_return_roots(execution_request)
+    roots = zip(execution_request.roots,
+                self._scheduler.run_and_return_roots(execution_request.native))
 
     if self._scheduler.visualize_to_dir() is not None:
       name = 'run.{}.dot'.format(self._run_count)

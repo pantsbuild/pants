@@ -44,9 +44,7 @@ pub struct Scheduler {
 
 impl Scheduler {
   pub fn new(core: Core) -> Scheduler {
-    Scheduler {
-      core: Arc::new(core),
-    }
+    Scheduler { core: Arc::new(core) }
   }
 
   pub fn visualize(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
@@ -60,7 +58,12 @@ impl Scheduler {
     Ok(())
   }
 
-  pub fn add_root_select(&self, request: &mut ExecutionRequest, subject: Key, product: TypeConstraint) {
+  pub fn add_root_select(
+    &self,
+    request: &mut ExecutionRequest,
+    subject: Key,
+    product: TypeConstraint,
+  ) {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
       selectors::Selector::Select(selectors::Select::without_variant(product)),
@@ -115,7 +118,7 @@ impl Scheduler {
         .create(root.clone(), &core)
         .or_else(move |e| match e {
           Failure::Invalidated => Scheduler::create(core, root, count - 1),
-          x => future::err(x).to_boxed()
+          x => future::err(x).to_boxed(),
         })
         .to_boxed()
     }
@@ -124,7 +127,10 @@ impl Scheduler {
   ///
   /// Compute the results for roots in the given request.
   ///
-  pub fn execute<'e>(&mut self, request: &'e ExecutionRequest) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
+  pub fn execute<'e>(
+    &mut self,
+    request: &'e ExecutionRequest,
+  ) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
     // Bootstrap tasks for the roots, and then wait for all of them.
     externs::log(
       LogLevel::Debug,
@@ -155,13 +161,7 @@ impl Scheduler {
       .roots
       .iter()
       .zip(results.into_iter())
-      .map(|(s, r)| {
-        (
-          &s.subject,
-          &s.selector.product,
-          r,
-        )
-      })
+      .map(|(s, r)| (&s.subject, &s.selector.product, r))
       .collect()
   }
 }
