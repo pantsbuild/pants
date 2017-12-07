@@ -98,12 +98,10 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
       # Using the fetch pattern should result in the same export information.
       self.assertEqual(first_export_result.stdout_data, second_export_result.stdout_data)
-      # TODO(wisechengyi): this assertion is likely incorrect because the second run
-      # should be validated and should not trigger any ivy resolve or fetch action.
-      # ---- old comment ----
+
       # The second run uses the cached resolution information from the first resolve, and
       # generates a fetch ivy.xml.
-      # self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
+      self.assertIn('fetch-ivy.xml', os.listdir(resolve_workdir))
 
   def test_generates_no_report_if_no_resolve_performed(self):
     with temporary_dir() as ivy_report_dir:
