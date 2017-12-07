@@ -103,6 +103,25 @@ class ListGoalsTest(ConsoleTaskTestBase):
     self.assertIn('foo', ctx.exception.message)
     self.assertIn(self._LIST_GOALS_NAME, ctx.exception.message)
 
+  def test_register_duplicate_task_name_is_not_error_when_replacing(self):
+    Goal.clear()
+
+    class NoopTask(Task):
+      def execute(self):
+        pass
+
+    class OtherNoopTask(Task):
+      def execute(self):
+        pass
+
+    goal = Goal.register(self._LIST_GOALS_NAME, self._LIST_GOALS_DESC)
+    task_name = 'foo'
+    goal.install(TaskRegistrar(task_name, NoopTask))
+    goal.install(TaskRegistrar(task_name, OtherNoopTask), replace=True)
+
+    self.assertIsInstance(OtherNoopTask, goal.task_type_by_name(task_name))
+
+
   # TODO(John Sirois): Re-enable when fixing up ListGoals `--graph` in
   # https://github.com/pantsbuild/pants/issues/918
   @expectedFailure
