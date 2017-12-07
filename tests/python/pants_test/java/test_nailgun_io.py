@@ -58,7 +58,7 @@ class TestNailgunStreamWriter(unittest.TestCase):
   def test_run_stop_on_error(self, mock_select):
     mock_select.return_value = ([], [], [self.in_file])
     self.writer.run()
-    self.assertTrue(self.writer.is_stopped)
+    self.assertFalse(self.writer.is_alive())
     self.assertEquals(mock_select.call_count, 1)
 
   @mock.patch('os.read')
@@ -77,18 +77,16 @@ class TestNailgunStreamWriter(unittest.TestCase):
     # Exercise NailgunStreamWriter.running() and .run() simultaneously.
     inc = 0
     with self.writer.running():
-      while not self.writer.is_stopped:
+      while self.writer.is_alive():
         time.sleep(0.01)
         inc += 1
         if inc >= 1000:
           raise Exception('waited too long.')
 
-    self.assertTrue(self.writer.is_stopped)
+    self.assertFalse(self.writer.is_alive())
 
     mock_read.assert_called_with(-1, io.DEFAULT_BUFFER_SIZE)
     self.assertEquals(mock_read.call_count, 2)
-
-    self.mock_socket.shutdown.assert_called_once_with(socket.SHUT_WR)
 
     mock_writer.assert_has_calls([
       mock.call(mock.ANY, ChunkType.STDIN, b'A' * 300),

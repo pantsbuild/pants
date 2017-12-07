@@ -38,7 +38,8 @@ class PantsDaemonMonitor(ProcessManager):
 
   def assert_stopped(self):
     self._log()
-    assert self._pid is not None and self.is_dead(), 'pantsd should be stopped!'
+    assert self._pid is not None, 'cant assert stoppage on an unknown pid!'
+    assert self.is_dead(), 'pantsd should be stopped!'
     return self._pid
 
 
@@ -99,8 +100,14 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       )
 
   def assert_success_runner(self, workdir, config, cmd, extra_config={}):
-    print('running: ./pants {} (extra_config={})'.format(' '.join(cmd), extra_config))
-    run = self.run_pants_with_workdir(cmd, workdir, combined_dict(config, extra_config))
+    combined_config = combined_dict(config, extra_config)
+    print('\nrunning: ./pants {} (config={})'.format(' '.join(cmd), combined_config))
+    run = self.run_pants_with_workdir(
+      cmd,
+      workdir,
+      combined_config,
+      tee_output=True
+    )
     self.assert_success(run)
     return run
 
@@ -194,29 +201,37 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
   def test_pantsd_runner_strays(self):
     # Allow env var overrides for local stress testing.
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_ATTEMPTS', 20))
+    cmd = os.environ.get('PANTS_TEST_PANTSD_ATTEMPTS', 'help').split()
     with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _):
-      pantsd_run(['help'])
+      pantsd_run(cmd)
       checker.await_pantsd()
       for _ in range(attempts):
-        pantsd_run(['help'])
+        pantsd_run(cmd)
         checker.assert_running()
-        assert_no_process_exists_by_command('pantsd-runner')
+      # The runner can sometimes exit more slowly than the thin client caller.
+      time.sleep(3)
+      assert_no_process_exists_by_command('pantsd-runner')
 
-  def test_pantsd_output_truncation(self):
+  def test_pantsd_aligned_output(self):
     # Set for pytest output display.
     self.maxDiff = None
 
     cmds = [
-      [],
+      ['goals'],
       ['help'],
-      ['help-advanced']
+      ['targets'],
+      ['roots']
     ]
 
-    for cmd in cmds:
-      print('testing cmd: ./pants {}'.format(' '.join(cmd)))
-      non_daemon_run = self.run_pants(cmd)
-      with self.pantsd_test_context() as (workdir, pantsd_config, checker):
-        daemon_run = self.run_pants_with_workdir(cmd, workdir, pantsd_config)
-        checker.await_pantsd()
+    non_daemon_runs = [self.run_pants(cmd) for cmd in cmds]
 
-      self.assertEqual(non_daemon_run.stdout_data, daemon_run.stdout_data)
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
+      daemon_runs = [pantsd_run(cmd) for cmd in cmds]
+      checker.await_pantsd()
+
+    for run in daemon_runs:
+      self.assertEqual(run.stderr_data.strip(), '')
+      self.assertNotEqual(run.stdout_data, '')
+
+    for run_pairs in zip(non_daemon_runs, daemon_runs):
+      self.assertEqual(*(run.stdout_data for run in run_pairs))
