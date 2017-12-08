@@ -446,6 +446,13 @@ class ClasspathProducts(object):
     return [(element[0], ClasspathEntry(element[1])) for element in classpath_elements]
 
   def add_elements_for_target(self, target, elements):
+    """
+    :API: public
+
+    :param target: pants.build_graph.target.Target
+    :param elements: list of tuples of (conf, pants.backend.jvm.tasks.classpath_products.ArtifactClasspathEntry). E.g. [('default', ArtifactClasspathEntry(...)), ('sources', ArtifactClasspathEntry(...))]
+
+    """
     self._validate_classpath_tuples(elements, target)
     self._classpaths.add_for_target(target, elements)
 
