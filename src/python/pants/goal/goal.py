@@ -140,6 +140,13 @@ class _Goal(object):
     if [bool(place) for place in [first, replace, before, after]].count(True) > 1:
       raise GoalError('Can only specify one of first, replace, before or after')
 
+    otn = self._ordered_task_names
+    if replace:
+      for tt in self.task_types():
+        tt.options_scope = None
+      del otn[:]
+      self._task_type_by_name = {}
+
     task_name = task_registrar.name
     if task_name in self._task_type_by_name:
       raise GoalError(
@@ -166,12 +173,6 @@ class _Goal(object):
       '_stable_name': superclass.stable_name()
     })
 
-    otn = self._ordered_task_names
-    if replace:
-      for tt in self.task_types():
-        tt.options_scope = None
-      del otn[:]
-      self._task_type_by_name = {}
     if first:
       otn.insert(0, task_name)
     elif before in otn:
