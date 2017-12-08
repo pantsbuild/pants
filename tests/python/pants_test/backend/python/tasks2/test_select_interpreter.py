@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import mock
-
 from pex.interpreter import PythonIdentity, PythonInterpreter
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache

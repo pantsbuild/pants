@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
