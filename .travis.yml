@@ -274,7 +274,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
-        - travis_wait 30 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
+        - travis_wait 90 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 1/7 "${SHARD}"
 
     - os: linux
       dist: trusty
@@ -326,7 +326,7 @@ matrix:
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
-        - travis_wait 30 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
+        - travis_wait 90 ./build-support/bin/ci.sh -x -efkmrjlpnt -i 3/7 "${SHARD}"
 
     - os: linux
       dist: trusty
