@@ -258,7 +258,7 @@ class SchedulerTraceTest(unittest.TestCase):
     request = scheduler._native.new_execution_request()
     subject = B()
     scheduler.add_root_selection(request, subject, A)
-    _ = scheduler.run_and_return_roots(request)
+    scheduler.run_and_return_roots(request)
 
     trace = '\n'.join(scheduler.graph_trace(request))
     # NB removing location info to make trace repeatable
