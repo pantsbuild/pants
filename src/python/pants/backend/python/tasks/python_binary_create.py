@@ -137,7 +137,7 @@ class PythonBinaryCreate(Task):
       import pdb;pdb.set_trace()
       if built_dists:
         for dist in built_dists:
-          builder.add_location(dist)
+          builder.add_dist_location(dist)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))

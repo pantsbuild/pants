@@ -23,7 +23,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_mkdir_for
+from pants.util.dirutil import safe_mkdir, safe_mkdir_for
 from pants.util.fileutil import atomic_copy
 
 
@@ -62,7 +62,7 @@ class PythonCreateDistributions(Task):
         names[name] = dist_target
 
       with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
-        import pdb;pdb.set_trace
+        import pdb;pdb.set_trace()
         for vt in invalidation_check.all_vts:
           built_dists.add(self._create_dist(vt.target)) # vt.results dir
 
@@ -90,4 +90,4 @@ class PythonCreateDistributions(Task):
     elif len(dists) > 1:
       raise TaskError('Ambiguous whls found: %s' % (' '.join(dists)))
     else:
-      return os.path.join(self.install_tmp, dists[0])
+      return os.path.join(install_dir, dists[0])
