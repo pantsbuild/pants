@@ -121,7 +121,6 @@ class ListGoalsTest(ConsoleTaskTestBase):
 
     self.assertTrue(issubclass(goal.task_type_by_name(task_name), OtherNoopTask))
 
-
   # TODO(John Sirois): Re-enable when fixing up ListGoals `--graph` in
   # https://github.com/pantsbuild/pants/issues/918
   @expectedFailure
