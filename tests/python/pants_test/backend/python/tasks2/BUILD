@@ -43,5 +43,5 @@ python_tests(
     '3rdparty/python:pex',
   ],
   tags={'integration'},
-  timeout=1200
+  timeout=2400
 )

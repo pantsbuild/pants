@@ -150,21 +150,15 @@ class TestInterpreterCache(BaseTest):
 
   def test_interpereter_cache_setup_using_pex_python_paths(self): 
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
-    with mock.patch.object(PythonInterpreterCache, 'pex_python_paths') as mock_pex_python_paths:
-      # Target python 2 for interpreter cache.
-      with self._setup_test(constraints=['<3,<2.7.14'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
-        py27 = ensure_python_interpreter('2.7.10')
-        py36 = ensure_python_interpreter('3.6.3')
-        mock_pex_python_paths.return_value = ':'.join([py27, py36])
-        interpreters = cache.setup()
-        self.assertEqual(len(interpreters), 1)
-        self.assertEqual(interpreters[0].binary, py27)
-      # Target python 3 for interpreter cache.
-      with self._setup_test(constraints=['>3,<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
-        py27 = ensure_python_interpreter('2.7.10')
-        py36 = ensure_python_interpreter('3.6.3')
-        mock_pex_python_paths.return_value = ':'.join([py27, py36])
-        interpreters = cache.setup()
-        import pytest;pytest.set_trace()
-        self.assertEqual(len(interpreters), 1)
-        self.assertEqual(interpreters[0].binary, py36)
+    py27 = ensure_python_interpreter('2.7.10')
+    py36 = ensure_python_interpreter('3.6.3')
+    # Target python 2 for interpreter cache.
+    with self._setup_test(constraints=['<3,<2.7.14'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
+      interpereters = cache.setup()
+      self.assertEqual(len(interpereters), 1)
+      self.assertEqual(interpereters[0].binary, py27)
+    # Target python 3 for interpreter cache.
+    with self._setup_test(constraints=['>3,<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
+      interpereters = cache.setup()
+      self.assertEqual(len(interpereters), 1)
+      self.assertEqual(interpereters[0].binary, py36)
