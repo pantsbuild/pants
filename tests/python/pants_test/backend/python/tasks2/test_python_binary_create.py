@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from textwrap import dedent
 
-from pex.testing import ensure_python_interpreter
 
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
@@ -17,7 +16,6 @@ from pants.base.run_info import RunInfo
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.util.process_handler import subprocess
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
-from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class PythonBinaryCreateTest(PythonTaskTestBase):

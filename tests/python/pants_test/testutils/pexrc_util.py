@@ -7,10 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import shutil
-import sys
 from contextlib import contextmanager
-
-from pants.util.contextutil import temporary_dir
 
 
 @contextmanager
