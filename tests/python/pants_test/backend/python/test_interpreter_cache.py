@@ -145,25 +145,26 @@ class TestInterpreterCache(BaseTest):
       py27 = ensure_python_interpreter('2.7.10')
       py36 = ensure_python_interpreter('3.6.3')
       with setup_pexrc_with_pex_python_path(os.path.dirname(sys.argv[0]), [py27, py36]):
-        pex_python_paths = cache.pex_python_paths
+        pex_python_paths = cache.pex_python_paths()
         self.assertEqual(pex_python_paths, [py27, py36])
 
   def test_interpereter_cache_setup_using_pex_python_paths(self): 
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
     with mock.patch.object(PythonInterpreterCache, 'pex_python_paths') as mock_pex_python_paths:
       # Target python 2 for interpreter cache.
-      with self._setup_test(constraints=['<3', '<2.7.14'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
+      with self._setup_test(constraints=['<3,<2.7.14'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
         py27 = ensure_python_interpreter('2.7.10')
         py36 = ensure_python_interpreter('3.6.3')
         mock_pex_python_paths.return_value = ':'.join([py27, py36])
-        interpereters = cache.setup()
-        self.assertEqual(len(interpereters), 1)
-        self.assertEqual(interpereters[0].binary, py27)
+        interpreters = cache.setup()
+        self.assertEqual(len(interpreters), 1)
+        self.assertEqual(interpreters[0].binary, py27)
       # Target python 3 for interpreter cache.
-      with self._setup_test(constraints=['>3', '<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
+      with self._setup_test(constraints=['>3,<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
         py27 = ensure_python_interpreter('2.7.10')
         py36 = ensure_python_interpreter('3.6.3')
         mock_pex_python_paths.return_value = ':'.join([py27, py36])
-        interpereters = cache.setup()
-        self.assertEqual(len(interpereters), 1)
-        self.assertEqual(interpereters[0].binary, py36)
+        interpreters = cache.setup()
+        import pytest;pytest.set_trace()
+        self.assertEqual(len(interpreters), 1)
+        self.assertEqual(interpreters[0].binary, py36)

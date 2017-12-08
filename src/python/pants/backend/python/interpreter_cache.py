@@ -31,14 +31,13 @@ def _safe_link(src, dst):
 
 class PythonInterpreterCache(object):
   @staticmethod
-  def _matches(interpreter, filters, meet_all_constraints=False):
-    check = all if meet_all_constraints else any
-    return check(interpreter.identity.matches(filt) for filt in filters)
+  def _matches(interpreter, filters):
+    return any(interpreter.identity.matches(filt) for filt in filters)
 
   @classmethod
-  def _matching(cls, interpreters, filters, meet_all_constraints=False):
+  def _matching(cls, interpreters, filters):
     for interpreter in interpreters:
-      if cls._matches(interpreter, filters, meet_all_constraints):
+      if cls._matches(interpreter, filters):
         yield interpreter
 
   @classmethod
@@ -81,7 +80,7 @@ class PythonInterpreterCache(object):
 
     # Constrain allowed_interpreters based on each target's compatibility requirements.
     for target in tgts_with_compatibilities:
-      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility, meet_all_constraints=True))
+      compatible_with_target = set(self._matching(allowed_interpreters, target.compatibility))
       allowed_interpreters &= compatible_with_target
 
     if not allowed_interpreters:
@@ -125,7 +124,7 @@ class PythonInterpreterCache(object):
 
   def _setup_paths(self, paths, filters):
     """Find interpreters under paths, and cache them."""
-    for interpreter in self._matching(PythonInterpreter.all(paths), filters, meet_all_constraints=True):
+    for interpreter in self._matching(PythonInterpreter.all(paths), filters):
       identity_str = str(interpreter.identity)
       cache_path = os.path.join(self._cache_dir, identity_str)
       pi = self._interpreter_from_path(cache_path, filters)
@@ -155,7 +154,7 @@ class PythonInterpreterCache(object):
                    or os.getenv('PATH').split(os.pathsep))
 
     def unsatisfied_filters(interpreters):
-      return filter(lambda f: len(list(self._matching(interpreters, [f], meet_all_constraints=True))) == 0, filters)
+      return filter(lambda f: len(list(self._matching(interpreters, [f]))) == 0, filters)
 
     interpreters = []
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
@@ -166,7 +165,7 @@ class PythonInterpreterCache(object):
     for filt in unsatisfied_filters(interpreters):
       self._logger('No valid interpreters found for {}!'.format(filt))
 
-    matches = list(self._matching(interpreters, filters, meet_all_constraints=True))
+    matches = list(self._matching(interpreters, filters))
     if len(matches) == 0:
       self._logger('Found no valid interpreters!')
 
