@@ -72,7 +72,9 @@ impl RawNode {
       ),
       Err(Failure::Invalidated) => (
         RawStateTag::Invalidated as u8,
-        externs::create_exception("Node was Invalidated"),
+        externs::create_exception(
+          "Exhausted retries due to changed files.",
+        ),
       ),
     };
 

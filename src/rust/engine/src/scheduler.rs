@@ -7,12 +7,12 @@ use std::sync::Arc;
 
 use futures::future::{self, Future};
 
-use boxfuture::Boxable;
+use boxfuture::{Boxable, BoxFuture};
 use context::{Context, ContextFactory, Core};
-use core::{Failure, Key, TypeConstraint, TypeId, throw, Value};
+use core::{Failure, Key, TypeConstraint, TypeId, Value};
 use externs::{self, LogLevel};
 use graph::EntryId;
-use nodes::{NodeFuture, NodeKey, Select};
+use nodes::{NodeKey, Select};
 use rule_graph;
 use selectors;
 
@@ -103,25 +103,54 @@ impl Scheduler {
   }
 
   ///
-  /// Attempts to complete a Node, recovering from `Failure::Invalidated` up to `count` times.
+  /// Attempts to complete all of the given roots, retrying the entire set (up to `count`
+  /// times) if any of them fail with `Failure::Invalidated`.
   ///
   /// In common usage, graph entries won't be repeatedly invalidated, but in a case where they
   /// were (say by an automated process changing files under pants), we'd want to eventually
   /// give up.
   ///
-  fn create(core: Arc<Core>, root: Root, count: usize) -> NodeFuture<Value> {
-    if count == 0 {
-      future::err(throw("Exhausted retries due to changed files.")).to_boxed()
-    } else {
-      core
-        .graph
-        .create(root.clone(), &core)
-        .or_else(move |e| match e {
-          Failure::Invalidated => Scheduler::create(core, root, count - 1),
-          x => future::err(x).to_boxed(),
+  fn execute_helper(
+    core: Arc<Core>,
+    roots: Vec<Root>,
+    count: usize,
+  ) -> BoxFuture<Vec<Result<Value, Failure>>, ()> {
+    // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
+    let roots_res = future::join_all(
+      roots
+        .clone()
+        .into_iter()
+        .map(|root| {
+          core
+            .graph
+            .create(root.clone(), &core)
+            .then::<_, Result<Result<Value, Failure>, Failure>>(move |r| {
+              match r {
+                Err(Failure::Invalidated) if count > 0 => {
+                  // A node was invalidated: fail quickly so that all roots can be retried.
+                  Err(Failure::Invalidated)
+                }
+                other => {
+                  // Otherwise (if it is a success, some other type of Failure, or if we've run
+                  // out of retries) recover to complete the join, which will cause the results to
+                  // propagate to the user.
+                  externs::log(
+                    LogLevel::Debug,
+                    &format!("Root {} completed.", NodeKey::Select(root).format()),
+                  );
+                  Ok(other)
+                }
+              }
+            })
         })
-        .to_boxed()
-    }
+        .collect::<Vec<_>>(),
+    );
+
+    // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
+    // the entire set of roots.
+    roots_res
+      .or_else(move |_| Scheduler::execute_helper(core, roots, count - 1))
+      .to_boxed()
   }
 
   ///
@@ -136,26 +165,12 @@ impl Scheduler {
       LogLevel::Debug,
       &format!("Launching {} roots.", request.roots.len()),
     );
-    let roots_res = future::join_all(
-      request
-        .roots
-        .iter()
-        .map(|root| {
-          Scheduler::create(self.core.clone(), root.clone(), 8)
-            .then::<_, Result<Result<Value, Failure>, ()>>(move |r| {
-              externs::log(
-                LogLevel::Debug,
-                &format!("Root {} completed.", NodeKey::Select(root.clone()).format()),
-              );
-              Ok(r)
-            })
-        })
-        .collect::<Vec<_>>(),
-    );
 
     // Wait for all roots to complete. Failure here should be impossible, because each
-    // individual Future in the join was mapped into success.
-    let results = roots_res.wait().expect("Execution failed.");
+    // individual Future in the join was (eventually) mapped into success.
+    let results = Scheduler::execute_helper(self.core.clone(), request.roots.clone(), 8)
+      .wait()
+      .expect("Execution failed.");
 
     request
       .roots
