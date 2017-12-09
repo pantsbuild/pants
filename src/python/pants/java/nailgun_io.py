@@ -94,7 +94,6 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
           self._write_handle.write(payload)
           self._write_handle.flush()
         elif chunk_type == ChunkType.STDIN_EOF:
-          self._write_handle.close()
           return
         else:
           raise NailgunProtocol.ProtocolError(
