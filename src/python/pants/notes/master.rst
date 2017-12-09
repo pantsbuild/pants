@@ -4,6 +4,63 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev23 (12/08/2017)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Relativize the classpaths that are recorded during a JVM compile (#5139)
+  `PR #5139 <https://github.com/pantsbuild/pants/pull/5139>`_
+
+New Features
+~~~~~~~~~~~~
+
+* fs_util backfills from remote CAS if --server-address is set (#5179)
+  `PR #5179 <https://github.com/pantsbuild/pants/pull/5179>`_
+
+* Store backfills from a remote CAS (#5166)
+  `PR #5166 <https://github.com/pantsbuild/pants/pull/5166>`_
+
+* ByteStore impl for reading from the gRPC ContentAddressableStorage service (#5155)
+  `PR #5155 <https://github.com/pantsbuild/pants/pull/5155>`_
+
+* Add the ability to build a pex to the release script (#5159)
+  `PR #5159 <https://github.com/pantsbuild/pants/pull/5159>`_
+
+Bugfixes
+~~~~~~~~
+
+* Installing a duplicate task into a goal should not throw error if replace=True (#5188)
+  `PR #5188 <https://github.com/pantsbuild/pants/pull/5188>`_
+
+* Close suiteCaptures after all tests are finished instead of after each test (#5173)
+  `PR #5173 <https://github.com/pantsbuild/pants/pull/5173>`_
+
+* Fix thrift handling in the new python pipeline. (#5168)
+  `PR #5168 <https://github.com/pantsbuild/pants/pull/5168>`_
+
+* [pantsd] Improve SIGQUIT handling in the thin client. (#5177)
+  `PR #5177 <https://github.com/pantsbuild/pants/pull/5177>`_
+
+* Fix showing test output that happens after the tests are finished (#5165)
+  `PR #5165 <https://github.com/pantsbuild/pants/pull/5165>`_
+
+* Post suffixed-wheel release fixups (#5152)
+  `PR #5152 <https://github.com/pantsbuild/pants/pull/5152>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove scheduler lock (#5178)
+  `PR #5178 <https://github.com/pantsbuild/pants/pull/5178>`_
+
+* Kill obsolete `ThritNamespacePackagesTest`. (#5183)
+  `PR #5183 <https://github.com/pantsbuild/pants/pull/5183>`_
+
+* Prefactor Store wrapper (#5154)
+  `PR #5154 <https://github.com/pantsbuild/pants/pull/5154>`_
+
 1.4.0.dev22 (12/01/2017)
 ------------------------
 
