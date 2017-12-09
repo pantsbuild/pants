@@ -109,20 +109,15 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     request = scheduler.execution_request([TestTable().constraint()], [address])
     root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
-    return root_entries[0]
-
-  def walk(self, scheduler, address):
-    """Return a list of all (Node, State) tuples reachable from the given Address."""
-    root, _ = self._populate(scheduler, address)
-    return list(e for e in scheduler.product_graph.walk([root], predicate=lambda n, s: True))
+    return request, root_entries[0][1]
 
   def resolve_failure(self, scheduler, address):
-    root, state = self._populate(scheduler, address)
+    _, state = self._populate(scheduler, address)
     self.assertEquals(type(state), Throw, '{} is not a Throw.'.format(state))
     return state.exc
 
   def resolve(self, scheduler, address):
-    root, state = self._populate(scheduler, address)
+    _, state = self._populate(scheduler, address)
     self.assertEquals(type(state), Return, '{} is not a Return.'.format(state))
     return state.value
 
@@ -190,9 +185,9 @@ class InlinedGraphTest(GraphTestBase):
 
   def do_test_trace_message(self, scheduler, parsed_address, expected_string=None):
     # Confirm that the root failed, and that a cycle occurred deeper in the graph.
-    root, state = self._populate(scheduler, parsed_address)
+    request, state = self._populate(scheduler, parsed_address)
     self.assertEqual(type(state), Throw)
-    trace_message = '\n'.join(scheduler.trace())
+    trace_message = '\n'.join(scheduler.trace(request))
 
     self.assert_throws_are_leaves(trace_message, Throw.__name__)
     if expected_string:

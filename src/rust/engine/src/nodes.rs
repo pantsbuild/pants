@@ -11,7 +11,7 @@ use ordermap::OrderMap;
 
 use boxfuture::{Boxable, BoxFuture};
 use context::Context;
-use core::{Failure, Key, Noop, TypeConstraint, Value, Variants};
+use core::{Failure, Key, Noop, TypeConstraint, Value, Variants, throw};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
 use handles::maybe_drain_handles;
@@ -28,16 +28,6 @@ fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
 
 fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
   future::err(failure).to_boxed()
-}
-
-fn throw(msg: &str) -> Failure {
-  Failure::Throw(
-    externs::create_exception(msg),
-    format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    ).to_string(),
-  )
 }
 
 ///
@@ -236,6 +226,7 @@ impl Select {
               }
               continue;
             }
+            i @ Failure::Invalidated => return Err(i),
             f @ Failure::Throw(..) => return Err(f),
           }
         }
