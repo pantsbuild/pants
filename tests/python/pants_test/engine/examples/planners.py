@@ -493,5 +493,4 @@ def setup_json_scheduler(build_root, native):
                         goals,
                         tasks,
                         project_tree,
-                        native,
-                        graph_lock=None)
+                        native)

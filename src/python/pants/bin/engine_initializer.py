@@ -93,10 +93,9 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
-    with self.scheduler.lock:
-      # Ensure the entire generator is unrolled.
-      for _ in graph.inject_specs_closure(target_roots.as_specs()):
-        pass
+    # Ensure the entire generator is unrolled.
+    for _ in graph.inject_specs_closure(target_roots.as_specs()):
+      pass
 
     address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
