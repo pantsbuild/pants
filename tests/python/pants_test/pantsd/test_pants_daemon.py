@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import threading
 
 import mock
 
@@ -45,14 +44,12 @@ class LoggerStreamTest(BaseTest):
 class PantsDaemonTest(BaseTest):
   def setUp(self):
     super(PantsDaemonTest, self).setUp()
-    lock = threading.RLock()
     mock_options = mock.Mock()
     mock_options.pants_subprocessdir = 'non_existent_dir'
     self.pantsd = PantsDaemon(None,
                               'test_buildroot',
                               'test_work_dir',
                               logging.INFO,
-                              lock,
                               [],
                               {},
                               '/tmp/pants_test_metadata_dir',

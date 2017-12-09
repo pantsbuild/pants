@@ -150,23 +150,25 @@ struct InnerGraph {
 
 impl InnerGraph {
   fn entry(&self, node: &EntryKey) -> Option<&Entry> {
-    self.entry_id(node).map(|&id| self.entry_for_id(id))
+    self.entry_id(node).and_then(|&id| self.entry_for_id(id))
   }
 
   fn entry_id(&self, node: &EntryKey) -> Option<&EntryId> {
     self.nodes.get(node)
   }
 
-  fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.pg.node_weight(id).unwrap_or_else(|| {
-      panic!("Invalid EntryId: {:?}", id)
-    })
+  fn entry_for_id(&self, id: EntryId) -> Option<&Entry> {
+    self.pg.node_weight(id)
   }
 
-  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.pg.node_weight_mut(id).unwrap_or_else(|| {
-      panic!("Invalid EntryId: {:?}", id)
-    })
+  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry> {
+    self.pg.node_weight_mut(id)
+  }
+
+  fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry {
+    self.pg.node_weight(id).expect(
+      "The unsafe_entry_for_id method should only be used in read-only methods!",
+    )
   }
 
   fn ensure_entry(&mut self, node: EntryKey) -> EntryId {
@@ -318,6 +320,7 @@ impl InnerGraph {
       None |
       Some(Err(Failure::Noop(_))) => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = viz_colors.len();
         viz_colors
@@ -342,7 +345,7 @@ impl InnerGraph {
     let predicate = |_| true;
 
     for eid in self.walk(root_entries, false) {
-      let entry = self.entry_for_id(eid);
+      let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format::<NodeKey>();
 
       // Write the node header.
@@ -353,7 +356,7 @@ impl InnerGraph {
       )));
 
       for dep_id in self.pg.neighbors(eid) {
-        let dep_entry = self.entry_for_id(dep_id);
+        let dep_entry = self.unsafe_entry_for_id(dep_id);
         if !predicate(dep_entry) {
           continue;
         }
@@ -375,8 +378,9 @@ impl InnerGraph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |eid: EntryId| -> bool {
-      match self.entry_for_id(eid).peek::<NodeKey>() {
+      match self.unsafe_entry_for_id(eid).peek::<NodeKey>() {
         None |
+        Some(Err(Failure::Invalidated)) => false,
         Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(..))) => false,
         Some(Ok(_)) => true,
@@ -395,7 +399,7 @@ impl InnerGraph {
     };
 
     let _format = |eid: EntryId, level: Level| -> String {
-      let entry = self.entry_for_id(eid);
+      let entry = self.unsafe_entry_for_id(eid);
       let indent = _indent(level);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
       if is_one_level_above_bottom(eid) {
@@ -414,6 +418,7 @@ impl InnerGraph {
             )
           }
           Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+          Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -497,7 +502,12 @@ impl Graph {
 
       // Declare the dep, and return the state of the destination.
       inner.pg.add_edge(src_id, dst_id, ());
-      inner.entry_for_id_mut(dst_id).state(context, dst_id)
+      inner
+        .entry_for_id_mut(dst_id)
+        .map(|entry| entry.state(context, dst_id))
+        .unwrap_or_else(|| {
+          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
+        })
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -513,7 +523,12 @@ impl Graph {
     let state = {
       let mut inner = self.inner.lock().unwrap();
       let id = inner.ensure_entry(EntryKey::Valid(node.into()));
-      inner.entry_for_id_mut(id).state(context, id)
+      inner
+        .entry_for_id_mut(id)
+        .map(|entry| entry.state(context, id))
+        .unwrap_or_else(|| {
+          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
+        })
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()

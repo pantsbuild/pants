@@ -160,7 +160,12 @@ impl fmt::Debug for Value {
 
 #[derive(Debug, Clone)]
 pub enum Failure {
+  /// A Node failed because a filesystem change invalidated it or its inputs.
+  /// A root requestor should usually immediately retry their request.
+  Invalidated,
+  /// There was no valid combination of rules to satisfy a request.
   Noop(Noop),
+  /// A rule raised an exception.
   Throw(Value, String),
 }
 
@@ -181,4 +186,14 @@ impl fmt::Debug for Noop {
       &Noop::NoVariant => "A matching variant key was not configured in variants.",
     })
   }
+}
+
+pub fn throw(msg: &str) -> Failure {
+  Failure::Throw(
+    externs::create_exception(msg),
+    format!(
+      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+      msg
+    ).to_string(),
+  )
 }
