@@ -13,10 +13,10 @@ from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks2.pex_build_util import (build_python_distribution,
-                                                        dump_requirements, dump_sources,
+from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
-                                                        has_resources, is_local_python_dist)
+                                                        has_resources, is_local_python_dist,
+                                                        prepare_dist_workdir)
 from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -62,7 +62,6 @@ class PythonCreateDistributions(Task):
         names[name] = dist_target
 
       with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
-        import pdb;pdb.set_trace()
         for vt in invalidation_check.all_vts:
           built_dists.add(self._create_dist(vt.target)) # vt.results dir
 
@@ -71,19 +70,19 @@ class PythonCreateDistributions(Task):
   def _create_dist(self, dist_tgt):
     """Create a .whl file for the specified python_distribution target."""
     interpreter = self.context.products.get_data(PythonInterpreter)
-    
+
+    # Build whl from python_dist target.
     whl_location = ''
-    # build whl from python_dist target
-    dist_target_dir = build_python_distribution(dist_tgt, interpreter, self.workdir, self.context.log)
-    
-    # build the whl from pex API using tempdir and get its location
+    dist_target_dir = prepare_dist_workdir(dist_tgt, self.workdir, self.context.log)
+
+    # Build the whl from pex API using tempdir and get its location.
     install_dir = os.path.join(dist_target_dir, 'dist')
     if not os.path.exists(install_dir):
       safe_mkdir(install_dir)
     setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
     setup_runner.run()
 
-    # return the location of the whl on disk (somewhere in pantsd or dist)
+    # Return the location of the whl on disk.
     dists = os.listdir(install_dir)
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')

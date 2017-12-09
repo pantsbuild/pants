@@ -132,9 +132,8 @@ class PythonBinaryCreate(Task):
         dump_sources(builder, tgt, self.context.log)
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
-      # Dump python_distributions, if any, into builder's chroot.
+      # Dump built python distributions, if any, into builder's chroot.
       built_dists = self.context.products.get_data('python-dists')
-      import pdb;pdb.set_trace()
       if built_dists:
         for dist in built_dists:
           builder.add_dist_location(dist)

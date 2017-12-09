@@ -132,71 +132,45 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
       locations.add(dist.location)
 
 
-def build_python_distribution_from_target(target, workdir):
-  # Create a temporary working directory, pydistworkdir
-  pydist_workdir = os.path.join(workdir, 'pydistworkdir')
-  safe_mkdir(pydist_workdir)
-  pex_name = "%s.pex" % target.name
-  path_to_target = os.path.dirname(target.address.rel_path)
+def prepare_dist_workdir(dist_tgt, workdir, log):
+  """Prepare Python distribution directory for SetupPyRunner by copying the 
+  target sources into a working directory located in .pants.d. 
 
-  # disable cache to ensure reproducible runs
-  args = ['--disable-cache', path_to_target, '-o', os.path.join(pydist_workdir, pex_name)]
-  try:
-    pex_main.main(args=args)
-  except SystemExit as e:
-    raise TaskError(e)
-  except Exception as e:
-    raise TaskError(e)
-
-  # clean up egg-info created by setup.py
-  for path in glob.glob(os.path.join(path_to_target, '*.egg-info')):
-    shutil.rmtree(path)
-
-  # unzip into a chroot within the python dist workdir
-  zip_ref = zipfile.ZipFile(os.path.join(pydist_workdir, pex_name), 'r')
-  fingerprint = target.payload.fingerprint()
-  safe_mkdir(os.path.join(pydist_workdir, fingerprint))
-  zip_ref.extractall(os.path.join(pydist_workdir, fingerprint))
-  zip_ref.close()
-
-  # read the contents from .deps of the chroot to obtain the whl location
-  chroot_deps_contents = os.listdir(os.path.join(pydist_workdir, fingerprint, '.deps'))
-  if chroot_deps_contents:
-    whl_dist = chroot_deps_contents[0]  # TODO: find better way to grab .whl from chroot 
-    whl_location = os.path.join(pydist_workdir, fingerprint, '.deps', whl_dist)
-    return whl_location
-  else:
-    raise TaskError('Failed to package python distribution for target: %s', target.name)
-
-
-def build_python_distribution(dist_tgt, interpreter, workdir, log):
-  """Dump python distribution targets into a given builder
+  :param dist_target: The :class:`PythonDistribution` to prepare a directory for. 
+  :param workdir: The working directory for this task.
+  :param log: Use this logger.
 
   """
-  # make directory based on fingerprint in workdir
+  # Make directory for local built distributions.
   local_dists_workdir = os.path.join(workdir, 'local_dists')
   if not os.path.exists(local_dists_workdir):
     safe_mkdir(local_dists_workdir)
 
+  # Fingerprint distribution target and create subdirectory for that target.
   fingerprint = dist_tgt.payload.fingerprint()
   dist_target_dir = os.path.join(local_dists_workdir, fingerprint)
   if not os.path.exists(dist_target_dir):
+    log.debug('Creating working directory for target %s with fingerprint %s', 
+      dist_tgt.name, fingerprint)
     safe_mkdir(dist_target_dir)
 
-  tmp_dir_for_dist = os.path.join(workdir, 'tmp')
+
+  # Create subdirectory based on target's name.
+  tmp_dir_for_dist = os.path.join(dist_target_dir, dist_tgt.name)
   if not tmp_dir_for_dist:
     safe_mkdir(tmp_dir_for_dist)
 
-  # copy sources and setup.py to this temp dir
+  # Copy sources and setup.py over for packaging.
   sources_rel_to_target_base = dist_tgt.sources_relative_to_target_base()
   sources_rel_to_buildroot = dist_tgt.sources_relative_to_buildroot()
+  # NB: We need target paths both relative to the target base and relative to 
+  # the build root for the shutil file copying below.
   sources = zip(sources_rel_to_buildroot, sources_rel_to_target_base)
   for source_relative_to_build_root, source_relative_to_target_base in sources:
     path_to_source = os.path.join(tmp_dir_for_dist, source_relative_to_target_base)
     if not os.path.exists(os.path.dirname(path_to_source)):
       os.makedirs(os.path.dirname(path_to_source))
     shutil.copyfile(os.path.join(get_buildroot(), source_relative_to_build_root), path_to_source)
-
 
   return tmp_dir_for_dist  
 
