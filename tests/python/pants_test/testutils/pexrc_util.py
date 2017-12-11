@@ -9,6 +9,8 @@ import os
 import shutil
 from contextlib import contextmanager
 
+from pants.util.process_handler import subprocess
+
 
 @contextmanager
 def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
@@ -47,3 +49,30 @@ def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
   if os.path.exists(temp_pexrc):
     shutil.copyfile(temp_pexrc, pexrc_path)
     os.remove(temp_pexrc)
+
+
+def bootstrap_python_installer(location):
+  install_location = os.path.join(location, '.pyenv_test')
+  if not os.path.exists(install_location) or not os.path.exists(
+    os.path.join(location, '.pyenv_test')):
+    import pytest;pytest.set_trace()  
+    for _ in range(3):
+      try:
+        subprocess.call(['git', 'clone', 'https://github.com/pyenv/pyenv.git', install_location])
+      except StandardError:
+        continue
+      else:
+        break
+    else:
+      raise RuntimeError("Helper method could not clone pyenv from git")
+
+
+def ensure_python_interpreter(version, location=None):
+  if not location:
+    location = os.getcwd()
+  bootstrap_python_installer(location)
+  install_location = os.path.join(location, '.pyenv_test/versions', version)
+  if not os.path.exists(install_location):
+    os.environ['PYENV_ROOT'] = os.path.join(location, '.pyenv_test')
+    subprocess.call([os.path.join(location, '.pyenv_test/bin/pyenv'), 'install', version])
+  return os.path.join(install_location, 'bin', 'python' + version[0:3])

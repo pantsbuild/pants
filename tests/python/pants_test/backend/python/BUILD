@@ -61,5 +61,5 @@ python_tests(
     'tests/python/pants_test:base_test',
     'tests/python/pants_test/testutils:pexrc_util',
   ],
-  timeout=600
+  timeout=1200
 )
