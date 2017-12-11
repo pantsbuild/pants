@@ -36,7 +36,7 @@ class TestInterpreterCache(BaseTest):
     self._interpreter = PythonInterpreter.get()
 
   def get_project_root(self):
-    return os.path.abspath(os.path.join(os.path.dirname(__file__),"..", "..", "..", "..", "..", "..", ".."))
+    return super(TestInterpreterCache, self).get_project_root()
 
   @contextmanager
   def _setup_test(self, constraints=None, mock_setup_paths_with_interpreters=False):
@@ -155,7 +155,6 @@ class TestInterpreterCache(BaseTest):
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
     py27 = ensure_python_interpreter('2.7.10', self.get_project_root())
     py36 = ensure_python_interpreter('3.6.3', self.get_project_root())
-    if os.path.exists(os.path.join(self.get_project_root(), '.pyenv_test')):
     # Target python 2 for interpreter cache.
     with self._setup_test(constraints=['CPython==2.7.10'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
       interpereters = cache.setup()

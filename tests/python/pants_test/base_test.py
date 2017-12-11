@@ -29,6 +29,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
+from pants.util.process_handler import subprocess
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
 
@@ -144,6 +145,13 @@ class BaseTest(unittest.TestCase):
     """
     self.create_file(self.build_path(relpath), target, mode='a')
     return BuildFile(self.address_mapper._project_tree, relpath=self.build_path(relpath))
+
+  def get_project_root(self):
+    """Get the absolute path to the root directory of the Pants git repo.
+
+    :API: public
+    """
+    return subprocess.check_output(['git','rev-parse','--show-toplevel']).strip()
 
   def make_target(self,
                   spec='',
