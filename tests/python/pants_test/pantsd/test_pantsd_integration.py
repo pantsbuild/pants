@@ -17,13 +17,17 @@ from pants.util.collections import combined_dict
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import assert_no_process_exists_by_command
 
+from colors import bold, cyan, magenta
+
 
 class PantsDaemonMonitor(ProcessManager):
   def __init__(self, metadata_base_dir=None):
     super(PantsDaemonMonitor, self).__init__(name='pantsd', metadata_base_dir=metadata_base_dir)
 
   def _log(self):
-    print('PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
+    print(magenta(
+      'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
+    )
 
   def await_pantsd(self, timeout=3):
     self._process = None
@@ -44,9 +48,9 @@ class PantsDaemonMonitor(ProcessManager):
 
 
 def banner(s):
-  print('=' * 63)
-  print('- {} {}'.format(s, '-' * (60 - len(s))))
-  print('=' * 63)
+  print(cyan('=' * 63))
+  print(cyan('- {} {}'.format(s, '-' * (60 - len(s)))))
+  print(cyan('=' * 63))
 
 
 def read_pantsd_log(workdir):
@@ -101,13 +105,18 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
   def assert_success_runner(self, workdir, config, cmd, extra_config={}):
     combined_config = combined_dict(config, extra_config)
-    print('\nrunning: ./pants {} (config={})'.format(' '.join(cmd), combined_config))
+    print(bold(cyan('\nrunning: ./pants {} (config={})'
+                    .format(' '.join(cmd), combined_config))))
+    start_time = time.time()
     run = self.run_pants_with_workdir(
       cmd,
       workdir,
       combined_config,
       tee_output=True
     )
+    elapsed = time.time() - start_time
+    print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
+
     self.assert_success(run)
     return run
 
