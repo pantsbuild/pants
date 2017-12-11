@@ -127,6 +127,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
 def create_options_for_optionables(optionables,
                                    extra_scopes=None,
                                    options=None,
+                                   options_fingerprintable=None,
                                    passthru_args=None):
   """Create a fake Options object for testing with appropriate defaults for the given optionables.
 
@@ -144,6 +145,14 @@ def create_options_for_optionables(optionables,
   fingerprintable_options = defaultdict(dict)
   bootstrap_option_values = None
 
+  # We need to update options before completing them based on inner/outer relation.
+  if options:
+    for scope, opts in options.items():
+      all_options[scope].update(opts)
+  if options_fingerprintable:
+    for scope, opts in options_fingerprintable.items():
+      fingerprintable_options[scope].update(opts)
+
   def complete_scopes(scopes):
     """Return all enclosing scopes.
 
@@ -159,8 +168,11 @@ def create_options_for_optionables(optionables,
     return completed_scopes
 
   def register_func(on_scope):
+    print('on_scope: {}'.format(on_scope))
     scoped_options = all_options[on_scope]
+    print('scoped_options: {}'.format(scoped_options))
     scoped_fingerprintables = fingerprintable_options[on_scope]
+    print('scoped_fingerprintables: {}'.format(scoped_fingerprintables))
     register = _options_registration_function(scoped_options, scoped_fingerprintables)
     register.bootstrap = bootstrap_option_values
     register.scope = on_scope
@@ -190,11 +202,6 @@ def create_options_for_optionables(optionables,
     all_scopes.update(extra_scopes)
 
   all_scopes = complete_scopes(all_scopes)
-
-  # We need to update options before completing them based on inner/outer relation.
-  if options:
-    for scope, opts in options.items():
-      all_options[scope].update(opts)
 
   # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
   # and therefore only have to inherit from our immediately enclosing scope.

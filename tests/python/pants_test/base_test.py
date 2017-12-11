@@ -275,8 +275,9 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
-              console_outstream=None, workspace=None, for_subsystems=None):
+  def context(self, for_task_types=None, options=None, passthru_args=None,
+              target_roots=None, console_outstream=None, workspace=None,
+              for_subsystems=None, options_fingerprintable=None):
     """
     :API: public
     """
@@ -312,6 +313,7 @@ class BaseTest(unittest.TestCase):
     options = create_options_for_optionables(optionables,
                                              extra_scopes=extra_scopes,
                                              options=options,
+                                             options_fingerprintable=options_fingerprintable,
                                              passthru_args=passthru_args)
 
     Subsystem.reset(reset_options=True)
