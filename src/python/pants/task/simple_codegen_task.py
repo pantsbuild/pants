@@ -293,6 +293,12 @@ class SimpleCodegenTask(Task):
 
     return synthetic_target
 
+  def _supports_exports(self, target_type):
+    return hasattr(target_type, 'export_specs')
+
+  def _original_export_specs(self, target):
+    return [t.spec for t in target.export_addresses]
+
   def resolve_deps(self, unresolved_deps):
     """
     :API: public
