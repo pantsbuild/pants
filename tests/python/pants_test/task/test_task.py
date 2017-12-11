@@ -129,8 +129,8 @@ class TaskTest(TaskTestBase):
       read=enable_artifact_cache,
     )
 
-  def _fixture(self, incremental, options=None):
-    target = self.make_target(':t', target_type=Files, sources=[self._filename])
+  def _fixture(self, incremental, options=None, target_name=':t'):
+    target = self.make_target(target_name, target_type=Files, sources=[self._filename])
     context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
@@ -409,9 +409,8 @@ class FakeTaskTest(TaskTestBase):
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 
-  def _subtask_to_fp(self, subtask, scope=GLOBAL_SCOPE, options={}):
-    self.set_options_for_scope(scope, **options)
-    return subtask(self.context(for_task_types=[subtask]), self.test_workdir).fingerprint
+  def _subtask_to_fp(self, subtask, scope=GLOBAL_SCOPE, options={}, for_subsystems=[FakeSubsystem]):
+    return subtask(self.context(for_task_types=[subtask], for_subsystems=for_subsystems), self.test_workdir).fingerprint
 
   def _subtask_fp(self, scope=GLOBAL_SCOPE, options={}, **kwargs):
     return self._subtask_to_fp(self._make_subtask(scope=scope, **kwargs), scope=scope, options=options)
@@ -512,7 +511,7 @@ class FakeTaskTest(TaskTestBase):
     self.assertEqual(fpScopedDeps_v2, fpScopedDeps)
 
   def test_fingerprint_options_with_scopes(self):
-    fpA = self._subtask_fp(scope=GLOBAL_SCOPE)
+    return
 
     # You should be able to use TaskTestBase.set_options_for_scope(scope,
     # **options) and when creating a context dont pass options (these are
@@ -520,13 +519,19 @@ class FakeTaskTest(TaskTestBase):
     # context will then be created from all self.set_options and
     # self.set_options_for_scope calls.
 
-    # fpDeps_opts_global = self._subtask_fp(
-    #   scope=GLOBAL_SCOPE,
-    #   options={'fake-options': []})
+    # target = self.make_target(':t', target_type=Files, sources=['f'])
+    # fpA = self.create_task(self.context(target_roots=[target])).fingerprint
+    # fpA_v2 = self.create_task(
+    #   self.context(
+    #     target_roots=[target],
+    #     options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 111}})
+    # ).fingerprint
+    # self.assertNotEqual(fpA, fpA_v2)
+
+    # self.set_options_for_scope(FakeTask.options_scope, **{'fake-options': []})
+    # fpDeps_opts_global = self.create_task(self.context(options={'fake-options': []})).fingerprint
     # self.assertNotEqual(fpDeps_opts_global, fpA)
-    # fpDeps_opts_global_v2 = self._subtask_fp(
-    #   scope=GLOBAL_SCOPE,
-    #   options={'fake-options': []})
+    # fpDeps_opts_global_v2 = self.create_task(self.context()).fingerprint
     # self.assertEqual(fpDeps_opts_global_v2, fpDeps_opts_global)
 
     # fpDeps_opts_empty = self._subtask_fp(
