@@ -7,15 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.subsystems.zinc import Zinc
-from pants.backend.jvm.tasks.jvm_compile.jvm_compile import JvmCompile
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.cache.cache_setup import CacheSetup
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.source.source_root import SourceRootConfig
-from pants.task.task import Task
+from pants.subsystem.subsystem import Subsystem
+from pants.subsystem.subsystem_client_mixin import SubsystemDependency
+from pants.task.task import Task, TaskBase
 from pants.util.dirutil import safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -59,7 +58,7 @@ class DummyTask(Task):
         vt.update()
       return vt, was_valid
 
-class NonExecutingTask(Task):
+class FakeTask(TaskBase):
   _impls = []
   @classmethod
   def implementation_version(cls):
@@ -69,9 +68,7 @@ class NonExecutingTask(Task):
   def supports_passthru_args(cls):
     return True
 
-  options_scope = GLOBAL_SCOPE
-
-  def execute(self): pass
+  options_scope = 'fake-task'
 
   def __init__(self, context, workdir):
     self.context = context
@@ -82,12 +79,31 @@ class NonExecutingTask(Task):
   def subsystem_dependencies(cls):
     return cls._deps
 
-class OtherNonExecutingTask(NonExecutingTask):
+class OtherFakeTask(FakeTask):
   _other_impls = []
+
+  options_scope = 'other-fake-task'
 
   @classmethod
   def implementation_version(cls):
-    return super(OtherNonExecutingTask, cls).implementation_version() + cls._other_impls
+    return super(OtherFakeTask, cls).implementation_version() + cls._other_impls
+
+class FakeSubsystem(Subsystem):
+  options_scope = 'fake-subsystem'
+
+  @classmethod
+  def get_fake_options_default(cls, bootstrap_option_values):
+    # FIXME: do we need to do anything with the bootstrap options? what exactly
+    # are bootstrap options? options_bootstrapper.py does not have a clear
+    # description, and e.g. zinc does not use any bootstrap options
+    return ['--some-fake-option']
+
+  @classmethod
+  def register_options(cls, register):
+    super(FakeSubsystem, cls).register_options(register)
+    register('--fake-options', type=list, advanced=True, metavar='<option>...',
+             default=cls.get_fake_options_default(register.bootstrap),
+             help='Some fake options for our fake subsystem.')
 
 class TaskTest(TaskTestBase):
 
@@ -119,24 +135,6 @@ class TaskTest(TaskTestBase):
     task = self.create_task(context)
     task._incremental = incremental
     return task, target
-
-  def _new_subtask(self, name, options_scope, task_type, **kwargs):
-    subclass_name = b'test_{0}_{1}'.format(task_type.__name__, options_scope)
-    kwargs['options_scope'] = options_scope
-    return type(subclass_name, (task_type,), kwargs)
-
-  def _make_subtask(self, name='A', scope=GLOBAL_SCOPE, cls=NonExecutingTask, **kwargs):
-    return self._new_subtask(name, scope, cls, **kwargs)
-
-  def _subtask_to_fp(self, subtask, options={}):
-    context = super(TaskTest, self).context(
-      options=options,
-      for_task_types=[NonExecutingTask])
-    workdir = self.test_workdir
-    return subtask(context, workdir).fingerprint
-
-  def _subtask_fp(self, options={}, **kwargs):
-    return self._subtask_to_fp(self._make_subtask(**kwargs), options=options)
 
   def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
     content = content or self._file_contents
@@ -275,163 +273,6 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(vtA.current_results_dir, vtB.current_results_dir)
     self.assertNotEqual(vtA.results_dir, vtB.results_dir)
 
-  def test_fingerprint_identity(self):
-    fpA = self._subtask_fp()
-    fpB = self._subtask_fp()
-    self.assertEqual(fpA, fpB)
-
-  def test_fingerprint_implementation_version(self):
-    fpA = self._subtask_fp()
-
-    # Using an implementation_version() should be different than nothing
-    fpA_with_version = self._subtask_fp(_impls=[('asdf', 0)])
-    self.assertNotEqual(fpA_with_version, fpA)
-
-    # Should return same fingerprint for same implementation_version()
-    fpA_same_version = self._subtask_fp(_impls=[('asdf', 0)])
-    self.assertEqual(fpA_same_version, fpA_with_version)
-
-    # Different fingerprint for different implementation_version()
-    fpA_new_version = self._subtask_fp(_impls=[('asdf', 1)])
-    self.assertNotEqual(fpA_new_version, fpA)
-
-    # Append implementation_version() from super
-    fpB = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)])
-    fpB_v2 = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)])
-    self.assertEqual(fpB, fpB_v2)
-    # The same chain of implementation_version() should result in the same fingerprint
-    fpB_with_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
-    self.assertNotEqual(fpB, fpB_with_version)
-    fpB_same_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
-    self.assertEqual(fpB_with_version, fpB_same_version)
-    # Same implementation_version() for NonExecutingTask, different for
-    # OtherNonExecutingTask should result in a different fingerprint
-    fpB_new_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 1)])
-    self.assertNotEqual(fpB_new_version, fpB_with_version)
-
-    # Same implementation_version() for OtherNonExecutingTask, different for
-    # NonExecutingTask should result in a different fingerprint
-    fpB_new_typeA = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)])
-    self.assertNotEqual(fpB_new_typeA, fpB)
-    fpB_new_typeA_with_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
-    self.assertNotEqual(fpB_new_typeA_with_version, fpB_new_typeA)
-    self.assertNotEqual(fpB_new_typeA_with_version, fpB_same_version)
-    fpB_new_typeA_same_version = self._subtask_fp(cls=OtherNonExecutingTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
-    self.assertEqual(fpB_new_typeA_with_version, fpB_new_typeA_same_version)
-
-  def test_fingerprint_stable_name(self):
-    # the same tasks should have the same stable_name
-    typeA = self._make_subtask(name='asdf')
-    fpA = self._subtask_to_fp(typeA)
-    typeA_v2 = self._make_subtask(name='asdf')
-    fpA_v2 = self._subtask_to_fp(typeA_v2)
-    self.assertEqual(fpA, fpA_v2)
-
-    # the same _stable_name means the same stable_name()
-    typeA_stable = self._make_subtask(name='asdf', _stable_name='wow')
-    fpA_stable = self._subtask_to_fp(typeA_stable)
-    self.assertNotEqual(fpA_stable, fpA)
-    typeA_stable_v2 = self._make_subtask(name='asdf')
-    typeA_stable_v2._stable_name = 'wow'
-    fpA_stable_v2 = self._subtask_to_fp(typeA_stable_v2)
-    self.assertEqual(fpA_stable, fpA_stable_v2)
-    # _stable_name subsumes the class name
-    self.assertNotEqual(fpA_stable_v2, fpA)
-
-    typeB = self._make_subtask(_stable_name='wow')
-    fpB = self._subtask_to_fp(typeB)
-    typeB_v2 = self._make_subtask()
-    typeB_v2._stable_name = 'wow'
-    fpB_v2 = self._subtask_to_fp(typeB_v2)
-    self.assertEqual(fpB, fpB_v2)
-    self.assertNotEqual(fpB, fpA)
-    self.assertEqual(fpB, fpA_stable)
-
-  def test_fingerprint_options_scope(self):
-    fpA = self._subtask_fp(scope='xxx')
-    fpB = self._subtask_fp(scope='yyy')
-    fpC = self._subtask_fp(scope='xxx')
-    self.assertEqual(fpA, fpC)
-    self.assertNotEqual(fpA, fpB)
-
-    fpD = self._subtask_fp()
-    fpDeps = self._subtask_fp(_deps=(Zinc.global_instance(),))
-    self.assertNotEqual(fpD, fpDeps)
-    fpDeps_v2 = self._subtask_fp(_deps=(Zinc.global_instance(),))
-    self.assertEqual(fpDeps, fpDeps_v2)
-
-    fpDeps_opts_global = self._subtask_fp(
-      scope=GLOBAL_SCOPE,
-      options={GLOBAL_SCOPE: {'colors': False}})
-    self.assertNotEqual(fpDeps_opts_global, fpD)
-    fpDeps_opts_global_v2 = self._subtask_fp(
-      scope=GLOBAL_SCOPE,
-      options={GLOBAL_SCOPE: {'colors': False}})
-    self.assertEqual(fpDeps_opts_global_v2, fpDeps_opts_global)
-
-    fpDeps_opts_empty = self._subtask_fp(
-      options={GLOBAL_SCOPE: {'some-random-arg': []}},
-      _deps=(Zinc.global_instance(),))
-    self.assertEqual(fpDeps_opts_empty, fpDeps)
-    fpDeps_opts_empty_scoped = self._subtask_fp(
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertNotEqual(fpDeps_opts_empty_scoped, fpDeps)
-    fpDeps_opts_scoped = self._subtask_fp(
-      options={'compile.zinc': {}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertEqual(fpDeps_opts_scoped, fpDeps_opts_empty_scoped)
-    fpDeps_opts_scoped_v2 = self._subtask_fp(
-      options={'compile.zinc': {}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertEqual(fpDeps_opts_scoped_v2, fpDeps_opts_scoped)
-    fpDeps_opts_dbg = self._subtask_fp(
-      options={'compile': {'debug-symbols': True}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_empty)
-    self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_scoped)
-    fpDeps_opts_dbg_v2 = self._subtask_fp(
-      options={'compile.zinc': {'debug-symbols': True}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertEqual(fpDeps_opts_dbg_v2, fpDeps_opts_dbg)
-    fpDeps_opts_compile_empty = self._subtask_fp(
-      options={'compile.zinc': {'some-random-arg': []}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    # some-random-arg is not registered in the compile.zinc scope,
-    self.assertNotEqual(fpDeps_opts_compile_empty, fpDeps_opts_empty)
-    self.assertEqual(fpDeps_opts_compile_empty, fpDeps_opts_scoped)
-    fpDeps_opts_dbg_compile = self._subtask_fp(
-      options={'compile.zinc': {'debug-symbols': True}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_compile_empty)
-    self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_dbg)
-    fpDeps_opts_dbg_compile_v2 = self._subtask_fp(
-      options={'compile.zinc': {'debug-symbols': True}},
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertEqual(fpDeps_opts_dbg_compile_v2, fpDeps_opts_dbg_compile)
-
-    fpDeps_opts_dbg_compile_with_global = self._subtask_fp(
-      options={
-        GLOBAL_SCOPE: {'colors': False},
-        'compile.zinc': {'debug-symbols': True}
-      },
-      _deps=(Zinc.scoped(JvmCompile),))
-    self.assertNotEqual(fpDeps_opts_dbg_compile_with_global, fpDeps_opts_dbg_compile)
-
-    fpDeps_extra = self._subtask_fp(
-      options={'compile.zinc': {'debug-symbols': True}},
-      _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
-    self.assertNotEqual(fpDeps_extra, fpDeps_opts_dbg_compile)
-    fpDeps_new_scope = self._subtask_fp(
-      options={'compile.zinc': {'debug-symbols': True}},
-      scope='xxx',
-      _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
-    self.assertNotEqual(fpDeps_new_scope, fpDeps_extra)
-    fpDeps_new_scope_v2 = self._subtask_fp(
-      options={'compile.zinc': {'debug-symbols': True}},
-      scope='xxx',
-      _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
-    self.assertEqual(fpDeps_new_scope_v2, fpDeps_new_scope)
-
   def test_execute_cleans_invalid_result_dirs(self):
     # Regression test to protect task.execute() from returning invalid dirs.
     task, vt, _ = self._run_fixture()
@@ -554,3 +395,199 @@ class TaskTest(TaskTestBase):
     _, vtA, was_valid = self._run_fixture(options=self._cache_ignore_options())
     self.assertFalse(was_valid)
     self.assertFalse(vtA.cacheable)
+
+class FakeTaskTest(TaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return FakeTask
+
+  def context(self, **kwargs):
+    return super(TaskTestBase, self).context(**kwargs)
+
+  def _make_subtask(self, name='A', scope=GLOBAL_SCOPE, cls=FakeTask, **kwargs):
+    subclass_name = b'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    kwargs['options_scope'] = scope
+    return type(subclass_name, (cls,), kwargs)
+
+  def _subtask_to_fp(self, subtask, scope=GLOBAL_SCOPE, options={}):
+    self.set_options_for_scope(scope, **options)
+    return subtask(self.context(for_task_types=[subtask]), self.test_workdir).fingerprint
+
+  def _subtask_fp(self, scope=GLOBAL_SCOPE, options={}, **kwargs):
+    return self._subtask_to_fp(self._make_subtask(scope=scope, **kwargs), scope=scope, options=options)
+
+  def test_fingerprint_identity(self):
+    fpA = self._subtask_fp()
+    fpB = self._subtask_fp()
+    self.assertEqual(fpA, fpB)
+
+  def test_fingerprint_implementation_version(self):
+    fpA = self._subtask_fp()
+
+    # Using an implementation_version() should be different than nothing
+    fpA_with_version = self._subtask_fp(_impls=[('asdf', 0)])
+    self.assertNotEqual(fpA_with_version, fpA)
+
+    # Should return same fingerprint for same implementation_version()
+    fpA_same_version = self._subtask_fp(_impls=[('asdf', 0)])
+    self.assertEqual(fpA_same_version, fpA_with_version)
+
+    # Different fingerprint for different implementation_version()
+    fpA_new_version = self._subtask_fp(_impls=[('asdf', 1)])
+    self.assertNotEqual(fpA_new_version, fpA)
+
+    # Append implementation_version() from super
+    fpB = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)])
+    fpB_v2 = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)])
+    self.assertEqual(fpB, fpB_v2)
+    # The same chain of implementation_version() should result in the same fingerprint
+    fpB_with_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
+    self.assertNotEqual(fpB, fpB_with_version)
+    fpB_same_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
+    self.assertEqual(fpB_with_version, fpB_same_version)
+    # Same implementation_version() for FakeTask, different for
+    # OtherFakeTask should result in a different fingerprint
+    fpB_new_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 1)])
+    self.assertNotEqual(fpB_new_version, fpB_with_version)
+
+    # Same implementation_version() for OtherFakeTask, different for
+    # FakeTask should result in a different fingerprint
+    fpB_new_typeA = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 2)])
+    self.assertNotEqual(fpB_new_typeA, fpB)
+    fpB_new_typeA_with_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
+    self.assertNotEqual(fpB_new_typeA_with_version, fpB_new_typeA)
+    self.assertNotEqual(fpB_new_typeA_with_version, fpB_same_version)
+    fpB_new_typeA_same_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
+    self.assertEqual(fpB_new_typeA_with_version, fpB_new_typeA_same_version)
+
+  def test_fingerprint_stable_name(self):
+    # the same tasks should have the same stable_name
+    typeA = self._make_subtask(name='asdf')
+    fpA = self._subtask_to_fp(typeA)
+    typeA_v2 = self._make_subtask(name='asdf')
+    fpA_v2 = self._subtask_to_fp(typeA_v2)
+    self.assertEqual(fpA, fpA_v2)
+
+    # the same _stable_name means the same stable_name()
+    typeA_stable = self._make_subtask(name='asdf', _stable_name='wow')
+    fpA_stable = self._subtask_to_fp(typeA_stable)
+    self.assertNotEqual(fpA_stable, fpA)
+    typeA_stable_v2 = self._make_subtask(name='asdf')
+    typeA_stable_v2._stable_name = 'wow'
+    fpA_stable_v2 = self._subtask_to_fp(typeA_stable_v2)
+    self.assertEqual(fpA_stable, fpA_stable_v2)
+    # _stable_name subsumes the class name
+    self.assertNotEqual(fpA_stable_v2, fpA)
+
+    typeB = self._make_subtask(_stable_name='wow')
+    fpB = self._subtask_to_fp(typeB)
+    typeB_v2 = self._make_subtask()
+    typeB_v2._stable_name = 'wow'
+    fpB_v2 = self._subtask_to_fp(typeB_v2)
+    self.assertEqual(fpB, fpB_v2)
+    self.assertNotEqual(fpB, fpA)
+    self.assertEqual(fpB, fpA_stable)
+
+  def test_fingerprint_options_scope(self):
+    fpA = self._subtask_fp(scope='xxx')
+    fpB = self._subtask_fp(scope='yyy')
+    fpC = self._subtask_fp(scope='xxx')
+    self.assertEqual(fpA, fpC)
+    self.assertNotEqual(fpA, fpB)
+
+    fpDefault = self._subtask_fp()
+    self.assertNotEqual(fpDefault, fpA)
+    self.assertNotEqual(fpDefault, fpB)
+    fpDefault_v2 = self._subtask_to_fp(self._make_subtask())
+    self.assertEqual(fpDefault_v2, fpDefault)
+
+    fpDeps = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    self.assertNotEqual(fpDefault, fpDeps)
+    fpDeps_v2 = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    self.assertEqual(fpDeps_v2, fpDeps)
+
+    fpScopedDeps = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    self.assertNotEqual(fpScopedDeps, fpDeps)
+    fpScopedDeps_v2 = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    self.assertEqual(fpScopedDeps_v2, fpScopedDeps)
+
+  def test_fingerprint_options_with_scopes(self):
+    fpA = self._subtask_fp(scope=GLOBAL_SCOPE)
+
+    # You should be able to use TaskTestBase.set_options_for_scope(scope,
+    # **options) and when creating a context dont pass options (these are
+    # populated in an Options object under the tests task_type scope). The
+    # context will then be created from all self.set_options and
+    # self.set_options_for_scope calls.
+
+    # fpDeps_opts_global = self._subtask_fp(
+    #   scope=GLOBAL_SCOPE,
+    #   options={'fake-options': []})
+    # self.assertNotEqual(fpDeps_opts_global, fpA)
+    # fpDeps_opts_global_v2 = self._subtask_fp(
+    #   scope=GLOBAL_SCOPE,
+    #   options={'fake-options': []})
+    # self.assertEqual(fpDeps_opts_global_v2, fpDeps_opts_global)
+
+    # fpDeps_opts_empty = self._subtask_fp(
+    #   options={GLOBAL_SCOPE: {'some-random-arg': []}},
+    #   _deps=(Zinc.global_instance(),))
+    # self.assertEqual(fpDeps_opts_empty, fpDeps)
+    # fpDeps_opts_empty_scoped = self._subtask_fp(
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertNotEqual(fpDeps_opts_empty_scoped, fpDeps)
+    # fpDeps_opts_scoped = self._subtask_fp(
+    #   options={'compile.zinc': {}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertEqual(fpDeps_opts_scoped, fpDeps_opts_empty_scoped)
+    # fpDeps_opts_scoped_v2 = self._subtask_fp(
+    #   options={'compile.zinc': {}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertEqual(fpDeps_opts_scoped_v2, fpDeps_opts_scoped)
+    # fpDeps_opts_dbg = self._subtask_fp(
+    #   options={'compile': {'debug-symbols': True}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_empty)
+    # self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_scoped)
+    # fpDeps_opts_dbg_v2 = self._subtask_fp(
+    #   options={'compile.zinc': {'debug-symbols': True}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertEqual(fpDeps_opts_dbg_v2, fpDeps_opts_dbg)
+    # fpDeps_opts_compile_empty = self._subtask_fp(
+    #   options={'compile.zinc': {'some-random-arg': []}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # # some-random-arg is not registered in the compile.zinc scope,
+    # self.assertNotEqual(fpDeps_opts_compile_empty, fpDeps_opts_empty)
+    # self.assertEqual(fpDeps_opts_compile_empty, fpDeps_opts_scoped)
+    # fpDeps_opts_dbg_compile = self._subtask_fp(
+    #   options={'compile.zinc': {'debug-symbols': True}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_compile_empty)
+    # self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_dbg)
+    # fpDeps_opts_dbg_compile_v2 = self._subtask_fp(
+    #   options={'compile.zinc': {'debug-symbols': True}},
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertEqual(fpDeps_opts_dbg_compile_v2, fpDeps_opts_dbg_compile)
+
+    # fpDeps_opts_dbg_compile_with_global = self._subtask_fp(
+    #   options={
+    #     GLOBAL_SCOPE: {'colors': False},
+    #     'compile.zinc': {'debug-symbols': True}
+    #   },
+    #   _deps=(Zinc.scoped(JvmCompile),))
+    # self.assertNotEqual(fpDeps_opts_dbg_compile_with_global, fpDeps_opts_dbg_compile)
+
+    # fpDeps_extra = self._subtask_fp(
+    #   options={'compile.zinc': {'debug-symbols': True}},
+    #   _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
+    # self.assertNotEqual(fpDeps_extra, fpDeps_opts_dbg_compile)
+    # fpDeps_new_scope = self._subtask_fp(
+    #   options={'compile.zinc': {'debug-symbols': True}},
+    #   scope='xxx',
+    #   _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
+    # self.assertNotEqual(fpDeps_new_scope, fpDeps_extra)
+    # fpDeps_new_scope_v2 = self._subtask_fp(
+    #   options={'compile.zinc': {'debug-symbols': True}},
+    #   scope='xxx',
+    #   _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
+    # self.assertEqual(fpDeps_new_scope_v2, fpDeps_new_scope)
