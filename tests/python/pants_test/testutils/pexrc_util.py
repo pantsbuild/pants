@@ -26,10 +26,8 @@ def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
     raise IOError('Directory for pexrc %s does not exist. Please create it. Note that this '
                   'directory must be either /etc, your home directory, or '
                   'os.path.dirname(sys.argv[0]) to ensure a valid pexrc location.', pexrc_dir)
-  if pexrc_dir == '/etc':
-    pexrc_filename = 'pexrc'
-  else:
-    pexrc_filename = '.pexrc'
+    
+  pexrc_filename = 'pexrc' if pexrc_dir == '/etc' else '.pexrc'
   pexrc_path = os.path.join(pexrc_dir, pexrc_filename)
 
   temp_pexrc = ''

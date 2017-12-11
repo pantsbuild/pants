@@ -9,7 +9,9 @@ import os
 
 from pex.pex_bootstrapper import get_pex_info
 
+from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
+from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import (ensure_python_interpreter,
                                              setup_pexrc_with_pex_python_path)
@@ -62,8 +64,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(var_val, pants_run.stdout_data.strip())
 
   def test_pants_run_interpreter_selection_with_pexrc(self):
-    py27 = ensure_python_interpreter('2.7.10', self.get_project_root())
-    py36 = ensure_python_interpreter('3.6.3', self.get_project_root())
+    py27 = ensure_python_interpreter('2.7.10', get_buildroot())
+    py36 = ensure_python_interpreter('3.6.3', get_buildroot())
     with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
@@ -81,9 +83,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         assert py36 in pants_run_3.stdout_data
 
   def test_pants_binary_interpreter_selection_with_pexrc(self):
-    import pytest; pytest.set_trace()
-    py27 = ensure_python_interpreter('2.7.10', self.get_project_root())
-    py36 = ensure_python_interpreter('3.6.3', self.get_project_root())
+    py27 = ensure_python_interpreter('2.7.10', get_buildroot())
+    py36 = ensure_python_interpreter('3.6.3', get_buildroot())
     with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
