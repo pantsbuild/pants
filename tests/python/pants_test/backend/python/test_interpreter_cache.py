@@ -155,11 +155,9 @@ class TestInterpreterCache(BaseTest):
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
     py27 = ensure_python_interpreter('2.7.10', self.get_project_root())
     py36 = ensure_python_interpreter('3.6.3', self.get_project_root())
-    print(os.path.exists(os.path.join(self.get_project_root(), '.pyenv_test')))
     if os.path.exists(os.path.join(self.get_project_root(), '.pyenv_test')):
-      print(os.listdir(os.path.join(self.get_project_root(), '.pyenv_test', 'versions', '2.7.10', 'bin')))
     # Target python 2 for interpreter cache.
-    with self._setup_test(constraints=['<3,<2.7.14'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
+    with self._setup_test(constraints=['CPython==2.7.10'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
       interpereters = cache.setup()
       self.assertEqual(len(interpereters), 1)
       self.assertEqual(interpereters[0].binary, py27)

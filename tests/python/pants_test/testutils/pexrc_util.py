@@ -53,18 +53,14 @@ def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
 
 def bootstrap_python_installer(location):
   install_location = os.path.join(location, '.pyenv_test')
-  print(os.path.exists(install_location))
   if os.path.exists(install_location):
     if os.listdir(install_location) == []:
       shutil.rmtree(install_location)
-  if not os.path.exists(install_location) or not os.path.exists(
-    os.path.join(location, '.pyenv_test')):
+  if not os.path.exists(install_location):
     for _ in range(5):
       try:
         subprocess.call(['git', 'clone', 'https://github.com/pyenv/pyenv.git', install_location])
-      except StandardError as e:
-        print('Error cloning from github')
-        print(e)
+      except StandardError:
         continue
       else:
         break
@@ -73,8 +69,6 @@ def bootstrap_python_installer(location):
 
 
 def ensure_python_interpreter(version, location=None):
-  print("ensuring")
-  print(os.path.exists(os.path.join(location, '.pyenv_test/bin/pyenv')))
   if not location:
     location = os.getcwd()
   bootstrap_python_installer(location)
@@ -82,6 +76,4 @@ def ensure_python_interpreter(version, location=None):
   if not os.path.exists(install_location):
     os.environ['PYENV_ROOT'] = os.path.join(location, '.pyenv_test')
     subprocess.call([os.path.join(location, '.pyenv_test/bin/pyenv'), 'install', version])
-
-  print(os.listdir(install_location))
   return os.path.join(install_location, 'bin', 'python' + version[0:3])

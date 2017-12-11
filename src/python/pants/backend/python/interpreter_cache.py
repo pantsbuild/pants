@@ -160,9 +160,7 @@ class PythonInterpreterCache(object):
     with OwnerPrintingInterProcessFileLock(path=os.path.join(self._cache_dir, '.file_lock')):
       interpreters.extend(self._setup_cached(filters))
       if unsatisfied_filters(interpreters):
-        print(self._setup_paths(setup_paths, filters))
         interpreters.extend(self._setup_paths(setup_paths, filters))
-        print(interpreters)
 
     for filt in unsatisfied_filters(interpreters):
       self._logger('No valid interpreters found for {}!'.format(filt))
