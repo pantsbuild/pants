@@ -55,7 +55,8 @@ def bootstrap_python_installer(location):
   install_location = os.path.join(location, '.pyenv_test')
   print(os.path.exists(install_location))
   if os.path.exists(install_location):
-    print(os.listdir(install_location))
+    if os.listdir(install_location) == []:
+      shutil.rmtree(install_location)
   if not os.path.exists(install_location) or not os.path.exists(
     os.path.join(location, '.pyenv_test')):
     for _ in range(5):

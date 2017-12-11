@@ -49,7 +49,7 @@ class TestInterpreterCache(BaseTest):
       cache._setup_cached = mock.Mock(return_value=[self._interpreter])
       if mock_setup_paths_with_interpreters:
         cache._setup_paths = mock.Mock(return_value=[PythonInterpreter.from_binary(ensure_python_interpreter('2.7.10', self.get_project_root())),
-                                                     PythonInterpreter.from_binary(ensure_python_interpreter('3.6.3', self.get_project_root())])
+                                                     PythonInterpreter.from_binary(ensure_python_interpreter('3.6.3', self.get_project_root()))]
       else:
         cache._setup_paths = mock.Mock(return_value=[])
       yield cache, path
