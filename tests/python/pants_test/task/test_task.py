@@ -564,6 +564,12 @@ class FakeTaskTest(TaskTestBase):
       options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 111}},
     ).fingerprint
     self.assertEqual(fpA_opts_v2, fpA_opts)
+    fpA_new_opts = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 112}},
+    ).fingerprint
+    self.assertNotEqual(fpA_new_opts, fpA_opts)
 
     # self.set_options_for_scope(FakeTask.options_scope, **{'fake-options': []})
     # fpDeps_opts_global = self.create_task(self.context(options={'fake-options': []})).fingerprint
