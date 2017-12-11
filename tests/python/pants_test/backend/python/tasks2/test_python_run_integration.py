@@ -82,6 +82,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         assert py36 in pants_run_3.stdout_data
 
   def test_pants_binary_interpreter_selection_with_pexrc(self):
+    print("DEBUG START")
+    print(get_buildroot())
     py27 = ensure_python_interpreter('2.7.10', get_buildroot())
     py36 = ensure_python_interpreter('3.6.3', get_buildroot())
     with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
