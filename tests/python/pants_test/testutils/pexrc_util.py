@@ -55,7 +55,6 @@ def bootstrap_python_installer(location):
   install_location = os.path.join(location, '.pyenv_test')
   if not os.path.exists(install_location) or not os.path.exists(
     os.path.join(location, '.pyenv_test')):
-    import pytest;pytest.set_trace()  
     for _ in range(3):
       try:
         subprocess.call(['git', 'clone', 'https://github.com/pyenv/pyenv.git', install_location])
