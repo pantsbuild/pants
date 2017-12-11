@@ -70,14 +70,14 @@ class FakeTask(TaskBase):
 
   options_scope = 'fake-task'
 
-  def __init__(self, context, workdir):
-    self.context = context
-    self._workdir = workdir
-
   _deps = ()
   @classmethod
   def subsystem_dependencies(cls):
     return cls._deps
+
+  def __init__(self, context, workdir):
+    self.context = context
+    self._workdir = workdir
 
 class OtherFakeTask(FakeTask):
   _other_impls = []
@@ -136,11 +136,12 @@ class TaskTest(TaskTestBase):
     task._incremental = incremental
     return task, target
 
-  def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
+  def _run_fixture(self, content=None, incremental=False, artifact_cache=False,
+                   options=None, target_name=':t'):
     content = content or self._file_contents
     self._toggle_cache(artifact_cache)
 
-    task, target = self._fixture(incremental=incremental, options=options)
+    task, target = self._fixture(incremental=incremental, options=options, target_name=target_name)
     self._create_clean_file(target, content)
     vtA, was_valid = task.execute()
     return task, vtA, was_valid
@@ -148,6 +149,11 @@ class TaskTest(TaskTestBase):
   def _create_clean_file(self, target, content):
     self.create_file(self._filename, content)
     target.mark_invalidation_hash_dirty()
+
+  def test_fingerprint_identity(self):
+    fpA = self._run_fixture(incremental=True, target_name=':a')[0].fingerprint
+    fpB = self._run_fixture(incremental=True, target_name=':b')[0].fingerprint
+    self.assertEqual(fpA, fpB)
 
   def test_revert_after_failure(self):
     # Regression test to catch the following scenario:
@@ -409,8 +415,9 @@ class FakeTaskTest(TaskTestBase):
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 
-  def _subtask_to_fp(self, subtask, scope=GLOBAL_SCOPE, options={}, for_subsystems=[FakeSubsystem]):
-    return subtask(self.context(for_task_types=[subtask], for_subsystems=for_subsystems), self.test_workdir).fingerprint
+  def _subtask_to_fp(self, subtask, scope=GLOBAL_SCOPE, options={}):
+    context = super(TaskTestBase, self).context(for_task_types=[subtask])
+    return subtask(context, self._test_workdir).fingerprint
 
   def _subtask_fp(self, scope=GLOBAL_SCOPE, options={}, **kwargs):
     return self._subtask_to_fp(self._make_subtask(scope=scope, **kwargs), scope=scope, options=options)
@@ -519,14 +526,44 @@ class FakeTaskTest(TaskTestBase):
     # context will then be created from all self.set_options and
     # self.set_options_for_scope calls.
 
-    # target = self.make_target(':t', target_type=Files, sources=['f'])
-    # fpA = self.create_task(self.context(target_roots=[target])).fingerprint
-    # fpA_v2 = self.create_task(
-    #   self.context(
-    #     target_roots=[target],
-    #     options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 111}})
-    # ).fingerprint
-    # self.assertNotEqual(fpA, fpA_v2)
+    fpA = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={},
+    ).fingerprint
+    fpA_no_options = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={'fake-subsystem.' + FakeTask.options_scope: {}},
+    ).fingerprint
+    self.assertEqual(fpA_no_options, fpA)
+    fpA_unrecognized_options = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={'fake-subsystem.' + FakeTask.options_scope: {'asdf': 3}},
+    ).fingerprint
+    self.assertEqual(fpA_unrecognized_options, fpA)
+
+    fpA_super_scope = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={FakeTask.options_scope: {'fake-options': 111}},
+    ).fingerprint
+    self.assertNotEqual(fpA_super_scope, fpA)
+
+    fpA_opts = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 111}},
+    ).fingerprint
+    self.assertNotEqual(fpA, fpA_opts)
+    self.assertNotEqual(fpA_opts, fpA_super_scope)
+    fpA_opts_v2 = self._subtask_to_fp(
+      self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask),
+      scope=GLOBAL_SCOPE,
+      options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 111}},
+    ).fingerprint
+    self.assertEqual(fpA_opts_v2, fpA_opts)
 
     # self.set_options_for_scope(FakeTask.options_scope, **{'fake-options': []})
     # fpDeps_opts_global = self.create_task(self.context(options={'fake-options': []})).fingerprint
