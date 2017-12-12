@@ -192,7 +192,7 @@ class PantsDaemon(FingerprintedProcessManager):
       for service, service_thread in service_thread_map.items():
         self._logger.info('terminating pantsd service: {}'.format(service))
         service.terminate()
-        service_thread.join()
+        service_thread.join(self.JOIN_TIMEOUT_SECONDS)
       self._logger.info('terminating pantsd')
       self._kill_switch.set()
 
@@ -227,13 +227,19 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.info('setting up service {}'.format(service))
       service.setup(self._lock)
 
+  @staticmethod
+  def _make_thread(target):
+    t = threading.Thread(target=target)
+    t.daemon = True
+    return t
+
   def _run_services(self, services):
     """Service runner main loop."""
     if not services:
       self._logger.critical('no services to run, bailing!')
       return
 
-    service_thread_map = {service: threading.Thread(target=service.run) for service in services}
+    service_thread_map = {service: self._make_thread(service.run) for service in services}
 
     # Start services.
     for service, service_thread in service_thread_map.items():

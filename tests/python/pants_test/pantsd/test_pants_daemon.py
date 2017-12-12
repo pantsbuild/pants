@@ -77,7 +77,7 @@ class PantsDaemonTest(BaseTest):
 
     self.mock_service.terminate.assert_called_once_with()
     self.assertTrue(self.pantsd.is_killed)
-    mock_thread.join.assert_called_once_with()
+    mock_thread.join.assert_called_once_with(PantsDaemon.JOIN_TIMEOUT_SECONDS)
 
   def test_run_services_no_services(self):
     self.pantsd._run_services([])

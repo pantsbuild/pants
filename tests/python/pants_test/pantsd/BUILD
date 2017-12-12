@@ -69,10 +69,11 @@ python_tests(
     'src/python/pants/pantsd:process_manager',
     'src/python/pants/util:collections',
     'tests/python/pants_test:int-test',
-    'tests/python/pants_test/testutils:process_test_util'
+    'tests/python/pants_test/testutils:process_test_util',
+    '3rdparty/python:ansicolors'
   ],
   tags = {'integration'},
-  timeout = 600
+  timeout = 900
 )
 
 python_tests(
