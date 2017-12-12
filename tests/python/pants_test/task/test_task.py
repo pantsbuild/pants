@@ -182,12 +182,15 @@ class TaskTest(TaskTestBase):
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 
+  def _instantiate_task(self, subtask, **kwargs):
+    ctx = super(TaskTestBase, self).context(for_task_types=[subtask], **kwargs)
+    return subtask(ctx, self._test_workdir)
+
   def _subtask_to_fp(self, subtask, options_fingerprintable=None):
-    context = super(TaskTestBase, self).context(
-      for_task_types=[subtask],
+    return self._instantiate_task(
+      subtask,
       options_fingerprintable=options_fingerprintable,
-    )
-    return subtask(context, self._test_workdir).fingerprint
+    ).fingerprint
 
   def _subtask_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
     if scope is None:
@@ -505,24 +508,27 @@ class TaskTest(TaskTestBase):
     version_extended_base = self._subtask_fp(_impls=[('asdf', 0), ('xxx', 0)])
     self.assertNotEqual(version_extended_base, extended_version_other_fake)
 
-  def test_fingerprint_stable_name(self):
-    # the same tasks should have the same stable_name
-    typeA = self._make_subtask(name='asdf')
-    fpA = self._subtask_to_fp(typeA)
-    typeA_v2 = self._make_subtask(name='asdf')
-    fpA_v2 = self._subtask_to_fp(typeA_v2)
-    self.assertEqual(fpA, fpA_v2)
+  def test_stable_name(self):
+    task_stable_name = self._make_subtask(name='xxx').stable_name()
+    task_same_stable_name = self._make_subtask(name='xxx').stable_name()
+    self.assertEqual(task_same_stable_name, task_stable_name)
+    task_new_name = self._make_subtask(name='yyy').stable_name()
+    self.assertNotEqual(task_new_name, task_stable_name)
 
     # the same _stable_name means the same stable_name()
-    typeA_stable = self._make_subtask(name='asdf', _stable_name='wow')
-    fpA_stable = self._subtask_to_fp(typeA_stable)
-    self.assertNotEqual(fpA_stable, fpA)
-    typeA_stable_v2 = self._make_subtask(name='asdf')
-    typeA_stable_v2._stable_name = 'wow'
-    fpA_stable_v2 = self._subtask_to_fp(typeA_stable_v2)
-    self.assertEqual(fpA_stable, fpA_stable_v2)
-    # _stable_name subsumes the class name
-    self.assertNotEqual(fpA_stable_v2, fpA)
+    task_with_stable_name = self._make_subtask(name='asdf', _stable_name='xxx')
+    self.assertEqual(task_with_stable_name.stable_name(), 'xxx')
+    task_with_stable_name._stable_name = 'yyy'
+    self.assertEqual(task_with_stable_name.stable_name(), 'yyy')
+    task_with_new_stable_name = self._make_subtask(name='other_name', _stable_name='yyy')
+    self.assertEqual(task_with_new_stable_name.stable_name(), task_with_stable_name.stable_name())
+
+  def test_fingerprint_name_stable_name(self):
+    named_task_fp = self._subtask_fp(name='asdf')
+    other_named_task_fp = self._subtask_fp(name='asdf')
+    self.assertEqual(other_named_task_fp, named_task_fp)
+    new_name_task_fp = self._subtask_fp(name='x')
+    self.assertNotEqual(new_name_task_fp, named_task_fp)
 
     typeB = self._make_subtask(_stable_name='wow')
     fpB = self._subtask_to_fp(typeB)

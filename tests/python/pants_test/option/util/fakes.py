@@ -115,7 +115,6 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
       pairs = []
       if include_passthru and passthru_args:
         pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
-      print('fingerprintable scope: {}'.format(scope))
       registration_scope = scope
       while registration_scope is not None:
         print('registration_scope: {}'.format(registration_scope))
@@ -183,11 +182,8 @@ def create_options_for_optionables(optionables,
     return completed_scopes
 
   def register_func(on_scope):
-    print('on_scope: {}'.format(on_scope))
     scoped_options = all_options[on_scope]
-    print('scoped_options: {}'.format(scoped_options))
     scoped_fingerprintables = fingerprintable_options[on_scope]
-    print('scoped_fingerprintables: {}'.format(scoped_fingerprintables))
     register = _options_registration_function(scoped_options, scoped_fingerprintables)
     register.bootstrap = bootstrap_option_values
     register.scope = on_scope
