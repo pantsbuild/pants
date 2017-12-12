@@ -169,7 +169,7 @@ def create_options_for_optionables(optionables,
     """
     completed_scopes = set(scopes)
     for scope in scopes:
-      while scope != '':
+      while scope != GLOBAL_SCOPE:
         if scope not in completed_scopes:
           completed_scopes.add(scope)
         scope = enclosing_scope(scope)
