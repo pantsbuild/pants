@@ -59,6 +59,9 @@ class OptionsFingerprinter(object):
       fingerprint_key=fingerprint_key,
       invert=invert
     ):
+      fp_result = six.binary_type(fingerprinter.fingerprint(option_type, option_value))
+      print('scope: {}, option_type: {}, option_value: {}, fp_result: {}'.format(
+        scope, option_type, option_value, fp_result))
       hasher.update(
         # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
         # so we always cast to bytes here.

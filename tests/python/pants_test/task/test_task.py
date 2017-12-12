@@ -103,7 +103,7 @@ class FakeSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(FakeSubsystem, cls).register_options(register)
-    register('--fake-options', type=bool, default=False,
+    register('--fake-options', type=bool, default=True,
              help='Some fake options for our fake subsystem.')
 
 class TaskTest(TaskTestBase):
@@ -537,6 +537,11 @@ class OtherFakeTaskTest(TaskTestBase):
   def task_type(cls):
     return AnotherFakeTask
 
+  def _make_subtask(self, name='A', scope=GLOBAL_SCOPE, cls=AnotherFakeTask, **kwargs):
+    subclass_name = b'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
+    kwargs['options_scope'] = scope
+    return type(subclass_name, (cls,), kwargs)
+
   def test_fingerprint_options_with_scopes(self):
     # You should be able to use TaskTestBase.set_options_for_scope(scope,
     # **options) and when creating a context dont pass options (these are
@@ -548,14 +553,74 @@ class OtherFakeTaskTest(TaskTestBase):
     fpA_v2 = self.create_task(self.context()).fingerprint
     self.assertEqual(fpA_v2, fpA)
 
-    self.set_options_for_scope('other-fake-test-scope', **{'fake-options': False})
-    fpA_default = self.create_task(self.context()).fingerprint
-    self.assertEqual(fpA_default, fpA)
+    fake_opts_spec = {'fake-options': bool}
 
-    ctxB = self.context(options_fingerprintable={'other-fake-test-scope': {'fake-options': True}})
-    taskB = self.create_task(ctxB)
-    fpB = taskB.fingerprint
+    self.set_options_for_scope(self.options_scope, **{'fake-options': False})
+    fpB = self.create_task(self.context(
+      options_fingerprintable={self.options_scope: fake_opts_spec})
+    ).fingerprint
     self.assertNotEqual(fpB, fpA)
+    fpB_v2 = self.create_task(self.context(
+      options_fingerprintable={self.options_scope: fake_opts_spec})
+    ).fingerprint
+    self.assertEqual(fpB_v2, fpB)
+
+    self.set_options_for_scope(self.options_scope, **{'fake-options': True})
+    fpB_new_value = self.create_task(self.context(
+      options_fingerprintable={self.options_scope: fake_opts_spec}
+    )).fingerprint
+    self.assertNotEqual(fpB_new_value, fpB)
+    self.assertNotEqual(fpB_new_value, fpA)
+
+    def subtask(scope):
+      return self._make_subtask(scope=scope, cls=AnotherFakeTask)
+    def ctx(task_type, options_fingerprintable):
+      return super(TaskTestBase, self).context(
+        for_task_types=[task_type],
+        options_fingerprintable=options_fingerprintable
+      )
+    def fp(scope, options_fingerprintable):
+      task_type = subtask(scope)
+      return task_type(
+        ctx(task_type, options_fingerprintable=options_fingerprintable),
+        self._test_workdir,
+      ).fingerprint
+
+    fpC = fp(self.options_scope, {self.options_scope: fake_opts_spec})
+    fpC_v2 = fp(self.options_scope, {self.options_scope: fake_opts_spec})
+    self.assertEqual(fpC_v2, fpC)
+
+    self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-options': True})
+    fpE = fp(self.options_scope, {
+      self.options_scope: fake_opts_spec,
+      'fake-subsystem': fake_opts_spec,
+      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+    })
+    self.assertNotEqual(fpE, fpC)
+
+    self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-options': True})
+    fpE_v2 = fp(self.options_scope, {
+      self.options_scope: fake_opts_spec,
+      'fake-subsystem': fake_opts_spec,
+      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+    })
+    self.assertEqual(fpE_v2, fpE)
+
+    self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-options': False})
+    fpD = fp(self.options_scope, {
+      self.options_scope: fake_opts_spec,
+      'fake-subsystem': fake_opts_spec,
+      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+    })
+    self.assertNotEqual(fpD, fpC)
+    self.assertNotEqual(fpD, fpE)
+
+    fpD_v2 = fp(self.options_scope, {
+      self.options_scope: fake_opts_spec,
+      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+      'fake-subsystem': fake_opts_spec,
+    })
+    self.assertEqual(fpD_v2, fpD)
 
     # fpA = self._subtask_to_fp(
     #   self._make_subtask(scope=FakeTask.options_scope, cls=FakeTask, _deps=fake_dep),

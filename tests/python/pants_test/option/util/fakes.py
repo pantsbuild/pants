@@ -109,14 +109,28 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def scope_to_flags(self):
       return {}
 
+    # FIXME: use Options#get_fingerprintable_for_scope to accurately test!
     def get_fingerprintable_for_scope(self, scope, include_passthru=False,
                                       fingerprint_key=None, invert=False):
       pairs = []
       if include_passthru and passthru_args:
         pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
-      option_values = self.for_scope(scope)
-      pairs.extend((option_type, option_values[option_name])
-                   for option_name, option_type in fingerprintable[scope].items())
+      print('fingerprintable scope: {}'.format(scope))
+      registration_scope = scope
+      while registration_scope is not None:
+        print('registration_scope: {}'.format(registration_scope))
+        option_values = self.for_scope(registration_scope)
+        for n, t in fingerprintable[registration_scope].items():
+          print('name: {}, type: {}, val: {}'.format(
+            n, t, option_values[n]))
+          scoped_pairs = [(option_type, option_values[option_name])
+                          for option_name, option_type in fingerprintable[scope].items()]
+          print('registration_scope: {}, scoped_pairs: {}'.format(
+            registration_scope, scoped_pairs))
+          pairs.extend(scoped_pairs)
+        registration_scope = (None if registration_scope == GLOBAL_SCOPE
+                              else enclosing_scope(registration_scope))
+      print('scope: {}, pairs: {}'.format(scope, pairs))
       return pairs
 
     def __getitem__(self, key):
