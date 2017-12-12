@@ -9,7 +9,6 @@ import logging
 import select
 import sys
 import traceback
-from contextlib import contextmanager
 
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
