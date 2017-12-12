@@ -12,12 +12,12 @@ import signal
 import time
 from contextlib import contextmanager
 
+from colors import bold, cyan, magenta
+
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import assert_no_process_exists_by_command
-
-from colors import bold, cyan, magenta
 
 
 class PantsDaemonMonitor(ProcessManager):
