@@ -62,7 +62,7 @@ class FakeTask(Task):
   _impls = []
   @classmethod
   def implementation_version(cls):
-    return cls._impls
+    return super(FakeTask, cls).implementation_version() + cls._impls
 
   @classmethod
   def supports_passthru_args(cls):
@@ -192,7 +192,7 @@ class TaskTest(TaskTestBase):
   def _subtask_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
     if scope is None:
       scope = cls.options_scope
-    return self._subtask_to_fp(self._make_subtask(scope=scope, **kwargs), options_fingerprintable=options_fingerprintable)
+    return self._subtask_to_fp(self._make_subtask(scope=scope, cls=cls, **kwargs), options_fingerprintable=options_fingerprintable)
 
   def test_revert_after_failure(self):
     # Regression test to catch the following scenario:
@@ -459,55 +459,51 @@ class TaskTest(TaskTestBase):
 
   def test_fingerprint_implementation_version_inheritance(self):
     fake_task = self._subtask_fp(_impls=[])
-    other_task = self._subtask_fp(scope=OtherFakeTask.options_scope, cls=OtherFakeTask, _impls=[], _other_impls=[])
+    other_task = self._subtask_fp(cls=OtherFakeTask, _impls=[], _other_impls=[])
     self.assertNotEqual(other_task, fake_task)
 
     versioned_fake = self._subtask_fp(_impls=[('asdf', 0)])
     base_version_other_fake = self._subtask_fp(
-      scope=OtherFakeTask.options_scope,
       cls=OtherFakeTask,
        _impls=[('asdf', 0)],
       _other_impls=[],
     )
+    self.assertNotEqual(base_version_other_fake, versioned_fake)
+    a = self._make_subtask(cls=OtherFakeTask, _impls=[('asdf', 0)], _other_impls=[])
+    b = self._make_subtask(cls=OtherFakeTask, _impls=[('asdf', 0)], _other_impls=[('xxx', 0)])
+    print(a.implementation_version_str())
+    print(a(super(TaskTestBase, self).context(for_task_types=[a]), self._test_workdir).fingerprint)
+    print(b.implementation_version_str())
+    print(b(super(TaskTestBase, self).context(for_task_types=[b]), self._test_workdir).fingerprint)
+    extended_version_other_fake = self._subtask_fp(
+      cls=OtherFakeTask,
+       _impls=[('asdf', 0)],
+      _other_impls=[('xxx', 0)],
+    )
+    self.assertNotEqual(extended_version_other_fake, base_version_other_fake)
 
-  def test_fingerprint_implementation_version(self):
-    fpA = self._subtask_fp(_impls=[])
+    extended_version_copy = self._subtask_fp(
+      cls=OtherFakeTask,
+       _impls=[('asdf', 0)],
+      _other_impls=[('xxx', 0)],
+    )
+    self.assertEqual(extended_version_copy, extended_version_other_fake)
+    extended_new_version = self._subtask_fp(
+      cls=OtherFakeTask,
+       _impls=[('asdf', 0)],
+      _other_impls=[('xxx', 1)],
+    )
+    self.assertNotEqual(extended_new_version, extended_version_other_fake)
 
-    # # Using an implementation_version() should be different than nothing
-    # fpA_with_version = self._subtask_fp(_impls=[('asdf', 0)])
-    # self.assertNotEqual(fpA_with_version, fpA)
+    extended_new_base_version = self._subtask_fp(
+      cls=OtherFakeTask,
+      _impls=[('xxx', 0)],
+      _other_impls=[('xxx', 0)]
+    )
+    self.assertNotEqual(extended_new_base_version, extended_version_other_fake)
 
-    # # Should return same fingerprint for same implementation_version()
-    # fpA_same_version = self._subtask_fp(_impls=[('asdf', 0)])
-    # self.assertEqual(fpA_same_version, fpA_with_version)
-
-    # # Different fingerprint for different implementation_version()
-    # fpA_new_version = self._subtask_fp(_impls=[('asdf', 1)])
-    # self.assertNotEqual(fpA_new_version, fpA)
-
-    # # Append implementation_version() from super
-    # fpB = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)])
-    # fpB_v2 = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)])
-    # self.assertEqual(fpB, fpB_v2)
-    # # The same chain of implementation_version() should result in the same fingerprint
-    # fpB_with_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
-    # self.assertNotEqual(fpB, fpB_with_version)
-    # fpB_same_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 2)])
-    # self.assertEqual(fpB_with_version, fpB_same_version)
-    # # Same implementation_version() for FakeTask, different for
-    # # OtherFakeTask should result in a different fingerprint
-    # fpB_new_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 1)], _other_impls=[('bbbb', 1)])
-    # self.assertNotEqual(fpB_new_version, fpB_with_version)
-
-    # # Same implementation_version() for OtherFakeTask, different for
-    # # FakeTask should result in a different fingerprint
-    # fpB_new_typeA = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 2)])
-    # self.assertNotEqual(fpB_new_typeA, fpB)
-    # fpB_new_typeA_with_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
-    # self.assertNotEqual(fpB_new_typeA_with_version, fpB_new_typeA)
-    # self.assertNotEqual(fpB_new_typeA_with_version, fpB_same_version)
-    # fpB_new_typeA_same_version = self._subtask_fp(cls=OtherFakeTask, _impls=[('asdf', 2)], _other_impls=[('bbbb', 2)])
-    # self.assertEqual(fpB_new_typeA_with_version, fpB_new_typeA_same_version)
+    version_extended_base = self._subtask_fp(_impls=[('asdf', 0), ('xxx', 0)])
+    self.assertNotEqual(version_extended_base, extended_version_other_fake)
 
   def test_fingerprint_stable_name(self):
     # the same tasks should have the same stable_name
