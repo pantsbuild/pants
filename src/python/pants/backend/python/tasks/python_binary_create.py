@@ -114,7 +114,6 @@ class PythonBinaryCreate(Task):
       # Find which targets provide sources and which specify requirements.
       source_tgts = []
       req_tgts = []
-      python_dist_targets = []
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
@@ -124,8 +123,6 @@ class PythonBinaryCreate(Task):
               builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
-        elif is_local_python_dist(tgt):
-          python_dist_targets.append(tgt)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
