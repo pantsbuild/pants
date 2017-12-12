@@ -207,7 +207,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         pantsd_run(cmd[1:], {'GLOBAL': {'level': cmd[0]}})
         checker.assert_running()
 
-  def test_pantsd_runner_strays(self):
+  def test_pantsd_stray_runners(self):
     # Allow env var overrides for local stress testing.
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_STRESS_ATTEMPTS', 20))
     cmd = os.environ.get('PANTS_TEST_PANTSD_STRESS_CMD', 'help').split()
