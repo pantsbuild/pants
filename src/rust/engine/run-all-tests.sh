@@ -17,7 +17,7 @@ exit_code=0
 for crate in $(find ${here} -name Cargo.toml); do
   (
     echo >&2 "Running tests for ${crate}:"
-    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" run_cargo test ${MODE_FLAG} \
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test ${MODE_FLAG} \
       --manifest-path=${crate}
   ) || exit_code=1
 done

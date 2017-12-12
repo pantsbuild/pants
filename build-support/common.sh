@@ -22,9 +22,8 @@ function green() {
 }
 
 # Initialization for elapsed()
-if [ -z "$elapsed_start_time" ] ; then
-  export elapsed_start_time=$(date +'%s')
-fi
+: ${elapsed_start_time:=$(date +'%s')}
+export elapsed_start_time
 
 function elapsed() {
   now=$(date '+%s')
@@ -83,3 +82,23 @@ function set_archflags() {
   fi
 }
 set_archflags
+
+function get_os() {
+  case "$(uname)" in
+    "Darwin")
+      os="mac"
+      base="$(uname -r)"
+      os_version="10.$(( ${base%%.*} - 4))"
+      ;;
+    "Linux")
+      os="linux"
+      os_version="$(uname -m)"
+      ;;
+    *)
+      echo >&2 "Unknown platform"
+      exit 1
+      ;;
+  esac
+
+  echo "${os}/${os_version}"
+}
