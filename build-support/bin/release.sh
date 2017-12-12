@@ -32,6 +32,8 @@ readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 
 source ${ROOT}/contrib/release_packages.sh
 
+source "${ROOT}/build-support/bin/native/bootstrap.sh"
+
 function find_pkg() {
   local readonly pkg_name=$1
   local readonly version=$2
@@ -216,6 +218,17 @@ function build_pants_packages() {
     ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     end_travis_section
   done
+
+  start_travis_section "fs_util" "Building fs_util binary"
+  (
+    set -e
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${ROOT}/src/python" run_cargo build --release --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$(get_os)/${version}"
+    mkdir -p "${dst_dir}"
+    cp "${ROOT}/src/rust/engine/fs/fs_util/target/release/fs_util" "${dst_dir}/"
+  ) || die "Failed to build fs_util"
+  end_travis_section
+
   pants_version_reset
 }
 
