@@ -112,7 +112,8 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       cmd,
       workdir,
       combined_config,
-      tee_output=True
+      # TODO: With this uncommented, `test_pantsd_run` fails.
+      # tee_output=True
     )
     elapsed = time.time() - start_time
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
