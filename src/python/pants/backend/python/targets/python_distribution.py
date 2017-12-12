@@ -15,9 +15,7 @@ from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
 
 class PythonDistribution(Target):
-  """A Python distribution.
-
-  """
+  """A Python distribution target that accepts a user-defined setup.py."""
 
   default_sources_globs = '*.py'
 
@@ -40,9 +38,7 @@ class PythonDistribution(Target):
     :type dependencies: list of strings
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
-    :type sources: ``Fileset`` or list of strings
-    :param resource_targets: The addresses of ``resources`` targets this target
-      depends on.
+    :type sources: ``Fileset`` or list of strings. Must include setup.py.
     :param compatibility: either a string or list of strings that represents
       interpreter compatibility for this target, using the Requirement-style
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements

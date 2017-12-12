@@ -154,12 +154,6 @@ def prepare_dist_workdir(dist_tgt, workdir, log):
       dist_tgt.name, fingerprint)
     safe_mkdir(dist_target_dir)
 
-
-  # Create subdirectory based on target's name.
-  tmp_dir_for_dist = os.path.join(dist_target_dir, dist_tgt.name)
-  if not tmp_dir_for_dist:
-    safe_mkdir(tmp_dir_for_dist)
-
   # Copy sources and setup.py over for packaging.
   sources_rel_to_target_base = dist_tgt.sources_relative_to_target_base()
   sources_rel_to_buildroot = dist_tgt.sources_relative_to_buildroot()
@@ -167,12 +161,13 @@ def prepare_dist_workdir(dist_tgt, workdir, log):
   # the build root for the shutil file copying below.
   sources = zip(sources_rel_to_buildroot, sources_rel_to_target_base)
   for source_relative_to_build_root, source_relative_to_target_base in sources:
-    path_to_source = os.path.join(tmp_dir_for_dist, source_relative_to_target_base)
-    if not os.path.exists(os.path.dirname(path_to_source)):
+    source_rel_to_dist_dir = os.path.join(dist_target_dir, source_relative_to_target_base)
+    if not os.path.exists(os.path.dirname(source_rel_to_dist_dir)):
       os.makedirs(os.path.dirname(path_to_source))
-    shutil.copyfile(os.path.join(get_buildroot(), source_relative_to_build_root), path_to_source)
+    shutil.copyfile(os.path.join(get_buildroot(), source_relative_to_build_root),
+                    source_rel_to_dist_dir)
 
-  return tmp_dir_for_dist  
+  return dist_target_dir
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):
