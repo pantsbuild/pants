@@ -509,9 +509,13 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(version_extended_base, extended_version_other_fake)
 
   def test_stable_name(self):
-    task_stable_name = self._make_subtask(name='xxx').stable_name()
-    task_same_stable_name = self._make_subtask(name='xxx').stable_name()
-    self.assertEqual(task_same_stable_name, task_stable_name)
+    task_stable_name = self._make_subtask(name='xxx')
+    task_same_stable_name = self._make_subtask(name='xxx')
+    self.assertEqual(task_same_stable_name.stable_name(),
+                     task_stable_name.stable_name())
+    self.assertEqual(self._instantiate_task(task_same_stable_name).fingerprint,
+                     self._instantiate_task(task_stable_name).fingerprint)
+
     task_new_name = self._make_subtask(name='yyy').stable_name()
     self.assertNotEqual(task_new_name, task_stable_name)
 
@@ -521,119 +525,98 @@ class TaskTest(TaskTestBase):
     task_with_stable_name._stable_name = 'yyy'
     self.assertEqual(task_with_stable_name.stable_name(), 'yyy')
     task_with_new_stable_name = self._make_subtask(name='other_name', _stable_name='yyy')
-    self.assertEqual(task_with_new_stable_name.stable_name(), task_with_stable_name.stable_name())
+    self.assertEqual(task_with_new_stable_name.stable_name(),
+                     task_with_stable_name.stable_name())
+    self.assertEqual(self._instantiate_task(task_with_new_stable_name).fingerprint,
+                     self._instantiate_task(task_with_stable_name).fingerprint)
 
-  def test_fingerprint_name_stable_name(self):
-    named_task_fp = self._subtask_fp(name='asdf')
-    other_named_task_fp = self._subtask_fp(name='asdf')
-    self.assertEqual(other_named_task_fp, named_task_fp)
-    new_name_task_fp = self._subtask_fp(name='x')
-    self.assertNotEqual(new_name_task_fp, named_task_fp)
+  def test_fingerprint_changing_options_scope(self):
+    task_fp = self._subtask_fp(scope='xxx')
+    other_task_fp = self._subtask_fp(scope='yyy')
+    same_task_fp = self._subtask_fp(scope='xxx')
+    self.assertEqual(same_task_fp, task_fp)
+    self.assertNotEqual(other_task_fp, task_fp)
 
-    typeB = self._make_subtask(_stable_name='wow')
-    fpB = self._subtask_to_fp(typeB)
-    typeB_v2 = self._make_subtask()
-    typeB_v2._stable_name = 'wow'
-    fpB_v2 = self._subtask_to_fp(typeB_v2)
-    self.assertEqual(fpB, fpB_v2)
-    self.assertNotEqual(fpB, fpA)
-    self.assertEqual(fpB, fpA_stable)
+    default_scope_fp = self._subtask_fp()
+    self.assertNotEqual(default_scope_fp, task_fp)
+    self.assertNotEqual(default_scope_fp, other_task_fp)
+    subsystem_deps_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    self.assertNotEqual(subsystem_deps_fp, default_scope_fp)
+    same_subsystem_deps_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    self.assertEqual(same_subsystem_deps_fp, subsystem_deps_fp)
 
-  def test_fingerprint_options_scope(self):
-    fpA = self._subtask_fp(scope='xxx')
-    fpB = self._subtask_fp(scope='yyy')
-    fpC = self._subtask_fp(scope='xxx')
-    self.assertEqual(fpA, fpC)
-    self.assertNotEqual(fpA, fpB)
-
-    fpDefault = self._subtask_fp()
-    self.assertNotEqual(fpDefault, fpA)
-    self.assertNotEqual(fpDefault, fpB)
-    fpDefault_v2 = self._subtask_to_fp(self._make_subtask())
-    self.assertEqual(fpDefault_v2, fpDefault)
-
-    fpDeps = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
-    self.assertNotEqual(fpDefault, fpDeps)
-    fpDeps_v2 = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
-    self.assertEqual(fpDeps_v2, fpDeps)
-
-    fpScopedDeps = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
-    self.assertNotEqual(fpScopedDeps, fpDeps)
-    fpScopedDeps_v2 = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
-    self.assertEqual(fpScopedDeps_v2, fpScopedDeps)
+    scoped_subsystems_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    self.assertNotEqual(scoped_subsystems_fp, subsystem_deps_fp)
+    same_scoped_subsystems_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    self.assertEqual(same_scoped_subsystems_fp, scoped_subsystems_fp)
 
   def test_fingerprint_options_with_scopes(self):
-    def fp(scope, options_fingerprintable=None, cls=AnotherFakeTask):
+    def fp(options_fingerprintable=None, cls=AnotherFakeTask, scope=self.options_scope):
       task_type = self._make_subtask(scope=scope, cls=cls)
       return self._subtask_to_fp(task_type, options_fingerprintable=options_fingerprintable)
 
-    fpA = fp(self.options_scope)
-    fpA_v2 = fp(self.options_scope)
-    self.assertEqual(fpA_v2, fpA)
-
-    fake_opts_spec = {'fake-option': bool}
+    default_fp = fp()
+    same_default_fp = fp()
+    self.assertEqual(same_default_fp, default_fp)
 
     self.set_options_for_scope(self.options_scope, **{'fake-option': False})
-    fpB = fp(self.options_scope, {self.options_scope: fake_opts_spec})
-    self.assertNotEqual(fpB, fpA)
-    fpB_v2 = fp(self.options_scope, {self.options_scope: fake_opts_spec})
-    self.assertEqual(fpB_v2, fpB)
+    with_option_fp = fp({self.options_scope: {'fake-option': bool}})
+    self.assertNotEqual(with_option_fp, default_fp)
+    same_option_fp = fp({self.options_scope: {'fake-option': bool}})
+    self.assertEqual(same_option_fp, with_option_fp)
 
     self.set_options_for_scope(self.options_scope, **{'fake-option': True})
-    fpB_new_value = fp(self.options_scope, {self.options_scope: fake_opts_spec})
-    self.assertNotEqual(fpB_new_value, fpB)
-    self.assertNotEqual(fpB_new_value, fpA)
-
-    fpC = fp(self.options_scope, {self.options_scope: fake_opts_spec})
-    fpC_v2 = fp(self.options_scope, {self.options_scope: fake_opts_spec})
-    self.assertEqual(fpC_v2, fpC)
+    different_option_value_fp = fp({self.options_scope: {'fake-option': bool}})
+    self.assertNotEqual(different_option_value_fp, with_option_fp)
+    self.assertNotEqual(different_option_value_fp, default_fp)
 
     self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
-    fpE = fp(self.options_scope, {
-      self.options_scope: fake_opts_spec,
-      'fake-subsystem': fake_opts_spec,
-      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+    subsystem_task_scoped_opts_fp = fp({
+      self.options_scope: {'fake-option': bool},
+      'fake-subsystem': {'fake-option': bool},
+      'fake-subsystem.' + self.options_scope: {'fake-option': bool},
     })
-    self.assertNotEqual(fpE, fpC)
+    self.assertNotEqual(subsystem_task_scoped_opts_fp, default_fp)
+    self.assertNotEqual(subsystem_task_scoped_opts_fp, with_option_fp)
+    self.assertNotEqual(subsystem_task_scoped_opts_fp, different_option_value_fp)
 
     self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-option': True})
-    fpE_v2 = fp(self.options_scope, {
-      self.options_scope: fake_opts_spec,
-      'fake-subsystem': fake_opts_spec,
-      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+    subsystem_task_intersecting_scope_opts_fp = fp({
+      self.options_scope: {'fake-option': bool},
+      'fake-subsystem': {'fake-option': bool},
+      'fake-subsystem.' + self.options_scope: {'fake-option': bool},
     })
-    self.assertEqual(fpE_v2, fpE)
+    self.assertEqual(subsystem_task_intersecting_scope_opts_fp, subsystem_task_scoped_opts_fp)
 
     self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-option': False})
-    fpD = fp(self.options_scope, {
-      self.options_scope: fake_opts_spec,
-      'fake-subsystem': fake_opts_spec,
-      'fake-subsystem.' + self.options_scope: fake_opts_spec,
+    different_nested_opts_values_fp = fp({
+      self.options_scope: {'fake-option': bool},
+      'fake-subsystem': {'fake-option': bool},
+      'fake-subsystem.' + self.options_scope: {'fake-option': bool},
     })
-    self.assertNotEqual(fpD, fpC)
-    self.assertNotEqual(fpD, fpE)
+    self.assertNotEqual(different_nested_opts_values_fp, default_fp)
+    self.assertNotEqual(different_nested_opts_values_fp, with_option_fp)
+    self.assertNotEqual(different_nested_opts_values_fp, subsystem_task_scoped_opts_fp)
 
     self.set_options_for_scope('another-fake-subsystem', **{'another-fake-option': True})
-    fpD_v2 = fp(
-      self.options_scope,
+    same_base_task_different_scope_options_fp = fp(
       {
-        self.options_scope: fake_opts_spec,
-        'fake-subsystem.' + self.options_scope: fake_opts_spec,
-        'fake-subsystem': fake_opts_spec,
+        self.options_scope: {'fake-option': bool},
+        'fake-subsystem.' + self.options_scope: {'fake-option': bool},
+        'fake-subsystem': {'fake-option': bool},
         'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
         'another-fake-subsystem': {'another-fake-option': bool},
       },
     )
-    self.assertEqual(fpD_v2, fpD)
+    self.assertEqual(same_base_task_different_scope_options_fp, different_nested_opts_values_fp)
 
-    fpF = fp(
-      self.options_scope,
+    different_task_with_same_opts_fp = fp(
       {
-        self.options_scope: fake_opts_spec,
-        'fake-subsystem.' + self.options_scope: fake_opts_spec,
-        'fake-subsystem': fake_opts_spec,
+        self.options_scope: {'fake-option': bool},
+        'fake-subsystem.' + self.options_scope: {'fake-option': bool},
+        'fake-subsystem': {'fake-option': bool},
         'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
         'another-fake-subsystem': {'another-fake-option': bool},
       },
       cls=YetAnotherFakeTask)
-    self.assertNotEqual(fpF, fpD)
+    self.assertNotEqual(different_task_with_same_opts_fp, different_nested_opts_values_fp)
