@@ -173,15 +173,15 @@ public class ConsoleRunnerImpl {
       }
     }
 
-    byte[] readOut() throws IOException {
+    byte[] readOut() {
       return read(outstream);
     }
 
-    byte[] readErr() throws IOException {
+    byte[] readErr() {
       return read(errstream);
     }
 
-    private byte[] read(ByteArrayOutputStream stream) throws IOException {
+    private byte[] read(ByteArrayOutputStream stream) {
       Preconditions.checkState(closed, "Capture must be closed by all users before it can be read");
       return stream.toByteArray();
     }
@@ -237,6 +237,8 @@ public class ConsoleRunnerImpl {
 
     @Override
     public void testRunFinished(Result result) throws Exception {
+      swappableOut.swap(swappableOut.getOriginal());
+      swappableErr.swap(swappableErr.getOriginal());
       for (StreamCapture capture : suiteCaptures.values()) {
         capture.close();
       }
