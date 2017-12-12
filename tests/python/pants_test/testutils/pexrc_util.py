@@ -31,19 +31,19 @@ def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
   pexrc_path = os.path.join(pexrc_dir, pexrc_filename)
 
   temp_pexrc = ''
-  # preserve .pexrc if it already exists in pexrc_dir.
+  # Preserve .pexrc if it already exists in pexrc_dir.
   if os.path.exists(pexrc_path):
     temp_pexrc = os.path.join(pexrc_dir, '.pexrc.bak')
     shutil.copyfile(pexrc_path, temp_pexrc)
 
-  # write a temp .pexrc in pexrc_dir
+  # Write a temp .pexrc in pexrc_dir.
   with open(pexrc_path, 'w') as pexrc:
     pexrc.write("PEX_PYTHON_PATH=%s" % ':'.join(interpreter_paths))
   yield 
 
-  # cleanup temporary .pexrc
+  # Cleanup temporary .pexrc.
   os.remove(pexrc_path)
-  # replace .pexrc if it was there before
+  # Replace .pexrc if it was there before.
   if os.path.exists(temp_pexrc):
     shutil.copyfile(temp_pexrc, pexrc_path)
     os.remove(temp_pexrc)
