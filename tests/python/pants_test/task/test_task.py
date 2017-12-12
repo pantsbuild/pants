@@ -94,17 +94,9 @@ class FakeSubsystem(Subsystem):
   options_scope = 'fake-subsystem'
 
   @classmethod
-  def get_fake_options_default(cls, bootstrap_option_values):
-    # FIXME: do we need to do anything with the bootstrap options? what exactly
-    # are bootstrap options? options_bootstrapper.py does not have a clear
-    # description, and e.g. zinc does not use any bootstrap options
-    return ['--some-fake-option']
-
-  @classmethod
   def register_options(cls, register):
     super(FakeSubsystem, cls).register_options(register)
-    register('--fake-options', type=bool, default=True,
-             help='Some fake options for our fake subsystem.')
+    register('--fake-option', type=bool)
 
 class TaskTest(TaskTestBase):
 
@@ -516,19 +508,34 @@ class FakeTaskTest(TaskTestBase):
     fpScopedDeps_v2 = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
     self.assertEqual(fpScopedDeps_v2, fpScopedDeps)
 
+class AnotherFakeSubsystem(Subsystem):
+  options_scope = 'another-fake-subsystem'
+
+  @classmethod
+  def register_options(cls, register):
+    super(AnotherFakeSubsystem, cls).register_options(register)
+    register('--another-fake-option', type=bool)
+
 class AnotherFakeTask(Task):
+  # TODO: test with passthru args too!
   @classmethod
   def supports_passthru_args(cls):
     return True
 
-  options_scope = 'another-fake-task'
-
-  _ssub = FakeSubsystem
   @classmethod
   def subsystem_dependencies(cls):
-    return super(AnotherFakeTask, cls).subsystem_dependencies() + (cls._ssub.scoped(cls),)
+    return super(AnotherFakeTask, cls).subsystem_dependencies() + (FakeSubsystem.scoped(cls),)
 
   def execute(self): pass
+
+class YetAnotherFakeTask(AnotherFakeTask):
+  @classmethod
+  def supports_passthru_args(cls):
+    return False
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(YetAnotherFakeTask, cls).subsystem_dependencies() + (AnotherFakeSubsystem.scoped(cls),)
 
 class OtherFakeTaskTest(TaskTestBase):
   options_scope = 'other-fake-test-scope'
@@ -553,9 +560,9 @@ class OtherFakeTaskTest(TaskTestBase):
     fpA_v2 = self.create_task(self.context()).fingerprint
     self.assertEqual(fpA_v2, fpA)
 
-    fake_opts_spec = {'fake-options': bool}
+    fake_opts_spec = {'fake-option': bool}
 
-    self.set_options_for_scope(self.options_scope, **{'fake-options': False})
+    self.set_options_for_scope(self.options_scope, **{'fake-option': False})
     fpB = self.create_task(self.context(
       options_fingerprintable={self.options_scope: fake_opts_spec})
     ).fingerprint
@@ -565,22 +572,22 @@ class OtherFakeTaskTest(TaskTestBase):
     ).fingerprint
     self.assertEqual(fpB_v2, fpB)
 
-    self.set_options_for_scope(self.options_scope, **{'fake-options': True})
+    self.set_options_for_scope(self.options_scope, **{'fake-option': True})
     fpB_new_value = self.create_task(self.context(
       options_fingerprintable={self.options_scope: fake_opts_spec}
     )).fingerprint
     self.assertNotEqual(fpB_new_value, fpB)
     self.assertNotEqual(fpB_new_value, fpA)
 
-    def subtask(scope):
-      return self._make_subtask(scope=scope, cls=AnotherFakeTask)
+    def subtask(scope, cls=AnotherFakeTask):
+      return self._make_subtask(scope=scope, cls=cls)
     def ctx(task_type, options_fingerprintable):
       return super(TaskTestBase, self).context(
         for_task_types=[task_type],
         options_fingerprintable=options_fingerprintable
       )
-    def fp(scope, options_fingerprintable):
-      task_type = subtask(scope)
+    def fp(scope, options_fingerprintable, cls=AnotherFakeTask):
+      task_type = subtask(scope, cls=cls)
       return task_type(
         ctx(task_type, options_fingerprintable=options_fingerprintable),
         self._test_workdir,
@@ -590,7 +597,7 @@ class OtherFakeTaskTest(TaskTestBase):
     fpC_v2 = fp(self.options_scope, {self.options_scope: fake_opts_spec})
     self.assertEqual(fpC_v2, fpC)
 
-    self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-options': True})
+    self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
     fpE = fp(self.options_scope, {
       self.options_scope: fake_opts_spec,
       'fake-subsystem': fake_opts_spec,
@@ -598,7 +605,7 @@ class OtherFakeTaskTest(TaskTestBase):
     })
     self.assertNotEqual(fpE, fpC)
 
-    self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-options': True})
+    self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-option': True})
     fpE_v2 = fp(self.options_scope, {
       self.options_scope: fake_opts_spec,
       'fake-subsystem': fake_opts_spec,
@@ -606,7 +613,7 @@ class OtherFakeTaskTest(TaskTestBase):
     })
     self.assertEqual(fpE_v2, fpE)
 
-    self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-options': False})
+    self.set_options_for_scope('fake-subsystem.' + self.options_scope, **{'fake-option': False})
     fpD = fp(self.options_scope, {
       self.options_scope: fake_opts_spec,
       'fake-subsystem': fake_opts_spec,
@@ -615,113 +622,27 @@ class OtherFakeTaskTest(TaskTestBase):
     self.assertNotEqual(fpD, fpC)
     self.assertNotEqual(fpD, fpE)
 
-    fpD_v2 = fp(self.options_scope, {
-      self.options_scope: fake_opts_spec,
-      'fake-subsystem.' + self.options_scope: fake_opts_spec,
-      'fake-subsystem': fake_opts_spec,
-    })
+    self.set_options_for_scope('another-fake-subsystem', **{'another-fake-option': True})
+    fpD_v2 = fp(
+      self.options_scope,
+      {
+        self.options_scope: fake_opts_spec,
+        'fake-subsystem.' + self.options_scope: fake_opts_spec,
+        'fake-subsystem': fake_opts_spec,
+        'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
+        'another-fake-subsystem': {'another-fake-option': bool},
+      },
+    )
     self.assertEqual(fpD_v2, fpD)
 
-    # fpA = self._subtask_to_fp(
-    #   self._make_subtask(scope=FakeTask.options_scope, cls=FakeTask, _deps=fake_dep),
-    #   options={})
-    # fpA_no_options = self._subtask_to_fp(
-    #   self._make_subtask(scope=FakeTask.options_scope, cls=FakeTask, _deps=fake_dep),
-    #   scope=FakeTask.options_scope,
-    #   options={})
-    # self.assertEqual(fpA_no_options, fpA)
-    # fpA_unrecognized_options = self._subtask_to_fp(
-    #   self._make_subtask(scope=FakeTask.options_scope, cls=FakeTask, _deps=fake_dep),
-    #   scope=FakeTask.options_scope,
-    #   options={'asdf': 3})
-    # self.assertEqual(fpA_unrecognized_options, fpA)
-
-    # fpA_super_scope = self._subtask_to_fp(
-    #   self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask, _deps=fake_dep),
-    #   scope='FakeTask'
-    #   options={FakeTask.options_scope: {'fake-options': 111}})
-    # self.assertNotEqual(fpA_super_scope, fpA)
-
-    # fpA_opts = self._subtask_to_fp(
-    #   self._make_subtask(scope=FakeTask.options_scope, cls=FakeTask, _deps=fake_dep),
-    #   scope=FakeSubsystem.subscope(FakeTask.options_scope),
-    #   options={'fake-options': 111})
-    # self.assertNotEqual(fpA, fpA_opts)
-    # self.assertNotEqual(fpA_opts, fpA_super_scope)
-    # fpA_opts_v2 = self._subtask_to_fp(
-    #   self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask, _deps=fake_dep),
-    #   options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 111}})
-    # self.assertEqual(fpA_opts_v2, fpA_opts)
-    # fpA_new_opts = self._subtask_to_fp(
-    #   self._make_subtask(scope=GLOBAL_SCOPE, cls=FakeTask, _deps=fake_dep),
-    #   options={'fake-subsystem.' + FakeTask.options_scope: {'fake-options': 112}})
-    # self.assertNotEqual(fpA_new_opts, fpA_opts)
-
-    # self.set_options_for_scope(FakeTask.options_scope, **{'fake-options': []})
-    # fpDeps_opts_global = self.create_task(self.context(options={'fake-options': []})).fingerprint
-    # self.assertNotEqual(fpDeps_opts_global, fpA)
-    # fpDeps_opts_global_v2 = self.create_task(self.context()).fingerprint
-    # self.assertEqual(fpDeps_opts_global_v2, fpDeps_opts_global)
-
-    # fpDeps_opts_empty = self._subtask_fp(
-    #   options={GLOBAL_SCOPE: {'some-random-arg': []}},
-    #   _deps=(Zinc.global_instance(),))
-    # self.assertEqual(fpDeps_opts_empty, fpDeps)
-    # fpDeps_opts_empty_scoped = self._subtask_fp(
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertNotEqual(fpDeps_opts_empty_scoped, fpDeps)
-    # fpDeps_opts_scoped = self._subtask_fp(
-    #   options={'compile.zinc': {}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertEqual(fpDeps_opts_scoped, fpDeps_opts_empty_scoped)
-    # fpDeps_opts_scoped_v2 = self._subtask_fp(
-    #   options={'compile.zinc': {}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertEqual(fpDeps_opts_scoped_v2, fpDeps_opts_scoped)
-    # fpDeps_opts_dbg = self._subtask_fp(
-    #   options={'compile': {'debug-symbols': True}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_empty)
-    # self.assertNotEqual(fpDeps_opts_dbg, fpDeps_opts_scoped)
-    # fpDeps_opts_dbg_v2 = self._subtask_fp(
-    #   options={'compile.zinc': {'debug-symbols': True}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertEqual(fpDeps_opts_dbg_v2, fpDeps_opts_dbg)
-    # fpDeps_opts_compile_empty = self._subtask_fp(
-    #   options={'compile.zinc': {'some-random-arg': []}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # # some-random-arg is not registered in the compile.zinc scope,
-    # self.assertNotEqual(fpDeps_opts_compile_empty, fpDeps_opts_empty)
-    # self.assertEqual(fpDeps_opts_compile_empty, fpDeps_opts_scoped)
-    # fpDeps_opts_dbg_compile = self._subtask_fp(
-    #   options={'compile.zinc': {'debug-symbols': True}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_compile_empty)
-    # self.assertNotEqual(fpDeps_opts_dbg_compile, fpDeps_opts_dbg)
-    # fpDeps_opts_dbg_compile_v2 = self._subtask_fp(
-    #   options={'compile.zinc': {'debug-symbols': True}},
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertEqual(fpDeps_opts_dbg_compile_v2, fpDeps_opts_dbg_compile)
-
-    # fpDeps_opts_dbg_compile_with_global = self._subtask_fp(
-    #   options={
-    #     GLOBAL_SCOPE: {'colors': False},
-    #     'compile.zinc': {'debug-symbols': True}
-    #   },
-    #   _deps=(Zinc.scoped(JvmCompile),))
-    # self.assertNotEqual(fpDeps_opts_dbg_compile_with_global, fpDeps_opts_dbg_compile)
-
-    # fpDeps_extra = self._subtask_fp(
-    #   options={'compile.zinc': {'debug-symbols': True}},
-    #   _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
-    # self.assertNotEqual(fpDeps_extra, fpDeps_opts_dbg_compile)
-    # fpDeps_new_scope = self._subtask_fp(
-    #   options={'compile.zinc': {'debug-symbols': True}},
-    #   scope='xxx',
-    #   _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
-    # self.assertNotEqual(fpDeps_new_scope, fpDeps_extra)
-    # fpDeps_new_scope_v2 = self._subtask_fp(
-    #   options={'compile.zinc': {'debug-symbols': True}},
-    #   scope='xxx',
-    #   _deps=(Zinc.scoped(JvmCompile), SourceRootConfig.global_instance()))
-    # self.assertEqual(fpDeps_new_scope_v2, fpDeps_new_scope)
+    fpF = fp(
+      self.options_scope,
+      {
+        self.options_scope: fake_opts_spec,
+        'fake-subsystem.' + self.options_scope: fake_opts_spec,
+        'fake-subsystem': fake_opts_spec,
+        'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
+        'another-fake-subsystem': {'another-fake-option': bool},
+      },
+      cls=YetAnotherFakeTask)
+    self.assertNotEqual(fpF, fpD)
