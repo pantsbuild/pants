@@ -84,6 +84,10 @@ class OtherFakeTask(FakeTask):
   _other_impls = []
 
   @classmethod
+  def supports_passthru_args(cls):
+    return False
+
+  @classmethod
   def implementation_version(cls):
     return super(OtherFakeTask, cls).implementation_version() + cls._other_impls
 
@@ -197,11 +201,10 @@ class TaskTest(TaskTestBase):
     ctx = super(TaskTestBase, self).context(for_task_types=[subtask], **kwargs)
     return subtask(ctx, self._test_workdir)
 
-  def _subtask_to_fp(self, subtask, options_fingerprintable=None):
-    return self._instantiate_task(
-      subtask,
-      options_fingerprintable=options_fingerprintable,
-    ).fingerprint
+  def _subtask_to_fp(self, subtask, options_fingerprintable=None, **kwargs):
+    task_instance = self._instantiate_task(
+      subtask, options_fingerprintable=options_fingerprintable, **kwargs)
+    return task_instance.fingerprint
 
   def _subtask_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
     if scope is None:
@@ -556,9 +559,9 @@ class TaskTest(TaskTestBase):
     self.assertEqual(same_scoped_subsystems_fp, scoped_subsystems_fp)
 
   def test_fingerprint_options_with_scopes(self):
-    def fp(options_fingerprintable=None, cls=AnotherFakeTask, scope=self.options_scope):
+    def fp(options_fingerprintable=None, cls=AnotherFakeTask, scope=self.options_scope, **kwargs):
       task_type = self._make_subtask(scope=scope, cls=cls)
-      return self._subtask_to_fp(task_type, options_fingerprintable=options_fingerprintable)
+      return self._subtask_to_fp(task_type, options_fingerprintable=options_fingerprintable, **kwargs)
 
     default_fp = fp()
     same_default_fp = fp()
@@ -605,7 +608,7 @@ class TaskTest(TaskTestBase):
 
     self.set_options_for_scope('another-fake-subsystem', **{'another-fake-option': True})
     same_base_task_different_scope_options_fp = fp(
-      {
+      options_fingerprintable={
         self.options_scope: {'fake-option': bool},
         'fake-subsystem.' + self.options_scope: {'fake-option': bool},
         'fake-subsystem': {'fake-option': bool},
@@ -615,13 +618,50 @@ class TaskTest(TaskTestBase):
     )
     self.assertEqual(same_base_task_different_scope_options_fp, different_nested_opts_values_fp)
 
-    different_task_with_same_opts_fp = fp(
-      {
+    empty_passthru_args_fp = fp(
+      passthru_args=[],
+      options_fingerprintable={
         self.options_scope: {'fake-option': bool},
         'fake-subsystem.' + self.options_scope: {'fake-option': bool},
         'fake-subsystem': {'fake-option': bool},
         'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
         'another-fake-subsystem': {'another-fake-option': bool},
       },
-      cls=YetAnotherFakeTask)
+    )
+    self.assertEqual(empty_passthru_args_fp, same_base_task_different_scope_options_fp)
+    non_empty_passthru_args_fp = fp(
+      passthru_args=['something'],
+      options_fingerprintable={
+        self.options_scope: {'fake-option': bool},
+        'fake-subsystem.' + self.options_scope: {'fake-option': bool},
+        'fake-subsystem': {'fake-option': bool},
+        'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
+        'another-fake-subsystem': {'another-fake-option': bool},
+      },
+    )
+    self.assertNotEqual(non_empty_passthru_args_fp, empty_passthru_args_fp)
+
+    different_task_with_same_opts_fp = fp(
+      cls=YetAnotherFakeTask,
+      options_fingerprintable={
+        self.options_scope: {'fake-option': bool},
+        'fake-subsystem.' + self.options_scope: {'fake-option': bool},
+        'fake-subsystem': {'fake-option': bool},
+        'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
+        'another-fake-subsystem': {'another-fake-option': bool},
+      },
+    )
     self.assertNotEqual(different_task_with_same_opts_fp, different_nested_opts_values_fp)
+
+    different_task_with_passthru_fp = fp(
+      cls=YetAnotherFakeTask,
+      passthru_args=['asdf'],
+      options_fingerprintable={
+        self.options_scope: {'fake-option': bool},
+        'fake-subsystem.' + self.options_scope: {'fake-option': bool},
+        'fake-subsystem': {'fake-option': bool},
+        'another-fake-subsystem.' + self.options_scope: {'another-fake-option': bool},
+        'another-fake-subsystem': {'another-fake-option': bool},
+      },
+    )
+    self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)
