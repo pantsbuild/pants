@@ -163,7 +163,7 @@ def prepare_dist_workdir(dist_tgt, workdir, log):
   for source_relative_to_build_root, source_relative_to_target_base in sources:
     source_rel_to_dist_dir = os.path.join(dist_target_dir, source_relative_to_target_base)
     if not os.path.exists(os.path.dirname(source_rel_to_dist_dir)):
-      os.makedirs(os.path.dirname(path_to_source))
+      os.makedirs(os.path.dirname(source_rel_to_dist_dir))
     shutil.copyfile(os.path.join(get_buildroot(), source_relative_to_build_root),
                     source_rel_to_dist_dir)
 
