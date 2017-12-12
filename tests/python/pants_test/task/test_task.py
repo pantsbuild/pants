@@ -14,9 +14,8 @@ from pants.cache.cache_setup import CacheSetup
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.subsystem.subsystem_client_mixin import SubsystemDependency
-from pants.task.task import Task, TaskBase
+from pants.task.task import Task
 from pants.util.dirutil import safe_rmtree
-from pants_test.base.context_utils import create_context_from_options
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -58,8 +57,10 @@ class DummyTask(Task):
         vt.update()
       return vt, was_valid
 
+
 class FakeTask(Task):
   _impls = []
+
   @classmethod
   def implementation_version(cls):
     return super(FakeTask, cls).implementation_version() + cls._impls
@@ -71,19 +72,23 @@ class FakeTask(Task):
   options_scope = 'fake-task'
 
   _deps = ()
+
   @classmethod
   def subsystem_dependencies(cls):
     return super(FakeTask, cls).subsystem_dependencies() + cls._deps
 
   def execute(self): pass
 
+
 class OtherFakeTask(FakeTask):
   _other_impls = []
+
   @classmethod
   def implementation_version(cls):
     return super(OtherFakeTask, cls).implementation_version() + cls._other_impls
 
   options_scope = 'other-fake-task'
+
 
 class FakeSubsystem(Subsystem):
   options_scope = 'fake-subsystem'
@@ -93,7 +98,9 @@ class FakeSubsystem(Subsystem):
     super(FakeSubsystem, cls).register_options(register)
     register('--fake-option', type=bool)
 
+
 class AnotherFakeTask(Task):
+
   # TODO: test with passthru args too!
   @classmethod
   def supports_passthru_args(cls):
@@ -105,6 +112,7 @@ class AnotherFakeTask(Task):
 
   def execute(self): pass
 
+
 class AnotherFakeSubsystem(Subsystem):
   options_scope = 'another-fake-subsystem'
 
@@ -114,7 +122,9 @@ class AnotherFakeSubsystem(Subsystem):
     super(AnotherFakeSubsystem, cls).register_options(register)
     register('--another-fake-option', type=bool)
 
+
 class YetAnotherFakeTask(AnotherFakeTask):
+
   # TODO: test with passthru args too!
   @classmethod
   def supports_passthru_args(cls):
@@ -123,6 +133,7 @@ class YetAnotherFakeTask(AnotherFakeTask):
   @classmethod
   def subsystem_dependencies(cls):
     return super(YetAnotherFakeTask, cls).subsystem_dependencies() + (AnotherFakeSubsystem.scoped(cls),)
+
 
 class TaskTest(TaskTestBase):
 
