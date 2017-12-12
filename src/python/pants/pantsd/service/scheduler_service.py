@@ -55,7 +55,8 @@ class SchedulerService(PantsService):
 
   def _handle_batch_event(self, files):
     self._logger.debug('handling change event for: %s', files)
-    self._scheduler.invalidate_files(files)
+    with self.lock:
+      self._scheduler.invalidate_files(files)
 
   def _process_event_queue(self):
     """File event notification queue processor."""

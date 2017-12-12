@@ -80,7 +80,7 @@ class RemotePantsRunner(object):
     log_level = logging.getLevelName(self._bootstrap_options.for_global_scope().level.upper())
 
     formatter = logging.Formatter('%(levelname)s] %(message)s')
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stderr)
     handler.setLevel(log_level)
     handler.setFormatter(formatter)
 
