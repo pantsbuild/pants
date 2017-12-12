@@ -21,6 +21,10 @@ class PythonDistribution(Target):
 
   default_sources_globs = '*.py'
 
+  @classmethod
+  def alias(cls):
+    return 'python_dist'
+
   def __init__(self,
                address=None,
                payload=None,
@@ -64,8 +68,3 @@ class PythonDistribution(Target):
         PythonIdentity.parse_requirement(req)
       except ValueError as e:
         raise TargetDefinitionException(self, str(e))
-
-    @classmethod
-    def get_alias(cls):
-      return 'python_dist'
-

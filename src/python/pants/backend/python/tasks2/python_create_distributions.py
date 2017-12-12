@@ -63,7 +63,7 @@ class PythonCreateDistributions(Task):
 
       with self.invalidated(dist_targets, invalidate_dependents=True) as invalidation_check:
         for vt in invalidation_check.all_vts:
-          built_dists.add(self._create_dist(vt.target)) # vt.results dir
+          built_dists.add(self._create_dist(vt.target))
 
     self.context.products.register_data('python-dists', built_dists)
 
