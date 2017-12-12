@@ -152,19 +152,18 @@ class TaskTest(TaskTestBase):
       read=enable_artifact_cache,
     )
 
-  def _fixture(self, incremental, options=None, target_name=':t'):
-    target = self.make_target(target_name, target_type=Files, sources=[self._filename])
+  def _fixture(self, incremental, options=None):
+    target = self.make_target(':t', target_type=Files, sources=[self._filename])
     context = self.context(options=options, target_roots=[target])
     task = self.create_task(context)
     task._incremental = incremental
     return task, target
 
-  def _run_fixture(self, content=None, incremental=False, artifact_cache=False,
-                   options=None, target_name=':t'):
+  def _run_fixture(self, content=None, incremental=False, artifact_cache=False, options=None):
     content = content or self._file_contents
     self._toggle_cache(artifact_cache)
 
-    task, target = self._fixture(incremental=incremental, options=options, target_name=target_name)
+    task, target = self._fixture(incremental=incremental, options=options)
     self._create_clean_file(target, content)
     vtA, was_valid = task.execute()
     return task, vtA, was_valid

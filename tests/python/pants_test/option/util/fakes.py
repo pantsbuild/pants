@@ -124,7 +124,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
           print('name: {}, type: {}, val: {}'.format(
             n, t, option_values[n]))
           scoped_pairs = [(option_type, option_values[option_name])
-                          for option_name, option_type in fingerprintable[scope].items()]
+                          for option_name, option_type in fingerprintable[registration_scope].items()]
           print('registration_scope: {}, scoped_pairs: {}'.format(
             registration_scope, scoped_pairs))
           pairs.extend(scoped_pairs)
@@ -159,7 +159,8 @@ def create_options_for_optionables(optionables,
   fingerprintable_options = defaultdict(dict)
   bootstrap_option_values = None
 
-  # We need to update options before completing them based on inner/outer relation.
+  # NB(cosmicexplorer): wed do this again for all_options after calling
+  # register_func below, this is a hack
   if options:
     for scope, opts in options.items():
       all_options[scope].update(opts)
@@ -216,6 +217,11 @@ def create_options_for_optionables(optionables,
     all_scopes.update(extra_scopes)
 
   all_scopes = complete_scopes(all_scopes)
+
+  # We need to update options before completing them based on inner/outer relation.
+  if options:
+    for scope, opts in options.items():
+      all_options[scope].update(opts)
 
   # Iterating in sorted order guarantees that we see outer scopes before inner scopes,
   # and therefore only have to inherit from our immediately enclosing scope.
