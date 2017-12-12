@@ -28,6 +28,7 @@ class ResolveRequirementsTaskBase(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
+    round_manager.require_data('python-dists')
 
   def resolve_requirements(self, req_libs, local_python_dist_targets=None):
     """Requirements resolution for PEX files.
@@ -60,6 +61,7 @@ class ResolveRequirementsTaskBase(Task):
   def _build_requirements_pex(self, interpreter, path, req_libs, local_python_dist_targets=None):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
-    if local_python_dist_targets:
-      dump_python_distributions(builder, local_python_dist_targets, self.workdir, self.context.log)
+    built_dists = self.context.products.get_data('python-dists')
+    for dist in built_dists:
+      builder.add_dist_location(dist)
     builder.freeze()
