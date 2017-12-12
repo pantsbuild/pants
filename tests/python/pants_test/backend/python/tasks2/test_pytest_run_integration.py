@@ -105,9 +105,6 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH
     defined in a pexrc file on disk.
 
-    Note that both pants run and pants test use the python_execution_task_base module, so
-    the similar integration tests in test_python_run_integration.py take care of validating
-    that the proper interpreter was used for exexuting the targets (there is no way of doing that here).
     """
     py27 = ensure_python_interpreter('2.7.10', get_buildroot())
     py36 = ensure_python_interpreter('3.6.3', get_buildroot())
