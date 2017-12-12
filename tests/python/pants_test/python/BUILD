@@ -12,16 +12,6 @@ python_tests(
   ],
 )
 
-# XXX this tests the code running the test, not the code under test!
-python_tests(
-  name = 'test_thrift_namespace_packages',
-  sources = ['test_thrift_namespace_packages.py'],
-  dependencies = [
-    'testprojects/src/thrift/org/pantsbuild/testing:duck-py',
-    'testprojects/src/thrift/org/pantsbuild/testing:goose-py',
-  ],
-)
-
 python_tests(
   name = 'interpreter_selection_integration',
   sources = ['test_interpreter_selection_integration.py'],

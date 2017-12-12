@@ -10,12 +10,16 @@ pub use store::{Digest, Store};
 mod pool;
 pub use pool::ResettablePool;
 
+#[cfg(test)]
+pub mod test_cas;
+
 extern crate bazel_protos;
 extern crate boxfuture;
 extern crate digest;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
+extern crate grpcio;
 extern crate hex;
 extern crate ignore;
 extern crate itertools;

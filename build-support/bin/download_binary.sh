@@ -16,23 +16,11 @@ util_name="$1"
 version="$2"
 filename="${3:-${util_name}}"
 
-case "$(uname)" in
-  "Darwin")
-    os="mac"
-    base="$(uname -r)"
-    os_version="10.$(( ${base%%.*} - 4))"
-    ;;
-  "Linux")
-    os="linux"
-    os_version="$(uname -m)"
-    ;;
-  *)
-    echo >&2 "Unknown platform when fetching binary"
-    exit 1
-    ;;
-esac
 
-path="bin/${util_name}/${os}/${os_version}/${version}/${filename}"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "../.." && pwd)"
+source "${REPO_ROOT}/build-support/common.sh"
+
+path="bin/${util_name}/$(get_os)/${version}/${filename}"
 cache_path="${HOME}/.cache/pants/${path}"
 
 if [[ ! -f "${cache_path}" ]]; then

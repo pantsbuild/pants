@@ -8,6 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import errno
 import io
 import select
+import socket
+
+
+def teardown_socket(s):
+  """Shuts down and closes a socket."""
+  try:
+    s.shutdown(socket.SHUT_WR)
+  except socket.error:
+    pass
+  finally:
+    s.close()
 
 
 def safe_select(*args, **kwargs):
@@ -26,14 +37,14 @@ def safe_select(*args, **kwargs):
 class RecvBufferedSocket(object):
   """A socket wrapper that simplifies recv() buffering."""
 
-  def __init__(self, socket, chunk_size=io.DEFAULT_BUFFER_SIZE, select_timeout=None):
+  def __init__(self, sock, chunk_size=io.DEFAULT_BUFFER_SIZE, select_timeout=None):
     """
-    :param socket socket: The socket.socket object to wrap.
+    :param socket sock: The socket.socket object to wrap.
     :param int chunk_size: The smallest max read size for calls to recv() in bytes.
     :param float select_timeout: The select timeout for a socket read in seconds. An integer value
                                  effectively makes self.recv non-blocking (default: None, blocking).
     """
-    self._socket = socket
+    self._socket = sock
     self._chunk_size = chunk_size
     self._select_timeout = select_timeout
     self._buffer = b''

@@ -32,6 +32,8 @@ readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
 
 source ${ROOT}/contrib/release_packages.sh
 
+source "${ROOT}/build-support/bin/native/bootstrap.sh"
+
 function find_pkg() {
   local readonly pkg_name=$1
   local readonly version=$2
@@ -216,6 +218,23 @@ function build_pants_packages() {
     ) || die "Failed to build package ${NAME}-${version} with target '${BUILD_TARGET}'!"
     end_travis_section
   done
+
+  start_travis_section "fs_util" "Building fs_util binary"
+  # fs_util is a standalone tool which can be used to inspect and manipulate
+  # Pants's engine's file store, and interact with content addressable storage
+  # services which implement the Bazel remote execution API.
+  # It is a useful standalone tool which people may want to consume, for
+  # instance when debugging pants issues, or if they're implementing a remote
+  # execution API. Accordingly, we include it in our releases.
+  (
+    set -e
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${ROOT}/src/python" run_cargo build --release --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$(get_os)/${version}"
+    mkdir -p "${dst_dir}"
+    cp "${ROOT}/src/rust/engine/fs/fs_util/target/release/fs_util" "${dst_dir}/"
+  ) || die "Failed to build fs_util"
+  end_travis_section
+
   pants_version_reset
 }
 
@@ -619,17 +638,6 @@ function fetch_and_check_prebuilt_wheels() {
       missing+=("${NAME} (expected whls for each platform: had only ${packages[@]})")
       continue
     fi
-
-    # Here we re-name the linux platform specific wheels we build to masquerade as manylinux1
-    # compatible wheels. We take care to support this when we generate the wheels and pypi will
-    # only accept manylinux1 linux binary wheels.
-    for package in "${packages[@]}"
-    do
-      if [[ "${package}" =~ "-linux_" ]]
-      then
-        mv -v "${package}" "${package/-linux_/-manylinux1_}"
-      fi
-    done
   done
 
   if (( ${#missing[@]} > 0 ))
@@ -643,6 +651,20 @@ function fetch_and_check_prebuilt_wheels() {
   fi
 }
 
+function adjust_wheel_platform() {
+  # Renames wheels to adjust their tag from a src platform to a dst platform.
+  # TODO: pypi will only accept manylinux wheels, but pex does not support manylinux whls:
+  # this function is used to go in one direction or another, depending on who is consuming.
+  #   see https://github.com/pantsbuild/pants/issues/4956
+  local src_plat="$1"
+  local dst_plat="$2"
+  local dir="$3"
+  for src_whl in `find "${dir}" -name '*'"${src_plat}.whl"`; do
+    local dst_whl=${src_whl/$src_plat/$dst_plat}
+    mv -f "${src_whl}" "${dst_whl}"
+  done
+}
+
 function activate_twine() {
   local readonly venv_dir="${ROOT}/build-support/twine-deps.venv"
 
@@ -650,6 +672,34 @@ function activate_twine() {
   "${ROOT}/build-support/virtualenv" "${venv_dir}"
   source "${venv_dir}/bin/activate"
   pip install twine
+}
+
+function build_pex() {
+  # Builds a pex from the current UNSTABLE version.
+
+  local linux_platform="linux_x86_64"
+
+  rm -rf "${DEPLOY_DIR}"
+  mkdir -p "${DEPLOY_DIR}"
+  fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  adjust_wheel_platform "manylinux1_x86_64" "${linux_platform}" "${DEPLOY_DIR}"
+
+  local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+
+  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.2.13" || die "Failed to install pex."
+
+  pex \
+    -o "${dest}" \
+    --entry-point="pants.bin.pants_loader:main" \
+    --no-build \
+    --no-pypi \
+    --disable-cache \
+    --platform="macosx_10.10_x86_64" \
+    --platform="${linux_platform}" \
+    -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    "pantsbuild.pants==${PANTS_UNSTABLE_VERSION}"
+
 }
 
 function publish_packages() {
@@ -664,8 +714,11 @@ function publish_packages() {
 
   start_travis_section "Publishing" "Publishing packages for ${PANTS_STABLE_VERSION}"
 
-  # Fetch unstable wheels, and then reversion them from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION.
+  # Fetch unstable wheels, rename any linux whls to manylinux, and reversion them
+  # from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION
   fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  adjust_wheel_platform "linux_x86_64" "manylinux1_x86_64" \
+    "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}"
   reversion_whls \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_STABLE_VERSION}" \
@@ -685,7 +738,7 @@ function usage() {
   echo "PyPi.  Credentials are needed for this as described in the"
   echo "release docs: http://pantsbuild.org/release.html"
   echo
-  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e)"
+  echo "Usage: $0 [-d] [-c] (-h|-n|-t|-l|-o|-e|-p)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"
   echo " -h  Prints out this help message."
   echo " -n  Performs a release dry run."
@@ -700,6 +753,7 @@ function usage() {
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo " -e  Check that wheels are prebuilt for this release."
+  echo " -p  Build a pex from prebuilt wheels for this release."
   echo
   echo "All options (except for '-d' and '-c') are mutually exclusive."
 
@@ -710,16 +764,17 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloe" opt; do
+while getopts "hdntcloep" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
     c) core_only="true" ;;
-    l) list_packages && exit 0 ;;
-    o) list_owners && exit 0 ;;
-    e) fetch_and_check_prebuilt_wheels && exit 0 ;;
+    l) list_packages ; exit $? ;;
+    o) list_owners ; exit $? ;;
+    e) fetch_and_check_prebuilt_wheels ; exit $? ;;
+    p) build_pex ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done

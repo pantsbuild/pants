@@ -72,10 +72,8 @@ public class ConsoleRunnerImpl {
       this.original = out;
     }
 
-    OutputStream swap(OutputStream out) {
-      OutputStream old = this.out;
+    void swap(OutputStream out) {
       this.out = out;
-      return old;
     }
 
     /**
@@ -96,16 +94,11 @@ public class ConsoleRunnerImpl {
     private final File err;
     private OutputStream errstream;
 
-    private int useCount;
     private boolean closed;
 
-    StreamCapture(File out, File err) throws IOException {
+    StreamCapture(File out, File err) {
       this.out = out;
       this.err = err;
-    }
-
-    void incrementUseCount() {
-      this.useCount++;
     }
 
     OutputStream getOutputStream() throws FileNotFoundException {
@@ -123,7 +116,7 @@ public class ConsoleRunnerImpl {
     }
 
     void close() throws IOException {
-      if (--useCount <= 0 && !closed) {
+      if (!closed) {
         if (outstream != null) {
           Closeables.close(outstream, /* swallowIOException */ true);
         }
@@ -132,11 +125,6 @@ public class ConsoleRunnerImpl {
         }
         closed = true;
       }
-    }
-
-    void dispose() throws IOException {
-      useCount = 0;
-      close();
     }
 
     byte[] readOut() throws IOException {
@@ -243,7 +231,6 @@ public class ConsoleRunnerImpl {
             suiteCapture = new StreamCapture(out, err);
             suiteCaptures.put(test.getTestClass(), suiteCapture);
           }
-          suiteCapture.incrementUseCount();
         }
       }
     }
@@ -251,7 +238,7 @@ public class ConsoleRunnerImpl {
     @Override
     public void testRunFinished(Result result) throws Exception {
       for (StreamCapture capture : suiteCaptures.values()) {
-        capture.dispose();
+        capture.close();
       }
       caseCaptures.clear();
       super.testRunFinished(result);
@@ -295,7 +282,8 @@ public class ConsoleRunnerImpl {
           swappableErr.getOriginal().append(new String(capture.readErr(), UTF_8));
         } else {
           // Do nothing.
-          // In case of exception in @BeforeClass method testFailure executes without testStarted.
+          // When there is an exception in a @BeforeClass method the testStarted callback is not
+          // called before the testFailure callback so there will be no caseCapture for the test.
         }
       }
       super.testFailure(failure);
@@ -303,7 +291,6 @@ public class ConsoleRunnerImpl {
 
     @Override
     public void testFinished(Description description) throws Exception {
-      suiteCaptures.get(description.getTestClass()).close();
       if (caseCaptures.containsKey(description)) {
         caseCaptures.remove(description).close();
       }
