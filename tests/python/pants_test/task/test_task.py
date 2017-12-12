@@ -472,12 +472,6 @@ class TaskTest(TaskTestBase):
       _other_impls=[],
     )
     self.assertNotEqual(base_version_other_fake, versioned_fake)
-    a = self._make_subtask(cls=OtherFakeTask, _impls=[('asdf', 0)], _other_impls=[])
-    b = self._make_subtask(cls=OtherFakeTask, _impls=[('asdf', 0)], _other_impls=[('xxx', 0)])
-    print(a.implementation_version_str())
-    print(a(super(TaskTestBase, self).context(for_task_types=[a]), self._test_workdir).fingerprint)
-    print(b.implementation_version_str())
-    print(b(super(TaskTestBase, self).context(for_task_types=[b]), self._test_workdir).fingerprint)
     extended_version_other_fake = self._subtask_fp(
       cls=OtherFakeTask,
        _impls=[('asdf', 0)],
