@@ -21,21 +21,5 @@ RUN yum install -y \
   java-1.8.0-openjdk-devel \
   python27
 
-# Setup mount points for the travis ci user & workdir.
-VOLUME /travis/home
-VOLUME /travis/workdir
-
-# Setup a non-root user to execute the build under (avoids problems with npm install).
-ARG TRAVIS_USER=travis_ci
-ARG TRAVIS_UID=1000
-ARG TRAVIS_GROUP=root
-ARG TRAVIS_GID=0
-
-RUN groupadd --gid ${TRAVIS_GID} ${TRAVIS_GROUP}
-RUN useradd -d /travis/home -g ${TRAVIS_GROUP} --uid ${TRAVIS_UID} ${TRAVIS_USER}
-USER ${TRAVIS_USER}:${TRAVIS_GROUP}
-
-WORKDIR /travis/workdir
-
 # By default, execute in an environment with python27 enabled.
 ENTRYPOINT ["/usr/bin/scl", "enable", "python27", "devtoolset-7",  "--"]
