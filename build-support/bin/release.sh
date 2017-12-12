@@ -220,6 +220,12 @@ function build_pants_packages() {
   done
 
   start_travis_section "fs_util" "Building fs_util binary"
+  # fs_util is a standalone tool which can be used to inspect and manipulate
+  # Pants's engine's file store, and interact with content addressable storage
+  # services which implement the Bazel remote execution API.
+  # It is a useful standalone tool which people may want to consume, for
+  # instance when debugging pants issues, or if they're implementing a remote
+  # execution API. Accordingly, we include it in our releases.
   (
     set -e
     RUST_BACKTRACE=1 PANTS_SRCPATH="${ROOT}/src/python" run_cargo build --release --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
