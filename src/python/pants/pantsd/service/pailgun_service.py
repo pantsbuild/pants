@@ -75,14 +75,17 @@ class PailgunService(PantsService):
             ''.join(traceback.format_exception(*deferred_exc))
           )
 
-      return self._runner_class(sock, exiter, arguments, environment, graph_helper, deferred_exc)
+      return self._runner_class(
+        sock,
+        exiter,
+        arguments,
+        environment,
+        graph_helper,
+        self.lock,
+        deferred_exc
+      )
 
-    @contextmanager
-    def context_lock():
-      with self.lock:
-        yield
-
-    return PailgunServer(self._bind_addr, runner_factory, context_lock)
+    return PailgunServer(self._bind_addr, runner_factory)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

@@ -72,7 +72,7 @@ class DaemonPantsRunner(ProcessManager):
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
 
-  def __init__(self, socket, exiter, args, env, graph_helper, deferred_exception=None):
+  def __init__(self, socket, exiter, args, env, graph_helper, fork_lock, deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
@@ -81,6 +81,7 @@ class DaemonPantsRunner(ProcessManager):
     :param LegacyGraphHelper graph_helper: The LegacyGraphHelper instance to use for BuildGraph
                                            construction. In the event of an exception, this will be
                                            None.
+    :param threading.RLock fork_lock: A lock to use during forking for thread safety.
     :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
                                          If present, this will be re-raised in the client context.
     """
@@ -90,6 +91,7 @@ class DaemonPantsRunner(ProcessManager):
     self._args = args
     self._env = env
     self._graph_helper = graph_helper
+    self._fork_lock = fork_lock
     self._deferred_exception = deferred_exception
 
   def _make_identity(self):
@@ -126,6 +128,8 @@ class DaemonPantsRunner(ProcessManager):
           time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
           writer.stop()
           writer.join()
+          stdout.close()
+          stderr.close()
       yield finalizer
 
   def _setup_sigint_handler(self):
@@ -148,7 +152,8 @@ class DaemonPantsRunner(ProcessManager):
 
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
-    self.daemonize(write_pid=False)
+    with self._fork_lock:
+      self.daemonize(write_pid=False)
 
   def pre_fork(self):
     """Pre-fork callback executed via ProcessManager.daemonize().

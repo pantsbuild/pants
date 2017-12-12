@@ -43,7 +43,7 @@ class NailgunClientSession(NailgunProtocol):
       self._input_writer.start()
 
   def _maybe_stop_input_writer(self):
-    if self._input_writer:
+    if self._input_writer and self._input_writer.is_alive():
       self._input_writer.stop()
       self._input_writer.join()
 
