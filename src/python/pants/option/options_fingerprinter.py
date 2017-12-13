@@ -53,12 +53,13 @@ class OptionsFingerprinter(object):
     """
     fingerprinter = cls(build_graph)
     hasher = sha1()
-    for (option_type, option_value) in options.get_fingerprintable_for_scope(
+    pairs = options.get_fingerprintable_for_scope(
       scope,
       include_passthru=include_passthru,
       fingerprint_key=fingerprint_key,
       invert=invert
-    ):
+    )
+    for (option_type, option_value) in pairs:
       hasher.update(
         # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
         # so we always cast to bytes here.
