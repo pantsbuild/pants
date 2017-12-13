@@ -1,9 +1,8 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-# Use the standard python-2.7 docker Debian Wheezy image for binary compatibility with old linux
-# distros.
-FROM pantsbuild/wheezy:latest
+# Use our custom Centos6 image for binary compatibility with old linux distros.
+FROM pantsbuild/centos6:latest
 
 # Setup mount points for the travis ci user & workdir.
 VOLUME /travis/home
