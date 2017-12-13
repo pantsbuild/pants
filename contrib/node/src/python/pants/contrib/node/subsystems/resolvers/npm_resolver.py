@@ -55,7 +55,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
         returncode, yarnpkg_command = node_task.execute_yarnpkg(
-          args=[],
+          args=['--ignore-optional'],
           workunit_name=target.address.reference(),
           workunit_labels=[WorkUnitLabel.COMPILER])
         if returncode != 0:
