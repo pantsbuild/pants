@@ -19,4 +19,7 @@ RUN groupadd --gid ${TRAVIS_GID} ${TRAVIS_GROUP}
 RUN useradd -d /travis/home -g ${TRAVIS_GROUP} --uid ${TRAVIS_UID} ${TRAVIS_USER}
 USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 
+# Ensure Pants runs under the 2.7.13 interpreter.
+ENV PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==2.7.13']"
+
 WORKDIR /travis/workdir
