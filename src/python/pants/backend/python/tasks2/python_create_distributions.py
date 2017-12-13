@@ -30,9 +30,11 @@ from pants.util.fileutil import atomic_copy
 class PythonCreateDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
 
+  PYTHON_DISTS = 'user_defined_python_dists'
+
   @classmethod
   def product_types(cls):
-    return ['python-dists']
+    return [cls.PYTHON_DISTS]
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -65,7 +67,7 @@ class PythonCreateDistributions(Task):
         for vt in invalidation_check.all_vts:
           built_dists.add(self._create_dist(vt.target))
 
-    self.context.products.register_data('python-dists', built_dists)
+    self.context.products.register_data(self.PYTHON_DISTS, built_dists)
 
   def _create_dist(self, dist_tgt):
     """Create a .whl file for the specified python_distribution target."""

@@ -4,7 +4,7 @@
 # Example of defining a test target that depends on a python_dist target.
 
 python_tests(
-  name='superhello_test',
+  name='superhello',
   sources=[
   	'test_superhello.py'
   ],

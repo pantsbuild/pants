@@ -12,6 +12,7 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.tasks2.pex_build_util import dump_requirements
+from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -28,6 +29,7 @@ class ResolveRequirementsTaskBase(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
+    round_manager.require_data(PythonCreateDistributions.PYTHON_DISTS)
 
   def resolve_requirements(self, req_libs, local_python_dist_targets=None):
     """Requirements resolution for PEX files.
@@ -60,4 +62,8 @@ class ResolveRequirementsTaskBase(Task):
   def _build_requirements_pex(self, interpreter, path, req_libs, local_python_dist_targets=None):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
+    # Dump built python distributions, if any, into requirements pex.
+    built_dists = self.context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
+    for dist in built_dists:
+      builder.add_dist_location(dist)
     builder.freeze()
