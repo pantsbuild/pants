@@ -90,13 +90,18 @@ class PailgunHandler(PailgunHandlerBase):
 class PailgunServer(TCPServer):
   """A (forking) pants nailgun server."""
 
-  def __init__(self, server_address, runner_factory, handler_class=None, bind_and_activate=True):
+  def __init__(self, server_address, runner_factory, lifecycle_lock,
+               handler_class=None, bind_and_activate=True):
     """Override of TCPServer.__init__().
 
     N.B. the majority of this function is copied verbatim from TCPServer.__init__().
 
     :param tuple server_address: An address tuple of (hostname, port) for socket.bind().
     :param class runner_factory: A factory function for creating a DaemonPantsRunner for each run.
+    :param threading.RLock lifecycle_lock: A lock used to guard against abrupt teardown of the servers
+                                           execution thread during handling. All pailgun request handling
+                                           will take place under care of this lock, which would be shared with
+                                           a `PailgunServer`-external lifecycle manager to guard teardown.
     :param class handler_class: The request handler class to use for each request. (Optional)
     :param bool bind_and_activate: If True, binds and activates networking at __init__ time.
                                    (Optional)
@@ -105,6 +110,7 @@ class PailgunServer(TCPServer):
     BaseServer.__init__(self, server_address, handler_class or PailgunHandler)
     self.socket = RecvBufferedSocket(socket.socket(self.address_family, self.socket_type))
     self.runner_factory = runner_factory
+    self.lifecycle_lock = lifecycle_lock
     self.allow_reuse_address = True           # Allow quick reuse of TCP_WAIT sockets.
     self.server_port = None                   # Set during server_bind() once the port is bound.
 
@@ -121,12 +127,18 @@ class PailgunServer(TCPServer):
     TCPServer.server_bind(self)
     _, self.server_port = self.socket.getsockname()[:2]
 
+  def handle_request(self):
+    """Override of TCPServer.handle_request() that guards handling with a lock."""
+    # Handle the underlying accept and request under care of the lifecycle lock, which will
+    # help ensure no client protocol errors from unexpected teardown from accept to close.
+    with self.lifecycle_lock():
+      TCPServer.handle_request(self)
+
   def process_request(self, request, client_address):
     """Override of TCPServer.process_request() that provides for forking request handlers and
     delegates error handling to the request handler."""
     # Instantiate the request handler.
     handler = self.RequestHandlerClass(request, client_address, self)
-
     try:
       # Attempt to handle a request with the handler.
       handler.handle_request()

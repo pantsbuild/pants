@@ -37,7 +37,7 @@ class TestFSEventService(BaseTest):
     BaseTest.setUp(self)
     self.mock_watchman = mock.create_autospec(Watchman, spec_set=True)
     self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT, self.WORKER_COUNT)
-    self.service.setup(None, executor=TestExecutor())
+    self.service.setup(None, None, executor=TestExecutor())
     self.service.register_all_files_handler(lambda x: True, name='test')
     self.service.register_all_files_handler(lambda x: False, name='test2')
 
