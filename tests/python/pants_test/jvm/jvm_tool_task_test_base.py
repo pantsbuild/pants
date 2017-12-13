@@ -107,8 +107,8 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
 
     :returns: The prepared Task instance.
     """
-    task = self.create_task(context)
-    task.invalidate()
+    # test_workdir is an @property
+    workdir = self.test_workdir
 
     # Bootstrap the tools needed by the task under test.
     # We need the bootstrap task's workdir to be under the test's .pants.d, so that it can
@@ -116,8 +116,11 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     self.bootstrap_task_type.get_alternate_target_roots(context.options,
                                                         self.address_mapper,
                                                         self.build_graph)
-    bootstrap_workdir = os.path.join(os.path.dirname(task.workdir), 'bootstrap_jvm_tools')
+    bootstrap_workdir = os.path.join(os.path.dirname(workdir), 'bootstrap_jvm_tools')
     self.bootstrap_task_type(context, bootstrap_workdir).execute()
+
+    task = self.create_task(context, workdir)
+    task.invalidate()
     return task
 
   def execute(self, context):

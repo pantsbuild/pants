@@ -137,7 +137,9 @@ class TaskTestBase(BaseTest):
     """
     :API: public
     """
-    return self._testing_task_type(context, workdir or self._test_workdir)
+    if workdir is None:
+      workdir = self.test_workdir
+    return self._testing_task_type(context, workdir)
 
 
 class ConsoleTaskTestBase(TaskTestBase):

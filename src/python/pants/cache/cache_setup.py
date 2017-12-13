@@ -87,14 +87,18 @@ class CacheSetup(Subsystem):
              help='Permissions to use when writing artifacts to a local cache, in octal.')
 
   @classmethod
-  def create_cache_factory_for_task(cls, task, pinger=None, resolver=None):
-    return CacheFactory(cls.scoped_instance(task).get_options(),
-                        task.context.log, task.stable_name(), pinger=pinger, resolver=resolver)
+  def create_cache_factory_for_task(cls, task, **kwargs):
+    return CacheFactory(
+      cls.scoped_instance(task).get_options(),
+      task.context.log,
+      task.stable_name(),
+      task.fingerprint,
+      **kwargs)
 
 
 class CacheFactory(object):
 
-  def __init__(self, options, log, stable_name, pinger=None, resolver=None):
+  def __init__(self, options, log, stable_name, fingerprint, pinger=None, resolver=None):
     """Create a cache factory from settings.
 
     :param options: Task's scoped options.
@@ -107,6 +111,7 @@ class CacheFactory(object):
     self._options = options
     self._log = log
     self._stable_name = stable_name
+    self._fingerprint = fingerprint
 
     # Created on-demand.
     self._read_cache = None
@@ -261,7 +266,7 @@ class CacheFactory(object):
     artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
-      path = os.path.join(parent_path, self._stable_name)
+      path = os.path.join(parent_path, self._fingerprint)
       self._log.debug('{0} {1} local artifact cache at {2}'
                       .format(self._stable_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression,
@@ -273,8 +278,9 @@ class CacheFactory(object):
       urls = self.get_available_urls(remote_spec.split('|'))
 
       if len(urls) > 0:
-        best_url_selector = BestUrlSelector(['{}/{}'.format(url.rstrip('/'), self._stable_name)
-                                             for url in urls])
+        best_url_selector = BestUrlSelector(
+          ['{}/{}'.format(url.rstrip('/'), self._fingerprint) for url in urls]
+        )
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
         return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
 
