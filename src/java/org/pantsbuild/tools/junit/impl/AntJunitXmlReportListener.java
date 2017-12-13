@@ -10,7 +10,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.FilterWriter;
 import java.io.IOException;
 import java.io.Writer;
@@ -375,7 +374,9 @@ class AntJunitXmlReportListener extends RunListener {
 
   @Override
   public void testStarted(Description description) throws java.lang.Exception {
-    if (!Util.isRunnable(description)) return;
+    if (!Util.isRunnable(description)) {
+      return;
+    }
     getTestSuiteFor(description).started();
     getTestCaseFor(description).started();
   }
@@ -494,20 +495,22 @@ class AntJunitXmlReportListener extends RunListener {
       }
 
       if (suite.tests > 0) {
-        Writer xmlOut = Files.newBufferedWriter(
-            new File(outdir, String.format("TEST-%s.xml", suite.getName())).toPath(), UTF_8);
-
-        // Only output valid XML1.0 characters - JAXB does not handle this.
-        JAXB.marshal(suite, new XmlWriter(xmlOut) {
-          @Override protected void handleInvalid(int c) throws IOException {
-            out.write(' ');
+        Writer xmlOut = null;
+        try {
+          xmlOut = Files.newBufferedWriter(
+              new File(outdir, String.format("TEST-%s.xml", suite.getName())).toPath(), UTF_8);
+          // Use XmlWriter to output valid XML1.0 characters - JAXB does not handle this.
+          JAXB.marshal(suite, new XmlWriter(xmlOut));
+        } finally {
+          if (xmlOut != null) {
+            xmlOut.close();
           }
-        });
+        }
       }
     }
   }
 
-  private abstract static class XmlWriter extends FilterWriter {
+  private static class XmlWriter extends FilterWriter {
     protected XmlWriter(Writer out) {
       super(out);
     }
@@ -554,7 +557,9 @@ class AntJunitXmlReportListener extends RunListener {
      * @throws IOException If there is a problem using this stream while handling the invalid
      *     character.
      */
-    protected abstract void handleInvalid(int c) throws IOException;
+    protected void handleInvalid(int c) throws IOException {
+      out.write(' ');
+    };
   }
 
   /**
