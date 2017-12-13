@@ -9,3 +9,4 @@ import super_greet
 
 def hello():
   print(super_greet.super_greet())
+  return super_greet.super_greet()
