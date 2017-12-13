@@ -9,13 +9,16 @@ import functools
 import itertools
 import os
 import signal
+import threading
 import time
 from contextlib import contextmanager
 
 from colors import bold, cyan, magenta
+from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
+from pants.util.dirutil import touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import assert_no_process_exists_by_command
 
@@ -58,6 +61,25 @@ def read_pantsd_log(workdir):
   with open('{}/pantsd/pantsd.log'.format(workdir)) as f:
     for line in f:
       yield line.strip()
+
+
+def launch_file_toucher(f):
+  """Launch a loop to touch the given file, and return a function to call to stop and join it."""
+  executor = ThreadPoolExecutor(max_workers=1)
+  halt = threading.Event()
+
+  def file_toucher():
+    while not halt.isSet():
+      touch(f)
+      time.sleep(1)
+
+  future = executor.submit(file_toucher)
+
+  def join():
+    halt.set()
+    future.result(timeout=10)
+
+  return join
 
 
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
@@ -245,3 +267,20 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))
+
+  def test_pantsd_filesystem_invalidation(self):
+    """Runs with pantsd enabled, in a loop, while another thread invalidates files."""
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
+      cmd = ['list', '::']
+      pantsd_run(cmd)
+      checker.await_pantsd()
+
+      # Launch a separate thread to poke files in 3rdparty.
+      join = launch_file_toucher('3rdparty/BUILD')
+
+      # Repeatedly re-list 3rdparty while the file is being invalidated.
+      for _ in range(0, 8):
+        pantsd_run(cmd)
+        checker.assert_running()
+
+      join()
