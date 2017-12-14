@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import glob
 import os
 from contextlib import closing
 from StringIO import StringIO
 
+from pants.cache.cache_setup import CacheFactory
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
@@ -42,10 +44,29 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
       with temporary_dir() as artifact_cache:
         self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                    write_to=[artifact_cache])
-        task_cache = os.path.join(artifact_cache, task_cls.stable_name())
-        os.mkdir(task_cache)
+        self.set_options_for_scope('cache.{}'.format(task_cls.options_scope),
+                                   write_to=[artifact_cache])
+        # TODO: explain that this works because we can assume the cache
+        # directory starts with the stable_name() -- see cache_setup.py
+
+        # task_cache = os.path.join(artifact_cache, task_cls.stable_name())
+        # os.mkdir(task_cache)
 
         test_fn(self, *args, **kwargs)
+
+        cache_subdir_glob_str = os.path.join(
+          artifact_cache,
+          CacheFactory.make_task_cache_glob_str(task_cls))
+        print('cache_subdir_glob_str: {}'.format(cache_subdir_glob_str))
+        cache_subdirs = glob.glob(cache_subdir_glob_str)
+        print('cache subdirs: {}'.format(os.listdir(artifact_cache)))
+
+        if expected_num_artifacts == 0:
+          self.assertEqual(len(cache_subdirs), 0)
+          return
+
+        self.assertEqual(len(cache_subdirs), 1)
+        task_cache = cache_subdirs[0]
 
         num_artifacts = 0
         for (_, _, files) in os.walk(task_cache):

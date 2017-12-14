@@ -92,13 +92,13 @@ class CacheSetup(Subsystem):
       cls.scoped_instance(task).get_options(),
       task.context.log,
       task.stable_name(),
-      task.fingerprint,
+      CacheFactory.make_task_cache_dirname(task),
       **kwargs)
 
 
 class CacheFactory(object):
 
-  def __init__(self, options, log, stable_name, fingerprint, pinger=None, resolver=None):
+  def __init__(self, options, log, task_name, cache_dirname, pinger=None, resolver=None):
     """Create a cache factory from settings.
 
     :param options: Task's scoped options.
@@ -110,8 +110,9 @@ class CacheFactory(object):
     """
     self._options = options
     self._log = log
-    self._stable_name = stable_name
-    self._fingerprint = fingerprint
+    # TODO: describe what these are for in the docstring!
+    self._task_name = task_name
+    self._cache_dirname = cache_dirname
 
     # Created on-demand.
     self._read_cache = None
@@ -223,6 +224,15 @@ class CacheFactory(object):
       # resolver fails but there is no local cache
       return None
 
+  # TODO: discuss how @ensure_cached needs this construction so it can glob!
+  @staticmethod
+  def make_task_cache_dirname(task):
+    return '{}-{}'.format(task.stable_name(), task.fingerprint)
+
+  @staticmethod
+  def make_task_cache_glob_str(task_cls):
+    return '{}-*/'.format(task_cls.stable_name())
+
   @staticmethod
   def is_local(string_spec):
     return string_spec.startswith('/') or string_spec.startswith('~')
@@ -266,9 +276,9 @@ class CacheFactory(object):
     artifact_root = self._options.pants_workdir
 
     def create_local_cache(parent_path):
-      path = os.path.join(parent_path, self._fingerprint)
+      path = os.path.join(parent_path, self._cache_dirname)
       self._log.debug('{0} {1} local artifact cache at {2}'
-                      .format(self._stable_name, action, path))
+                      .format(self._task_name, action, path))
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
                                 permissions=self._options.write_permissions,
@@ -279,7 +289,7 @@ class CacheFactory(object):
 
       if len(urls) > 0:
         best_url_selector = BestUrlSelector(
-          ['{}/{}'.format(url.rstrip('/'), self._fingerprint) for url in urls]
+          ['{}/{}'.format(url.rstrip('/'), self._cache_dirname) for url in urls]
         )
         local_cache = local_cache or TempLocalArtifactCache(artifact_root, compression)
         return RESTfulArtifactCache(artifact_root, best_url_selector, local_cache)
