@@ -7,12 +7,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.target import Target
+
 
 class PythonDistribution(Target):
   """A Python distribution target that accepts a user-defined setup.py."""

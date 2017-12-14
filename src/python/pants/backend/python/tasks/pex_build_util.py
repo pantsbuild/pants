@@ -5,12 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import glob
 import os
 import shutil
-import zipfile
 
-from pex.bin import pex as pex_main
 from pex.fetcher import Fetcher
 from pex.platforms import Platform
 from pex.resolver import resolve

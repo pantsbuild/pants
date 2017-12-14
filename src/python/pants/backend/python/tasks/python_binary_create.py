@@ -14,7 +14,7 @@ from pex.pex_info import PexInfo
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
-                                                        has_resources, is_local_python_dist)
+                                                        has_resources)
 from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -132,8 +132,9 @@ class PythonBinaryCreate(Task):
 
       # Dump built python distributions, if any, into builder's chroot.
       built_dists = self.context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
-      for dist in built_dists:
-        builder.add_dist_location(dist)
+      if built_dists:
+        for dist in built_dists:
+          builder.add_dist_location(dist)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
