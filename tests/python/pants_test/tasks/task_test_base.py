@@ -53,9 +53,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
         cache_subdir_glob_str = os.path.join(
           artifact_cache,
           CacheFactory.make_task_cache_glob_str(task_cls))
-        print('cache_subdir_glob_str: {}'.format(cache_subdir_glob_str))
         cache_subdirs = glob.glob(cache_subdir_glob_str)
-        print('cache subdirs: {}'.format(os.listdir(artifact_cache)))
 
         if expected_num_artifacts == 0:
           self.assertEqual(len(cache_subdirs), 0)
