@@ -9,7 +9,7 @@ import os
 
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
-from pants.cache.cache_setup import CacheSetup
+from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -62,9 +62,11 @@ class LocalCachingTest(TaskTestBase):
     all_vts, invalid_vts = self.task.execute()
     self.assertGreater(len(invalid_vts), 0)
     for vt in invalid_vts:
-      artifact_address = "{}{}".format(
-        os.path.join(self.artifact_cache, self.task.stable_name(), self.target.id, vt.cache_key.hash),
-        '.tgz',
+      artifact_address = os.path.join(
+        self.artifact_cache,
+        CacheFactory.make_task_cache_dirname(self.task),
+        self.target.id,
+        '{}.tgz'.format(vt.cache_key.hash),
       )
       self.assertTrue(os.path.isfile(artifact_address))
 

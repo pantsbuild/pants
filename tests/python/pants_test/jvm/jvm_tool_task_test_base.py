@@ -19,7 +19,6 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
-
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 

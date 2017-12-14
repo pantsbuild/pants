@@ -23,6 +23,7 @@ from pants_test.base_test import BaseTest
 from pants_test.option.util.fakes import create_options
 from pants_test.testutils.mock_logger import MockLogger
 
+
 class DummyTask(Task):
   options_scope = 'dummy'
   _stable_name = 'test'
