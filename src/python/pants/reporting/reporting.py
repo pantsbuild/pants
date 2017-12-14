@@ -15,11 +15,11 @@ from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
-from pants.reporting.report import Report, ReportingError
+from pants.reporting.report import Report
 from pants.reporting.reporter import ReporterDestination
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
+from pants.util.dirutil import safe_mkdir
 
 
 class Reporting(Subsystem):
@@ -54,7 +54,6 @@ class Reporting(Subsystem):
 
     run_id = run_tracker.initialize()
     run_dir = os.path.join(self.get_options().reports_dir, run_id)
-    safe_rmtree(run_dir)
 
     html_dir = os.path.join(run_dir, 'html')
     safe_mkdir(html_dir)

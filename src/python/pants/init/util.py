@@ -11,16 +11,11 @@ from pants.init.options_initializer import OptionsInitializer
 from pants.subsystem.subsystem import Subsystem
 
 
-def clean_global_runtime_state(reset_runtracker=True, reset_subsystem=False):
+def clean_global_runtime_state(reset_subsystem=False):
   """Resets the global runtime state of a pants runtime for cleaner forking.
 
-  :param bool reset_runtracker: Whether or not to clean RunTracker global state.
   :param bool reset_subsystem: Whether or not to clean Subsystem global state.
   """
-  if reset_runtracker:
-    # Reset RunTracker state.
-    RunTracker.global_instance().reset(reset_options=False)
-
   if reset_subsystem:
     # Reset subsystem state.
     Subsystem.reset()
