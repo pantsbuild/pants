@@ -285,7 +285,10 @@ python_tests(
 
 python_tests(
   name = 'coursier_resolve',
-  sources = ['test_coursier_resolve.py', 'test_coursier_unit.py'],
+  sources = [
+    'test_coursier_resolve.py',
+    'test_coursier_unit.py'
+  ],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:mock',
