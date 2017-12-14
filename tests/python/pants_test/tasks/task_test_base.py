@@ -44,13 +44,10 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
       with temporary_dir() as artifact_cache:
         self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                    write_to=[artifact_cache])
-        self.set_options_for_scope('cache.{}'.format(task_cls.options_scope),
-                                   write_to=[artifact_cache])
+        # self.set_options_for_scope('cache.{}'.format(task_cls.options_scope),
+        #                            write_to=[artifact_cache])
         # TODO: explain that this works because we can assume the cache
         # directory starts with the stable_name() -- see cache_setup.py
-
-        # task_cache = os.path.join(artifact_cache, task_cls.stable_name())
-        # os.mkdir(task_cache)
 
         test_fn(self, *args, **kwargs)
 
