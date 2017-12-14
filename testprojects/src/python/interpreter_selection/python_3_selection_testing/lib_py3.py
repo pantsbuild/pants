@@ -6,12 +6,4 @@
 
 def say_something():
   print('I am a python 3 library method.')
-  # Return reduce function for testing purposes.
-  # Note that reduce exists as a built-in in Python 2 and
-  # does not exist in Python 3
-  try:
-  	ret = reduce
-  except NameError:
-  	ret = None
-  assert ret == None
-  return ret 
+  return ascii

@@ -44,4 +44,7 @@ python_library(
   sources = [
     'pexrc_util.py',
   ],
+  dependencies = [
+    ':git_util'
+  ,]
 )

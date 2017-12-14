@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import sys
 import time
 
 from pants.base.build_environment import get_buildroot
@@ -106,9 +107,9 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     defined in a pexrc file on disk.
 
     """
-    py27 = ensure_python_interpreter('2.7.10', get_buildroot())
+    py27 = ensure_python_interpreter('2.7.9', get_buildroot())
     py36 = ensure_python_interpreter('3.6.3', get_buildroot())
-    with setup_pexrc_with_pex_python_path(os.path.expanduser('~'), [py27, py36]):
+    with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]),'.pexrc'), [py27, py36]):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
         pants_run_27 = self.run_pants(

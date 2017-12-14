@@ -10,9 +10,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 def say_something():
   print('I am a python 2 library method.')
-  # Return reduce function for testing purposes.
-  # Note that reduce exists as a built-in in Python 2 and
-  # does not exist in Python 3
-  ret = reduce
-  assert ret is not None
+  # Note that ascii exists as a built-in in Python 3 and
+  # does not exist in Python 2.
+  try:
+    ret = ascii
+  except NameError:
+    ret = None
+  assert ret is None
   return ret

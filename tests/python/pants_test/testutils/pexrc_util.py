@@ -13,42 +13,32 @@ from pants.util.process_handler import subprocess
 
 
 @contextmanager
-def setup_pexrc_with_pex_python_path(pexrc_dir, interpreter_paths):
+def setup_pexrc_with_pex_python_path(pexrc_path, interpreter_paths):
   """A helper function for writing interpreter paths to a PEX_PYTHON_PATH variable
-  in a .pexrc file. This function will preserve a .pexrc file if it already exists in 
-  the pexrc_dir.
+  in a .pexrc file. This function raise an error if a .pexrc file already exists at
+  `pexrc_path`.
 
-  :param pexrc_dir (str): a directory to write a .pexrc to.
+  :param pexrc_path (str): a path to a temporary .pexrc to write for testing purposes.
   :param interpreter_paths (list): a list of paths to interpreter binaries to include on 
   PEX_PYTHON_PATH.
   """
-  if not os.path.exists(pexrc_dir):
-    raise IOError('Directory for pexrc %s does not exist. Please create it. Note that this '
-                  'directory must be either /etc, your home directory, or '
-                  'os.path.dirname(sys.argv[0]) to ensure a valid pexrc location.', pexrc_dir)
-    
-  pexrc_filename = 'pexrc' if pexrc_dir == '/etc' else '.pexrc'
-  pexrc_path = os.path.join(pexrc_dir, pexrc_filename)
-
-  temp_pexrc = ''
-  # Preserve .pexrc if it already exists in pexrc_dir.
+  pexrc_path = os.path.expanduser(pexrc_path)
   if os.path.exists(pexrc_path):
-    temp_pexrc = os.path.join(pexrc_dir, '.pexrc.bak')
-    shutil.copyfile(pexrc_path, temp_pexrc)
+    raise RuntimeError("A pexrc file already exists in {}".format(pexrc_path))
 
   # Write a temp .pexrc in pexrc_dir.
   with open(pexrc_path, 'w') as pexrc:
     pexrc.write("PEX_PYTHON_PATH=%s" % ':'.join(interpreter_paths))
-  yield 
-
-  # Cleanup temporary .pexrc.
-  os.remove(pexrc_path)
-  # Replace .pexrc if it was there before.
-  if os.path.exists(temp_pexrc):
-    shutil.copyfile(temp_pexrc, pexrc_path)
-    os.remove(temp_pexrc)
+  
+  try:
+    yield
+  finally:
+    # Cleanup temporary .pexrc.
+    os.remove(pexrc_path)
 
 
+# TODO: Refactor similar helper methods in the pex codebase and remove from Pants.
+# https://github.com/pantsbuild/pex/issues/438
 def bootstrap_python_installer(location):
   install_location = os.path.join(location, '.pyenv_test')
   if os.path.exists(install_location):
@@ -64,13 +54,13 @@ def bootstrap_python_installer(location):
         break
     else:
       raise RuntimeError("Helper method could not clone pyenv from git")
+  return os.path.join(location, '.pyenv_test/versions')
 
 
 def ensure_python_interpreter(version, location=None):
   if not location:
-    location = os.getcwd()
-  bootstrap_python_installer(location)
-  install_location = os.path.join(location, '.pyenv_test/versions', version)
+    location = get_repo_root()
+  install_location = os.path.join(bootstrap_python_installer(location), version)
   if not os.path.exists(install_location):
     os.environ['PYENV_ROOT'] = os.path.join(location, '.pyenv_test')
     subprocess.call([os.path.join(location, '.pyenv_test/bin/pyenv'), 'install', version])

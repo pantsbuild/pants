@@ -52,10 +52,8 @@ class SelectInterpreter(Task):
     fs = PythonInterpreterFingerprintStrategy()
     with self.invalidated(python_tgts, fingerprint_strategy=fs) as invalidation_check:
       if PythonSetup.global_instance().interpreter_search_paths and PythonInterpreterCache.pex_python_paths:
-        self.context.log.warn('You specified interpreter search paths with the --python-setup-interpreter-search-paths '
-                              'option but also defined a PEX_PYTHON_PATH variable in a pexrc file on '
-                              'your system (in either /etc/pexrc or ~/.pexrc). '
-                              'Using PEX_PYTHON_PATH and ignoring --python-setup-interpreter-search-paths.')
+        self.context.log.warn("Detected both PEX_PYTHON_PATH and --python-setup-interpreter-search-paths. "
+                              "Ignoring --python-setup-interpreter-search-paths.")
       # If there are no relevant targets, we still go through the motions of selecting
       # an interpreter, to prevent downstream tasks from having to check for this special case.
       if invalidation_check.all_vts:

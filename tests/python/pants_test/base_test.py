@@ -146,13 +146,6 @@ class BaseTest(unittest.TestCase):
     self.create_file(self.build_path(relpath), target, mode='a')
     return BuildFile(self.address_mapper._project_tree, relpath=self.build_path(relpath))
 
-  def get_project_root(self):
-    """Get the absolute path to the root directory of the Pants git repo.
-
-    :API: public
-    """
-    return subprocess.check_output(['git','rev-parse','--show-toplevel']).strip()
-
   def make_target(self,
                   spec='',
                   target_type=Target,
