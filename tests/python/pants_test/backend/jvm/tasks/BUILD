@@ -285,7 +285,7 @@ python_tests(
 
 python_tests(
   name = 'coursier_resolve',
-  sources = ['test_coursier_resolve.py', 'test_couriser_unit.py'],
+  sources = ['test_coursier_resolve.py', 'test_coursier_unit.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:mock',
@@ -295,8 +295,6 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/tasks:coursier_resolve',
-    # 'src/python/pants/backend/jvm/tasks:ivy_resolve',
-    # 'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',

@@ -1,5 +1,4 @@
 python_library(
-  sources = globs('*.py'),
   dependencies = [
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:nailgun_task',

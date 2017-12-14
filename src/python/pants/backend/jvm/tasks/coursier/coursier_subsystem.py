@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class CoursierSubsystem(Subsystem):
-  """Common configuration items for ivy tasks.
+  """Common configuration items for coursier tasks.
 
   :API: public
   """
@@ -42,6 +42,8 @@ class CoursierSubsystem(Subsystem):
     register('--version', type=str, fingerprint=True,
              default='0.0.0.a3eccfacf2f4b1e4df0b48a4aa7cbe30b467a116',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
+    register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
+             help='Timeout the fetch if the connection is idle for longer than this value.')
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -49,11 +51,12 @@ class CoursierSubsystem(Subsystem):
 
   def bootstrap_coursier(self):
 
-    bootstrap_url = self.get_options().bootstrap_jar_url
+    opts = self.get_options()
+    bootstrap_url = opts.bootstrap_jar_url
 
-    coursier_bootstrap_dir = os.path.join(self.get_options().pants_bootstrapdir,
+    coursier_bootstrap_dir = os.path.join(opts.pants_bootstrapdir,
                                           'tools', 'jvm', 'coursier',
-                                          self.get_options().version)
+                                          opts.version)
 
     bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
 
@@ -68,7 +71,7 @@ class CoursierSubsystem(Subsystem):
           fetcher.download(bootstrap_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
                            path_or_fd=bootstrap_jar,
-                           timeout_secs=2)
+                           timeout_secs=opts.bootstrap_fetch_timeout_secs)
           logger.info('sha1: {}'.format(checksummer.checksum))
           bootstrap_jar.close()
           touch(bootstrap_jar_path)

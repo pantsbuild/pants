@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class JvmResolveSubsystem(Subsystem):
-  """A JVM invocation.
+  """Used to keep track of global jvm resolver settings
 
   :API: public
   """
@@ -23,4 +23,4 @@ class JvmResolveSubsystem(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(JvmResolveSubsystem, cls).register_options(register)
-    register('--resolver', choices=['ivy', 'coursier'], default='ivy', help='Pick a resolver.')
+    register('--resolver', choices=['ivy', 'coursier'], default='ivy', help='Resolver to use for external jvm dependencies.')

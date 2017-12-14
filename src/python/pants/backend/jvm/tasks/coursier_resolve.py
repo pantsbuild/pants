@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -40,14 +40,6 @@ class CoursierError(Exception):
 
 
 class CoursierMixin(NailgunTask):
-
-  @classmethod
-  def implementation_version(cls):
-    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 0)]
-
-  @classmethod
-  def register_options(cls, register):
-    super(CoursierMixin, cls).register_options(register)
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -97,7 +89,7 @@ class CoursierMixin(NailgunTask):
       for jar in jar_list:
         for ex in jar.excludes:
           # `--` means exclude. See --soft-exclude-file in `coursier fetch --help`
-          ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name)
+          ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name or '*')
           exclude_args.add(ex_arg)
 
     return jars_to_resolve, exclude_args, untouched_pinned_artifact
@@ -241,9 +233,10 @@ class CoursierMixin(NailgunTask):
                     if transitive_resolved_jars:
                       compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
 
-        self._write_result_to_cache(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
+        self._update_results_dir_content(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
 
-  def _write_result_to_cache(self, compile_classpath, all_vts, target_resolution_filename):
+  @staticmethod
+  def _update_results_dir_content(compile_classpath, all_vts, target_resolution_filename):
     # TODO(wisechengyi): currently the path contains abs path, so need to remove that before
     # cache can be shared across machines.
     for vt in all_vts:
@@ -273,14 +266,15 @@ class CoursierMixin(NailgunTask):
             if not os.path.exists(artifact_classpath.path) \
                 or not os.path.exists(artifact_classpath.cache_path) \
                 or not os.path.exists(os.path.realpath(artifact_classpath.cache_path)):
-              print("cache verification failed")
+              logger.debug("Failed to verify coursier artifacts.")
               return False
             temp_store.append((t, tuples_conf_artifact_classpath))
 
     # If all artifacts path are valid, add them to compile_classpath
+    logger.debug("Coursier artifact verified.")
     for t, tuples_conf_artifact_classpath in temp_store:
       compile_classpath.add_elements_for_target(t, tuples_conf_artifact_classpath)
-    print("cache verified")
+
     return True
 
   def _construct_cmd_args(self, classified_jars, classifier, common_args, global_excludes, local_exclude_args,
@@ -317,11 +311,9 @@ class CoursierMixin(NailgunTask):
         cmd_args.append('--soft-exclude-file')
         cmd_args.append(exclude_file)
 
-    # TODO(wisechengyi): support exclusion on the whole org
     for ex in global_excludes:
-      if ex.org and ex.name:
-        cmd_args.append('-E')
-        cmd_args.append('{}:{}'.format(ex.org, ex.name))
+      cmd_args.append('-E')
+      cmd_args.append('{}:{}'.format(ex.org, ex.name or '*'))
     return cmd_args
 
   @classmethod
