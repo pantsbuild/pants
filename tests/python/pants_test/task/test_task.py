@@ -106,7 +106,6 @@ class FakeSubsystem(Subsystem):
 class AnotherFakeTask(Task):
   options_scope = 'another-fake-task'
 
-  # TODO: test with passthru args too!
   @classmethod
   def supports_passthru_args(cls):
     return True
@@ -121,7 +120,6 @@ class AnotherFakeTask(Task):
 class AnotherFakeSubsystem(Subsystem):
   options_scope = 'another-fake-subsystem'
 
-  # TODO: make sure we can use parent options too!
   @classmethod
   def register_options(cls, register):
     super(AnotherFakeSubsystem, cls).register_options(register)
@@ -131,7 +129,6 @@ class AnotherFakeSubsystem(Subsystem):
 class YetAnotherFakeTask(AnotherFakeTask):
   options_scope = 'yet-another-fake-task'
 
-  # TODO: test with passthru args too!
   @classmethod
   def supports_passthru_args(cls):
     return False
@@ -600,6 +597,7 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(different_nested_opts_values_fp, subsystem_task_scoped_opts_fp)
 
     self.set_options_for_scope(AnotherFakeSubsystem.options_scope, **{'another-fake-option': True})
+    cur_option_spec[FakeSubsystem.subscope(YetAnotherFakeTask.options_scope)] = {'fake-option': bool}
     cur_option_spec[AnotherFakeSubsystem.options_scope] = {'another-fake-option': bool}
     cur_option_spec[AnotherFakeSubsystem.subscope(YetAnotherFakeTask.options_scope)] = {'another-fake-option': bool}
     same_base_task_different_scope_options_fp = fp(cur_option_spec)
@@ -615,3 +613,7 @@ class TaskTest(TaskTestBase):
 
     different_task_with_passthru_fp = fp(cur_option_spec, cls=YetAnotherFakeTask, passthru_args=['asdf'])
     self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)
+
+    self.set_options_for_scope(FakeSubsystem.subscope(YetAnotherFakeTask.options_scope), **{'fake-option': False})
+    different_task_with_different_parent_opts_fp = fp(cur_option_spec, cls=YetAnotherFakeTask)
+    self.assertNotEqual(different_task_with_different_parent_opts_fp, different_task_with_same_opts_fp)
