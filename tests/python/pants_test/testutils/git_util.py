@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 from pants.base.revision import Revision
 from pants.scm.git import Git
-from pants.util.contextutil import environment_as, subprocess, temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.process_handler import subprocess
 
 

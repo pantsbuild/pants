@@ -10,6 +10,7 @@ import shutil
 from contextlib import contextmanager
 
 from pants.util.process_handler import subprocess
+from pants_test.testutils.git_util import get_repo_root
 
 
 @contextmanager
