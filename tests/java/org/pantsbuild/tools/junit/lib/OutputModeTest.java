@@ -3,7 +3,11 @@
 
 package org.pantsbuild.tools.junit.lib;
 
+import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
@@ -12,6 +16,26 @@ import org.junit.Test;
  * on its own. It is run by the ConsoleRunnerTest suite to test ConsoleRunnerImpl.
  */
 public class OutputModeTest {
+  @BeforeClass
+  public static void classSetUp() {
+    System.out.println("Output in classSetUp");
+  }
+
+  @Before
+  public void setUp() {
+    System.out.println("Output in setUp");
+  }
+
+  @After
+  public void tearDown() {
+    System.out.println("Output in tearDown");
+  }
+
+  @AfterClass
+  public static void classTearDown() {
+    System.out.println("Output in classTearDown");
+  }
+
   @Test
   public void testPasses() {
     System.out.println("Output from passing test");
