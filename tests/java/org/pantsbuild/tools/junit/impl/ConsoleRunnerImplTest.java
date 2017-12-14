@@ -21,14 +21,18 @@ import org.junit.rules.TemporaryFolder;
 import org.junit.runner.Result;
 import org.junit.runner.notification.RunListener;
 import org.pantsbuild.tools.junit.lib.AllFailingTest;
+import org.pantsbuild.tools.junit.lib.AllIgnoredTest;
 import org.pantsbuild.tools.junit.lib.AllPassingTest;
 import org.pantsbuild.tools.junit.lib.ExceptionInSetupTest;
 import org.pantsbuild.tools.junit.lib.LogOutputInTeardownTest;
 import org.pantsbuild.tools.junit.lib.OutputModeTest;
+import org.pantsbuild.tools.junit.lib.XmlReportTest;
+import org.pantsbuild.tools.junit.lib.XmlReportTestSuite;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.fail;
 
 /**
@@ -190,6 +194,10 @@ public class ConsoleRunnerImplTest {
   public void testOutputMode() {
     outputMode = ConsoleRunnerImpl.OutputMode.ALL;
     String output = runTest(OutputModeTest.class, true);
+    assertThat(output, containsString("Output in classSetUp"));
+    assertThat(output, containsString("Output in setUp"));
+    assertThat(output, containsString("Output in tearDown"));
+    assertThat(output, containsString("Output in classTearDown"));
     assertThat(output, containsString("There were 2 failures:"));
     assertThat(output, containsString("Output from passing test"));
     assertThat(output, containsString("Output from failing test"));
@@ -203,6 +211,10 @@ public class ConsoleRunnerImplTest {
 
     outputMode = ConsoleRunnerImpl.OutputMode.FAILURE_ONLY;
     output = runTest(OutputModeTest.class, true);
+    assertThat(output, containsString("Output in classSetUp"));
+    assertThat(output, containsString("Output in setUp"));
+    assertThat(output, containsString("Output in tearDown"));
+    assertThat(output, not(containsString("Output in classTearDown")));
     assertThat(output, containsString("There were 2 failures:"));
     assertThat(output, not(containsString("Output from passing test")));
     assertThat(output, containsString("Output from failing test"));
@@ -216,6 +228,10 @@ public class ConsoleRunnerImplTest {
 
     outputMode = ConsoleRunnerImpl.OutputMode.NONE;
     output = runTest(OutputModeTest.class, true);
+    assertThat(output, containsString("Output in classSetUp"));
+    assertThat(output, not(containsString("Output in setUp")));
+    assertThat(output, not(containsString("Output in tearDown")));
+    assertThat(output, not(containsString("Output in classTearDown")));
     assertThat(output, containsString("There were 2 failures:"));
     assertThat(output, not(containsString("Output from passing test")));
     assertThat(output, not(containsString("Output from failing test")));
@@ -250,6 +266,45 @@ public class ConsoleRunnerImplTest {
     assertThat(output, containsString("java.lang.RuntimeException"));
     assertThat(output, containsString("Tests run: 0,  Failures: 1"));
     assertThat(output, not(containsString("Test mechanism")));
+  }
+
+  @Test
+  public void testOutputModeTestSuite() {
+    outputMode = ConsoleRunnerImpl.OutputMode.ALL;
+    String output = runTest(XmlReportTestSuite.class, true);
+    assertThat(output, containsString("There were 2 failures:"));
+    assertThat(output, containsString("Test output"));
+    assertThat(output, containsString("Tests run: 5,  Failures: 2"));
+    assertThat(output, not(containsString("Test mechanism")));
+    File testSuiteLogFile =
+        new File(outdir.getPath(), XmlReportTestSuite.class.getCanonicalName() + ".out.txt");
+    assertThat(testSuiteLogFile.exists(), is(false));
+    String testLogContents = getTestLogContents(XmlReportTest.class, ".out.txt");
+    assertThat(testLogContents, containsString("Test output"));
+  }
+
+  @Test
+  public void testOutputModeIgnoredTest() {
+    File testSuiteLogFile =
+        new File(outdir.getPath(), AllIgnoredTest.class.getCanonicalName() + ".out.txt");
+
+    outputMode = ConsoleRunnerImpl.OutputMode.ALL;
+    String output = runTest(AllIgnoredTest.class);
+    assertThat(testSuiteLogFile.exists(), is(false));
+    assertThat(output, containsString("OK (0 tests)"));
+    assertThat(output, not(containsString("testIgnore")));
+
+    outputMode = ConsoleRunnerImpl.OutputMode.FAILURE_ONLY;
+    output = runTest(AllIgnoredTest.class);
+    assertThat(testSuiteLogFile.exists(), is(false));
+    assertThat(output, containsString("OK (0 tests)"));
+    assertThat(output, not(containsString("testIgnore")));
+
+    outputMode = ConsoleRunnerImpl.OutputMode.NONE;
+    output = runTest(AllIgnoredTest.class);
+    assertThat(testSuiteLogFile.exists(), is(false));
+    assertThat(output, containsString("OK (0 tests)"));
+    assertThat(output, not(containsString("testIgnore")));
   }
 
   /**
