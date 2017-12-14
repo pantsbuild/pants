@@ -120,7 +120,6 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     self.bootstrap_task_type(context, bootstrap_workdir).execute()
 
     task = self.create_task(context, workdir)
-    task.invalidate()
     return task
 
   def execute(self, context):

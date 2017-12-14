@@ -19,6 +19,7 @@ from pants.cache.pinger import BestUrlSelector, Pinger
 from pants.cache.resolver import NoopResolver, Resolver, RESTfulResolver
 from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_property
 
 
 class EmptyCacheSpecError(ArtifactCacheError): pass
@@ -88,17 +89,12 @@ class CacheSetup(Subsystem):
 
   @classmethod
   def create_cache_factory_for_task(cls, task, **kwargs):
-    return CacheFactory(
-      cls.scoped_instance(task).get_options(),
-      task.context.log,
-      task.stable_name(),
-      CacheFactory.make_task_cache_dirname(task),
-      **kwargs)
+    return CacheFactory(cls, task, **kwargs)
 
 
 class CacheFactory(object):
 
-  def __init__(self, options, log, task_name, cache_dirname, pinger=None, resolver=None):
+  def __init__(self, subsystem_cls, task, pinger=None, resolver=None):
     """Create a cache factory from settings.
 
     :param options: Task's scoped options.
@@ -108,11 +104,9 @@ class CacheFactory(object):
     :param resolver: Resolver to look up remote artifact cache URLs.
     :return: cache factory.
     """
-    self._options = options
-    self._log = log
-    # TODO: describe what these are for in the docstring!
-    self._task_name = task_name
-    self._cache_dirname = cache_dirname
+     # TODO: describe what these are for in the docstring!
+    self._subsystem_cls = subsystem_cls
+    self._task = task
 
     # Created on-demand.
     self._read_cache = None
@@ -135,6 +129,22 @@ class CacheFactory(object):
       self._resolver = RESTfulResolver(timeout=1.0, tries=3)
     else:
       self._resolver = NoopResolver()
+
+  @memoized_property
+  def _log(self):
+    return self._task.context.log
+
+  @memoized_property
+  def _cache_dirname(self):
+    return self.make_task_cache_dirname(self._task)
+
+  @memoized_property
+  def _options(self):
+    return self._subsystem_cls.scoped_instance(self._task).get_options()
+
+  @memoized_property
+  def _task_description(self):
+    return self._task.stable_name()
 
   @property
   def ignore(self):
@@ -278,7 +288,7 @@ class CacheFactory(object):
     def create_local_cache(parent_path):
       path = os.path.join(parent_path, self._cache_dirname)
       self._log.debug('{0} {1} local artifact cache at {2}'
-                      .format(self._task_name, action, path))
+                      .format(self._task_description, action, path))
       return LocalArtifactCache(artifact_root, path, compression,
                                 self._options.max_entries_per_target,
                                 permissions=self._options.write_permissions,
