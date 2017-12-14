@@ -333,17 +333,10 @@ class CoursierMixin(NailgunTask):
     :param result: see a nested dict capturing the resolution.
     :return: a flattened view with the top artifact as the roots.
     """
-
-    def flat_walk(dep_map):
-      for art in dep_map:
-        for x in flat_walk(art['dependencies']):
-          yield x
-        yield art['coord']
-
     flat_result = defaultdict(list)
 
     for artifact in result['dependencies']:
-      flat_result[artifact['coord']].extend(flat_walk(artifact['dependencies']))
+      flat_result[artifact['coord']].extend(artifact['dependencies'])
 
     return flat_result
 
@@ -360,26 +353,22 @@ class CoursierMixin(NailgunTask):
 
     final_result = defaultdict(set)
 
-    def walk(dep_map):
-      for art in dep_map:
+    for dep in result['dependencies']:
 
-        for classifier, jar_path in art['files']:
-          simple_coord = art['coord']
-          coord = cls.to_m2_coord(simple_coord, classifier)
-          pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
+      for classifier, jar_path in dep['files']:
+        simple_coord = dep['coord']
+        coord = cls.to_m2_coord(simple_coord, classifier)
+        pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
-          if not os.path.exists(pants_path):
-            safe_mkdir(os.path.dirname(pants_path))
-            os.symlink(jar_path, pants_path)
+        if not os.path.exists(pants_path):
+          safe_mkdir(os.path.dirname(pants_path))
+          os.symlink(jar_path, pants_path)
 
-          resolved_jar = ResolvedJar(coord,
-                                     cache_path=jar_path,
-                                     pants_path=pants_path)
-          final_result[simple_coord].add(resolved_jar)
+        resolved_jar = ResolvedJar(coord,
+                                   cache_path=jar_path,
+                                   pants_path=pants_path)
+        final_result[simple_coord].add(resolved_jar)
 
-        walk(art['dependencies'])
-
-    walk(result['dependencies'])
     return final_result
 
   @classmethod

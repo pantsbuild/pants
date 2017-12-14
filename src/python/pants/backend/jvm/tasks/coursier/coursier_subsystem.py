@@ -37,10 +37,10 @@ class CoursierSubsystem(Subsystem):
     register('--fetch-options', type=list, fingerprint=True,
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
     register('--bootstrap-jar-url', fingerprint=True,
-             default='https://dl.dropboxusercontent.com/s/pev2p1yfz7fratt/coursier-cli.61cbb1101d9f92bc6362331bfd521bbe5e39ad3b.jar?dl=0',
+             default='https://dl.dropboxusercontent.com/s/7tfwf1jj0e9mis6/coursier-cli.0.0.0.a3eccfacf2f4b1e4df0b48a4aa7cbe30b467a116.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')
     register('--version', type=str, fingerprint=True,
-             default='0.0.0.61cbb1101d9f92bc6362331bfd521bbe5e39ad3b',
+             default='0.0.0.a3eccfacf2f4b1e4df0b48a4aa7cbe30b467a116',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
 
   @classmethod
