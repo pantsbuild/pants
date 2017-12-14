@@ -30,4 +30,5 @@ setuptools==30.0.0
 subprocess32==3.2.7
 six>=1.9.0,<2
 thrift>=0.9.1
+typing==3.6.2
 wheel==0.29.0
