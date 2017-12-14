@@ -89,12 +89,13 @@ class CacheSetup(Subsystem):
 
   @classmethod
   def create_cache_factory_for_task(cls, task, **kwargs):
-    return CacheFactory(cls, task, **kwargs)
+    scoped_options = cls.scoped_instance(task).get_options()
+    return CacheFactory(scoped_options, task.context.log, task, **kwargs)
 
 
 class CacheFactory(object):
 
-  def __init__(self, subsystem_cls, task, pinger=None, resolver=None):
+  def __init__(self, options, log, task, pinger=None, resolver=None):
     """Create a cache factory from settings.
 
     :param options: Task's scoped options.
@@ -105,7 +106,8 @@ class CacheFactory(object):
     :return: cache factory.
     """
      # TODO: describe what these are for in the docstring!
-    self._subsystem_cls = subsystem_cls
+    self._options = options
+    self._log = log
     self._task = task
 
     # Created on-demand.
@@ -131,16 +133,8 @@ class CacheFactory(object):
       self._resolver = NoopResolver()
 
   @memoized_property
-  def _log(self):
-    return self._task.context.log
-
-  @memoized_property
   def _cache_dirname(self):
     return self.make_task_cache_dirname(self._task)
-
-  @memoized_property
-  def _options(self):
-    return self._subsystem_cls.scoped_instance(self._task).get_options()
 
   @memoized_property
   def _task_description(self):
