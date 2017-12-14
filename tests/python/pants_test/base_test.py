@@ -29,7 +29,6 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
-from pants.util.process_handler import subprocess
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
 
