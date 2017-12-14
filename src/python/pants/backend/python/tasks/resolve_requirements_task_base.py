@@ -64,6 +64,7 @@ class ResolveRequirementsTaskBase(Task):
     dump_requirements(builder, interpreter, req_libs, self.context.log)
     # Dump built python distributions, if any, into requirements pex.
     built_dists = self.context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
-    for dist in built_dists:
-      builder.add_dist_location(dist)
+    if built_dists:
+      for dist in built_dists:
+        builder.add_dist_location(dist)
     builder.freeze()

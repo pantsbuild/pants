@@ -47,7 +47,6 @@ class PythonCreateDistributions(Task):
 
   def __init__(self, *args, **kwargs):
     super(PythonCreateDistributions, self).__init__(*args, **kwargs)
-    self._distdir = self.get_options().pants_distdir
 
   def execute(self):
     dist_targets = self.context.targets(self.is_distribution)
