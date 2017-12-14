@@ -44,13 +44,12 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
       with temporary_dir() as artifact_cache:
         self.set_options_for_scope('cache.{}'.format(self.options_scope),
                                    write_to=[artifact_cache])
-        # self.set_options_for_scope('cache.{}'.format(task_cls.options_scope),
-        #                            write_to=[artifact_cache])
-        # TODO: explain that this works because we can assume the cache
-        # directory starts with the stable_name() -- see cache_setup.py
 
         test_fn(self, *args, **kwargs)
 
+        # TODO: explain that this works (in docstring for glob factory method!)
+        # because we can assume the cache directory starts with the
+        # stable_name() -- see cache_setup.py
         cache_subdir_glob_str = os.path.join(
           artifact_cache,
           CacheFactory.make_task_cache_glob_str(task_cls))
