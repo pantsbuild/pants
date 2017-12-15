@@ -10,6 +10,7 @@ import os
 from textwrap import dedent
 
 from pants.build_graph.target import Target
+from pants_test.option.util.fakes import create_options
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
@@ -20,6 +21,8 @@ from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalled
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_resolve import NodeResolve
+
+import mock
 
 
 class NodeResolveTest(TaskTestBase):
@@ -85,7 +88,9 @@ class NodeResolveTest(TaskTestBase):
                               sources=['util.js', 'package.json'],
                               dependencies=[typ])
 
-    context = self.context(target_roots=[target])
+    context = self.context(target_roots=[target], options={
+      'npm-resolver': {'install_optional': False}
+    })
     task = self.create_task(context)
     task.execute()
 
@@ -140,7 +145,9 @@ class NodeResolveTest(TaskTestBase):
                             target_type=NodeModule,
                             sources=['leaf.js', 'package.json'],
                             dependencies=[util, typ2])
-    context = self.context(target_roots=[leaf])
+    context = self.context(target_roots=[leaf], options={
+      'npm-resolver': {'install_optional': False}
+    })
     task = self.create_task(context)
     task.execute()
 
@@ -205,7 +212,9 @@ class NodeResolveTest(TaskTestBase):
                                        target_type=NodeModule,
                                        sources=['package.json'],
                                        dependencies=[util])
-    context = self.context(target_roots=[scripts_project])
+    context = self.context(target_roots=[scripts_project], options={
+      'npm-resolver': {'install_optional': False}
+    })
     task = self.create_task(context)
     task.execute()
 
@@ -230,3 +239,53 @@ class NodeResolveTest(TaskTestBase):
       self.assertNotIn('devDependencies', package)
       self.assertNotIn('peerDependencies', package)
       self.assertNotIn('optionalDependencies', package)
+
+  def _test_resolve_optional_install_helper(
+    self, install_optional, expected_params, package_manager):
+    typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
+    self.create_file('src/node/util/package.json', contents=dedent("""
+      {
+        "name": "util",
+        "version": "0.0.1"
+      }
+    """))
+    self.create_file('src/node/util/util.js', contents=dedent("""
+      var typ = require('typ');
+      console.log("type of boolean is: " + typ.BOOLEAN);
+    """))
+    # yarn execution path requires yarn.lock
+    self.create_file('src/node/util/yarn.lock', contents='')
+    target = self.make_target(spec='src/node/util',
+                              target_type=NodeModule,
+                              sources=['util.js', 'package.json', 'yarn.lock'],
+                              dependencies=[],
+                              package_manager=package_manager)
+
+    context = self.context(target_roots=[target], options={
+      'npm-resolver': {'install_optional': install_optional}
+    })
+    task = self.create_task(context)
+
+    method_to_mock = {
+      'npm': 'execute_npm',
+      'yarn': 'execute_yarnpkg'
+    }[package_manager]
+    with mock.patch.object(task, method_to_mock) as exec_call:
+      exec_call.return_value = (0, None)
+      task.execute()
+      exec_call.assert_called_once_with(
+        expected_params,
+        workunit_labels=mock.ANY,
+        workunit_name=mock.ANY)
+
+  def test_resolve_default_no_optional_install_npm(self):
+    self._test_resolve_optional_install_helper(False, ['install', '--no-optional'], 'npm')
+
+  def test_resolve_optional_install_npm(self):
+    self._test_resolve_optional_install_helper(True, ['install'], 'npm')
+
+  def test_resolve_default_no_optional_install_yarn(self):
+    self._test_resolve_optional_install_helper(False, ['--ignore-optional'], 'yarn')
+
+  def test_resolve_optional_install_yarn(self):
+    self._test_resolve_optional_install_helper(True, [], 'yarn')
