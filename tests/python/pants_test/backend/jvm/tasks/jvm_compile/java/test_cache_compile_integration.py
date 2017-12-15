@@ -5,12 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import glob
 import os
 from collections import namedtuple
 from textwrap import dedent
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
+from pants.cache.cache_setup import CacheFactory
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.backend.jvm.tasks.jvm_compile.base_compile_integration_test import BaseCompileIT
@@ -202,9 +204,11 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       buildfile = os.path.join(src_dir, 'BUILD')
       spec = os.path.join(src_dir, ':cachetest')
-      artifact_dir = os.path.join(cache_dir,
-                                  ZincCompile.stable_name(),
-                                  '{}.cachetest'.format(os.path.basename(src_dir)))
+      artifact_base_glob_str = os.path.join(
+        cache_dir,
+        CacheFactory.make_task_cache_glob_str(ZincCompile),
+      )
+      artifact_dir = None
 
       for c in compiles:
         # Clear the src directory and recreate the files.
@@ -216,7 +220,18 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
         # Compile, and confirm that we have the right count of artifacts.
         self.run_compile(spec, complete_config(c.config), workdir)
-        self.assertEquals(c.artifact_count, len(os.listdir(artifact_dir)))
+
+        globbed = glob.glob(artifact_base_glob_str)
+        self.assertEquals(len(globbed), 1)
+        if artifact_dir:
+          self.assertEquals(globbed[0], artifact_dir)
+        else:
+          artifact_dir = globbed[0]
+        artifact_cachetest_dir = os.path.join(
+          artifact_dir,
+          '{}.cachetest'.format(os.path.basename(src_dir)),
+        )
+        self.assertEquals(c.artifact_count, len(os.listdir(artifact_cachetest_dir)))
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
