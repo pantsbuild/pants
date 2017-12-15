@@ -29,7 +29,7 @@ def safe_select(*args, **kwargs):
   while 1:
     try:
       return select.select(*args, **kwargs)
-    except select.error as e:
+    except (OSError, select.error) as e:
       if e[0] != errno.EINTR:
         raise
 

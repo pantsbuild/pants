@@ -24,6 +24,9 @@ class NpmResolver(Subsystem, NodeResolverBase):
   @classmethod
   def register_options(cls, register):
     super(NpmResolver, cls).register_options(register)
+    register(
+      '--install-optional', type=bool, default=False, fingerprint=True,
+      help='If enabled, install optional dependencies.')
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
   def resolve_target(self, node_task, target, results_dir, node_paths):
@@ -33,6 +36,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
         raise TaskError(
           'Cannot find package.json. Did you forget to put it in target sources?')
       package_manager = node_task.get_package_manager_for_target(target=target)
+      install_optional = self.get_options().install_optional
       if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
@@ -44,7 +48,10 @@ class NpmResolver(Subsystem, NodeResolverBase):
             'not fully supported.')
           self._emit_package_descriptor(node_task, target, results_dir, node_paths)
         # TODO: expose npm command options via node subsystems.
-        result, npm_install = node_task.execute_npm(['install', '--no-optional'],
+        args = ['install']
+        if not install_optional:
+          args.append('--no-optional')
+        result, npm_install = node_task.execute_npm(args,
                                                     workunit_name=target.address.reference(),
                                                     workunit_labels=[WorkUnitLabel.COMPILER])
         if result != 0:
@@ -54,8 +61,11 @@ class NpmResolver(Subsystem, NodeResolverBase):
         if not os.path.exists('yarn.lock'):
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
+        args = []
+        if not install_optional:
+          args.append('--ignore-optional')
         returncode, yarnpkg_command = node_task.execute_yarnpkg(
-          args=[],
+          args,
           workunit_name=target.address.reference(),
           workunit_labels=[WorkUnitLabel.COMPILER])
         if returncode != 0:

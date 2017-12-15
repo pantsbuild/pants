@@ -15,11 +15,11 @@ from pants.reporting.html_reporter import HtmlReporter
 from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
-from pants.reporting.report import Report, ReportingError
+from pants.reporting.report import Report
 from pants.reporting.reporter import ReporterDestination
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import relative_symlink, safe_mkdir, safe_rmtree
+from pants.util.dirutil import relative_symlink, safe_mkdir
 
 
 class Reporting(Subsystem):
@@ -46,23 +46,18 @@ class Reporting(Subsystem):
                   '{workunits}.  Possible formatting values are {formats}'.format(
                workunits=WorkUnitLabel.keys(), formats=ToolOutputFormat.keys()))
 
-  def initial_reporting(self, run_tracker):
-    """Sets up the initial reporting configuration.
+  def initialize(self, run_tracker):
+    """Initialize with the given RunTracker.
 
-    Will be changed after we parse cmd-line flags.
+    TODO: See `RunTracker.start`.
     """
-    link_to_latest = os.path.join(self.get_options().reports_dir, 'latest')
 
-    run_id = run_tracker.run_info.get_info('id')
-    if run_id is None:
-      raise ReportingError('No run_id set')
+    run_id = run_tracker.initialize()
     run_dir = os.path.join(self.get_options().reports_dir, run_id)
-    safe_rmtree(run_dir)
 
     html_dir = os.path.join(run_dir, 'html')
     safe_mkdir(html_dir)
-
-    relative_symlink(run_dir, link_to_latest)
+    relative_symlink(run_dir, os.path.join(self.get_options().reports_dir, 'latest'))
 
     report = Report()
 
@@ -92,7 +87,8 @@ class Reporting(Subsystem):
     if port:
       run_tracker.run_info.add_info('report_url', 'http://localhost:{}/run/{}'.format(port, run_id))
 
-    return report
+    # And start tracking the run.
+    run_tracker.start(report)
 
   def _get_invalidation_report(self):
     return InvalidationReport() if self.get_options().invalidation_report else None
