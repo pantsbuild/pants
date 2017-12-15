@@ -103,10 +103,18 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         workdir
       )
 
+  def _run_count(self, workdir):
+    run_tracker_dir = os.path.join(workdir, 'run-tracker')
+    if os.path.isdir(run_tracker_dir):
+      return len([f for f in os.listdir(run_tracker_dir) if f != 'latest'])
+    else:
+      return 0
+
   def assert_success_runner(self, workdir, config, cmd, extra_config={}):
     combined_config = combined_dict(config, extra_config)
     print(bold(cyan('\nrunning: ./pants {} (config={})'
                     .format(' '.join(cmd), combined_config))))
+    run_count = self._run_count(workdir)
     start_time = time.time()
     run = self.run_pants_with_workdir(
       cmd,
@@ -118,6 +126,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     elapsed = time.time() - start_time
     print(bold(cyan('\ncompleted in {} seconds'.format(elapsed))))
 
+    runs_created = self._run_count(workdir) - run_count
+    self.assertEquals(
+        runs_created,
+        1,
+        'Expected one RunTracker run to be created per pantsd run: was {}'.format(runs_created)
+    )
     self.assert_success(run)
     return run
 
