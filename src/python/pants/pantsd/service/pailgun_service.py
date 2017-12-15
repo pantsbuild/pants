@@ -9,6 +9,7 @@ import logging
 import select
 import sys
 import traceback
+from contextlib import contextmanager
 
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
@@ -80,11 +81,17 @@ class PailgunService(PantsService):
         arguments,
         environment,
         graph_helper,
-        self.lock,
+        self.fork_lock,
         deferred_exc
       )
 
-    return PailgunServer(self._bind_addr, runner_factory)
+    # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
+    @contextmanager
+    def lifecycle_lock():
+      with self.lifecycle_lock:
+        yield
+
+    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
