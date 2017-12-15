@@ -9,6 +9,7 @@ import json
 import os
 from textwrap import dedent
 
+import mock
 from pants.build_graph.target import Target
 from pants_test.option.util.fakes import create_options
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -21,8 +22,6 @@ from pants.contrib.node.targets.node_preinstalled_module import NodePreinstalled
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 from pants.contrib.node.tasks.node_paths import NodePaths
 from pants.contrib.node.tasks.node_resolve import NodeResolve
-
-import mock
 
 
 class NodeResolveTest(TaskTestBase):
@@ -241,7 +240,7 @@ class NodeResolveTest(TaskTestBase):
       self.assertNotIn('optionalDependencies', package)
 
   def _test_resolve_optional_install_helper(
-    self, install_optional, expected_params, package_manager):
+      self, install_optional, package_manager, expected_params):
     typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
     self.create_file('src/node/util/package.json', contents=dedent("""
       {
@@ -279,13 +278,25 @@ class NodeResolveTest(TaskTestBase):
         workunit_name=mock.ANY)
 
   def test_resolve_default_no_optional_install_npm(self):
-    self._test_resolve_optional_install_helper(False, ['install', '--no-optional'], 'npm')
+    self._test_resolve_optional_install_helper(
+      install_optional=False,
+      package_manager='npm',
+      expected_params=['install', '--no-optional'])
 
   def test_resolve_optional_install_npm(self):
-    self._test_resolve_optional_install_helper(True, ['install'], 'npm')
+    self._test_resolve_optional_install_helper(
+      install_optional=True,
+      package_manager='npm',
+      expected_params=['install'])
 
   def test_resolve_default_no_optional_install_yarn(self):
-    self._test_resolve_optional_install_helper(False, ['--ignore-optional'], 'yarn')
+    self._test_resolve_optional_install_helper(
+      install_optional=False,
+      package_manager='yarn',
+      expected_params=['--ignore-optional'])
 
   def test_resolve_optional_install_yarn(self):
-    self._test_resolve_optional_install_helper(True, [], 'yarn')
+    self._test_resolve_optional_install_helper(
+      install_optional=True,
+      package_manager='yarn',
+      expected_params=[])
