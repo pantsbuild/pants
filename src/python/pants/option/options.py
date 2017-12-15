@@ -310,15 +310,17 @@ class Options(object):
 
     return values
 
-  # TODO: document kwargs, return value
   def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False, fingerprint_key=None, invert=False):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
     can be parameterized with `fingerprint_key` for special cases.
 
-    :param str scope: The scope to gather fingerprintable options for.
-    :param bool include_passthru: Whether to include passthru args captured by `scope` in the
+    This method also searches enclosing options scopes of `bottom_scope` to determine the set of
+    fingerprintable pairs.
+
+    :param str bottom_scope: The scope to gather fingerprintable options for.
+    :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
                                   fingerprintable options.
     :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
     :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
@@ -334,7 +336,7 @@ class Options(object):
       # NB: We can't sort passthru args, the underlying consumer may be order-sensitive.
       pairs.extend((str, pass_arg) for pass_arg in passthru_args)
 
-    # Note that we iterate over options registered at `scope` and at all
+    # Note that we iterate over options registered at `bottom_scope` and at all
     # enclosing scopes, since option-using code can read those values indirectly
     # via its own OptionValueContainer, so they can affect that code's output.
     for registration_scope in all_enclosing_scopes(bottom_scope):

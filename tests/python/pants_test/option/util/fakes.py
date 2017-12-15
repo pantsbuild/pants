@@ -109,9 +109,17 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def scope_to_flags(self):
       return {}
 
-    # TODO: describe how this does NOT go recursively! check previous def here?
     def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
+      """Returns a list of fingerprintable (option type, option value) pairs for
+      the given scope.
 
+      Note that this method only collects values for a single scope, NOT from
+      all enclosing scopes as in the Options class!
+
+      :param str bottom_scope: The scope to gather fingerprintable options for.
+      :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
+                                    fingerprintable options.
+      """
       pairs = []
       if include_passthru:
         passthru_args = self.passthru_args_for_scope(bottom_scope)
