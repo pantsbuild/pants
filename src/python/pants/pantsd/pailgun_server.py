@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import select
 import socket
 import traceback
 
@@ -13,7 +14,7 @@ from six.moves.socketserver import BaseRequestHandler, BaseServer, TCPServer
 
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.util.contextutil import maybe_profiled
-from pants.util.socket import RecvBufferedSocket
+from pants.util.socket import RecvBufferedSocket, safe_select
 
 
 class PailgunHandlerBase(BaseRequestHandler):
@@ -128,11 +129,24 @@ class PailgunServer(TCPServer):
     _, self.server_port = self.socket.getsockname()[:2]
 
   def handle_request(self):
-    """Override of TCPServer.handle_request() that guards handling with a lock."""
-    # Handle the underlying accept and request under care of the lifecycle lock, which will
-    # help ensure no client protocol errors from unexpected teardown from accept to close.
+    """Override of TCPServer.handle_request() that provides locking.
+
+    N.B. Most of this is copied verbatim from SocketServer.py in the stdlib.
+    """
+    timeout = self.socket.gettimeout()
+    if timeout is None:
+      timeout = self.timeout
+    elif self.timeout is not None:
+      timeout = min(timeout, self.timeout)
+    fd_sets = safe_select([self], [], [], timeout)
+    if not fd_sets[0]:
+      self.handle_timeout()
+      return
+
+    # After select tells us we can safely accept, guard the accept and request
+    # handling with the lifecycle lock to avoid abrupt teardown mid-request.
     with self.lifecycle_lock():
-      TCPServer.handle_request(self)
+      self._handle_request_noblock()
 
   def process_request(self, request, client_address):
     """Override of TCPServer.process_request() that provides for forking request handlers and

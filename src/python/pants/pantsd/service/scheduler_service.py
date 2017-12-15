@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import Queue
+import threading
 
 from pants.pantsd.service.pants_service import PantsService
 
@@ -35,6 +36,7 @@ class SchedulerService(PantsService):
     self._scheduler = legacy_graph_helper.scheduler
     self._logger = logging.getLogger(__name__)
     self._event_queue = Queue.Queue(maxsize=self.QUEUE_SIZE)
+    self._watchman_is_running = threading.Event()
 
   @property
   def change_calculator(self):
@@ -80,6 +82,9 @@ class SchedulerService(PantsService):
     if not is_initial_event:
       self._handle_batch_event(files)
 
+    if not self._watchman_is_running.is_set():
+      self._watchman_is_running.set()
+
     self._event_queue.task_done()
 
   def warm_product_graph(self, spec_roots):
@@ -87,6 +92,13 @@ class SchedulerService(PantsService):
 
     :returns: A `LegacyGraphHelper` instance for graph construction.
     """
+    # If any nodes exist in the product graph, wait for the initial watchman event to avoid
+    # racing watchman startup vs invalidation events.
+    graph_len = self._scheduler.graph_len()
+    if graph_len > 0:
+      self._logger.debug('graph len was {}, waiting for initial watchman event'.format(graph_len))
+      self._watchman_is_running.wait()
+
     with self.fork_lock:
       self._graph_helper.warm_product_graph(spec_roots)
       return self._graph_helper

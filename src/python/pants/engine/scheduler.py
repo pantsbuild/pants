@@ -337,6 +337,9 @@ class LocalScheduler(object):
 
     self._scheduler.assert_ruleset_valid()
 
+  def graph_len(self):
+    return self._scheduler.graph_len()
+
   def trace(self, execution_request):
     """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
     for line in self._scheduler.graph_trace(execution_request.native):
