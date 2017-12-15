@@ -217,7 +217,7 @@ class BaseTest(unittest.TestCase):
     """
     super(BaseTest, self).setUp()
     # Avoid resetting the Runtracker here, as that is specific to fork'd process cleanup.
-    clean_global_runtime_state(reset_runtracker=False, reset_subsystem=True)
+    clean_global_runtime_state(reset_subsystem=True)
 
     self.real_build_root = BuildRoot().path
 
