@@ -31,12 +31,19 @@ class PantsService(AbstractClass):
     """
     return self._kill_switch.is_set()
 
-  def setup(self, lock):
+  def setup(self, lifecycle_lock, fork_lock):
     """Called before `run` to allow for service->service or other side-effecting setup.
 
-    :param threading.Lock lock: A global service<->service lock for guarding critical work.
+    :param threading.RLock lifecycle_lock: A lock to guard the service thread lifecycles. This
+                                           can be used by individual services to safeguard
+                                           daemon-synchronous sections that should be protected
+                                           from abrupt teardown.
+    :param threading.RLock fork_lock: A lock to guard pantsd->runner forks. This can be used by
+                                      services to safeguard resources held by threads at fork
+                                      time, so that we can fork without deadlocking.
     """
-    self.lock = lock
+    self.lifecycle_lock = lifecycle_lock
+    self.fork_lock = fork_lock
 
   @abstractmethod
   def run(self):
