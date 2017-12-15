@@ -7,10 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import get_buildroot
 from pants.bin.goal_runner import GoalRunner
-from pants.bin.reporting_initializer import ReportingInitializer
 from pants.bin.repro import Reproducer
+from pants.goal.run_tracker import RunTracker
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.reporting.reporting import Reporting
 from pants.util.contextutil import hard_exit_handler, maybe_profiled
 
 
@@ -56,7 +57,9 @@ class LocalPantsRunner(object):
       options_bootstrapper.verify_configs_against_options(options)
 
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
-    run_tracker, reporting = ReportingInitializer().setup()
+    run_tracker = RunTracker.global_instance()
+    reporting = Reporting.global_instance()
+    reporting.initialize(run_tracker)
 
     try:
       # Determine the build root dir.
