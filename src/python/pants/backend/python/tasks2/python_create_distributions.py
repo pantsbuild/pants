@@ -9,9 +9,8 @@ import os
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks2.pex_build_util import is_local_python_dist, prepare_dist_workdir
+from pants.backend.python.tasks2.pex_build_util import prepare_dist_workdir
 from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
