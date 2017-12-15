@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.goal.goal import Goal
-from pants.goal.run_tracker import RunTracker
 from pants.init.options_initializer import OptionsInitializer
 from pants.subsystem.subsystem import Subsystem
 
