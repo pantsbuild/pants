@@ -25,7 +25,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
   def register_options(cls, register):
     super(NpmResolver, cls).register_options(register)
     register(
-      '--install-optional', type=bool, default=False,
+      '--install-optional', type=bool, default=False, fingerprint=True,
       help='If enabled, install optional dependencies.')
     NodeResolve.register_resolver_for_type(NodeModule, cls)
 
