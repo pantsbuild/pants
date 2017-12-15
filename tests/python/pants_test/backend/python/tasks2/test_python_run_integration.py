@@ -70,13 +70,13 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       with temporary_dir() as interpreters_cache:
         pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
         pants_run_27 = self.run_pants(
-          command=['run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          command=['clean-all', 'run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
           config=pants_ini_config
         )
         self.assert_success(pants_run_27)
         assert py27 in pants_run_27.stdout_data
         pants_run_3 = self.run_pants(
-          command=['run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+          command=['clean-all', 'run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
           config=pants_ini_config
         )
         self.assert_success(pants_run_3)
