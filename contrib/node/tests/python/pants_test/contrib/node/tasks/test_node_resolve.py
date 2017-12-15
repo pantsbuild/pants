@@ -11,7 +11,6 @@ from textwrap import dedent
 
 import mock
 from pants.build_graph.target import Target
-from pants_test.option.util.fakes import create_options
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.node.subsystems.resolvers.node_preinstalled_module_resolver import \
@@ -241,7 +240,6 @@ class NodeResolveTest(TaskTestBase):
 
   def _test_resolve_optional_install_helper(
       self, install_optional, package_manager, expected_params):
-    typ = self.make_target(spec='3rdparty/node:typ', target_type=NodeRemoteModule, version='0.6.3')
     self.create_file('src/node/util/package.json', contents=dedent("""
       {
         "name": "util",
