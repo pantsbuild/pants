@@ -143,28 +143,28 @@ class TestInterpreterCache(BaseTest):
   def test_pex_python_paths(self):
     """Test pex python path helper method of PythonInterpreterCache."""
     py27 = '2.7'
-    py36 = '3.6'
-    if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py36):
-      print('Found both python {} and python {}. Running test.'.format(py27, py36))
+    py3 = '3'
+    if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py3):
+      print('Found both python {} and python {}. Running test.'.format(py27, py3))
       py27_path = PantsRunIntegrationTest.python_interpreter_path(py27)
-      py36_path = PantsRunIntegrationTest.python_interpreter_path(py36)
+      py3_path = PantsRunIntegrationTest.python_interpreter_path(py3)
       with self._setup_test() as (cache, cache_path):
-        with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+        with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py3_path]):
           pex_python_paths = cache.pex_python_paths()
-          self.assertEqual(pex_python_paths, [py27_path, py36_path])
+          self.assertEqual(pex_python_paths, [py27_path, py3_path])
 
   def test_interpereter_cache_setup_using_pex_python_paths(self): 
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
     py27 = '2.7'
-    py36 = '3.6'
-    if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py36):
-      print('Found both python {} and python {}. Running test.'.format(py27, py36))
+    py3 = '3'
+    if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py3):
+      print('Found both python {} and python {}. Running test.'.format(py27, py3))
       py27_path = PantsRunIntegrationTest.python_interpreter_path(py27)
-      py36_path = PantsRunIntegrationTest.python_interpreter_path(py36)
-      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+      py3_path = PantsRunIntegrationTest.python_interpreter_path(py3)
+      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py3_path]):
         # Target python 2 for interpreter cache.
         with self._setup_test(constraints=['CPython>=2.7'],
-                              mock_setup_paths_interpreters=(py27_path, py36_path)) as (cache, cache_path):
+                              mock_setup_paths_interpreters=(py27_path, py3_path)) as (cache, cache_path):
           interpreters = cache.setup()
           # The majority of systems are able to satisfy the above constraint without needing to use setup paths,
           # so checking for presence of compatible interpreters is sufficient. Constraints are typcially met
@@ -173,10 +173,16 @@ class TestInterpreterCache(BaseTest):
           self.assertGreater(len(interpreters), 0)
         # Target python 3 for interpreter cache.
         with self._setup_test(constraints=['CPython>=3.6'],
-                              mock_setup_paths_interpreters=(py27_path, py36_path)) as (cache, cache_path):
+                              mock_setup_paths_interpreters=(py27_path, py3_path)) as (cache, cache_path):
           interpreters = cache.setup()
           self.assertGreater(len(interpreters), 0)
-          assert py36_path in [pi.binary for pi in interpreters]
+          # Travis CI does not support `python3.6` from the command line, so we just have to check
+          # that the interpreter path of `py3_path` lines up with a cached interpreter. For this
+          # case,`py3_path` is just missing '.6' at the end of the binary's path basename.
+          # Ex:
+          #   p36_path = /path/to/python3
+          #   pi.binary = /path/to/python3.6
+          assert any([py3_path in pi.binary for pi in interpreters])
     else:
-      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py36))
+      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
       self.skipTest('Missing neccesary Python interpreters on system.')

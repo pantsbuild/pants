@@ -45,7 +45,7 @@ python_tests(
 python_binary(
   name='main_py2',
   source='main_py2.py',
-  compatibility=['CPython<3'],
+  compatibility=['CPython>=2.7,<3'],
   dependencies=[
     ':lib_py2'
   ]
@@ -54,7 +54,7 @@ python_binary(
 python_library(
   name='lib_py2',
   sources=['lib_py2.py'],
-  compatibility=['CPython<3']
+  compatibility=['CPython>=2.7,<3']
 )
 
 python_tests(
@@ -65,5 +65,5 @@ python_tests(
   dependencies=[
     ':main_py2'
   ],
-  compatibility=['CPython<3']
+  compatibility=['CPython>=2.7,<3']
 )

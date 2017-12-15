@@ -107,11 +107,11 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
 
     """
     py27 = '2.7'
-    py36 = '3.6'
-    if self.has_python_version(py27) and self.has_python_version(py36):
-      print('Found both python {} and python {}. Running test.'.format(py27, py36))
-      py27_path, py36_path = self.python_interpreter_path(py27), self.python_interpreter_path(py36)
-      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+    py3 = '3'
+    if self.has_python_version(py27) and self.has_python_version(py3):
+      print('Found both python {} and python {}. Running test.'.format(py27, py3))
+      py27_path, py3_path = self.python_interpreter_path(py27), self.python_interpreter_path(py3)
+      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py3_path]):
         with temporary_dir() as interpreters_cache:
           pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
           pants_run_27 = self.run_pants(
@@ -125,5 +125,5 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
           )
           self.assert_success(pants_run_3)
     else:
-      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py36))
+      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
       self.skipTest('Missing neccesary Python interpreters on system.')

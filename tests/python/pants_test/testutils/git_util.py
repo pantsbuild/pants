@@ -28,7 +28,7 @@ def git_version():
 
 
 def get_repo_root():
-  """Get the absolute path to the root directory of the Pants git repo."""
+  """Return the absolute path to the root directory of the Pants git repo."""
   return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip()
 
 
