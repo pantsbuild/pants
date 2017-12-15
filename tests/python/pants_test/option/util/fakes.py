@@ -109,25 +109,19 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def scope_to_flags(self):
       return {}
 
-    # FIXME: use Options#get_fingerprintable_for_scope to accurately test!
-    def get_fingerprintable_for_scope(self, scope, include_passthru=False,
-                                      fingerprint_key=None, invert=False):
+    # TODO: describe how this does NOT go recursively! check previous def here?
+    def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
+
       pairs = []
-      if include_passthru and passthru_args:
-        pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
-      registration_scope = scope
-      while registration_scope is not None:
-        option_values = self.for_scope(registration_scope)
-        for n, t in fingerprintable[registration_scope].items():
-          scoped_pairs = [(option_type, option_values[option_name])
-                          for option_name, option_type in fingerprintable[registration_scope].items()]
-          pairs.extend(scoped_pairs)
-        registration_scope = (None if registration_scope == GLOBAL_SCOPE
-                              else enclosing_scope(registration_scope))
+      if include_passthru:
+        passthru_args = self.passthru_args_for_scope(bottom_scope)
+        pairs.extend((str, arg) for arg in passthru_args)
+
+      option_values = self.for_scope(bottom_scope)
+      for option_name, option_type in fingerprintable[bottom_scope].items():
+        pairs.append((option_type, option_values[option_name]))
       return pairs
 
-    def __getitem__(self, key):
-      return self.for_scope(key)
   return FakeOptions()
 
 

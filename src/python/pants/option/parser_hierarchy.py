@@ -14,6 +14,20 @@ def enclosing_scope(scope):
   """Utility function to return the scope immediately enclosing a given scope."""
   return scope.rpartition('.')[0]
 
+def all_enclosing_scopes(scope, allow_global=True):
+  """Utility function to return all scopes up to the global scope enclosing a
+  given scope."""
+  # TODO: validate scopes here and in enclosing_scope!
+  def scope_within_range(tentative_scope):
+    if tentative_scope is None:
+      return False
+    if not allow_global and tentative_scope == GLOBAL_SCOPE:
+      return False
+    return True
+
+  while scope_within_range(scope):
+    yield scope
+    scope = (None if scope == GLOBAL_SCOPE else enclosing_scope(scope))
 
 class ParserHierarchy(object):
   """A hierarchy of scoped Parser instances.

@@ -569,15 +569,16 @@ class TaskTest(TaskTestBase):
     self.set_options_for_scope(AnotherFakeTask.options_scope, **{'fake-option': False})
     with_option_fp = fp(cur_option_spec)
     self.assertNotEqual(with_option_fp, default_fp)
-    same_option_fp = fp(cur_option_spec)
-    self.assertEqual(same_option_fp, with_option_fp)
+
+    self.set_options_for_scope(AnotherFakeTask.options_scope, **{'an-unregistered-option': 'value'})
+    with_unregistered_option_fp = fp(cur_option_spec)
+    self.assertEqual(with_unregistered_option_fp, with_option_fp)
 
     self.set_options_for_scope(AnotherFakeTask.options_scope, **{'fake-option': True})
     different_option_value_fp = fp(cur_option_spec)
     self.assertNotEqual(different_option_value_fp, with_option_fp)
     self.assertNotEqual(different_option_value_fp, default_fp)
 
-    # TODO: test with different options too! invalid(-ly named) options?
     self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
     cur_option_spec[FakeSubsystem.options_scope] = {'fake-option': bool}
     cur_option_spec[FakeSubsystem.subscope(AnotherFakeTask.options_scope)] = {'fake-option': bool}

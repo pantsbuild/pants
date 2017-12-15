@@ -221,7 +221,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       scope,
       self.context.options,
       build_graph=self.context.build_graph,
-      include_passthru=self.supports_passthru_args()
+      include_passthru=self.supports_passthru_args(),
     )
     options_hasher.update(options_fp)
     return options_hasher.hexdigest()
