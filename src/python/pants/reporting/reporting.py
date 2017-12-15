@@ -19,7 +19,7 @@ from pants.reporting.report import Report
 from pants.reporting.reporter import ReporterDestination
 from pants.reporting.reporting_server import ReportingServerManager
 from pants.subsystem.subsystem import Subsystem
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import relative_symlink, safe_mkdir
 
 
 class Reporting(Subsystem):
@@ -57,6 +57,7 @@ class Reporting(Subsystem):
 
     html_dir = os.path.join(run_dir, 'html')
     safe_mkdir(html_dir)
+    relative_symlink(run_dir, os.path.join(self.get_options().reports_dir, 'latest'))
 
     report = Report()
 
