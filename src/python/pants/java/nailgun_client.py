@@ -150,7 +150,7 @@ class NailgunClient(object):
     if self._session and self._session.remote_pid is not None:
       try:
         os.kill(self._session.remote_pid, signal.SIGINT)
-      except Exception as e:
+      except (OSError, IOError) as e:
         # Ignore "No such process" errors.
         if e.errno != errno.ESRCH:
           raise
