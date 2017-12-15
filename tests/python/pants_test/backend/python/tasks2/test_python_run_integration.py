@@ -64,7 +64,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(var_val, pants_run.stdout_data.strip())
 
   def test_pants_run_interpreter_selection_with_pexrc(self):
-    py27 = ensure_python_interpreter('2.7.10', get_buildroot())
+    py27 = ensure_python_interpreter('2.7.9', get_buildroot())
     py36 = ensure_python_interpreter('3.6.3', get_buildroot())
     with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27, py36]):
       with temporary_dir() as interpreters_cache:
@@ -83,7 +83,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         assert py36 in pants_run_3.stdout_data
 
   def test_pants_binary_interpreter_selection_with_pexrc(self):
-    py27 = ensure_python_interpreter('2.7.10', get_buildroot())
+    py27 = ensure_python_interpreter('2.7.9', get_buildroot())
     py36 = ensure_python_interpreter('3.6.3', get_buildroot())
     with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27, py36]):
       with temporary_dir() as interpreters_cache:
