@@ -138,6 +138,7 @@ class RESTfulArtifactCache(ArtifactCache):
     path = '{0}/{1}'.format(path_prefix, self._url_suffix_for_key(cache_key))
     return '{0}://{1}{2}'.format(url.scheme, url.netloc, path)
 
+
 def _log_if_no_response(timeout_seconds, message, getter):
   while True:
     try:
