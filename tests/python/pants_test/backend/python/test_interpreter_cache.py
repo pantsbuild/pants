@@ -18,9 +18,9 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.git_util import get_repo_root
-from pants_test.testutils.pexrc_util import (ensure_python_interpreter,
-                                             setup_pexrc_with_pex_python_path)
+from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class TestInterpreterCache(BaseTest):
@@ -37,7 +37,7 @@ class TestInterpreterCache(BaseTest):
     self._interpreter = PythonInterpreter.get()
 
   @contextmanager
-  def _setup_test(self, constraints=None, mock_setup_paths_with_interpreters=False):
+  def _setup_test(self, constraints=None, mock_setup_paths_interpreters=None):
     mock_setup = mock.MagicMock().return_value
     type(mock_setup).interpreter_constraints = mock.PropertyMock(return_value=constraints)
 
@@ -45,9 +45,9 @@ class TestInterpreterCache(BaseTest):
       mock_setup.interpreter_cache_dir = path
       cache = PythonInterpreterCache(mock_setup, mock.MagicMock())
       cache._setup_cached = mock.Mock(return_value=[self._interpreter])
-      if mock_setup_paths_with_interpreters:
-        cache._setup_paths = mock.Mock(return_value=[PythonInterpreter.from_binary(ensure_python_interpreter('2.7.9', get_repo_root())),
-                                                     PythonInterpreter.from_binary(ensure_python_interpreter('3.6.3', get_repo_root()))])
+      if mock_setup_paths_interpreters:
+        cache._setup_paths = mock.Mock(return_value=[PythonInterpreter.from_binary(mock_setup_paths_interpreters[0]),
+                                                     PythonInterpreter.from_binary(mock_setup_paths_interpreters[1])])
       else:
         cache._setup_paths = mock.Mock(return_value=[])
       yield cache, path
@@ -142,24 +142,41 @@ class TestInterpreterCache(BaseTest):
 
   def test_pex_python_paths(self):
     """Test pex python path helper method of PythonInterpreterCache."""
-    with self._setup_test() as (cache, cache_path):
-      py27 = ensure_python_interpreter('2.7.9', get_repo_root())
-      py36 = ensure_python_interpreter('3.6.3', get_repo_root())
-      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27, py36]):
-        pex_python_paths = cache.pex_python_paths()
-        self.assertEqual(pex_python_paths, [py27, py36])
+    py27 = '2.7'
+    py36 = '3.6'
+    if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py36):
+      print('Found both python {} and python {}. Running test.'.format(py27, py36))
+      py27_path = PantsRunIntegrationTest.python_interpreter_path(py27)
+      py36_path = PantsRunIntegrationTest.python_interpreter_path(py36)
+      with self._setup_test() as (cache, cache_path):
+        with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+          pex_python_paths = cache.pex_python_paths()
+          self.assertEqual(pex_python_paths, [py27_path, py36_path])
 
   def test_interpereter_cache_setup_using_pex_python_paths(self): 
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
-    py27 = ensure_python_interpreter('2.7.9', get_repo_root())
-    py36 = ensure_python_interpreter('3.6.3', get_repo_root())
-    # Target python 2 for interpreter cache.
-    with self._setup_test(constraints=['CPython==2.7.9'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
-      interpereters = cache.setup()
-      self.assertEqual(len(interpereters), 1)
-      self.assertEqual(interpereters[0].binary, py27)
-    # Target python 3 for interpreter cache.
-    with self._setup_test(constraints=['>3,<=3.6.3'], mock_setup_paths_with_interpreters=True) as (cache, cache_path):
-      interpereters = cache.setup()
-      self.assertEqual(len(interpereters), 1)
-      self.assertEqual(interpereters[0].binary, py36)
+    py27 = '2.7'
+    py36 = '3.6'
+    if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py36):
+      print('Found both python {} and python {}. Running test.'.format(py27, py36))
+      py27_path = PantsRunIntegrationTest.python_interpreter_path(py27)
+      py36_path = PantsRunIntegrationTest.python_interpreter_path(py36)
+      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+        # Target python 2 for interpreter cache.
+        with self._setup_test(constraints=['CPython>=2.7'],
+                              mock_setup_paths_interpreters=(py27_path, py36_path)) as (cache, cache_path):
+          interpreters = cache.setup()
+          # The majority of systems are able to satisfy the above constraint without needing to use setup paths,
+          # so checking for presence of compatible interpreters is sufficient. Constraints are typcially met
+          # by a system interpreter and as a result, the Pants venv interpreter from `py27_path` does not get
+          # added to the interpreter cache.
+          self.assertGreater(len(interpreters), 0)
+        # Target python 3 for interpreter cache.
+        with self._setup_test(constraints=['CPython>=3.6'],
+                              mock_setup_paths_interpreters=(py27_path, py36_path)) as (cache, cache_path):
+          interpreters = cache.setup()
+          self.assertGreater(len(interpreters), 0)
+          assert py36_path in [pi.binary for pi in interpreters]
+    else:
+      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py36))
+      self.skipTest('Missing neccesary Python interpreters on system.')

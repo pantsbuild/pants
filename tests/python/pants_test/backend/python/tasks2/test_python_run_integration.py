@@ -13,8 +13,7 @@ from pex.pex_bootstrapper import get_pex_info
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.pexrc_util import (ensure_python_interpreter,
-                                             setup_pexrc_with_pex_python_path)
+from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
@@ -64,40 +63,52 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(var_val, pants_run.stdout_data.strip())
 
   def test_pants_run_interpreter_selection_with_pexrc(self):
-    py27 = ensure_python_interpreter('2.7.10', get_buildroot())
-    py36 = ensure_python_interpreter('3.6.3', get_buildroot())
-    with setup_pexrc_with_pex_python_path('~/.pexrc', [py27, py36]):
-      with temporary_dir() as interpreters_cache:
-        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
-        pants_run_27 = self.run_pants(
-          command=['clean-all', 'run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
-          config=pants_ini_config
-        )
-        self.assert_success(pants_run_27)
-        assert py27 in pants_run_27.stdout_data
-        pants_run_3 = self.run_pants(
-          command=['clean-all', 'run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
-          config=pants_ini_config
-        )
-        self.assert_success(pants_run_3)
-        assert py36 in pants_run_3.stdout_data
+    py27 = '2.7'
+    py36 = '3.6'
+    if self.has_python_version(py27) and self.has_python_version(py36):
+      print('Found both python {} and python {}. Running test.'.format(py27, py36))
+      py27_path, py36_path = self.python_interpreter_path(py27), self.python_interpreter_path(py36)
+      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+        with temporary_dir() as interpreters_cache:
+          pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+          pants_run_27 = self.run_pants(
+            command=['clean-all', 'run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            config=pants_ini_config
+          )
+          self.assert_success(pants_run_27)
+          assert py27 in pants_run_27.stdout_data
+          pants_run_3 = self.run_pants(
+            command=['clean-all', 'run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            config=pants_ini_config
+          )
+          self.assert_success(pants_run_3)
+          assert py36 in pants_run_3.stdout_data
+    else:
+      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py36))
+      self.skipTest('Missing neccesary Python interpreters on system.')
 
   def test_pants_binary_interpreter_selection_with_pexrc(self):
-    py27 = ensure_python_interpreter('2.7.9', get_buildroot())
-    py36 = ensure_python_interpreter('3.6.3', get_buildroot())
-    with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27, py36]):
-      with temporary_dir() as interpreters_cache:
-        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
-        pants_run_27 = self.run_pants(
-          command=['binary', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
-          config=pants_ini_config
-        )
-        self.assert_success(pants_run_27)
-        pants_run_3 = self.run_pants(
-          command=['binary', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
-          config=pants_ini_config
-        )
-        self.assert_success(pants_run_3)
+    py27 = '2.7'
+    py36 = '3.6'
+    if self.has_python_version(py27) and self.has_python_version(py36):
+      print('Found both python {} and python {}. Running test.'.format(py27, py36))
+      py27_path, py36_path = self.python_interpreter_path(py27), self.python_interpreter_path(py36)
+      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py36_path]):
+        with temporary_dir() as interpreters_cache:
+          pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+          pants_run_27 = self.run_pants(
+            command=['binary', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            config=pants_ini_config
+          )
+          self.assert_success(pants_run_27)
+          pants_run_3 = self.run_pants(
+            command=['binary', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            config=pants_ini_config
+          )
+          self.assert_success(pants_run_3)
+    else:
+      print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py36))
+      self.skipTest('Missing neccesary Python interpreters on system.')
 
     # Ensure proper interpreter constraints were passed to built pexes.
     py2_pex = os.path.join(os.getcwd(), 'dist', 'main_py2.pex')

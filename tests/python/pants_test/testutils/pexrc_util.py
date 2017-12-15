@@ -36,33 +36,3 @@ def setup_pexrc_with_pex_python_path(pexrc_path, interpreter_paths):
   finally:
     # Cleanup temporary .pexrc.
     os.remove(pexrc_path)
-
-
-# TODO: Refactor similar helper methods in the pex codebase and remove from Pants.
-# https://github.com/pantsbuild/pex/issues/438
-def bootstrap_python_installer(location):
-  install_location = os.path.join(location, '.pyenv_test')
-  if os.path.exists(install_location):
-    if os.listdir(install_location) == []:
-      shutil.rmtree(install_location)
-  if not os.path.exists(install_location):
-    for _ in range(5):
-      try:
-        subprocess.call(['git', 'clone', 'https://github.com/pyenv/pyenv.git', install_location])
-      except StandardError:
-        continue
-      else:
-        break
-    else:
-      raise RuntimeError("Helper method could not clone pyenv from git")
-  return os.path.join(location, '.pyenv_test/versions')
-
-
-def ensure_python_interpreter(version, location=None):
-  if not location:
-    location = get_repo_root()
-  install_location = os.path.join(bootstrap_python_installer(location), version)
-  if not os.path.exists(install_location):
-    os.environ['PYENV_ROOT'] = os.path.join(location, '.pyenv_test')
-    subprocess.call([os.path.join(location, '.pyenv_test/bin/pyenv'), 'install', version])
-  return os.path.join(install_location, 'bin', 'python' + version[0:3])

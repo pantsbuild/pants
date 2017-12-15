@@ -17,7 +17,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized, memoized_property
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
@@ -40,8 +40,9 @@ class PythonInterpreterCache(object):
       if cls._matches(interpreter, filters):
         yield interpreter
 
-  @memoized_method
-  def pex_python_paths(self):
+  @classmethod
+  @memoized
+  def pex_python_paths(cls):
     """A list of paths to Python interpreter binaries as defined by a
     PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc'.
     PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
@@ -50,7 +51,7 @@ class PythonInterpreterCache(object):
     :return: paths to interpreters as specified by PEX_PYTHON_PATH
     :rtype: list
     """
-    ppp = Variables.from_rc().get('PEX_PYTHON_PATH', '')
+    ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
     if ppp:
       return ppp.split(os.pathsep)
     else:

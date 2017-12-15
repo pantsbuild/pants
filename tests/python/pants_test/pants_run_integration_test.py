@@ -124,6 +124,20 @@ class PantsRunIntegrationTest(unittest.TestCase):
     except OSError:
       return False
 
+  @classmethod
+  def python_interpreter_path(cls, version):
+    """Returns the interpreter path if the current system has the specified version of python.
+
+    :param version: A python version string, such as 2.7, 3.
+    """
+    try:
+      py_path = subprocess.check_output(['python%s' % version,
+                                         '-c',
+                                         'import sys; print(sys.executable)']).strip()
+      return py_path
+    except OSError:
+      return None
+
   def setUp(self):
     super(PantsRunIntegrationTest, self).setUp()
     # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
