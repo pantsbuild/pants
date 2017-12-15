@@ -36,7 +36,7 @@ class ResolveRequirementsTaskBase(Task):
 
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
     :param local_python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
-    :returns a PEX containing target requirements and any specified python dist targets.
+    :returns: a PEX containing target requirements and any specified python dist targets.
     """
     with self.invalidated(req_libs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving

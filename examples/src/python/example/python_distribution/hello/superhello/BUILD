@@ -7,9 +7,9 @@
 python_dist(
   name='superhello',
   sources=[
-  	'super_greet.c',
-  	'hello_package/hello.py',
-  	'hello_package/__init__.py',
+    'super_greet.c',
+    'hello_package/hello.py',
+    'hello_package/__init__.py',
     'setup.py'
   ]
 )
@@ -18,6 +18,6 @@ python_binary(
   name='main',
   source='main.py',
   dependencies=[
-    'examples/src/python/example/python_distribution/hello/superhello:superhello',
+    ':superhello',
   ]
 )
