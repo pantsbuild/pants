@@ -14,7 +14,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 #
 # class CoursierTest(BaseTest):
 #   def test_flatten_result(self):
-#     flat_resolution = CoursierResolve._flatten_resolution_by_root(
+#     flat_resolution = CoursierResolve._extract_dependencies_by_root(
 #       {"dependencies": [{"dependencies": [{"dependencies": [], "coord": "com.thoughtworks.paranamer:paranamer:2.3"},
 #                                           {"dependencies": [{"dependencies": [], "coord": "org.tukaani:xz:1.0"}],
 #                                            "coord": "org.apache.commons:commons-compress:1.4.1"},

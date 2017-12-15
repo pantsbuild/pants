@@ -195,7 +195,7 @@ class CoursierMixin(NailgunTask):
             raise CoursierError(e)
 
           else:
-            flattened_resolution = self._flatten_resolution_by_root(result)
+            flattened_resolution = self._extract_dependencies_by_root(result)
             files_by_coord = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
             org_name_to_org_name_rev = {}
@@ -317,13 +317,37 @@ class CoursierMixin(NailgunTask):
     return cmd_args
 
   @classmethod
-  def _flatten_resolution_by_root(cls, result):
+  def _extract_dependencies_by_root(cls, result):
     """
-    Flatten the resolution by root dependencies. If we want to resolve X and Y, and X->A->B, and Y -> C,
-    the result will be {X: [A, B], Y: [C]}
+    Only extracts the transitive dependencies for the given coursier resolve.
+    Note the "dependencies" field is already transitive.
 
-    :param result: see a nested dict capturing the resolution.
-    :return: a flattened view with the top artifact as the roots.
+    Example:
+    {
+      "conflict_resolution": {},
+      "dependencies": [
+        {
+          "coord": "a",
+          "dependencies": ["b", "c"]
+          "files": ...
+        },
+        {
+          "coord": "b",
+          "dependencies": []
+          "files": ...
+        },
+        {
+          "coord": "c",
+          "dependencies": []
+          "files": ...
+        }
+      ]
+    }
+
+    Should return { "a": ["b", "c"], "b": [], "c": [] }
+
+    :param result: coursier result like the example.
+    :return: a simplified view with the top artifact as the roots.
     """
     flat_result = defaultdict(list)
 
@@ -335,15 +359,45 @@ class CoursierMixin(NailgunTask):
   @classmethod
   def _map_coord_to_resolved_jars(cls, result, coursier_cache_path, pants_jar_path_base):
     """
-    Flatten the file paths corresponding to the coordinate from the nested json.
+    Map resolved files to each org:name:version
+
+    Example:
+    {
+      "conflict_resolution": {},
+      "dependencies": [
+        {
+          "coord": "a",
+          "dependencies": ["b", "c"],
+          "files": [ ["", "a.jar"], ["sources", "a-sources.jar"] ]
+        },
+        {
+          "coord": "b",
+          "dependencies": [],
+          "files": [ ["", "b.jar"] ]
+        },
+        {
+          "coord": "c",
+          "dependencies": [],
+          "files": [ ["", "c.jar"] ]
+        }
+      ]
+    }
+
+    Should return
+    {
+      "a": { ResolvedJar(classifier='', path/cache_path="a.jar"),
+             ResolvedJar(classifier='sources', path/cache_path="a-sources.jar") },
+      "b": { ResolvedJar(classifier='', path/cache_path="b.jar") },
+      "c": { ResolvedJar(classifier='', path/cache_path="c.jar") },
+    }
 
     :param result: coursier json output
     :param coursier_cache_path: coursier cache location
     :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
-    :return: a map form simple coordinate to a set of resolved jars.
+    :return: a map from org:name:version to a set of resolved jars.
     """
 
-    final_result = defaultdict(set)
+    coord_to_resolved_jars = defaultdict(set)
 
     for dep in result['dependencies']:
 
@@ -359,12 +413,12 @@ class CoursierMixin(NailgunTask):
         resolved_jar = ResolvedJar(coord,
                                    cache_path=jar_path,
                                    pants_path=pants_path)
-        final_result[simple_coord].add(resolved_jar)
+        coord_to_resolved_jars[simple_coord].add(resolved_jar)
 
-    return final_result
+    return coord_to_resolved_jars
 
   @classmethod
-  def to_m2_coord(cls, coord_str, classifier=''):
+  def to_m2_coord(cls, coord_str, classifier):
     # TODO: currently assuming all packaging is a jar
     return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
 
