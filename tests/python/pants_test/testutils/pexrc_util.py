@@ -6,11 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 from contextlib import contextmanager
-
-from pants.util.process_handler import subprocess
-from pants_test.testutils.git_util import get_repo_root
 
 
 @contextmanager

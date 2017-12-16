@@ -19,7 +19,6 @@ from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_dir
 from pants_test.base_test import BaseTest
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.git_util import get_repo_root
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
 
@@ -149,19 +148,19 @@ class TestInterpreterCache(BaseTest):
       py27_path = PantsRunIntegrationTest.python_interpreter_path(py27)
       py3_path = PantsRunIntegrationTest.python_interpreter_path(py3)
       with self._setup_test() as (cache, cache_path):
-        with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py3_path]):
+        with setup_pexrc_with_pex_python_path('~/.pexrc', [py27_path, py3_path]):
           pex_python_paths = cache.pex_python_paths()
           self.assertEqual(pex_python_paths, [py27_path, py3_path])
 
   def test_interpereter_cache_setup_using_pex_python_paths(self): 
     """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
-    py27 = '2.7'
+    py27 = '2'
     py3 = '3'
     if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py3):
       print('Found both python {} and python {}. Running test.'.format(py27, py3))
       py27_path = PantsRunIntegrationTest.python_interpreter_path(py27)
       py3_path = PantsRunIntegrationTest.python_interpreter_path(py3)
-      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py3_path]):
+      with setup_pexrc_with_pex_python_path('~/.pexrc', [py27_path, py3_path]):
         # Target python 2 for interpreter cache.
         with self._setup_test(constraints=['CPython>=2.7'],
                               mock_setup_paths_interpreters=(py27_path, py3_path)) as (cache, cache_path):
@@ -172,7 +171,7 @@ class TestInterpreterCache(BaseTest):
           # added to the interpreter cache.
           self.assertGreater(len(interpreters), 0)
         # Target python 3 for interpreter cache.
-        with self._setup_test(constraints=['CPython>=3.6'],
+        with self._setup_test(constraints=['CPython>=3'],
                               mock_setup_paths_interpreters=(py27_path, py3_path)) as (cache, cache_path):
           interpreters = cache.setup()
           self.assertGreater(len(interpreters), 0)

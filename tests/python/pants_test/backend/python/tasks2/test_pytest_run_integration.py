@@ -9,7 +9,6 @@ import os
 import sys
 import time
 
-from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
