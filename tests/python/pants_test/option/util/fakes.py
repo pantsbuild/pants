@@ -130,6 +130,9 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
         pairs.append((option_type, option_values[option_name]))
       return pairs
 
+    def __getitem__(self, scope):
+      return self.for_scope(scope)
+
   return FakeOptions()
 
 
