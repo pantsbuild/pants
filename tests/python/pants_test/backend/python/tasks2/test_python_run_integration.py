@@ -62,7 +62,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     self.assertEquals(var_val, pants_run.stdout_data.strip())
 
   def test_pants_run_interpreter_selection_with_pexrc(self):
-    py27 = '2.7'
+    py27 = '2'
     py3 = '3'
     if self.has_python_version(py27) and self.has_python_version(py3):
       print('Found both python {} and python {}. Running test.'.format(py27, py3))
@@ -77,6 +77,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
           self.assert_success(pants_run_27)
           # Protection for when the sys.executable path underlies a symlink pointing to 'python' without '2.7'
           # at the end of the basename.
+          print(pants_run_27.stdout_data)  # TRAVIS DEBUG
           assert py27_path.split(py27)[0] in pants_run_27.stdout_data
           pants_run_3 = self.run_pants(
             command=['run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
@@ -91,7 +92,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
       self.skipTest('Missing neccesary Python interpreters on system.')
 
   def test_pants_binary_interpreter_selection_with_pexrc(self):
-    py27 = '2.7'
+    py27 = '2'
     py3 = '3'
     if self.has_python_version(py27) and self.has_python_version(py3):
       print('Found both python {} and python {}. Running test.'.format(py27, py3))

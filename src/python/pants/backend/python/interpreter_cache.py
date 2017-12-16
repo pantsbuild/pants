@@ -41,7 +41,6 @@ class PythonInterpreterCache(object):
         yield interpreter
 
   @classmethod
-  @memoized
   def pex_python_paths(cls):
     """A list of paths to Python interpreter binaries as defined by a
     PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc'.

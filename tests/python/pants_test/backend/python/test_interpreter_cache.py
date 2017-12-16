@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import sys
 from contextlib import contextmanager
 
 import mock
@@ -141,7 +140,7 @@ class TestInterpreterCache(BaseTest):
 
   def test_pex_python_paths(self):
     """Test pex python path helper method of PythonInterpreterCache."""
-    py27 = '2.7'
+    py27 = '2'
     py3 = '3'
     if PantsRunIntegrationTest.has_python_version(py27) and PantsRunIntegrationTest.has_python_version(py3):
       print('Found both python {} and python {}. Running test.'.format(py27, py3))
