@@ -50,7 +50,7 @@ class PythonInterpreterCache(object):
     :return: paths to interpreters as specified by PEX_PYTHON_PATH
     :rtype: list
     """
-    ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
+    ppp = Variables.from_rc().get('PEX_PYTHON_PATH', '')
     if ppp:
       return ppp.split(os.pathsep)
     else:
