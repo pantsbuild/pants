@@ -9,7 +9,6 @@ import glob
 import os
 import time
 
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
