@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_open
 
+
 logger = logging.getLogger(__name__)
 
 

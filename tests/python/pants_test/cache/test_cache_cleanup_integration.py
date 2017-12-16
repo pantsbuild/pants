@@ -82,7 +82,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--cache-max-entries-per-target=1',
       ]
-      java_7_artifact_base_dir = self._run_pants_get_artifact_dir(
+      self._run_pants_get_artifact_dir(
         java_7_args,
         cache_dir,
         'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
@@ -125,7 +125,7 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
         'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
         '--cache-max-entries-per-target=0',
       ]
-      java_7_artifact_base_dir = self._run_pants_get_artifact_dir(
+      self._run_pants_get_artifact_dir(
         java_7_args,
         cache_dir,
         'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
