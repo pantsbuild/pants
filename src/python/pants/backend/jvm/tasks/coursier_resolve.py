@@ -26,6 +26,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import FingerprintStrategy
 from pants.base.workunit import WorkUnit, WorkUnitLabel
+from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
@@ -40,6 +41,8 @@ class CoursierError(Exception):
 
 
 class CoursierMixin(NailgunTask):
+
+  RESULT_FILENAME = 'result.pickle'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -94,10 +97,6 @@ class CoursierMixin(NailgunTask):
 
     return jars_to_resolve, exclude_args, untouched_pinned_artifact
 
-  @property
-  def cache_target_dirs(self):
-    return True
-
   def resolve(self, targets, compile_classpath):
     """
 
@@ -123,22 +122,33 @@ class CoursierMixin(NailgunTask):
                             silent=False,
                             fingerprint_strategy=CouriserResolveFingerprintStrategy([])) as invalidation_check:
 
-        target_resolution_filename = 'coursier_resolve.json'
+        if not invalidation_check.all_vts:
+          return
+
+        pants_workdir = self.get_options().pants_workdir
+        resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+        vts_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', resolve_vts.cache_key.hash)
+        safe_mkdir(vts_results_dir)
+
+        # Check each individual target without context first
         if not invalidation_check.invalid_vts:
-          success = self._load_result_from_cache(compile_classpath, invalidation_check.all_vts,
-                                               target_resolution_filename)
-          if success:
-            return
+
+          # If the individuals are valid, check them as a VersionedTargetSet
+          if resolve_vts.valid:
+            # Load up from the results dir
+            success = self._load_result_from_cache(compile_classpath, resolve_vts, vts_results_dir)
+            if success:
+              return
 
         jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
                                                                                                           artifact_set,
                                                                                                           manager)
         # Prepare coursier args
         coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
-        pants_jar_path_base = os.path.join(self.get_options().pants_workdir, 'coursier')
+        pants_jar_path_base = os.path.join(pants_workdir, 'coursier', 'cache')
         safe_mkdir(pants_jar_path_base)
 
-        coursier_workdir = os.path.join(self.get_options().pants_workdir, 'tmp')
+        coursier_workdir = os.path.join(pants_workdir, 'tmp')
         safe_mkdir(coursier_workdir)
 
 
@@ -196,10 +206,10 @@ class CoursierMixin(NailgunTask):
 
           else:
             flattened_resolution = self._extract_dependencies_by_root(result)
-            files_by_coord = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+            coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
             org_name_to_org_name_rev = {}
-            for coord in files_by_coord.keys():
+            for coord in coord_to_resolved_jars.keys():
               (org, name, _) = coord.split(':')
               org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
             for vt in invalidation_check.all_vts:
@@ -218,7 +228,7 @@ class CoursierMixin(NailgunTask):
                 for jar in t.jar_dependencies:
                   simple_coord_candidate = jar.coordinate.simple_coord
                   final_simple_coord = None
-                  if simple_coord_candidate in files_by_coord:
+                  if simple_coord_candidate in coord_to_resolved_jars:
                     final_simple_coord = simple_coord_candidate
                   elif simple_coord_candidate in result['conflict_resolution']:
                     final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
@@ -229,46 +239,55 @@ class CoursierMixin(NailgunTask):
                       final_simple_coord = org_name_to_org_name_rev[org_name]
 
                   if final_simple_coord:
-                    transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, files_by_coord)
+                    transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
                     if transitive_resolved_jars:
                       compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
 
-        self._update_results_dir_content(compile_classpath, invalidation_check.all_vts, target_resolution_filename)
+        self._populate_results_dir(compile_classpath, resolve_vts, vts_results_dir)
 
-  @staticmethod
-  def _update_results_dir_content(compile_classpath, all_vts, target_resolution_filename):
+  def _populate_results_dir(self, compile_classpath, versioned_target_set, vts_results_dir):
     # TODO(wisechengyi): currently the path contains abs path, so need to remove that before
     # cache can be shared across machines.
-    for vt in all_vts:
+
+    to_be_serialized_result = {}
+    for vt in versioned_target_set.versioned_targets:
       t = vt.target
       if isinstance(t, JarLibrary):
-        with open(os.path.join(vt.results_dir, target_resolution_filename), 'w') as f:
-          pickle.dump(compile_classpath.get_artifact_classpath_entries_for_targets([t]), f)
-        vt.update()
+        to_be_serialized_result[vt.cache_key.hash] = compile_classpath.get_artifact_classpath_entries_for_targets([t])
 
-  def _load_result_from_cache(self, compile_classpath, all_vts, target_resolution_filename):
+    with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'w') as f:
+      pickle.dump(to_be_serialized_result, f)
+
+
+  def _load_result_from_cache(self, compile_classpath, versioned_target_set, vts_results_dir):
     """
 
     :param compile_classpath:
-    :param all_vts:
+    :param versioned_target_set:
     :param target_resolution_filename:
     :return: True if success; False if any of the classpath is not valid anymore.
     """
     temp_store = []
+    try:
 
-    for vt in all_vts:
-      t = vt.target
-      if isinstance(t, JarLibrary):
-        # compile_classpath.add_jars_for_targets
-        with open(os.path.join(vt.results_dir, target_resolution_filename), 'r') as f:
-          tuples_conf_artifact_classpath = pickle.load(f)
+      with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'r') as f:
+
+        deserialized_result = pickle.load(f)
+
+        for vt in versioned_target_set.versioned_targets:
+          tuples_conf_artifact_classpath = deserialized_result[vt.cache_key.hash]
           for conf, artifact_classpath in tuples_conf_artifact_classpath:
             if not os.path.exists(artifact_classpath.path) \
                 or not os.path.exists(artifact_classpath.cache_path) \
                 or not os.path.exists(os.path.realpath(artifact_classpath.cache_path)):
               logger.debug("Failed to verify coursier artifacts.")
               return False
-            temp_store.append((t, tuples_conf_artifact_classpath))
+
+            temp_store.append((vt.target, tuples_conf_artifact_classpath))
+
+    except (IOError, KeyError) as e:
+      logger.debug("Failed to verify coursier artifact: {}".format(e))
+      return False
 
     # If all artifacts path are valid, add them to compile_classpath
     logger.debug("Coursier artifact verified.")
@@ -465,9 +484,7 @@ class CoursierResolve(CoursierMixin):
                                                           self.get_options().pants_workdir))
 
     # confs = ['default']
-    targets_by_sets = JarDependencyManagement.global_instance().targets_by_artifact_set(self.context.targets())
-    for artifact_set, target_subset in targets_by_sets.items():
-      self.resolve(target_subset, classpath_products)
+    self.resolve(self.context.targets(), classpath_products)
 
 
 class CouriserResolveFingerprintStrategy(FingerprintStrategy):
