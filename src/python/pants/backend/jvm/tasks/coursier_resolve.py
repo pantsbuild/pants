@@ -49,7 +49,7 @@ class CoursierMixin(NailgunTask):
     return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement, CoursierSubsystem)
 
   @staticmethod
-  def _compute_jars_to_resolve_and_to_exclude(jars, artifact_set, manager):
+  def _compute_jars_to_resolve_and_to_exclude(raw_jars, artifact_set, manager):
     """
 
     :param jars_by_key:
@@ -62,7 +62,8 @@ class CoursierMixin(NailgunTask):
       artifact_set = PinnedJarArtifactSet()
 
     jars_by_key = OrderedDict()
-    for jar in jars:
+    for jar in raw_jars:
+      # (wisechengyi) This is equivalent to OrderedDefaultDict, but not sure why it is not used here.
       jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
       jars_for_the_key.append(jar)
 
@@ -105,10 +106,6 @@ class CoursierMixin(NailgunTask):
     :return:
     """
 
-    coursier_subsystem_instance = CoursierSubsystem.global_instance()
-
-    coursier_jar = coursier_subsystem_instance.bootstrap_coursier()
-
     manager = JarDependencyManagement.global_instance()
 
     jar_targets = manager.targets_by_artifact_set(targets)
@@ -127,8 +124,8 @@ class CoursierMixin(NailgunTask):
 
         pants_workdir = self.get_options().pants_workdir
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
-        vts_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', resolve_vts.cache_key.hash)
-        safe_mkdir(vts_results_dir)
+        vt_set_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', resolve_vts.cache_key.hash)
+        safe_mkdir(vt_set_results_dir)
 
         # Check each individual target without context first
         if not invalidation_check.invalid_vts:
@@ -136,9 +133,13 @@ class CoursierMixin(NailgunTask):
           # If the individuals are valid, check them as a VersionedTargetSet
           if resolve_vts.valid:
             # Load up from the results dir
-            success = self._load_result_from_cache(compile_classpath, resolve_vts, vts_results_dir)
+            success = self._load_result_from_cache(compile_classpath, resolve_vts, vt_set_results_dir)
             if success:
               return
+
+
+        coursier_subsystem_instance = CoursierSubsystem.global_instance()
+        coursier_jar = coursier_subsystem_instance.bootstrap_coursier()
 
         jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
                                                                                                           artifact_set,
@@ -162,6 +163,21 @@ class CoursierMixin(NailgunTask):
                        '--json-output-file', output_fn] + coursier_subsystem_instance.get_options().fetch_options
 
         def construct_classifier_to_jar(jars):
+          """
+          Reshape jars by classifier
+
+          For example:
+          [
+            ResolvedJar('sources', 'a-sources.jar'),
+            ResolvedJar('sources', 'b-sources.jar'),
+            ResolvedJar('', 'a.jar'),
+          ]
+          =>
+          {
+            'sources': [ResolvedJar('sources', 'a-sources.jar'),ResolvedJar('sources', 'b-sources.jar')],
+            '':  [ResolvedJar('', 'a.jar') ]
+          }
+          """
           product = defaultdict(list)
           for x in jars:
             product[x.coordinate.classifier or ''].append(x)
@@ -169,7 +185,8 @@ class CoursierMixin(NailgunTask):
 
         classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
-        # Coursier calls need to be divided by classifier because coursier treats classifier option globally.
+        vt_set_result = {}
+        # Divide the resolve by classifier because coursier treats classifier option globally.
         for classifier, classified_jars in classifier_to_jars.items():
 
           cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
@@ -189,10 +206,6 @@ class CoursierMixin(NailgunTask):
                 # to let stdout/err through, but don't print tool's label.
                 workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
-              # return_code = subprocess.call(cmd_args,
-              #                               stdout=workunit.output('stdout'),
-              #                               stderr=workunit.output('stderr'))
-
               workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
               if return_code:
@@ -200,50 +213,53 @@ class CoursierMixin(NailgunTask):
 
               with open(output_fn) as f:
                 result = json.loads(f.read())
+                vt_set_result[classifier] = result
 
           except subprocess.CalledProcessError as e:
             raise CoursierError(e)
 
           else:
-            flattened_resolution = self._extract_dependencies_by_root(result)
-            coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+            self.load_coursier_result(classifier, compile_classpath, coursier_cache_path, invalidation_check,
+                                      pants_jar_path_base, result)
 
-            org_name_to_org_name_rev = {}
-            for coord in coord_to_resolved_jars.keys():
-              (org, name, _) = coord.split(':')
-              org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
-            for vt in invalidation_check.all_vts:
-              t = vt.target
-            # for t in targets:
-              if isinstance(t, JarLibrary):
+        self._populate_results_dir(compile_classpath, resolve_vts, vt_set_results_dir)
 
-                def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
-                  transitive_jar_path_for_coord = []
-                  if my_simple_coord in flattened_resolution:
-                    for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
-                      transitive_jar_path_for_coord.extend(resolved_jars[c])
+  def load_coursier_result(self, classifier, compile_classpath, coursier_cache_path, invalidation_check,
+                           pants_jar_path_base, result):
+    flattened_resolution = self._extract_dependencies_by_root(result)
+    coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+    org_name_to_org_name_rev = {}
+    for coord in coord_to_resolved_jars.keys():
+      (org, name, _) = coord.split(':')
+      org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
+    for vt in invalidation_check.all_vts:
+      t = vt.target
+      if isinstance(t, JarLibrary):
+        def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
+          transitive_jar_path_for_coord = []
+          if my_simple_coord in flattened_resolution:
+            for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
+              transitive_jar_path_for_coord.extend(resolved_jars[c])
 
-                  return transitive_jar_path_for_coord
+          return transitive_jar_path_for_coord
 
-                for jar in t.jar_dependencies:
-                  simple_coord_candidate = jar.coordinate.simple_coord
-                  final_simple_coord = None
-                  if simple_coord_candidate in coord_to_resolved_jars:
-                    final_simple_coord = simple_coord_candidate
-                  elif simple_coord_candidate in result['conflict_resolution']:
-                    final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
-                  # If still not found, look for org:name match.
-                  else:
-                    org_name = '{}:{}'.format(jar.org, jar.name)
-                    if org_name in org_name_to_org_name_rev:
-                      final_simple_coord = org_name_to_org_name_rev[org_name]
+        for jar in t.jar_dependencies:
+          simple_coord_candidate = jar.coordinate.simple_coord
+          final_simple_coord = None
+          if simple_coord_candidate in coord_to_resolved_jars:
+            final_simple_coord = simple_coord_candidate
+          elif simple_coord_candidate in result['conflict_resolution']:
+            final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
+          # If still not found, look for org:name match.
+          else:
+            org_name = '{}:{}'.format(jar.org, jar.name)
+            if org_name in org_name_to_org_name_rev:
+              final_simple_coord = org_name_to_org_name_rev[org_name]
 
-                  if final_simple_coord:
-                    transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
-                    if transitive_resolved_jars:
-                      compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
-
-        self._populate_results_dir(compile_classpath, resolve_vts, vts_results_dir)
+          if final_simple_coord:
+            transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
+            if transitive_resolved_jars:
+              compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
 
   def _populate_results_dir(self, compile_classpath, versioned_target_set, vts_results_dir):
     # TODO(wisechengyi): currently the path contains abs path, so need to remove that before
