@@ -17,7 +17,7 @@ from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
-from pants.util.memo import memoized, memoized_property
+from pants.util.memo import memoized_property
 
 
 # TODO(wickman) Create a safer version of this and add to twitter.common.dirutil
