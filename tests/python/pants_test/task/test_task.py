@@ -536,7 +536,8 @@ class TaskTest(TaskTestBase):
 
     cur_option_spec = {}
     def fp(cls=AnotherFakeTask, scope=None, **kwargs):
-      """Generate a fingerprint for a """
+      """Generate a fingerprint for a task using `cur_option_spec` to register
+      options in different scopes."""
       task_type = self._synthesize_subtype(scope=scope, cls=cls)
       return self._task_type_to_fp(task_type, options_fingerprintable=cur_option_spec, **kwargs)
 
@@ -555,44 +556,26 @@ class TaskTest(TaskTestBase):
     self.set_options_for_scope(AnotherFakeTask.options_scope, **{'fake-option': True})
     different_option_value_fp = fp()
     self.assertNotEqual(different_option_value_fp, with_option_fp)
-    self.assertNotEqual(different_option_value_fp, default_fp)
 
-    self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
-    cur_option_spec[FakeSubsystem.options_scope] = {'fake-option': bool}
-    cur_option_spec[FakeSubsystem.subscope(AnotherFakeTask.options_scope)] = {'fake-option': bool}
-    subsystem_task_scoped_opts_fp = fp()
-    self.assertNotEqual(subsystem_task_scoped_opts_fp, default_fp)
-    self.assertNotEqual(subsystem_task_scoped_opts_fp, with_option_fp)
-    self.assertNotEqual(subsystem_task_scoped_opts_fp, different_option_value_fp)
-
-    self.set_options_for_scope(FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': True})
-    subsystem_task_intersecting_scope_opts_fp = fp()
-    self.assertEqual(subsystem_task_intersecting_scope_opts_fp, subsystem_task_scoped_opts_fp)
-
-    self.set_options_for_scope(FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': False})
-    different_nested_opts_values_fp = fp()
-    self.assertNotEqual(different_nested_opts_values_fp, default_fp)
-    self.assertNotEqual(different_nested_opts_values_fp, with_option_fp)
-    self.assertNotEqual(different_nested_opts_values_fp, subsystem_task_scoped_opts_fp)
-
-    self.set_options_for_scope(AnotherFakeSubsystem.options_scope, **{'another-fake-option': True})
-    cur_option_spec[FakeSubsystem.subscope(YetAnotherFakeTask.options_scope)] = {'fake-option': bool}
-    cur_option_spec[AnotherFakeSubsystem.options_scope] = {'another-fake-option': bool}
-    cur_option_spec[AnotherFakeSubsystem.subscope(YetAnotherFakeTask.options_scope)] = {'another-fake-option': bool}
-    same_base_task_different_scope_options_fp = fp()
-    self.assertEqual(same_base_task_different_scope_options_fp, different_nested_opts_values_fp)
+    cur_option_spec.update({
+      FakeSubsystem.options_scope: {'fake-option': bool},
+      FakeSubsystem.subscope(AnotherFakeTask.options_scope): {'fake-option': bool},
+    })
+    self.set_options_for_scope(
+      FakeSubsystem.options_scope, **{'fake-option': True})
+    subsystem_opts_fp = fp()
+    self.assertNotEqual(subsystem_opts_fp, different_option_value_fp)
+    self.set_options_for_scope(
+      FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': False}
+    )
+    subsystem_subscope_opts_fp = fp()
+    self.assertNotEqual(subsystem_subscope_opts_fp, subsystem_opts_fp)
 
     empty_passthru_args_fp = fp(passthru_args=[])
-    self.assertEqual(empty_passthru_args_fp, same_base_task_different_scope_options_fp)
+    self.assertEqual(empty_passthru_args_fp, subsystem_subscope_opts_fp)
     non_empty_passthru_args_fp = fp(passthru_args=['something'])
     self.assertNotEqual(non_empty_passthru_args_fp, empty_passthru_args_fp)
 
     different_task_with_same_opts_fp = fp(cls=YetAnotherFakeTask)
-    self.assertNotEqual(different_task_with_same_opts_fp, different_nested_opts_values_fp)
-
     different_task_with_passthru_fp = fp(cls=YetAnotherFakeTask, passthru_args=['asdf'])
     self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)
-
-    self.set_options_for_scope(FakeSubsystem.subscope(YetAnotherFakeTask.options_scope), **{'fake-option': False})
-    different_task_with_different_parent_opts_fp = fp(cls=YetAnotherFakeTask)
-    self.assertNotEqual(different_task_with_different_parent_opts_fp, different_task_with_same_opts_fp)
