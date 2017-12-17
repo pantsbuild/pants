@@ -449,15 +449,15 @@ class TaskTest(TaskTestBase):
     self.assertFalse(vtA.cacheable)
 
   def test_fingerprint_identity(self):
-    """
-    Smoke test: failure means some state is changing in between calls, which
-    should not happen.
-    """
+    """Tasks formed with the same parameters should have the same fingerprint
+    (smoke test)."""
     x = self._subtask_fp()
     y = self._subtask_fp()
     self.assertEqual(y, x)
 
   def test_fingerprint_implementation_version_single(self):
+    """Tasks with a different implementation_version() should have different
+    fingerprints."""
     empty_impls = self._subtask_fp(_impls=[])
     zero_version = self._subtask_fp(_impls=[('asdf', 0)])
     self.assertNotEqual(zero_version, empty_impls)
@@ -470,6 +470,8 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(zero_one_version, one_version)
 
   def test_fingerprint_implementation_version_inheritance(self):
+    """The implementation_version() of superclasses of the task should affect
+    the task fingerprint."""
     versioned_fake = self._subtask_fp(_impls=[('asdf', 0)])
     base_version_other_fake = self._subtask_fp(
       cls=OtherFakeTask,
@@ -490,14 +492,9 @@ class TaskTest(TaskTestBase):
       _other_impls=[('xxx', 0)],
     )
     self.assertNotEqual(extended_version_copy, extended_version_other_fake)
-    extended_new_version = self._subtask_fp(
-      cls=OtherFakeTask,
-       _impls=[('asdf', 0)],
-      _other_impls=[('xxx', 1)],
-    )
-    self.assertNotEqual(extended_new_version, extended_version_other_fake)
 
   def test_stable_name(self):
+    """The stable_name() should be used to form the task fingerprint."""
     a_fingerprint = self._subtask_fp(name='some_name', _stable_name='xxx')
     b_fingerprint = self._subtask_fp(name='other_name', _stable_name='xxx')
     c_fingerprint = self._subtask_fp(name='some_name', _stable_name='yyy')
@@ -505,6 +502,8 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(c_fingerprint, a_fingerprint)
 
   def test_fingerprint_changing_options_scope(self):
+    """The options_scope of the task and any of its subsystem_dependencies
+    should affect the task fingerprint."""
     task_fp = self._subtask_fp(scope='xxx')
     other_task_fp = self._subtask_fp(scope='yyy')
     same_task_fp = self._subtask_fp(scope='xxx')
@@ -525,6 +524,8 @@ class TaskTest(TaskTestBase):
     self.assertEqual(same_scoped_subsystems_fp, scoped_subsystems_fp)
 
   def test_fingerprint_options_with_scopes(self):
+    """Values for registered options across multiple enclosing scopes affect the
+    task fingerprint."""
     def fp(options_fingerprintable=None, cls=AnotherFakeTask, scope=None, **kwargs):
       task_type = self._make_subtask(scope=scope, cls=cls)
       return self._subtask_to_fp(task_type, options_fingerprintable=options_fingerprintable, **kwargs)
