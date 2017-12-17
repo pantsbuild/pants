@@ -463,19 +463,13 @@ class TaskTest(TaskTestBase):
     self.assertNotEqual(zero_version, empty_impls)
     one_version = self._subtask_fp(_impls=[('asdf', 1)])
     self.assertNotEqual(one_version, empty_impls)
-    self.assertNotEqual(one_version, zero_version)
+    alt_name_version = self._subtask_fp(_impls=[('xxx', 0)])
+    self.assertNotEqual(alt_name_version, zero_version)
     zero_one_version = self._subtask_fp(_impls=[('asdf', 0), ('asdf', 1)])
     self.assertNotEqual(zero_one_version, zero_version)
     self.assertNotEqual(zero_one_version, one_version)
-    alt_name_version = self._subtask_fp(_impls=[('xxx', 0)])
-    self.assertNotEqual(alt_name_version, zero_version)
-    self.assertNotEqual(alt_name_version, empty_impls)
 
   def test_fingerprint_implementation_version_inheritance(self):
-    fake_task = self._subtask_fp(_impls=[])
-    other_task = self._subtask_fp(cls=OtherFakeTask, _impls=[], _other_impls=[])
-    self.assertNotEqual(other_task, fake_task)
-
     versioned_fake = self._subtask_fp(_impls=[('asdf', 0)])
     base_version_other_fake = self._subtask_fp(
       cls=OtherFakeTask,
@@ -492,10 +486,10 @@ class TaskTest(TaskTestBase):
 
     extended_version_copy = self._subtask_fp(
       cls=OtherFakeTask,
-       _impls=[('asdf', 0)],
+       _impls=[('asdf', 1)],
       _other_impls=[('xxx', 0)],
     )
-    self.assertEqual(extended_version_copy, extended_version_other_fake)
+    self.assertNotEqual(extended_version_copy, extended_version_other_fake)
     extended_new_version = self._subtask_fp(
       cls=OtherFakeTask,
        _impls=[('asdf', 0)],
@@ -503,37 +497,12 @@ class TaskTest(TaskTestBase):
     )
     self.assertNotEqual(extended_new_version, extended_version_other_fake)
 
-    extended_new_base_version = self._subtask_fp(
-      cls=OtherFakeTask,
-      _impls=[('xxx', 0)],
-      _other_impls=[('xxx', 0)]
-    )
-    self.assertNotEqual(extended_new_base_version, extended_version_other_fake)
-
-    version_extended_base = self._subtask_fp(_impls=[('asdf', 0), ('xxx', 0)])
-    self.assertNotEqual(version_extended_base, extended_version_other_fake)
-
   def test_stable_name(self):
-    task_stable_name = self._make_subtask(name='xxx')
-    task_same_stable_name = self._make_subtask(name='xxx')
-    self.assertEqual(task_same_stable_name.stable_name(),
-                     task_stable_name.stable_name())
-    self.assertEqual(self._instantiate_task(task_same_stable_name).fingerprint,
-                     self._instantiate_task(task_stable_name).fingerprint)
-
-    task_new_name = self._make_subtask(name='yyy').stable_name()
-    self.assertNotEqual(task_new_name, task_stable_name)
-
-    # the same _stable_name means the same stable_name()
-    task_with_stable_name = self._make_subtask(name='asdf', _stable_name='xxx')
-    self.assertEqual(task_with_stable_name.stable_name(), 'xxx')
-    task_with_stable_name._stable_name = 'yyy'
-    self.assertEqual(task_with_stable_name.stable_name(), 'yyy')
-    task_with_new_stable_name = self._make_subtask(name='other_name', _stable_name='yyy')
-    self.assertEqual(task_with_new_stable_name.stable_name(),
-                     task_with_stable_name.stable_name())
-    self.assertEqual(self._instantiate_task(task_with_new_stable_name).fingerprint,
-                     self._instantiate_task(task_with_stable_name).fingerprint)
+    a_fingerprint = self._subtask_fp(name='some_name', _stable_name='xxx')
+    b_fingerprint = self._subtask_fp(name='other_name', _stable_name='xxx')
+    c_fingerprint = self._subtask_fp(name='some_name', _stable_name='yyy')
+    self.assertEqual(b_fingerprint, a_fingerprint)
+    self.assertNotEqual(c_fingerprint, a_fingerprint)
 
   def test_fingerprint_changing_options_scope(self):
     task_fp = self._subtask_fp(scope='xxx')
