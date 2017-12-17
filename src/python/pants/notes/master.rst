@@ -4,6 +4,61 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.4.0.dev24 (12/16/2017)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+* Add --ignore-optional commandline flag for yarn install process. (#5209)
+  `PR #5209 <https://github.com/pantsbuild/pants/pull/5209>`_
+
+New Features
+~~~~~~~~~~~~
+* contrib plugin for Avro/Java code generation (#5144)
+  `PR #5144 <https://github.com/pantsbuild/pants/pull/5144>`_
+
+* Release fs_util as part of the regular release (#5196)
+  `PR #5196 <https://github.com/pantsbuild/pants/pull/5196>`_
+
+Bugfixes
+~~~~~~~~
+* Cross-compiling Go binaries works (#5197)
+  `PR #5197 <https://github.com/pantsbuild/pants/pull/5197>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Log if artifact downloads are slow (#5208)
+  `PR #5208 <https://github.com/pantsbuild/pants/pull/5208>`_
+
+* [pantsd] Improve service locking. (#5201)
+  `PR #5201 <https://github.com/pantsbuild/pants/pull/5201>`_
+
+* Fix RunTracker re-initialization with pantsd (#5211)
+  `PR #5211 <https://github.com/pantsbuild/pants/pull/5211>`_
+
+* [pantsd] Catch ESRCH on os.kill of pantsd-runner. (#5213)
+  `PR #5213 <https://github.com/pantsbuild/pants/pull/5213>`_
+
+* Update junit-runner to 1.0.23 (#5206)
+  `PR #5206 <https://github.com/pantsbuild/pants/pull/5206>`_
+
+* Reset swappable streams in JUnit runner before closing the TeeOutputStreams to the log files and close XML Files after use (#5204)
+  `PR #5204 <https://github.com/pantsbuild/pants/pull/5204>`_
+
+* Use centos6 in travis, and remove the wheezy image. (#5202)
+  `PR #5202 <https://github.com/pantsbuild/pants/pull/5202>`_
+
+* Add a centos6 Dockerfile (#5167)
+  `PR #5167 <https://github.com/pantsbuild/pants/pull/5167>`_
+
+* Add integration test to cover the fix for #5169. (#5192)
+  `PR #5192 <https://github.com/pantsbuild/pants/pull/5192>`_
+
+* [pantsd] Repair stdio truncation. (#5156)
+  `PR #5156 <https://github.com/pantsbuild/pants/pull/5156>`_
+
+
 1.4.0.dev23 (12/08/2017)
 ------------------------
 
