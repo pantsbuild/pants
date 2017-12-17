@@ -54,7 +54,7 @@ python_binary(
 python_library(
   name='lib_py2',
   sources=['lib_py2.py'],
-  compatibility=['CPython>=2.7.6,<3']
+  compatibility=['CPython>2.7.6,<3']
 )
 
 python_tests(
@@ -65,5 +65,5 @@ python_tests(
   dependencies=[
     ':main_py2'
   ],
-  compatibility=['CPython>=2.7.6,<3']
+  compatibility=['CPython>2.7.6,<3']
 )
