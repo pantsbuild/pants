@@ -80,7 +80,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
           # Protection for when the sys.executable path underlies a symlink pointing to 'python' without '2.7'
           # at the end of the basename.
           print(pants_run_27.stdout_data)  # TRAVIS DEBUG
-          test = subprocess.check_output(['/home/travis/virtualenv/python'
+          test = subprocess.check_output(['/home/travis/virtualenv/python',
                                          '-c',
                                          'import sys; print(sys.executable)']).strip()
           print(test)
