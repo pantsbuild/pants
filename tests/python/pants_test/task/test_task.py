@@ -571,11 +571,27 @@ class TaskTest(TaskTestBase):
     subsystem_subscope_opts_fp = fp()
     self.assertNotEqual(subsystem_subscope_opts_fp, subsystem_opts_fp)
 
-    empty_passthru_args_fp = fp(passthru_args=[])
-    self.assertEqual(empty_passthru_args_fp, subsystem_subscope_opts_fp)
-    non_empty_passthru_args_fp = fp(passthru_args=['something'])
+  def test_fingerprint_passthru_args(self):
+    """Passthrough arguments should affect fingerprints iff the task
+    supports passthrough args."""
+    task_type_base = self._synthesize_subtype(cls=AnotherFakeTask)
+    empty_passthru_args_fp = self._task_type_to_fp(
+      task_type_base,
+      passthru_args=[],
+    )
+    non_empty_passthru_args_fp = self._task_type_to_fp(
+      task_type_base,
+      passthru_args=['something'],
+    )
     self.assertNotEqual(non_empty_passthru_args_fp, empty_passthru_args_fp)
 
-    different_task_with_same_opts_fp = fp(cls=YetAnotherFakeTask)
-    different_task_with_passthru_fp = fp(cls=YetAnotherFakeTask, passthru_args=['asdf'])
+    task_type_derived_ignore_passthru = self._synthesize_subtype(cls=YetAnotherFakeTask)
+    different_task_with_same_opts_fp = self._task_type_to_fp(
+      task_type_derived_ignore_passthru,
+      passthru_args=[],
+    )
+    different_task_with_passthru_fp = self._task_type_to_fp(
+      task_type_derived_ignore_passthru,
+      passthru_args=['asdf'],
+    )
     self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)
