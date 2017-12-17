@@ -189,24 +189,31 @@ class TaskTest(TaskTestBase):
       }
     }
 
-  def _make_subtask(self, name='A', scope=None, cls=FakeTask, **kwargs):
+  def _synthesize_subtype(self, name='A', scope=None, cls=FakeTask, **kwargs):
+    """Generate a synthesized subtype of `cls`."""
     if scope is None:
       scope = cls.options_scope
     subclass_name = b'test_{0}_{1}_{2}'.format(cls.__name__, scope, name)
     kwargs['options_scope'] = scope
     return type(subclass_name, (cls,), kwargs)
 
-  def _instantiate_task(self, subtask, **kwargs):
-    ctx = super(TaskTestBase, self).context(for_task_types=[subtask], **kwargs)
-    return subtask(ctx, self._test_workdir)
+  def _instantiate_synthesized_type(self, task_type, **kwargs):
+    """Generate a new instance of the synthesized type `task_type`."""
+    ctx = super(TaskTestBase, self).context(for_task_types=[task_type], **kwargs)
+    return task_type(ctx, self.test_workdir)
 
-  def _subtask_to_fp(self, subtask, options_fingerprintable=None, **kwargs):
-    task_instance = self._instantiate_task(
-      subtask, options_fingerprintable=options_fingerprintable, **kwargs)
-    return task_instance.fingerprint
+  def _task_type_to_fp(self, task_type, **kwargs):
+    """Instantiate the `task_type` and return its fingerprint."""
+    task_object = self._instantiate_synthesized_type(task_type, **kwargs)
+    return task_object.fingerprint
 
-  def _subtask_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
-    return self._subtask_to_fp(self._make_subtask(scope=scope, cls=cls, **kwargs), options_fingerprintable=options_fingerprintable)
+  def _synth_fp(self, scope=None, cls=FakeTask, options_fingerprintable=None, **kwargs):
+    """Synthesize a subtype of `cls`, instantiate it, and take its
+    fingerprint. `options_fingerprintable` describes the registered options in
+    their respective scopes which can contribute to the task fingerprint."""
+    task_type = self._synthesize_subtype(scope=scope, cls=cls, **kwargs)
+    return self._task_type_to_fp(
+      task_type, options_fingerprintable=options_fingerprintable)
 
   def test_revert_after_failure(self):
     # Regression test to catch the following scenario:
@@ -451,42 +458,42 @@ class TaskTest(TaskTestBase):
   def test_fingerprint_identity(self):
     """Tasks formed with the same parameters should have the same fingerprint
     (smoke test)."""
-    x = self._subtask_fp()
-    y = self._subtask_fp()
+    x = self._synth_fp()
+    y = self._synth_fp()
     self.assertEqual(y, x)
 
   def test_fingerprint_implementation_version_single(self):
     """Tasks with a different implementation_version() should have different
     fingerprints."""
-    empty_impls = self._subtask_fp(_impls=[])
-    zero_version = self._subtask_fp(_impls=[('asdf', 0)])
+    empty_impls = self._synth_fp(_impls=[])
+    zero_version = self._synth_fp(_impls=[('asdf', 0)])
     self.assertNotEqual(zero_version, empty_impls)
-    one_version = self._subtask_fp(_impls=[('asdf', 1)])
+    one_version = self._synth_fp(_impls=[('asdf', 1)])
     self.assertNotEqual(one_version, empty_impls)
-    alt_name_version = self._subtask_fp(_impls=[('xxx', 0)])
+    alt_name_version = self._synth_fp(_impls=[('xxx', 0)])
     self.assertNotEqual(alt_name_version, zero_version)
-    zero_one_version = self._subtask_fp(_impls=[('asdf', 0), ('asdf', 1)])
+    zero_one_version = self._synth_fp(_impls=[('asdf', 0), ('asdf', 1)])
     self.assertNotEqual(zero_one_version, zero_version)
     self.assertNotEqual(zero_one_version, one_version)
 
   def test_fingerprint_implementation_version_inheritance(self):
     """The implementation_version() of superclasses of the task should affect
     the task fingerprint."""
-    versioned_fake = self._subtask_fp(_impls=[('asdf', 0)])
-    base_version_other_fake = self._subtask_fp(
+    versioned_fake = self._synth_fp(_impls=[('asdf', 0)])
+    base_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
        _impls=[('asdf', 0)],
       _other_impls=[],
     )
     self.assertNotEqual(base_version_other_fake, versioned_fake)
-    extended_version_other_fake = self._subtask_fp(
+    extended_version_other_fake = self._synth_fp(
       cls=OtherFakeTask,
        _impls=[('asdf', 0)],
       _other_impls=[('xxx', 0)],
     )
     self.assertNotEqual(extended_version_other_fake, base_version_other_fake)
 
-    extended_version_copy = self._subtask_fp(
+    extended_version_copy = self._synth_fp(
       cls=OtherFakeTask,
        _impls=[('asdf', 1)],
       _other_impls=[('xxx', 0)],
@@ -495,74 +502,75 @@ class TaskTest(TaskTestBase):
 
   def test_stable_name(self):
     """The stable_name() should be used to form the task fingerprint."""
-    a_fingerprint = self._subtask_fp(name='some_name', _stable_name='xxx')
-    b_fingerprint = self._subtask_fp(name='other_name', _stable_name='xxx')
-    c_fingerprint = self._subtask_fp(name='some_name', _stable_name='yyy')
+    a_fingerprint = self._synth_fp(name='some_name', _stable_name='xxx')
+    b_fingerprint = self._synth_fp(name='other_name', _stable_name='xxx')
+    c_fingerprint = self._synth_fp(name='some_name', _stable_name='yyy')
     self.assertEqual(b_fingerprint, a_fingerprint)
     self.assertNotEqual(c_fingerprint, a_fingerprint)
 
   def test_fingerprint_changing_options_scope(self):
     """The options_scope of the task and any of its subsystem_dependencies
     should affect the task fingerprint."""
-    task_fp = self._subtask_fp(scope='xxx')
-    other_task_fp = self._subtask_fp(scope='yyy')
-    same_task_fp = self._subtask_fp(scope='xxx')
+    task_fp = self._synth_fp(scope='xxx')
+    other_task_fp = self._synth_fp(scope='yyy')
+    same_task_fp = self._synth_fp(scope='xxx')
     self.assertEqual(same_task_fp, task_fp)
     self.assertNotEqual(other_task_fp, task_fp)
 
-    default_scope_fp = self._subtask_fp()
+    default_scope_fp = self._synth_fp()
     self.assertNotEqual(default_scope_fp, task_fp)
     self.assertNotEqual(default_scope_fp, other_task_fp)
-    subsystem_deps_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    subsystem_deps_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
     self.assertNotEqual(subsystem_deps_fp, default_scope_fp)
-    same_subsystem_deps_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    same_subsystem_deps_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
     self.assertEqual(same_subsystem_deps_fp, subsystem_deps_fp)
 
-    scoped_subsystems_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    scoped_subsystems_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
     self.assertNotEqual(scoped_subsystems_fp, subsystem_deps_fp)
-    same_scoped_subsystems_fp = self._subtask_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    same_scoped_subsystems_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
     self.assertEqual(same_scoped_subsystems_fp, scoped_subsystems_fp)
 
   def test_fingerprint_options_with_scopes(self):
     """Values for registered options across multiple enclosing scopes affect the
     task fingerprint."""
-    def fp(options_fingerprintable=None, cls=AnotherFakeTask, scope=None, **kwargs):
-      task_type = self._make_subtask(scope=scope, cls=cls)
-      return self._subtask_to_fp(task_type, options_fingerprintable=options_fingerprintable, **kwargs)
+
+    cur_option_spec = {}
+    def fp(cls=AnotherFakeTask, scope=None, **kwargs):
+      """Generate a fingerprint for a """
+      task_type = self._synthesize_subtype(scope=scope, cls=cls)
+      return self._task_type_to_fp(task_type, options_fingerprintable=cur_option_spec, **kwargs)
 
     default_fp = fp()
-    same_default_fp = fp()
-    self.assertEqual(same_default_fp, default_fp)
 
-    cur_option_spec = {AnotherFakeTask.options_scope: {'fake-option': bool}}
-
-    self.set_options_for_scope(AnotherFakeTask.options_scope, **{'fake-option': False})
-    with_option_fp = fp(cur_option_spec)
+    self.set_options_for_scope(
+      AnotherFakeTask.options_scope, **{'fake-option': False})
+    unregistered_opts_fp = fp()
+    self.assertEqual(unregistered_opts_fp, default_fp)
+    cur_option_spec.update({
+      AnotherFakeTask.options_scope: {'fake-option': bool}
+    })
+    with_option_fp = fp()
     self.assertNotEqual(with_option_fp, default_fp)
 
-    self.set_options_for_scope(AnotherFakeTask.options_scope, **{'an-unregistered-option': 'value'})
-    with_unregistered_option_fp = fp(cur_option_spec)
-    self.assertEqual(with_unregistered_option_fp, with_option_fp)
-
     self.set_options_for_scope(AnotherFakeTask.options_scope, **{'fake-option': True})
-    different_option_value_fp = fp(cur_option_spec)
+    different_option_value_fp = fp()
     self.assertNotEqual(different_option_value_fp, with_option_fp)
     self.assertNotEqual(different_option_value_fp, default_fp)
 
     self.set_options_for_scope(FakeSubsystem.options_scope, **{'fake-option': True})
     cur_option_spec[FakeSubsystem.options_scope] = {'fake-option': bool}
     cur_option_spec[FakeSubsystem.subscope(AnotherFakeTask.options_scope)] = {'fake-option': bool}
-    subsystem_task_scoped_opts_fp = fp(cur_option_spec)
+    subsystem_task_scoped_opts_fp = fp()
     self.assertNotEqual(subsystem_task_scoped_opts_fp, default_fp)
     self.assertNotEqual(subsystem_task_scoped_opts_fp, with_option_fp)
     self.assertNotEqual(subsystem_task_scoped_opts_fp, different_option_value_fp)
 
     self.set_options_for_scope(FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': True})
-    subsystem_task_intersecting_scope_opts_fp = fp(cur_option_spec)
+    subsystem_task_intersecting_scope_opts_fp = fp()
     self.assertEqual(subsystem_task_intersecting_scope_opts_fp, subsystem_task_scoped_opts_fp)
 
     self.set_options_for_scope(FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': False})
-    different_nested_opts_values_fp = fp(cur_option_spec)
+    different_nested_opts_values_fp = fp()
     self.assertNotEqual(different_nested_opts_values_fp, default_fp)
     self.assertNotEqual(different_nested_opts_values_fp, with_option_fp)
     self.assertNotEqual(different_nested_opts_values_fp, subsystem_task_scoped_opts_fp)
@@ -571,20 +579,20 @@ class TaskTest(TaskTestBase):
     cur_option_spec[FakeSubsystem.subscope(YetAnotherFakeTask.options_scope)] = {'fake-option': bool}
     cur_option_spec[AnotherFakeSubsystem.options_scope] = {'another-fake-option': bool}
     cur_option_spec[AnotherFakeSubsystem.subscope(YetAnotherFakeTask.options_scope)] = {'another-fake-option': bool}
-    same_base_task_different_scope_options_fp = fp(cur_option_spec)
+    same_base_task_different_scope_options_fp = fp()
     self.assertEqual(same_base_task_different_scope_options_fp, different_nested_opts_values_fp)
 
-    empty_passthru_args_fp = fp(cur_option_spec, passthru_args=[])
+    empty_passthru_args_fp = fp(passthru_args=[])
     self.assertEqual(empty_passthru_args_fp, same_base_task_different_scope_options_fp)
-    non_empty_passthru_args_fp = fp(cur_option_spec, passthru_args=['something'])
+    non_empty_passthru_args_fp = fp(passthru_args=['something'])
     self.assertNotEqual(non_empty_passthru_args_fp, empty_passthru_args_fp)
 
-    different_task_with_same_opts_fp = fp(cur_option_spec, cls=YetAnotherFakeTask)
+    different_task_with_same_opts_fp = fp(cls=YetAnotherFakeTask)
     self.assertNotEqual(different_task_with_same_opts_fp, different_nested_opts_values_fp)
 
-    different_task_with_passthru_fp = fp(cur_option_spec, cls=YetAnotherFakeTask, passthru_args=['asdf'])
+    different_task_with_passthru_fp = fp(cls=YetAnotherFakeTask, passthru_args=['asdf'])
     self.assertEqual(different_task_with_passthru_fp, different_task_with_same_opts_fp)
 
     self.set_options_for_scope(FakeSubsystem.subscope(YetAnotherFakeTask.options_scope), **{'fake-option': False})
-    different_task_with_different_parent_opts_fp = fp(cur_option_spec, cls=YetAnotherFakeTask)
+    different_task_with_different_parent_opts_fp = fp(cls=YetAnotherFakeTask)
     self.assertNotEqual(different_task_with_different_parent_opts_fp, different_task_with_same_opts_fp)
