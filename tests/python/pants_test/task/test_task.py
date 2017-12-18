@@ -117,25 +117,12 @@ class AnotherFakeTask(Task):
   def execute(self): pass
 
 
-class AnotherFakeSubsystem(Subsystem):
-  options_scope = 'another-fake-subsystem'
-
-  @classmethod
-  def register_options(cls, register):
-    super(AnotherFakeSubsystem, cls).register_options(register)
-    register('--another-fake-option', type=bool)
-
-
 class YetAnotherFakeTask(AnotherFakeTask):
   options_scope = 'yet-another-fake-task'
 
   @classmethod
   def supports_passthru_args(cls):
     return False
-
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(YetAnotherFakeTask, cls).subsystem_dependencies() + (AnotherFakeSubsystem.scoped(cls),)
 
 
 class TaskTest(TaskTestBase):
