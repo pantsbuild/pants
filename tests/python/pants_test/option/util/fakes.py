@@ -149,6 +149,9 @@ def create_options_for_optionables(optionables,
   :param iterable extra_scopes: An optional series of extra known scopes in play.
   :param dict options: A dict of scope -> (dict of option name -> value) representing option values
                        explicitly set via the command line.
+  :param dict options_fingerprintable: A dict of scope -> (dict of option name -> option type)
+                                       representing the fingerprintable options
+                                       and the scopes they are registered for.
   :param list passthru_args: A list of passthrough args (specified after `--` on the command line).
   :returns: A fake `Options` object with defaults populated for the given `optionables` and any
             explicitly set `options` overlayed.
@@ -157,7 +160,7 @@ def create_options_for_optionables(optionables,
   fingerprintable_options = defaultdict(dict)
   bootstrap_option_values = None
 
-  # NB(cosmicexplorer): wed do this again for all_options after calling
+  # NB(cosmicexplorer): we do this again for all_options after calling
   # register_func below, this is a hack
   if options:
     for scope, opts in options.items():
