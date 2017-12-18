@@ -10,7 +10,6 @@ import os
 from contextlib import closing
 from StringIO import StringIO
 
-from pants.cache.cache_setup import CacheFactory
 from pants.goal.goal import Goal
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
