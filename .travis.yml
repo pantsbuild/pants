@@ -47,7 +47,6 @@ cache:
     - ${HOME}/.npm
     - build-support/isort.venv
     - build-support/pants_dev_deps.venv
-    - .pyenv_test
 
 # NB: There is much repetition in include elements, but there is no known current way to factor
 # this duplication up.

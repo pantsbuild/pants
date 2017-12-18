@@ -23,7 +23,6 @@
 .pants.stats
 .pids
 .project
-.pyenv_test/
 .settings
 .classpath
 .factorypath
