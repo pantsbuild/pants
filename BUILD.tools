@@ -48,3 +48,13 @@ jar_library(
   name='kythe-indexer',
   jars = [jar(org='kythe', name='indexers/java_indexer', rev='v0.0.26-snowchain3')]
 )
+
+# Runtime dependencies for the Avro Java generated code.
+avro_rev = '1.8.2'
+jar_library(
+  name = 'avro-java-runtime',
+  jars = [
+    jar(org='org.apache.avro', name='avro', rev=avro_rev),
+    jar(org='org.apache.avro', name='avro-ipc', rev=avro_rev),
+  ],
+)
