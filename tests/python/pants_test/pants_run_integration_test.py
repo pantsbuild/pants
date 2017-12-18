@@ -178,20 +178,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       cls._profile_disambiguator += 1
       return ret
 
-  def get_cache_subdir(self, cache_dir, other_dirs=[], task_cls=None):
-    """Use a glob to find the subdirectory of `cache_dir` corresponding to the
-    task type `task_cls`, or any subdirectory of `cache_dir` if `task_cls` is
-    None. Check that there is only one directory matching the glob (excluding
-    `other_dirs`), and return it.
+  def get_cache_subdir(self, cache_dir, other_dirs=[]):
+    """Check that there is only one directory of `cache_dir` matching the glob
+    (excluding `other_dirs`), and return it (with a trailing slash).
     """
-    if task_cls:
-      glob_str = CacheFactory.make_task_cache_glob_str(task_cls)
-    else:
-      glob_str = '*/'
-    task_dirs = set(glob.glob(os.path.join(cache_dir, glob_str)))
+    subdirs = set(glob.glob(os.path.join(cache_dir, '*/')))
     other_dirs = set(other_dirs)
-    self.assertTrue(other_dirs.issubset(task_dirs))
-    remaining_dirs = task_dirs - other_dirs
+    self.assertTrue(other_dirs.issubset(subdirs))
+    remaining_dirs = subdirs - other_dirs
     self.assertEqual(len(remaining_dirs), 1)
     return list(remaining_dirs)[0]
 

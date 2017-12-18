@@ -22,37 +22,28 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
             '--jvm-platform-default-platform=default']
 
   def _run_pants_get_artifact_dir(self, args, cache_dir, subdir, num_files_to_insert, expected_num_files, config=None, prev_dirs=[]):
+    """Run Pants with the given `args` and `config`, delete the results, add
+    some files, then run pants again and ensure there are exactly
+    `expected_num_files` in the output.
+
+    Pants needs to be run twice because we don't know what the results directory
+    will be named before we run Pants, and we want to insert files into that
+    specific directory to test cache cleanup procedures.
+    """
     self.assert_success(self.run_pants(args, config=config))
 
-    prev_dirs = set(prev_dirs)
-    globbed = set(glob.glob(os.path.join(cache_dir, '*')))
-    self.assertTrue(prev_dirs.issubset(globbed))
-    cur_globbed = globbed - prev_dirs
-    self.assertEqual(len(cur_globbed), 1)
-    artifact_base_dir = list(cur_globbed)[0]
-
-    artifact_dir = os.path.join(
-      artifact_base_dir,
-      subdir,
-    )
+    artifact_base_dir = self.get_cache_subdir(cache_dir, other_dirs=prev_dirs)
+    artifact_dir = os.path.join(artifact_base_dir, subdir)
 
     for tgz in glob.glob(os.path.join(artifact_dir, '*.tgz')):
       safe_delete(tgz)
-
     for i in range(0, num_files_to_insert):
       touch(os.path.join(artifact_dir, 'old_cache_test{}'.format(i + 1)))
 
     self.assert_success(self.run_pants(args, config=config))
-
     self.assertEqual(len(os.listdir(artifact_dir)), expected_num_files)
 
     return artifact_base_dir
-
-  def _get_single_other_set_entry(self, from_set, all_other_elements):
-    self.assertTrue(all_other_elements.issubset(from_set))
-    remaining_entries = from_set - all_other_elements
-    self.assertEqual(len(remaining_entries), 1)
-    return list(remaining_entries)[0]
 
   def test_buildcache_leave_one(self):
     """Ensure that max-old of 1 removes all but one files"""
@@ -160,30 +151,32 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # <workdir>/compile/zinc/d4600a981d5d/testprojects.src.java.org.pantsbuild.testproject.unicode.main.main/
       target_dir_in_pantsd = os.path.dirname(os.path.dirname(jar_path_in_pantsd))
 
-      old_cache_entries = set([
-        'old_cache_test1_dir',
-        'old_cache_test2_dir',
-        'old_cache_test3_dir',
+      old_cache_dirnames = set([
+        'old_cache_test1_dir/',
+        'old_cache_test2_dir/',
+        'old_cache_test3_dir/',
       ])
-      new_cache_entries = set([
-        'old_cache_test4_dir',
-        'old_cache_test5_dir',
+      new_cache_dirnames = set([
+        'old_cache_test4_dir/',
+        'old_cache_test5_dir/',
       ])
+      old_cache_entries = {os.path.join(target_dir_in_pantsd, subdir) for subdir in old_cache_dirnames}
+      new_cache_entries = {os.path.join(target_dir_in_pantsd, subdir) for subdir in new_cache_dirnames}
       for old_entry in old_cache_entries:
-        safe_mkdir(os.path.join(target_dir_in_pantsd, old_entry))
+        safe_mkdir(old_entry)
       # sleep for a bit so these files are all newer than the other ones
       time.sleep(1.1)
       for new_entry in new_cache_entries:
-        safe_mkdir(os.path.join(target_dir_in_pantsd, new_entry))
+        safe_mkdir(new_entry)
+      expected_dirs = set([os.path.join(target_dir_in_pantsd, 'current/')]) | old_cache_entries | new_cache_entries
 
       # stable symlink, current version directory, and synthetically created directories.
       entries = set(os.listdir(target_dir_in_pantsd))
-      remaining_cache_dir_fingerprint = self._get_single_other_set_entry(
-        entries,
-        set(['current']) | old_cache_entries | new_cache_entries,
-      )
+      remaining_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=expected_dirs)
       fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
-      self.assertEqual(fingerprinted_realdir, os.path.join(target_dir_in_pantsd, remaining_cache_dir_fingerprint))
+      self.assertEqual(
+        fingerprinted_realdir,
+        remaining_cache_dir_fingerprinted.rstrip('/'))
 
       max_entries_per_target = 2
       self.assert_success(self.run_pants_with_workdir([
@@ -196,11 +189,9 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # stable (same as before), current, and 2 newest dirs
       self.assertEqual(os.path.dirname(os.path.dirname(os.path.realpath(classpath))), target_dir_in_pantsd)
       entries = set(os.listdir(target_dir_in_pantsd))
-      other_entry = self._get_single_other_set_entry(
-        entries,
-        set(['current']) | new_cache_entries,
-      )
-      self.assertEqual(other_entry, remaining_cache_dir_fingerprint)
+      newest_expected_dirs = expected_dirs - old_cache_entries
+      other_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
+      self.assertEqual(other_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
       self.assertEqual(
         os.path.realpath(os.path.join(target_dir_in_pantsd, 'current')),
         fingerprinted_realdir)
@@ -216,11 +207,9 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       # stable, current, and 2 newest dirs
       self.assertEqual(os.path.dirname(os.path.dirname(os.path.realpath(classpath))), target_dir_in_pantsd)
       entries = set(os.listdir(target_dir_in_pantsd))
-      new_cache_dir = self._get_single_other_set_entry(
-        entries,
-        set(['current']) | new_cache_entries,
-      )
+      new_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
       # subsequent run with --compile-zinc-debug-symbols will invalidate previous build thus triggering the clean up.
-      self.assertNotEqual(new_cache_dir, remaining_cache_dir_fingerprint)
+      self.assertNotEqual(new_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
       new_fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
-      self.assertEqual(new_fingerprinted_realdir, os.path.join(target_dir_in_pantsd, new_cache_dir))
+      self.assertEqual(new_fingerprinted_realdir,
+                       new_cache_dir_fingerprinted.rstrip('/'))

@@ -17,10 +17,6 @@ from pants_test.cache.cache_server import cache_server
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
-  def get_cache_subdir(self, *args, **kwargs):
-    return super(JavaCompileIntegrationTest, self).get_cache_subdir(
-      *args, task_cls=ZincCompile, **kwargs)
-
   def test_basic_binary(self):
     with temporary_dir() as cache_dir:
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
