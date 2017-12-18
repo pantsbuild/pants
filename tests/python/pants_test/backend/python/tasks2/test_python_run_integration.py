@@ -11,7 +11,6 @@ import sys
 from pex.pex_bootstrapper import get_pex_info
 
 from pants.util.contextutil import temporary_dir
-from pants.util.process_handler import subprocess
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.pexrc_util import setup_pexrc_with_pex_python_path
 
