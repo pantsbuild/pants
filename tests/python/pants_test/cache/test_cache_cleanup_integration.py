@@ -171,7 +171,6 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
       expected_dirs = set([os.path.join(target_dir_in_pantsd, 'current/')]) | old_cache_entries | new_cache_entries
 
       # stable symlink, current version directory, and synthetically created directories.
-      entries = set(os.listdir(target_dir_in_pantsd))
       remaining_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=expected_dirs)
       fingerprinted_realdir = os.path.realpath(os.path.join(target_dir_in_pantsd, 'current'))
       self.assertEqual(
@@ -188,7 +187,6 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       # stable (same as before), current, and 2 newest dirs
       self.assertEqual(os.path.dirname(os.path.dirname(os.path.realpath(classpath))), target_dir_in_pantsd)
-      entries = set(os.listdir(target_dir_in_pantsd))
       newest_expected_dirs = expected_dirs - old_cache_entries
       other_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
       self.assertEqual(other_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)
@@ -206,7 +204,6 @@ class CacheCleanupIntegrationTest(PantsRunIntegrationTest):
 
       # stable, current, and 2 newest dirs
       self.assertEqual(os.path.dirname(os.path.dirname(os.path.realpath(classpath))), target_dir_in_pantsd)
-      entries = set(os.listdir(target_dir_in_pantsd))
       new_cache_dir_fingerprinted = self.get_cache_subdir(target_dir_in_pantsd, other_dirs=newest_expected_dirs)
       # subsequent run with --compile-zinc-debug-symbols will invalidate previous build thus triggering the clean up.
       self.assertNotEqual(new_cache_dir_fingerprinted, remaining_cache_dir_fingerprinted)

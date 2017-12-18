@@ -19,7 +19,6 @@ from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
-from pants.cache.cache_setup import CacheFactory
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir

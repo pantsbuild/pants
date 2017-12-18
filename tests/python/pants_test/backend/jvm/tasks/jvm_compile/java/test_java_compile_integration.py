@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
