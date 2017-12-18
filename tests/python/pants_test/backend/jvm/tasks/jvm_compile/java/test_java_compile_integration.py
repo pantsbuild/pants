@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import glob
 import os
 
 from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
-from pants.cache.cache_setup import CacheFactory
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
@@ -19,16 +17,9 @@ from pants_test.cache.cache_server import cache_server
 
 class JavaCompileIntegrationTest(BaseCompileIT):
 
-  def _get_task_dir(self, cache_dir, other_dirs=[], cls=ZincCompile):
-    task_dirs = set(glob.glob(os.path.join(
-      cache_dir,
-      CacheFactory.make_task_cache_glob_str(cls),
-    )))
-    other_dirs = set(other_dirs)
-    self.assertTrue(other_dirs.issubset(task_dirs))
-    remaining_dirs = task_dirs - other_dirs
-    self.assertEqual(len(remaining_dirs), 1)
-    return list(remaining_dirs)[0]
+  def get_cache_subdir(self, *args, **kwargs):
+    return super(JavaCompileIntegrationTest, self).get_cache_subdir(
+      *args, task_cls=ZincCompile, **kwargs)
 
   def test_basic_binary(self):
     with temporary_dir() as cache_dir:
@@ -51,7 +42,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         'testprojects/src/java/org/pantsbuild/testproject/nocache::',
       ], config=config))
 
-      zinc_task_dir = self._get_task_dir(cache_dir)
+      zinc_task_dir = self.get_cache_subdir(cache_dir)
 
       bad_artifact_dir = os.path.join(zinc_task_dir, 'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
       good_artifact_dir = os.path.join(zinc_task_dir, 'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
@@ -81,7 +72,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       ]
       self.assert_success(self.run_pants(java_6_args, config))
 
-      java_6_artifact_dir = self._get_task_dir(cache_dir)
+      java_6_artifact_dir = self.get_cache_subdir(cache_dir)
       main_java_6_dir = os.path.join(
         java_6_artifact_dir,
         'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
@@ -96,7 +87,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
       ]
       self.assert_success(self.run_pants(java_7_args, config))
 
-      java_7_artifact_dir = self._get_task_dir(
+      java_7_artifact_dir = self.get_cache_subdir(
         cache_dir,
         other_dirs=[java_6_artifact_dir],
       )
@@ -119,7 +110,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         'testprojects/src/java/org/pantsbuild/testproject/annotation/main',
       ], config=config))
 
-      base_artifact_dir = self._get_task_dir(cache_dir)
+      base_artifact_dir = self.get_cache_subdir(cache_dir)
       artifact_dir = os.path.join(
         base_artifact_dir,
         'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main',
@@ -192,7 +183,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         'compile',
         '{}:only-15-directly'.format(path_prefix),
       ], workdir, config))
-      guava_15_base_dir = self._get_task_dir(cache_dir)
+      guava_15_base_dir = self.get_cache_subdir(cache_dir)
       guava_15_artifact_dir = os.path.join(
         guava_15_base_dir,
         '{}.jarversionincompatibility'.format(dotted_path),
@@ -207,7 +198,9 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         (u'{}:alongside-16'.format(path_prefix)),
       ], workdir, config))
 
-      guava_16_base_dir = self._get_task_dir(cache_dir)
+      guava_16_base_dir = self.get_cache_subdir(cache_dir)
+      # the zinc compile task has the same option values in both runs, so the
+      # results directory should be the same
       guava_16_artifact_dir = os.path.join(
         guava_16_base_dir,
         '{}.jarversionincompatibility'.format(dotted_path),

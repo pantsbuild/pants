@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import ConfigParser
+import glob
 import os
 import shutil
 import unittest
@@ -18,6 +19,7 @@ from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.cache.cache_setup import CacheFactory
 from pants.fs.archive import ZIP
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
@@ -175,6 +177,23 @@ class PantsRunIntegrationTest(unittest.TestCase):
       ret = cls._profile_disambiguator
       cls._profile_disambiguator += 1
       return ret
+
+  def get_cache_subdir(self, cache_dir, other_dirs=[], task_cls=None):
+    """Use a glob to find the subdirectory of `cache_dir` corresponding to the
+    task type `task_cls`, or any subdirectory of `cache_dir` if `task_cls` is
+    None. Check that there is only one directory matching the glob (excluding
+    `other_dirs`), and return it.
+    """
+    if task_cls:
+      glob_str = CacheFactory.make_task_cache_glob_str(task_cls)
+    else:
+      glob_str = '*/'
+    task_dirs = set(glob.glob(os.path.join(cache_dir, glob_str)))
+    other_dirs = set(other_dirs)
+    self.assertTrue(other_dirs.issubset(task_dirs))
+    remaining_dirs = task_dirs - other_dirs
+    self.assertEqual(len(remaining_dirs), 1)
+    return list(remaining_dirs)[0]
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              build_root=None, tee_output=False, **kwargs):

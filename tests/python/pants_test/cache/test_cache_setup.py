@@ -90,7 +90,6 @@ class TestCacheSetup(BaseTest):
       'pants_workdir': self.pants_workdir
     }
     cache_options.update(**options)
-    self.context(for_task_types=[DummyTask]) # force option initialization
     return CacheFactory(create_options(options={'test': cache_options}).for_scope('test'),
                         MockLogger(),
                         self.create_task(),
