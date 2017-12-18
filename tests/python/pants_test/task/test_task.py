@@ -503,34 +503,25 @@ class TaskTest(TaskTestBase):
   def test_stable_name(self):
     """The stable_name() should be used to form the task fingerprint."""
     a_fingerprint = self._synth_fp(name='some_name', _stable_name='xxx')
-    b_fingerprint = self._synth_fp(name='other_name', _stable_name='xxx')
-    c_fingerprint = self._synth_fp(name='some_name', _stable_name='yyy')
-    self.assertEqual(b_fingerprint, a_fingerprint)
-    self.assertNotEqual(c_fingerprint, a_fingerprint)
+    b_fingerprint = self._synth_fp(name='some_name', _stable_name='yyy')
+    self.assertNotEqual(b_fingerprint, a_fingerprint)
 
   def test_fingerprint_changing_options_scope(self):
     """The options_scope of the task and any of its subsystem_dependencies
     should affect the task fingerprint."""
     task_fp = self._synth_fp(scope='xxx')
     other_task_fp = self._synth_fp(scope='yyy')
-    same_task_fp = self._synth_fp(scope='xxx')
-    self.assertEqual(same_task_fp, task_fp)
     self.assertNotEqual(other_task_fp, task_fp)
 
-    default_scope_fp = self._synth_fp()
-    self.assertNotEqual(default_scope_fp, task_fp)
-    self.assertNotEqual(default_scope_fp, other_task_fp)
-    subsystem_deps_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
-    self.assertNotEqual(subsystem_deps_fp, default_scope_fp)
-    same_subsystem_deps_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
-    self.assertEqual(same_subsystem_deps_fp, subsystem_deps_fp)
+    subsystem_deps_fp = self._synth_fp(scope='xxx', _deps=(SubsystemDependency(FakeSubsystem, GLOBAL_SCOPE),))
+    self.assertNotEqual(subsystem_deps_fp, task_fp)
 
-    scoped_subsystems_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
+    scoped_subsystems_fp = self._synth_fp(scope='xxx', _deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
     self.assertNotEqual(scoped_subsystems_fp, subsystem_deps_fp)
-    same_scoped_subsystems_fp = self._synth_fp(_deps=(SubsystemDependency(FakeSubsystem, 'xxx'),))
-    self.assertEqual(same_scoped_subsystems_fp, scoped_subsystems_fp)
 
   def test_fingerprint_options_on_registered_scopes_only(self):
+    """Changing or setting an option value should only affect the task
+    fingerprint if it is registered as a fingerprintable option."""
     default_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable={})
     self.set_options_for_scope(
       AnotherFakeTask.options_scope, **{'fake-option': False})
@@ -545,7 +536,6 @@ class TaskTest(TaskTestBase):
   def test_fingerprint_changing_option_value(self):
     """Changing an option value in some scope should affect the task
     fingerprint."""
-
     cur_option_spec = {
       AnotherFakeTask.options_scope: {'fake-option': bool},
     }
@@ -556,32 +546,6 @@ class TaskTest(TaskTestBase):
       AnotherFakeTask.options_scope, **{'fake-option': True})
     task_opt_true_fp = self._synth_fp(cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
     self.assertNotEqual(task_opt_true_fp, task_opt_false_fp)
-
-  def test_fingerprint_options_enclosing_scope(self):
-    """Option values for a subsystem subscoped to a task should contribute to
-    the task fingerprint as well."""
-    cur_option_spec = {
-      FakeSubsystem.options_scope: {'fake-option': bool},
-    }
-    self.set_options_for_scope(
-      FakeSubsystem.options_scope, **{'fake-option': True})
-    task_only_opt_true_fp = self._synth_fp(
-      cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
-
-    cur_option_spec.update({
-      FakeSubsystem.subscope(AnotherFakeTask.options_scope): {'fake-option': bool},
-    })
-    self.set_options_for_scope(
-      FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': True})
-    subsystem_subscope_opt_true_fp = self._synth_fp(
-      cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
-    self.assertNotEqual(subsystem_subscope_opt_true_fp, task_only_opt_true_fp)
-    self.set_options_for_scope(
-      FakeSubsystem.subscope(AnotherFakeTask.options_scope), **{'fake-option': False})
-    subsystem_subscope_opt_false_fp = self._synth_fp(
-      cls=AnotherFakeTask, options_fingerprintable=cur_option_spec)
-    self.assertNotEqual(subsystem_subscope_opt_false_fp, task_only_opt_true_fp)
-    self.assertNotEqual(subsystem_subscope_opt_false_fp, subsystem_subscope_opt_true_fp)
 
   def test_fingerprint_passthru_args(self):
     """Passthrough arguments should affect fingerprints iff the task
@@ -597,6 +561,7 @@ class TaskTest(TaskTestBase):
     )
     self.assertNotEqual(non_empty_passthru_args_fp, empty_passthru_args_fp)
 
+    # YetAnotherFakeTask.supports_passthru_args() returns False
     task_type_derived_ignore_passthru = self._synthesize_subtype(cls=YetAnotherFakeTask)
     different_task_with_same_opts_fp = self._task_type_to_fp(
       task_type_derived_ignore_passthru,
