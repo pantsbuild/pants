@@ -228,7 +228,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         self.assertFalse("Compiling" in second_run.stdout_data)
 
         # Corrupt the remote artifact.
-        self.assertTrue(server.corrupt_artifacts(r'.*zinc.*matcher.*') == 1)
+        self.assertEqual(server.corrupt_artifacts(r'.*'), 1)
 
         # Ensure that the third run succeeds, despite a failed attempt to fetch.
         third_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)
