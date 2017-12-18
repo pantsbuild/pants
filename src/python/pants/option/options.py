@@ -310,7 +310,8 @@ class Options(object):
 
     return values
 
-  def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False, fingerprint_key=None, invert=False):
+  def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False,
+                                    fingerprint_key=None, invert=False):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
