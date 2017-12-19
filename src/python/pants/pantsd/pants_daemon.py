@@ -319,8 +319,8 @@ class PantsDaemon(FingerprintedProcessManager):
         self.terminate(include_watchman=False)
         self._logger.debug('launching pantsd')
         self.daemon_spawn()
-        # Wait up to 10 seconds for pantsd to write its pidfile so we can display the pid to the user.
-        self.await_pid(10)
+        # Wait up to 60 seconds for pantsd to write its pidfile.
+        self.await_pid(60)
       listening_port = self.read_named_socket('pailgun', int)
       pantsd_pid = self.pid
     self._logger.debug('released lock: {}'.format(self.process_lock))

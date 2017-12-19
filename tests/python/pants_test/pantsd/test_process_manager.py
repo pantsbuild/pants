@@ -141,7 +141,10 @@ class TestProcessMetadataManager(BaseTest):
 
   def test_deadline_until(self):
     with self.assertRaises(self.pmm.Timeout):
-      self.pmm._deadline_until(lambda: False, timeout=.1)
+      with self.captured_logging() as captured:
+        self.pmm._deadline_until(lambda: False, 'the impossible', timeout=.5, info_interval=.1)
+    self.assertTrue(4 <= len(captured.infos()) <= 6,
+                    'Expected between 4 and 6 infos, got: {}'.format(captured.infos()))
 
   def test_wait_for_file(self):
     with temporary_dir() as td:
