@@ -104,7 +104,6 @@ class GoalRunnerFactory(object):
           native=native,
           build_file_aliases=self._build_config.registered_aliases(),
           build_ignore_patterns=build_ignore_patterns,
-          exclude_target_regexps=exclude_target_regexps,
           subproject_roots=subproject_build_roots,
           include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
         )

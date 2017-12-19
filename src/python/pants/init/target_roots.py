@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import re
 
 from twitter.common.collections import OrderedSet
 
@@ -45,8 +46,16 @@ class TargetRoots(object):
     :param ChangeCalculator change_calculator: A `ChangeCalculator` for calculating changes.
     """
 
+    exclude_target_regexp = options.for_global_scope().exclude_target_regexp
+
+    def is_ignored(spec):
+      for regexp in exclude_target_regexp:
+        if re.match(regexp, spec.to_spec_string()):
+          return True
+      return False
+
     # Determine the literal target roots.
-    spec_roots = cls.parse_specs(options.target_specs, build_root)
+    spec_roots = tuple(spec for spec in cls.parse_specs(options.target_specs, build_root) if not is_ignored(spec))
 
     # Determine `Changed` arguments directly from options to support pre-`Subsystem`
     # initialization paths.
@@ -66,8 +75,8 @@ class TargetRoots(object):
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
-      return ChangedTargetRoots(tuple(SingleAddress(a.spec_path, a.target_name)
-                                      for a in changed_addresses))
+      specs = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
+      return ChangedTargetRoots(tuple(spec for spec in specs if not is_ignored(spec)))
 
     return LiteralTargetRoots(spec_roots)
 

@@ -112,7 +112,6 @@ class EngineInitializer(object):
                          native=None,
                          build_file_aliases=None,
                          build_ignore_patterns=None,
-                         exclude_target_regexps=None,
                          subproject_roots=None,
                          include_trace_on_error=True):
     """Construct and return the components necessary for LegacyBuildGraph construction.
@@ -126,7 +125,6 @@ class EngineInitializer(object):
     :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
-    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
@@ -148,7 +146,6 @@ class EngineInitializer(object):
     parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
     address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
     # Load the native backend.
