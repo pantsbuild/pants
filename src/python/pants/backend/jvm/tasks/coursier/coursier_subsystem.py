@@ -8,15 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import logging
 import os
-import shutil
 
 from pants.base.build_environment import get_buildroot
 from pants.java.distribution.distribution import DistributionLocator
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_file
-from pants.util.dirutil import touch
-
+from pants.util.dirutil import safe_concurrent_creation
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +58,7 @@ class CoursierSubsystem(Subsystem):
     bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
 
     if not os.path.exists(bootstrap_jar_path):
-      with temporary_file() as bootstrap_jar:
+      with safe_concurrent_creation(bootstrap_jar_path) as temp_path:
         fetcher = Fetcher(get_buildroot())
         checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
         try:
@@ -70,12 +67,9 @@ class CoursierSubsystem(Subsystem):
           # to the console directly.
           fetcher.download(bootstrap_url,
                            listener=fetcher.ProgressListener().wrap(checksummer),
-                           path_or_fd=bootstrap_jar,
+                           path_or_fd=temp_path,
                            timeout_secs=opts.bootstrap_fetch_timeout_secs)
           logger.info('sha1: {}'.format(checksummer.checksum))
-          bootstrap_jar.close()
-          touch(bootstrap_jar_path)
-          shutil.move(bootstrap_jar.name, bootstrap_jar_path)
         except fetcher.Error as e:
           raise self.Error('Problem fetching the coursier bootstrap jar! {}'.format(e))
 

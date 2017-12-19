@@ -114,10 +114,6 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
       round_manager.require_data('java')
       round_manager.require_data('scala')
 
-  @property
-  def create_target_dirs(self):
-    return True
-
   def resolve_jars(self, targets):
     executor = SubprocessExecutor(DistributionLocator.cached())
     confs = []
