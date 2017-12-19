@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import re
 import traceback
 from collections import defaultdict
 
@@ -47,7 +46,8 @@ class BuildFileAddressMapper(AddressMapper):
   # patterns, because the asterisks in its name make it an invalid regexp.
   _UNMATCHED_KEY = '** unmatched **'
 
-  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None,
+  # TODO(dwh): Ununsed exclude_target_regexps
+  def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None, exclude_target_regexps=None,
                subproject_roots=None):
     """Create a BuildFileAddressMapper.
 

@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import re
 from collections import OrderedDict
 
 from pathspec import PathSpec
@@ -165,10 +164,12 @@ class ResolveError(MappingError):
 class AddressMapper(object):
   """Configuration to parse build files matching a filename pattern."""
 
+  # TODO(dwh): Ignored exclude_target_regexps
   def __init__(self,
                parser,
                build_patterns=None,
                build_ignore_patterns=None,
+               exclude_target_regexps=None,
                subproject_roots=None):
     """Create an AddressMapper.
 

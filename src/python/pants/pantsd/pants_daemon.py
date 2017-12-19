@@ -115,7 +115,6 @@ class PantsDaemon(FingerprintedProcessManager):
         bootstrap_options.pants_workdir,
         native=native,
         build_ignore_patterns=bootstrap_options.build_ignore,
-        exclude_target_regexps=bootstrap_options.exclude_target_regexp,
         subproject_roots=bootstrap_options.subproject_roots,
       )
 

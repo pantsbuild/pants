@@ -105,6 +105,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
 class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
+  # TODO(dwh): Ununsed exclude_target_regexps
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          workdir,
@@ -112,6 +113,7 @@ class EngineInitializer(object):
                          native=None,
                          build_file_aliases=None,
                          build_ignore_patterns=None,
+                         exclude_target_regexps=None,
                          subproject_roots=None,
                          include_trace_on_error=True):
     """Construct and return the components necessary for LegacyBuildGraph construction.
