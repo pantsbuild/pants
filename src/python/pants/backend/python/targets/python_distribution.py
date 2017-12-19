@@ -32,12 +32,11 @@ class PythonDistribution(Target):
                compatibility=None,
                **kwargs):
     """
-    :param dependencies: The addresses of targets that this target depends on.
-      These dependencies may
-      be ``python_library``-like targets (``python_library``,
-      ``python_thrift_library``, ``python_antlr_library`` and so forth) or
-      ``python_requirement_library`` targets.
-    :type dependencies: list of strings
+    :param address: The Address that maps to this Target in the BuildGraph.
+    :type address: :class:`pants.build_graph.address.Address`
+    :param payload: The configuration encapsulated by this target.  Also in charge of most
+                    fingerprinting details.
+    :type payload: :class:`pants.base.payload.Payload`
     :param sources: Files to "include". Paths are relative to the
       BUILD file's directory.
     :type sources: ``Fileset`` or list of strings. Must include setup.py.

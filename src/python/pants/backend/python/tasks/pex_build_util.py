@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 
 from pex.fetcher import Fetcher
 from pex.platforms import Platform
@@ -23,7 +22,6 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
-from pants.util.dirutil import safe_mkdir
 
 
 def is_python_target(tgt):
@@ -127,44 +125,6 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
         log.debug('  Dumping distribution: .../{}'.format(os.path.basename(dist.location)))
         builder.add_distribution(dist)
       locations.add(dist.location)
-
-
-def prepare_dist_workdir(dist_tgt, workdir, log):
-  """Prepare Python distribution directory for SetupPyRunner by copying the 
-  target sources into a working directory located in .pants.d. 
-
-  :param dist_target: The :class:`PythonDistribution` to prepare a directory for. 
-  :param workdir: The working directory for this task.
-  :param log: Use this logger.
-
-  """
-  # Make directory for local built distributions.
-  local_dists_workdir = os.path.join(workdir, 'local_dists')
-  if not os.path.exists(local_dists_workdir):
-    safe_mkdir(local_dists_workdir)
-
-  # Fingerprint distribution target and create subdirectory for that target.
-  fingerprint = dist_tgt.payload.fingerprint()
-  dist_target_dir = os.path.join(local_dists_workdir, fingerprint)
-  if not os.path.exists(dist_target_dir):
-    log.debug('Creating working directory for target %s with fingerprint %s', 
-      dist_tgt.name, fingerprint)
-    safe_mkdir(dist_target_dir)
-
-  # Copy sources and setup.py over for packaging.
-  sources_rel_to_target_base = dist_tgt.sources_relative_to_target_base()
-  sources_rel_to_buildroot = dist_tgt.sources_relative_to_buildroot()
-  # NB: We need target paths both relative to the target base and relative to 
-  # the build root for the shutil file copying below.
-  sources = zip(sources_rel_to_buildroot, sources_rel_to_target_base)
-  for source_relative_to_build_root, source_relative_to_target_base in sources:
-    source_rel_to_dist_dir = os.path.join(dist_target_dir, source_relative_to_target_base)
-    if not os.path.exists(os.path.dirname(source_rel_to_dist_dir)):
-      os.makedirs(os.path.dirname(source_rel_to_dist_dir))
-    shutil.copyfile(os.path.join(get_buildroot(), source_relative_to_build_root),
-                    source_rel_to_dist_dir)
-
-  return dist_target_dir
 
 
 def _resolve_multi(interpreter, requirements, platforms, find_links):

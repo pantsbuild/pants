@@ -63,7 +63,7 @@ def build_file_aliases():
 
 def register_goals():
   task(name='interpreter', action=SelectInterpreter).install('pyprep')
-  task(name='python-dists', action=PythonCreateDistributions).install('pyprep')
+  task(name='build-local-dists', action=PythonCreateDistributions).install('pyprep')
   task(name='requirements', action=ResolveRequirements).install('pyprep')
   task(name='sources', action=GatherSources).install('pyprep')
   task(name='py', action=PythonRun).install('run')
