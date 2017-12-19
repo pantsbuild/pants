@@ -68,14 +68,11 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
     compile_classpath = self.resolve([losing_lib, winning_lib])
 
-    # task.execute()
-    # compile_classpath = context.products.get_data('compile_classpath', None)
     losing_cp = compile_classpath.get_for_target(losing_lib)
     winning_cp = compile_classpath.get_for_target(winning_lib)
 
     self.assertEquals(losing_cp, winning_cp)
 
-    print(winning_cp)
     self.assertEqual(1, len(winning_cp))
     conf, path = winning_cp[0]
     self.assertEqual('default', conf)
