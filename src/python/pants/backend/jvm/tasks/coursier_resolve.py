@@ -108,7 +108,8 @@ class CoursierMixin(NailgunTask):
     2. Once each target is fingerprinted, we combine them into a `VersionedTargetSet` where they
        are fingerprinted together, because each run of 3rdparty resolve is context sensitive.
 
-    Artifacts are stored in `VersionedTargetSet`'s results_dir, the content are the aggregation of each
+    Artifacts are stored in `VersionedTargetSet`'s results_dir, the contents are the aggregation of
+    each coursier run happened within that context.
 
     Caching: (TODO): https://github.com/pantsbuild/pants/issues/5187
     Currently it is disabled due to absolute paths in the coursier results.
@@ -189,7 +190,7 @@ class CoursierMixin(NailgunTask):
 
     # Prepare coursier args
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
-    coursier_jar = coursier_subsystem_instance.bootstrap_coursier()
+    coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
 
     coursier_workdir = os.path.join(pants_workdir, 'tmp')
     safe_mkdir(coursier_workdir)

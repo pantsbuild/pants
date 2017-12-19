@@ -10,10 +10,12 @@ import logging
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.java.distribution.distribution import DistributionLocator
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_concurrent_creation
+
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ class CoursierSubsystem(Subsystem):
   def subsystem_dependencies(cls):
     return super(CoursierSubsystem, cls).subsystem_dependencies() + (DistributionLocator,)
 
-  def bootstrap_coursier(self):
+  def bootstrap_coursier(self, workunit_factory):
 
     opts = self.get_options()
     bootstrap_url = opts.bootstrap_jar_url
@@ -57,20 +59,25 @@ class CoursierSubsystem(Subsystem):
 
     bootstrap_jar_path = os.path.join(coursier_bootstrap_dir, 'coursier.jar')
 
-    if not os.path.exists(bootstrap_jar_path):
-      with safe_concurrent_creation(bootstrap_jar_path) as temp_path:
-        fetcher = Fetcher(get_buildroot())
-        checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
-        try:
-          logger.info('\nDownloading {}'.format(bootstrap_url))
-          # TODO: Capture the stdout of the fetcher, instead of letting it output
-          # to the console directly.
-          fetcher.download(bootstrap_url,
-                           listener=fetcher.ProgressListener().wrap(checksummer),
-                           path_or_fd=temp_path,
-                           timeout_secs=opts.bootstrap_fetch_timeout_secs)
-          logger.info('sha1: {}'.format(checksummer.checksum))
-        except fetcher.Error as e:
-          raise self.Error('Problem fetching the coursier bootstrap jar! {}'.format(e))
+    with workunit_factory(name='bootstrap-coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
 
-    return bootstrap_jar_path
+      if not os.path.exists(bootstrap_jar_path):
+        with safe_concurrent_creation(bootstrap_jar_path) as temp_path:
+          fetcher = Fetcher(get_buildroot())
+          checksummer = fetcher.ChecksumListener(digest=hashlib.sha1())
+          try:
+            logger.info('\nDownloading {}'.format(bootstrap_url))
+            # TODO: Capture the stdout of the fetcher, instead of letting it output
+            # to the console directly.
+            fetcher.download(bootstrap_url,
+                             listener=fetcher.ProgressListener().wrap(checksummer),
+                             path_or_fd=temp_path,
+                             timeout_secs=opts.bootstrap_fetch_timeout_secs)
+            logger.info('sha1: {}'.format(checksummer.checksum))
+          except fetcher.Error as e:
+            workunit.set_outcome(WorkUnit.FAILURE)
+            raise self.Error('Problem fetching the coursier bootstrap jar! {}'.format(e))
+          else:
+            workunit.set_outcome(WorkUnit.SUCCESS)
+
+      return bootstrap_jar_path
