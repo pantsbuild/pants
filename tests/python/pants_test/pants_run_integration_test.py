@@ -177,11 +177,24 @@ class PantsRunIntegrationTest(unittest.TestCase):
       cls._profile_disambiguator += 1
       return ret
 
-  def get_cache_subdir(self, cache_dir, other_dirs=[]):
-    """Check that there is only one directory of `cache_dir` matching the glob
-    (excluding `other_dirs`), and return it (with a trailing slash).
+  def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=[]):
+    """Check that there is only one entry of `cache_dir` which matches the glob
+    specified by `subdir_glob`, excluding `other_dirs`, and
+    return it.
+
+    :param str cache_dir: absolute path to some directory.
+    :param str subdir_glob: string specifying a glob for (one level down)
+                            subdirectories of `cache_dir`.
+    :param list other_dirs: absolute paths to subdirectories of `cache_dir`
+                            which must exist and match `subdir_glob`.
+    :return: Assert that there is a single remaining directory entry matching
+             `subdir_glob` after removing `other_dirs`, and return it.
+
+             This method oes not check if its arguments or return values are
+             files or directories. If `subdir_glob` has a trailing slash, so
+             will the return value of this method.
     """
-    subdirs = set(glob.glob(os.path.join(cache_dir, '*/')))
+    subdirs = set(glob.glob(os.path.join(cache_dir, glob_str)))
     other_dirs = set(other_dirs)
     self.assertTrue(other_dirs.issubset(subdirs))
     remaining_dirs = subdirs - other_dirs
