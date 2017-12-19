@@ -168,14 +168,18 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       pantsd_run(['list', '3rdparty:'])
       checker.await_pantsd()
 
+      # Some testprojects have warnings or errors, so skip them.
+      all_dirs_except_testprojects = ['3rdparty', 'contrib', 'src', 'tests', 'pants-plugins']
+      all_targets_except_testprojects = ['{}::'.format(d) for d in all_dirs_except_testprojects]
+
       pantsd_run(['list', ':'])
       checker.assert_running()
 
-      pantsd_run(['list', '::'])
+      pantsd_run(['list'] + all_targets_except_testprojects)
       checker.assert_running()
 
       # And again using the cached BuildGraph.
-      pantsd_run(['list', '::'])
+      pantsd_run(['list'] + all_targets_except_testprojects)
       checker.assert_running()
 
       # Assert there were no warnings or errors thrown in the pantsd log.
