@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.option.arg_splitter import GLOBAL_SCOPE
-from pants.option.parser_hierarchy import all_enclosing_scopes, enclosing_scope, InvalidScopeError
+from pants.option.parser_hierarchy import InvalidScopeError, all_enclosing_scopes, enclosing_scope
 from pants_test.base_test import BaseTest
 
 
