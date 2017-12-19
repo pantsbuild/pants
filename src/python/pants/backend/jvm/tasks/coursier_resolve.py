@@ -234,7 +234,7 @@ class CoursierMixin(NailgunTask):
                                           pinned_coords, coursier_workdir)
 
       cmd_str = ' '.join(cmd_args)
-      logger.info(cmd_str)
+      logger.debug(cmd_str)
 
       try:
         with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
