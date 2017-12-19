@@ -214,16 +214,12 @@ class CacheCompileIntegrationTest(BaseCompileIT):
         # Compile, and confirm that we have the right count of artifacts.
         self.run_compile(spec, complete_config(c.config), workdir)
 
-        new_artifact_dir = self.get_cache_subdir(cache_dir)
-        if artifact_dir:
-          self.assertEquals(new_artifact_dir, artifact_dir)
-        else:
-          artifact_dir = new_artifact_dir
-        artifact_cachetest_dir = os.path.join(
+        artifact_dir = self.get_cache_subdir(cache_dir)
+        cache_test_subdir = os.path.join(
           artifact_dir,
           '{}.cachetest'.format(os.path.basename(src_dir)),
         )
-        self.assertEquals(c.artifact_count, len(os.listdir(artifact_cachetest_dir)))
+        self.assertEquals(c.artifact_count, len(os.listdir(cache_test_subdir)))
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):
