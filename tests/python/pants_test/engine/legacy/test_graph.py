@@ -65,7 +65,7 @@ class GraphTestBase(unittest.TestCase):
     return graph, target_roots
 
   def create_target_roots(self, specs):
-    return TargetRoots.create(options=self._make_setup_args(specs))
+    return TargetRoots.create(self._make_setup_args(specs))
 
 
 class GraphTargetScanFailureTests(GraphTestBase):
