@@ -294,7 +294,7 @@ class CoursierMixin(NailgunTask):
     local_exclude_args = []
     for jar in classified_jars:
       for ex in jar.excludes:
-        # `--` means exclude. See --soft-exclude-file in `coursier fetch --help`
+        # `--` means exclude. See --local-exclude-file in `coursier fetch --help`
         # If ex.name does not exist, that means the whole org needs to be excluded.
         ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name or '*')
         local_exclude_args.append(ex_arg)
@@ -305,7 +305,7 @@ class CoursierMixin(NailgunTask):
         with open(exclude_file, 'w') as ex_f:
           ex_f.write('\n'.join(local_exclude_args).encode('utf8'))
 
-        cmd_args.append('--soft-exclude-file')
+        cmd_args.append('--local-exclude-file')
         cmd_args.append(exclude_file)
 
     for ex in global_excludes:
