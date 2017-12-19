@@ -117,7 +117,7 @@ class DaemonPantsRunner(ProcessManager):
            (stdout_isatty, stderr_isatty)
          ) as ((stdout, stderr), writer),\
          NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin,\
-         stdio_as(stdout=stdout, stderr=stderr, stdin=stdin):
+         stdio_as(stdout_fd=stdout.fileno(), stderr_fd=stderr.fileno(), stdin_fd=stdin.fileno()):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
       def finalizer():
