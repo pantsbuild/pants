@@ -132,7 +132,7 @@ class CoursierMixin(NailgunTask):
                             fingerprint_strategy=CouriserResolveFingerprintStrategy([])) as invalidation_check:
 
         if not invalidation_check.all_vts:
-          return
+          continue
 
         pants_workdir = self.get_options().pants_workdir
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
