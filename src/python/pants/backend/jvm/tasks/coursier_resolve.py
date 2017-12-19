@@ -52,30 +52,30 @@ class CoursierMixin(NailgunTask):
     return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement, CoursierSubsystem)
 
   @staticmethod
-  def _compute_jars_to_resolve_and_to_exclude(raw_jars, artifact_set, manager):
+  def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
     """
 
-    :param jars_by_key:
+    :param raw_jars: a collection of `JarDependencies`
     :param artifact_set:
     :param manager:
-    :return:
+    :return: (list of settled `JarDependency`, set of pinned `M2Coordinate`)
     """
-
     if artifact_set is None:
       artifact_set = PinnedJarArtifactSet()
 
     jars_by_key = OrderedDict()
     for jar in raw_jars:
-      # (wisechengyi) This is equivalent to OrderedDefaultDict, but not sure why it is not used here.
+      # (wisechengyi) This is equivalent to OrderedDefaultDict
       jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
       jars_for_the_key.append(jar)
 
     jars_to_resolve = []
-    exclude_args = set()
 
     untouched_pinned_artifact = set(M2Coordinate.create(x) for x in artifact_set)
 
     for k, jar_list in jars_by_key.items():
+
+      # Portion to managed pinned jars in case of conflict
       for i, dep in enumerate(jar_list):
         direct_coord = M2Coordinate.create(dep)
 
@@ -92,21 +92,30 @@ class CoursierMixin(NailgunTask):
             # Once a version is settled, we force it anyway
             jar_list[i] = dep.copy(rev=coord.rev, force=True)
 
+      # Once the jar list is settled, add it to the global list later passed to coursier
       jars_to_resolve.extend(jar_list)
-      for jar in jar_list:
-        for ex in jar.excludes:
-          # `--` means exclude. See --soft-exclude-file in `coursier fetch --help`
-          ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name or '*')
-          exclude_args.add(ex_arg)
 
-    return jars_to_resolve, exclude_args, untouched_pinned_artifact
+    return jars_to_resolve, untouched_pinned_artifact
 
   def resolve(self, targets, compile_classpath):
     """
+    This is the core function for coursier resolve.
+
+    Validation strategy:
+
+    1. All targets are going through the `invalidated` to get fingerprinted in the target level.
+       No cache is fetched at stage.
+    2. Once each target is fingerprinted, we combine them into a `VersionedTargetSet` where they
+       are fingerprinted together, because each run of 3rdparty resolve is context sensitive.
+
+    Artifacts are stored in `VersionedTargetSet`'s results_dir, the content are the aggregation of each
+
+    Caching: (TODO): https://github.com/pantsbuild/pants/issues/5187
+    Currently it is disabled due to absolute paths in the coursier results.
 
     :param targets: a collection of targets to do 3rdparty resolve against
     :param compile_classpath: classpath product that holds the resolution result. IMPORTANT: this parameter will be changed.
-    :return:
+    :return: n/a
     """
 
     manager = JarDependencyManagement.global_instance()
@@ -127,14 +136,13 @@ class CoursierMixin(NailgunTask):
 
         pants_workdir = self.get_options().pants_workdir
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+
         vt_set_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', resolve_vts.cache_key.hash)
         safe_mkdir(vt_set_results_dir)
-
 
         coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
         pants_jar_path_base = os.path.join(pants_workdir, 'coursier', 'cache')
         safe_mkdir(pants_jar_path_base)
-
 
         # Check each individual target without context first
         if not invalidation_check.invalid_vts:
@@ -147,27 +155,37 @@ class CoursierMixin(NailgunTask):
             if success:
               return
 
-        jars_to_resolve, local_exclude_args, pinned_coords = self._compute_jars_to_resolve_and_to_exclude(raw_jar_deps,
-                                                                                                          artifact_set,
-                                                                                                          manager)
+        jars_to_resolve, pinned_coords = self._compute_jars_to_resolve_and_pin(raw_jar_deps,
+                                                                               artifact_set,
+                                                                               manager)
 
-
-
-        results = self.get_result_from_coursier(global_excludes,
-                                      jars_to_resolve, local_exclude_args, pants_workdir,
-                                      pinned_coords, coursier_cache_path)
+        results = self._get_result_from_coursier(global_excludes,
+                                                 jars_to_resolve, pants_workdir,
+                                                 pinned_coords, coursier_cache_path)
 
         for classifier, result in results.items():
           self._load_json_result(classifier, compile_classpath, coursier_cache_path, invalidation_check,
                                  pants_jar_path_base, result)
 
-
-
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
 
-  def get_result_from_coursier(self, global_excludes, jars_to_resolve, local_exclude_args,
-                               pants_workdir, pinned_coords, coursier_cache_path):
+  def _get_result_from_coursier(self, global_excludes, jars_to_resolve,
+                                pants_workdir, pinned_coords, coursier_cache_path):
+    """
+    Calling coursier and return the result per invocation.
+
+    If coursier was called once for classifier '' and once for classifier 'tests', then the return value
+    would be: {'': <first couriser output>, 'tests': <second coursier output>}
+
+    :param global_excludes:
+    :param jars_to_resolve:
+    :param local_exclude_args:
+    :param pants_workdir:
+    :param pinned_coords:
+    :param coursier_cache_path:
+    :return:
+    """
 
     # Prepare coursier args
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
@@ -212,7 +230,7 @@ class CoursierMixin(NailgunTask):
     for classifier, classified_jars in classifier_to_jars.items():
 
       cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
-                                          local_exclude_args, pinned_coords, coursier_workdir)
+                                          pinned_coords, coursier_workdir)
 
       cmd_str = ' '.join(cmd_args)
       logger.info(cmd_str)
@@ -242,11 +260,16 @@ class CoursierMixin(NailgunTask):
 
     return results
 
-  def _construct_cmd_args(self, classified_jars, classifier, common_args, global_excludes, local_exclude_args,
+  @staticmethod
+  def _construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
                           pinned_coords, coursier_workdir):
     cmd_args = list(common_args)
-    if classifier:
+
+    # Append classifier if not default
+    if classifier != '':
       cmd_args.extend(['--classifier', classifier])
+
+    # Dealing with intransitivity and forced versions.
     for j in classified_jars:
       if not j.rev:
         continue
@@ -266,8 +289,16 @@ class CoursierMixin(NailgunTask):
       cmd_args.append('-V')
       cmd_args.append(j.simple_coord)
 
-    if local_exclude_args:
+    # Local exclusions
+    local_exclude_args = []
+    for jar in classified_jars:
+      for ex in jar.excludes:
+        # `--` means exclude. See --soft-exclude-file in `coursier fetch --help`
+        # If ex.name does not exist, that means the whole org needs to be excluded.
+        ex_arg = "{}:{}--{}:{}".format(jar.org, jar.name, ex.org, ex.name or '*')
+        local_exclude_args.append(ex_arg)
 
+    if local_exclude_args:
       with temporary_file(coursier_workdir, cleanup=False) as f:
         exclude_file = f.name
         with open(exclude_file, 'w') as ex_f:
@@ -279,16 +310,21 @@ class CoursierMixin(NailgunTask):
     for ex in global_excludes:
       cmd_args.append('-E')
       cmd_args.append('{}:{}'.format(ex.org, ex.name or '*'))
+
     return cmd_args
 
   def _load_json_result(self, classifier, compile_classpath, coursier_cache_path, invalidation_check,
                         pants_jar_path_base, result):
+    # Parse the coursier result
     flattened_resolution = self._extract_dependencies_by_root(result)
     coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+
+    # Construct a map from org:name to reconciled org:name:version
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
       (org, name, _) = coord.split(':')
       org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
+
     for vt in invalidation_check.all_vts:
       t = vt.target
       if isinstance(t, JarLibrary):
@@ -415,7 +451,7 @@ class CoursierMixin(NailgunTask):
       ]
     }
 
-    Should return
+    Should return:
     {
       "a": { ResolvedJar(classifier='', path/cache_path="a.jar"),
              ResolvedJar(classifier='sources', path/cache_path="a-sources.jar") },

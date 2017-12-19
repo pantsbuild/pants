@@ -26,7 +26,7 @@ from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
-from pants_test.tasks.task_test_base import TaskTestBase, ensure_cached
+from pants_test.tasks.task_test_base import TaskTestBase
 
 
 class CoursierResolveTest(JvmToolTaskTestBase):
@@ -50,7 +50,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.execute(context)
     return context.products.get_data('compile_classpath')
 
-
   def test_resolve_specific(self):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
@@ -60,7 +59,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
-
 
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
