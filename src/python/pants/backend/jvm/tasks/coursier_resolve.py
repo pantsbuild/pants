@@ -29,14 +29,9 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
-from pants.util.process_handler import subprocess
 
 
 logger = logging.getLogger(__name__)
-
-
-class CoursierError(Exception):
-  pass
 
 
 class CouriserCacheNotFound(Exception):
@@ -44,6 +39,13 @@ class CouriserCacheNotFound(Exception):
 
 
 class CoursierMixin(NailgunTask):
+  """
+  Experimental 3rdparty resolver using coursier.
+
+  TODO(wisechengyi):
+  1. Add conf support
+  2. Add relative url support
+  """
 
   RESULT_FILENAME = 'result'
 
@@ -104,7 +106,7 @@ class CoursierMixin(NailgunTask):
     Validation strategy:
 
     1. All targets are going through the `invalidated` to get fingerprinted in the target level.
-       No cache is fetched at stage.
+       No cache is fetched at this stage because it is disabled.
     2. Once each target is fingerprinted, we combine them into a `VersionedTargetSet` where they
        are fingerprinted together, because each run of 3rdparty resolve is context sensitive.
 
@@ -233,31 +235,24 @@ class CoursierMixin(NailgunTask):
       cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
                                           pinned_coords, coursier_workdir)
 
-      cmd_str = ' '.join(cmd_args)
-      logger.debug(cmd_str)
+      with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
 
-      try:
-        with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
+        return_code = self.runjava(
+          classpath=[coursier_jar],
+          main='coursier.cli.Coursier',
+          args=cmd_args,
+          jvm_options=self.get_options().jvm_options,
+          # to let stdout/err through, but don't print tool's label.
+          workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
-          return_code = self.runjava(
-            classpath=[coursier_jar],
-            main='coursier.cli.Coursier',
-            args=cmd_args,
-            jvm_options=self.get_options().jvm_options,
-            # to let stdout/err through, but don't print tool's label.
-            workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+        workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
 
-          workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+        if return_code:
+          raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
 
-          if return_code:
-            raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
-
-          with open(output_fn) as f:
-            result = json.loads(f.read())
-            results[classifier] = result
-
-      except subprocess.CalledProcessError as e:
-        raise CoursierError(e)
+        with open(output_fn) as f:
+          result = json.loads(f.read())
+          results[classifier] = result
 
     return results
 
@@ -356,8 +351,6 @@ class CoursierMixin(NailgunTask):
               compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
 
   def _populate_results_dir(self, vts_results_dir, results):
-    # TODO(wisechengyi): currently the path contains abs path, so need to remove that before
-    # cache can be shared across machines.
 
     with open(os.path.join(vts_results_dir, self.RESULT_FILENAME), 'w') as f:
       json.dump(results, f)
@@ -365,7 +358,6 @@ class CoursierMixin(NailgunTask):
   def _load_from_results_dir(self, compile_classpath, vts_results_dir,
                              coursier_cache_path, invalidation_check, pants_jar_path_base):
     """
-
     :return: True if success; False if any of the classpath is not valid anymore.
     """
     result_file_path = os.path.join(vts_results_dir, self.RESULT_FILENAME)
@@ -496,13 +488,6 @@ class CoursierMixin(NailgunTask):
 
 
 class CoursierResolve(CoursierMixin):
-  """
-  Experimental 3rdparty resolver using coursier.
-
-  # TODO(wisechengyi):
-  # 1. Add conf support
-  # 2. Add relative url support
-  """
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -536,7 +521,6 @@ class CoursierResolve(CoursierMixin):
                                                         init_func=ClasspathProducts.init_func(
                                                           self.get_options().pants_workdir))
 
-    # confs = ['default']
     self.resolve(self.context.targets(), classpath_products)
 
 
