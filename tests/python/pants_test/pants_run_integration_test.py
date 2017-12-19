@@ -194,7 +194,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
              files or directories. If `subdir_glob` has a trailing slash, so
              will the return value of this method.
     """
-    subdirs = set(glob.glob(os.path.join(cache_dir, glob_str)))
+    subdirs = set(glob.glob(os.path.join(cache_dir, subdir_glob)))
     other_dirs = set(other_dirs)
     self.assertTrue(other_dirs.issubset(subdirs))
     remaining_dirs = subdirs - other_dirs
