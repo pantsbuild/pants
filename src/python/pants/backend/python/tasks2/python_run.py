@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 import signal
+import sys
 
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
@@ -44,7 +45,12 @@ class PythonRun(PythonExecutionTaskBase):
       with self.context.new_workunit(name='run',
                                      cmd=pex.cmdline(args),
                                      labels=[WorkUnitLabel.TOOL, WorkUnitLabel.RUN]):
-        po = pex.run(blocking=False, args=args, env=os.environ.copy())
+        po = pex.run(blocking=False,
+                     args=args,
+                     env=os.environ.copy(),
+                     stdin=sys.stdin,
+                     stdout=sys.stdout,
+                     stderr=sys.stderr)
         try:
           result = po.wait()
           if result != 0:
