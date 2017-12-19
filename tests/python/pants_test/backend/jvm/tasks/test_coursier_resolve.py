@@ -50,10 +50,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.execute(context)
     return context.products.get_data('compile_classpath')
 
-  #
-  # Test section
-  #
-  @ensure_cached(CoursierResolve, expected_num_artifacts=1)
+
   def test_resolve_specific(self):
     # Create a jar_library with a single dep, and another library with no deps.
     dep = JarDependency('commons-lang', 'commons-lang', '2.5')
@@ -64,8 +61,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
 
-  # 2 artifacts because each target will store its own result
-  @ensure_cached(CoursierResolve, expected_num_artifacts=2)
+
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
     winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
@@ -126,7 +122,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     #   self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
     #   self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
   #
-  @ensure_cached(CoursierResolve, expected_num_artifacts=2)
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_jar_lib = self._make_junit_target()
 
@@ -140,7 +135,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEquals(2, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
 
-  @ensure_cached(CoursierResolve, expected_num_artifacts=0)
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', JavaLibrary, sources=[])
@@ -174,8 +168,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
       # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
       conf, path = jar_cp[0]
-      safe_remove(path)
-      print(path)
+      safe_remove(os.path.realpath(path))
 
       task.runjava = MagicMock()
 
