@@ -6,15 +6,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class PythonRunIntegrationTest(PantsRunIntegrationTest):
   testproject = 'testprojects/src/python/interpreter_selection'
 
+  @ensure_daemon
   def test_run_3(self):
     self._maybe_run_version('3')
 
+  @ensure_daemon
   def test_run_27(self):
     self._maybe_run_version('2.7')
 
