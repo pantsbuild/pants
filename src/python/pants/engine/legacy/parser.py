@@ -41,11 +41,14 @@ class LegacyPythonCallbacksParser(Parser):
     :type build_file_imports_behavior: string
     """
     super(LegacyPythonCallbacksParser, self).__init__()
-    self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
-    self._build_file_import_behavior = build_file_imports_behavior
+    self._symbols, self._parse_context = self._generate_symbols(
+      symbol_table,
+      aliases,
+      build_file_imports_behavior
+    )
 
   @staticmethod
-  def _generate_symbols(symbol_table, aliases):
+  def _generate_symbols(symbol_table, aliases, build_file_imports_behavior):
     symbols = {}
 
     # Compute "per path" symbols.  For performance, we use the same ParseContext, which we
@@ -119,6 +122,27 @@ class LegacyPythonCallbacksParser(Parser):
 
     symbols['bundle'] = BundleAdaptor
 
+    if build_file_imports_behavior != 'allow':
+      # This is not secure sandboxing, because people could replace __import__ again themselves
+      # if they wanted (and there are plenty of other ways to escape a python "sandbox"), but it
+      # should be sufficient to tell the casual user that they're doing something wrong.
+      builtins = dict(__builtins__)
+      if build_file_imports_behavior == 'warn':
+        import_hook = lambda import_name, *args: _warn_on_import(
+          __import__,
+          parse_context,
+          import_name,
+          *args
+        )
+      elif build_file_imports_behavior == 'error':
+        import_hook = _fail_on_import
+      else:
+        raise ParseError("Didn't know what to do for build_file_imports_behavior value {}".format(
+          build_file_imports_behavior
+        ))
+      builtins['__import__'] = import_hook
+      symbols['__builtins__'] = builtins
+
     return symbols, parse_context
 
   def parse(self, filepath, filecontent):
@@ -131,31 +155,14 @@ class LegacyPythonCallbacksParser(Parser):
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
 
-    symbols = dict(self._symbols)
-    if self._build_file_import_behavior != 'allow':
-      # This is not secure sandboxing, because people could replace __import__ again themselves
-      # if they wanted (and there are plenty of other ways to escape a python "sandbox"), but it
-      # should be sufficient to tell the casual user that they're doing something wrong.
-      builtins = dict(__builtins__)
-      if self._build_file_import_behavior == 'warn':
-        import_hook = lambda import_name, *args: _warn_on_import(__import__, filepath, import_name, *args)
-      elif self._build_file_import_behavior == 'error':
-        import_hook = _fail_on_import
-      else:
-        raise ParseError("Didn't know what to do for build_file_import_behavior value {}".format(
-          self._build_file_import_behavior
-        ))
-      builtins['__import__'] = import_hook
-      symbols['__builtins__'] = builtins
-
-    six.exec_(python, symbols)
+    six.exec_(python, dict(self._symbols))
     return list(self._parse_context._storage.objects)
 
 
-def _warn_on_import(import_builtin, filepath, import_name, *args):
+def _warn_on_import(import_builtin, parse_context, import_name, *args):
   logger = logging.getLogger(__name__)
-  logger.warn('BUILD file at {} tried to import {} - import statements should be avoided'.format(
-    filepath, import_name
+  logger.warn('BUILD file in directory {} tried to import {} - import statements should be avoided'.format(
+    parse_context.rel_path, import_name
   ))
   return import_builtin(import_name, *args)
 

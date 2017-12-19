@@ -177,13 +177,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
       return ret
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
-                             build_root=None, tee_output=False, **kwargs):
+                             build_root=None, tee_output=False, print_exception_stacktrace=True,
+                             **kwargs):
 
     args = [
       '--no-pantsrc',
       '--pants-workdir={}'.format(workdir),
       '--kill-nailguns',
-      '--print-exception-stacktrace',
+      '--print-exception-stacktrace={}'.format(print_exception_stacktrace),
     ]
 
     if self.hermetic():
