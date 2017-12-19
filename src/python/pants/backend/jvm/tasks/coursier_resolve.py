@@ -162,9 +162,8 @@ class CoursierMixin(NailgunTask):
                                                                                artifact_set,
                                                                                manager)
 
-        results = self._get_result_from_coursier(global_excludes,
-                                                 jars_to_resolve, pants_workdir,
-                                                 pinned_coords, coursier_cache_path)
+        results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
+                                                 coursier_cache_path)
 
         for classifier, result in results.items():
           self._load_json_result(classifier, compile_classpath, coursier_cache_path, invalidation_check,
@@ -173,20 +172,19 @@ class CoursierMixin(NailgunTask):
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
 
-  def _get_result_from_coursier(self, global_excludes, jars_to_resolve,
-                                pants_workdir, pinned_coords, coursier_cache_path):
+  def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
+                                coursier_cache_path):
     """
     Calling coursier and return the result per invocation.
 
     If coursier was called once for classifier '' and once for classifier 'tests', then the return value
     would be: {'': <first couriser output>, 'tests': <second coursier output>}
 
-    :param global_excludes:
-    :param jars_to_resolve:
-    :param local_exclude_args:
-    :param pants_workdir:
-    :param pinned_coords:
-    :param coursier_cache_path:
+    :param jars_to_resolve: list of settled `M2Coordinate`s to resolve
+    :param global_excludes: list of `M2Coordinate`s to exclude globally
+    :param pinned_coords: list of `M2Coordinate`s that need to be pinned.
+    :param pants_workdir: workdir for pants.
+    :param coursier_cache_path: path to where coursier cache is stored.
     :return:
     """
 
@@ -194,15 +192,11 @@ class CoursierMixin(NailgunTask):
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
     coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
 
-    coursier_workdir = os.path.join(pants_workdir, 'tmp')
-    safe_mkdir(coursier_workdir)
-    with temporary_file(coursier_workdir, cleanup=False) as f:
-      output_fn = f.name
     common_args = ['fetch',
                    # Print the resolution tree
                    '-t',
-                   '--cache', coursier_cache_path,
-                   '--json-output-file', output_fn] + coursier_subsystem_instance.get_options().fetch_options
+                   '--cache', coursier_cache_path
+                   ] + coursier_subsystem_instance.get_options().fetch_options
 
     def construct_classifier_to_jar(jars):
       """
@@ -225,15 +219,22 @@ class CoursierMixin(NailgunTask):
         product[x.coordinate.classifier or ''].append(x)
       return product
 
-    classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
     # Divide the resolve by classifier because coursier treats classifier option globally.
+    classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
+    # Variable to store coursier each run.
     results = {}
 
     for classifier, classified_jars in classifier_to_jars.items():
 
+      coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
+      safe_mkdir(coursier_work_temp_dir)
+      with temporary_file(coursier_work_temp_dir, cleanup=False) as f:
+        output_fn = f.name
+        common_args.extend(['--json-output-file', output_fn])
+
       cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
-                                          pinned_coords, coursier_workdir)
+                                          pinned_coords, coursier_work_temp_dir)
 
       with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
 
