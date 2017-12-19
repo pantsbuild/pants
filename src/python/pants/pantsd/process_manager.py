@@ -112,11 +112,11 @@ class ProcessMetadataManager(object):
 
     :param func closure: the function/closure to execute (should not block for long periods of time
                          and must return True on success).
+    :param str action_msg: a description of the action that is being executed, to be rendered as
+                           info while we wait, and as part of any rendered exception.
     :param float timeout: the maximum amount of time to wait for a true result from the closure in
                           seconds. N.B. this is timing based, so won't be exact if the runtime of
                           the closure exceeds the timeout.
-    :param str action_msg: a description of the action that is being executed, to be rendered as
-                           info while we wait, and as part of any rendered exception.
     :param float wait_interval: the amount of time to sleep between closure invocations.
     :param float info_interval: the amount of time to wait before and between info logging that
                                 we're still waiting for the `action_msg`.
@@ -135,7 +135,7 @@ class ProcessMetadataManager(object):
 
       if now > info_deadline:
         logger.info('waiting for {}...'.format(action_msg))
-        info_deadline = now + info_interval
+        info_deadline = info_deadline + info_interval
       elif wait_interval:
         time.sleep(wait_interval)
 
