@@ -58,8 +58,8 @@ class CoursierMixin(NailgunTask):
     """
 
     :param raw_jars: a collection of `JarDependencies`
-    :param artifact_set:
-    :param manager:
+    :param artifact_set: PinnedJarArtifactSet
+    :param manager: JarDependencyManagement
     :return: (list of settled `JarDependency`, set of pinned `M2Coordinate`)
     """
     if artifact_set is None:
@@ -180,12 +180,54 @@ class CoursierMixin(NailgunTask):
     If coursier was called once for classifier '' and once for classifier 'tests', then the return value
     would be: {'': <first couriser output>, 'tests': <second coursier output>}
 
-    :param jars_to_resolve: list of settled `M2Coordinate`s to resolve
-    :param global_excludes: list of `M2Coordinate`s to exclude globally
-    :param pinned_coords: list of `M2Coordinate`s that need to be pinned.
-    :param pants_workdir: workdir for pants.
+    :param jars_to_resolve: List of `JarDependency`s to resolve
+    :param global_excludes: List of `M2Coordinate`s to exclude globally
+    :param pinned_coords: List of `M2Coordinate`s that need to be pinned.
+    :param pants_workdir: Pants' workdir
     :param coursier_cache_path: path to where coursier cache is stored.
-    :return:
+
+    :return: The aggregation of result from coursier. Each coursier call could return
+    the following:
+        {
+          "conflict_resolution": {
+            "org:name:version" (requested): "org:name:version" (reconciled)
+          },
+          "dependencies": [
+            {
+              "coord": "orgA:nameA:versionA",
+              "files": [
+                [
+                  <classifier>,
+                  <path>,
+                ]
+              ],
+              "dependencies": [ // coodinates for its transitive dependencies
+                <orgX:nameX:versionX>,
+                <orgY:nameY:versionY>,
+              ]
+            },
+            {
+              "coord": "orgB:nameB:versionB",
+              "files": [
+                [
+                  <classifier>,
+                  <path>,
+                ]
+              ],
+              "dependencies": [ // coodinates for its transitive dependencies
+                <orgX:nameX:versionX>,
+                <orgZ:nameZ:versionZ>,
+              ]
+            },
+            ... // more about orgX:nameX:versionX, orgY:nameY:versionY, orgZ:nameZ:versionZ
+          ]
+        }
+    Hence the aggregation of the results will be in the following format, for example when default classifier
+    and sources are fetched:
+    {
+      '': <result from first coursier call with default classifier>,
+      'sources': <result from second coursier call with 'sources' classifier>,
+    }
     """
 
     # Prepare coursier args
