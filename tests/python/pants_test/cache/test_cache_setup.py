@@ -24,18 +24,15 @@ from pants_test.option.util.fakes import create_options
 from pants_test.testutils.mock_logger import MockLogger
 
 
-class DummyContext(object):
-  log = MockLogger()
-
-
 class DummyTask(Task):
   options_scope = 'dummy'
-
-  context = DummyContext()
+  _stable_name = 'test'
 
   @classmethod
   def subsystem_dependencies(cls):
     return super(DummyTask, cls).subsystem_dependencies() + (CacheSetup, )
+
+  def execute(self): pass
 
 
 class MockPinger(object):
@@ -64,6 +61,10 @@ class TestCacheSetup(BaseTest):
   CACHE_SPEC_RESOLVE_ONLY = CacheSpec(local=None, remote=TEST_RESOLVED_FROM)
   CACHE_SPEC_LOCAL_RESOLVE = CacheSpec(local=LOCAL_URI, remote=TEST_RESOLVED_FROM)
 
+  def create_task(self):
+    return DummyTask(self.context(for_task_types=[DummyTask]),
+                     self.pants_workdir)
+
   def setUp(self):
     super(TestCacheSetup, self).setUp()
 
@@ -89,9 +90,9 @@ class TestCacheSetup(BaseTest):
       'pants_workdir': self.pants_workdir
     }
     cache_options.update(**options)
-    return CacheFactory(options=create_options(options={'test': cache_options}).for_scope('test'),
-                        log=MockLogger(),
-                        stable_name='test',
+    return CacheFactory(create_options(options={'test': cache_options}).for_scope('test'),
+                        MockLogger(),
+                        self.create_task(),
                         resolver=self.resolver)
 
   def test_sanitize_cache_spec(self):
@@ -166,9 +167,10 @@ class TestCacheSetup(BaseTest):
       self.set_options_for_scope(CacheSetup.subscope(DummyTask.options_scope),
                                  read_from=spec, compression=1)
       self.context(for_task_types=[DummyTask])  # Force option initialization.
-      cache_factory = CacheSetup.create_cache_factory_for_task(DummyTask,
-                                                               pinger=self.pinger,
-                                                               resolver=resolver)
+      cache_factory = CacheSetup.create_cache_factory_for_task(
+        self.create_task(),
+        pinger=self.pinger,
+        resolver=resolver)
       return cache_factory.get_read_cache()
 
     def check(expected_type, spec, resolver=None):

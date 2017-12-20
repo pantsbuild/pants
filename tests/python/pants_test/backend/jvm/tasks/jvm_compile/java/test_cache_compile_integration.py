@@ -9,7 +9,6 @@ import os
 from collections import namedtuple
 from textwrap import dedent
 
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
@@ -202,9 +201,7 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
       buildfile = os.path.join(src_dir, 'BUILD')
       spec = os.path.join(src_dir, ':cachetest')
-      artifact_dir = os.path.join(cache_dir,
-                                  ZincCompile.stable_name(),
-                                  '{}.cachetest'.format(os.path.basename(src_dir)))
+      artifact_dir = None
 
       for c in compiles:
         # Clear the src directory and recreate the files.
@@ -216,7 +213,13 @@ class CacheCompileIntegrationTest(BaseCompileIT):
 
         # Compile, and confirm that we have the right count of artifacts.
         self.run_compile(spec, complete_config(c.config), workdir)
-        self.assertEquals(c.artifact_count, len(os.listdir(artifact_dir)))
+
+        artifact_dir = self.get_cache_subdir(cache_dir)
+        cache_test_subdir = os.path.join(
+          artifact_dir,
+          '{}.cachetest'.format(os.path.basename(src_dir)),
+        )
+        self.assertEquals(c.artifact_count, len(os.listdir(cache_test_subdir)))
 
 
 class CacheCompileIntegrationWithZjarsTest(CacheCompileIntegrationTest):

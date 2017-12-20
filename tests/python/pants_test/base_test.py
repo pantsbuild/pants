@@ -275,10 +275,13 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
-              console_outstream=None, workspace=None, for_subsystems=None):
+  def context(self, for_task_types=None, for_subsystems=None, options=None,
+              target_roots=None, console_outstream=None, workspace=None,
+              **kwargs):
     """
     :API: public
+
+    :param dict **kwargs: keyword arguments passed in to `create_options_for_optionables`.
     """
     # Many tests use source root functionality via the SourceRootConfig.global_instance().
     # (typically accessed via Target.target_base), so we always set it up, for convenience.
@@ -309,10 +312,8 @@ class BaseTest(unittest.TestCase):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    options = create_options_for_optionables(optionables,
-                                             extra_scopes=extra_scopes,
-                                             options=options,
-                                             passthru_args=passthru_args)
+    options = create_options_for_optionables(
+      optionables, extra_scopes=extra_scopes, options=options, **kwargs)
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(options)

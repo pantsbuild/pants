@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import ConfigParser
+import glob
 import os
 import shutil
 import unittest
@@ -175,6 +176,30 @@ class PantsRunIntegrationTest(unittest.TestCase):
       ret = cls._profile_disambiguator
       cls._profile_disambiguator += 1
       return ret
+
+  def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=[]):
+    """Check that there is only one entry of `cache_dir` which matches the glob
+    specified by `subdir_glob`, excluding `other_dirs`, and
+    return it.
+
+    :param str cache_dir: absolute path to some directory.
+    :param str subdir_glob: string specifying a glob for (one level down)
+                            subdirectories of `cache_dir`.
+    :param list other_dirs: absolute paths to subdirectories of `cache_dir`
+                            which must exist and match `subdir_glob`.
+    :return: Assert that there is a single remaining directory entry matching
+             `subdir_glob` after removing `other_dirs`, and return it.
+
+             This method oes not check if its arguments or return values are
+             files or directories. If `subdir_glob` has a trailing slash, so
+             will the return value of this method.
+    """
+    subdirs = set(glob.glob(os.path.join(cache_dir, subdir_glob)))
+    other_dirs = set(other_dirs)
+    self.assertTrue(other_dirs.issubset(subdirs))
+    remaining_dirs = subdirs - other_dirs
+    self.assertEqual(len(remaining_dirs), 1)
+    return list(remaining_dirs)[0]
 
   def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
                              build_root=None, tee_output=False, **kwargs):

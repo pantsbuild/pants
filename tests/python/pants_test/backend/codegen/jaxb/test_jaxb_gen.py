@@ -11,7 +11,6 @@ from pants.backend.codegen.jaxb.jaxb_gen import JaxbGen
 from pants.backend.codegen.jaxb.jaxb_library import JaxbLibrary
 from pants.backend.codegen.jaxb.register import build_file_aliases as register_codegen
 from pants.build_graph.register import build_file_aliases as register_core
-
 from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
 
 

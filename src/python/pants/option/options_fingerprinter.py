@@ -37,24 +37,23 @@ class OptionsFingerprinter(object):
   """
 
   @classmethod
-  def combined_options_fingerprint_for_scope(cls, scope, options, fingerprint_key=None,
-                                             invert=None, build_graph=None):
+  def combined_options_fingerprint_for_scope(cls, scope, options,
+                                             build_graph=None, **kwargs):
     """Given options and a scope, compute a combined fingerprint for the scope.
 
     :param string scope: The scope to fingerprint.
     :param Options options: The `Options` object to fingerprint.
-    :param string fingerprint_key: The options kwarg to filter against.
-    :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
     :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
                                    target options.
+    :param dict **kwargs: Keyword parameters passed on to
+                          `Options#get_fingerprintable_for_scope`.
+    :return: Hexadecimal string representing the fingerprint for all `options`
+             values in `scope`.
     """
     fingerprinter = cls(build_graph)
     hasher = sha1()
-    for (option_type, option_value) in options.get_fingerprintable_for_scope(
-      scope,
-      fingerprint_key=fingerprint_key,
-      invert=invert
-    ):
+    pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
+    for (option_type, option_value) in pairs:
       hasher.update(
         # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
         # so we always cast to bytes here.

@@ -236,6 +236,3 @@ class TestCobertura(BaseTest):
 
     no_force_cobertura._nothing_to_instrument = False
     self.assertEquals(no_force_cobertura.should_report(exception), False, 'Don\'t report after a failure if coverage isn\'t forced.')
-
-
-

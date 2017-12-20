@@ -459,14 +459,17 @@ class PytestTest(PytestTestBase):
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_fail_fast_skips_second_red_test_with_single_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red],
-                           fail_fast=True, fast=False)
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red],
+                           fail_fast=True,
+                           fast=False)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_fail_fast_skips_second_red_test_with_isolated_chroot(self):
     self.run_failing_tests(targets=[self.red, self.red_in_class],
                            failed_targets=[self.red_in_class],
-                           fail_fast=True, fast=True)
+                           fail_fast=True,
+                           fast=True)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red_test_in_class(self):
