@@ -38,3 +38,13 @@ python_library(
     '3rdparty/python:psutil',
   ],
 )
+
+python_library(
+  name = 'pexrc_util',
+  sources = [
+    'pexrc_util.py',
+  ],
+  dependencies = [
+    ':git_util'
+  ,]
+)

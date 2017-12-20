@@ -118,11 +118,21 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
     :param version: A python version string, such as 2.7, 3.
     """
+    return cls.python_interpreter_path(version) is not None
+
+  @classmethod
+  def python_interpreter_path(cls, version):
+    """Returns the interpreter path if the current system has the specified version of python.
+
+    :param version: A python version string, such as 2.7, 3.
+    """
     try:
-      subprocess.call(['python%s' % version, '-V'])
-      return True
+      py_path = subprocess.check_output(['python%s' % version,
+                                         '-c',
+                                         'import sys; print(sys.executable)']).strip()
+      return os.path.realpath(py_path)
     except OSError:
-      return False
+      return None
 
   def setUp(self):
     super(PantsRunIntegrationTest, self).setUp()

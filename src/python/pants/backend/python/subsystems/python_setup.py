@@ -64,7 +64,9 @@ class PythonSetup(Subsystem):
                   'If unspecified, a standard path under the workdir is used.')
     register('--interpreter-search-paths', advanced=True, type=list, default=[],
              metavar='<binary-paths>',
-             help='A list of paths to search for python interpreters.')
+             help='A list of paths to search for python interpreters. Note that if a PEX_PYTHON_PATH '
+              'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
+              'this option.')
 
   @property
   def interpreter_constraints(self):

@@ -16,6 +16,7 @@ from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.pex_build_util import has_python_sources
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address
@@ -141,6 +142,11 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
         with safe_concurrent_creation(path) as safe_path:
           builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
+          # Add target interpreter compatibilities to pex info.
+          for rt in relevant_targets:
+            if has_python_sources(rt):
+              for constraint in rt.compatibility:
+                builder.add_interpreter_constraint(constraint)
           builder.freeze()
 
     return WrappedPEX(PEX(os.path.realpath(path), interpreter), interpreter)
