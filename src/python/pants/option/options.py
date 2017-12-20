@@ -328,7 +328,7 @@ class Options(object):
     :API: public
     """
     fingerprint_key = fingerprint_key or 'fingerprint'
-    fingerprint_default = False if invert else None
+    fingerprint_default = bool(invert)
     pairs = []
 
     if include_passthru:
@@ -347,7 +347,7 @@ class Options(object):
       for (_, kwargs) in sorted(parser.option_registrations_iter()):
         if kwargs.get('recursive') and not kwargs.get('recursive_root'):
           continue  # We only need to fprint recursive options once.
-        if kwargs.get(fingerprint_key, fingerprint_default) is not (False if invert else True):
+        if kwargs.get(fingerprint_key, fingerprint_default) is not True:
           continue
         # Note that we read the value from scope, even if the registration was on an enclosing
         # scope, to get the right value for recursive options (and because this mirrors what
