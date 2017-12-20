@@ -229,7 +229,7 @@ function build_pants_packages() {
   (
     set -e
     RUST_BACKTRACE=1 PANTS_SRCPATH="${ROOT}/src/python" run_cargo build --release --manifest-path="${ROOT}/src/rust/engine/fs/fs_util/Cargo.toml"
-    dst_dir="${DEPLOY_DIR}/bin/fs_util/$(get_os)/${version}"
+    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${version}"
     mkdir -p "${dst_dir}"
     cp "${ROOT}/src/rust/engine/fs/fs_util/target/release/fs_util" "${dst_dir}/"
   ) || die "Failed to build fs_util"

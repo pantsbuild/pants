@@ -82,23 +82,3 @@ function set_archflags() {
   fi
 }
 set_archflags
-
-function get_os() {
-  case "$(uname)" in
-    "Darwin")
-      os="mac"
-      base="$(uname -r)"
-      os_version="10.$(( ${base%%.*} - 4))"
-      ;;
-    "Linux")
-      os="linux"
-      os_version="$(uname -m)"
-      ;;
-    *)
-      echo >&2 "Unknown platform"
-      exit 1
-      ;;
-  esac
-
-  echo "${os}/${os_version}"
-}
