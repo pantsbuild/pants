@@ -70,25 +70,16 @@ class PythonCreateDistributions(Task):
     interpreter = self.context.products.get_data(PythonInterpreter)
     safe_mkdir(dist_target_dir)
 
-    # Copy sources and setup.py over for packaging.
-    sources_rel_to_target_base = dist_tgt.sources_relative_to_target_base()
-    sources_rel_to_buildroot = dist_tgt.sources_relative_to_buildroot()
-    # NB: We need target paths both relative to the target base and relative to
-    # the build root for the shutil file copying below.
-    # TODO: simplify block
-    sources = zip(sources_rel_to_buildroot, sources_rel_to_target_base)
-    for source_relative_to_build_root, source_relative_to_target_base in sources:
-      source_rel_to_dist_dir = os.path.join(dist_target_dir, source_relative_to_target_base)
-      safe_mkdir(os.path.dirname(source_rel_to_dist_dir))
-      shutil.copyfile(os.path.join(get_buildroot(), source_relative_to_build_root),
-                      source_rel_to_dist_dir)
-
-
-    #for source in dist_tgt.sources_relative_to_source_root():
-     # dest_source = os.path.join(dist_target_dir, source)
-      #safe_mkdir_for(dest_source)
-      #shutil.copyfile(os.path.join(dist_tgt.target_base, source), dest_source)
-
+    # Copy sources and setup.py over to vt results directory for packaging.
+    # NB: The directory structure of the destination directory needs to match 1:1
+    # with the directory structure that setup.py expects.
+    for src_relative_to_target_base in dist_tgt.sources_relative_to_target_base():
+      src_rel_to_results_dir = os.path.join(dist_target_dir, src_relative_to_target_base)
+      safe_mkdir(os.path.dirname(src_rel_to_results_dir))
+      abs_src_path = os.path.join(get_buildroot(),
+                                  dist_tgt.address.spec_path,
+                                  src_relative_to_target_base)
+      shutil.copyfile(abs_src_path, src_rel_to_results_dir)
 
     # Build the whl from pex API using tempdir and get its location.
     install_dir = os.path.join(dist_target_dir, 'dist')
@@ -102,7 +93,5 @@ class PythonCreateDistributions(Task):
     dists = os.listdir(install_dir)
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
-    elif len(dists) > 1:
-      raise TaskError('Ambiguous whls found: %s' % (' '.join(dists)))
     else:
       return os.path.join(os.path.abspath(install_dir), dists[0])
