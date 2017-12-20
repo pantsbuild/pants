@@ -118,8 +118,8 @@ class ProcessMetadataManager(object):
                           seconds. N.B. this is timing based, so won't be exact if the runtime of
                           the closure exceeds the timeout.
     :param float wait_interval: the amount of time to sleep between closure invocations.
-    :param float info_interval: the amount of time to wait before and between info logging that
-                                we're still waiting for the `action_msg`.
+    :param float info_interval: the amount of time to wait before and between reports via info
+                                logging that we're still waiting for the closure to succeed.
     :raises: :class:`ProcessManager.Timeout` on execution timeout.
     """
     now = time.time()
