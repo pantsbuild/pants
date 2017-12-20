@@ -13,12 +13,13 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.pex_build_util import has_python_sources
-from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
-from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks2.pex_build_util import has_python_sources, is_local_python_dist
+from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
+from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -102,7 +103,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
     relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Files)))
+      lambda tgt: isinstance(tgt, (PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
     with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving
@@ -120,7 +121,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-      if not os.path.isdir(path):
+      local_python_dist_targets = self.context.targets(is_local_python_dist)
+      invalid_target_objs = [v.target for v in invalidation_check.invalid_vts]
+      context_has_invalid_python_dists = any([lpdt in invalid_target_objs for lpdt in local_python_dist_targets])
+      if not os.path.isdir(path) or context_has_invalid_python_dists:
         source_pexes = self.context.products.get_data(GatherSources.PythonSources).all()
         requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
         pexes = [requirements_pex] + source_pexes
@@ -132,7 +136,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
             addr, PythonRequirementLibrary, requirements=extra_reqs)
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
-          pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
+          pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)], local_python_dist_targets)] + pexes
 
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 

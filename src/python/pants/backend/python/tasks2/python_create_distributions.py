@@ -16,7 +16,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.task.task import Task
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for
+from pants.util.dirutil import safe_mkdir
 
 
 class PythonCreateDistributions(Task):
@@ -73,6 +73,7 @@ class PythonCreateDistributions(Task):
     # Copy sources and setup.py over to vt results directory for packaging.
     # NB: The directory structure of the destination directory needs to match 1:1
     # with the directory structure that setup.py expects.
+
     for src_relative_to_target_base in dist_tgt.sources_relative_to_target_base():
       src_rel_to_results_dir = os.path.join(dist_target_dir, src_relative_to_target_base)
       safe_mkdir(os.path.dirname(src_rel_to_results_dir))
@@ -80,7 +81,6 @@ class PythonCreateDistributions(Task):
                                   dist_tgt.address.spec_path,
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
-
     # Build the whl from pex API using tempdir and get its location.
     install_dir = os.path.join(dist_target_dir, 'dist')
     safe_mkdir(install_dir)

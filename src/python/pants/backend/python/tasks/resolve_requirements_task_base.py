@@ -31,14 +31,15 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(PythonCreateDistributions.PYTHON_DISTS)
 
-  def resolve_requirements(self, req_libs, local_python_dist_targets=None):
+  def resolve_requirements(self, req_libs, local_python_dist_targets=()):
     """Requirements resolution for PEX files.
 
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
     :param local_python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
-    with self.invalidated(req_libs) as invalidation_check:
+    tgts = req_libs + local_python_dist_targets
+    with self.invalidated(tgts) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
       # for this special case.
@@ -53,13 +54,14 @@ class ResolveRequirementsTaskBase(Task):
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-      if not os.path.isdir(path):
+      invalid_target_objs = [v.target for v in invalidation_check.invalid_vts]
+      context_has_invalid_python_dists = any([lpdt in invalid_target_objs for lpdt in local_python_dist_targets])
+      if not os.path.isdir(path) or context_has_invalid_python_dists:
         with safe_concurrent_creation(path) as safe_path:
-          self._build_requirements_pex(interpreter, safe_path, req_libs,
-                                       local_python_dist_targets=local_python_dist_targets)
+          self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)
 
-  def _build_requirements_pex(self, interpreter, path, req_libs, local_python_dist_targets=None):
+  def _build_requirements_pex(self, interpreter, path, req_libs):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
     # Dump built python distributions, if any, into requirements pex.
