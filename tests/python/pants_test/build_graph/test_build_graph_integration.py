@@ -21,61 +21,52 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('Cycle detected', pants_run.stderr_data)
 
   def test_banned_module_import(self):
-    pants_run = self.run_pants([
-      '--build-file-imports=error',
-      'run',
-      'testprojects/src/python/build_file_imports_module:hello',
-    ], print_exception_stacktrace=False)
-    self.assert_failure(pants_run)
-    self.assertIn('testprojects/src/python/build_file_imports_module/BUILD', pants_run.stderr_data)
-    self.assertIn('import os.path', pants_run.stderr_data)
-
-  def test_warn_module_import(self):
-    pants_run = self.run_pants([
-      '--build-file-imports=warn',
-      'run',
-      'testprojects/src/python/build_file_imports_module:hello',
-    ])
-    self.assert_success(pants_run)
-    self.assertIn('Hello\n', pants_run.stdout_data)
-    self.assertIn('directory testprojects/src/python/build_file_imports_module', pants_run.stderr_data)
-    self.assertIn('import os.path', pants_run.stderr_data)
+    self.banned_import('testprojects/src/python/build_file_imports_module')
 
   def test_banned_function_import(self):
-    pants_run = self.run_pants([
-      '--build-file-imports=error',
-      'run',
-      'testprojects/src/python/build_file_imports_function:hello',
-    ], print_exception_stacktrace=False)
-    self.assert_failure(pants_run)
-    self.assertIn('testprojects/src/python/build_file_imports_function/BUILD', pants_run.stderr_data)
-    self.assertIn('import os.path', pants_run.stderr_data)
+    self.banned_import('testprojects/src/python/build_file_imports_function')
+
+  def banned_import(self, dir):
+    with self.file_renamed(dir, 'TEST_BUILD', 'BUILD'):
+      pants_run = self.run_pants([
+        '--build-file-imports=error',
+        'run',
+        '{}:hello'.format(dir),
+      ], print_exception_stacktrace=False)
+      self.assert_failure(pants_run)
+      self.assertIn('{}/BUILD'.format(dir), pants_run.stderr_data)
+      self.assertIn('import os.path', pants_run.stderr_data)
+
+  def test_warn_module_import(self):
+    self.warn_import('testprojects/src/python/build_file_imports_module')
 
   def test_warn_function_import(self):
-    pants_run = self.run_pants([
-      '--build-file-imports=warn',
-      'run',
-      'testprojects/src/python/build_file_imports_function:hello',
-    ])
-    self.assert_success(pants_run)
-    self.assertIn('Hello\n', pants_run.stdout_data)
-    self.assertIn('directory testprojects/src/python/build_file_imports_function', pants_run.stderr_data)
-    self.assertIn('import os.path', pants_run.stderr_data)
+    self.warn_import('testprojects/src/python/build_file_imports_function')
+
+  def warn_import(self, dir):
+    with self.file_renamed(dir, 'TEST_BUILD', 'BUILD'):
+      pants_run = self.run_pants([
+        '--build-file-imports=warn',
+        'run',
+        '{}:hello'.format(dir),
+      ])
+      self.assert_success(pants_run)
+      self.assertIn('Hello\n', pants_run.stdout_data)
+      self.assertIn('directory {}'.format(dir), pants_run.stderr_data)
+      self.assertIn('import os.path', pants_run.stderr_data)
 
   def test_allowed_module_import(self):
-    pants_run = self.run_pants([
-      '--build-file-imports=allow',
-      'run',
-      'testprojects/src/python/build_file_imports_module:hello',
-    ])
-    self.assert_success(pants_run)
-    self.assertIn('Hello\n', pants_run.stdout_data)
+    self.allowed_import('testprojects/src/python/build_file_imports_module')
 
   def test_allowed_function_import(self):
-    pants_run = self.run_pants([
-      '--build-file-imports=allow',
-      'run',
-      'testprojects/src/python/build_file_imports_function:hello',
-    ])
+    self.allowed_import('testprojects/src/python/build_file_imports_function')
+
+  def allowed_import(self, dir):
+    with self.file_renamed(dir, 'TEST_BUILD', 'BUILD'):
+      pants_run = self.run_pants([
+        '--build-file-imports=allow',
+        'run',
+        '{}:hello'.format(dir),
+      ])
     self.assert_success(pants_run)
     self.assertIn('Hello\n', pants_run.stdout_data)

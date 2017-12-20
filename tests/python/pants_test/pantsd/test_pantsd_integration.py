@@ -184,7 +184,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         if 'DeprecationWarning' in line:
           continue
 
-        self.assertNotRegexpMatches(line, r'^E.*')
+        self.assertNotRegexpMatches(line, r'^[WE].*')
 
   def test_pantsd_broken_pipe(self):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
