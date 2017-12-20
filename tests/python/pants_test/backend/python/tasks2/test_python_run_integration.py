@@ -71,21 +71,21 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
         with temporary_dir() as interpreters_cache:
           pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
           pants_run_27 = self.run_pants(
-            command=['clean-all', 'run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            command=['run', '{}:main_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
             config=pants_ini_config
           )
           self.assert_success(pants_run_27)
           # Interpreter selection for Python 2 is problematic in CI due to multiple virtualenvs in play.
           if not os.getenv('CI'):
-            assert py27_path.split(py27)[0] in pants_run_27.stdout_data
+            self.assertIn(py27_path.split(py27)[0], pants_run_27.stdout_data)
           pants_run_3 = self.run_pants(
-            command=['clean-all', 'run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            command=['run', '{}:main_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
             config=pants_ini_config
           )
           self.assert_success(pants_run_3)
           # Protection for when the sys.executable path underlies a symlink pointing to 'python' without '3'
           # at the end of the basename.
-          assert py3_path.split(py3)[0] in pants_run_3.stdout_data
+          self.assertIn(py3_path.split(py3)[0], pants_run_3.stdout_data)
     else:
       print('Could not find both python {} and python {} on system. Skipping.'.format(py27, py3))
       self.skipTest('Missing neccesary Python interpreters on system.')
@@ -118,8 +118,8 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     py3_pex = os.path.join(os.getcwd(), 'dist', 'main_py3.pex')
     py2_info = get_pex_info(py2_pex)
     py3_info = get_pex_info(py3_pex)
-    assert 'CPython>2.7.6,<3' in py2_info.interpreter_constraints
-    assert 'CPython>3' in py3_info.interpreter_constraints
+    self.assertIn('CPython>2.7.6,<3', py2_info.interpreter_constraints)
+    self.assertIn('CPython>3', py3_info.interpreter_constraints)
 
     # Cleanup created pexes.
     os.remove(py2_pex)
