@@ -391,7 +391,7 @@ class CoursierMixin(NailgunTask):
           if final_simple_coord:
             transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
             if transitive_resolved_jars:
-              compile_classpath.add_jars_for_targets([t], 'default' or classifier, transitive_resolved_jars)
+              compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
 
   def _populate_results_dir(self, vts_results_dir, results):
 
