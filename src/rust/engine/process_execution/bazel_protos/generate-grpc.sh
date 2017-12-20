@@ -5,7 +5,7 @@
 here="$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)"
 REPO_ROOT="$(dirname "$(dirname "$(dirname "$(dirname "$(dirname "${here}")")")")")"
 
-protoc="$("${REPO_ROOT}/build-support/bin/download_binary.sh" "protobuf" "3.4.1" "protoc")"
+protoc="$("${REPO_ROOT}/build-support/bin/download_binary.sh" "binaries.pantsbuild.org" "protobuf" "3.4.1" "protoc")"
 
 thirdpartyprotobuf="../../../../../3rdparty/protobuf"
 googleapis="${thirdpartyprotobuf}/googleapis"
