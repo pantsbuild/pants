@@ -244,6 +244,22 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         pantsd_run(cmd[1:], {'GLOBAL': {'level': cmd[0]}})
         checker.assert_running()
 
+  def test_pantsd_lifecycle_non_invalidation(self):
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _):
+      variants = (
+        ['-q', 'help'],
+        ['--no-colors', 'help'],
+        ['help']
+      )
+      last_pid = None
+      for cmd in itertools.chain(*itertools.repeat(variants, 3)):
+        # Run with a CLI flag.
+        pantsd_run(cmd)
+        next_pid = checker.await_pantsd()
+        if last_pid is not None:
+          self.assertEqual(last_pid, next_pid)
+        last_pid = next_pid
+
   def test_pantsd_stray_runners(self):
     # Allow env var overrides for local stress testing.
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_STRESS_ATTEMPTS', 20))

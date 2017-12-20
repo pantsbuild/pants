@@ -57,7 +57,8 @@ class OptionsTest(unittest.TestCase):
                         task('simple-dashed'),
                         task('scoped.a.bit'),
                         task('scoped.and-dashed'),
-                        task('fromfile')]
+                        task('fromfile'),
+                        task('fingerprinting')]
 
   def _register(self, options):
     def register_global(*args, **kwargs):
@@ -150,6 +151,12 @@ class OptionsTest(unittest.TestCase):
     options.register('fromfile', '--dictvalue', type=dict, fromfile=True)
     options.register('fromfile', '--listvalue', type=list, fromfile=True)
     options.register('fromfile', '--appendvalue', type=list, member_type=int, fromfile=True)
+
+    # For fingerprint tests
+    options.register('fingerprinting', '--inverted')  # Implicitly: daemon=True
+    options.register('fingerprinting', '--definitely-not-inverted', daemon=False)
+    options.register('fingerprinting', '--fingerprinted', fingerprint=True)
+    options.register('fingerprinting', '--definitely-not-fingerprinted', fingerprint=False)
 
   def _create_config(self, config):
     with open(os.path.join(safe_mkdtemp(), 'test_config.ini'), 'w') as fp:
@@ -1066,6 +1073,40 @@ class OptionsTest(unittest.TestCase):
                        (bool, True),
                        (int, 77)],
                       pairs)
+
+  def test_fingerprintable(self):
+    options = self._parse(
+      './pants fingerprinting --fingerprinted=shall_be_fingerprinted '
+      ' --definitely-not-fingerprinted=shant_be_fingerprinted'
+    )
+    pairs = options.get_fingerprintable_for_scope('fingerprinting')
+    self.assertIn(
+      (str, 'shall_be_fingerprinted'),
+      pairs
+    )
+    self.assertNotIn(
+      (str, 'shant_be_fingerprinted'),
+      pairs
+    )
+
+  def test_fingerprintable_inverted(self):
+    options = self._parse(
+      './pants fingerprinting --inverted=shall_be_fingerprinted '
+      ' --definitely-not-inverted=shant_be_fingerprinted'
+    )
+    pairs = options.get_fingerprintable_for_scope(
+      'fingerprinting',
+      fingerprint_key='daemon',
+      invert=True
+    )
+    self.assertIn(
+      (str, 'shall_be_fingerprinted'),
+      pairs
+    )
+    self.assertNotIn(
+      (str, 'shant_be_fingerprinted'),
+      pairs
+    )
 
   def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
     def _do_assert_fromfile(dest, expected, contents):
