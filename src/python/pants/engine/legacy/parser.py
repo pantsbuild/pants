@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import tokenize
+from StringIO import StringIO
 
 import six
 
@@ -17,6 +19,9 @@ from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 class LegacyPythonCallbacksParser(Parser):
@@ -41,14 +46,11 @@ class LegacyPythonCallbacksParser(Parser):
     :type build_file_imports_behavior: string
     """
     super(LegacyPythonCallbacksParser, self).__init__()
-    self._symbols, self._parse_context = self._generate_symbols(
-      symbol_table,
-      aliases,
-      build_file_imports_behavior
-    )
+    self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
+    self._build_file_imports_behavior = build_file_imports_behavior
 
   @staticmethod
-  def _generate_symbols(symbol_table, aliases, build_file_imports_behavior):
+  def _generate_symbols(symbol_table, aliases):
     symbols = {}
 
     # Compute "per path" symbols.  For performance, we use the same ParseContext, which we
@@ -122,27 +124,6 @@ class LegacyPythonCallbacksParser(Parser):
 
     symbols['bundle'] = BundleAdaptor
 
-    if build_file_imports_behavior != 'allow':
-      # This is not secure sandboxing, because people could replace __import__ again themselves
-      # if they wanted (and there are plenty of other ways to escape a python "sandbox"), but it
-      # should be sufficient to tell the casual user that they're doing something wrong.
-      builtins = dict(__builtins__)
-      if build_file_imports_behavior == 'warn':
-        import_hook = lambda import_name, *args: _warn_on_import(
-          __import__,
-          parse_context,
-          import_name,
-          *args
-        )
-      elif build_file_imports_behavior == 'error':
-        import_hook = _fail_on_import
-      else:
-        raise ParseError("Didn't know what to do for build_file_imports_behavior value {}".format(
-          build_file_imports_behavior
-        ))
-      builtins['__import__'] = import_hook
-      symbols['__builtins__'] = builtins
-
     return symbols, parse_context
 
   def parse(self, filepath, filecontent):
@@ -154,18 +135,33 @@ class LegacyPythonCallbacksParser(Parser):
     # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
-
     six.exec_(python, dict(self._symbols))
+
+    # Perform this check after successful execution, so we know the python is valid (and should
+    # tokenize properly!)
+    # Note that this is incredibly poor sandboxing. There are many ways to get around it.
+    # But it's sufficient to tell most users who aren't being actively malicious that they're doing
+    # something wrong, and it has a low performance overhead.
+    if self._build_file_imports_behavior != 'allow' and 'import' in python:
+      for token in tokenize.generate_tokens(StringIO(python).readline):
+        if token[1] == 'import':
+          line_being_tokenized = token[4]
+          if self._build_file_imports_behavior == 'warn':
+            logger.warn('{} tried to import - import statements should be avoided ({})'.format(
+              filepath,
+              line_being_tokenized
+            ))
+          elif self._build_file_imports_behavior == 'error':
+            raise ParseError(
+              'import statements have been banned, but tried to import: {}'.format(
+                line_being_tokenized
+              )
+            )
+          else:
+            raise ParseError(
+              "Didn't know what to do for build_file_imports_behavior value {}".format(
+                self._build_file_imports_behavior
+              )
+            )
+
     return list(self._parse_context._storage.objects)
-
-
-def _warn_on_import(import_builtin, parse_context, import_name, *args):
-  logger = logging.getLogger(__name__)
-  logger.warn('BUILD file in directory {} tried to import {} - import statements should be avoided'.format(
-    parse_context.rel_path, import_name
-  ))
-  return import_builtin(import_name, *args)
-
-
-def _fail_on_import(name, *args):
-  raise ParseError('import statements have been banned, but tried to import {}'.format(name))
