@@ -216,6 +216,11 @@ class GlobalOptionsRegistrar(Optionable):
              help='The path to the watchman UNIX socket. This can be overridden if the default '
                   'absolute path length exceeds the maximum allowed by the OS.')
 
+    # This option changes the parser behavior in a fundamental way (which currently invalidates
+    # all caches), and needs to be parsed out early, so we make it a bootstrap option.
+    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
+      help='Whether to allow import statements in BUILD files')
+
   @classmethod
   def register_options(cls, register):
     """Register options not tied to any particular task or subsystem."""

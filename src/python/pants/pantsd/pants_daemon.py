@@ -113,6 +113,7 @@ class PantsDaemon(FingerprintedProcessManager):
       return EngineInitializer.setup_legacy_graph(
         bootstrap_options.pants_ignore,
         bootstrap_options.pants_workdir,
+        bootstrap_options.build_file_imports,
         native=native,
         build_ignore_patterns=bootstrap_options.build_ignore,
         exclude_target_regexps=bootstrap_options.exclude_target_regexp,

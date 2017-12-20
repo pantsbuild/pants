@@ -108,6 +108,7 @@ class EngineInitializer(object):
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          workdir,
+                         build_file_imports_behavior,
                          build_root=None,
                          native=None,
                          build_file_aliases=None,
@@ -120,6 +121,9 @@ class EngineInitializer(object):
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
     :param str workdir: The pants workdir.
+    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+      import statements. Valid values: "allow", "warn", "error".
+    :type build_file_imports_behavior: string
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
     :param build_file_aliases: BuildFileAliases to register.
@@ -140,12 +144,17 @@ class EngineInitializer(object):
     if not build_file_aliases:
       _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
       build_file_aliases = build_config.registered_aliases()
+
     symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
     # Register "literal" subjects required for these tasks.
-    parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
+    parser = LegacyPythonCallbacksParser(
+      symbol_table,
+      build_file_aliases,
+      build_file_imports_behavior
+    )
     address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps,
