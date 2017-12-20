@@ -364,10 +364,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         targets.extend(vt.targets)
 
       if len(targets):
-        msg, detail = items_to_report_element(
-          [t.address.reference() for t in targets],
-          'target')
-        self.context.log.info('Invalidated {}: {}.'.format(msg, detail))
+        target_address_references = [t.address.reference() for t in targets]
+        msg_elements = [
+          'Invalidated ',
+          items_to_report_element(target_address_references, 'target'),
+          '.',
+        ]
+        self.context.log.info(*msg_elements)
 
     self._update_invalidation_report(invalidation_check, 'pre-check')
 
@@ -581,11 +584,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return None
 
   def _report_targets(self, prefix, targets, suffix, logger=None):
+    target_address_references = [t.address.reference() for t in targets]
+    msg_elements = [
+      prefix,
+      items_to_report_element(target_address_references, 'target'),
+      suffix,
+    ]
     logger = logger or self.context.log.info
-    msg, detail = items_to_report_element(
-      [t.address.reference() for t in targets],
-      'target')
-    logger(prefix + '{}: {}'.format(msg, detail) + suffix)
+    logger(*msg_elements)
 
   def require_single_root_target(self):
     """If a single target was specified on the cmd line, returns that target.
