@@ -132,7 +132,7 @@ class CoursierMixin(NailgunTask):
       with self.invalidated(target_subset,
                             invalidate_dependents=False,
                             silent=False,
-                            fingerprint_strategy=CouriserResolveFingerprintStrategy([])) as invalidation_check:
+                            fingerprint_strategy=CoursierResolveFingerprintStrategy([])) as invalidation_check:
 
         if not invalidation_check.all_vts:
           continue
@@ -567,10 +567,10 @@ class CoursierResolve(CoursierMixin):
     self.resolve(self.context.targets(), classpath_products)
 
 
-class CouriserResolveFingerprintStrategy(FingerprintStrategy):
+class CoursierResolveFingerprintStrategy(FingerprintStrategy):
 
   def __init__(self, confs):
-    super(CouriserResolveFingerprintStrategy, self).__init__()
+    super(CoursierResolveFingerprintStrategy, self).__init__()
     self._confs = sorted(confs or [])
 
   def compute_fingerprint(self, target):

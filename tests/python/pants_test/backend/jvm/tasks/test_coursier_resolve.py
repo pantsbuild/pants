@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -17,8 +17,8 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
-from pants.backend.jvm.tasks.coursier_resolve import (CouriserResolveFingerprintStrategy,
-                                                      CoursierResolve)
+from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
+                                                      CoursierResolveFingerprintStrategy)
 from pants.base.exceptions import TaskError
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
@@ -258,7 +258,7 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_target_target_is_none(self):
     confs = ()
-    strategy = CouriserResolveFingerprintStrategy(confs)
+    strategy = CoursierResolveFingerprintStrategy(confs)
 
     target = self.make_target(':just-target')
 
@@ -266,7 +266,7 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_jvm_target_without_excludes_is_none(self):
     confs = ()
-    strategy = CouriserResolveFingerprintStrategy(confs)
+    strategy = CoursierResolveFingerprintStrategy(confs)
 
     target_without_excludes = self.make_target(':jvm-target', target_type=JvmTarget)
 
@@ -274,7 +274,7 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_jvm_target_with_excludes_is_hashed(self):
     confs = ()
-    strategy = CouriserResolveFingerprintStrategy(confs)
+    strategy = CoursierResolveFingerprintStrategy(confs)
 
     target_with_excludes = self.make_target(':jvm-target', target_type=JvmTarget,
                                                excludes=[Exclude('org.some')])
@@ -283,7 +283,7 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_jar_library_with_one_jar_is_hashed(self):
     confs = ()
-    strategy = CouriserResolveFingerprintStrategy(confs)
+    strategy = CoursierResolveFingerprintStrategy(confs)
 
     jar_library = self.make_target(':jar-library', target_type=JarLibrary,
                                    jars=[JarDependency('org.some', 'name')])
@@ -292,7 +292,7 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_identical_jar_libraries_with_same_jar_dep_management_artifacts_match(self):
     confs = ()
-    strategy = CouriserResolveFingerprintStrategy(confs)
+    strategy = CoursierResolveFingerprintStrategy(confs)
 
     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
                                artifacts=[JarDependency('org.some', 'name')])
@@ -312,7 +312,7 @@ class CoursierResolveFingerprintStrategyTest(TaskTestBase):
 
   def test_identical_jar_libraries_with_differing_managed_deps_differ(self):
     confs = ()
-    strategy = CouriserResolveFingerprintStrategy(confs)
+    strategy = CoursierResolveFingerprintStrategy(confs)
 
     managed_jar_deps = self.make_target(':managed', target_type=ManagedJarDependencies,
                                artifacts=[JarDependency('org.some', 'name')])
