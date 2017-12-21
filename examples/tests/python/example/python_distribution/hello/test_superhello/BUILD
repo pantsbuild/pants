@@ -6,7 +6,7 @@
 python_tests(
   name='superhello',
   sources=[
-  	'test_superhello.py'
+    'test_superhello.py'
   ],
   dependencies=[
     'examples/src/python/example/python_distribution/hello/superhello:superhello'

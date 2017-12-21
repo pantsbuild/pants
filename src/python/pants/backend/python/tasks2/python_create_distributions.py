@@ -38,10 +38,6 @@ class PythonCreateDistributions(Task):
     return isinstance(target, PythonDistribution)
 
   @property
-  def local_dists_workdir(self):
-    return os.path.join(self.workdir, 'local_dists')
-
-  @property
   def cache_target_dirs(self):
     return True
 
@@ -50,10 +46,6 @@ class PythonCreateDistributions(Task):
     built_dists = set()
     
     if dist_targets:
-      local_dists_workdir = self.local_dists_workdir
-      if not os.path.exists(self.local_dists_workdir):
-        safe_mkdir(local_dists_workdir)
-
       with self.invalidated(dist_targets,
                             fingerprint_strategy=DefaultFingerprintStrategy(),
                             invalidate_dependents=True) as invalidation_check:
