@@ -126,12 +126,8 @@ class CoursierMixin(NailgunTask):
         pants_workdir = self.get_options().pants_workdir
         resolve_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
-        vt_set_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', resolve_vts.cache_key.hash)
-        safe_mkdir(vt_set_results_dir)
-
-        coursier_cache_path = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
-        pants_jar_path_base = os.path.join(pants_workdir, 'coursier', 'cache')
-        safe_mkdir(pants_jar_path_base)
+        vt_set_results_dir = self._prepare_vts_results_dir(pants_workdir, resolve_vts)
+        coursier_cache_dir, pants_jar_base_dir = self._prepare_workdir(pants_workdir)
 
         # Check each individual target without context first
         if not invalidation_check.invalid_vts:
@@ -140,7 +136,7 @@ class CoursierMixin(NailgunTask):
           if resolve_vts.valid:
             # Load up from the results dir
             success = self._load_from_results_dir(compile_classpath, vt_set_results_dir,
-                                                  coursier_cache_path, invalidation_check, pants_jar_path_base)
+                                                  coursier_cache_dir, invalidation_check, pants_jar_base_dir)
             if success:
               return
 
@@ -149,14 +145,35 @@ class CoursierMixin(NailgunTask):
                                                                                manager)
 
         results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
-                                                 coursier_cache_path)
+                                                 coursier_cache_dir)
 
         for classifier, result in results.items():
-          self._load_json_result(compile_classpath, coursier_cache_path, invalidation_check,
-                                 pants_jar_path_base, result)
+          self._load_json_result(compile_classpath, coursier_cache_dir, invalidation_check,
+                                 pants_jar_base_dir, result)
 
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
+
+  def _prepare_vts_results_dir(self, pants_workdir, vts):
+    """
+    Given a `VergetTargetSet`, prepare its results dir.
+    """
+    vt_set_results_dir = os.path.join(pants_workdir, 'coursier', 'workdir', vts.cache_key.hash)
+    safe_mkdir(vt_set_results_dir)
+    return vt_set_results_dir
+
+  def _prepare_workdir(self, pants_workdir):
+    """
+    Given pants workdir, prepare the location in pants workdir to store all the symlinks
+    and coursier cache dir.
+    """
+    coursier_cache_dir = os.path.join(self.get_options().pants_bootstrapdir, 'coursier')
+    pants_jar_base_dir = os.path.join(pants_workdir, 'coursier', 'cache')
+
+    # Only pants_jar_path_base needs to be touched whereas coursier_cache_path will
+    # be managed by coursier
+    safe_mkdir(pants_jar_base_dir)
+    return coursier_cache_dir, pants_jar_base_dir
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
                                 coursier_cache_path):
