@@ -152,7 +152,7 @@ class CoursierMixin(NailgunTask):
                                                  coursier_cache_path)
 
         for classifier, result in results.items():
-          self._load_json_result(classifier, compile_classpath, coursier_cache_path, invalidation_check,
+          self._load_json_result(compile_classpath, coursier_cache_path, invalidation_check,
                                  pants_jar_path_base, result)
 
         self._populate_results_dir(vt_set_results_dir, results)
@@ -172,7 +172,7 @@ class CoursierMixin(NailgunTask):
     :param pants_workdir: Pants' workdir
     :param coursier_cache_path: path to where coursier cache is stored.
 
-    :return: The aggregation of result from coursier. Each coursier call could return
+    :return: The aggregation of results from coursier. Each coursier call could return
     the following:
         {
           "conflict_resolution": {
@@ -338,8 +338,18 @@ class CoursierMixin(NailgunTask):
 
     return cmd_args
 
-  def _load_json_result(self, classifier, compile_classpath, coursier_cache_path, invalidation_check,
+  def _load_json_result(self, compile_classpath, coursier_cache_path, invalidation_check,
                         pants_jar_path_base, result):
+    """
+    Given a coursier run result, load it into compile_classpath by target.
+
+    :param compile_classpath: `ClasspathProducts` that will be modified
+    :param coursier_cache_path: cache location that is managed by coursier
+    :param invalidation_check: InvalidationCheck
+    :param pants_jar_path_base: location under pants workdir that contains all the symlinks to coursier cache
+    :param result: result dict converted from the json produced by one coursier run
+    :return: n/a
+    """
     # Parse the coursier result
     flattened_resolution = self._extract_dependencies_by_root(result)
     coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
@@ -387,6 +397,8 @@ class CoursierMixin(NailgunTask):
   def _load_from_results_dir(self, compile_classpath, vts_results_dir,
                              coursier_cache_path, invalidation_check, pants_jar_path_base):
     """
+    Given vts_results_dir, load the results which can be from multiple runs of coursier into compile_classpath.
+
     :return: True if success; False if any of the classpath is not valid anymore.
     """
     result_file_path = os.path.join(vts_results_dir, self.RESULT_FILENAME)
@@ -397,7 +409,7 @@ class CoursierMixin(NailgunTask):
       results = json.load(f)
       for classifier, result in results.items():
         try:
-          self._load_json_result(classifier, compile_classpath,
+          self._load_json_result(compile_classpath,
                                  coursier_cache_path,
                                  invalidation_check,
                                  pants_jar_path_base, result)
