@@ -57,7 +57,12 @@ class PythonDistribution(Target):
     sources_basenames = [os.path.basename(source) for source in sources]
     if not 'setup.py' in sources_basenames:
       raise TargetDefinitionException(self,
-        'A setup.py is required to create a python_dist. You must include a setup.py file in your sources field.')
+        'A setup.py is required to create a python_dist. '
+        'You must include a setup.py file in your sources field.')
+    if len(filter(lambda x: x == 'setup.py', sources_basenames)) > 1:
+      raise TargetDefinitionException(self,
+        'Multiple setup.py files detected. You can only specify one '
+        'setup.py in a python_dist target.')
 
     # Check that the compatibility requirements are well-formed.
     for req in self.payload.compatibility:
