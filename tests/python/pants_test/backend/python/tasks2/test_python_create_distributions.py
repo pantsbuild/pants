@@ -11,6 +11,7 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
+
 class TestPythonCreateDistributions(PythonTaskTestBase):
   @classmethod
   def task_type(cls):

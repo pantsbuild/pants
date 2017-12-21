@@ -11,8 +11,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.pex_build_util import (dump_requirements,
-                                                        targets_are_invalid_targets)
+from pants.backend.python.tasks2.pex_build_util import dump_requirements, targets_are_invalid
 from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -58,7 +57,7 @@ class ResolveRequirementsTaskBase(Task):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-      if not os.path.isdir(path) or targets_are_invalid_targets(python_dist_targets, invalid_targets):
+      if not os.path.isdir(path) or targets_are_invalid(python_dist_targets, invalid_targets):
         with safe_concurrent_creation(path) as safe_path:
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)

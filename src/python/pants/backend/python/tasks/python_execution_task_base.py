@@ -17,7 +17,8 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.pex_build_util import has_python_sources, is_local_python_dist
+from pants.backend.python.tasks2.pex_build_util import (has_python_sources, is_local_python_dist,
+                                                        targets_are_invalid)
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address
@@ -121,6 +122,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
+<<<<<<< 365e70892e9ebcafb7e376fbe4f68694e6efba5e
       local_python_dist_targets = self.context.targets(is_local_python_dist)
       invalid_target_objs = [v.target for v in invalidation_check.invalid_vts]
       context_has_invalid_python_dists = any([lpdt in invalid_target_objs for lpdt in local_python_dist_targets])
@@ -128,6 +130,13 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         source_pexes = self.context.products.get_data(GatherSources.PythonSources).all()
         requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
         pexes = [requirements_pex] + source_pexes
+=======
+      if not os.path.isdir(path) or targets_are_invalid(python_dist_targets, invalid_targets):
+        pexes = [
+          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
+        ]
+>>>>>>> Fix merge conflict
 
         if self.extra_requirements():
           extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]
