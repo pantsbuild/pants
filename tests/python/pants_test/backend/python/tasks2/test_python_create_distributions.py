@@ -44,7 +44,7 @@ class TestPythonCreateDistributions(PythonTaskTestBase):
 
   def test_python_create_distributions(self):
     context = self.context(target_roots=[self.python_dist_tgt], for_task_types=[PythonCreateDistributions])
-    python_create_distributions_task = self.create_task(context,)
+    python_create_distributions_task = self.create_task(context)
     python_create_distributions_task.execute()
     built_dists = context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
     self.assertGreater(len(built_dists), 0)

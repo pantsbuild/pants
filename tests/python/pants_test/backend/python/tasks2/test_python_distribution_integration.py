@@ -13,8 +13,8 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
-  # The paths a project and an associated test containing a simple C extension to 
-  # be packaged into a whl by setup.py and consumed by the pants goals tested below. 
+  # The paths to both a project containing a simple C extension (to be packaged into a
+  # whl by setup.py) and an associated test to be consumed by the pants goals tested below.
   superhello_project = 'examples/src/python/example/python_distribution/hello/superhello'
   superhello_tests = 'examples/tests/python/example/python_distribution/hello/test_superhello'
 

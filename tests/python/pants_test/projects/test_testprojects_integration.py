@@ -65,6 +65,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/htmlreport:htmlreport',
       'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
+      'examples/src/python/example/python_distribution/hello/superhello:main_with_conflicting_dep'
     ]
 
     # May not succeed without java8 installed

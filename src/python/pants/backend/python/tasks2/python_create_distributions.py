@@ -71,7 +71,7 @@ class PythonCreateDistributions(Task):
                                   dist_tgt.address.spec_path,
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
-    # Build the whl from pex API using tempdir and get its location.
+    # Build a whl using SetupPyRunner and return its absolute path.
     install_dir = os.path.join(dist_target_dir, 'dist')
     safe_mkdir(install_dir)
     setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
@@ -79,7 +79,7 @@ class PythonCreateDistributions(Task):
     return self._get_whl_from_dir(install_dir)
 
   def _get_whl_from_dir(self, install_dir):
-    """Return the location of the whl on disk."""
+    """Return the absolute path of the whl in a setup.py install directory."""
     dists = os.listdir(install_dir)
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')

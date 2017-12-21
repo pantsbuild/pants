@@ -48,7 +48,7 @@ def has_python_requirements(tgt):
 
 
 def targets_are_invalid(targets, invalid_targets):
-  """Return whether a set of invalidated versioned targets containts a target from `targets`.
+  """Return whether `invalid_targets` contains at least one target from `targets`.
 
   :param invalid_targets: A list of targets that have been invalidated by a cache manager.
   :param targets: A list of targets to check for membership in `invalid_targets`.

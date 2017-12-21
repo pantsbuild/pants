@@ -65,7 +65,10 @@ class ResolveRequirementsTaskBase(Task):
   def _build_requirements_pex(self, interpreter, path, req_libs):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
-    # Dump built python distributions, if any, into requirements pex.
+    # Dump built python distributions, if any, into the requirements pex.
+    # NB: If a python_dist depends on a requirement X and another target in play requires
+    # an incompatible version of X, this will cause the pex resolver to throw an incompatiblity
+    # error and Pants will abort the build.
     built_dists = self.context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
     if built_dists:
       for dist in built_dists:
