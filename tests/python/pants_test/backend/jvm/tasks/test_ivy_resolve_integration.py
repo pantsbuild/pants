@@ -40,7 +40,6 @@ class IvyResolveIntegrationTest(PantsRunIntegrationTest):
       **kwargs
     )
 
-
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
     with self.temporary_workdir() as workdir:
