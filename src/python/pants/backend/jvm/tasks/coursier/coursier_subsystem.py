@@ -38,6 +38,8 @@ class CoursierSubsystem(Subsystem):
     register('--bootstrap-jar-url', fingerprint=True,
              default='https://dl.dropboxusercontent.com/s/g0q7266bntl1nmj/coursier-cli.0.0.0.c8b1349e0d4e89f4aad14589c737efa918f294b4.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')
+    # TODO(wisechengyi): currently using a custom url for fast iteration.
+    # Once the coursier builds are stable, move the logic to binary_util
     register('--version', type=str, fingerprint=True,
              default='0.0.0.c8b1349e0d4e89f4aad14589c737efa918f294b4',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')

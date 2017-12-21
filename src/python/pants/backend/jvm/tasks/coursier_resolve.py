@@ -11,8 +11,6 @@ import logging
 import os
 from collections import defaultdict
 
-from twitter.common.collections import OrderedDict
-
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
@@ -34,7 +32,7 @@ from pants.util.dirutil import safe_mkdir
 logger = logging.getLogger(__name__)
 
 
-class CouriserCacheNotFound(Exception):
+class CoursierResultNotFound(Exception):
   pass
 
 
@@ -56,6 +54,8 @@ class CoursierMixin(NailgunTask):
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
     """
+    This method provides settled lists of jar dependencies and coordinates
+    based on conflict management.
 
     :param raw_jars: a collection of `JarDependencies`
     :param artifact_set: PinnedJarArtifactSet
@@ -65,39 +65,25 @@ class CoursierMixin(NailgunTask):
     if artifact_set is None:
       artifact_set = PinnedJarArtifactSet()
 
-    jars_by_key = OrderedDict()
-    for jar in raw_jars:
-      # (wisechengyi) This is equivalent to OrderedDefaultDict
-      jars_for_the_key = jars_by_key.setdefault((jar.org, jar.name), [])
-      jars_for_the_key.append(jar)
-
-    jars_to_resolve = []
-
     untouched_pinned_artifact = set(M2Coordinate.create(x) for x in artifact_set)
+    jar_list = list(raw_jars)
+    for i, dep in enumerate(jar_list):
+      direct_coord = M2Coordinate.create(dep)
+      # Portion to manage pinned jars in case of conflict
+      if direct_coord in artifact_set:
+        managed_coord = artifact_set[direct_coord]
+        untouched_pinned_artifact.remove(managed_coord)
 
-    for k, jar_list in jars_by_key.items():
+        if direct_coord.rev != managed_coord.rev:
+          # It may be necessary to actually change the version number of the jar we want to resolve
+          # here, because overrides do not apply directly (they are exclusively transitive). This is
+          # actually a good thing, because it gives us more control over what happens.
+          coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
 
-      # Portion to managed pinned jars in case of conflict
-      for i, dep in enumerate(jar_list):
-        direct_coord = M2Coordinate.create(dep)
+          # Once a version is settled, we force it anyway
+          jar_list[i] = dep.copy(rev=coord.rev, force=True)
 
-        if direct_coord in artifact_set:
-          managed_coord = artifact_set[direct_coord]
-          untouched_pinned_artifact.remove(managed_coord)
-
-          if direct_coord.rev != managed_coord.rev:
-            # It may be necessary to actually change the version number of the jar we want to resolve
-            # here, because overrides do not apply directly (they are exclusively transitive). This is
-            # actually a good thing, because it gives us more control over what happens.
-            coord = manager.resolve_version_conflict(managed_coord, direct_coord, force=dep.force)
-
-            # Once a version is settled, we force it anyway
-            jar_list[i] = dep.copy(rev=coord.rev, force=True)
-
-      # Once the jar list is settled, add it to the global list later passed to coursier
-      jars_to_resolve.extend(jar_list)
-
-    return jars_to_resolve, untouched_pinned_artifact
+    return jar_list, untouched_pinned_artifact
 
   def resolve(self, targets, compile_classpath):
     """
@@ -415,7 +401,7 @@ class CoursierMixin(NailgunTask):
                                  coursier_cache_path,
                                  invalidation_check,
                                  pants_jar_path_base, result)
-        except CouriserCacheNotFound:
+        except CoursierResultNotFound:
           return False
 
     return True
@@ -511,7 +497,7 @@ class CoursierMixin(NailgunTask):
         pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
         if not os.path.exists(jar_path):
-          raise CouriserCacheNotFound("Jar path not found: {}".format(jar_path))
+          raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
 
         if not os.path.exists(pants_path):
           safe_mkdir(os.path.dirname(pants_path))
