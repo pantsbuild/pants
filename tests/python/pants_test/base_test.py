@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
+import logging
 import os
 import unittest
 from collections import defaultdict
+from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
@@ -455,3 +457,31 @@ class BaseTest(unittest.TestCase):
     # Can't parse any options without a pants.ini.
     self.create_file('pants.ini')
     return OptionsBootstrapper(args=cli_options).get_bootstrap_options().for_global_scope()
+
+  class LoggingRecorder(object):
+    """Simple logging handler to record warnings."""
+
+    def __init__(self):
+      self._records = []
+      self.level = logging.DEBUG
+
+    def handle(self, record):
+      self._records.append(record)
+
+    def _messages_for_level(self, levelname):
+      return ['{}: {}'.format(record.name, record.getMessage())
+              for record in self._records if record.levelname == levelname]
+
+    def infos(self):
+      return self._messages_for_level('INFO')
+
+    def warnings(self):
+      return self._messages_for_level('WARNING')
+
+  @contextmanager
+  def captured_logging(self):
+    handler = self.LoggingRecorder()
+    logger = logging.getLogger('')
+    logger.addHandler(handler)
+    yield handler
+    logger.removeHandler(handler)
