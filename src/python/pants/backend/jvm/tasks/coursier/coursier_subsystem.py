@@ -40,6 +40,7 @@ class CoursierSubsystem(Subsystem):
              help='Location to download a bootstrap version of Coursier.')
     # TODO(wisechengyi): currently using a custom url for fast iteration.
     # Once the coursier builds are stable, move the logic to binary_util
+    # Ths sha in the version corresponds to the sha in the PR https://github.com/coursier/coursier/pull/692
     register('--version', type=str, fingerprint=True,
              default='0.0.0.c8b1349e0d4e89f4aad14589c737efa918f294b4',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
