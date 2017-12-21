@@ -109,6 +109,7 @@ python_tests(
   sources = ['test_osutil.py'],
   dependencies = [
     'src/python/pants/util:osutil',
+    'tests/python/pants_test:base_test',
   ]
 )
 
