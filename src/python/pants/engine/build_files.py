@@ -244,17 +244,10 @@ def addresses_from_address_families(address_mapper, address_families, spec):
     if not address_families:
       raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
 
-  def exclude_address(address):
-    if address_mapper.exclude_patterns:
-      address_str = address.spec
-      return any(p.search(address_str) is not None for p in address_mapper.exclude_patterns)
-    return False
-
   def all_included_addresses():
     return (a
             for af in address_families
-            for a in af.addressables.keys()
-            if not exclude_address(a))
+            for a in af.addressables.keys())
 
   if type(spec) in (DescendantAddresses, SiblingAddresses):
     raise_if_empty_address_families()

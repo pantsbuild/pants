@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import re
 from collections import OrderedDict
 
 from pathspec import PathSpec
@@ -165,6 +164,7 @@ class ResolveError(MappingError):
 class AddressMapper(object):
   """Configuration to parse build files matching a filename pattern."""
 
+  # TODO(dwh): Ignored exclude_target_regexps
   def __init__(self,
                parser,
                build_patterns=None,
@@ -181,13 +181,10 @@ class AddressMapper(object):
     :param tuple build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
                                  used to resolve addresses.
     :param list build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
-    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     """
     self.parser = parser
     self.build_patterns = build_patterns or (b'BUILD', b'BUILD.*')
     self.build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
-    self._exclude_target_regexps = exclude_target_regexps or []
-    self.exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
     self.subproject_roots = subproject_roots or []
 
   def __eq__(self, other):

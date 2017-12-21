@@ -105,6 +105,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
 class EngineInitializer(object):
   """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
 
+  # TODO(dwh): Ununsed exclude_target_regexps
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          workdir,
@@ -130,7 +131,6 @@ class EngineInitializer(object):
     :type build_file_aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
     :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
                                        files, usually taken from the '--build-ignore' global option.
-    :param list exclude_target_regexps: A list of regular expressions for excluding targets.
     :param list subproject_roots: Paths that correspond with embedded build roots
                                   under the current build root.
     :param bool include_trace_on_error: If True, when an error occurs, the error message will
@@ -157,7 +157,6 @@ class EngineInitializer(object):
     )
     address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
-                                   exclude_target_regexps=exclude_target_regexps,
                                    subproject_roots=subproject_roots)
 
     # Load the native backend.

@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
-import re
 import traceback
 from collections import defaultdict
 
@@ -47,6 +46,7 @@ class BuildFileAddressMapper(AddressMapper):
   # patterns, because the asterisks in its name make it an invalid regexp.
   _UNMATCHED_KEY = '** unmatched **'
 
+  # TODO(dwh): Ununsed exclude_target_regexps
   def __init__(self, build_file_parser, project_tree, build_ignore_patterns=None, exclude_target_regexps=None,
                subproject_roots=None):
     """Create a BuildFileAddressMapper.
@@ -59,8 +59,6 @@ class BuildFileAddressMapper(AddressMapper):
     self._project_tree = project_tree
     self._build_ignore_patterns = PathSpec.from_lines(GitWildMatchPattern, build_ignore_patterns or [])
 
-    self._exclude_target_regexps = exclude_target_regexps or []
-    self._exclude_patterns = [re.compile(pattern) for pattern in self._exclude_target_regexps]
     self.subproject_roots = subproject_roots or []
 
   @property
@@ -170,23 +168,11 @@ class BuildFileAddressMapper(AddressMapper):
     """Execute a collection of `specs.Spec` objects and return a set of Addresses."""
     excluded_target_map = defaultdict(set)  # pattern -> targets (for debugging)
 
-    def exclude_spec(spec):
-      for pattern in self._exclude_patterns:
-        if pattern.search(spec) is not None:
-          excluded_target_map[pattern.pattern].add(spec)
-          return True
-      excluded_target_map[self._UNMATCHED_KEY].add(spec)
-      return False
-
-    def exclude_address(address):
-      return exclude_spec(address.spec)
-
     #TODO: Investigate why using set will break ci. May help migration to v2 engine.
     addresses = OrderedSet()
     for spec in specs:
       for address in self._scan_spec(spec, fail_fast):
-        if not exclude_address(address):
-          addresses.add(address)
+        addresses.add(address)
 
     # Print debug information about the excluded targets
     if logger.getEffectiveLevel() <= logging.DEBUG and excluded_target_map:
