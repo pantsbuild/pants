@@ -11,7 +11,8 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.pex_build_util import dump_requirements
+from pants.backend.python.tasks2.pex_build_util import (dump_requirements,
+                                                        targets_are_invalid_targets)
 from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -31,14 +32,14 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(PythonCreateDistributions.PYTHON_DISTS)
 
-  def resolve_requirements(self, req_libs, local_python_dist_targets=()):
+  def resolve_requirements(self, req_libs, python_dist_targets=()):
     """Requirements resolution for PEX files.
 
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
-    :param local_python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
+    :param python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
-    tgts = req_libs + local_python_dist_targets
+    tgts = req_libs + python_dist_targets
     with self.invalidated(tgts) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
@@ -52,11 +53,12 @@ class ResolveRequirementsTaskBase(Task):
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
 
+      # Gather invalid targets so we can check whether the requirements pex should be
+      # rebuilt due to changes to PythonDistribution targets.
+      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-      invalid_target_objs = [v.target for v in invalidation_check.invalid_vts]
-      context_has_invalid_python_dists = any([lpdt in invalid_target_objs for lpdt in local_python_dist_targets])
-      if not os.path.isdir(path) or context_has_invalid_python_dists:
+      if not os.path.isdir(path) or targets_are_invalid_targets(python_dist_targets, invalid_targets):
         with safe_concurrent_creation(path) as safe_path:
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)

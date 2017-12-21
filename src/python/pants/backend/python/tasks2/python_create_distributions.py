@@ -22,6 +22,7 @@ from pants.util.dirutil import safe_mkdir
 class PythonCreateDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
 
+  options_scope = 'python-create-distributions'
   PYTHON_DISTS = 'user_defined_python_dists'
 
   @classmethod
@@ -66,14 +67,11 @@ class PythonCreateDistributions(Task):
 
   def _create_dist(self, dist_tgt, dist_target_dir):
     """Create a .whl file for the specified python_distribution target."""
-    
     interpreter = self.context.products.get_data(PythonInterpreter)
-    safe_mkdir(dist_target_dir)
 
     # Copy sources and setup.py over to vt results directory for packaging.
     # NB: The directory structure of the destination directory needs to match 1:1
     # with the directory structure that setup.py expects.
-
     for src_relative_to_target_base in dist_tgt.sources_relative_to_target_base():
       src_rel_to_results_dir = os.path.join(dist_target_dir, src_relative_to_target_base)
       safe_mkdir(os.path.dirname(src_rel_to_results_dir))

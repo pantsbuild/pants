@@ -47,6 +47,17 @@ def has_python_requirements(tgt):
   return isinstance(tgt, PythonRequirementLibrary)
 
 
+def targets_are_invalid_targets(targets, invalid_targets):
+  """Return whether a set of invalidated versioned targets containts a target from `targets`.
+
+  :param invalid_targets: A list of targets that have been invalidated by a cache manager.
+  :param targets: A list of targets to check for membership in `invalid_targets`.
+
+  :return: A boolean indicating if any target in `targets` exists in `invalid_targets`.
+  """
+  return any([target in invalid_targets for target in targets])
+
+
 def _create_source_dumper(builder, tgt):
   if type(tgt) == Files:
     # Loose `Files` as opposed to `Resources` or `PythonTarget`s have no (implied) package structure
