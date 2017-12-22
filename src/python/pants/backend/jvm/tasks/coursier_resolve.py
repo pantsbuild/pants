@@ -51,6 +51,12 @@ class CoursierMixin(NailgunTask):
   def subsystem_dependencies(cls):
     return super(CoursierMixin, cls).subsystem_dependencies() + (JarDependencyManagement, CoursierSubsystem)
 
+  @classmethod
+  def register_options(cls, register):
+    super(CoursierMixin, cls).register_options(register)
+    register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=False,
+             help='Whether global excludes are allowed.')
+
   @staticmethod
   def _compute_jars_to_resolve_and_pin(raw_jars, artifact_set, manager):
     """
@@ -278,7 +284,8 @@ class CoursierMixin(NailgunTask):
         output_fn = f.name
         common_args.extend(['--json-output-file', output_fn])
 
-      cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
+      cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args,
+                                          global_excludes if self.get_options().allow_global_excludes else [],
                                           pinned_coords, coursier_work_temp_dir)
 
       with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
