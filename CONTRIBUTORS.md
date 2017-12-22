@@ -19,6 +19,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Chris Burroughs
 + Chris Chen
 + Chris Heisterkamp
++ Chris Livingston
 + Chris Pesto
 + Christopher Livingston
 + Cody Gibb
@@ -30,6 +31,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Daniel Bentley
 + Daniel Peebles
 + Daniel Wagner-Hall
++ Danny McClanahan
 + Dave Brewster
 + David Katz
 + David Taylor

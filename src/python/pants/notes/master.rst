@@ -5,6 +5,53 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.4.0.dev25 (12/22/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Integrate PEX interpreter selection based on target-level interpreter compatibility constraints (#5160)
+  `PR #5160 <https://github.com/pantsbuild/pants/pull/5160>`_
+
+* Import statements can be banned in BUILD files (#5180)
+  `PR #5180 <https://github.com/pantsbuild/pants/pull/5180>`_
+
+Bugfixes
+~~~~~~~~
+
+* revert log statement edits from #5170 that break console logging (#5233)
+  `PR #5233 <https://github.com/pantsbuild/pants/pull/5233>`_
+
+* [pantsd] Repair daemon lifecycle options fingerprinting. (#5232)
+  `PR #5232 <https://github.com/pantsbuild/pants/pull/5232>`_
+
+* use task fingerprint for build invalidation to avoid `results_dir` clashes (#5170)
+  `PR #5170 <https://github.com/pantsbuild/pants/pull/5170>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* [pantsd] Bump watchman version. (#5238)
+  `PR #5238 <https://github.com/pantsbuild/pants/pull/5238>`_
+
+* [pantsd] Improve stream latency by disabling Nagle's algorithm. (#5237)
+  `PR #5237 <https://github.com/pantsbuild/pants/pull/5237>`_
+
+* Log and increase pantsd startup timeout (#5231)
+  `PR #5231 <https://github.com/pantsbuild/pants/pull/5231>`_
+
+* [pantsd] Improve artifact cache progress output when daemon is enabled. (#5236)
+  `PR #5236 <https://github.com/pantsbuild/pants/pull/5236>`_
+
+* download_binary.sh takes hostname as a parameter (#5234)
+  `PR #5234 <https://github.com/pantsbuild/pants/pull/5234>`_
+
+* Kill noisy NodeModule.__init__() debug logging. (#5215)
+  `PR #5215 <https://github.com/pantsbuild/pants/pull/5215>`_
+
+* TargetRoots always requires options (#5217)
+  `PR #5217 <https://github.com/pantsbuild/pants/pull/5217>`_
+
+
 1.4.0.dev24 (12/16/2017)
 ------------------------
 
