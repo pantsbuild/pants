@@ -10,8 +10,8 @@ from abc import abstractmethod
 from collections import OrderedDict
 from zipfile import ZIP_DEFLATED
 
-from pants.util.contextutil import open_tar, open_zip
-from pants.util.dirutil import safe_walk
+from pants.util.contextutil import open_tar, open_zip, temporary_dir
+from pants.util.dirutil import safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_text
 
@@ -22,8 +22,18 @@ from pants.util.strutil import ensure_text
 class Archiver(AbstractClass):
 
   @classmethod
-  def extract(cls, path, outdir):
+  def extract(cls, path, outdir, safe=False):
     """Extracts an archive's contents to the specified outdir."""
+    if safe:
+      with temporary_dir() as temp_dir:
+        cls._extract(path, temp_dir)
+        safe_concurrent_rename(temp_dir, outdir)
+    else:
+      # Leave the existing default behavior unchanged.
+      cls._extract(path, outdir)
+
+  @classmethod
+  def _extract(cls, path, outdir):
     raise NotImplementedError()
 
   @abstractmethod
@@ -41,7 +51,7 @@ class TarArchiver(Archiver):
   """
 
   @classmethod
-  def extract(cls, path, outdir):
+  def _extract(cls, path, outdir):
     """
     :API: public
     """
@@ -75,7 +85,7 @@ class ZipArchiver(Archiver):
   """
 
   @classmethod
-  def extract(cls, path, outdir, filter_func=None):
+  def _extract(cls, path, outdir, filter_func=None):
     """Extract from a zip file, with an optional filter
 
     :API: public
