@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import math
 
 from pants.util.memo import memoized_property
-from pants_test.pants_run_integration_test import ensure_engine
+from pants_test.pants_run_integration_test import ensure_engine, ensure_resolver
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
@@ -18,7 +18,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   # on), we shard all of the targets under `testprojects` into _SHARDS test methods.
   #
   # NB: Do not change this value without matching the number of test methods.
-  _SHARDS = 16
+  _SHARDS = 32
 
   @memoized_property
   def targets(self):
@@ -81,7 +81,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     timeout_targets = [
       'testprojects/tests/python/pants/timeout:sleeping_target',
       'testprojects/tests/java/org/pantsbuild/testproject/timeout:sleeping_target',
-       # Called with test_pytest_run_integration
+      # Called with test_pytest_run_integration
       'testprojects/tests/python/pants/timeout:exceeds_timeout',
       'testprojects/tests/python/pants/timeout:ignores_terminate',
     ]
@@ -90,8 +90,13 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/src/python/interpreter_selection.*'
     ]
 
+    simply_skip = [
+      # Already tested at pants_test.backend.jvm.targets.test_jar_dependency_integration.JarDependencyIntegrationTest
+      'testprojects/3rdparty/org/pantsbuild/testprojects:testprojects'
+    ]
+
     targets_to_exclude = (known_failing_targets + negative_test_targets + need_java_8 +
-                          timeout_targets + deliberately_conflicting_targets)
+                          timeout_targets + deliberately_conflicting_targets + simply_skip)
     exclude_opts = map(lambda target: '--exclude-target-regexp={}'.format(target),
                        targets_to_exclude)
 
@@ -105,9 +110,10 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       raise Exception('Invalid shard: {} / {}'.format(shard, self._SHARDS))
 
     per_shard = int(math.ceil(len(self.targets) / self._SHARDS))
-    offset = (per_shard*shard)
+    offset = (per_shard * shard)
     return self.targets[offset:offset + per_shard]
 
+  @ensure_resolver
   @ensure_engine
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
@@ -117,7 +123,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
   def test_self(self):
     self.assertEquals([t for s in range(0, self._SHARDS)
-                         for t in self.targets_for_shard(s)], 
+                       for t in self.targets_for_shard(s)],
                       self.targets)
 
   def test_shard_0(self):
@@ -167,3 +173,51 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
   def test_shard_15(self):
     self.run_shard(15)
+
+  def test_shard_16(self):
+    self.run_shard(16)
+
+  def test_shard_17(self):
+    self.run_shard(17)
+
+  def test_shard_18(self):
+    self.run_shard(18)
+
+  def test_shard_19(self):
+    self.run_shard(19)
+
+  def test_shard_20(self):
+    self.run_shard(20)
+
+  def test_shard_21(self):
+    self.run_shard(21)
+
+  def test_shard_22(self):
+    self.run_shard(22)
+
+  def test_shard_23(self):
+    self.run_shard(23)
+
+  def test_shard_24(self):
+    self.run_shard(24)
+
+  def test_shard_25(self):
+    self.run_shard(25)
+
+  def test_shard_26(self):
+    self.run_shard(26)
+
+  def test_shard_27(self):
+    self.run_shard(27)
+
+  def test_shard_28(self):
+    self.run_shard(28)
+
+  def test_shard_29(self):
+    self.run_shard(29)
+
+  def test_shard_30(self):
+    self.run_shard(30)
+
+  def test_shard_31(self):
+    self.run_shard(31)

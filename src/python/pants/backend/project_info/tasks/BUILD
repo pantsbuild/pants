@@ -94,7 +94,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
-    'src/python/pants/option',
     'src/python/pants/task',
     'src/python/pants/util:memo',
   ],
