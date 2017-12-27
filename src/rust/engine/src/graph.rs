@@ -388,7 +388,7 @@ impl InnerGraph {
           // because a dependent failed. In either case, it's not useful to render
           // them, as we don't know whether they would have succeeded or failed.
           true
-        },
+        }
       }
     };
 
