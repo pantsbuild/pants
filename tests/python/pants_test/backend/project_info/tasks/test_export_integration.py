@@ -39,7 +39,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     :rtype: dict
     """
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    args = ['--resolver-resolver=ivy', 'export',
+    args = ['--resolver-resolver=coursier', 'export',
             '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     if load_libs and only_default:
@@ -86,6 +86,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
       json_data = self.run_export(test_target, workdir, load_libs=True)
+      print(json_data)
       self.assertIsNone(json_data
                         .get('libraries')
                         .get('com.typesafe.sbt:incremental-compiler:0.13.7'))
@@ -111,31 +112,23 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertTrue('com.typesafe.sbt:incremental-compiler' in foo_target.get('excludes'))
       self.assertTrue('org.pantsbuild' in foo_target.get('excludes'))
 
-  # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
-  # the default location.  The set cache_dir likely needs to be plumbed down
-  # to the sub-invocation of pants.
-  # https://github.com/pantsbuild/pants/issues/3126
   def test_export_jar_path(self):
     with self.temporary_workdir() as workdir:
       test_target = 'examples/tests/java/org/pantsbuild/example/usethrift:usethrift'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      ivy_subsystem = global_subsystem_instance(IvySubsystem)
-      ivy_cache_dir = ivy_subsystem.get_options().cache_dir
       common_lang_lib_info = json_data.get('libraries').get('junit:junit:4.12')
       self.assertIsNotNone(common_lang_lib_info)
-      self.assertEquals(
-        common_lang_lib_info.get('default'),
-        os.path.join(ivy_cache_dir, 'junit/junit/jars/junit-4.12.jar')
+      self.assertIn(
+        'junit-4.12.jar',
+        common_lang_lib_info.get('default')
       )
-      self.assertEquals(
-        common_lang_lib_info.get('javadoc'),
-        os.path.join(ivy_cache_dir,
-                     'junit/junit/javadocs/junit-4.12-javadoc.jar')
+      self.assertIn(
+        'junit-4.12-javadoc.jar',
+        common_lang_lib_info.get('javadoc')
       )
-      self.assertEquals(
-        common_lang_lib_info.get('sources'),
-        os.path.join(ivy_cache_dir,
-                     'junit/junit/sources/junit-4.12-sources.jar')
+      self.assertIn(
+        'junit-4.12-sources.jar',
+        common_lang_lib_info.get('sources')
       )
 
   def test_dep_map_for_java_sources(self):

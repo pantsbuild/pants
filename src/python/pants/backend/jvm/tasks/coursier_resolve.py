@@ -54,7 +54,7 @@ class CoursierMixin(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(CoursierMixin, cls).register_options(register)
-    register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=False,
+    register('--allow-global-excludes', type=bool, advanced=False, fingerprint=True, default=True,
              help='Whether global excludes are allowed.')
 
   @staticmethod
@@ -91,7 +91,7 @@ class CoursierMixin(NailgunTask):
 
     return jar_list, untouched_pinned_artifact
 
-  def resolve(self, targets, compile_classpath):
+  def resolve(self, targets, compile_classpath, sources, javadoc):
     """
     This is the core function for coursier resolve.
 
@@ -110,6 +110,8 @@ class CoursierMixin(NailgunTask):
 
     :param targets: a collection of targets to do 3rdparty resolve against
     :param compile_classpath: classpath product that holds the resolution result. IMPORTANT: this parameter will be changed.
+    :param sources: if True, fetch sources for 3rdparty
+    :param javadoc: if True, fetch javadoc for 3rdparty
     :return: n/a
     """
 
@@ -151,11 +153,14 @@ class CoursierMixin(NailgunTask):
                                                                                manager)
 
         results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
-                                                 coursier_cache_dir)
+                                                 coursier_cache_dir, sources, javadoc)
 
-        for classifier, result in results.items():
-          self._load_json_result(compile_classpath, coursier_cache_dir, invalidation_check,
-                                 pants_jar_base_dir, result)
+        print(json.dumps(results, indent=2))
+
+        for conf, result_list in results.items():
+          for result in result_list:
+            self._load_json_result(conf, compile_classpath, coursier_cache_dir, invalidation_check,
+                                   pants_jar_base_dir, result)
 
         self._populate_results_dir(vt_set_results_dir, results)
         resolve_vts.update()
@@ -182,12 +187,12 @@ class CoursierMixin(NailgunTask):
     return coursier_cache_dir, pants_jar_base_dir
 
   def _get_result_from_coursier(self, jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
-                                coursier_cache_path):
+                                coursier_cache_path, sources, javadoc):
     """
     Calling coursier and return the result per invocation.
 
     If coursier was called once for classifier '' and once for classifier 'tests', then the return value
-    would be: {'': <first couriser output>, 'tests': <second coursier output>}
+    would be: {'default': [<first couriser output>, <second coursier output>]}
 
     :param jars_to_resolve: List of `JarDependency`s to resolve
     :param global_excludes: List of `M2Coordinate`s to exclude globally
@@ -195,7 +200,7 @@ class CoursierMixin(NailgunTask):
     :param pants_workdir: Pants' workdir
     :param coursier_cache_path: path to where coursier cache is stored.
 
-    :return: The aggregation of results from coursier. Each coursier call could return
+    :return: The aggregation of results by conf from coursier. Each coursier call could return
     the following:
         {
           "conflict_resolution": {
@@ -234,8 +239,9 @@ class CoursierMixin(NailgunTask):
     Hence the aggregation of the results will be in the following format, for example when default classifier
     and sources are fetched:
     {
-      '': <result from first coursier call with default classifier>,
-      'sources': <result from second coursier call with 'sources' classifier>,
+      'default': [ <result from coursier call with default conf with classifier X>,
+                   <result from coursier call with default conf with classifier Y> ],
+      'src_doc': [ <result from second coursier call with --sources and/or --javadoc> ],
     }
     """
 
@@ -249,6 +255,18 @@ class CoursierMixin(NailgunTask):
                    '--cache', coursier_cache_path
                    ] + coursier_subsystem_instance.get_options().fetch_options
 
+    results_by_conf = self._get_default_conf_results(common_args, coursier_jar, global_excludes, jars_to_resolve, pants_workdir,
+                                             pinned_coords)
+    if sources or javadoc:
+      non_default_conf_results = self._get_non_default_conf_results(common_args, coursier_jar, global_excludes, jars_to_resolve, pants_workdir,
+                                             pinned_coords, sources, javadoc)
+      results_by_conf.update(non_default_conf_results)
+
+    return results_by_conf
+
+
+  def _get_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve, pants_workdir,
+                                pinned_coords):
     def construct_classifier_to_jar(jars):
       """
       Reshape jars by classifier
@@ -272,48 +290,81 @@ class CoursierMixin(NailgunTask):
 
     # Divide the resolve by classifier because coursier treats classifier option globally.
     classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
-
     # Variable to store coursier each run.
-    results = {}
-
+    results = defaultdict(list)
     for classifier, classified_jars in classifier_to_jars.items():
 
       coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
       safe_mkdir(coursier_work_temp_dir)
       with temporary_file(coursier_work_temp_dir, cleanup=False) as f:
         output_fn = f.name
-        common_args.extend(['--json-output-file', output_fn])
 
-      cmd_args = self._construct_cmd_args(classified_jars, classifier, common_args,
+      cmd_args = self._construct_cmd_args(classified_jars,
+                                          classifier,
+                                          common_args,
                                           global_excludes if self.get_options().allow_global_excludes else [],
-                                          pinned_coords, coursier_work_temp_dir)
+                                          pinned_coords,
+                                          coursier_work_temp_dir,
+                                          output_fn)
 
-      with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
-
-        return_code = self.runjava(
-          classpath=[coursier_jar],
-          main='coursier.cli.Coursier',
-          args=cmd_args,
-          jvm_options=self.get_options().jvm_options,
-          # to let stdout/err through, but don't print tool's label.
-          workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
-
-        workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
-
-        if return_code:
-          raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
-
-        with open(output_fn) as f:
-          result = json.loads(f.read())
-          results[classifier] = result
+      results['default'].append(self._call_coursier(cmd_args, coursier_jar, output_fn))
 
     return results
 
+  def _get_non_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve, pants_workdir,
+                                    pinned_coords, sources, javadoc):
+
+    # To prevent improper api usage during development. User should not see this anyway.
+    if not sources and not javadoc:
+      raise TaskError("sources or javadoc has to be True.")
+
+    coursier_work_temp_dir = os.path.join(pants_workdir, 'tmp')
+    safe_mkdir(coursier_work_temp_dir)
+    with temporary_file(coursier_work_temp_dir, cleanup=False) as f:
+      output_fn = f.name
+
+    results = defaultdict(list)
+
+    special_args = []
+    if sources:
+      special_args.append('--sources')
+
+    if javadoc:
+      special_args.append('--javadoc')
+
+    cmd_args = self._construct_cmd_args(jars_to_resolve, '', common_args,
+                                        global_excludes if self.get_options().allow_global_excludes else [],
+                                        pinned_coords, coursier_work_temp_dir, output_fn)
+    cmd_args.extend(special_args)
+
+    results['src_doc'] = [self._call_coursier(cmd_args, coursier_jar, output_fn)]
+    return results
+
+  def _call_coursier(self, cmd_args, coursier_jar, output_fn):
+    # runjava already contains workunit
+    return_code = self.runjava(
+      classpath=[coursier_jar],
+      main='coursier.cli.Coursier',
+      args=cmd_args,
+      jvm_options=self.get_options().jvm_options,
+      # to let stdout/err through, but don't print tool's label.
+      workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+
+    if return_code:
+      raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+
+    with open(output_fn) as f:
+      result = json.loads(f.read())
+      return result
+
   @staticmethod
   def _construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
-                          pinned_coords, coursier_workdir):
+                          pinned_coords, coursier_workdir, json_output_path):
+
+    # Make a copy, so there is no side effect or others using `common_args`
     cmd_args = list(common_args)
 
+    cmd_args.extend(['--json-output-file', json_output_path])
     # Append classifier if not default
     if classifier != '':
       cmd_args.extend(['--classifier', classifier])
@@ -362,7 +413,7 @@ class CoursierMixin(NailgunTask):
 
     return cmd_args
 
-  def _load_json_result(self, compile_classpath, coursier_cache_path, invalidation_check,
+  def _load_json_result(self, conf, compile_classpath, coursier_cache_path, invalidation_check,
                         pants_jar_path_base, result):
     """
     Given a coursier run result, load it into compile_classpath by target.
@@ -411,7 +462,7 @@ class CoursierMixin(NailgunTask):
           if final_simple_coord:
             transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
             if transitive_resolved_jars:
-              compile_classpath.add_jars_for_targets([t], 'default', transitive_resolved_jars)
+              compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
 
   def _populate_results_dir(self, vts_results_dir, results):
 
@@ -431,14 +482,15 @@ class CoursierMixin(NailgunTask):
 
     with open(result_file_path, 'r') as f:
       results = json.load(f)
-      for classifier, result in results.items():
-        try:
-          self._load_json_result(compile_classpath,
-                                 coursier_cache_path,
-                                 invalidation_check,
-                                 pants_jar_path_base, result)
-        except CoursierResultNotFound:
-          return False
+      for conf, result_list in results.items():
+        for result in result_list:
+          try:
+            self._load_json_result(conf, compile_classpath,
+                                   coursier_cache_path,
+                                   invalidation_check,
+                                   pants_jar_path_base, result)
+          except CoursierResultNotFound:
+            return False
 
     return True
 
@@ -586,7 +638,7 @@ class CoursierResolve(CoursierMixin):
                                                         init_func=ClasspathProducts.init_func(
                                                           self.get_options().pants_workdir))
 
-    self.resolve(self.context.targets(), classpath_products)
+    self.resolve(self.context.targets(), classpath_products, sources=False, javadoc=False)
 
 
 class CoursierResolveFingerprintStrategy(FingerprintStrategy):
