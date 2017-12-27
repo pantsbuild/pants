@@ -39,7 +39,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     :rtype: dict
     """
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    args = ['--resolver-resolver=coursier', 'export',
+    args = ['export',
             '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     if load_libs and only_default:
@@ -148,33 +148,27 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertIsNotNone(shapeless_lib['sources'])
       self.assertIsNotNone(shapeless_lib['javadoc'])
 
-  # This test fails when the `PANTS_IVY_CACHE_DIR` is set to something that isn't
-  # the default location.  The set cache_dir likely needs to be plumbed down
-  # to the sub-invocation of pants.
-  # See https://github.com/pantsbuild/pants/issues/3126
-  def test_ivy_classifiers(self):
+  def test_classifiers(self):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/tests/java/org/pantsbuild/testproject/ivyclassifier:ivyclassifier'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      ivy_subsystem = global_subsystem_instance(IvySubsystem)
-      ivy_cache_dir = ivy_subsystem.get_options().cache_dir
       avro_lib_info = json_data.get('libraries').get('org.apache.avro:avro:1.7.7')
       self.assertIsNotNone(avro_lib_info)
-      self.assertEquals(
+      self.assertIn(
+        'avro-1.7.7.jar',
         avro_lib_info.get('default'),
-        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7.jar')
       )
-      self.assertEquals(
+      self.assertIn(
+        'avro-1.7.7-tests.jar',
         avro_lib_info.get('tests'),
-        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/jars/avro-1.7.7-tests.jar')
       )
-      self.assertEquals(
+      self.assertIn(
+        'avro-1.7.7-javadoc.jar',
         avro_lib_info.get('javadoc'),
-        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/javadocs/avro-1.7.7-javadoc.jar')
       )
-      self.assertEquals(
+      self.assertIn(
+        'avro-1.7.7-sources.jar',
         avro_lib_info.get('sources'),
-        os.path.join(ivy_cache_dir, 'org.apache.avro/avro/sources/avro-1.7.7-sources.jar')
       )
 
   def test_distributions_and_platforms(self):
