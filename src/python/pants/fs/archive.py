@@ -22,7 +22,7 @@ from pants.util.strutil import ensure_text
 class Archiver(AbstractClass):
 
   @classmethod
-  def extract(cls, path, outdir, filter_func=None, safe=False):
+  def extract(cls, path, outdir, filter_func=None):
     """Extracts an archive's contents to the specified outdir with an optional filter.
 
     :API: public
@@ -31,16 +31,11 @@ class Archiver(AbstractClass):
     :param string outdir: directory to extract files into
     :param function filter_func: optional filter with the filename as the parameter.  Returns True
       if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
-    :param bool safe: True if use safe extraction.  Safe extraction ignores errors if destination
-      already exists and thus is safe to use in different threads / concurrent processes.
     """
-    if safe:
-      with temporary_dir() as temp_dir:
-        cls._extract(path, temp_dir)
-        safe_concurrent_rename(temp_dir, outdir)
-    else:
-      # Leave the existing default behavior unchanged.
-      cls._extract(path, outdir, filter_func=filter_func)
+    # TODO(unrememberme): consider safe_concurrent_creation after it is made UNICODE safe.
+    with temporary_dir() as temp_dir:
+      cls._extract(path, temp_dir, filter_func=filter_func)
+      safe_concurrent_rename(temp_dir, outdir)
 
   @classmethod
   def _extract(cls, path, outdir):
