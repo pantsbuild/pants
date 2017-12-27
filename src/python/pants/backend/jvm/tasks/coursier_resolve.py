@@ -123,7 +123,8 @@ class CoursierMixin(NailgunTask):
       # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
-      confs_for_fingerprint = (['sources'] if sources else []) + (['javadoc'] if javadoc else [])
+      # ['sources'] * False = [], ['sources'] * True = ['sources']
+      confs_for_fingerprint = ['sources'] * sources + ['javadoc'] * javadoc
       fs_strategy = CoursierResolveFingerprintStrategy(confs_for_fingerprint)
 
       with self.invalidated(target_subset,
