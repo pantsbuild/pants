@@ -32,8 +32,7 @@ class Archiver(AbstractClass):
     :param function filter_func: optional filter with the filename as the parameter.  Returns True
       if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
     :param bool safe: True if use safe extraction.  Safe extraction ignores errors if destination
-      already exists and thus is safe to extract same archive in different threads / concurrent
-      processes.
+      already exists and thus is safe to use in different threads / concurrent processes.
     """
     if safe:
       with temporary_dir() as temp_dir:
