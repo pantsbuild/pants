@@ -155,8 +155,6 @@ class CoursierMixin(NailgunTask):
         results = self._get_result_from_coursier(jars_to_resolve, global_excludes, pinned_coords, pants_workdir,
                                                  coursier_cache_dir, sources, javadoc)
 
-        print(json.dumps(results, indent=2))
-
         for conf, result_list in results.items():
           for result in result_list:
             self._load_json_result(conf, compile_classpath, coursier_cache_dir, invalidation_check,
@@ -264,7 +262,6 @@ class CoursierMixin(NailgunTask):
 
     return results_by_conf
 
-
   def _get_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve, pants_workdir,
                                 pinned_coords):
     def construct_classifier_to_jar(jars):
@@ -341,21 +338,24 @@ class CoursierMixin(NailgunTask):
     return results
 
   def _call_coursier(self, cmd_args, coursier_jar, output_fn):
-    # runjava already contains workunit
-    return_code = self.runjava(
-      classpath=[coursier_jar],
-      main='coursier.cli.Coursier',
-      args=cmd_args,
-      jvm_options=self.get_options().jvm_options,
-      # to let stdout/err through, but don't print tool's label.
-      workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
 
-    if return_code:
-      raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+    with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
 
-    with open(output_fn) as f:
-      result = json.loads(f.read())
-      return result
+      return_code = self.runjava(
+        classpath=[coursier_jar],
+        main='coursier.cli.Coursier',
+        args=cmd_args,
+        jvm_options=self.get_options().jvm_options,
+        # to let stdout/err through, but don't print tool's label.
+        workunit_labels=[WorkUnitLabel.TOOL, WorkUnitLabel.SUPPRESS_LABEL])
+
+      workunit.set_outcome(WorkUnit.FAILURE if return_code else WorkUnit.SUCCESS)
+
+      if return_code:
+        raise TaskError('The coursier process exited non-zero: {0}'.format(return_code))
+
+      with open(output_fn) as f:
+        return json.loads(f.read())
 
   @staticmethod
   def _construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
