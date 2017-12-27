@@ -22,15 +22,26 @@ from pants.util.strutil import ensure_text
 class Archiver(AbstractClass):
 
   @classmethod
-  def extract(cls, path, outdir, safe=False):
-    """Extracts an archive's contents to the specified outdir."""
+  def extract(cls, path, outdir, filter_func=None, safe=False):
+    """Extracts an archive's contents to the specified outdir with an optional filter.
+
+    :API: public
+
+    :param string path: path to the zipfile to extract from
+    :param string outdir: directory to extract files into
+    :param function filter_func: optional filter with the filename as the parameter.  Returns True
+      if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
+    :param bool safe: True if use safe extraction.  Safe extraction ignores errors if destination
+      already exists and thus is safe to extract same archive in different threads / concurrent
+      processes.
+    """
     if safe:
       with temporary_dir() as temp_dir:
         cls._extract(path, temp_dir)
         safe_concurrent_rename(temp_dir, outdir)
     else:
       # Leave the existing default behavior unchanged.
-      cls._extract(path, outdir)
+      cls._extract(path, outdir, filter_func=filter_func)
 
   @classmethod
   def _extract(cls, path, outdir):
@@ -51,10 +62,7 @@ class TarArchiver(Archiver):
   """
 
   @classmethod
-  def _extract(cls, path, outdir):
-    """
-    :API: public
-    """
+  def _extract(cls, path, outdir, **kwargs):
     with open_tar(path, errorlevel=1) as tar:
       tar.extractall(outdir)
 
@@ -85,16 +93,8 @@ class ZipArchiver(Archiver):
   """
 
   @classmethod
-  def _extract(cls, path, outdir, filter_func=None):
-    """Extract from a zip file, with an optional filter
-
-    :API: public
-
-    :param string path: path to the zipfile to extract from
-    :param string outdir: directory to extract files into
-    :param function filter_func: optional filter with the filename as the parameter.  Returns True if
-      the file should be extracted.
-    """
+  def _extract(cls, path, outdir, filter_func=None, **kwargs):
+    """Extract from a zip file, with an optional filter."""
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.
