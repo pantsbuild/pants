@@ -123,10 +123,13 @@ class CoursierMixin(NailgunTask):
       # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
       raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
 
+      confs_for_fingerprint = (['sources'] if sources else []) + (['javadoc'] if javadoc else [])
+      fs_strategy = CoursierResolveFingerprintStrategy(confs_for_fingerprint)
+
       with self.invalidated(target_subset,
                             invalidate_dependents=False,
                             silent=False,
-                            fingerprint_strategy=CoursierResolveFingerprintStrategy([])) as invalidation_check:
+                            fingerprint_strategy=fs_strategy) as invalidation_check:
 
         if not invalidation_check.all_vts:
           continue
@@ -287,7 +290,8 @@ class CoursierMixin(NailgunTask):
 
     # Divide the resolve by classifier because coursier treats classifier option globally.
     classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
-    # Variable to store coursier each run.
+
+    # Variable to store coursier result each run.
     results = defaultdict(list)
     for classifier, classified_jars in classifier_to_jars.items():
 
@@ -334,6 +338,7 @@ class CoursierMixin(NailgunTask):
                                         pinned_coords, coursier_work_temp_dir, output_fn)
     cmd_args.extend(special_args)
 
+    # sources and/or javadoc share the same conf
     results['src_doc'] = [self._call_coursier(cmd_args, coursier_jar, output_fn)]
     return results
 
