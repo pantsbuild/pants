@@ -115,11 +115,12 @@ class DaemonPantsRunner(ProcessManager):
            (ChunkType.STDOUT, ChunkType.STDERR),
            None,
            (stdout_isatty, stderr_isatty)
-         ) as ((stdout, stderr), writer),\
-         NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin,\
-         stdio_as(stdout_fd=stdout.fileno(), stderr_fd=stderr.fileno(), stdin_fd=stdin.fileno()):
+         ) as ((stdout_fd, stderr_fd), writer),\
+         NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin_fd,\
+         stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
       # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
       # exit chunk, to avoid any socket shutdown vs write races.
+      stdout, stderr = sys.stdout, sys.stderr
       def finalizer():
         try:
           stdout.flush()
