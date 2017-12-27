@@ -39,7 +39,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     :rtype: dict
     """
     export_out_file = os.path.join(workdir, 'export_out.txt')
-    args = ['export',
+    args = ['--resolver-resolver=ivy', 'export',
             '--output-file={out_file}'.format(out_file=export_out_file)] + maybe_list(test_target)
     libs_args = ['--no-export-libraries'] if not load_libs else self._confs_args
     if load_libs and only_default:
@@ -100,7 +100,7 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       json_data = self.run_export(test_target,
                                   workdir,
                                   load_libs=True,
-                                  extra_args=['--resolve-ivy-soft-excludes'])
+                                  extra_args=['--export-soft-excludes'])
       self.assertIsNotNone(json_data
                            .get('libraries')
                            .get('com.martiansoftware:nailgun-server:0.9.1'))

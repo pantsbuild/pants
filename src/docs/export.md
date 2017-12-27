@@ -168,6 +168,10 @@ The following is an abbreviated export file from a command in the pants repo:
 
 # Export Format Changes
 
+## 1.0.10
+
+Coursier is added to be an option for the resolve path which ignores the confs for library sources and javadoc yet.
+
 ## 1.0.9
 
 Added 'is_target_root' field to target
