@@ -37,8 +37,7 @@ class CoursierMixin(NailgunTask):
   Experimental 3rdparty resolver using coursier.
 
   TODO(wisechengyi):
-  1. Add conf support
-  2. Add relative url support
+  1. Add relative url support
   """
 
   RESULT_FILENAME = 'result'
