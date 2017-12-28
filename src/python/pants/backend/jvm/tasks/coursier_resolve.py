@@ -189,7 +189,7 @@ class CoursierMixin(NailgunTask):
     Calling coursier and return the result per invocation.
 
     If coursier was called once for classifier '' and once for classifier 'tests', then the return value
-    would be: {'default': [<first couriser output>, <second coursier output>]}
+    would be: {'default': [<first coursier output>, <second coursier output>]}
 
     :param jars_to_resolve: List of `JarDependency`s to resolve
     :param global_excludes: List of `M2Coordinate`s to exclude globally
