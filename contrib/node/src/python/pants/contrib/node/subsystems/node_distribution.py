@@ -100,7 +100,7 @@ class NodeDistribution(object):
       supportdir=supportdir, version=version, name=filename)
     logger.debug('Tarball for %s(%s): %s', supportdir, version, tarball_filepath)
     work_dir = os.path.dirname(tarball_filepath)
-    TGZ.extract(tarball_filepath, work_dir)
+    TGZ.extract(tarball_filepath, work_dir, safe=True)
     return work_dir
 
   @memoized_method
