@@ -6,11 +6,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.python.tasks.python_isort import IsortPythonTask
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
 
 
 class PythonIsortTest(PantsRunIntegrationTest):
 
+  @ensure_daemon
   def test_isort_no_python_sources_should_noop(self):
     command = ['-ldebug',
                'fmt.isort',

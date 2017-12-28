@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import sys
 
 import mock
 
@@ -59,15 +60,14 @@ class PantsDaemonTest(BaseTest):
     self.mock_service = mock.create_autospec(PantsService, spec_set=True)
 
   @mock.patch('os.close', **PATCH_OPTS)
-  def test_close_fds(self, mock_close):
-    mock_fd = mock.Mock()
-    mock_fd.fileno.side_effect = [0, 1, 2]
-
-    with stdio_as(mock_fd, mock_fd, mock_fd):
-      self.pantsd._close_fds()
-
-    self.assertEquals(mock_fd.close.call_count, 3)
-    mock_close.assert_has_calls(mock.call(x) for x in [0, 1, 2])
+  def test_close_stdio(self, mock_close):
+    with stdio_as(-1, -1, -1):
+      handles = (sys.stdin, sys.stdout, sys.stderr)
+      fds = [h.fileno() for h in handles]
+      self.pantsd._close_stdio()
+      mock_close.assert_has_calls(mock.call(x) for x in fds)
+      for handle in handles:
+        self.assertTrue(handle.closed, '{} was not closed'.format(handle))
 
   def test_shutdown(self):
     mock_thread = mock.Mock()
