@@ -180,7 +180,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def execute_export(self, *specs, **options_overrides):
     options = {
       JvmResolveSubsystem.options_scope: {
-        'resolver': 'coursier'
+        'resolver': 'ivy'
       },
       JvmPlatform.options_scope: {
         'default_platform': 'java6',
