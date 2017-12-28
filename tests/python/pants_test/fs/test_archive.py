@@ -24,7 +24,7 @@ class ArchiveTest(unittest.TestCase):
     return listing
 
   def round_trip(self, archiver, expected_ext, empty_dirs):
-    def test_round_trip(prefix=None):
+    def test_round_trip(prefix=None, safe=False):
       with temporary_dir() as fromdir:
         safe_mkdir(os.path.join(fromdir, 'a/b/c'))
         touch(os.path.join(fromdir, 'a/b/d/e.txt'))
@@ -40,7 +40,7 @@ class ArchiveTest(unittest.TestCase):
                   archive, expected_ext))
 
           with temporary_dir() as todir:
-            archiver.extract(archive, todir)
+            archiver.extract(archive, todir, safe=safe)
             fromlisting = self._listtree(fromdir, empty_dirs)
             if prefix:
               fromlisting = set(os.path.join(prefix, x) for x in fromlisting)
@@ -50,6 +50,7 @@ class ArchiveTest(unittest.TestCase):
 
     test_round_trip()
     test_round_trip(prefix='jake')
+    test_round_trip(safe=True)
 
   def test_tar(self):
     self.round_trip(archiver('tar'), expected_ext='tar', empty_dirs=True)
@@ -97,22 +98,3 @@ class ArchiveTest(unittest.TestCase):
     check_archive_with_flags('tgz', True)
     check_archive_with_flags('tbz2', False)
     check_archive_with_flags('tbz2', True)
-
-  def test_extract_to_exist_dir_with_no_error(self):
-
-    def test_extract_helper(archiver):
-      with temporary_dir() as fromdir:
-        safe_mkdir(os.path.join(fromdir, 'a/b/c'))
-        touch(os.path.join(fromdir, 'a/b/d/e.txt'))
-
-        with temporary_dir() as archivedir:
-          archive = archiver.create(fromdir, archivedir, 'archive')
-
-          with temporary_dir() as todir:
-            safe_mkdir(os.path.join(todir, 'e'))
-            touch(os.path.join(todir, 'e/f.txt'))
-            # Extract to existing dir gives no error
-            archiver.extract(archive, todir)
-
-    test_extract_helper(archiver('tar'))
-    test_extract_helper(archiver('zip'))
