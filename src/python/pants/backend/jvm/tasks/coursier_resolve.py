@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 import json
-import logging
 import os
 from collections import defaultdict
 
@@ -27,8 +26,6 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
-
-logger = logging.getLogger(__name__)
 
 
 class CoursierResultNotFound(Exception):
