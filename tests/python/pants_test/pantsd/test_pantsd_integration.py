@@ -291,9 +291,9 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       daemon_runs = [pantsd_run(cmd) for cmd in cmds]
       checker.await_pantsd()
 
-    for run in daemon_runs:
-      self.assertEqual(run.stderr_data.strip(), '')
-      self.assertNotEqual(run.stdout_data, '')
+    for cmd, run in zip(cmds, daemon_runs):
+      self.assertEqual(run.stderr_data.strip(), '', 'Non-empty stderr for {}'.format(cmd))
+      self.assertNotEqual(run.stdout_data, '', 'Empty stdout for {}'.format(cmd))
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))

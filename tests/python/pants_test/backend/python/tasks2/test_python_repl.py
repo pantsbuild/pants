@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import sys
 from contextlib import contextmanager
 from textwrap import dedent
 
@@ -19,7 +18,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.task.repl_task_mixin import ReplTaskMixin
-from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.contextutil import environment_as, stdio_as, temporary_dir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -70,20 +69,16 @@ class PythonReplTest(PythonTaskTestBase):
     ReplTaskMixin.reset_implementations()
 
   @contextmanager
-  def new_io(self, input):
-    orig_stdin, orig_stdout, orig_stderr = sys.stdin, sys.stdout, sys.stderr
+  def new_io(self, stdin_data):
     with temporary_dir() as iodir:
       stdin = os.path.join(iodir, 'stdin')
       stdout = os.path.join(iodir, 'stdout')
       stderr = os.path.join(iodir, 'stderr')
       with open(stdin, 'w') as fp:
-        fp.write(input)
+        fp.write(stdin_data)
       with open(stdin, 'rb') as inp, open(stdout, 'wb') as out, open(stderr, 'wb') as err:
-        sys.stdin, sys.stdout, sys.stderr = inp, out, err
-        try:
-          yield inp, out, err
-        finally:
-          sys.stdin, sys.stdout, sys.stderr = orig_stdin, orig_stdout, orig_stderr
+        with stdio_as(stdin_fd=inp.fileno(), stdout_fd=out.fileno(), stderr_fd=err.fileno()):
+          yield (stdin, stdout, stderr)
 
   def do_test_repl(self, code, expected, targets, options=None):
     if options:
@@ -123,7 +118,7 @@ class PythonReplTest(PythonTaskTestBase):
 
     with self.new_io('\n'.join(code)) as (inp, out, err):
       python_repl.execute()
-      with open(out.name) as fp:
+      with open(out) as fp:
         lines = fp.read()
         if not expected:
           self.assertEqual('', lines)
