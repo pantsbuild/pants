@@ -13,12 +13,10 @@ from twitter.common.collections import maybe_list
 
 from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
-from pants.ivy.ivy_subsystem import IvySubsystem
 from pants.util.process_handler import subprocess
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
 from pants_test.pants_run_integration_test import (PantsRunIntegrationTest, ensure_engine,
                                                    ensure_resolver)
-from pants_test.subsystem.subsystem_util import global_subsystem_instance
 
 
 class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
