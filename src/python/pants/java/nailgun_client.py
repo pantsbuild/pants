@@ -23,18 +23,18 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol):
   """Handles a single nailgun client session."""
 
-  def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
+  def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False):
     self._sock = sock
     self._input_writer = None
-    if in_fd:
+    if in_file:
       self._input_writer = NailgunStreamWriter(
-        (in_fd,),
+        (in_file.fileno(),),
         self._sock,
         (ChunkType.STDIN,),
         ChunkType.STDIN_EOF
       )
-    self._stdout = out_fd
-    self._stderr = err_fd
+    self._stdout = out_file
+    self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
 

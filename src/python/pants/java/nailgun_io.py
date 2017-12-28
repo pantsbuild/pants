@@ -117,7 +117,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   def __init__(self, in_fds, sock, chunk_types, chunk_eof_type, buf_size=None, select_timeout=None):
     """
-    :param tuple in_files: A tuple of input file-likes to read from.
+    :param tuple in_fds: A tuple of input file descriptors to read from.
     :param socket sock: the socket to emit nailgun protocol chunks over.
     :param tuple chunk_types: A tuple of chunk types with a 1:1 positional association with in_files.
     :param int chunk_eof_type: The nailgun chunk type for EOF (applies only to stdin).
@@ -125,7 +125,8 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
     """
     super(NailgunStreamWriter, self).__init__()
-    self._in_fds = list(in_fds[:])
+    # Validates that we've received file descriptor numbers.
+    self._in_fds = [int(f) for f in in_fds]
     self._socket = sock
     self._chunk_eof_type = chunk_eof_type
     self._buf_size = buf_size or io.DEFAULT_BUFFER_SIZE
