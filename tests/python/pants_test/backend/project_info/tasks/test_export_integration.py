@@ -72,7 +72,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       codegen_target_regex = os.path.join(os.path.relpath(workdir, get_buildroot()),
                                           'gen/thrift-java/[^/]*/[^/:]*/[^/:]*:{0}'.format(thrift_target_name))
       p = re.compile(codegen_target_regex)
-      print(json_data.get('targets').keys())
       self.assertTrue(any(p.match(target) for target in json_data.get('targets').keys()))
 
   @ensure_resolver
@@ -88,7 +87,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
     with self.temporary_workdir() as workdir:
       test_target = 'testprojects/src/java/org/pantsbuild/testproject/exclude:foo'
       json_data = self.run_export(test_target, workdir, load_libs=True)
-      print(json_data)
       self.assertIsNone(json_data
                         .get('libraries')
                         .get('com.typesafe.sbt:incremental-compiler:0.13.7'))
