@@ -4,6 +4,35 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev26 (12/30/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add [resolve.coursier] as an experimental task (#5133)
+  `PR #5133 <https://github.com/pantsbuild/pants/pull/5133>`_
+
+* mypy contrib plugin (#5172)
+  `PR #5172 <https://github.com/pantsbuild/pants/pull/5172>`_
+
+Bugfixes
+~~~~~~~~
+
+* Swap stdio file descriptors at the os level (#5247)
+  `PR #5247 <https://github.com/pantsbuild/pants/pull/5247>`_
+
+* Don't render cancelled nodes in trace (#5252)
+  `PR #5252 <https://github.com/pantsbuild/pants/pull/5252>`_
+
+* Correction on ensure_resolver (#5250)
+  `PR #5250 <https://github.com/pantsbuild/pants/pull/5250>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Support fetching sources and javadoc in export using coursier (#5254)
+  `PR #5254 <https://github.com/pantsbuild/pants/pull/5254>`_
 
 1.4.0.dev25 (12/22/2017)
 ------------------------
