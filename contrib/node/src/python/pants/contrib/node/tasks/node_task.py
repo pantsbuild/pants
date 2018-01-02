@@ -77,41 +77,33 @@ class NodeTask(Task):
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 
-  def execute_npm(self, args, workunit_name, workunit_labels=None, node_paths=None):
-    """Executes npm passing the given args.
-
-    :param list args: The command line args to pass to `npm`.
-    :param string workunit_name: A name for the execution's work unit; defaults to 'npm'.
-    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param list node_paths: A list of node module paths to be included.
-    :returns: A tuple of (returncode, command).
-    :rtype: A tuple of (int,
-            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
+  def install_with_package_manager(
+    self, package_manager, install_optional=Fasle, node_paths=None,
+    workunit_name=None, workunit_labels=None):
+    """Install package using requested package_manager.
     """
+    command = self.node_distribution.package_manager_install_pacakges(
+      install_optional=install_optional,
+      node_paths=node_paths,
+      package_manager=package_manager
+    )
+    return self._execute_command(
+      command, workunit_name=workunit_name, workunit_labels=workunit_labels)
 
-    npm_command = self.node_distribution.npm_command(args=args, node_paths=node_paths)
-    return self._execute_command(npm_command,
-                                 workunit_name=workunit_name,
-                                 workunit_labels=workunit_labels)
+  def run_target_script(
+    self, target, script_name, script_args=None, node_paths=None,
+    workunit_name=None, workunit_labels=None):
+    package_manager = target.payload.get_field('package_manager').value
+    command = self.node_distribution.package_manager_run_script(
+      script_name,
+      script_args=script_args,
+      node_paths=node_paths,
+      package_manager=package_manager
+    )
+    return self._execute_command(
+      command, workunit_name=workunit_name, workunit_labels=workunit_labels)
 
-  def execute_yarnpkg(self, args, workunit_name, workunit_labels=None, node_paths=None):
-    """Executes npm passing the given args.
-
-    :param list args: The command line args to pass to `yarnpkg`.
-    :param string workunit_name: A name for the execution's work unit; defaults to 'yarnpkg'.
-    :param list workunit_labels: Any extra :class:`pants.base.workunit.WorkUnitLabel`s to apply.
-    :param list node_paths: A list of node module paths to be included.
-    :returns: A tuple of (returncode, command).
-    :rtype: A tuple of (int,
-            :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
-    """
-
-    yarnpkg_command = self.node_distribution.yarnpkg_command(args=args, node_paths=node_paths)
-    return self._execute_command(yarnpkg_command,
-                                 workunit_name=workunit_name,
-                                 workunit_labels=workunit_labels)
-
-  def _execute_command(self, command, workunit_name, workunit_labels=None):
+  def _execute_command(self, command, workunit_name=None, workunit_labels=None):
     """Executes a node or npm command via self._run_node_distribution_command.
 
     :param NodeDistribution.Command command: The command to run.

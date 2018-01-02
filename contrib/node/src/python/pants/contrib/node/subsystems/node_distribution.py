@@ -33,7 +33,7 @@ class NodeDistribution(object):
     @classmethod
     def register_options(cls, register):
       super(NodeDistribution.Factory, cls).register_options(register)
-      register('--supportdir', advanced=True, default='bin/node',
+      register('--supportdir', advanced=True, default='bin',
                help='Find the Node distributions under this dir.  Used as part of the path to '
                     'lookup the distribution with --binary-util-baseurls and --pants-bootstrapdir')
       register('--version', advanced=True, default='6.9.1',
@@ -57,11 +57,104 @@ class NodeDistribution(object):
         package_manager=options.package_manager,
         yarnpkg_version=options.yarnpkg_version)
 
+  class ToolBinary(object):
+
+    def __init__(self, tool_name, version=None):
+      self.tool_name = tool_name
+      self.version = self._normalize_version(version) if version else None
+
+    @staticmethod
+    def _normalize_version(version):
+      # The versions reported by node and embedded in distribution package names are 'vX.Y.Z' and not
+      # 'X.Y.Z'.
+      return version if version.startswith('v') else 'v' + version
+
+    def _get_path_vars(self):
+      raise NotImplementedError
+
+    def _get_bin_dir(self):
+      raise NotImplementedError
+
+    @memoized_property
+    def bin_dir(self):
+      return self._get_bin_dir()
+
+    @memoized_property
+    def bin_path(self):
+      return os.path.join(self.bin_dir, self.tool_name)
+
+    @memoized_property
+    def path_vars(self):
+      return self._get_path_vars()
+
+  class InstallableToolBinary(ToolBinary):
+
+    def __init__(self, binary_util, supportdir, tool_name, version=None, tool_dir_name=None):
+      super(InstallableToolBinary, self).__init__(tool_name, version=version)
+      self._binary_util = binary_util
+      self._tool_dir_name = tool_dir_name or self.tool_name
+      if supportdir.endswith(self._tool_dir_name):
+        self._supportdir = supportdir
+      else:
+        self._supportdir = os.path.join(supportdir, self._tool_dir_name)
+      self._bin_dir = None
+
+    def unpack_package(self, filename, relative_bin_path):
+      tarball_filepath = self._binary_util.select_binary(
+        supportdir=self._supportdir, version=self.version, name=filename)
+      logger.debug('Tarball for %s(%s): %s', self._supportdir, self.version, tarball_filepath)
+      workdir = os.path.dirname(tarball_filepath)
+      TGZ.extract(tarball_filepath, workdir)
+      self._bin_dir = os.path.join(workdir, relative_bin_path)
+      return self._bin_dir
+
+    def _get_tool_installation_params(self):
+      raise NotImplementedError
+
+    def _get_bin_dir(self):
+      return self.unpack_package(*self._get_tool_installation_params())
+
+  class NodeBinary(InstallableToolBinary):
+    def __init__(self, binary_util, supportdir, version):
+      super(NodeBinary, self).__init__(binary_util, supportdir, 'node', version=version)
+
+    def _get_tool_installation_params(self):
+      # Todo: https://github.com/pantsbuild/pants/issues/4431
+      # This line depends on repacked node distribution.
+      # Should change it from 'node/bin' to 'dist/bin'
+      return ('node.tar.gz', 'node/bin')
+
+    def _get_path_vars(self):
+      return [self.bin_dir]
+
+  class YarnBinary(InstallableToolBinary):
+    def __init__(self, binary_util, supportdir, version, node_binary):
+      super(YarnBinary, self).__init__(binary_util, supportdir, 'yarnpkg', version=version)
+      self._node_binary = node_binary
+
+    def _get_tool_installation_params(self):
+      return ('yarnpkg.tar.gz', 'dist/bin')
+
+    def _get_path_vars(self):
+      return [self._node_binary.bin_dir, self.bin_dir]
+
+  class NpmBinary(ToolBinary):
+    def __init__(self, node_binary):
+      super(NpmBinary, self).__init__('npm', version=None)
+      self._node_binary = node_binary
+
+    def _get_bin_dir(self):
+      return self._node_binary.bin_dir
+
+    def _get_path_vars(self):
+      return [self._node_binary.bin_dir]
+
   PACKAGE_MANAGER_NPM = 'npm'
   PACKAGE_MANAGER_YARNPKG = 'yarnpkg'
   VALID_PACKAGE_MANAGER_LIST = {
     'npm': PACKAGE_MANAGER_NPM,
-    'yarn': PACKAGE_MANAGER_YARNPKG
+    'yarn': PACKAGE_MANAGER_YARNPKG,  # Allow yarn use as an alias for yarnpkg
+    'yarnpkg': PACKAGE_MANAGER_YARNPKG,
   }
 
   @classmethod
@@ -71,64 +164,14 @@ class NodeDistribution(object):
     package_manager = cls.VALID_PACKAGE_MANAGER_LIST[package_manager]
     return package_manager
 
-  @classmethod
-  def _normalize_version(cls, version):
-    # The versions reported by node and embedded in distribution package names are 'vX.Y.Z' and not
-    # 'X.Y.Z'.
-    return version if version.startswith('v') else 'v' + version
-
   def __init__(self, binary_util, supportdir, version, package_manager, yarnpkg_version):
-    self._binary_util = binary_util
-    self._supportdir = supportdir
-    self._version = self._normalize_version(version)
     self.package_manager = self.validate_package_manager(package_manager=package_manager)
-    self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
-    logger.debug('Node.js version: %s package manager from config: %s',
-                 self._version, package_manager)
-
-  @property
-  def version(self):
-    """Returns the version of the Node distribution.
-
-    :returns: The Node distribution version number string.
-    :rtype: string
-    """
-    return self._version
-
-  def unpack_package(self, supportdir, version, filename):
-    tarball_filepath = self._binary_util.select_binary(
-      supportdir=supportdir, version=version, name=filename)
-    logger.debug('Tarball for %s(%s): %s', supportdir, version, tarball_filepath)
-    work_dir = os.path.dirname(tarball_filepath)
-    TGZ.extract(tarball_filepath, work_dir)
-    return work_dir
-
-  @memoized_method
-  def install_node(self):
-    """Install the Node distribution from pants support binaries.
-
-    :returns: The Node distribution bin path.
-    :rtype: string
-    """
-    node_package_path = self.unpack_package(
-      supportdir=self._supportdir, version=self.version, filename='node.tar.gz')
-    # Todo: https://github.com/pantsbuild/pants/issues/4431
-    # This line depends on repacked node distribution.
-    # Should change it from 'node/bin' to 'dist/bin'
-    node_bin_path = os.path.join(node_package_path, 'node', 'bin')
-    return node_bin_path
-
-  @memoized_method
-  def install_yarnpkg(self):
-    """Install the Yarnpkg distribution from pants support binaries.
-
-    :returns: The Yarnpkg distribution bin path.
-    :rtype: string
-    """
-    yarnpkg_package_path = self.unpack_package(
-      supportdir='bin/yarnpkg', version=self.yarnpkg_version, filename='yarnpkg.tar.gz')
-    yarnpkg_bin_path = os.path.join(yarnpkg_package_path, 'dist', 'bin')
-    return yarnpkg_bin_path
+    self._node_instance = NodeBinary(binary_util, supportdir, version)
+    self._package_managers_dict = {
+      self.PACKAGE_MANAGER_NPM: NpmBinary(self._node_instance)
+      self.PACKAGE_MANAGER_YARNPKG: YarnBianry(binary_util, supportdir, yarnpkg_version)
+    }
+    logger.debug('Node.js version: %s package manager from config: %s', version, package_manager)
 
   class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
     """Describes a command to be run using a Node distribution."""
@@ -140,7 +183,7 @@ class NodeDistribution(object):
       :returns: The full command line used to spawn this command as a list of strings.
       :rtype: list
       """
-      return [self.executable] + (self.args or [])
+      return [self.executable.bin_path] + (self.args or [])
 
     def _prepare_env(self, kwargs):
       """Returns a modifed copy of kwargs['env'], and a copy of kwargs with 'env' removed.
@@ -154,7 +197,10 @@ class NodeDistribution(object):
       """
       kwargs = kwargs.copy()
       env = kwargs.pop('env', os.environ).copy()
-      env['PATH'] = os.path.pathsep.join(self.extra_paths + [env.get('PATH', '')])
+      env['PATH'] = os.path.pathsep.join(
+        self.executable.path_vars +
+        self.extra_paths +
+        [env.get('PATH', '')])
       return env, kwargs
 
     def run(self, **kwargs):
@@ -182,11 +228,9 @@ class NodeDistribution(object):
     def __str__(self):
       return ' '.join(self.cmd)
 
-  def _command_gen(self, tool_installations, tool_executable, args=None, node_paths=None):
+  def _command_gen(self, tool_executable, args=None, node_paths=None):
     """Generate a Command object with requires tools installed and paths setup.
 
-    :param list tool_installations: A list of functions to install required tools.  Those functions
-      should take no parameter and return an installation path to be included in the runtime path.
     :param tool_executable: Name of the tool to be executed.
     :param list args: A list of arguments to be passed to the executable
     :param list node_paths: A list of path to node_modules.  node_modules/.bin will be appended
@@ -195,8 +239,6 @@ class NodeDistribution(object):
     """
     NODE_MODULE_BIN_DIR = 'node_modules/.bin'
     extra_paths = []
-    for t in tool_installations:
-      extra_paths.append(t())
     if node_paths:
       for node_path in node_paths:
         if not node_path.endswith(NODE_MODULE_BIN_DIR):
@@ -213,23 +255,41 @@ class NodeDistribution(object):
     """
     # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
     # `node` with no arguments is useful, it launches a REPL.
-    return self._command_gen([self.install_node], 'node', args=args, node_paths=node_paths)
+    return self._command_gen(self._node_instance, args=args, node_paths=node_paths)
 
-  def npm_command(self, args, node_paths=None):
-    """Creates a command that can run `npm`, passing the given args to it.
-
-    :param list args: A list of arguments to pass to `npm`.
-    :returns: An `npm` command that can be run later.
-    :rtype: :class:`NodeDistribution.Command`
-    """
-    return self._command_gen([self.install_node], 'npm', args=args, node_paths=node_paths)
-
-  def yarnpkg_command(self, args, node_paths=None):
-    """Creates a command that can run `yarnpkg`, passing the given args to it.
-
-    :param list args: A list of arguments to pass to `yarnpkg`.
-    :returns: An `yarnpkg` command that can be run later.
-    :rtype: :class:`NodeDistribution.Command`
-    """
+  def package_manager_install_pacakges(
+    self, install_optional=False, node_paths=None, package_manager=None):
+    package_manager = (
+      self.validate_package_manager(package_manager) if package_manager
+      else self.package_manager
+    )
+    package_manager_args = {
+      (self.PACKAGE_MANAGER_NPM, True): ['install'],
+      (self.PACKAGE_MANAGER_NPM, False): ['install', '--no-optional'],
+      (self.PACKAGE_MANAGER_YARNPKG, True): [],
+      (self.PACKAGE_MANAGER_YARNPKG, False): ['--ignore-optional'],
+    }[(package_manager, install_optional)]
     return self._command_gen(
-      [self.install_node, self.install_yarnpkg], 'yarnpkg', args=args, node_paths=node_paths)
+      self._package_managers_dict[package_manager],
+      args=package_manager_args,
+      node_paths=node_paths
+    )
+
+  def package_manager_run_script(
+    self, script_name, script_args=None, node_paths=None, package_manager=None):
+    package_manager = (
+      self.validate_package_manager(package_manager) if package_manager
+      else self.package_manager
+    )
+    package_manager_args = {
+      self.PACKAGE_MANAGER_NPM: ['run-script', script_name],
+      self.PACKAGE_MANAGER_YARNPKG: ['run', script_name],
+    }[package_manager]
+    if script_args:
+      package_manager_args.append('--')
+      package_manager_args.extend(script_args)
+    return self._command_gen(
+      self._package_managers_dict[package_manager],
+      args=package_manager_args,
+      node_paths=node_paths
+    )

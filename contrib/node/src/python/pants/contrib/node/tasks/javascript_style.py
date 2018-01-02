@@ -77,7 +77,7 @@ class JavascriptStyle(NodeTask):
   @memoized_method
   def _install_javascriptstyle(self, javascriptstyle_dir):
     with pushd(javascriptstyle_dir):
-      result, yarn_add_command = self.execute_yarnpkg(
+      result, yarn_add_command = self.install_pacakge(
         args=['install'],
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
