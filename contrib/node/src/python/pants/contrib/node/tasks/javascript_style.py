@@ -146,17 +146,13 @@ class JavascriptStyle(NodeTask):
     if other_args:
       args.extend(other_args)
     args.extend(files)
-    # TODO: Ignore patterns based on targets
     with pushd(bootstrap_dir):
       result, yarn_run_command = self.execute_yarnpkg(
         args=args,
         workunit_name=target.address.reference(),
         workunit_labels=[WorkUnitLabel.PREP])
       self.context.log.debug('Javascript style command: {}'.format(yarn_run_command))
-      if result != 0 and not self.get_options().fail_slow:
-        raise TaskError('Javascript style failed: \n'
-                        '{} failed with exit code {}'.format(yarn_run_command, result))
-    return result
+    return (result, yarn_run_command)
 
   def execute(self):
     if self.get_options().skip:
@@ -179,13 +175,17 @@ class JavascriptStyle(NodeTask):
     for target in targets:
       files = self.get_javascript_sources(target)
       if files:
-        result_code = self._run_javascriptstyle(target,
-                                                bootstrap_dir,
-                                                files,
-                                                config=self.eslint_distribution.eslint_config,
-                                                ignore_path=self.eslint_distribution._eslint_ignore)
+        result_code, command = self._run_javascriptstyle(target,
+                                                         bootstrap_dir,
+                                                         files,
+                                                         config=self.eslint_distribution.eslint_config,
+                                                         ignore_path=self.eslint_distribution._eslint_ignore)
         if result_code != 0:
-          failed_targets.append(target)
+          if self.get_options().fail_slow:
+            raise TaskError('Javascript style failed: \n'
+                            '{} failed with exit code {}'.format(command, result_code))
+          else:
+            failed_targets.append(target)
 
     if failed_targets:
       msg = 'Failed when evaluating {} targets:\n  {}'.format(
