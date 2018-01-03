@@ -13,8 +13,7 @@
   ],
   "env": {
     "es6": true,
-    "node": true,
-    "mocha": true,
+    "node": true
   },
   "globals": {
     "document": false,
