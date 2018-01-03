@@ -18,6 +18,12 @@ def test():
   print(TEST_STR)
 
 
+def test_env():
+  """An alternate test entrypoint for exercising scrubbing."""
+  import os
+  print(os.environ.get('PANTS_ENTRYPOINT'))
+
+
 def main():
   exiter = Exiter()
   exiter.set_except_hook()
