@@ -579,6 +579,7 @@ python_library(
     ':resources_task',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
     'src/python/pants/util:dirutil',
   ],

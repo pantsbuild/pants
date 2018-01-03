@@ -120,6 +120,8 @@ python_library(
   sources = ['payload_field.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
+    ':deprecated',
+    ':hash_utils',
     'src/python/pants/util:meta',
   ]
 )
