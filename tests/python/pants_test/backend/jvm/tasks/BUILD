@@ -604,6 +604,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:resources_task',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
