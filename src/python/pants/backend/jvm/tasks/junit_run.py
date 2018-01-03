@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import fnmatch
 import functools
+import itertools
 import os
 import shutil
 import sys
@@ -39,7 +41,7 @@ from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import safe_mkdir, safe_mkdir_for, safe_rmtree
+from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree, safe_walk
 from pants.util.memo import memoized_method
 from pants.util.meta import AbstractClass
 from pants.util.strutil import pluralize
@@ -136,11 +138,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def implementation_version(cls):
     return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 2)]
 
+  _BATCH_ALL = sys.maxint
+
   @classmethod
   def register_options(cls, register):
     super(JUnitRun, cls).register_options(register)
 
-    register('--batch-size', advanced=True, type=int, default=sys.maxint, fingerprint=True,
+    register('--batch-size', advanced=True, type=int, default=cls._BATCH_ALL, fingerprint=True,
              help='Run at most this many tests in a single test process.')
     register('--test', type=list, fingerprint=True,
              help='Force running of just these tests.  Tests can be specified using any of: '
@@ -385,6 +389,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
         )
         yield chroot
 
+  @property
+  def _batched(self):
+    return self._batch_size != self._BATCH_ALL
+
   def _run_tests(self, test_registry, output_dir, coverage):
     coverage.instrument()
 
@@ -403,20 +411,27 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     classpath_product = self.context.products.get_data('instrument_classpath')
 
     result = 0
-    for properties, batch in self._partition(test_registry):
+    for batch_id, (properties, batch) in enumerate(self._partition(test_registry)):
       (workdir, platform, target_jvm_options, target_env_vars, concurrency, threads) = properties
+
+      batch_output_dir = output_dir
+      if self._batched:
+        batch_output_dir = os.path.join(batch_output_dir, 'batch-{}'.format(batch_id))
+
       # Batches of test classes will likely exist within the same targets: dedupe them.
       relevant_targets = {test_registry.get_owning_target(t) for t in batch}
+
       complete_classpath = OrderedSet()
       complete_classpath.update(classpath_prepend)
       complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
       complete_classpath.update(self.classpath(relevant_targets,
                                                classpath_product=classpath_product))
       complete_classpath.update(classpath_append)
+
       distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
 
       # Override cmdline args with values from junit_test() target that specify concurrency:
-      args = self._args(output_dir) + [u'-xmlreport']
+      args = self._args(batch_output_dir) + [u'-xmlreport']
 
       if concurrency is not None:
         args = remove_arg(args, '-default-parallel')
@@ -450,14 +465,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               workunit_name='run',
               workunit_labels=[WorkUnitLabel.TEST],
               cwd=chroot,
-              synthetic_jar_dir=output_dir,
+              synthetic_jar_dir=batch_output_dir,
               create_synthetic_jar=self.synthetic_classpath,
             )
             self.context.log.debug('JUnit subprocess exited with result ({})'
                                    .format(subprocess_result))
             result += abs(subprocess_result)
 
-        tests_info = self.parse_test_info(output_dir, parse_error_handler, ['classname'])
+        tests_info = self.parse_test_info(batch_output_dir, parse_error_handler, ['classname'])
         for test_name, test_info in tests_info.items():
           test_item = Test(test_info['classname'], test_name)
           test_target = test_registry.get_owning_target(test_item)
@@ -503,10 +518,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       lambda tgt: tgt.concurrency,
       lambda tgt: tgt.threads)
 
-    for properties, tests in tests_by_properties.items():
-      stride = min(self._batch_size, len(tests))
-      for i in range(0, len(tests), stride):
-        yield properties, tests[i:i + stride]
+    for properties, tests in sorted(tests_by_properties.items()):
+      sorted_tests = sorted(tests)
+      stride = min(self._batch_size, len(sorted_tests))
+      for i in range(0, len(sorted_tests), stride):
+        yield properties, sorted_tests[i:i + stride]
 
   def _get_possible_tests_to_run(self):
     buildroot = get_buildroot()
@@ -624,7 +640,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   @contextmanager
   def _isolation(self, all_targets):
     run_dir = '_runs'
-    output_dir = os.path.join(self.workdir, run_dir, Target.identify(all_targets))
+    batch_dir = str(self._batch_size) if self._batched else 'all'
+    output_dir = os.path.join(self.workdir, run_dir, Target.identify(all_targets), batch_dir)
     safe_mkdir(output_dir, clean=False)
 
     if self._html_report:
@@ -644,23 +661,46 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     try:
       yield output_dir, reports, coverage
     finally:
-      # NB: Deposit of the "current" test output in the root workdir (.pants.d/test/junit) is a
-      # defacto public API and so we implement that behavior here to maintain backwards
-      # compatibility for non-pants report file consumers.
-      # TODO(John Sirois): Deprecate this ~API and provide a stable directory solution for test
-      # output: https://github.com/pantsbuild/pants/issues/3879
       lock_file = '.file_lock'
       with OwnerPrintingInterProcessFileLock(os.path.join(self.workdir, lock_file)):
-        # Kill everything except the isolated `_runs/` dir.
-        for name in os.listdir(self.workdir):
-          path = os.path.join(self.workdir, name)
-          if name not in (run_dir, lock_file):
-            if os.path.isdir(path):
-              safe_rmtree(path)
-            else:
-              os.unlink(path)
+        preserve = (run_dir, lock_file)
+        self._link_current_reports(output_dir, preserve)
 
-        # Link all the isolated run/ dir contents back up to the stable workdir
-        for name in os.listdir(output_dir):
-          path = os.path.join(output_dir, name)
-          os.symlink(path, os.path.join(self.workdir, name))
+  def _link_current_reports(self, output_dir, preserve):
+    # NB: Deposit of the "current" test output in the root workdir (.pants.d/test/junit) is a
+    # defacto public API and so we implement that behavior here to maintain backwards
+    # compatibility for non-pants report file consumers.
+    # TODO(John Sirois): Deprecate this ~API and provide a stable directory solution for test
+    # output: https://github.com/pantsbuild/pants/issues/3879
+
+    # Kill everything except the isolated `_runs/` dir.
+    for name in os.listdir(self.workdir):
+      path = os.path.join(self.workdir, name)
+      if name not in preserve:
+        if os.path.isdir(path):
+          safe_rmtree(path)
+        else:
+          os.unlink(path)
+
+    # Link ~all the isolated run/ dir contents back up to the stable workdir
+    # NB: In the case of like-named files, which can be emitted under different subdirs when
+    # batching is enabled, the last file found will win. We accept this truncation of the full
+    # data since this feature is on the road to deprecation, and since prior to batch fixes to
+    # preserve batch report information using separate batch output subdirs, a last-report-wins
+    # semantic was in-place on the generation side of things.
+    for root, dirs, files in safe_walk(output_dir, topdown=True):
+      dirs.sort()  # Ensure a consistent walk order for sanity sake.
+      for f in itertools.chain(fnmatch.filter(files, '*.err.txt'),
+                               fnmatch.filter(files, '*.out.txt'),
+                               fnmatch.filter(files, 'TEST-*.xml')):
+        src = os.path.join(root, f)
+        dst = os.path.join(self.workdir, f)
+        safe_delete(dst)
+        os.symlink(src, dst)
+
+    for path in os.listdir(output_dir):
+      if path in ('coverage', 'reports'):
+        src = os.path.join(output_dir, path)
+        dst = os.path.join(self.workdir, path)
+        os.symlink(src, dst)
+
