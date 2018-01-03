@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import codecs
-import os.path
+import os
 import time
 from unittest import skipIf
 
@@ -67,7 +67,10 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
       coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/reports/xml')
       self.assertTrue(os.path.isfile(coverage_xml))
       with codecs.open(coverage_xml, 'r', encoding='utf8') as xml:
-        self.assertIn('<class name="org/pantsbuild/testproject/unicode/cucumber/CucumberAnnotatedExample"><method name="&lt;init&gt;" desc="()V" line="13"><counter type="INSTRUCTION" missed="0" covered="3"/>', xml.read())
+        self.assertIn(
+          '<class name="org/pantsbuild/testproject/unicode/cucumber/CucumberAnnotatedExample">'
+          '<method name="&lt;init&gt;" desc="()V" line="13">'
+          '<counter type="INSTRUCTION" missed="0" covered="3"/>', xml.read())
       # validate that the html report was able to find sources for annotation
       cucumber_src_html = os.path.join(
           results.workdir,
@@ -131,11 +134,15 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                              synthetic_jar_target]).stdout_data
     self.assertIn('Synthetic jar run is not detected', output)
 
-  def test_junit_run_with_html_report(self):
-    with self.pants_results(['clean-all',
-                             'test.junit',
-                             'testprojects/tests/java/org/pantsbuild/testproject/htmlreport::',
-                             '--test-junit-html-report']) as results:
+  def do_test_junit_run_with_html_report(self, tests=(), args=()):
+    def html_report_test(test):
+      return '--test=org.pantsbuild.testproject.htmlreport.HtmlReportTest#{}'.format(test)
+
+    with self.pants_results(['clean-all', 'test.junit'] +
+                            [html_report_test(name) for name in tests] +
+                            ['testprojects/tests/java/org/pantsbuild/testproject/htmlreport::',
+                             '--test-junit-html-report'] +
+                            list(args)) as results:
       self.assert_failure(results)
       report_html = os.path.join(results.workdir, 'test/junit/reports/junit-report.html')
       self.assertTrue(os.path.isfile(report_html))
@@ -145,3 +152,13 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('testFails', html)
         self.assertIn('testErrors', html)
         self.assertIn('testSkipped', html)
+
+  def test_junit_run_with_html_report(self):
+    self.do_test_junit_run_with_html_report()
+
+  def test_junit_run_with_html_report_merged(self):
+    self.do_test_junit_run_with_html_report(tests=['testPasses',
+                                                   'testFails',
+                                                   'testErrors',
+                                                   'testSkipped'],
+                                            args=['--test-junit-batch-size=3'])
