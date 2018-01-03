@@ -128,3 +128,11 @@ python_library(
     'src/python/pants/subsystem',
   ]
 )
+
+python_library(
+  name='resolve_subsystem',
+  sources=['resolve_subsystem.py'],
+  dependencies=[
+    'src/python/pants/subsystem',
+  ],
+)

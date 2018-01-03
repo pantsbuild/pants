@@ -24,7 +24,7 @@ class ArchiveTest(unittest.TestCase):
     return listing
 
   def round_trip(self, archiver, expected_ext, empty_dirs):
-    def test_round_trip(prefix=None):
+    def test_round_trip(prefix=None, concurrency_safe=False):
       with temporary_dir() as fromdir:
         safe_mkdir(os.path.join(fromdir, 'a/b/c'))
         touch(os.path.join(fromdir, 'a/b/d/e.txt'))
@@ -40,7 +40,7 @@ class ArchiveTest(unittest.TestCase):
                   archive, expected_ext))
 
           with temporary_dir() as todir:
-            archiver.extract(archive, todir)
+            archiver.extract(archive, todir, concurrency_safe=concurrency_safe)
             fromlisting = self._listtree(fromdir, empty_dirs)
             if prefix:
               fromlisting = set(os.path.join(prefix, x) for x in fromlisting)
@@ -50,6 +50,7 @@ class ArchiveTest(unittest.TestCase):
 
     test_round_trip()
     test_round_trip(prefix='jake')
+    test_round_trip(concurrency_safe=True)
 
   def test_tar(self):
     self.round_trip(archiver('tar'), expected_ext='tar', empty_dirs=True)
