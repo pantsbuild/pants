@@ -673,7 +673,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     # TODO(John Sirois): Deprecate this ~API and provide a stable directory solution for test
     # output: https://github.com/pantsbuild/pants/issues/3879
 
-    # Kill everything except the isolated `_runs/` dir.
+    # Kill everything not preserved.
     for name in os.listdir(self.workdir):
       path = os.path.join(self.workdir, name)
       if name not in preserve:
@@ -683,11 +683,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           os.unlink(path)
 
     # Link ~all the isolated run/ dir contents back up to the stable workdir
-    # NB: In the case of like-named files, which can be emitted under different subdirs when
-    # batching is enabled, the last file found will win. We accept this truncation of the full
-    # data since this feature is on the road to deprecation, and since prior to batch fixes to
-    # preserve batch report information using separate batch output subdirs, a last-report-wins
-    # semantic was in-place on the generation side of things.
+    # NB: When batching is enabled, files can be emitted under different subdirs. If those files
+    # have the like-names, the last file with a like-name will be the one that is used. This may
+    # result in a loss of information from the ignored files. We're OK with this because:
+    # a) We're planning on deprecating this loss of information.
+    # b) It is the same behavior as existed before batching was added.
     for root, dirs, files in safe_walk(output_dir, topdown=True):
       dirs.sort()  # Ensure a consistent walk order for sanity sake.
       for f in itertools.chain(fnmatch.filter(files, '*.err.txt'),
