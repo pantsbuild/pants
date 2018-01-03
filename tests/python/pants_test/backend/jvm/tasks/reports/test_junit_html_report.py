@@ -118,8 +118,7 @@ class TestJUnitHtmlReport(BaseTest):
       """)
 
       write_xml('a-2', """
-      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="2" time="0.02">
-        <testcase name="test-a" time="0.01" />
+      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.01">
         <testcase name="test-b" time="0.01" />
       </testsuite>
       """)
@@ -161,16 +160,14 @@ class TestJUnitHtmlReport(BaseTest):
           fp.write(xml)
 
       write_xml('a-1', """
-      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.01">
-        <testcase name="test-a" time="0.01" />
+      <testsuite name="suite-a" errors="0" failures="0" skipped="0" tests="1" time="0.02">
+        <testcase name="test-a" time="0.02" />
       </testsuite>
       """)
 
       write_xml('a-2', """
-      <testsuite name="suite-a" errors="1" failures="0" skipped="1" tests="2" time="0.02">
-        <testcase name="test-a" time="0">
-          <skipped/>
-        </testcase>
+      <testsuite name="suite-a" errors="1" failures="0" skipped="1" tests="2" time="0.03">
+        <testcase name="test-a" time="0.01" />
         <testcase name="test-b" time="0.02">
           <error type="java.lang.RuntimeException">java.lang.RuntimeException!</error>
         </testcase>
@@ -196,9 +193,9 @@ class TestJUnitHtmlReport(BaseTest):
       self.assertEqual(1, suite_a.errors)
       self.assertEqual(0, suite_a.failures)
       self.assertEqual(0, suite_a.skipped)
-      self.assertEqual(0.03, suite_a.time)
+      self.assertEqual(0.04, suite_a.time)
       self.assertEqual(2, suite_a.tests)
-      self.assertEqual([ReportTestCase(name='test-a', time=0.01),
+      self.assertEqual([ReportTestCase(name='test-a', time=0.02),
                         ReportTestCase(name='test-b', time=0.02,
                                        error='java.lang.RuntimeException!')],
                        suite_a.testcases)

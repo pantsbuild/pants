@@ -14,8 +14,6 @@ import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from functools import total_ordering
 
-from twitter.common.collections import OrderedSet
-
 from pants.base.mustache import MustacheRenderer
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir_for, safe_walk
@@ -33,24 +31,28 @@ class ReportTestSuite(object):
   """Data object for a JUnit test suite"""
 
   class MergeError(Exception):
-    def __init__(self, test_cases):
-      error_message = 'Conflicting test cases are not mergeable:\n\t{}'.format(
-        '\n\t'.join(map(repr, test_cases)))
+    def __init__(self, suites, test_cases):
+      error_message = ('Refusing to merge duplicate test cases in suite {!r} from files {}:'
+                       '\n    {}').format(suites[0].name,
+                                          ', '.join(s.file for s in suites),
+                                          '\n    '.join(map(str, test_cases)))
       super(ReportTestSuite.MergeError, self).__init__(error_message)
 
   @classmethod
   def merged(cls, report_test_suites, error_on_conflict=True, logger=None):
-    """Merges any like-named test suites into one.
+    """Merges any like-named test suites into one test suite encompasing all the suite's test cases.
 
     :param report_test_suites: A sequence of test suites to merge results from.
     :type report_test_suites: :class:`collections.Iterable` of :class:`ReportTestSuite`
     :param bool error_on_conflict: `True` to raise when two or more test cases in a given test suite
-                                   have the same name but otherwise different attributes.
+                                   have the same name; otherwise the conflict is logged and the 1st
+                                   encountered duplicate is used.
     :param logger: An optional logger to use for logging merge conflicts.
     :type logger: :class:`logging.Logger`
     :raises: :class:`ReportTestSuite.MergeError` if configured to do so on merge errors.
-    :returns: A single test suite with the result of all the given `report_test_suites` merged.
-    :rtype: iter of :class:`ReportTestSuite`s
+    :yields: One test suite per unique test suite name in `report_test_suites` with the results of
+             all like-named test suites merged.
+    :rtype: iter of :class:`ReportTestSuite`
     """
 
     logger = logger or _LOGGER
@@ -59,20 +61,22 @@ class ReportTestSuite(object):
     for report_test_suite in report_test_suites:
       suites_by_name[report_test_suite.name].append(report_test_suite)
 
-    for name, suites in suites_by_name.items():
-      cases_by_name = collections.defaultdict(OrderedSet)
+    for suite_name, suites in suites_by_name.items():
+      cases_by_name = collections.defaultdict(list)
       for case in itertools.chain.from_iterable(s.testcases for s in suites):
-        cases_by_name[case.name].add(case)
+        cases_by_name[case.name].append(case)
 
       test_cases = []
       tests, errors, failures, skipped, time = 0, 0, 0, 0, 0
       for cases in cases_by_name.values():
         if len(cases) > 1:
           if error_on_conflict:
-            raise cls.MergeError(cases)
+            raise cls.MergeError(suites, cases)
           else:
-            logger.warning('Found test case results with conflicting values, using first result '
-                           'from:\n\t{}'.format('\n\t'.join(map(str, cases))))
+            logger.warning('Found duplicate test case results in suite {!r} from files: {}, '
+                           'using first result:\n -> {}'.format(suite_name,
+                                                                ', '.join(s.file for s in suites),
+                                                                '\n    '.join(map(str, cases))))
         case = iter(cases).next()
         tests += 1
         time += case.time
@@ -84,7 +88,7 @@ class ReportTestSuite(object):
           skipped += 1
         test_cases.append(case)
 
-      yield cls(name=name,
+      yield cls(name=suite_name,
                 tests=tests,
                 errors=errors,
                 failures=failures,
@@ -92,7 +96,7 @@ class ReportTestSuite(object):
                 time=time,
                 testcases=test_cases)
 
-  def __init__(self, name, tests, errors, failures, skipped, time, testcases):
+  def __init__(self, name, tests, errors, failures, skipped, time, testcases, file=None):
     self.name = name
     self.tests = int(tests)
     self.errors = int(errors)
@@ -100,6 +104,7 @@ class ReportTestSuite(object):
     self.skipped = int(skipped)
     self.time = float(time)
     self.testcases = testcases
+    self.file = file
 
   def __lt__(self, other):
     if (self.errors, self.failures) > (other.errors, other.failures):
@@ -264,7 +269,8 @@ class JUnitHtmlReport(JUnitHtmlReportInterface):
         testsuite.attrib['failures'],
         testsuite.attrib.get('skipped', 0),
         testsuite.attrib['time'],
-        testcases
+        testcases,
+        file=xml_file,
       ))
     return testsuites
 
