@@ -13,8 +13,7 @@ from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util import desktop
-from pants.util.dirutil import safe_delete, safe_mkdir
+from pants.util.dirutil import safe_mkdir, safe_walk
 
 
 class Jacoco(CoverageEngine):
@@ -62,6 +61,8 @@ class Jacoco(CoverageEngine):
                                                    scope='jacoco')
       return Jacoco(settings, agent_path, cli_path, targets, execute_java_for_targets)
 
+  _DATAFILE_NAME = 'jacoco.exec'
+
   def __init__(self, settings, agent_path, cli_path, targets, execute_java_for_targets):
     """
     :param settings: Generic code coverage settings.
@@ -82,58 +83,72 @@ class Jacoco(CoverageEngine):
     self._cli_path = cli_path
     self._execute_java = functools.partial(execute_java_for_targets, targets)
     self._coverage_force = options.coverage_force
-    self._coverage_datafile = os.path.join(settings.coverage_dir, 'jacoco.exec')
-    self._coverage_report_dir = os.path.join(settings.coverage_dir, 'reports')
 
-  def instrument(self):
-    # jacoco does runtime instrumentation, so this only does clean-up of existing run
-    safe_delete(self._coverage_datafile)
+  def _iter_datafiles(self, output_dir):
+    for root, _, files in safe_walk(output_dir):
+      for f in files:
+        if f == self._DATAFILE_NAME:
+          yield os.path.join(root, f)
+          break
 
-  @property
-  def classpath_append(self):
-    return ()
+  def instrument(self, output_dir):
+    # Since jacoco does runtime instrumentation, we only need to clean-up existing runs.
+    for datafile in self._iter_datafiles(output_dir):
+      os.unlink(datafile)
 
-  @property
-  def classpath_prepend(self):
-    return ()
-
-  @property
-  def extra_jvm_options(self):
+  def run_modifications(self, output_dir):
+    datafile = os.path.join(output_dir, self._DATAFILE_NAME)
     agent_option = '-javaagent:{agent}=destfile={destfile}'.format(agent=self._agent_path,
-                                                                   destfile=self._coverage_datafile)
-    return [agent_option]
+                                                                   destfile=datafile)
+    return self.RunModifications.create(extra_jvm_options=[agent_option])
 
   @staticmethod
   def is_coverage_target(tgt):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
-  def report(self, execution_failed_exception=None):
+  def _execute_jacoco_cli(self, workunit_name, args):
+    main = 'org.jacoco.cli.internal.Main'
+    result = self._execute_java(classpath=self._cli_path,
+                                main=main,
+                                jvm_options=self._settings.coverage_jvm_options,
+                                args=args,
+                                workunit_factory=self._context.new_workunit,
+                                workunit_name=workunit_name)
+    if result != 0:
+      raise TaskError('java {} ... exited non-zero ({}) - failed to {}'
+                      .format(main, result, workunit_name))
+
+  def report(self, output_dir, execution_failed_exception=None):
     if execution_failed_exception:
-      self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
+      self._settings.log.warn('Test failed: {}'.format(execution_failed_exception))
       if self._coverage_force:
         self._settings.log.warn('Generating report even though tests failed, because the'
                                 'coverage-force flag is set.')
       else:
         return
 
-    safe_mkdir(self._coverage_report_dir, clean=True)
-    for report_format in ['xml', 'csv', 'html']:
-      target_path = os.path.join(self._coverage_report_dir, report_format)
-      args = (['report', self._coverage_datafile] +
+    report_dir = os.path.join(output_dir, 'coverage', 'reports')
+    safe_mkdir(report_dir, clean=True)
+
+    datafiles = list(self._iter_datafiles(output_dir))
+    if len(datafiles) == 1:
+      datafile = datafiles[0]
+    else:
+      datafile = os.path.join(output_dir, '{}.merged'.format(self._DATAFILE_NAME))
+      args = ['merge'] + datafiles + ['--destfile={}'.format(datafile)]
+      self._execute_jacoco_cli(workunit_name='jacoco-merge', args=args)
+
+    for report_format in ('xml', 'csv', 'html'):
+      target_path = os.path.join(report_dir, report_format)
+      args = (['report', datafile] +
               self._get_target_classpaths() +
               self._get_source_roots() +
               ['--{report_format}={target_path}'.format(report_format=report_format,
                                                         target_path=target_path)])
-      main = 'net.sourceforge.cobertura.reporting.ReportMain'
-      result = self._execute_java(classpath=self._cli_path,
-                                  main='org.jacoco.cli.internal.Main',
-                                  jvm_options=self._settings.coverage_jvm_options,
-                                  args=args,
-                                  workunit_factory=self._context.new_workunit,
-                                  workunit_name='jacoco-report-' + report_format)
-      if result != 0:
-        raise TaskError("java {0} ... exited non-zero ({1})"
-                        " 'failed to report'".format(main, result))
+      self._execute_jacoco_cli(workunit_name='jacoco-report-' + report_format, args=args)
+
+    if self._settings.coverage_open:
+      return os.path.join(report_dir, 'html', 'index.html')
 
   def _get_target_classpaths(self):
     runtime_classpath = self._context.products.get_data('runtime_classpath')
@@ -161,11 +176,3 @@ class Jacoco(CoverageEngine):
     flattened = list(sum(args, ()))
 
     return flattened
-
-  def maybe_open_report(self):
-    if self._settings.coverage_open:
-      report_file_path = os.path.join(self._settings.coverage_dir, 'reports/html', 'index.html')
-      try:
-        desktop.ui_open(report_file_path)
-      except desktop.OpenError as e:
-        raise TaskError(e)

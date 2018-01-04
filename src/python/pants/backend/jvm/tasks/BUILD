@@ -292,7 +292,6 @@ python_library(
     ':jar_publish_resources',
     ':jar_task',
     ':properties',
-    ':reports_resources',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ossrh_publication_metadata',
@@ -347,54 +346,20 @@ python_library(
 )
 
 python_library(
-  name = 'coverage',
-  sources = globs('coverage/*.py'),
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/java/jar',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:desktop',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:meta',
-    'src/python/pants/util:strutil',
-  ],
-)
-
-python_library(
-  name = 'reports',
-  sources = globs('reports/*.py'),
-  dependencies = [
-    'src/python/pants/base:mustache',
-    'src/python/pants/util:desktop',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
-    'src/python/pants/util:strutil',
-  ],
-)
-
-resources(
-  name = 'reports_resources',
-  sources = globs('reports/templates/*.mustache'),
-)
-
-python_library(
   name = 'junit_run',
   sources = ['junit_run.py'],
   dependencies = [
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python:six',
     ':classpath_util',
-    ':coverage',
     ':jvm_task',
     ':jvm_tool_task_mixin',
-    ':reports',
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/subsystems:jvm_platform',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/targets:jvm',
+    'src/python/pants/backend/jvm/tasks/coverage',
+    'src/python/pants/backend/jvm/tasks/reports',
     'src/python/pants/backend/jvm:argfile',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
@@ -409,6 +374,7 @@ python_library(
     'src/python/pants/task',
     'src/python/pants/util:argutil',
     'src/python/pants/util:contextutil',
+    'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

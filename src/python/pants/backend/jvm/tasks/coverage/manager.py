@@ -31,10 +31,6 @@ class CodeCoverageSettings(object):
     self.log = log
 
     self.coverage_dir = os.path.join(self.workdir, 'coverage')
-    self.coverage_instrument_dir = os.path.join(self.coverage_dir, 'classes')
-    self.coverage_console_file = os.path.join(self.coverage_dir, 'coverage.txt')
-    self.coverage_xml_file = os.path.join(self.coverage_dir, 'coverage.xml')
-    self.coverage_html_file = os.path.join(self.coverage_dir, 'html', 'index.html')
 
     self.coverage_jvm_options = []
     for jvm_option in options.coverage_jvm_options:
@@ -72,18 +68,18 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
   @staticmethod
   def register_junit_options(register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
-
-    register('--coverage-processor', advanced=True, choices=['cobertura', 'jacoco'],
-             removal_hint='Only cobertura is supported for code coverage so this option can be '
-                          'omitted. jacoco is here only as a placeholder, and acts as a no-op until '
-                          'it is implemented.',
+    register('--coverage-processor', advanced=True, fingerprint=True,
+             choices=['cobertura', 'jacoco'], default='cobertura',
              help='Which coverage subsystem to use.')
-
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
+
+    # We need to fingerprint this even though it nominally UI-only affecting option since the
+    # presence of this option alone can implicitly flag on `--coverage`.
     register('--coverage-open', type=bool, fingerprint=True,
              help='Open the generated HTML coverage report in a browser. Implies --coverage.')
+
     register('--coverage-force', advanced=True, type=bool,
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
@@ -99,7 +95,7 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
     coverage = NoCoverage()
 
     if options.coverage or options.coverage_processor or options.is_flagged('coverage_open'):
-      if options.coverage_processor == 'cobertura' or options.coverage_processor is None:
+      if options.coverage_processor == 'cobertura':
         coverage = Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
       elif options.coverage_processor == 'jacoco':
         coverage = Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)
