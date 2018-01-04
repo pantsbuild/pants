@@ -10,8 +10,15 @@ import os
 import time
 from unittest import skipIf
 
+from parameterized import parameterized
+
+from pants.base.build_environment import get_buildroot
 from pants_test.backend.jvm.tasks.missing_jvm_check import is_missing_jvm
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+
+
+OUTPUT_MODES = [('legacy_layout', ['--legacy-report-layout'], True),
+                ('nominal_layout', ['--no-legacy-report-layout'], False)]
 
 
 class JunitRunIntegrationTest(PantsRunIntegrationTest):
@@ -35,36 +42,41 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                                 'testprojects/tests/java/org/pantsbuild/testproject/matcher'])
     self.assert_success(pants_run)
 
-  def test_junit_run_with_cobertura_coverage_succeeds(self):
-    with self.pants_results(['clean-all',
-                             'test.junit',
-                             'testprojects/tests/java/org/pantsbuild/testproject/unicode::',
+  def report_file_path(self, results, relpath, legacy=False):
+    return os.path.join(results.workdir if legacy else os.path.join(get_buildroot(), 'dist'),
+                        relpath)
+
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_run_with_cobertura_coverage_succeeds(self, unused_test_name, extra_args, legacy):
+    with self.pants_results(['clean-all', 'test.junit'] + extra_args +
+                            ['testprojects/tests/java/org/pantsbuild/testproject/unicode::',
                              '--test-junit-coverage-processor=cobertura',
                              '--test-junit-coverage']) as results:
       self.assert_success(results)
       # validate that the expected coverage file exists, and it reflects 100% line rate coverage
-      coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/xml/coverage.xml')
+      coverage_xml = self.report_file_path(results, 'test/junit/coverage/xml/coverage.xml', legacy)
       self.assertTrue(os.path.isfile(coverage_xml))
       with codecs.open(coverage_xml, 'r', encoding='utf8') as xml:
         self.assertIn('line-rate="1.0"', xml.read())
       # validate that the html report was able to find sources for annotation
-      cucumber_src_html = os.path.join(
-          results.workdir,
+      cucumber_src_html = self.report_file_path(
+          results,
           'test/junit/coverage/html/'
-          'org.pantsbuild.testproject.unicode.cucumber.CucumberAnnotatedExample.html')
+          'org.pantsbuild.testproject.unicode.cucumber.CucumberAnnotatedExample.html',
+          legacy)
       self.assertTrue(os.path.isfile(cucumber_src_html))
       with codecs.open(cucumber_src_html, 'r', encoding='utf8') as src:
         self.assertIn('String pleasantry()', src.read())
 
-  def test_junit_run_with_jacoco_coverage_succeeds(self):
-    with self.pants_results(['clean-all',
-                             'test.junit',
-                             'testprojects/tests/java/org/pantsbuild/testproject/unicode::',
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_run_with_jacoco_coverage_succeeds(self, unused_test_name, extra_args, legacy):
+    with self.pants_results(['clean-all', 'test.junit'] + extra_args +
+                            ['testprojects/tests/java/org/pantsbuild/testproject/unicode::',
                              '--test-junit-coverage-processor=jacoco',
                              '--test-junit-coverage']) as results:
       self.assert_success(results)
       # validate that the expected coverage file exists, and it reflects 100% line rate coverage
-      coverage_xml = os.path.join(results.workdir, 'test/junit/coverage/reports/xml')
+      coverage_xml = self.report_file_path(results, 'test/junit/coverage/reports/xml', legacy)
       self.assertTrue(os.path.isfile(coverage_xml))
       with codecs.open(coverage_xml, 'r', encoding='utf8') as xml:
         self.assertIn(
@@ -72,10 +84,11 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
           '<method name="&lt;init&gt;" desc="()V" line="13">'
           '<counter type="INSTRUCTION" missed="0" covered="3"/>', xml.read())
       # validate that the html report was able to find sources for annotation
-      cucumber_src_html = os.path.join(
-          results.workdir,
+      cucumber_src_html = self.report_file_path(
+          results,
           'test/junit/coverage/reports/html/'
-          'org.pantsbuild.testproject.unicode.cucumber/CucumberAnnotatedExample.html')
+          'org.pantsbuild.testproject.unicode.cucumber/CucumberAnnotatedExample.html',
+          legacy)
       self.assertTrue(os.path.isfile(cucumber_src_html))
       with codecs.open(cucumber_src_html, 'r', encoding='utf8') as src:
         self.assertIn('class="el_method">pleasantry()</a>', src.read())
@@ -134,17 +147,16 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
                              synthetic_jar_target]).stdout_data
     self.assertIn('Synthetic jar run is not detected', output)
 
-  def do_test_junit_run_with_html_report(self, tests=(), args=()):
+  def do_test_junit_run_with_html_report(self, tests=(), args=(), legacy=False):
     def html_report_test(test):
       return '--test=org.pantsbuild.testproject.htmlreport.HtmlReportTest#{}'.format(test)
 
-    with self.pants_results(['clean-all', 'test.junit'] +
+    with self.pants_results(['clean-all', 'test.junit'] + list(args) +
                             [html_report_test(name) for name in tests] +
                             ['testprojects/tests/java/org/pantsbuild/testproject/htmlreport::',
-                             '--test-junit-html-report'] +
-                            list(args)) as results:
+                             '--test-junit-html-report']) as results:
       self.assert_failure(results)
-      report_html = os.path.join(results.workdir, 'test/junit/reports/junit-report.html')
+      report_html = self.report_file_path(results, 'test/junit/reports/junit-report.html', legacy)
       self.assertTrue(os.path.isfile(report_html))
       with codecs.open(report_html, 'r', encoding='utf8') as src:
         html = src.read()
@@ -153,12 +165,15 @@ class JunitRunIntegrationTest(PantsRunIntegrationTest):
         self.assertIn('testErrors', html)
         self.assertIn('testSkipped', html)
 
-  def test_junit_run_with_html_report(self):
-    self.do_test_junit_run_with_html_report()
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_run_with_html_report(self, unused_test_name, extra_args, legacy):
+    self.do_test_junit_run_with_html_report(args=extra_args, legacy=legacy)
 
-  def test_junit_run_with_html_report_merged(self):
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_run_with_html_report_merged(self, unused_test_name, extra_args, legacy):
     self.do_test_junit_run_with_html_report(tests=['testPasses',
                                                    'testFails',
                                                    'testErrors',
                                                    'testSkipped'],
-                                            args=['--test-junit-batch-size=3'])
+                                            args=['--batch-size=3'] + extra_args,
+                                            legacy=legacy)

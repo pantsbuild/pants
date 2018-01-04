@@ -28,6 +28,7 @@ from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.backend.jvm.tasks.reports.junit_html_report import JUnitHtmlReport, NoJunitHtmlReport
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import ErrorWhileTesting, TargetDefinitionException, TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.files import Files
@@ -189,6 +190,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='If true, generate an html summary report of tests that were run.')
     register('--open', type=bool, fingerprint=True,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
+    register('--legacy-report-layout', type=bool, default=True, advanced=True,
+             help='Links JUnit and coverage reports to the legacy location.')
 
     # TODO(jtrobec): Remove direct register when coverage steps are moved to their own subsystem.
     CodeCoverage.register_junit_options(register, cls.register_jvm_tool)
@@ -241,6 +244,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     self._failure_summary = options.failure_summary
     self._open = options.open
     self._html_report = self._open or options.html_report
+    self._legacy_report_layout = options.legacy_report_layout
 
   @memoized_method
   def _args(self, output_dir):
@@ -662,20 +666,34 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       yield output_dir, reports, coverage
     finally:
       lock_file = '.file_lock'
-      with OwnerPrintingInterProcessFileLock(os.path.join(self.workdir, lock_file)):
-        preserve = (run_dir, lock_file)
-        self._link_current_reports(output_dir, preserve)
+      preserve = (run_dir, lock_file)
+      dist_dir = os.path.join(self.get_options().pants_distdir,
+                              os.path.relpath(self.workdir, self.get_options().pants_workdir))
 
-  def _link_current_reports(self, output_dir, preserve):
-    # NB: Deposit of the "current" test output in the root workdir (.pants.d/test/junit) is a
-    # defacto public API and so we implement that behavior here to maintain backwards
-    # compatibility for non-pants report file consumers.
-    # TODO(John Sirois): Deprecate this ~API and provide a stable directory solution for test
-    # output: https://github.com/pantsbuild/pants/issues/3879
+      with OwnerPrintingInterProcessFileLock(os.path.join(dist_dir, lock_file)):
+        self._link_current_reports(report_dir=output_dir, link_dir=dist_dir,
+                                   preserve=preserve)
 
+      if self._legacy_report_layout:
+        deprecated_conditional(predicate=lambda: True,
+                               entity_description='[test.junit] legacy_report_layout',
+                               stacklevel=3,
+                               removal_version='1.6.0.dev0',
+                               hint_message='Reports are now linked into {} by default; so scripts '
+                                            'and CI jobs should be pointed there and the option '
+                                            'configured to False in pants.ini until such time as '
+                                            'the option is removed.'.format(dist_dir))
+        # NB: Deposit of the "current" test output in the root workdir (.pants.d/test/junit) is a
+        # defacto public API and so we implement that behavior here to maintain backwards
+        # compatibility for non-pants report file consumers.
+        with OwnerPrintingInterProcessFileLock(os.path.join(self.workdir, lock_file)):
+          self._link_current_reports(report_dir=output_dir, link_dir=self.workdir,
+                                     preserve=preserve)
+
+  def _link_current_reports(self, report_dir, link_dir, preserve):
     # Kill everything not preserved.
-    for name in os.listdir(self.workdir):
-      path = os.path.join(self.workdir, name)
+    for name in os.listdir(link_dir):
+      path = os.path.join(link_dir, name)
       if name not in preserve:
         if os.path.isdir(path):
           safe_rmtree(path)
@@ -688,19 +706,18 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     # result in a loss of information from the ignored files. We're OK with this because:
     # a) We're planning on deprecating this loss of information.
     # b) It is the same behavior as existed before batching was added.
-    for root, dirs, files in safe_walk(output_dir, topdown=True):
+    for root, dirs, files in safe_walk(report_dir, topdown=True):
       dirs.sort()  # Ensure a consistent walk order for sanity sake.
       for f in itertools.chain(fnmatch.filter(files, '*.err.txt'),
                                fnmatch.filter(files, '*.out.txt'),
                                fnmatch.filter(files, 'TEST-*.xml')):
         src = os.path.join(root, f)
-        dst = os.path.join(self.workdir, f)
+        dst = os.path.join(link_dir, f)
         safe_delete(dst)
         os.symlink(src, dst)
 
-    for path in os.listdir(output_dir):
+    for path in os.listdir(report_dir):
       if path in ('coverage', 'reports'):
-        src = os.path.join(output_dir, path)
-        dst = os.path.join(self.workdir, path)
+        src = os.path.join(report_dir, path)
+        dst = os.path.join(link_dir, path)
         os.symlink(src, dst)
-
