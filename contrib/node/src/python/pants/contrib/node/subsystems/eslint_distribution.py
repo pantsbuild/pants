@@ -127,7 +127,7 @@ class ESLintDistribution(object):
         bootstrapped_package_json = os.path.join(bootstrapped_support_path, 'package.json')
         if not self._compare_file_checksums(setup_package_json, bootstrapped_package_json):
           is_preconfigured = self._bootstrap_eslinter(bootstrapped_support_path)
-        if os.path.isfile(setup_lock_file) and not self._compare_file_checksums(setup_lock_file, bootstrapped_lock_file):
+        elif os.path.isfile(setup_lock_file) and not self._compare_file_checksums(setup_lock_file, bootstrapped_lock_file):
           is_preconfigured = self._bootstrap_eslinter(bootstrapped_support_path)
 
     return (bootstrapped_support_path, is_preconfigured)

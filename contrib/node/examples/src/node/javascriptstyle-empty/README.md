@@ -1,7 +1,7 @@
 RESERVED FOR JAVASCRIPTSTYLE UNIT TESTING
 =========================================
 
-Do not modify the contents of this file!
+Do not modify the contents of this directory!
 
 Please see path to the pants test target:
 
