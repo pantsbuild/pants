@@ -6,13 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from pants.contrib.node.subsystems.eslint_distribution import ESLintDistribution
+
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.contextutil import pushd
-from pants.util.memo import (memoized_method, memoized_property)
+from pants.util.memo import memoized_method, memoized_property
 
+from pants.contrib.node.subsystems.eslint_distribution import ESLintDistribution
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_task import NodeTask
 
@@ -81,7 +82,6 @@ class JavascriptStyle(NodeTask):
           'or package.json does not exist.')
         return False
     return True
-
 
   @memoized_method
   def _bootstrap_default_eslinter(self, bootstrap_dir):
