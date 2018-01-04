@@ -27,31 +27,22 @@ class Jacoco(CoverageEngine):
     def register_options(cls, register):
       super(Jacoco.Factory, cls).register_options(register)
 
+      def jacoco_jar(name, **kwargs):
+        return JarDependency(org='org.jacoco', name=name, rev='0.8.0', **kwargs)
+
       # We need to inject the jacoco agent at test runtime
       cls.register_jvm_tool(register,
-                        'jacoco-agent',
-                        classpath=[
-                          JarDependency(
-                            org='org.jacoco',
-                            name='org.jacoco.agent',
-                            # TODO(jtrobec): get off of snapshat once jacoco release with cli is available
-                            # see https://github.com/pantsbuild/pants/issues/5010
-                            rev='0.7.10-SNAPSHOT',
-                            classifier='runtime',
-                            intransitive=True)
-                        ])
+                            'jacoco-agent',
+                            classpath=[
+                              jacoco_jar(name='org.jacoco.agent', classifier='runtime')
+                            ])
 
       # We'll use the jacoco-cli to generate reports
       cls.register_jvm_tool(register,
-                        'jacoco-cli',
-                        classpath=[
-                          JarDependency(
-                            org='org.jacoco',
-                            name='org.jacoco.cli',
-                            # TODO(jtrobec): get off of snapshat once jacoco release with cli is available
-                            # see https://github.com/pantsbuild/pants/issues/5010
-                            rev='0.7.10-SNAPSHOT')
-                        ])
+                            'jacoco-cli',
+                            classpath=[
+                              jacoco_jar(name='org.jacoco.cli')
+                            ])
 
     def create(self, settings, targets, execute_java_for_targets):
       """
@@ -59,14 +50,16 @@ class Jacoco(CoverageEngine):
       :type settings: :class:`CodeCoverageSettings`
       :param list targets: A list of targets to instrument and record code coverage for.
       :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
-                                       constraints are used to pick a JVM `Distribution`. The function
-                                       should also accept `*args` and `**kwargs` compatible with the
-                                       remaining parameters accepted by
+                                       constraints are used to pick a JVM `Distribution`. The
+                                       function should also accept `*args` and `**kwargs` compatible
+                                       with the remaining parameters accepted by
                                        `pants.java.util.execute_java`.
       """
 
-      agent_path = self.tool_jar_from_products(settings.context.products, 'jacoco-agent', scope='jacoco')
-      cli_path = self.tool_classpath_from_products(settings.context.products, 'jacoco-cli', scope='jacoco')
+      agent_path = self.tool_jar_from_products(settings.context.products, 'jacoco-agent',
+                                               scope='jacoco')
+      cli_path = self.tool_classpath_from_products(settings.context.products, 'jacoco-cli',
+                                                   scope='jacoco')
       return Jacoco(settings, agent_path, cli_path, targets, execute_java_for_targets)
 
   def __init__(self, settings, agent_path, cli_path, targets, execute_java_for_targets):
@@ -118,17 +111,19 @@ class Jacoco(CoverageEngine):
     if execution_failed_exception:
       self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
       if self._coverage_force:
-        self._settings.log.warn('Generating report even though tests failed, because the coverage-force flag is set.')
+        self._settings.log.warn('Generating report even though tests failed, because the'
+                                'coverage-force flag is set.')
       else:
         return
 
     safe_mkdir(self._coverage_report_dir, clean=True)
     for report_format in ['xml', 'csv', 'html']:
       target_path = os.path.join(self._coverage_report_dir, report_format)
-      args = ['report', self._coverage_datafile] + self._get_target_classpaths() + self._get_source_roots() + [
-        '--{report_format}={target_path}'.format(report_format=report_format,
-                                                 target_path=target_path)
-      ]
+      args = (['report', self._coverage_datafile] +
+              self._get_target_classpaths() +
+              self._get_source_roots() +
+              ['--{report_format}={target_path}'.format(report_format=report_format,
+                                                        target_path=target_path)])
       main = 'net.sourceforge.cobertura.reporting.ReportMain'
       result = self._execute_java(classpath=self._cli_path,
                                   main='org.jacoco.cli.internal.Main',
@@ -156,9 +151,9 @@ class Jacoco(CoverageEngine):
     return self._make_multiple_arg('--sourcefiles', source_roots)
 
   def _make_multiple_arg(self, arg_name, arg_list):
-    """Jacoco cli allows the specification of multiple values for certain args by repeating the argument
-    with a new value. E.g. --classfiles a.class --classfiles b.class, etc. This method creates a list of
-    strings interleaved with the arg name to satisfy that format.
+    """Jacoco cli allows the specification of multiple values for certain args by repeating the
+    argument with a new value. E.g. --classfiles a.class --classfiles b.class, etc. This method
+    creates a list of strings interleaved with the arg name to satisfy that format.
     """
     unique_args = list(set(arg_list))
 
