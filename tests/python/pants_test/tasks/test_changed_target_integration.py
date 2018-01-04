@@ -122,7 +122,8 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
   def test_test_changed(self):
     with self.known_commits(), self.temporary_workdir() as workdir:
       cmd = ['test-changed', '--diffspec=HEAD~2..HEAD~1']
-      junit_out = os.path.join(workdir, 'test', 'junit', 'org.pantsbuild.ClassTest.out.txt')
+      junit_out = os.path.join(get_buildroot(), 'dist', 'test', 'junit',
+                               'org.pantsbuild.ClassTest.out.txt')
 
       self.assertFalse(os.path.exists(junit_out))
 
