@@ -17,8 +17,8 @@ module.exports = {
   },
   parseOpts: function (opts, packageOpts, rootDir) {
     // Ignore the excluded files
-    opts.ignore.push.apply(opts.ignore, exclude.files)
-    return opts
+    opts.ignore.push.apply(opts.ignore, exclude.files);
+    return opts;
   },
   cwd: ''     // current working directory, passed to eslint
 };

@@ -26,6 +26,7 @@ class JavascriptStyle(NodeTask):
   _JS_SOURCE_EXTENSION = '.js'
   _JSX_SOURCE_EXTENSION = '.jsx'
   INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = 'synthetic-install-javascriptstyle-module'
+  _IGNORE_PATH_FILE = '.gitignore'
 
   def __init__(self, *args, **kwargs):
     super(JavascriptStyle, self).__init__(*args, **kwargs)
@@ -41,7 +42,6 @@ class JavascriptStyle(NodeTask):
     register('--transitive', type=bool, default=True,
              help='True to run the tool transitively on targets in the context, false to run '
                   'for only roots specified on the commandline.')
-
   def get_lintable_node_targets(self, targets):
     return filter(
       lambda target: isinstance(target, NodePackage)
@@ -52,17 +52,22 @@ class JavascriptStyle(NodeTask):
 
   def get_javascript_sources(self, target):
     sources = set()
+    # sources contain absolute paths
     sources.update(os.path.join(get_buildroot(), source) for source in target.sources_relative_to_buildroot()
                    if (source.endswith(self._JS_SOURCE_EXTENSION) or
                        source.endswith(self._JSX_SOURCE_EXTENSION)))
     return sources
+
+  def get_ignore_path(self, target):
+    ignore_path = next((source for source in target.sources_relative_to_buildroot()
+                        if os.path.basename(source) == self._IGNORE_PATH_FILE), None)
+    return ignore_path
 
   def _is_javascriptstyle_dir_valid(self, javascriptstyle_dir):
     dir_exists = os.path.isdir(javascriptstyle_dir)
     if not dir_exists:
       raise TaskError(
         'javascriptstyle package does not exist: {}.'.format(javascriptstyle_dir))
-      return False
     else:
       lock_file = os.path.join(javascriptstyle_dir, 'yarn.lock')
       package_json = os.path.join(javascriptstyle_dir, 'package.json')
@@ -71,7 +76,6 @@ class JavascriptStyle(NodeTask):
         raise TaskError(
           'javascriptstyle cannot be installed because yarn.lock '
           'or package.json does not exist.')
-        return False
     return True
 
   @memoized_method
@@ -89,18 +93,32 @@ class JavascriptStyle(NodeTask):
 
   def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=False):
     args = [javascriptstyle_bin_path]
-    if fix:
+    if fix is True:
       self.context.log.info('Autoformatting is enabled for javascriptstyle.')
       args.extend(['--fix'])
     args.extend(files)
-    result, node_run_command = self.execute_node(
-      args=args,
-      workunit_name=target.address.reference(),
-      workunit_labels=[WorkUnitLabel.PREP])
-    if result != 0 and not self.get_options().fail_slow:
-      raise TaskError('Javascript linting failed: \n'
-                      '{} failed with exit code {}'.format(node_run_command, result))
-    return result
+    
+    working_directory = target.target_base
+    ignore_path = self.get_ignore_path(target)
+    if ignore_path is not None:
+      working_directory = os.path.dirname(ignore_path)
+    # TODO: The ignore_path file should be configurable.
+    # eslint provides a mechanism to specify a single --ignore-path, but
+    # it is not configurable in standard-engine.
+    # See https://github.com/standard/standard-engine/issues/169
+    # For now, eslint's default --ignore-path is .gitignore and is looked
+    # for in the current working directory (cwd).
+    with pushd(working_directory):
+      self.context.log.debug('working_directory: {}'.format(working_directory))
+      result, node_run_command = self.execute_node(
+        args=args,
+        workunit_name=target.address.reference(),
+        workunit_labels=[WorkUnitLabel.PREP])
+      if result != 0 and not self.get_options().fail_slow:
+        raise TaskError('Javascript style failed: \n'
+                        '{} failed with exit code {}'.format(node_run_command, result))
+
+      return result
 
   def execute(self):
     if self.get_options().skip:

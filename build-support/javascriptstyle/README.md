@@ -1,11 +1,11 @@
 # Setting up JavaScript Style Checker
 
-1. Download the JavaScriptStyle package from https://github.com/pantsbuild/binaries/build-support/scripts/javascriptstyle
-2. Unpack the javascriptstyle.tgz into your pants support directory
-3. Configure pants.ini
-4. Add new rules
-5. Add plugins to extend beyond the default ruleset
-6. Blacklisting
+1. Download the javascriptstyle directory from https://github.com/pantsbuild/pants/tree/master/build-support/javascriptstyle
+into your local pants_supportdir directory.
+2. Configure pants.ini
+3. Add new rules
+4. Add plugins to extend beyond the default ruleset
+5. Blacklisting
 
 ## Configuring pants.ini
 
