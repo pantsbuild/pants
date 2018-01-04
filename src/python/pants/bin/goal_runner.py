@@ -152,13 +152,6 @@ class GoalRunnerFactory(object):
 
     return list(generate_targets(specs))
 
-  def _maybe_launch_pantsd(self, pantsd_launcher):
-    """Launches pantsd if configured to do so."""
-    if self._global_options.enable_pantsd:
-      # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
-      with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
-        pantsd_launcher.maybe_launch()
-
   def _should_be_quiet(self, goals):
     if self._explain:
       return True
