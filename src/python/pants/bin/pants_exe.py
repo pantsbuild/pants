@@ -21,7 +21,7 @@ def test():
 def test_env():
   """An alternate test entrypoint for exercising scrubbing."""
   import os
-  print(os.environ.get('PANTS_ENTRYPOINT'))
+  print('PANTS_ENTRYPOINT={}'.format(os.environ.get('PANTS_ENTRYPOINT')))
 
 
 def main():

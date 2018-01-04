@@ -43,4 +43,4 @@ class LoaderIntegrationTest(PantsRunIntegrationTest):
       extra_env={'PANTS_ENTRYPOINT': 'pants.bin.pants_exe:test_env'}
     )
     self.assert_success(pants_run)
-    self.assertIn('None', pants_run.stdout_data)
+    self.assertIn('PANTS_ENTRYPOINT=None', pants_run.stdout_data)
