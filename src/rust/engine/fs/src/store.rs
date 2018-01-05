@@ -571,7 +571,7 @@ mod remote {
     ) -> BoxFuture<Option<T>, String> {
       let channel = grpcio::ChannelBuilder::new(self.env.clone()).connect(&self.address);
       let client = bazel_protos::bytestream_grpc::ByteStreamClient::new(channel);
-      let stream = client.read(&{
+      match client.read(&{
         let mut req = bazel_protos::bytestream::ReadRequest::new();
         // TODO: Pass a size around, or resolve that we don't need to.
         req.set_resource_name(format!("/blobs/{}/{}", fingerprint, -1));
@@ -579,23 +579,34 @@ mod remote {
         // 0 means no limit.
         req.set_read_limit(0);
         req
-      });
-
-      // We shouldn't have to pass around the client here, it's a workaround for
-      // https://github.com/pingcap/grpc-rs/issues/123
-      future::ok(client)
-        .join(stream.map(|r| r.data).concat2())
-        .map(|(_client, bytes)| Some(bytes))
-        .or_else(|e| match e {
-          grpcio::Error::RpcFailure(grpcio::RpcStatus {
-                                      status: grpcio::RpcStatusCode::NotFound, ..
-                                    }) => Ok(None),
-          _ => Err(format!("Error making CAS read request: {:?}", e)),
-        })
-        .map(move |maybe_bytes| {
-          maybe_bytes.map(|bytes: Vec<u8>| f(&bytes))
-        })
-        .to_boxed()
+      }) {
+        Ok(stream) =>
+        // We shouldn't have to pass around the client here, it's a workaround for
+        // https://github.com/pingcap/grpc-rs/issues/123
+        future::ok(client)
+            .join(stream.map(|r| r.data).concat2())
+            .map(|(_client, bytes)| Some(bytes))
+            .or_else(|e| match e {
+              grpcio::Error::RpcFailure(grpcio::RpcStatus {
+                                          status: grpcio::RpcStatusCode::NotFound, ..
+                                        }) => Ok(None),
+              _ => Err(format!(
+                "Error from server in response to CAS read request: {:?}",
+                e
+              )),
+            })
+            .map(move |maybe_bytes| {
+              maybe_bytes.map(|bytes: Vec<u8>| f(&bytes))
+            })
+            .to_boxed(),
+        Err(err) => future::err(
+          format!(
+            "Error making CAS read request for {}: {:?}",
+            fingerprint,
+            err
+          )
+        ).to_boxed() as BoxFuture<_, _>
+      }
     }
   }
 
