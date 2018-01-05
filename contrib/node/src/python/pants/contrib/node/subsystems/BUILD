@@ -3,7 +3,12 @@
 
 python_library(
   name='node_distribution',
-  sources=['node_distribution.py'],
+  sources=[
+    'command.py',
+    'mixins.py',
+    'node_distribution.py',
+    'tool_binaries.py',
+  ],
   dependencies=[
     'src/python/pants/binaries:binary_util',
     'src/python/pants/fs',

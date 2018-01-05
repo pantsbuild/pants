@@ -12,7 +12,7 @@ from collections import namedtuple
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.contrib.node.subsystems.command import command_gen
-from pants.contrib.node.subsystem import tool_binaries
+from pants.contrib.node.subsystems import tool_binaries
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.process_handler import subprocess
@@ -71,19 +71,26 @@ class NodeDistribution(object):
     package_manager = cls.VALID_PACKAGE_MANAGER_LIST[package_manager]
     return package_manager
 
-  def get_package_manager(package_manager=None):
-    return (
+  def get_package_manager(self, package_manager=None):
+    package_manager = (
       self.validate_package_manager(package_manager)
       if package_manager else self.package_manager
     )
+    return self._package_managers_dict[package_manager]
 
   def __init__(self, binary_util, supportdir, version, package_manager, yarnpkg_version):
     self.package_manager = self.validate_package_manager(package_manager=package_manager)
-    self._node_instance = tool_binaries.NodeBinary(binary_util, supportdir, version)
+    self._node_instance = tool_binaries.NodeBinary(
+      binary_util,
+      os.path.join(supportdir, 'node'),
+      version)
     self._package_managers_dict = {
-      tool_binaries.PACKAGE_MANAGER_NPM: tool_binaries.NpmBinary(self._node_instance)
-      tool_binaries.PACKAGE_MANAGER_YARNPKG: tool_binaries.YarnBianry(
-        binary_util, supportdir, yarnpkg_version, self._node_instance)
+      tool_binaries.PACKAGE_MANAGER_NPM: tool_binaries.NpmBinary(self._node_instance),
+      tool_binaries.PACKAGE_MANAGER_YARNPKG: tool_binaries.YarnBinary(
+        binary_util,
+        os.path.join(supportdir, 'yarnpkg'),
+        yarnpkg_version,
+        self._node_instance),
     }
     logger.debug('Node.js version: %s package manager from config: %s', version, package_manager)
 
@@ -111,6 +118,6 @@ class NodeDistribution(object):
       package_manager=package_manager
     ).run_script(
       script_name,
-      script_args=script_name,
+      script_args=script_args,
       node_paths=node_paths
     )
