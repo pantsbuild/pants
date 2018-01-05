@@ -2,6 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_thrift_library(
+  name = 'no-args-thrift',
+  sources = ['good.thrift'],
+  compiler='scrooge',
+  language='scala',
+)
+
+java_thrift_library(
   name = 'good-thrift',
   sources = ['good.thrift'],
   compiler='scrooge',
