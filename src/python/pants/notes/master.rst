@@ -4,6 +4,51 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0.dev27 (01/05/2018)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Support for finding all the targets derived from a given target. (#5271)
+  `PR #5271 <https://github.com/pantsbuild/pants/pull/5271>`_
+
+* Support merging of junit xml in reports. (#5257)
+  `PR #5257 <https://github.com/pantsbuild/pants/pull/5257>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Scrub PANTS_ENTRYPOINT env var upon use. (#5262)
+  `PR #5262 <https://github.com/pantsbuild/pants/pull/5262>`_
+
+* Fix junit report data loss under batching. (#5259)
+  `PR #5259 <https://github.com/pantsbuild/pants/pull/5259>`_
+
+* add safe extract for archivers (#5248)
+  `PR #5248 <https://github.com/pantsbuild/pants/pull/5248>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump rust version. (#5274)
+  `PR #5274 <https://github.com/pantsbuild/pants/pull/5274>`_
+
+* Deprecate legacy junit "public" workdir reports. (#5267)
+  `PR #5267 <https://github.com/pantsbuild/pants/pull/5267>`_
+
+* Upgrade to jacoco 0.8.0. (#5268)
+  `PR #5268 <https://github.com/pantsbuild/pants/pull/5268>`_
+
+* [pantsd] Kill dead method. (#5263)
+  `PR #5263 <https://github.com/pantsbuild/pants/pull/5263>`_
+
+* Give travis just the AWS permissions it needs. (#5261)
+  `PR #5261 <https://github.com/pantsbuild/pants/pull/5261>`_
+
+* Relocate stable_json_sha1 to hash_utils. (#5258)
+  `PR #5258 <https://github.com/pantsbuild/pants/pull/5258>`_
+
 1.4.0.dev26 (12/30/2017)
 ------------------------
 
