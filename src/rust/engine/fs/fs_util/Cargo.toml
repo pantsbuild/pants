@@ -10,3 +10,4 @@ clap = "2"
 fs = { path = ".." }
 futures = "0.1.16"
 protobuf = "1.4.1"
+crossbeam = "0.2.10"
