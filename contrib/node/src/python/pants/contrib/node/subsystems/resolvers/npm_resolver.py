@@ -16,6 +16,7 @@ from pants.util.contextutil import pushd
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_resolve import NodeResolve
+from pants.contrib.node.subsystems.tool_binaries import PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG
 
 
 class NpmResolver(Subsystem, NodeResolverBase):
@@ -37,8 +38,8 @@ class NpmResolver(Subsystem, NodeResolverBase):
           'Cannot find package.json. Did you forget to put it in target sources?')
       install_optional = self.get_options().install_optional
       # TODO(rjiang): Figure out how to support source level dependencies in BUILD file.
-      package_manager = node_task.get_package_manager_for_target(target=target)
-      if package_manager == node_task.node_distribution.PACKAGE_MANAGER_NPM:
+      package_manager = node_task.get_package_manager(target=target)
+      if package_manager == PACKAGE_MANAGER_NPM:
         if os.path.exists('npm-shrinkwrap.json'):
           node_task.context.log.info('Found npm-shrinkwrap.json, will not inject package.json')
         else:
@@ -48,12 +49,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
             'including node_remote_module and other node dependencies. However, this is '
             'not fully supported.')
           self._emit_package_descriptor(node_task, target, results_dir, node_paths)
-      elif package_manager == node_task.node_distribution.PACKAGE_MANAGER_YARNPKG:
+      elif package_manager == PACKAGE_MANAGER_YARNPKG:
         if not os.path.exists('yarn.lock'):
           raise TaskError(
             'Cannot find yarn.lock. Did you forget to put it in target sources?')
-      result, command = node_task.install_with_package_manager(
-        package_manager,
+      result, command = node_task.install(
+        target=target,
         install_optional=install_optional,
         workunit_name=target.address.reference(),
         workunit_labels=[WorkUnitLabel.COMPILER])

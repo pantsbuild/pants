@@ -53,13 +53,12 @@ class NodeTask(Task):
     """Returns `True` if given target is a `NodeBundle`."""
     return isinstance(target, NodeBundle)
 
-  def get_package_manager_for_target(self, target):
+  def get_package_manager(self, target=None):
     """Returns package manager string for target argument or global config."""
-    package_manager = target.payload.get_field('package_manager').value
-    package_manager = self.node_distribution.validate_package_manager(
-      package_manager=package_manager
-    ) if package_manager else self.node_distribution.package_manager
-    return package_manager
+    package_manager = self.node_distribution.get_package_manager(
+      target.payload.get_field('package_manager').value if target else None
+    )
+    return package_manager.name
 
   def execute_node(self, args, workunit_name, workunit_labels=None, node_paths=None):
     """Executes node passing the given args.
@@ -77,12 +76,13 @@ class NodeTask(Task):
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)
 
-  def install_with_package_manager(
-    self, package_manager, install_optional=Fasle, node_paths=None,
+  def install(
+    self, target=None, package_manager=None, install_optional=False, node_paths=None,
     workunit_name=None, workunit_labels=None):
     """Install package using requested package_manager.
     """
-    command = self.node_distribution.package_manager_install_pacakges(
+    package_manager = self.get_package_manager(target=target)
+    command = self.node_distribution.install_pacakges(
       install_optional=install_optional,
       node_paths=node_paths,
       package_manager=package_manager
@@ -90,11 +90,11 @@ class NodeTask(Task):
     return self._execute_command(
       command, workunit_name=workunit_name, workunit_labels=workunit_labels)
 
-  def run_target_script(
-    self, target, script_name, script_args=None, node_paths=None,
+  def run_script(
+    self, script_name, target=None, package_manager=None, script_args=None, node_paths=None,
     workunit_name=None, workunit_labels=None):
-    package_manager = target.payload.get_field('package_manager').value
-    command = self.node_distribution.package_manager_run_script(
+    package_manager = self.get_package_manager(target=target)
+    command = self.node_distribution.run_script(
       script_name,
       script_args=script_args,
       node_paths=node_paths,
