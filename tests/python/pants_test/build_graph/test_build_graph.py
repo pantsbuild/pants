@@ -221,7 +221,7 @@ class BuildGraphTest(BaseTest):
     predicate = lambda t: t.address.target_name != 'b'
     filtered = self.build_graph.transitive_subgraph_of_addresses_bfs([root], predicate=predicate)
 
-    self.assertEquals([t.address.target_name for t in filtered], ['a', 'c'])
+    self.assertEquals([target.address.target_name for target in filtered], ['a', 'c'])
 
   def test_target_walk(self):
     def assertWalk(expected, target):
@@ -368,3 +368,39 @@ class BuildGraphTest(BaseTest):
     check_funcs({b, d}, {b, d}, leveled_predicate=only_indirect_a)
     check_funcs({a, b, c, d}, {c, d}, leveled_predicate=only_indirect_a)
     check_funcs({a, b, c}, {c}, leveled_predicate=only_indirect_a)
+
+  def test_derivation(self):
+    a = self.make_target('a')
+    a_addr = a.address
+
+    b_addr = Address.parse('b')
+    self.build_graph.inject_synthetic_target(b_addr, Target, derived_from=a)
+    b = self.build_graph.get_target(b_addr)
+
+    c_addr = Address.parse('c')
+    self.build_graph.inject_synthetic_target(c_addr, Target, derived_from=a)
+    c = self.build_graph.get_target(c_addr)
+
+    d_addr = Address.parse('d')
+    self.build_graph.inject_synthetic_target(d_addr, Target, derived_from=b)
+    d = self.build_graph.get_target(d_addr)
+
+    self.assertEqual(a, self.build_graph.get_derived_from(a_addr))
+    self.assertEqual(a, self.build_graph.get_derived_from(b_addr))
+    self.assertEqual(a, self.build_graph.get_derived_from(c_addr))
+    self.assertEqual(b, self.build_graph.get_derived_from(d_addr))
+
+    self.assertEqual(a, self.build_graph.get_concrete_derived_from(a_addr))
+    self.assertEqual(a, self.build_graph.get_concrete_derived_from(b_addr))
+    self.assertEqual(a, self.build_graph.get_concrete_derived_from(c_addr))
+    self.assertEqual(a, self.build_graph.get_concrete_derived_from(d_addr))
+
+    self.assertEqual([b, c], self.build_graph.get_direct_derivatives(a_addr))
+    self.assertEqual([d], self.build_graph.get_direct_derivatives(b_addr))
+    self.assertEqual([], self.build_graph.get_direct_derivatives(c_addr))
+    self.assertEqual([], self.build_graph.get_direct_derivatives(d_addr))
+
+    self.assertEqual([b, c, d], self.build_graph.get_all_derivatives(a_addr))
+    self.assertEqual([d], self.build_graph.get_all_derivatives(b_addr))
+    self.assertEqual([], self.build_graph.get_all_derivatives(c_addr))
+    self.assertEqual([], self.build_graph.get_all_derivatives(d_addr))
