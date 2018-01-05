@@ -81,7 +81,7 @@ class NodeTask(Task):
     """Install package using requested package_manager.
     """
     package_manager = self.get_package_manager(target=target)
-    command = self.node_distribution.install_pacakges(
+    command = self.node_distribution.install_packages(
       install_optional=install_optional,
       node_paths=node_paths,
       package_manager=package_manager
