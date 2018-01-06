@@ -73,16 +73,13 @@ class BuildLocalPythonDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
     # Build a whl using SetupPyRunner and return its absolute path.
-    install_dir = os.path.join(dist_target_dir, '.dist')
-    safe_mkdir(install_dir)
-    setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
+    setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
     setup_runner.run()
-    return self._get_whl_from_dir(install_dir)
+    return self._get_whl_from_dir(os.path.join(dist_target_dir, 'dist'))
 
   def _get_whl_from_dir(self, install_dir):
     """Return the absolute path of the whl in a setup.py install directory."""
     dists = glob.glob(os.path.join(install_dir, '*.whl'))
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
-
     return dists[0]

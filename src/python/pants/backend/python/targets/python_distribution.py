@@ -55,8 +55,7 @@ class PythonDistribution(Target):
 
     has_setup_py_in_top_level = False
     for source in sources:
-      raise ValueError(self.address.rel_path)
-      if source == os.path.join(self.address.rel_path, 'setup.py'):
+      if source == 'setup.py':
         has_setup_py_in_top_level = True
 
     if not has_setup_py_in_top_level:
