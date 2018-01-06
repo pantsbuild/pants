@@ -45,7 +45,6 @@ class PythonDistribution(Target):
       format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
       agnostic to interpreter class.
     """
-    self.address = address
     payload = payload or Payload()
     payload.add_fields({
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
@@ -54,15 +53,16 @@ class PythonDistribution(Target):
     super(PythonDistribution, self).__init__(address=address, payload=payload, **kwargs)
     self.add_labels('python')
 
-    count_of_setup_py = [os.path.basename(s) for s in sources].count('setup.py')
-    if count_of_setup_py == 0:
-      raise TargetDefinitionException(self,
-        'A setup.py is required to create a python_dist. '
-        'You must include a setup.py file in your sources field.')
-    if count_of_setup_py > 1:
-      raise TargetDefinitionException(self,
-        'Multiple setup.py files detected. You can only specify one '
-        'setup.py in a python_dist target.')
+    has_setup_py_in_top_level = False
+    for source in sources:
+      raise ValueError(self.address.rel_path)
+      if source == os.path.join(self.address.rel_path, 'setup.py'):
+        has_setup_py_in_top_level = True
+
+    if not has_setup_py_in_top_level:
+      raise TargetDefinitionException(
+        self, 'A setup.py in the top-level directory relative to the target definition is required.'
+      )
 
     # Check that the compatibility requirements are well-formed.
     for req in self.payload.compatibility:

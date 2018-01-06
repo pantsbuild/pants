@@ -50,12 +50,12 @@ def has_python_requirements(tgt):
 def targets_are_invalid(targets, invalid_targets):
   """Return whether `invalid_targets` contains at least one target from `targets`.
 
-  :param invalid_targets: A list of targets that have been invalidated by a cache manager.
   :param targets: A list of targets to check for membership in `invalid_targets`.
+  :param invalid_targets: A list of targets that have been invalidated by a cache manager.
 
   :return: A boolean indicating if any target in `targets` exists in `invalid_targets`.
   """
-  return any([target in invalid_targets for target in targets])
+  return set(targets).isdisjoint(set(invalid_targets))
 
 
 def _create_source_dumper(builder, tgt):

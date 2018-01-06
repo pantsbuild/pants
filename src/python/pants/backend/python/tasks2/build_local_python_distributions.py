@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import glob
 import os
 import shutil
 
@@ -19,7 +20,7 @@ from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir
 
 
-class PythonCreateDistributions(Task):
+class BuildLocalPythonDistributions(Task):
   """Create python distributions (.whl) from python_dist targets."""
 
   options_scope = 'python-create-distributions'
@@ -72,7 +73,7 @@ class PythonCreateDistributions(Task):
                                   src_relative_to_target_base)
       shutil.copyfile(abs_src_path, src_rel_to_results_dir)
     # Build a whl using SetupPyRunner and return its absolute path.
-    install_dir = os.path.join(dist_target_dir, 'dist')
+    install_dir = os.path.join(dist_target_dir, '.dist')
     safe_mkdir(install_dir)
     setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter, install_dir=install_dir)
     setup_runner.run()
@@ -80,8 +81,8 @@ class PythonCreateDistributions(Task):
 
   def _get_whl_from_dir(self, install_dir):
     """Return the absolute path of the whl in a setup.py install directory."""
-    dists = os.listdir(install_dir)
+    dists = glob.glob(os.path.join(install_dir, '*.whl'))
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
-    else:
-      return os.path.join(os.path.abspath(install_dir), dists[0])
+
+    return dists[0]

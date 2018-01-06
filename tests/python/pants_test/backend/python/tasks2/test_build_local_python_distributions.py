@@ -8,17 +8,17 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
+from pants.backend.python.tasks2.build_local_python_distributions import BuildLocalPythonDistributions
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
-class TestPythonCreateDistributions(PythonTaskTestBase):
+class TestBuildLocalPythonDistributions(PythonTaskTestBase):
   @classmethod
   def task_type(cls):
-    return PythonCreateDistributions
+    return BuildLocalPythonDistributions
 
   def setUp(self):
-    super(TestPythonCreateDistributions, self).setUp()
+    super(BuildLocalPythonDistributions, self).setUp()
 
     # Setup simple python_dist target
     sources = ['foo.py', 'bar.py', '__init__.py', 'setup.py']
@@ -43,9 +43,9 @@ class TestPythonCreateDistributions(PythonTaskTestBase):
                                             sources=sources)
 
   def test_python_create_distributions(self):
-    context = self.context(target_roots=[self.python_dist_tgt], for_task_types=[PythonCreateDistributions])
+    context = self.context(target_roots=[self.python_dist_tgt], for_task_types=[BuildLocalPythonDistributions])
     python_create_distributions_task = self.create_task(context)
     python_create_distributions_task.execute()
-    built_dists = context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
+    built_dists = context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
     self.assertGreater(len(built_dists), 0)
     self.assertTrue(any(['my_dist-0.0.0-py2-none-any.whl' in dist for dist in list(built_dists)]))

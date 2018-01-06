@@ -122,7 +122,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-<<<<<<< 365e70892e9ebcafb7e376fbe4f68694e6efba5e
       local_python_dist_targets = self.context.targets(is_local_python_dist)
       invalid_target_objs = [v.target for v in invalidation_check.invalid_vts]
       context_has_invalid_python_dists = any([lpdt in invalid_target_objs for lpdt in local_python_dist_targets])
@@ -130,13 +129,6 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         source_pexes = self.context.products.get_data(GatherSources.PythonSources).all()
         requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
         pexes = [requirements_pex] + source_pexes
-=======
-      if not os.path.isdir(path) or targets_are_invalid(python_dist_targets, invalid_targets):
-        pexes = [
-          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
-          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
-        ]
->>>>>>> Fix merge conflict
 
         if self.extra_requirements():
           extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]

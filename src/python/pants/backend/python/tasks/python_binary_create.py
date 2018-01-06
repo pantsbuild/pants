@@ -15,7 +15,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
                                                         has_resources)
-from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
+from pants.backend.python.tasks2.build_local_python_distributions import BuildLocalPythonDistributions
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -44,7 +44,7 @@ class PythonBinaryCreate(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data('python')  # For codegen.
-    round_manager.require_data(PythonCreateDistributions.PYTHON_DISTS)
+    round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
 
   @staticmethod
   def is_binary(target):
@@ -131,7 +131,7 @@ class PythonBinaryCreate(Task):
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Dump built python distributions, if any, into builder's chroot.
-      built_dists = self.context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
+      built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
       if built_dists:
         for dist in built_dists:
           builder.add_dist_location(dist)

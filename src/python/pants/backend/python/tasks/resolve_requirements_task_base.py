@@ -11,8 +11,8 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
+from pants.backend.python.tasks2.build_local_python_distributions import BuildLocalPythonDistributions
 from pants.backend.python.tasks2.pex_build_util import dump_requirements, targets_are_invalid
-from pants.backend.python.tasks2.python_create_distributions import PythonCreateDistributions
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -29,7 +29,7 @@ class ResolveRequirementsTaskBase(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.require_data(PythonCreateDistributions.PYTHON_DISTS)
+    round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
 
   def resolve_requirements(self, req_libs, python_dist_targets=()):
     """Requirements resolution for PEX files.
@@ -69,7 +69,7 @@ class ResolveRequirementsTaskBase(Task):
     # NB: If a python_dist depends on a requirement X and another target in play requires
     # an incompatible version of X, this will cause the pex resolver to throw an incompatiblity
     # error and Pants will abort the build.
-    built_dists = self.context.products.get_data(PythonCreateDistributions.PYTHON_DISTS)
+    built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
     if built_dists:
       for dist in built_dists:
         builder.add_dist_location(dist)
