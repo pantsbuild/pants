@@ -100,46 +100,27 @@ class NodeTaskTest(TaskTestBase):
       with open(proof) as fp:
         self.assertEqual('Hello World!', fp.read().strip())
 
-  def test_execute_npm(self):
+  def test_run_script(self):
     task = self.create_task(self.context())
-    with temporary_dir() as chroot:
-      proof = os.path.join(chroot, 'proof')
-      self.assertFalse(os.path.exists(proof))
-      package = {
-        'name': 'pantsbuild.pants.test',
-        'version': '0.0.0',
-        'scripts': {
-          'proof': 'echo "42" > {}'.format(proof)
+    for package_manager in ['npm', 'yarnpkg']:
+      with temporary_dir() as chroot:
+        proof = os.path.join(chroot, 'proof')
+        self.assertFalse(os.path.exists(proof))
+        package = {
+          'name': 'pantsbuild.pants.test',
+          'version': '0.0.0',
+          'scripts': {
+            'proof': 'echo "42" > {}'.format(proof)
+          }
         }
-      }
-      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
-        json.dump(package, fp)
-      with pushd(chroot):
-        returncode, _ = task.execute_npm(['run-script', 'proof'], workunit_name='test')
+        with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
+          json.dump(package, fp)
 
-      self.assertEqual(0, returncode)
-      self.assertTrue(os.path.exists(proof))
-      with open(proof) as fp:
-        self.assertEqual('42', fp.read().strip())
+        with pushd(chroot):
+          returncode, _ = task.run_script(
+            'proof', workunit_name='test', package_manager=package_manager)
 
-  def test_execute_yarnpkg(self):
-    task = self.create_task(self.context())
-    with temporary_dir() as chroot:
-      proof = os.path.join(chroot, 'proof')
-      self.assertFalse(os.path.exists(proof))
-      package = {
-        'name': 'pantsbuild.pants.test',
-        'version': '0.0.0',
-        'scripts': {
-          'proof': 'echo "42" > {}'.format(proof)
-        }
-      }
-      with open(os.path.join(chroot, 'package.json'), 'wb') as fp:
-        json.dump(package, fp)
-      with pushd(chroot):
-        returncode, _ = task.execute_yarnpkg(['run', 'proof'], workunit_name='test')
-
-      self.assertEqual(0, returncode)
-      self.assertTrue(os.path.exists(proof))
-      with open(proof) as fp:
-        self.assertEqual('42', fp.read().strip())
+        self.assertEqual(0, returncode)
+        self.assertTrue(os.path.exists(proof))
+        with open(proof) as fp:
+          self.assertEqual('42', fp.read().strip())
