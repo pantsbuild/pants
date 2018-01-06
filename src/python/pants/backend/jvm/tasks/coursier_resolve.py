@@ -439,6 +439,8 @@ class CoursierMixin(NailgunTask):
 
     for vt in invalidation_check.all_vts:
       t = vt.target
+      compile_classpath.add_excludes_for_targets([t])
+
       if isinstance(t, JarLibrary):
         def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
           transitive_jar_path_for_coord = []
