@@ -8,7 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks2.build_local_python_distributions import BuildLocalPythonDistributions
+from pants.backend.python.tasks2.build_local_python_distributions import \
+  BuildLocalPythonDistributions
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 

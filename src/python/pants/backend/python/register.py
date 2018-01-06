@@ -14,7 +14,8 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks2.build_local_python_distributions import BuildLocalPythonDistributions
+from pants.backend.python.tasks2.build_local_python_distributions import \
+  BuildLocalPythonDistributions
 from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.backend.python.tasks2.pytest_prep import PytestPrep
 from pants.backend.python.tasks2.pytest_run import PytestRun
