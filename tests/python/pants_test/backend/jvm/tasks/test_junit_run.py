@@ -9,6 +9,7 @@ import os
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.junit import JUnit
+from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
@@ -126,9 +127,8 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
     with open(classpath_file_abs_path) as fp:
       classpath = fp.read()
 
-    # Now directly invoking javac to compile the test java code into java class
-    # so later we can inject the class into products mapping for JUnitRun to execute
-    # the test on.
+    # Now directly invoke javac to compile the test java code into classfiles that we can later
+    # inject into a product mapping for JUnitRun to execute against.
     javac = distribution.binary('javac')
     subprocess.check_call(
       [javac, '-d', test_classes_abs_path, '-cp', classpath] + test_java_file_abs_paths)
@@ -491,3 +491,71 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
         self.set_options(cwd=option_cwd)
         self._execute_junit_runner([('FooTest.java', content)],
                                    target_name='tests/java/org/pantsbuild/foo:foo_test')
+
+  def test_junit_run_with_coverage_caching(self):
+    source_under_test_content = dedent("""
+      package org.pantsbuild.foo;
+      class Foo {
+        static String foo() {
+          return "foo";
+        }
+        static String bar() {
+          return "bar";
+        }
+      }
+    """)
+    source_under_test = self.make_target(spec='tests/java/org/pantsbuild/foo',
+                                         target_type=JavaLibrary,
+                                         sources=['Foo.java'])
+
+    test_content = dedent("""
+      package org.pantsbuild.foo;
+      import org.pantsbuild.foo.Foo;
+      import org.junit.Test;
+      import static org.junit.Assert.assertEquals;
+      public class FooTest {
+        @Test
+        public void testFoo() {
+          assertEquals("foo", Foo.foo());
+        }
+      }
+    """)
+    self.make_target(spec='tests/java/org/pantsbuild/foo:foo_test',
+                     target_type=JUnitTests,
+                     sources=['FooTest.java'],
+                     dependencies=[source_under_test])
+
+    self.set_options(coverage=True)
+
+    with self.cache_check(expected_num_artifacts=1):
+      self._execute_junit_runner([('Foo.java', source_under_test_content),
+                                  ('FooTest.java', test_content)],
+                                 target_name='tests/java/org/pantsbuild/foo:foo_test')
+
+    # Now re-execute with a partial invalidation of the input targets. Since coverage is enabled,
+    # that input set is {tests/java/org/pantsbuild/foo, tests/java/org/pantsbuild/foo:bar_test}
+    # with only tests/java/org/pantsbuild/foo:bar_test invalidated. Even though the invalidation is
+    # partial over all input targets, it is total over all the test targets in the input and so the
+    # successful result run is eligible for caching.
+    test_content_edited = dedent("""
+      package org.pantsbuild.foo;
+      import org.pantsbuild.foo.Foo;
+      import org.junit.Test;
+      import static org.junit.Assert.assertEquals;
+      public class FooTest {
+        @Test
+        public void testFoo() {
+          assertEquals("bar", Foo.bar());
+        }
+      }
+    """)
+    self.make_target(spec='tests/java/org/pantsbuild/foo:bar_test',
+                     target_type=JUnitTests,
+                     sources=['FooTest.java'],
+                     dependencies=[source_under_test])
+
+    with self.cache_check(expected_num_artifacts=1):
+      self._execute_junit_runner([('Foo.java', source_under_test_content),
+                                  ('FooTest.java', test_content_edited)],
+                                 target_name='tests/java/org/pantsbuild/foo:bar_test',
+                                 create_some_resources=False)

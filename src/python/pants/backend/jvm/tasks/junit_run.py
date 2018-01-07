@@ -585,10 +585,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
                           # Re-run tests when the code they test (and depend on) changes.
                           invalidate_dependents=True) as invalidation_check:
 
+      all_test_tgts, invalid_test_tgts = [], []
       is_test_target = self._test_target_filter()
-      invalid_test_tgts = [invalid_tgt
-                           for vts in invalidation_check.invalid_vts
-                           for invalid_tgt in vts.targets if is_test_target(invalid_tgt)]
+      for vts in invalidation_check.all_vts:
+        test_targets = [tgt for tgt in vts.targets if is_test_target(tgt)]
+        all_test_tgts.extend(test_targets)
+        if not vts.valid:
+          invalid_test_tgts.extend(test_targets)
 
       test_registry = self._collect_test_targets(invalid_test_tgts)
 
@@ -605,9 +608,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
             self._run_tests(test_registry, output_dir, coverage)
 
             cache_vts = self._vts_for_partition(invalidation_check)
-
-            if invalidation_check.all_vts == invalidation_check.invalid_vts:
-              # 2.) The full partition was invalid, cache results.
+            if set(all_test_tgts) == set(invalid_test_tgts):
+              # 2.) All tests in the partition were invalid, cache the test results.
               if self.artifact_cache_writes_enabled():
                 self.update_artifact_cache([(cache_vts, self._collect_files(output_dir))])
             elif not invalidation_check.invalid_vts:
