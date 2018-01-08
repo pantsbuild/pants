@@ -19,11 +19,13 @@ class CoverageEngine(AbstractClass):
   1. instrument
   2. run_modifications
   3. report
-  4. maybe_open_report
 
   In this sequence, the `run_modifications` call in step 2 may occur multiple times if coverage data
   is being collected in parts. The `report` call in step 3 should be able to merge the results of
   these multiple runs.
+
+  The coverage engine will be discarded after one exercise of this sequence; ie: a coverage engine
+  is instantiated and used exactly once per `JUnitRun` task execution.
   """
 
   class RunModifications(datatype('RunModifications', ['classpath_prepend', 'extra_jvm_options'])):
