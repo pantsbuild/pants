@@ -82,7 +82,7 @@ matrix:
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -nc"
+          sh -c "git clean -xfd && ./pants --version && ./pants clean-all setup-py --run='bdist_wheel --python-tag cp27 --plat-name linux_x86_64' --recursive tests/python/pants_test:test_infra"
 
     - os: linux
       dist: trusty
