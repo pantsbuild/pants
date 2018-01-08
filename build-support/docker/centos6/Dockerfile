@@ -11,6 +11,9 @@ RUN yum install -y \
   devtoolset-7-gcc \
   devtoolset-7-gcc-c++ \
   git \
+  libffi \
+  libffi-devel \
+  openssl-devel \
   java-1.8.0-openjdk-devel \
   python27
 
