@@ -97,6 +97,7 @@ class Cobertura(CoverageEngine):
     options = settings.options
     self._context = settings.context
     self._coverage_force = options.coverage_force
+    self._canonical_datafile = None
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes
     self._exclude_classes = options.coverage_cobertura_exclude_classes
