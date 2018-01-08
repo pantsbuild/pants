@@ -49,7 +49,7 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     register('--args', type=list,
              fingerprint=True,
              help='Pass these extra args to ivy.')
-    register('--confs', type=list, default=['default'],
+    register('--confs', type=list, default=['default'], fingerprint=True,
              help='Pass a configuration to ivy in addition to the default ones.')
     register('--mutable-pattern',
              fingerprint=True,
