@@ -29,6 +29,7 @@ class MypyTask(PythonTask):
   @classmethod
   def register_options(cls, register):
     register('--mypy-version', default='0.550', help='The version of mypy to use')
+    register('--config-file', default=None, help='Name of mypy configuration file relative to buildroot')
 
   @classmethod
   def supports_passthru_args(cls):
@@ -97,6 +98,8 @@ class MypyTask(PythonTask):
 
       # Construct the mypy command line.
       cmd = ['--python-version={}'.format(interpreter_for_targets.identity.python)]
+      if self.get_options().config_file:
+        cmd.append('--config-file={}'.format(os.path.join(get_buildroot(), self.get_options().config_file)))
       cmd.extend(self.get_passthru_args())
       cmd.append('@{}'.format(sources_list_path))
       self.context.log.debug('mypy command: {}'.format(' '.join(cmd)))
