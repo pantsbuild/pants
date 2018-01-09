@@ -122,6 +122,8 @@ class CoursierMixin(NailgunTask):
       confs_for_fingerprint = ['sources'] * sources + ['javadoc'] * javadoc
       fp_strategy = CoursierResolveFingerprintStrategy(confs_for_fingerprint)
 
+      compile_classpath.add_excludes_for_targets(target_subset)
+
       with self.invalidated(target_subset,
                             invalidate_dependents=False,
                             silent=False,
@@ -439,8 +441,6 @@ class CoursierMixin(NailgunTask):
 
     for vt in invalidation_check.all_vts:
       t = vt.target
-      compile_classpath.add_excludes_for_targets([t])
-
       if isinstance(t, JarLibrary):
         def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
           transitive_jar_path_for_coord = []
