@@ -17,7 +17,6 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
-from pants.backend.jvm.tasks.classpath_products import ArtifactClasspathEntry
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
 from pants.base.exceptions import TaskError
