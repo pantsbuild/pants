@@ -13,7 +13,7 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.tasks2.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks2.pex_build_util import dump_requirements, targets_are_invalid
+from pants.backend.python.tasks2.pex_build_util import dump_requirements, is_local_python_dist
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -32,14 +32,14 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
 
-  def resolve_requirements(self, req_libs, python_dist_targets=()):
+  def resolve_requirements(self, req_libs):
     """Requirements resolution for PEX files.
 
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
     :param python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
-    tgts = req_libs + python_dist_targets
+    tgts = req_libs + self.context.targets(is_local_python_dist)
     with self.invalidated(tgts) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
@@ -58,7 +58,7 @@ class ResolveRequirementsTaskBase(Task):
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-      if not os.path.isdir(path) or targets_are_invalid(python_dist_targets, invalid_targets):
+      if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)

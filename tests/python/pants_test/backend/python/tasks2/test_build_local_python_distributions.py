@@ -19,7 +19,7 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase):
     return BuildLocalPythonDistributions
 
   def setUp(self):
-    super(BuildLocalPythonDistributions, self).setUp()
+    super(TestBuildLocalPythonDistributions, self).setUp()
 
     # Setup simple python_dist target
     sources = ['foo.py', 'bar.py', '__init__.py', 'setup.py']

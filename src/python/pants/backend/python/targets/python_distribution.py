@@ -53,12 +53,7 @@ class PythonDistribution(Target):
     super(PythonDistribution, self).__init__(address=address, payload=payload, **kwargs)
     self.add_labels('python')
 
-    has_setup_py_in_top_level = False
-    for source in sources:
-      if source == 'setup.py':
-        has_setup_py_in_top_level = True
-
-    if not has_setup_py_in_top_level:
+    if not 'setup.py' in sources:
       raise TargetDefinitionException(
         self, 'A setup.py in the top-level directory relative to the target definition is required.'
       )
