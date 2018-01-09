@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.kythe.tasks.extract_java import ExtractJava
-from pants.contrib.kythe.tasks.index_java import IndexJava
+from pants.contrib.codeanalysis.tasks.extract_java import ExtractJava
+from pants.contrib.codeanalysis.tasks.index_java import IndexJava
 
 
 def register_goals():
-  task(name='extract-java', action=ExtractJava).install('kythe')
-  task(name='index-java', action=IndexJava).install('kythe')
+  task(name='kythe-java-extract', action=ExtractJava).install('index')
+  task(name='kythe-java-index', action=IndexJava).install('index')

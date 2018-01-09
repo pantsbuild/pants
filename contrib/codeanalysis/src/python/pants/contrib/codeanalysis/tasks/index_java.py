@@ -11,7 +11,7 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 
-from pants.contrib.kythe.tasks.indexable_java_targets import IndexableJavaTargets
+from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
 
 
 class IndexJava(NailgunTask):

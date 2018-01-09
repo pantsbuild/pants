@@ -11,7 +11,7 @@ from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.tasks.jvm_tool_task_mixin import JvmToolTaskMixin
 from pants.base.exceptions import TaskError
 
-from pants.contrib.kythe.tasks.indexable_java_targets import IndexableJavaTargets
+from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
 
 
 # Kythe requires various system properties to be set (sigh).  So we can't use nailgun.
