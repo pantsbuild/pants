@@ -11,8 +11,71 @@ import xml.etree.ElementTree as ET
 from abc import abstractmethod
 from threading import Timer
 
-from pants.base.exceptions import ErrorWhileTesting
+from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.util.process_handler import subprocess
+
+
+class TestResult(object):
+  @classmethod
+  def exception(cls):
+    return cls('EXCEPTION')
+
+  @classmethod
+  def _map_exit_code(cls, value):
+    """Potentially transform test process exit codes.
+
+    Subclasses can override this classmethod if they know the test process emits non-standard
+    success (0) error codes. By default, no mapping is done and the `value` simply passes through.
+
+    :param int value: The test process exit code.
+    :returns: A potentially re-mapped exit code.
+    :rtype: int
+    """
+    return value
+
+  @classmethod
+  def rc(cls, value):
+    exit_code = cls._map_exit_code(value)
+    return cls('SUCCESS' if exit_code == 0 else 'FAILURE', rc=exit_code)
+
+  @classmethod
+  def from_error(cls, error):
+    if not isinstance(error, TaskError):
+      raise AssertionError('Can only synthesize a {} from a TaskError, given a {}'
+                           .format(cls.__name__, type(error).__name__))
+    return cls(str(error), rc=error.exit_code, failed_targets=error.failed_targets)
+
+  def with_failed_targets(self, failed_targets):
+    return self.__class__(self._msg, self._rc, failed_targets)
+
+  def __init__(self, msg, rc=None, failed_targets=None):
+    self._rc = rc
+    self._msg = msg
+    self._failed_targets = failed_targets or []
+
+  def __str__(self):
+    return self._msg
+
+  @property
+  def success(self):
+    return self._rc == 0
+
+  @property
+  def failed_targets(self):
+    return self._failed_targets
+
+  def checked(self):
+    """Raise if this result was unsuccessful and otherwise return this result unchanged.
+
+    :returns: this instance if successful
+    :rtype: :class:`TestResult`
+    :raises: :class:`ErrorWhileTesting` if this result represents a failure
+    """
+    if not self.success:
+      raise ErrorWhileTesting(self._msg,
+                              exit_code=self._rc,
+                              failed_targets=self._failed_targets)
+    return self
 
 
 class TestRunnerTaskMixin(object):
