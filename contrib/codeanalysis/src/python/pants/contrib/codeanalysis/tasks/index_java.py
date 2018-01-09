@@ -6,12 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import shutil
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 
 from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
+from pants.util.dirutil import safe_mkdir
 
 
 class IndexJava(NailgunTask):
@@ -40,6 +42,9 @@ class IndexJava(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(IndexJava, cls).register_options(register)
+    register('--dist', type=str, choices=['none', 'uncompressed', 'tar', 'zip', 'gztar', 'bztar'],
+             default='none', fingerprint=True,
+             help='Copy the (optionally compressed) entries file to the dist directory.')
     cls.register_jvm_tool(register,
                           'kythe-indexer',
                           main=cls._KYTHE_INDEXER_MAIN)
@@ -61,11 +66,13 @@ class IndexJava(NailgunTask):
       jvm_options.extend(self.get_options().jvm_options)
 
       for vt in invalidation_check.invalid_vts:
+        entries = entries_file(vt)
+
         self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
         kindex_file = kindex_files.get(vt.target)
         if not kindex_file:
           raise TaskError('No .kindex file found for {}'.format(vt.target.address.spec))
-        args = [kindex_file, '--out', entries_file(vt)]
+        args = [kindex_file, '--out', entries]
         result = self.runjava(classpath=indexer_cp, main=self._KYTHE_INDEXER_MAIN,
                               jvm_options=jvm_options,
                               args=args, workunit_name='kythe-index',
@@ -74,5 +81,22 @@ class IndexJava(NailgunTask):
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
             main=self._KYTHE_INDEXER_MAIN, result=result))
 
+    dist = self.get_options().dist
     for vt in invalidation_check.all_vts:
-      self.context.products.get_data('kythe_entries_files', dict)[vt.target] = entries_file(vt)
+      entries = entries_file(vt)
+      self.context.products.get_data('kythe_entries_files', dict)[vt.target] = entries
+      if dist != 'none':
+        kythe_distdir = os.path.join(self.get_options().pants_distdir, 'kythe')
+        safe_mkdir(kythe_distdir)
+        uncompressed_kythe_distpath = os.path.join(
+          kythe_distdir, '{}.entries'.format(vt.target.address.path_safe_spec))
+        if dist == 'uncompressed':
+          kythe_distpath = uncompressed_kythe_distpath
+          shutil.copy(entries, kythe_distpath)
+        else:
+          kythe_distpath = shutil.make_archive(base_name=uncompressed_kythe_distpath,
+                                               format=dist,
+                                               root_dir=os.path.dirname(entries),
+                                               base_dir=os.path.basename(entries))
+        self.context.log.info('Copied entries to {}'.format(kythe_distpath))
+
