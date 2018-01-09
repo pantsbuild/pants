@@ -555,7 +555,7 @@ mod remote {
 
   #[derive(Clone)]
   pub struct ByteStore {
-    cas_address: String,
+    client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
     env: Arc<grpcio::Environment>,
     chunk_size_bytes: usize,
     upload_timeout: Duration,
@@ -569,8 +569,12 @@ mod remote {
       upload_timeout: Duration,
     ) -> ByteStore {
       let env = Arc::new(grpcio::Environment::new(thread_count));
+      let channel = grpcio::ChannelBuilder::new(env.clone()).connect(&cas_address);
+      let client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
+        channel,
+      ));
       ByteStore {
-        cas_address,
+        client,
         env,
         chunk_size_bytes,
         upload_timeout,
@@ -586,12 +590,11 @@ mod remote {
       let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
       let len = bytes.len();
       let resource_name = format!("{}/uploads/{}/blobs/{}/{}", "", "", fingerprint, len);
-
-      let channel = grpcio::ChannelBuilder::new(self.env.clone()).connect(&self.cas_address);
-      // TODO: Maybe keep one reference to a client on the ByteStore, rather than newing one up for
-      // every operation.
-      let client = bazel_protos::bytestream_grpc::ByteStreamClient::new(channel);
-      match client.write_opt(grpcio::CallOption::default().timeout(self.upload_timeout)) {
+      match self.client.write_opt(
+        grpcio::CallOption::default().timeout(
+          self.upload_timeout,
+        ),
+      ) {
         Err(err) => {
           future::err(format!(
             "Error attempting to connect to upload fingerprint {}: {:?}",
@@ -615,7 +618,7 @@ mod remote {
             })
             .collect();
 
-          future::ok(client)
+          future::ok(self.client.clone())
             .join(
               sender
                 .send_all(futures::stream::iter_ok::<_, grpcio::Error>(chunks))
@@ -659,9 +662,7 @@ mod remote {
       fingerprint: Fingerprint,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      let channel = grpcio::ChannelBuilder::new(self.env.clone()).connect(&self.cas_address);
-      let client = bazel_protos::bytestream_grpc::ByteStreamClient::new(channel);
-      match client.read(&{
+      match self.client.read(&{
         let mut req = bazel_protos::bytestream::ReadRequest::new();
         // TODO: Pass a size around, or resolve that we don't need to.
         req.set_resource_name(format!("/blobs/{}/{}", fingerprint, -1));
@@ -673,7 +674,7 @@ mod remote {
         Ok(stream) =>
         // We shouldn't have to pass around the client here, it's a workaround for
         // https://github.com/pingcap/grpc-rs/issues/123
-        future::ok(client)
+        future::ok(self.client.clone())
             .join(stream.map(|r| r.data).concat2())
             .map(|(_client, bytes)| Some(bytes))
             .or_else(|e| match e {
