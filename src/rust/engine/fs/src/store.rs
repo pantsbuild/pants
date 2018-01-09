@@ -601,9 +601,10 @@ mod remote {
         }
         Ok((sender, receiver)) => {
           let mut offset = 0 as usize;
-          let stream = futures::stream::iter_ok::<_, grpcio::Error>(bytes)
+          let chunks: Vec<_> = bytes
             .chunks(self.chunk_size_bytes)
-            .map(move |chunk| {
+            .into_iter()
+            .map(|chunk| {
               let mut req = bazel_protos::bytestream::WriteRequest::new();
               req.set_resource_name(resource_name.clone());
               req.set_write_offset(offset as i64);
@@ -611,16 +612,21 @@ mod remote {
               req.set_finish_write(offset == len);
               req.set_data(chunk.to_vec());
               (req, grpcio::WriteFlags::default())
-            });
+            })
+            .collect();
 
           future::ok(client)
-            .join(sender.send_all(stream).map_err(move |e| {
-              format!(
-                "Error attempting to upload fingerprint {}: {:?}",
-                fingerprint,
-                e
-              )
-            }))
+            .join(
+              sender
+                .send_all(futures::stream::iter_ok::<_, grpcio::Error>(chunks))
+                .map_err(move |e| {
+                  format!(
+                    "Error attempting to upload fingerprint {}: {:?}",
+                    fingerprint,
+                    e
+                  )
+                }),
+            )
             .and_then(move |_| {
               receiver.map_err(move |e| {
                 format!(
