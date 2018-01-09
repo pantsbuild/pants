@@ -40,6 +40,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.junit.junit_xml_parser import RegistryOfTests, Test, parse_failed_targets
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.task.testrunner_task_mixin import TestRunnerTaskMixin
+from pants.util import desktop
 from pants.util.argutil import ensure_arg, remove_arg
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_mkdir_for, safe_rmtree, safe_walk
@@ -188,7 +189,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
              help='Use experimental junit-runner logic for more options for parallelism.')
     register('--html-report', type=bool, fingerprint=True,
              help='If true, generate an html summary report of tests that were run.')
-    register('--open', type=bool, fingerprint=True,
+    register('--open', type=bool,
              help='Attempt to open the html summary report in a browser (implies --html-report)')
     register('--legacy-report-layout', type=bool, default=True, advanced=True,
              help='Links JUnit and coverage reports to the legacy location.')
@@ -398,17 +399,13 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     return self._batch_size != self._BATCH_ALL
 
   def _run_tests(self, test_registry, output_dir, coverage):
-    coverage.instrument()
+    coverage.instrument(output_dir)
 
     def parse_error_handler(parse_error):
       # Just log and move on since the result is only used to characterize failures, and raising
       # an error here would just distract from the underlying test failures.
       self.context.log.error('Error parsing test result file {path}: {cause}'
                              .format(path=parse_error.xml_path, cause=parse_error.cause))
-
-    extra_jvm_options = coverage.extra_jvm_options
-    classpath_prepend = coverage.classpath_prepend
-    classpath_append = coverage.classpath_append
 
     # The 'instrument_classpath' product below below will be `None` if not set, and we'll default
     # back to runtime_classpath
@@ -422,15 +419,18 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if self._batched:
         batch_output_dir = os.path.join(batch_output_dir, 'batch-{}'.format(batch_id))
 
+      run_modifications = coverage.run_modifications(batch_output_dir)
+
+      extra_jvm_options = run_modifications.extra_jvm_options
+
       # Batches of test classes will likely exist within the same targets: dedupe them.
       relevant_targets = {test_registry.get_owning_target(t) for t in batch}
 
       complete_classpath = OrderedSet()
-      complete_classpath.update(classpath_prepend)
+      complete_classpath.update(run_modifications.classpath_prepend)
       complete_classpath.update(JUnit.global_instance().runner_classpath(self.context))
       complete_classpath.update(self.classpath(relevant_targets,
                                                classpath_product=classpath_product))
-      complete_classpath.update(classpath_append)
 
       distribution = JvmPlatform.preferred_jvm_distribution([platform], self._strict_jvm_version)
 
@@ -603,9 +603,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           try:
             # 1.) Write all results that will be potentially cached to output_dir.
             self._run_tests(test_registry, output_dir, coverage)
-            reports.generate()
 
             cache_vts = self._vts_for_partition(invalidation_check)
+
             if invalidation_check.all_vts == invalidation_check.invalid_vts:
               # 2.) The full partition was invalid, cache results.
               if self.artifact_cache_writes_enabled():
@@ -624,22 +624,28 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               # cache the results. That 1st of others is hopefully CI!
               cache_vts.force_invalidate()
           except TaskError as e:
-            reports.generate(exc=e)
+            reports.generate(output_dir, exc=e)
             raise
-        reports.maybe_open()
+        reports.generate(output_dir)
 
   class Reports(object):
     def __init__(self, junit_html_report, coverage):
       self._junit_html_report = junit_html_report
       self._coverage = coverage
 
-    def generate(self, exc=None):
-      self._coverage.report(execution_failed_exception=exc)
-      self._junit_html_report.report()
+    def generate(self, output_dir, exc=None):
+      junit_report_path = self._junit_html_report.report(output_dir)
+      self._maybe_open_report(junit_report_path)
 
-    def maybe_open(self):
-      self._coverage.maybe_open_report()
-      self._junit_html_report.maybe_open_report()
+      coverage_report_path = self._coverage.report(output_dir, execution_failed_exception=exc)
+      self._maybe_open_report(coverage_report_path)
+
+    def _maybe_open_report(self, report_file_path):
+      if report_file_path:
+        try:
+          desktop.ui_open(report_file_path)
+        except desktop.OpenError as e:
+          raise TaskError(e)
 
   @contextmanager
   def _isolation(self, all_targets):
@@ -649,7 +655,10 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
     safe_mkdir(output_dir, clean=False)
 
     if self._html_report:
-      junit_html_report = JUnitHtmlReport.create(output_dir, self.context.log)
+      junit_html_report = JUnitHtmlReport.create(xml_dir=output_dir,
+                                                 open_report=self.get_options().open,
+                                                 logger=self.context.log,
+                                                 error_on_conflict=True)
     else:
       junit_html_report = NoJunitHtmlReport()
 

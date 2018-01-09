@@ -15,7 +15,6 @@ from abc import abstractmethod
 from functools import total_ordering
 
 from pants.base.mustache import MustacheRenderer
-from pants.util import desktop
 from pants.util.dirutil import safe_mkdir_for, safe_walk
 from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
@@ -179,51 +178,47 @@ class JUnitHtmlReportInterface(AbstractClass):
   """The interface JUnit html reporters must support."""
 
   @abstractmethod
-  def report(self):
-    """Generate the junit test result report and return its path."""
+  def report(self, output_dir):
+    """Generate the junit test result report
 
-  @abstractmethod
-  def maybe_open_report(self):
-    """Open the junit test result report if requested by the end user."""
+    :returns: The generated report path iff it should be opened for the user.
+    :rtype: str
+    """
 
 
 class NoJunitHtmlReport(JUnitHtmlReportInterface):
   """JUnit html reporter that never produces a report."""
 
-  def report(self):
+  def report(self, output_dir):
     return None
-
-  def maybe_open_report(self):
-    pass
 
 
 class JUnitHtmlReport(JUnitHtmlReportInterface):
   """Generates an HTML report from JUnit TEST-*.xml files"""
 
   @classmethod
-  def create(cls, xml_dir, logger=None, error_on_conflict=True):
+  def create(cls, xml_dir, open_report=False, logger=None, error_on_conflict=True):
     return cls(xml_dir=xml_dir,
-               report_dir=os.path.join(xml_dir, 'reports'),
+               open_report=open_report,
                logger=logger,
                error_on_conflict=error_on_conflict)
 
-  def __init__(self, xml_dir, report_dir, logger=None, error_on_conflict=True):
+  def __init__(self, xml_dir, open_report=False, logger=None, error_on_conflict=True):
     self._xml_dir = xml_dir
-    self._report_file_path = os.path.join(report_dir, 'junit-report.html')
+    self._open_report = open_report
     self._logger = logger or _LOGGER
     self._error_on_conflict = error_on_conflict
 
-  def report(self):
+  def report(self, output_dir):
     self._logger.debug('Generating JUnit HTML report...')
     testsuites = self._parse_xml_files()
-    safe_mkdir_for(self._report_file_path)
-    with open(self._report_file_path, 'wb') as fp:
+    report_file_path = os.path.join(output_dir, 'reports', 'junit-report.html')
+    safe_mkdir_for(report_file_path)
+    with open(report_file_path, 'wb') as fp:
       fp.write(ensure_binary(self._generate_html(testsuites)))
-    self._logger.debug('JUnit HTML report generated to {}'.format(self._report_file_path))
-    return self._report_file_path
-
-  def maybe_open_report(self):
-    desktop.ui_open(self._report_file_path)
+    self._logger.debug('JUnit HTML report generated to {}'.format(report_file_path))
+    if self._open_report:
+      return report_file_path
 
   def _parse_xml_files(self):
     testsuites = []

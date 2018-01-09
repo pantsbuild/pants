@@ -14,7 +14,17 @@ public class CucumberAnnotatedExample {
   }
 
   @假如("祝你今天愉快!")
-  public String pleasantry() {
-    return "Have a nice day!";
+  public String pleasantry1() {
+    return "Have a nice day one!";
+  }
+
+  @假如("祝你今天愉快!")
+  public String pleasantry2() {
+    return "Have a nice day two!";
+  }
+
+  @假如("祝你今天愉快!")
+  public String pleasantry3() {
+    return "Have a nice day three!";
   }
 }
