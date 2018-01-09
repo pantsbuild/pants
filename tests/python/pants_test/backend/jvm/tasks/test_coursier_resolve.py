@@ -145,7 +145,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertIn('junit:junit:4.12', simple_coords)
     self.assertIn('org.hamcrest:hamcrest-core:1.3', simple_coords)
 
-    # If we grab transitive closure of the coordinates just for junit along with JavaLibrary
+    # If we grab transitive closure of the coordinates for junit along with a JavaLibrary
     # target that excludes junit, then junit should not be on the classpath.
     simple_coords = get_coord_in_classpath(compile_classpath, [excluding_target, junit_jar_lib])
     self.assertNotIn('junit:junit:4.12', simple_coords)
