@@ -12,5 +12,5 @@ from pants.contrib.kythe.tasks.index_java import IndexJava
 
 
 def register_goals():
-  task(name='extract', action=ExtractJava).install('kythe')
-  task(name='index', action=IndexJava).install('kythe')
+  task(name='extract-java', action=ExtractJava).install('kythe')
+  task(name='index-java', action=IndexJava).install('kythe')

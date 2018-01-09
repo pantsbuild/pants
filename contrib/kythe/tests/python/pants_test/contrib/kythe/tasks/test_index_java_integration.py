@@ -23,7 +23,7 @@ class TestIndexJavaIntegration(PantsRunIntegrationTest):
                   'examples.src.java.org.pantsbuild.example.hello.main.main-bin',
                   'examples.src.java.org.pantsbuild.example.hello.simple.simple']:
         kindex_glob = os.path.join(workdir,
-                                   'kythe/extract/current/{}/current/*.kindex'.format(tgt))
+                                   'kythe/extract-java/current/{}/current/*.kindex'.format(tgt))
         kindex_files = glob.glob(kindex_glob)
         self.assertEquals(1, len(kindex_files))
         kindex_file = kindex_files[0]
@@ -31,6 +31,6 @@ class TestIndexJavaIntegration(PantsRunIntegrationTest):
         self.assertGreater(os.path.getsize(kindex_file), 200)  # Make sure it's not trivial.
 
         entries_path = os.path.join(workdir,
-                                    'kythe/index/current/{}/current/index.entries'.format(tgt))
+                                    'kythe/index-java/current/{}/current/index.entries'.format(tgt))
         self.assertTrue(os.path.isfile(entries_path))
         self.assertGreater(os.path.getsize(entries_path), 1000)  # Make sure it's not trivial.
