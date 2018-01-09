@@ -6,25 +6,36 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.jvm_target import JvmTarget
-from pants.build_graph.target_scopes import Scopes
+from pants.build_graph.target_scopes import Scope
+from pants.subsystem.subsystem import Subsystem
 
 
-class IndexableJavaTargets(object):
+class IndexableJavaTargets(Subsystem):
   """Determines which java targets Kythe should act on."""
+  options_scope = 'kythe-java-targets'
 
   @classmethod
-  def get(cls, context):
+  def register_options(cls, register):
+    super(IndexableJavaTargets, cls).register_options(register)
+    register('--exclude-scopes', type=list, member_type=str, fingerprint=True,
+             help='Dependency scopes to exclude from indexing.')
+    register('--recursive', type=bool, fingerprint=True,
+             help='Index all dependencies. If false, process only target roots.')
+
+  def get(self, context):
     """Return the indexable targets in the given context.
 
     Computes them lazily from the given context.  They are then fixed for the duration
     of the run, even if this method is called again with a different context.
     """
-    if not cls._targets:
-      # TODO: Should we index COMPILE scoped deps? E.g., annotations?
-      cls._targets = context.targets(
-        lambda t: isinstance(t, JvmTarget) and t.has_sources('.java'),
-        exclude_scopes=Scopes.COMPILE
-      )
-    return cls._targets
+    if self.get_options().recursive:
+      requested_targets = context.targets(exclude_scopes=Scope(self.get_options().exclude_scopes))
+    else:
+      requested_targets = list(context.target_roots)
+      # We want to act on targets derived from the target roots, e.g., if acting on a binary
+      # jar_library we actually want to act on the derived java_library wrapping the decompiled
+      # sources.
+      for t in context.target_roots:
+        requested_targets.extend(context.build_graph.get_all_derivatives(t.address))
 
-  _targets = None
+    return [t for t in requested_targets if isinstance(t, JvmTarget) and t.has_sources('.java')]

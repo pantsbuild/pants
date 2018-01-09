@@ -5,6 +5,7 @@ contrib_plugin(
   name='plugin',
   dependencies=[
     'contrib/kythe/src/python/pants/contrib/kythe/tasks',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
   distribution_name='pantsbuild.pants.contrib.kythe',
