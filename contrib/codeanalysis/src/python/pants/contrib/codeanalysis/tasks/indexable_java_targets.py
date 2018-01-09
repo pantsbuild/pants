@@ -32,10 +32,12 @@ class IndexableJavaTargets(Subsystem):
       requested_targets = context.targets(exclude_scopes=Scope(self.get_options().exclude_scopes))
     else:
       requested_targets = list(context.target_roots)
-      # We want to act on targets derived from the target roots, e.g., if acting on a binary
-      # jar_library we actually want to act on the derived java_library wrapping the decompiled
-      # sources.
-      for t in context.target_roots:
-        requested_targets.extend(context.build_graph.get_all_derivatives(t.address))
 
-    return [t for t in requested_targets if isinstance(t, JvmTarget) and t.has_sources('.java')]
+    expanded_targets = list(requested_targets)
+    # We want to act on targets derived from the specified, e.g., if acting on a binary
+    # jar_library we actually want to act on the derived java_library wrapping the decompiled
+    # sources.
+    for t in requested_targets:
+      requested_targets.extend(context.build_graph.get_all_derivatives(t.address))
+
+    return [t for t in expanded_targets if isinstance(t, JvmTarget) and t.has_sources('.java')]
