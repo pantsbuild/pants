@@ -17,7 +17,7 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.pex_build_util import has_python_sources, is_local_python_dist
+from pants.backend.python.tasks2.pex_build_util import has_python_sources
 from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address

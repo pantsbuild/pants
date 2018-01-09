@@ -53,9 +53,6 @@ class ResolveRequirementsTaskBase(Task):
       interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
 
-      # Gather invalid targets so we can check whether the requirements pex should be
-      # rebuilt due to changes to PythonDistribution targets.
-      invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
       if not os.path.isdir(path):
