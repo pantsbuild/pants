@@ -1,9 +1,4 @@
-// Taken from http://shakespeare.mit.edu/
-
-pub const HASH: &str = "8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f";
-
-#[cfg_attr(rustfmt, rustfmt_skip)]
-pub const TEXT: &str = r###"HENRY IV, Part 1
+HENRY IV, Part 1
 
 ACT I
 SCENE I. London. The palace.
@@ -29158,4 +29153,3 @@ For such a one we show'd 'em: if they smile,
 And say 'twill do, I know, within a while
 All the best men are ours; for 'tis ill hap,
 If they hold when their ladies bid 'em clap.
-"###;

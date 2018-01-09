@@ -701,10 +701,12 @@ mod remote {
 
     use super::{ByteStore, Fingerprint};
     use super::super::{ByteStore as ByteStoreTrait, Digest, EntryType};
-    use super::super::super::all_the_henries;
     use super::super::super::test_cas::StubCAS;
     use futures::Future;
     use protobuf::Message;
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::PathBuf;
     use std::time::Duration;
 
     use super::super::tests::{directory, directory_fingerprint, fingerprint,
@@ -834,20 +836,32 @@ mod remote {
 
       let store = ByteStore::new(cas.address(), 1, 10 * 1024, Duration::from_secs(1));
 
-      let fingerprint = Fingerprint::from_hex_string(all_the_henries::HASH).unwrap();
+      let all_the_henries = {
+        let mut f = File::open(
+          PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata")
+            .join("all_the_henries"),
+        ).expect("Error opening all_the_henries");
+        let mut bytes = Vec::new();
+        f.read_to_end(&mut bytes).expect(
+          "Error reading all_the_henries",
+        );
+        bytes
+      };
+
+      let fingerprint = Fingerprint::from_hex_string(
+        "8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f",
+      ).unwrap();
 
       assert_eq!(
         store
-          .store_bytes(EntryType::File, all_the_henries::TEXT.as_bytes().to_vec())
+          .store_bytes(EntryType::File, all_the_henries.clone())
           .wait(),
-        Ok(Digest(fingerprint, all_the_henries::TEXT.len()))
+        Ok(Digest(fingerprint, all_the_henries.len()))
       );
 
       let blobs = cas.blobs.lock().unwrap();
-      assert_eq!(
-        blobs.get(&fingerprint),
-        Some(&all_the_henries::TEXT.as_bytes().to_vec())
-      );
+      assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
 
       let write_message_sizes = cas.write_message_sizes.lock().unwrap();
       assert_eq!(

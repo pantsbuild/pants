@@ -11,9 +11,6 @@ mod pool;
 pub use pool::ResettablePool;
 
 #[cfg(test)]
-#[cfg_attr(rustfmt, rustfmt_skip)]
-pub mod all_the_henries;
-#[cfg(test)]
 pub mod test_cas;
 
 extern crate bazel_protos;
