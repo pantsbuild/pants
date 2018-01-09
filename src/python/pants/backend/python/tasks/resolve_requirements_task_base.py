@@ -39,6 +39,7 @@ class ResolveRequirementsTaskBase(Task):
     :param python_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
+    # TODO: https://github.com/pantsbuild/pants/pull/5141
     tgts = req_libs + self.context.targets(is_local_python_dist)
     with self.invalidated(tgts) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
