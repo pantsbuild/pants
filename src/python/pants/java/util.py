@@ -276,7 +276,7 @@ def safe_classpath(classpath, synthetic_jar_dir, custom_name=None):
     synthetic_jar_dir = safe_mkdtemp()
 
   # Quote the paths so that if they contain reserved characters can be safely passed to JVM classloader.
-  bundled_classpath = map(lambda x: urllib.quote(x), relativize_classpath(classpath, synthetic_jar_dir))
+  bundled_classpath = map(urllib.quote, relativize_classpath(classpath, synthetic_jar_dir))
 
   manifest = Manifest()
   manifest.addentry(Manifest.CLASS_PATH, ' '.join(bundled_classpath))
