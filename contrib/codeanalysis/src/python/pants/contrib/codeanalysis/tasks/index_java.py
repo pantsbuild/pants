@@ -6,14 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import shutil
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-
 from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
-from pants.util.dirutil import safe_mkdir
 
 
 class IndexJava(NailgunTask):
@@ -49,54 +46,39 @@ class IndexJava(NailgunTask):
                           'kythe-indexer',
                           main=cls._KYTHE_INDEXER_MAIN)
 
-  def execute(self):
-    def entries_file(_vt):
-      return os.path.join(_vt.results_dir, 'index.entries')
+  @staticmethod
+  def _entries_file(vt):
+    return os.path.join(vt.results_dir, 'index.entries')
 
+  def execute(self):
     indexable_targets = IndexableJavaTargets.global_instance().get(self.context)
 
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
-      kindex_files = self.context.products.get_data('kindex_files')
+      if invalidation_check.invalid_vts:
+        indexer_cp = self.tool_classpath('kythe-indexer')
+        # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
+        # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
+        # the Java 9 versions, and not the runtime's versions.
+        jvm_options = ['-Xbootclasspath/p:{}'.format(':'.join(indexer_cp))]
+        jvm_options.extend(self.get_options().jvm_options)
 
-      indexer_cp = self.tool_classpath('kythe-indexer')
-      # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
-      # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
-      # the Java 9 versions, and not the runtime's versions.
-      jvm_options = ['-Xbootclasspath/p:{}'.format(':'.join(indexer_cp))]
-      jvm_options.extend(self.get_options().jvm_options)
+        for vt in invalidation_check.invalid_vts:
+          self._index(vt, indexer_cp, jvm_options)
 
-      for vt in invalidation_check.invalid_vts:
-        entries = entries_file(vt)
-
-        self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
-        kindex_file = kindex_files.get(vt.target)
-        if not kindex_file:
-          raise TaskError('No .kindex file found for {}'.format(vt.target.address.spec))
-        args = [kindex_file, '--out', entries]
-        result = self.runjava(classpath=indexer_cp, main=self._KYTHE_INDEXER_MAIN,
-                              jvm_options=jvm_options,
-                              args=args, workunit_name='kythe-index',
-                              workunit_labels=[WorkUnitLabel.COMPILER])
-        if result != 0:
-          raise TaskError('java {main} ... exited non-zero ({result})'.format(
-            main=self._KYTHE_INDEXER_MAIN, result=result))
-
-    dist = self.get_options().dist
     for vt in invalidation_check.all_vts:
-      entries = entries_file(vt)
+      entries = self._entries_file(vt)
       self.context.products.get_data('kythe_entries_files', dict)[vt.target] = entries
-      if dist != 'none':
-        kythe_distdir = os.path.join(self.get_options().pants_distdir, 'kythe')
-        safe_mkdir(kythe_distdir)
-        uncompressed_kythe_distpath = os.path.join(
-          kythe_distdir, '{}.entries'.format(vt.target.address.path_safe_spec))
-        if dist == 'uncompressed':
-          kythe_distpath = uncompressed_kythe_distpath
-          shutil.copy(entries, kythe_distpath)
-        else:
-          kythe_distpath = shutil.make_archive(base_name=uncompressed_kythe_distpath,
-                                               format=dist,
-                                               root_dir=os.path.dirname(entries),
-                                               base_dir=os.path.basename(entries))
-        self.context.log.info('Copied entries to {}'.format(kythe_distpath))
 
+  def _index(self, vt, indexer_cp, jvm_options):
+    self.context.log.info('Kythe indexing {}'.format(vt.target.address.spec))
+    kindex_file = self.context.products.get_data('kindex_files').get(vt.target)
+    if not kindex_file:
+      raise TaskError('No .kindex file found for {}'.format(vt.target.address.spec))
+    args = [kindex_file, '--out', self._entries_file(vt)]
+    result = self.runjava(classpath=indexer_cp, main=self._KYTHE_INDEXER_MAIN,
+                          jvm_options=jvm_options,
+                          args=args, workunit_name='kythe-index',
+                          workunit_labels=[WorkUnitLabel.COMPILER])
+    if result != 0:
+      raise TaskError('java {main} ... exited non-zero ({result})'.format(
+        main=self._KYTHE_INDEXER_MAIN, result=result))
