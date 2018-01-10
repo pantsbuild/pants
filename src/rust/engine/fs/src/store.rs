@@ -544,10 +544,12 @@ mod remote {
 
   use bazel_protos;
   use boxfuture::{Boxable, BoxFuture};
+  use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, Sink, Stream};
   use grpcio;
   use sha2::Sha256;
+  use std::cmp::min;
   use std::sync::Arc;
   use std::time::Duration;
 
@@ -584,12 +586,19 @@ mod remote {
 
 
   impl super::ByteStore for ByteStore {
-    fn store_bytes(&self, _entry_type: EntryType, bytes: Vec<u8>) -> BoxFuture<Digest, String> {
+    fn store_bytes(&self, _entry_type: EntryType, bytes_vec: Vec<u8>) -> BoxFuture<Digest, String> {
+      let bytes = Bytes::from(bytes_vec);
       let mut hasher = Sha256::default();
       hasher.input(&bytes);
       let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
       let len = bytes.len();
-      let resource_name = format!("{}/uploads/{}/blobs/{}/{}", "", "", fingerprint, len);
+      let resource_name = format!(
+        "{}/uploads/{}/blobs/{}/{}",
+        "",
+        "",
+        fingerprint,
+        bytes.len()
+      );
       match self.client.write_opt(
         grpcio::CallOption::default().timeout(
           self.upload_timeout,
@@ -603,33 +612,33 @@ mod remote {
           )).to_boxed() as BoxFuture<_, _>
         }
         Ok((sender, receiver)) => {
-          let mut offset = 0 as usize;
-          let chunks: Vec<_> = bytes
-            .chunks(self.chunk_size_bytes)
-            .into_iter()
-            .map(|chunk| {
-              let mut req = bazel_protos::bytestream::WriteRequest::new();
-              req.set_resource_name(resource_name.clone());
-              req.set_write_offset(offset as i64);
-              offset += chunk.len();
-              req.set_finish_write(offset == len);
-              req.set_data(chunk.to_vec());
-              (req, grpcio::WriteFlags::default())
-            })
-            .collect();
+          let chunk_size_bytes = self.chunk_size_bytes;
+          let stream =
+            futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
+              0 as usize,
+              move |offset| if offset >= bytes.len() {
+                None
+              } else {
+                let mut req = bazel_protos::bytestream::WriteRequest::new();
+                req.set_resource_name(resource_name.clone());
+                req.set_write_offset(offset as i64);
+                let next_offset = min(offset + chunk_size_bytes, bytes.len());
+                req.set_finish_write(next_offset == bytes.len());
+                req.set_data(bytes.slice(offset, next_offset).to_vec());
+                Some(future::ok(
+                  ((req, grpcio::WriteFlags::default()), next_offset),
+                ))
+              },
+            );
 
           future::ok(self.client.clone())
-            .join(
-              sender
-                .send_all(futures::stream::iter_ok::<_, grpcio::Error>(chunks))
-                .map_err(move |e| {
-                  format!(
-                    "Error attempting to upload fingerprint {}: {:?}",
-                    fingerprint,
-                    e
-                  )
-                }),
-            )
+            .join(sender.send_all(stream).map_err(move |e| {
+              format!(
+                "Error attempting to upload fingerprint {}: {:?}",
+                fingerprint,
+                e
+              )
+            }))
             .and_then(move |_| {
               receiver.map_err(move |e| {
                 format!(

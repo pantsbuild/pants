@@ -15,6 +15,7 @@ pub mod test_cas;
 
 extern crate bazel_protos;
 extern crate boxfuture;
+extern crate bytes;
 extern crate digest;
 extern crate futures;
 extern crate futures_cpupool;
