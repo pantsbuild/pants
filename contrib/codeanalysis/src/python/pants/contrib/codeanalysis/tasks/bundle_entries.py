@@ -9,8 +9,9 @@ import os
 import shutil
 
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
-from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
 from pants.util.dirutil import safe_mkdir
+
+from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
 
 
 class BundleEntries(NailgunTask):
