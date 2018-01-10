@@ -66,10 +66,8 @@ impl TestServer {
   /// * `mock_execution` - The canned responses to issue. Returns the MockExecution's
   ///                      operation_responses in order to any ExecuteRequest or GetOperation
   ///                      requests.
-  ///
   ///                      If an ExecuteRequest request is received which is not equal to this
   ///                      MockExecution's execute_request, an error will be returned.
-  ///
   ///                      If a GetOperation request is received whose name is not equal to this
   ///                      MockExecution's name, or more requests are received than stub responses
   ///                      are available for, an error will be returned.
