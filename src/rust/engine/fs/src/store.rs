@@ -4,6 +4,7 @@ use futures::{Future, future};
 use protobuf::core::Message;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use hash::Fingerprint;
 use pool::ResettablePool;
@@ -67,10 +68,18 @@ impl Store {
     path: P,
     pool: Arc<ResettablePool>,
     cas_address: String,
+    thread_count: usize,
+    chunk_size_bytes: usize,
+    timeout: Duration,
   ) -> Result<Store, String> {
     Ok(Store {
       local: local::ByteStore::new(path, pool)?,
-      remote: Some(remote::ByteStore::new(cas_address)),
+      remote: Some(remote::ByteStore::new(
+        cas_address,
+        thread_count,
+        chunk_size_bytes,
+        timeout,
+      )),
     })
   }
 
@@ -535,32 +544,125 @@ mod remote {
 
   use bazel_protos;
   use boxfuture::{Boxable, BoxFuture};
-  use futures::{future, Future, Stream};
+  use bytes::Bytes;
+  use digest::{Digest as DigestTrait, FixedOutput};
+  use futures::{self, future, Future, Sink, Stream};
   use grpcio;
+  use sha2::Sha256;
+  use std::cmp::min;
   use std::sync::Arc;
+  use std::time::Duration;
 
   use hash::Fingerprint;
 
   #[derive(Clone)]
   pub struct ByteStore {
-    address: String,
+    client: Arc<bazel_protos::bytestream_grpc::ByteStreamClient>,
     env: Arc<grpcio::Environment>,
+    chunk_size_bytes: usize,
+    upload_timeout: Duration,
   }
 
   impl ByteStore {
-    pub fn new(address: String) -> ByteStore {
-      // TODO: Pass through a parallelism configuration option here.
+    pub fn new(
+      cas_address: String,
+      thread_count: usize,
+      chunk_size_bytes: usize,
+      upload_timeout: Duration,
+    ) -> ByteStore {
+      let env = Arc::new(grpcio::Environment::new(thread_count));
+      let channel = grpcio::ChannelBuilder::new(env.clone()).connect(&cas_address);
+      let client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
+        channel,
+      ));
       ByteStore {
-        address: address,
-        env: Arc::new(grpcio::Environment::new(1)),
+        client,
+        env,
+        chunk_size_bytes,
+        upload_timeout,
       }
     }
   }
 
 
   impl super::ByteStore for ByteStore {
-    fn store_bytes(&self, _entry_type: EntryType, _bytes: Vec<u8>) -> BoxFuture<Digest, String> {
-      unimplemented!()
+    fn store_bytes(&self, _entry_type: EntryType, bytes_vec: Vec<u8>) -> BoxFuture<Digest, String> {
+      let bytes = Bytes::from(bytes_vec);
+      let mut hasher = Sha256::default();
+      hasher.input(&bytes);
+      let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
+      let len = bytes.len();
+      let resource_name = format!(
+        "{}/uploads/{}/blobs/{}/{}",
+        "",
+        "",
+        fingerprint,
+        bytes.len()
+      );
+      match self.client.write_opt(
+        grpcio::CallOption::default().timeout(
+          self.upload_timeout,
+        ),
+      ) {
+        Err(err) => {
+          future::err(format!(
+            "Error attempting to connect to upload fingerprint {}: {:?}",
+            fingerprint,
+            err
+          )).to_boxed() as BoxFuture<_, _>
+        }
+        Ok((sender, receiver)) => {
+          let chunk_size_bytes = self.chunk_size_bytes;
+          let stream =
+            futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
+              0 as usize,
+              move |offset| if offset >= bytes.len() {
+                None
+              } else {
+                let mut req = bazel_protos::bytestream::WriteRequest::new();
+                req.set_resource_name(resource_name.clone());
+                req.set_write_offset(offset as i64);
+                let next_offset = min(offset + chunk_size_bytes, bytes.len());
+                req.set_finish_write(next_offset == bytes.len());
+                req.set_data(bytes.slice(offset, next_offset).to_vec());
+                Some(future::ok(
+                  ((req, grpcio::WriteFlags::default()), next_offset),
+                ))
+              },
+            );
+
+          future::ok(self.client.clone())
+            .join(sender.send_all(stream).map_err(move |e| {
+              format!(
+                "Error attempting to upload fingerprint {}: {:?}",
+                fingerprint,
+                e
+              )
+            }))
+            .and_then(move |_| {
+              receiver.map_err(move |e| {
+                format!(
+                  "Error from server when uploading fingerprint {}: {:?}",
+                  fingerprint,
+                  e
+                )
+              })
+            })
+            .and_then(move |received| if received.get_committed_size() !=
+              len as i64
+            {
+              Err(format!(
+                "Uploading file with fingerprint {}: want commited size {} but got {}",
+                fingerprint,
+                len,
+                received.get_committed_size()
+              ))
+            } else {
+              Ok(Digest(fingerprint, len))
+            })
+            .to_boxed()
+        }
+      }
     }
 
     fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
@@ -569,9 +671,7 @@ mod remote {
       fingerprint: Fingerprint,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      let channel = grpcio::ChannelBuilder::new(self.env.clone()).connect(&self.address);
-      let client = bazel_protos::bytestream_grpc::ByteStreamClient::new(channel);
-      match client.read(&{
+      match self.client.read(&{
         let mut req = bazel_protos::bytestream::ReadRequest::new();
         // TODO: Pass a size around, or resolve that we don't need to.
         req.set_resource_name(format!("/blobs/{}/{}", fingerprint, -1));
@@ -583,7 +683,7 @@ mod remote {
         Ok(stream) =>
         // We shouldn't have to pass around the client here, it's a workaround for
         // https://github.com/pingcap/grpc-rs/issues/123
-        future::ok(client)
+        future::ok(self.client.clone())
             .join(stream.map(|r| r.data).concat2())
             .map(|(_client, bytes)| Some(bytes))
             .or_else(|e| match e {
@@ -615,9 +715,15 @@ mod remote {
 
     extern crate tempdir;
 
-    use super::ByteStore;
+    use super::{ByteStore, Fingerprint};
+    use super::super::{ByteStore as ByteStoreTrait, Digest, EntryType};
     use super::super::super::test_cas::StubCAS;
+    use futures::Future;
     use protobuf::Message;
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::PathBuf;
+    use std::time::Duration;
 
     use super::super::tests::{directory, directory_fingerprint, fingerprint,
                               load_directory_proto_bytes, load_file_bytes, new_cas, str_bytes};
@@ -627,7 +733,7 @@ mod remote {
       let cas = new_cas(10);
 
       assert_eq!(
-        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()).unwrap(),
+        load_file_bytes(&new_byte_store(&cas), fingerprint()).unwrap(),
         Some(str_bytes())
       );
     }
@@ -638,7 +744,7 @@ mod remote {
       let cas = StubCAS::empty();
 
       assert_eq!(
-        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        load_file_bytes(&new_byte_store(&cas), fingerprint()),
         Ok(None)
       );
     }
@@ -648,7 +754,7 @@ mod remote {
       let cas = new_cas(10);
 
       assert_eq!(
-        load_directory_proto_bytes(&ByteStore::new(cas.address()), directory_fingerprint()),
+        load_directory_proto_bytes(&new_byte_store(&cas), directory_fingerprint()),
         Ok(Some(directory().write_to_bytes().unwrap()))
       );
     }
@@ -658,7 +764,7 @@ mod remote {
       let cas = StubCAS::empty();
 
       assert_eq!(
-        load_directory_proto_bytes(&ByteStore::new(cas.address()), directory_fingerprint()),
+        load_directory_proto_bytes(&new_byte_store(&cas), directory_fingerprint()),
         Ok(None)
       );
     }
@@ -667,8 +773,7 @@ mod remote {
     fn load_file_grpc_error() {
       let cas = StubCAS::always_errors();
 
-      let error = load_file_bytes(&ByteStore::new(cas.address()), fingerprint())
-        .expect_err("Want error");
+      let error = load_file_bytes(&new_byte_store(&cas), fingerprint()).expect_err("Want error");
       assert!(
         error.contains("StubCAS is configured to always fail"),
         format!("Bad error message, got: {}", error)
@@ -679,9 +784,8 @@ mod remote {
     fn load_directory_grpc_error() {
       let cas = StubCAS::always_errors();
 
-      let error =
-        load_directory_proto_bytes(&ByteStore::new(cas.address()), directory_fingerprint())
-          .expect_err("Want error");
+      let error = load_directory_proto_bytes(&new_byte_store(&cas), directory_fingerprint())
+        .expect_err("Want error");
       assert!(
         error.contains("StubCAS is configured to always fail"),
         format!("Bad error message, got: {}", error)
@@ -693,7 +797,7 @@ mod remote {
       let cas = new_cas(str_bytes().len() + 1);
 
       assert_eq!(
-        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        load_file_bytes(&new_byte_store(&cas), fingerprint()),
         Ok(Some(str_bytes()))
       )
     }
@@ -703,7 +807,7 @@ mod remote {
       let cas = new_cas(str_bytes().len());
 
       assert_eq!(
-        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        load_file_bytes(&new_byte_store(&cas), fingerprint()),
         Ok(Some(str_bytes()))
       )
     }
@@ -713,7 +817,7 @@ mod remote {
       let cas = new_cas(1);
 
       assert_eq!(
-        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        load_file_bytes(&new_byte_store(&cas), fingerprint()),
         Ok(Some(str_bytes()))
       )
     }
@@ -723,9 +827,111 @@ mod remote {
       let cas = new_cas(9);
 
       assert_eq!(
-        load_file_bytes(&ByteStore::new(cas.address()), fingerprint()),
+        load_file_bytes(&new_byte_store(&cas), fingerprint()),
         Ok(Some(str_bytes()))
       )
+    }
+
+    #[test]
+    fn write_file_one_chunk() {
+      let cas = StubCAS::empty();
+
+      let store = new_byte_store(&cas);
+      assert_eq!(
+        store.store_bytes(EntryType::File, str_bytes()).wait(),
+        Ok(Digest(fingerprint(), str_bytes().len()))
+      );
+
+      let blobs = cas.blobs.lock().unwrap();
+      assert_eq!(blobs.get(&fingerprint()), Some(&str_bytes()));
+    }
+
+    #[test]
+    fn write_file_multiple_chunks() {
+      let cas = StubCAS::empty();
+
+      let store = ByteStore::new(cas.address(), 1, 10 * 1024, Duration::from_secs(1));
+
+      let all_the_henries = {
+        let mut f = File::open(
+          PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("testdata")
+            .join("all_the_henries"),
+        ).expect("Error opening all_the_henries");
+        let mut bytes = Vec::new();
+        f.read_to_end(&mut bytes).expect(
+          "Error reading all_the_henries",
+        );
+        bytes
+      };
+
+      let fingerprint = Fingerprint::from_hex_string(
+        "8dfba0adc29389c63062a68d76b2309b9a2486f1ab610c4720beabbdc273301f",
+      ).unwrap();
+
+      assert_eq!(
+        store
+          .store_bytes(EntryType::File, all_the_henries.clone())
+          .wait(),
+        Ok(Digest(fingerprint, all_the_henries.len()))
+      );
+
+      let blobs = cas.blobs.lock().unwrap();
+      assert_eq!(blobs.get(&fingerprint), Some(&all_the_henries));
+
+      let write_message_sizes = cas.write_message_sizes.lock().unwrap();
+      assert_eq!(
+        write_message_sizes.len(),
+        98,
+        "Wrong number of chunks uploaded"
+      );
+      for size in write_message_sizes.iter() {
+        assert!(
+          size <= &(10 * 1024),
+          format!("Size {} should have been <= {}", size, 10 * 1024)
+        );
+      }
+    }
+
+    #[test]
+    fn write_file_errors() {
+      let cas = StubCAS::always_errors();
+
+      let store = new_byte_store(&cas);
+      let error = store
+        .store_bytes(EntryType::File, str_bytes())
+        .wait()
+        .expect_err("Want error");
+      assert!(
+        error.contains("Error from server"),
+        format!("Bad error message, got: {}", error)
+      );
+      assert!(
+        error.contains("StubCAS is configured to always fail"),
+        format!("Bad error message, got: {}", error)
+      );
+    }
+
+    #[test]
+    fn write_connection_error() {
+      let store = ByteStore::new(
+        "doesnotexist.example".to_owned(),
+        1,
+        10 * 1024 * 1024,
+        Duration::from_secs(1),
+      );
+      let error = store
+        .store_bytes(EntryType::File, str_bytes())
+        .wait()
+        .expect_err("Want error");
+      assert!(
+        error.contains("Error attempting to upload fingerprint"),
+        format!("Bad error message, got: {}", error)
+      );
+    }
+
+    fn new_byte_store(cas: &StubCAS) -> ByteStore {
+      ByteStore::new(cas.address(), 1, 10 * 1024 * 1024, Duration::from_secs(1))
     }
   }
 }
@@ -743,6 +949,7 @@ mod tests {
   use sha2::Sha256;
   use std::path::Path;
   use std::sync::Arc;
+  use std::time::Duration;
   use tempdir::TempDir;
 
   pub const STR: &str = "European Burmese";
@@ -826,6 +1033,9 @@ c0033144c785a94d3ebd82baa931cd16";
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       cas_address,
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(1),
     ).unwrap()
   }
 
@@ -854,7 +1064,7 @@ c0033144c785a94d3ebd82baa931cd16";
         .wait(),
       Ok(Some(str_bytes()))
     );
-    assert_eq!(0, cas.request_count());
+    assert_eq!(0, cas.read_request_count());
   }
 
   #[test]
@@ -873,7 +1083,7 @@ c0033144c785a94d3ebd82baa931cd16";
         .wait(),
       Ok(Some(directory()))
     );
-    assert_eq!(0, cas.request_count());
+    assert_eq!(0, cas.read_request_count());
   }
 
   #[test]
@@ -888,7 +1098,7 @@ c0033144c785a94d3ebd82baa931cd16";
       Ok(Some(str_bytes())),
       "Read from CAS"
     );
-    assert_eq!(1, cas.request_count());
+    assert_eq!(1, cas.read_request_count());
     assert_eq!(
       local::tests::new_store(dir.path())
         .load_bytes_with(
@@ -913,7 +1123,7 @@ c0033144c785a94d3ebd82baa931cd16";
         .wait(),
       Ok(Some(directory()))
     );
-    assert_eq!(1, cas.request_count());
+    assert_eq!(1, cas.read_request_count());
     assert_eq!(
       local::tests::new_store(dir.path())
         .load_bytes_with(
@@ -937,7 +1147,7 @@ c0033144c785a94d3ebd82baa931cd16";
         .wait(),
       Ok(None)
     );
-    assert_eq!(1, cas.request_count());
+    assert_eq!(1, cas.read_request_count());
   }
 
   #[test]
@@ -951,7 +1161,7 @@ c0033144c785a94d3ebd82baa931cd16";
         .wait(),
       Ok(None)
     );
-    assert_eq!(1, cas.request_count());
+    assert_eq!(1, cas.read_request_count());
   }
 
 
@@ -964,7 +1174,7 @@ c0033144c785a94d3ebd82baa931cd16";
       .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
       .wait()
       .expect_err("Want error");
-    assert_eq!(1, cas.request_count());
+    assert_eq!(1, cas.read_request_count());
     assert!(
       error.contains("StubCAS is configured to always fail"),
       "Bad error message"
@@ -980,7 +1190,7 @@ c0033144c785a94d3ebd82baa931cd16";
       .load_directory(fingerprint())
       .wait()
       .expect_err("Want error");
-    assert_eq!(1, cas.request_count());
+    assert_eq!(1, cas.read_request_count());
     assert!(
       error.contains("StubCAS is configured to always fail"),
       "Bad error message"
