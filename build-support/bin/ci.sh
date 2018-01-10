@@ -50,7 +50,9 @@ function usage() {
 
 bootstrap_compile_args=(
   lint.python-eval
-  --closure
+  --transitive
+  --skip # TODO: After we fix the cycles from the engine refactor we should re-enable this.
+         # https://github.com/pantsbuild/pants/issues/4601
 )
 
 # No python test sharding (1 shard) by default.

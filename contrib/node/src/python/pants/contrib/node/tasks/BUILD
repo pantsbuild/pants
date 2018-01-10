@@ -112,8 +112,10 @@ python_library(
   dependencies=[
     ':node_paths',
     ':node_task',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:process_handler',
   ]

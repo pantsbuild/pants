@@ -142,6 +142,7 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/option',
     'src/python/pants/process',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ],
 )
@@ -632,6 +633,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
     'src/python/pants/option',
+    'src/python/pants/task',
   ]
 )
 
@@ -645,6 +647,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/java/jar',
     'src/python/pants/option',
+    'src/python/pants/task',
   ]
 )
 
@@ -670,6 +673,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/process',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil'
   ],
 )

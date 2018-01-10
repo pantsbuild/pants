@@ -24,6 +24,8 @@ from pants.core_tasks.targets_help import TargetsHelp
 from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
+from pants.task.fmt_task_mixin import FmtGoalOptionsRegistrar
+from pants.task.lint_task_mixin import LintGoalOptionsRegistrar
 
 
 def register_goals():
@@ -47,8 +49,8 @@ def register_goals():
   Goal.register('doc', 'Generate documentation.')
   Goal.register('publish', 'Publish a build artifact.')
   Goal.register('dep-usage', 'Collect target dependency usage data.')
-  Goal.register('lint', 'Find formatting errors in source code.')
-  Goal.register('fmt', 'Autoformat source code.')
+  Goal.register('lint', 'Find formatting errors in source code.', LintGoalOptionsRegistrar)
+  Goal.register('fmt', 'Autoformat source code.', FmtGoalOptionsRegistrar)
   Goal.register('buildozer', 'Manipulate BUILD files.')
 
   # Register tasks.
@@ -99,5 +101,5 @@ def register_goals():
   task(name='deferred-sources', action=DeferredSourcesMapper).install()
 
   # Processing aliased targets has to occur very early.
-  task(name='substitute-aliased-targets', action=SubstituteAliasedTargets).install('bootstrap',
-                                                                                   first=True)
+  task(name='substitute-aliased-targets', action=SubstituteAliasedTargets).install(
+    'bootstrap', first=True)

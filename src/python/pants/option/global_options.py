@@ -237,7 +237,6 @@ class GlobalOptionsRegistrar(Optionable):
              help="Include only targets with these tags (optional '+' prefix) or without these "
                   "tags ('-' prefix).  Useful with ::, to find subsets of targets "
                   "(e.g., integration tests.)")
-
     register('-t', '--timeout', advanced=True, type=int, metavar='<seconds>',
              help='Number of seconds to wait for http connections.')
     # TODO: After moving to the new options system these abstraction leaks can go away.

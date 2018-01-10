@@ -208,9 +208,9 @@ def register_goals():
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
 
-  # Formating.
-  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
+  # Formatting.
   task(name='scalafix', action=ScalaFixFix).install('fmt')
+  task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
 
   # Running.
   task(name='jvm', action=JvmRun, serialize=False).install('run')

@@ -18,8 +18,8 @@ from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTest
 
 class PythonIsortTest(PythonTaskTestBase):
   BAD_IMPORT_ORDER = dedent("""
-  from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, print_function,
-                          unicode_literals)
+  from __future__ import (with_statement, division, absolute_import, generators, nested_scopes, 
+                          print_function, unicode_literals)
 
   """)
 
@@ -68,9 +68,11 @@ class PythonIsortTest(PythonTaskTestBase):
     self.create_file('src/python/a/not_in_a_target.py', self.BAD_IMPORT_ORDER)
     self.create_file('src/python/a/.isort.cfg', self.CONFIG_A)
 
-    self.b_library = self.create_python_library('src/python/a/b', 'b', {'b.py': self.BAD_IMPORT_ORDER})
+    self.b_library = self.create_python_library('src/python/a/b', 'b',
+                                                {'b.py': self.BAD_IMPORT_ORDER})
 
-    self.c_library = self.create_python_library('src/python/c', 'c', {'c.py': self.BAD_IMPORT_ORDER})
+    self.c_library = self.create_python_library('src/python/c', 'c',
+                                                {'c.py': self.BAD_IMPORT_ORDER})
 
     self.create_file('src/.isort.cfg', self.CONFIG_B)
 
