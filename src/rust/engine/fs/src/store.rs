@@ -1,32 +1,13 @@
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use futures::{Future, future};
+use hashing::{Digest, Fingerprint};
 use protobuf::core::Message;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use hash::Fingerprint;
 use pool::ResettablePool;
-
-///
-/// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
-/// fingerprint.
-///
-/// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
-/// of needing to create an entire protobuf to pass around the two fields.
-///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Digest(pub Fingerprint, pub usize);
-
-impl Into<bazel_protos::remote_execution::Digest> for Digest {
-  fn into(self) -> bazel_protos::remote_execution::Digest {
-    let mut digest = bazel_protos::remote_execution::Digest::new();
-    digest.set_hash(self.0.to_hex());
-    digest.set_size_bytes(self.1 as i64);
-    digest
-  }
-}
 
 ///
 /// A content-addressed store of file contents, and Directories.
@@ -252,11 +233,12 @@ pub trait ByteStore {
 }
 
 mod local {
-  use super::{Digest, EntryType};
+  use super::EntryType;
 
   use boxfuture::{Boxable, BoxFuture};
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
+  use hashing::{Digest, Fingerprint};
   use lmdb::{Database, DatabaseFlags, Environment, NO_OVERWRITE, Transaction};
   use lmdb::Error::{KeyExist, NotFound};
   use sha2::Sha256;
@@ -264,7 +246,6 @@ mod local {
   use std::path::Path;
   use std::sync::Arc;
 
-  use hash::Fingerprint;
   use pool::ResettablePool;
 
   #[derive(Clone)]
@@ -540,20 +521,19 @@ mod local {
 }
 
 mod remote {
-  use super::{Digest, EntryType};
+  use super::EntryType;
 
   use bazel_protos;
   use boxfuture::{Boxable, BoxFuture};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, Sink, Stream};
+  use hashing::{Digest, Fingerprint};
   use grpcio;
   use sha2::Sha256;
   use std::cmp::min;
   use std::sync::Arc;
   use std::time::Duration;
-
-  use hash::Fingerprint;
 
   #[derive(Clone)]
   pub struct ByteStore {
@@ -938,12 +918,13 @@ mod remote {
 
 #[cfg(test)]
 mod tests {
-  use super::{ByteStore, Digest, EntryType, Fingerprint, Store, local};
+  use super::{ByteStore, EntryType, Store, local};
   use super::super::test_cas::StubCAS;
 
   use bazel_protos;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
+  use hashing::{Digest, Fingerprint};
   use pool::ResettablePool;
   use protobuf::Message;
   use sha2::Sha256;

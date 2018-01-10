@@ -3,12 +3,14 @@ extern crate boxfuture;
 extern crate clap;
 extern crate fs;
 extern crate futures;
+extern crate hashing;
 extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
-use fs::{Fingerprint, GetFileDigest, ResettablePool, Snapshot, Store, VFS};
+use fs::{GetFileDigest, ResettablePool, Snapshot, Store, VFS};
 use futures::future::{self, Future, join_all};
+use hashing::{Digest, Fingerprint};
 use protobuf::Message;
 use std::error::Error;
 use std::fs::File;
@@ -335,7 +337,7 @@ struct FileSaver {
 }
 
 impl GetFileDigest<String> for FileSaver {
-  fn digest(&self, file: &fs::File) -> BoxFuture<fs::Digest, String> {
+  fn digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
     let file_copy = file.clone();
     let store = self.store.clone();
     self
