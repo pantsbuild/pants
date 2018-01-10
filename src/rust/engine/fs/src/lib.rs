@@ -1,12 +1,10 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-mod hash;
-pub use hash::Fingerprint;
 mod snapshot;
 pub use snapshot::{GetFileDigest, Snapshot};
 mod store;
-pub use store::{Digest, Store};
+pub use store::Store;
 mod pool;
 pub use pool::ResettablePool;
 
@@ -21,6 +19,7 @@ extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
 extern crate grpcio;
+extern crate hashing;
 extern crate hex;
 extern crate ignore;
 extern crate itertools;
@@ -44,12 +43,12 @@ use std::cmp::min;
 use futures::future::{self, Future};
 use futures_cpupool::CpuFuture;
 use glob::Pattern;
+use hashing::{Fingerprint, WriterHasher};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ordermap::OrderMap;
 use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
-use hash::WriterHasher;
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

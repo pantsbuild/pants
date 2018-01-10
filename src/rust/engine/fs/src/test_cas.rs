@@ -6,7 +6,7 @@ use futures;
 use grpcio;
 
 use futures::{Future, IntoFuture, Stream};
-use Fingerprint;
+use hashing::Fingerprint;
 
 ///
 /// Implements the ContentAddressableStorage gRPC API, answering read requests with either known

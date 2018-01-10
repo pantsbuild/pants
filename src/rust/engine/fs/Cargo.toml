@@ -12,6 +12,7 @@ futures = "0.1.16"
 futures-cpupool = "0.1.6"
 glob = "0.2.11"
 grpcio = { version = "0.2.0", features = ["secure"] }
+hashing = { path = "../hashing" }
 hex = "0.3.1"
 ignore = "0.3.1"
 itertools = "0.7.2"
