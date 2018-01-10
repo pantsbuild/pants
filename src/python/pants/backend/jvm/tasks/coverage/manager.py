@@ -69,18 +69,18 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
   def register_junit_options(register, register_jvm_tool):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, fingerprint=True,
-             choices=['cobertura', 'jacoco'], default='cobertura',
-             help='Which coverage processor to use if --coverage is enabled. If this option is'
-                  'explicitly set, implies --coverage.')
-    register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
-             help='JVM flags to be added when running the coverage processor. For example: '
-                  '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
-
+             choices=['cobertura', 'jacoco'], default=None,
+             help="Which coverage processor to use if --coverage is enabled. If this option is "
+                  "unset but coverage is enabled implicitly or explicitly, defaults to 'cobertura'."
+                  "If this option is explicitly set, implies --coverage.")
     # We need to fingerprint this even though it nominally UI-only affecting option since the
     # presence of this option alone can implicitly flag on `--coverage`.
     register('--coverage-open', type=bool, fingerprint=True,
              help='Open the generated HTML coverage report in a browser. Implies --coverage.')
 
+    register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
+             help='JVM flags to be added when running the coverage processor. For example: '
+                  '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
     register('--coverage-force', advanced=True, type=bool,
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
@@ -94,11 +94,9 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
 
   def get_coverage_engine(self, task, output_dir, all_targets, execute_java):
     options = task.get_options()
-    if (options.coverage or
-        options.is_flagged('coverage_processor') or
-        options.is_flagged('coverage_open')):
+    if options.coverage or options.coverage_processor or options.is_flagged('coverage_open'):
       settings = CodeCoverageSettings.from_task(task, workdir=output_dir)
-      if options.coverage_processor == 'cobertura':
+      if options.coverage_processor in ('cobertura', None):
         return Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
       elif options.coverage_processor == 'jacoco':
         return Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)
