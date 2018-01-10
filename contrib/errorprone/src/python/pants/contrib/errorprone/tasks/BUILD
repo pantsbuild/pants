@@ -2,9 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=[
-    'errorprone.py',
-  ],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/backend/jvm/subsystems:shader',
@@ -13,6 +10,7 @@ python_library(
     'src/python/pants/java/jar',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ]
 )

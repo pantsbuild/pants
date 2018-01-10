@@ -14,6 +14,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:workunit',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:xml_parser',
   ]
