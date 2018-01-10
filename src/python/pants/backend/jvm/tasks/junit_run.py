@@ -138,7 +138,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
 
   @classmethod
   def implementation_version(cls):
-    return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 2)]
+    return super(JUnitRun, cls).implementation_version() + [('JUnitRun', 3)]
 
   _BATCH_ALL = sys.maxint
 
