@@ -135,7 +135,11 @@ class PythonBinaryCreate(Task):
       built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
       if built_dists:
         for dist in built_dists:
-          builder.add_dist_location(dist)
+          # Ensure only python_dist dependencies of binary_tgt are added to the output pex.
+          # This protects against the case where a single `./pants binary` command builds two
+          # binary targets that each have their own unique python_dist depencency.
+          if any([tgt.id in dist for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE)]):
+            builder.add_dist_location(dist)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
