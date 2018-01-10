@@ -70,7 +70,8 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
     register('--coverage', type=bool, fingerprint=True, help='Collect code coverage data.')
     register('--coverage-processor', advanced=True, fingerprint=True,
              choices=['cobertura', 'jacoco'], default='cobertura',
-             help='Which coverage subsystem to use.')
+             help='Which coverage processor to use if --coverage is enabled. If this option is'
+                  'explicitly set, implies --coverage.')
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
              help='JVM flags to be added when running the coverage processor. For example: '
                   '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
@@ -88,16 +89,23 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
     # TODO(jtrobec): get rid of this calls when engines are dependent subsystems
     Cobertura.register_junit_options(register, register_jvm_tool)
 
-  @staticmethod
-  def get_coverage_engine(task, output_dir, all_targets, execute_java):
+  class InvalidCoverageEngine(Exception):
+    """Indicates an invalid coverage engine type was selected."""
+
+  def get_coverage_engine(self, task, output_dir, all_targets, execute_java):
     options = task.get_options()
-    settings = CodeCoverageSettings.from_task(task, workdir=output_dir)
-    coverage = NoCoverage()
-
-    if options.coverage or options.coverage_processor or options.is_flagged('coverage_open'):
+    if (options.coverage or
+        options.is_flagged('coverage_processor') or
+        options.is_flagged('coverage_open')):
+      settings = CodeCoverageSettings.from_task(task, workdir=output_dir)
       if options.coverage_processor == 'cobertura':
-        coverage = Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
+        return Cobertura.Factory.global_instance().create(settings, all_targets, execute_java)
       elif options.coverage_processor == 'jacoco':
-        coverage = Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)
-
-    return coverage
+        return Jacoco.Factory.global_instance().create(settings, all_targets, execute_java)
+      else:
+        # NB: We should never get here since the `--coverage-processor` is restricted by `choices`,
+        # but for clarity.
+        raise self.InvalidCoverageEngine('Unknown and unexpected coverage processor {!r}!'
+                                         .format(options.coverage_processor))
+    else:
+      return NoCoverage()
