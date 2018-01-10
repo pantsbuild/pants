@@ -130,6 +130,26 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEquals(2, len(junit_jar_cp))
     self.assertEquals(0, len(excluding_cp))
 
+    def get_coord_in_classpath(cp, targets):
+      """
+      Get the simple coords that are going to be on the classpath
+      """
+      conf_art_tuples_ex = cp.get_classpath_entries_for_targets(targets)
+      simple_coords = set(x[1].coordinate.simple_coord for x in conf_art_tuples_ex)
+      return simple_coords
+
+    # If we grab the transitive closure of the coordinates just for junit, then
+    # both junit and hamcrest should be in it.
+    simple_coords = get_coord_in_classpath(compile_classpath, [junit_jar_lib])
+    self.assertIn('junit:junit:4.12', simple_coords)
+    self.assertIn('org.hamcrest:hamcrest-core:1.3', simple_coords)
+
+    # If we grab transitive closure of the coordinates for junit along with a JavaLibrary
+    # target that excludes junit, then junit should not be on the classpath.
+    simple_coords = get_coord_in_classpath(compile_classpath, [excluding_target, junit_jar_lib])
+    self.assertNotIn('junit:junit:4.12', simple_coords)
+    self.assertIn('org.hamcrest:hamcrest-core:1.3', simple_coords)
+
   def test_resolve_no_deps(self):
     # Resolve a library with no deps, and confirm that the empty product is created.
     target = self.make_target('//:a', JavaLibrary, sources=[])
