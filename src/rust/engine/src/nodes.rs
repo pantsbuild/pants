@@ -15,7 +15,6 @@ use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants, throw};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
-use handles::maybe_drain_handles;
 use process_execution as process_executor;
 use rule_graph;
 use selectors::{self, Selector};
@@ -762,6 +761,7 @@ impl Node for ExecuteProcess {
 
   fn run(self, _: Context) -> NodeFuture<ProcessResult> {
     let request = self.0.clone();
+    // TODO: this should run off-thread, and asynchronously
     future::ok(ProcessResult(
       process_executor::local::run_command_locally(request)
         .unwrap(),

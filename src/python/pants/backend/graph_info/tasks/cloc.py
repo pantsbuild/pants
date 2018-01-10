@@ -45,6 +45,10 @@ class CountLinesOfCode(ConsoleTask):
     buildroot = get_buildroot()
     with temporary_dir() as tmpdir:
       # Write the paths of all files we want cloc to process to the so-called 'list file'.
+      # TODO: 1) list_file, report_file and ignored_file should be relative files within the
+      # execution "chroot", 2) list_file should be part of an input files Snapshot, and
+      # 3) report_file and ignored_file should be part of an output files Snapshot, when we have
+      # that capability.
       list_file = os.path.join(tmpdir, 'list_file')
       with open(list_file, 'w') as list_file_out:
         for target in targets:
@@ -55,13 +59,16 @@ class CountLinesOfCode(ConsoleTask):
       report_file = os.path.join(tmpdir, 'report_file')
       ignored_file = os.path.join(tmpdir, 'ignored')
 
+      # TODO: Look at how to make BinaryUtil support Snapshots - such as adding an instrinsic to do
+      # network fetch directly into a Snapshot.
       # See http://cloc.sourceforge.net/#options for cloc cmd-line options.
       cmd = (
         self._get_cloc_script(),
         '--skip-uniqueness',
         '--ignored={}'.format(ignored_file),
         '--list-file={}'.format(list_file),
-        '--report-file={}'.format(report_file))
+        '--report-file={}'.format(report_file)
+      )
       if self.context._scheduler is None:
         with self.context.new_workunit(
           name='cloc',
@@ -73,15 +80,13 @@ class CountLinesOfCode(ConsoleTask):
               stderr=workunit.output('stderr')
             )
       else:
-        req = ExecuteProcessRequest(cmd, dict(os.environ))
-        self.context._scheduler.product_request(ExecuteProcessResult, [req])
-        request = self.context._scheduler.execution_request([ExecuteProcessResult], [req])
-        root_entries = self.context._scheduler.execute(request).root_products
-        if len(root_entries) != 1:
-          raise Exception("Got {} root entries ({})".format(len(root_entries), root_entries))
-        root, state = root_entries[0]
-        result = state.value.exit_code
-      if result != 0:
+        # TODO: Longer term we need to figure out what to put on $PATH in a remote execution env.
+        # Currently, we are adding everything within $PATH to the request.
+        env_path = ['PATH', os.environ.get('PATH')]
+        req = ExecuteProcessRequest(cmd, env_path)
+        execute_process_result, = self.context._scheduler.product_request(ExecuteProcessResult, [req])
+        exit_code = execute_process_result.exit_code
+      if exit_code != 0:
         raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
 
       with open(report_file, 'r') as report_file_in:

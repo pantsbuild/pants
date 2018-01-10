@@ -34,23 +34,10 @@ def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
   return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in snapshot.files)),
     snapshots=(snapshot,))
 
-def file_list_to_args_for_cat_with_snapshot_subjects(snapshot):
-  return ExecuteProcessRequest(argv=[sorted(f.path for f in snapshot.files)], env=snapshot)
-
-def file_list_to_args_for_cat_with_request_subjects(request):
-  return ExecuteProcessRequest(argv=request.argv, env=request.env)
-
-
 def process_result_to_concatted_from_outfile(process_result, sandbox_dir):
   with open(os.path.join(sandbox_dir, 'outfile')) as f:
     # TODO might be better to allow for this to be done via Nodes. But I'm not sure how as yet.
     return Concatted(f.read())
-
-def process_request_from_input(input):
-  return ExecuteProcessRequest(input.argv, input.env)
-
-def process_result_from_output(output, sandbox_dir):
-  return ExecuteProcessResult(output.stdout, output.stderr, output.exit_code)
 
 def process_result_to_concatted(process_result, sandbox_dir):
   return Concatted(process_result.stdout)
@@ -95,9 +82,9 @@ def java_sources_to_javac_args(sources_snapshot, out_dir):
                                    directories_to_create=(out_dir.path,))
 
 def process_request_from_java_sources(sources_snapshot, binary):
-  env = dict(os.environ)
+  env = []
   return ExecuteProcessRequest(
-    args=binary.prefix_of_command() + tuple(['-version']) + tuple(f.path for f in sources_snapshot.files),
+    args=binary.prefix_of_command() + ('-version',) + tuple(f.path for f in sources_snapshot.files),
     env=env)
 
 
@@ -162,6 +149,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
     result = state.value
     self.assertEqual(0, result.exit_code)
+    self.assertIn('javac', result.stderr)
 
   def test_javac_compilation_example(self):
     sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Simple.java'])

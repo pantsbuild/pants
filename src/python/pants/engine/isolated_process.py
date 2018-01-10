@@ -164,6 +164,7 @@ class SnapshottedProcess(object):
     # Return a task triple that executes the function to produce the product type.
     return TaskRule(product_type, inputs, func)
 
+
 def create_snapshot_rules():
   """Intrinsically replaced on the rust side."""
   return [
@@ -232,7 +233,7 @@ class ExecuteProcess(object):
 class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['args', 'env'])):
   """Request for execution with args and snapshots to extract."""
 
-  def __new__(cls, args, env, **kwargs):
+  def __new__(cls, args, env):
     """
 
     :param args: Arguments to the process being run.
@@ -240,13 +241,7 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['args', 'env'])):
     """
     if not isinstance(args, tuple):
       raise ValueError('args must be a tuple.')
-    if not isinstance(env, dict):
-      raise ValueError('env must be a dict')
-    env_list = []
-    for k, v in env.viewitems():
-      env_list.append(k)
-      env_list.append(v)
-    return super(ExecuteProcessRequest, cls).__new__(cls, args, tuple(env_list), **kwargs)
+    return super(ExecuteProcessRequest, cls).__new__(cls, args, tuple(env))
 
 class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):
   pass
