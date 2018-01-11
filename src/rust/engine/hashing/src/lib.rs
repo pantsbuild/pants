@@ -1,14 +1,17 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use digest::{Digest, FixedOutput};
+extern crate bazel_protos;
+extern crate digest;
+extern crate hex;
+extern crate sha2;
+
+use digest::{Digest as DigestTrait, FixedOutput};
 use sha2::Sha256;
 
 use std::error::Error;
 use std::fmt;
 use std::io::{self, Write};
-
-use hex;
 
 const FINGERPRINT_SIZE: usize = 32;
 
@@ -63,6 +66,25 @@ impl fmt::Debug for Fingerprint {
 impl AsRef<[u8]> for Fingerprint {
   fn as_ref(&self) -> &[u8] {
     &self.0[..]
+  }
+}
+
+///
+/// A Digest is a fingerprint, as well as the size in bytes of the plaintext for which that is the
+/// fingerprint.
+///
+/// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
+/// of needing to create an entire protobuf to pass around the two fields.
+///
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Digest(pub Fingerprint, pub usize);
+
+impl Into<bazel_protos::remote_execution::Digest> for Digest {
+  fn into(self) -> bazel_protos::remote_execution::Digest {
+    let mut digest = bazel_protos::remote_execution::Digest::new();
+    digest.set_hash(self.0.to_hex());
+    digest.set_size_bytes(self.1 as i64);
+    digest
   }
 }
 

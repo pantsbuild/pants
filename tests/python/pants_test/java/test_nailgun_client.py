@@ -49,9 +49,9 @@ class TestNailgunClientSession(unittest.TestCase):
 
     self.nailgun_client_session = NailgunClientSession(
       sock=self.client_sock,
-      in_fd=None,
-      out_fd=self.fake_stdout,
-      err_fd=self.fake_stderr
+      in_file=None,
+      out_file=self.fake_stdout,
+      err_file=self.fake_stderr
     )
 
     self.mock_stdin_reader = mock.create_autospec(NailgunStreamWriter, spec_set=True)

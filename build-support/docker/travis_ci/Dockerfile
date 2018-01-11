@@ -14,7 +14,7 @@ ARG TRAVIS_UID=1000
 ARG TRAVIS_GROUP=root
 ARG TRAVIS_GID=0
 
-RUN groupadd --gid ${TRAVIS_GID} ${TRAVIS_GROUP}
+RUN groupadd --gid ${TRAVIS_GID} ${TRAVIS_GROUP} || true
 RUN useradd -d /travis/home -g ${TRAVIS_GROUP} --uid ${TRAVIS_UID} ${TRAVIS_USER}
 USER ${TRAVIS_USER}:${TRAVIS_GROUP}
 

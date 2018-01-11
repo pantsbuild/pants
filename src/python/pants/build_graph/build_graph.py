@@ -124,7 +124,8 @@ class BuildGraph(AbstractClass):
     self._target_by_address = OrderedDict()
     self._target_dependencies_by_address = defaultdict(OrderedSet)
     self._target_dependees_by_address = defaultdict(set)
-    self._derived_from_by_derivative_address = {}
+    self._derived_from_by_derivative = {}  # Address -> Address.
+    self._derivatives_by_derived_from = defaultdict(list)   # Address -> list of Address.
     self.synthetic_addresses = set()
 
   def contains_address(self, address):
@@ -181,7 +182,7 @@ class BuildGraph(AbstractClass):
 
     :API: public
     """
-    parent_address = self._derived_from_by_derivative_address.get(address, address)
+    parent_address = self._derived_from_by_derivative.get(address, address)
     return self.get_target(parent_address)
 
   def get_concrete_derived_from(self, address):
@@ -192,11 +193,35 @@ class BuildGraph(AbstractClass):
     :API: public
     """
     current_address = address
-    next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
+    next_address = self._derived_from_by_derivative.get(current_address, current_address)
     while next_address != current_address:
       current_address = next_address
-      next_address = self._derived_from_by_derivative_address.get(current_address, current_address)
+      next_address = self._derived_from_by_derivative.get(current_address, current_address)
     return self.get_target(current_address)
+
+  def get_direct_derivatives(self, address):
+    """Get all targets derived directly from the specified target.
+
+    Note that the specified target itself is not returned.
+
+    :API: public
+    """
+    derivative_addrs = self._derivatives_by_derived_from.get(address, [])
+    return [self.get_target(addr) for addr in derivative_addrs]
+
+  def get_all_derivatives(self, address):
+    """Get all targets derived directly or indirectly from the specified target.
+
+    Note that the specified target itself is not returned.
+
+    :API: public
+    """
+    ret = []
+    direct = self.get_direct_derivatives(address)
+    ret.extend(direct)
+    for t in direct:
+      ret.extend(self.get_all_derivatives(t.address))
+    return ret
 
   def inject_target(self, target, dependencies=None, derived_from=None, synthetic=False):
     """Injects a fully realized Target into the BuildGraph.
@@ -237,7 +262,8 @@ class BuildGraph(AbstractClass):
                          ' Target already in the BuildGraph.'
                          .format(target=target,
                                  derived_from=derived_from))
-      self._derived_from_by_derivative_address[target.address] = derived_from.address
+      self._derived_from_by_derivative[target.address] = derived_from.address
+      self._derivatives_by_derived_from[derived_from.address].append(target.address)
 
     if derived_from or synthetic:
       self.synthetic_addresses.add(address)

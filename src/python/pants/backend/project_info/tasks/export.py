@@ -134,7 +134,8 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
                                           classpath_products=compile_classpath,
                                           confs=confs)
       else:
-        CoursierMixin.resolve(self, targets, compile_classpath)
+        CoursierMixin.resolve(self, targets, compile_classpath,
+                              sources=self.get_options().libraries_sources, javadoc=self.get_options().libraries_javadocs)
 
     return compile_classpath
 
