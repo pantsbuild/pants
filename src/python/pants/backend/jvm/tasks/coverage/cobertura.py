@@ -242,8 +242,8 @@ class Cobertura(CoverageEngine):
         return False
     return True
 
-  def _execute_cobertura(self, workunit_name, main, args):
-    cobertura_cp = self._settings.tool_classpath('cobertura-report')
+  def _execute_cobertura(self, workunit_name, tool_classpath, main, args):
+    cobertura_cp = self._settings.tool_classpath(tool_classpath)
     result = self._execute_java(classpath=cobertura_cp,
                                 main=main,
                                 jvm_options=self._settings.coverage_jvm_options,
@@ -262,6 +262,7 @@ class Cobertura(CoverageEngine):
       else:
         datafile = os.path.join(output_dir, '{}.merged'.format(self._DATAFILE_NAME))
         self._execute_cobertura(workunit_name='cobertura-merge',
+                                tool_classpath='cobertura-merge',
                                 main='net.sourceforge.cobertura.merge.MergeMain',
                                 args=['--datafile', datafile] + datafiles)
 
@@ -274,6 +275,7 @@ class Cobertura(CoverageEngine):
         report_dir = os.path.join(base_report_dir, report_format)
         safe_mkdir(report_dir, clean=True)
         self._execute_cobertura(workunit_name='cobertura-report-{}'.format(report_format),
+                                tool_classpath='cobertura-report',
                                 main='net.sourceforge.cobertura.reporting.ReportMain',
                                 args=base_args + ['--destination', report_dir,
                                                   '--format', report_format])
