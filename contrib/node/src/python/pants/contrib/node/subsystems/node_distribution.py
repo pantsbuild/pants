@@ -94,16 +94,9 @@ class NodeDistribution(object):
     }
     logger.debug('Node.js version: %s package manager from config: %s', version, package_manager)
 
-  def node_command(self, args=None, node_paths=None):
-    """Creates a command that can run `node`, passing the given args to it.
-
-    :param list args: An optional list of arguments to pass to `node`.
-    :returns: A `node` command that can be run later.
-    :rtype: :class:`NodeDistribution.Command`
-    """
-    # NB: We explicitly allow no args for the `node` command unlike the `npm` command since running
-    # `node` with no arguments is useful, it launches a REPL.
-    return command_gen(self._node_instance, args=args, node_paths=node_paths)
+  @property
+  def version(self):
+    return self._node_instance.version
 
   def install_packages(self, install_optional=False, node_paths=None, package_manager=None):
     return self.get_package_manager(

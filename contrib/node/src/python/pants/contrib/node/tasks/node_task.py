@@ -70,7 +70,8 @@ class NodeTask(Task):
     :rtype: A tuple of (int,
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
     """
-    node_command = self.node_distribution.node_command(args=args, node_paths=node_paths)
+    node_command = self.node_distribution._node_instance.run_command(
+      args=args, node_paths=node_paths)
     return self._execute_command(node_command,
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)

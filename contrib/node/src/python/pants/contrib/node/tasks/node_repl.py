@@ -60,7 +60,7 @@ class NodeRepl(ReplTaskMixin, NodeTask):
         json.dump(package, fp, indent=2)
 
       args = self.get_passthru_args()
-      node_repl = self.node_distribution.node_command(
+      node_repl = self.node_distribution._node_instance.run_command(
         args=args, node_paths=node_paths.all_node_paths if node_paths else None)
 
       with pushd(temp_dir):
