@@ -238,7 +238,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
                                                  mixed_addr],
                                                 workdir)
         group = [
-            'org/pantsbuild/tmp/tests:tests',
+            'org/pantsbuild/tmp/tests',
             'org.pantsbuild.tmp.tests.AllTests#test1Failure',
             'org.pantsbuild.tmp.tests.AllTests#test3Failure',
             'org.pantsbuild.tmp.tests.AllTests#test4Error',
