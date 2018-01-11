@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class Tool(object):
+  """Defines a third party tool dependency."""
   def __init__(self, name, version):
     self.name = name
     self.version = Tool._normalize_version(version)
@@ -32,6 +33,12 @@ class Tool(object):
     return version if version.startswith('v') else 'v' + version
 
   def run_command(self, args, node_paths=None):
+    """Returns a command to run arbituray commands with the bool.
+
+    :param args: Args to be passed to the tool.
+    :param node_paths: A list of path that should be included in $PATH when
+      running the tool.
+    """
     return command_gen(self, args, node_paths=node_paths)
 
   def _get_path_vars(self):
@@ -39,18 +46,22 @@ class Tool(object):
 
   @memoized_property
   def path_vars(self):
+    """Returns a list of paths to be prepended to $PATH."""
     return self._get_path_vars()
 
   @memoized_property
   def bin_dir(self):
+    """Returns path to directory that contains the tool binary."""
     return self._get_bin_dir()
 
   @memoized_property
   def bin_path(self):
+    """Returns path to the tool binary."""
     return os.path.join(self.bin_dir, self.name)
 
 
 class InstallableTool(Tool):
+  """Defines a third party tool dependency that needs to be installed."""
   def __init__(
     self, name, version,
     binary_util=None, support_dir=None, relative_bin_path=None, archive_filename=None):
@@ -59,6 +70,7 @@ class InstallableTool(Tool):
     self._supportdir = support_dir
     self._relative_bin_path = relative_bin_path
     self._archive_filename = archive_filename
+
   def unpack_package(self):
     tarball_filepath = self._binary_util.select_binary(
       supportdir=self._supportdir, version=self.version, name=self._archive_filename)
@@ -107,6 +119,8 @@ class YarnBinary(PackageManagerMixin, InstallableTool):
     return [] if install_optional else ['--ignore-optional']
 
 
+# Note that npm is installed with node.  Since node is a prerequisite for npm, there is no need
+# to install npm separately.
 class NpmBinary(PackageManagerMixin, Tool):
   def __init__(self, node_binary):
     # We don't actually know the npm version since we always use the npm bundled with node.
