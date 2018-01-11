@@ -6,11 +6,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
+from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
+from pants.backend.jvm.tasks.coverage.engine import NoCoverage
+from pants.backend.jvm.tasks.coverage.jacoco import Jacoco
+from pants.backend.jvm.tasks.coverage.manager import CodeCoverage
 from pants.backend.jvm.tasks.junit_run import JUnitRun
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.exceptions import TargetDefinitionException, TaskError
@@ -559,3 +564,38 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                                   ('FooTest.java', test_content_edited)],
                                  target_name='tests/java/org/pantsbuild/foo:bar_test',
                                  create_some_resources=False)
+
+  @contextmanager
+  def _coverage_engine(self):
+    junit_run = self.prepare_execute(self.context())
+    with temporary_dir() as output_dir:
+      code_coverage = CodeCoverage.global_instance()
+      yield code_coverage.get_coverage_engine(task=junit_run,
+                                              output_dir=output_dir,
+                                              all_targets=[],
+                                              execute_java=junit_run.execute_java_for_coverage)
+
+  def _assert_coverage_engine(self, expected_engine_type):
+    with self._coverage_engine() as engine:
+      self.assertIsInstance(engine, expected_engine_type)
+
+  def test_coverage_default_off(self):
+    self._assert_coverage_engine(NoCoverage)
+
+  def test_coverage_explicit_on(self):
+    self.set_options(coverage=True)
+    self._assert_coverage_engine(Cobertura)
+
+  def test_coverage_open_implicit_on(self):
+    self.set_options(coverage_open=True)
+    self._assert_coverage_engine(Cobertura)
+
+  def test_coverage_processor_implicit_on(self):
+    self.set_options(coverage_processor='jacoco')
+    self._assert_coverage_engine(Jacoco)
+
+  def test_coverage_processor_invalid(self):
+    self.set_options(coverage_processor='bob')
+    with self.assertRaises(CodeCoverage.InvalidCoverageEngine):
+      with self._coverage_engine():
+        self.fail("We should never get here.")
