@@ -90,16 +90,27 @@ class TestJUnitHtmlReport(BaseTest):
     self.assertEquals(u'testTwö', testsuites[0].testcases[1].name)
     self.assertIn(u'org.pantsbuild.PåssingTest.testTwö', testsuites[0].testcases[1].error)
 
+  def test_open_report(self):
+    with temporary_dir() as output_dir:
+      junit_html_report = JUnitHtmlReport.create(xml_dir=self._JUNIT_XML_DIR, open_report=True)
+      report_file_path = junit_html_report.report(output_dir)
+      self.assertIsNotNone(report_file_path)
+      stat = os.stat(report_file_path)
+      self.assertGreater(stat.st_size, 0)
+
+  def test_no_open_report(self):
+    with temporary_dir() as output_dir:
+      junit_html_report = JUnitHtmlReport.create(xml_dir=self._JUNIT_XML_DIR, open_report=False)
+      report_file_path = junit_html_report.report(output_dir)
+      self.assertIsNone(report_file_path)
+
   def test_all(self):
     testsuites = JUnitHtmlReport.create(self._JUNIT_XML_DIR)._parse_xml_files()
     self.assertEqual(7, len(testsuites))
 
     with temporary_dir() as output_dir:
-      output_file = os.path.join(output_dir, 'junit-report.html')
-      junit_html_report = JUnitHtmlReport(xml_dir=self._JUNIT_XML_DIR, report_dir=output_dir)
-      junit_html_report.report()
-      self.assertTrue(os.path.exists(output_file))
-      with open(output_file) as html_file:
+      junit_html_report = JUnitHtmlReport.create(xml_dir=self._JUNIT_XML_DIR, open_report=True)
+      with open(junit_html_report.report(output_dir)) as html_file:
         html_data = ensure_text(html_file.read())
         self.assertIn(u'</span>&nbsp;org.pantsbuild.PåssingTest', html_data)
         self.assertIn(u'</span>&nbsp;testTwö</td>', html_data)

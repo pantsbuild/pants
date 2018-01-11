@@ -4,10 +4,11 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/kythe/src/python/pants/contrib/kythe/tasks',
+    'contrib/codeanalysis/src/python/pants/contrib/codeanalysis/tasks',
+    'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
-  distribution_name='pantsbuild.pants.contrib.kythe',
-  description='Kythe support for pants.',
+  distribution_name='pantsbuild.pants.contrib.codeanalysis',
+  description='Support for various code analysis tools in Pants.',
   register_goals=True,
 )

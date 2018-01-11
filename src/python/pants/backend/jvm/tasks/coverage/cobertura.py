@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import functools
 import os
+import shutil
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
@@ -15,9 +16,8 @@ from pants.backend.jvm.tasks.coverage.engine import CoverageEngine
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
-from pants.util import desktop
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import relativize_paths, safe_delete, safe_mkdir, touch
+from pants.util.dirutil import relativize_paths, safe_mkdir, safe_mkdir_for, safe_walk, touch
 
 
 class Cobertura(CoverageEngine):
@@ -33,9 +33,9 @@ class Cobertura(CoverageEngine):
       :type settings: :class:`CodeCoverageSettings`
       :param list targets: A list of targets to instrument and record code coverage for.
       :param execute_java_for_targets: A function that accepts a list of targets whose JVM platform
-                                       constraints are used to pick a JVM `Distribution`. The function
-                                       should also accept `*args` and `**kwargs` compatible with the
-                                       remaining parameters accepted by
+                                       constraints are used to pick a JVM `Distribution`. The
+                                       function should also accept `*args` and `**kwargs` compatible
+                                       with the remaining parameters accepted by
                                        `pants.java.util.execute_java`.
       """
 
@@ -44,18 +44,18 @@ class Cobertura(CoverageEngine):
   # TODO(jtrobec): deprecate these options and move them to subsystem scope
   @staticmethod
   def register_junit_options(register, register_jvm_tool):
-    slf4j_jar = JarDependency(org='org.slf4j', name='slf4j-simple', rev='1.7.5')
-    slf4j_api_jar = JarDependency(org='org.slf4j', name='slf4j-api', rev='1.7.5')
-
-    register('--coverage-cobertura-include-classes', advanced=True, type=list,
+    register('--coverage-cobertura-include-classes', advanced=True, type=list, fingerprint=True,
              help='Regex patterns passed to cobertura specifying which classes should be '
                   'instrumented. (see the "includeclasses" element description here: '
                   'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference)')
 
-    register('--coverage-cobertura-exclude-classes', advanced=True, type=list,
+    register('--coverage-cobertura-exclude-classes', advanced=True, type=list, fingerprint=True,
              help='Regex patterns passed to cobertura specifying which classes should NOT be '
                   'instrumented. (see the "excludeclasses" element description here: '
                   'https://github.com/cobertura/cobertura/wiki/Ant-Task-Reference')
+
+    def slf4j_jar(name):
+      return JarDependency(org='org.slf4j', name=name, rev='1.7.5')
 
     def cobertura_jar(**kwargs):
       return JarDependency(org='net.sourceforge.cobertura', name='cobertura', rev='2.1.1', **kwargs)
@@ -65,7 +65,7 @@ class Cobertura(CoverageEngine):
                       'cobertura-instrument',
                       classpath=[
                         cobertura_jar(),
-                        slf4j_jar
+                        slf4j_jar('slf4j-simple')
                       ])
 
     # Instrumented code needs cobertura.jar in the classpath to run, but not most of the
@@ -74,10 +74,13 @@ class Cobertura(CoverageEngine):
                       'cobertura-run',
                       classpath=[
                         cobertura_jar(intransitive=True),
-                        slf4j_api_jar
+                        slf4j_jar('slf4j-api')
                       ])
 
+    register_jvm_tool(register, 'cobertura-merge', classpath=[cobertura_jar()])
     register_jvm_tool(register, 'cobertura-report', classpath=[cobertura_jar()])
+
+  _DATAFILE_NAME = 'cobertura.ser'
 
   def __init__(self, settings, targets, execute_java_for_targets):
     """
@@ -93,13 +96,11 @@ class Cobertura(CoverageEngine):
     self._settings = settings
     options = settings.options
     self._context = settings.context
-    self._coverage_datafile = os.path.join(settings.coverage_dir, 'cobertura.ser')
     self._coverage_force = options.coverage_force
-    touch(self._coverage_datafile)
+    self._canonical_datafile = None
     self._rootdirs = defaultdict(OrderedSet)
     self._include_classes = options.coverage_cobertura_include_classes
     self._exclude_classes = options.coverage_cobertura_exclude_classes
-    self._nothing_to_instrument = True
     self._targets = targets
     self._execute_java = functools.partial(execute_java_for_targets, targets)
 
@@ -108,21 +109,22 @@ class Cobertura(CoverageEngine):
     return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
   @staticmethod
-  def initialize_instrument_classpath(settings, targets, instrumentation_classpath):
+  def initialize_instrument_classpath(output_dir, settings, targets, instrumentation_classpath):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.
 
     :param targets: the targets for which we should create an instrumentation_classpath entry based
     on their runtime_classpath entry.
     """
-    settings.safe_makedir(settings.coverage_instrument_dir, clean=True)
+    instrument_dir = os.path.join(output_dir, 'coverage', 'classes')
+    settings.safe_makedir(instrument_dir, clean=True)
 
     for target in targets:
       if not Cobertura.is_coverage_target(target):
         continue
       # Do not instrument transitive dependencies.
       paths = instrumentation_classpath.get_for_target(target)
-      target_instrumentation_path = os.path.join(settings.coverage_instrument_dir, target.id)
+      target_instrumentation_path = os.path.join(instrument_dir, target.id)
       for (index, (config, path)) in enumerate(paths):
         # There are two sorts of classpath entries we see in the compile classpath: jars and dirs.
         # The branches below handle the cloning of those respectively.
@@ -140,15 +142,43 @@ class Cobertura(CoverageEngine):
         settings.log.debug(
           "runtime_classpath ({}) cloned to instrument_classpath ({})".format(path, new_path))
 
-  def instrument(self):
+  def _iter_datafiles(self, output_dir):
+    for root, _, files in safe_walk(output_dir):
+      for f in files:
+        if f == self._DATAFILE_NAME:
+          yield os.path.join(root, f)
+          break
+
+  @property
+  def canonical_datafile(self):
+    if self._canonical_datafile is None:
+      raise AssertionError('Expected a canonical datafile to have been created via a call to'
+                           '`instrument`.')
+    elif not os.path.exists(self._canonical_datafile):
+      raise AssertionError('The canonical datafile at {} has unexpectedly been deleted.'
+                           .format(self._canonical_datafile))
+    return self._canonical_datafile
+
+  def instrument(self, output_dir):
+    for datafile in self._iter_datafiles(output_dir):
+      os.unlink(datafile)
+
+    self._canonical_datafile = os.path.join(output_dir, '{}.canonical'.format(self._DATAFILE_NAME))
+    # It's conceivable we'll be executing a test that has no source file dependencies; ie: we'll
+    # never generate a canonical coverage datafile below. Create an empty one here to allow the
+    # test run to proceeed normally.
+    touch(self._canonical_datafile)
+
     # Setup an instrumentation classpath based on the existing runtime classpath.
     runtime_classpath = self._context.products.get_data('runtime_classpath')
     instrumentation_classpath = self._context.products.safe_create_data('instrument_classpath',
                                                                         runtime_classpath.copy)
-    Cobertura.initialize_instrument_classpath(self._settings, self._targets, instrumentation_classpath)
+    self.initialize_instrument_classpath(output_dir,
+                                         self._settings,
+                                         self._targets,
+                                         instrumentation_classpath)
 
     cobertura_cp = self._settings.tool_classpath('cobertura-instrument')
-    safe_delete(self._coverage_datafile)
     files_to_instrument = []
     for target in self._targets:
       if Cobertura.is_coverage_target(target):
@@ -157,8 +187,6 @@ class Cobertura(CoverageEngine):
           files_to_instrument.append(path)
 
     if len(files_to_instrument) > 0:
-      self._nothing_to_instrument = False
-
       unique_files = list(set(files_to_instrument))
       relativize_paths(unique_files, self._settings.workdir)
 
@@ -166,7 +194,7 @@ class Cobertura(CoverageEngine):
         '--basedir',
         self._settings.workdir,
         '--datafile',
-        self._coverage_datafile,
+        self._canonical_datafile,
       ]
       # apply class incl/excl filters
       if len(self._include_classes) > 0:
@@ -196,22 +224,15 @@ class Cobertura(CoverageEngine):
           raise TaskError("java {0} ... exited non-zero ({1})"
                           " 'failed to instrument'".format(main, result))
 
-  @property
-  def classpath_append(self):
-    return ()
-
-  @property
-  def classpath_prepend(self):
-    return self._settings.tool_classpath('cobertura-run')
-
-  @property
-  def extra_jvm_options(self):
-    return ['-Dnet.sourceforge.cobertura.datafile=' + self._coverage_datafile]
+  def run_modifications(self, output_dir):
+    datafile = os.path.join(output_dir, self._DATAFILE_NAME)
+    safe_mkdir_for(datafile)
+    shutil.copy(self.canonical_datafile, datafile)
+    datafile_option = '-Dnet.sourceforge.cobertura.datafile={datafile}'.format(datafile=datafile)
+    return self.RunModifications(classpath_prepend=self._settings.tool_classpath('cobertura-run'),
+                                 extra_jvm_options=[datafile_option])
 
   def should_report(self, execution_failed_exception=None):
-    if self._nothing_to_instrument:
-      self._settings.log.warn('Nothing found to instrument, skipping report...')
-      return False
     if execution_failed_exception:
       self._settings.log.warn('Test failed: {0}'.format(execution_failed_exception))
       if self._settings.coverage_force:
@@ -221,37 +242,42 @@ class Cobertura(CoverageEngine):
         return False
     return True
 
-  def report(self, execution_failed_exception=None):
-    if self.should_report(execution_failed_exception):
-      cobertura_cp = self._settings.tool_classpath('cobertura-report')
-      source_roots = {t.target_base for t in self._targets if Cobertura.is_coverage_target(t)}
-      for report_format in ['xml', 'html']:
-        report_dir = os.path.join(self._settings.coverage_dir, report_format)
-        safe_mkdir(report_dir, clean=True)
-        args = list(source_roots)
-        args += [
-          '--datafile',
-          self._coverage_datafile,
-          '--destination',
-          report_dir,
-          '--format',
-          report_format,
-        ]
-        main = 'net.sourceforge.cobertura.reporting.ReportMain'
-        result = self._execute_java(classpath=cobertura_cp,
-                                    main=main,
-                                    jvm_options=self._settings.coverage_jvm_options,
-                                    args=args,
-                                    workunit_factory=self._context.new_workunit,
-                                    workunit_name='cobertura-report-' + report_format)
-        if result != 0:
-          raise TaskError("java {0} ... exited non-zero ({1})"
-                          " 'failed to report'".format(main, result))
+  def _execute_cobertura(self, workunit_name, tool_classpath, main, args):
+    cobertura_cp = self._settings.tool_classpath(tool_classpath)
+    result = self._execute_java(classpath=cobertura_cp,
+                                main=main,
+                                jvm_options=self._settings.coverage_jvm_options,
+                                args=args,
+                                workunit_factory=self._context.new_workunit,
+                                workunit_name=workunit_name)
+    if result != 0:
+      raise TaskError('java {} ... exited non-zero ({}) - failed to {}'
+                      .format(main, result, workunit_name))
 
-  def maybe_open_report(self):
-    if self._settings.coverage_open:
-      report_file_path = os.path.join(self._settings.coverage_dir, 'html', 'index.html')
-      try:
-        desktop.ui_open(report_file_path)
-      except desktop.OpenError as e:
-        raise TaskError(e)
+  def report(self, output_dir, execution_failed_exception=None):
+    if self.should_report(execution_failed_exception):
+      datafiles = list(self._iter_datafiles(output_dir))
+      if len(datafiles) == 1:
+        datafile = datafiles[0]
+      else:
+        datafile = os.path.join(output_dir, '{}.merged'.format(self._DATAFILE_NAME))
+        self._execute_cobertura(workunit_name='cobertura-merge',
+                                tool_classpath='cobertura-merge',
+                                main='net.sourceforge.cobertura.merge.MergeMain',
+                                args=['--datafile', datafile] + datafiles)
+
+      base_report_dir = os.path.join(output_dir, 'coverage', 'reports')
+      safe_mkdir(base_report_dir, clean=True)
+
+      source_roots = {t.target_base for t in self._targets if Cobertura.is_coverage_target(t)}
+      base_args = list(source_roots) + ['--datafile', datafile]
+      for report_format in ('xml', 'html'):
+        report_dir = os.path.join(base_report_dir, report_format)
+        safe_mkdir(report_dir, clean=True)
+        self._execute_cobertura(workunit_name='cobertura-report-{}'.format(report_format),
+                                tool_classpath='cobertura-report',
+                                main='net.sourceforge.cobertura.reporting.ReportMain',
+                                args=base_args + ['--destination', report_dir,
+                                                  '--format', report_format])
+      if self._settings.coverage_open:
+        return os.path.join(base_report_dir, 'html', 'index.html')

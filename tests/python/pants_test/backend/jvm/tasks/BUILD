@@ -188,17 +188,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'coverage',
-  sources = ['coverage/test_cobertura.py'],
-  dependencies = [
-    ':jvm_binary_task_test_base',
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/tasks:coverage',
-  ]
-)
-
-python_tests(
   name = 'jar_dependency_management_setup',
   sources = ['test_jar_dependency_management_setup.py'],
   dependencies = [
