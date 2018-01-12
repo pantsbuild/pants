@@ -68,7 +68,10 @@ class NodeDistribution(object):
   @classmethod
   def validate_package_manager(cls, package_manager):
     if package_manager not in cls.VALID_PACKAGE_MANAGER_LIST.keys():
-      raise TaskError('Unknown package manager: %s' % package_manager)
+      raise TaskError(
+        'Unknown package manager: {}.\nValid values are {}.'.format(
+          package_manager, cls.VALID_PACKAGE_MANAGER_LIST.keys()
+      ))
     package_manager = cls.VALID_PACKAGE_MANAGER_LIST[package_manager]
     return package_manager
 

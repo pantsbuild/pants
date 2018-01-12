@@ -55,9 +55,12 @@ class NodeTask(Task):
 
   def get_package_manager(self, target=None):
     """Returns package manager string for target argument or global config."""
-    return self.node_distribution.get_package_manager(
-      target.payload.get_field('package_manager').value if target else None
-    ).name
+    package_manager = None
+    if target:
+      target_package_manager_field = target.payload.get_field('package_manager')
+      if target_package_manager_field:
+        package_manager = target_package_manager_field.value
+    return self.node_distribution.get_package_manager(package_manager).name
 
   def execute_node(self, args, workunit_name, workunit_labels=None, node_paths=None):
     """Executes node passing the given args.

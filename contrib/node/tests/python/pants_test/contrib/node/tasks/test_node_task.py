@@ -10,6 +10,7 @@ import os
 import string
 from textwrap import dedent
 
+from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.util.contextutil import pushd, temporary_dir
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -124,3 +125,40 @@ class NodeTaskTest(TaskTestBase):
         self.assertTrue(os.path.exists(proof))
         with open(proof) as fp:
           self.assertEqual('42', fp.read().strip())
+
+  def test_get_package_manager_not_defined_for_target(self):
+    task = self.create_task(self.context())
+    target = self.make_target(
+      spec='src/node/util',
+      target_type=NodeModule,
+      sources=[],
+      dependencies=[]
+    )
+    self.assertEqual(task.get_package_manager(target), task.node_distribution.package_manager)
+
+  def test_get_package_manager_defined_for_target(self):
+    task = self.create_task(self.context())
+    for (package_manager, expected_result) in [
+      ('yarn', 'yarnpkg'),
+      ('npm', 'npm'),
+      ('yarnpkg', 'yarnpkg')
+    ]:
+      target = self.make_target(
+        spec='src/node/util/{}'.format(package_manager),
+        target_type=NodeModule,
+        sources=[],
+        dependencies=[],
+        package_manager=package_manager
+      )
+    self.assertEqual(task.get_package_manager(target), expected_result)
+
+  def test_get_package_manager_invalid_package_manager(self):
+    task = self.create_task(self.context())
+    target = self.make_target(
+      spec='src/node/util',
+      target_type=NodeModule,
+      sources=[],
+      dependencies=[],
+      package_manager='not_a_valid_package_manager'
+    )
+    self.assertRaises(TaskError, task.get_package_manager, target)

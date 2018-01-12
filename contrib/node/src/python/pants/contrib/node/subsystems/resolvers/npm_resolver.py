@@ -47,7 +47,7 @@ class NpmResolver(Subsystem, NodeResolverBase):
             'Cannot find npm-shrinkwrap.json. Did you forget to put it in target sources? '
             'This package will fall back to inject package.json with pants BUILD dependencies '
             'including node_remote_module and other node dependencies. However, this is '
-            'not fully supported.')
+            'not fully supported.\n')
           self._emit_package_descriptor(node_task, target, results_dir, node_paths)
       elif package_manager == PACKAGE_MANAGER_YARNPKG:
         if not os.path.exists('yarn.lock'):
