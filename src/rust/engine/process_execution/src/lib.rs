@@ -25,7 +25,7 @@ pub struct ExecuteProcessRequest {
   ///
   /// No shell expansion will take place.
   ///
-  pub args: Vec<String>,
+  pub argv: Vec<String>,
   ///
   /// The environment variables to set for the execution.
   ///

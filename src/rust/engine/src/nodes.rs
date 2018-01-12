@@ -302,9 +302,10 @@ impl Select {
         );
       }
       let request = process_executor::ExecuteProcessRequest {
-        args: externs::project_multi_strs(&value, "args"),
+        argv: externs::project_multi_strs(&value, "argv"),
         env: env,
       };
+      // TODO: this should run off-thread, and asynchronously
       let result = process_executor::local::run_command_locally(request).unwrap();
       vec![
         future::ok(externs::invoke_unsafe(

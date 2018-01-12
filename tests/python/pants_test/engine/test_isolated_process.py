@@ -81,10 +81,10 @@ def java_sources_to_javac_args(sources_snapshot, out_dir):
                                    snapshots=(sources_snapshot,),
                                    directories_to_create=(out_dir.path,))
 
-def process_request_from_java_sources(sources_snapshot, binary):
+def process_request_from_java_sources(binary):
   env = []
   return ExecuteProcessRequest(
-    args=binary.prefix_of_command() + ('-version',) + tuple(f.path for f in sources_snapshot.files),
+    argv=binary.prefix_of_command() + ('-version',),
     env=env)
 
 
@@ -137,7 +137,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     sources = PathGlobs.create('', include=['inputs/src/java/simple/Simple.java'])
     scheduler = self.mk_scheduler_in_example_fs([
       ExecuteProcess.create_in(product_type=ExecuteProcessRequest,
-        input_selectors=(Select(Snapshot), Select(Javac)),
+        input_selectors=(Select(Javac),),
         input_conversion=process_request_from_java_sources),
       SingletonRule(Javac, Javac()),
     ])

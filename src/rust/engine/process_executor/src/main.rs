@@ -40,7 +40,7 @@ If unspecified, local execution will be performed.",
     .get_matches();
 
   let argv: Vec<String> = args
-    .values_of("argv")
+    .values_of("args")
     .unwrap()
     .map(|v| v.to_string())
     .collect();
