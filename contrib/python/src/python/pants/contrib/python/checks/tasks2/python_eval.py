@@ -62,8 +62,6 @@ class PythonEval(ResolveRequirementsTaskBase):
   @classmethod
   def register_options(cls, register):
     super(PythonEval, cls).register_options(register)
-    register('--skip', type=bool,
-             help='If enabled, skip eval of python targets.')
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
     register('--closure', type=bool,

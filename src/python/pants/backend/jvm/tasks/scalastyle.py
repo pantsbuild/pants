@@ -72,7 +72,6 @@ class Scalastyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Scalastyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip scalastyle.')
     register('--config', type=file_option, advanced=True, fingerprint=True,
              help='Path to scalastyle config file.')
     register('--excludes', type=file_option, advanced=True, fingerprint=True,

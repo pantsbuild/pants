@@ -22,14 +22,10 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
   @classmethod
   def register_options(cls, register):
     super(ScalaRewriteBase, cls).register_options(register)
-    register('--skip', type=bool, default=False, help='Skip running the tool.')
     register('--target-types',
              default=['scala_library', 'junit_tests', 'java_tests'],
              advanced=True, type=list,
              help='The target types to apply formatting to.')
-    register('--transitive', type=bool, default=True,
-             help='True to run the tool transitively on targets in the context, false to run '
-                  'for only roots specified on the commandline.')
 
   @memoized_property
   def _formatted_target_types(self):

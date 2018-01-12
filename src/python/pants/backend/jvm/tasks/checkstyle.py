@@ -36,8 +36,6 @@ class Checkstyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True,
-             help='Skip checkstyle.')
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
              help='Path to the checkstyle configuration file.')
     register('--properties', advanced=True, type=dict_with_files_option, default={},

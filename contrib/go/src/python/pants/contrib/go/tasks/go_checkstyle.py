@@ -16,11 +16,6 @@ class GoCheckstyle(GoFmtTaskBase):
   deprecated_options_scope = 'compile.gofmt'
   deprecated_options_scope_removal_version = '1.5.0.dev0'
 
-  @classmethod
-  def register_options(cls, register):
-    super(GoCheckstyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip checkstyle.')
-
   def execute(self):
     if self.get_options().skip:
       return
