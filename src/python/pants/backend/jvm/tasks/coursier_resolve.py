@@ -158,6 +158,7 @@ class CoursierMixin(NailgunTask):
 
         for conf, result_list in results.items():
           for result in result_list:
+            print(result)
             self._load_json_result(conf, compile_classpath, coursier_cache_dir, invalidation_check,
                                    pants_jar_base_dir, result)
 
@@ -321,7 +322,7 @@ class CoursierMixin(NailgunTask):
 
     with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
       return_code = self.runjava(
-        classpath=[coursier_jar],
+        classpath=['/Users/yic/workspace/coursier_dev/dist/coursier-cli.jar'],
         main='coursier.cli.Coursier',
         args=cmd_args,
         jvm_options=self.get_options().jvm_options,
@@ -352,7 +353,7 @@ class CoursierMixin(NailgunTask):
 
       module = j.coordinate.simple_coord
       if j.coordinate.classifier:
-        module += ';classifier={}'.format(j.coordinate.classifier)
+        module += '#classifier={}'.format(j.coordinate.classifier)
 
       if j.intransitive:
         cmd_args.append('--intransitive')
@@ -418,10 +419,16 @@ class CoursierMixin(NailgunTask):
     for vt in invalidation_check.all_vts:
       t = vt.target
       if isinstance(t, JarLibrary):
-        def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
+        def get_transitive_resolved_jars(my_simple_coord, classifier, resolved_jars):
           transitive_jar_path_for_coord = []
           if my_simple_coord in flattened_resolution:
-            for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
+            # TODO(wisechengyi): this only grabs jar with matching classifier the current coordinate
+            # and it still takes the jars wholesome for its transitive dependencies.
+            resolved_jars_with_matching_classifier = filter(lambda x: x.coordinate.classifier == classifier,
+                                                            resolved_jars[my_simple_coord])
+            transitive_jar_path_for_coord.extend(resolved_jars_with_matching_classifier)
+
+            for c in flattened_resolution[my_simple_coord]:
               transitive_jar_path_for_coord.extend(resolved_jars[c])
 
           return transitive_jar_path_for_coord
@@ -440,7 +447,11 @@ class CoursierMixin(NailgunTask):
               final_simple_coord = org_name_to_org_name_rev[org_name]
 
           if final_simple_coord:
-            transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
+            from pprint import pprint
+            pprint("resolved jars:")
+            pprint(coord_to_resolved_jars)
+
+            transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, jar.coordinate.classifier, coord_to_resolved_jars)
             if transitive_resolved_jars:
               compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
 
