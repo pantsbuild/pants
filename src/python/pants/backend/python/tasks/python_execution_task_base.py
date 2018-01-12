@@ -91,7 +91,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
-    round_manager.require_data(GatherSources.PythonSources)
+    round_manager.require_data(GatherSources.PYTHON_SOURCES)
 
   def extra_requirements(self):
     """Override to provide extra requirements needed for execution.
@@ -103,7 +103,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
     relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
+      lambda tgt: isinstance(tgt, (
+        PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
     with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving
@@ -121,13 +122,11 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
 
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
-      local_python_dist_targets = self.context.targets(is_local_python_dist)
-      invalid_target_objs = [v.target for v in invalidation_check.invalid_vts]
-      context_has_invalid_python_dists = any([lpdt in invalid_target_objs for lpdt in local_python_dist_targets])
-      if not os.path.isdir(path) or context_has_invalid_python_dists:
-        source_pexes = self.context.products.get_data(GatherSources.PythonSources).all()
-        requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
-        pexes = [requirements_pex] + source_pexes
+      if not os.path.isdir(path):
+        pexes = [
+          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
+        ]
 
         if self.extra_requirements():
           extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]
@@ -136,8 +135,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
             addr, PythonRequirementLibrary, requirements=extra_reqs)
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
-          pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)], local_python_dist_targets)] + pexes
-
+          pexes = [self.resolve_requirements([self.context.build_graph.get_target(addr)])] + pexes
 
         extra_pex_paths = [pex.path() for pex in pexes if pex]
 

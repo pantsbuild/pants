@@ -82,4 +82,6 @@ class BuildLocalPythonDistributions(Task):
     dists = glob.glob(os.path.join(install_dir, '*.whl'))
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
+    if len(dists) > 1:
+      raise TaskError('Ambiguous local python distributions found: %s' % (' '.join(dists)))
     return dists[0]
