@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import unittest
 
-import mock
-
 from pants.contrib.node.subsystems import tool_binaries
 
 

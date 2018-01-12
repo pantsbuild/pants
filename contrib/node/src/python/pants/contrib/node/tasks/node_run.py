@@ -43,4 +43,4 @@ class NodeRun(NodeTask):
         )
         if result != 0:
           raise TaskError('Run script failed:\n\t{} failed with exit code {}'.format(
-              run_script, result))
+              run_command, result))

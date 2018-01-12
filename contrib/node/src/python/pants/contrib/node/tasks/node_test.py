@@ -64,6 +64,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
 
     for target in targets:
       node_path = node_paths.node_path(target.dependencies[0])
+      package_manager = self.get_package_manager(target=target.dependencies[0])
 
       self.context.log.debug(
         'Testing node module (first dependency): {}'.format(target.dependencies[0]))
@@ -74,6 +75,7 @@ class NodeTest(TestRunnerTaskMixin, NodeTask):
           target=target,
           script_args=self.get_passthru_args(),
           node_paths=node_paths.all_node_paths,
+          package_manager=package_manager,
           workunit_name=target.address.reference(),
           workunit_labels=[WorkUnitLabel.TEST],
         )

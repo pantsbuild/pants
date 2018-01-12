@@ -70,6 +70,7 @@ class Command(namedtuple('Command', ['executable', 'args', 'extra_paths'])):
   def __str__(self):
     return ' '.join(self.cmd)
 
+
 def command_gen(tool_executable, args=None, node_paths=None):
   """Generate a Command object with requires tools installed and paths setup.
 

@@ -15,6 +15,7 @@ describe('Testing Yarnpkg Path Injection', () => {
     it('should contain "pants"', async () => {
       // This test will not pass outside of pants environment
       const NodeExecutablePathProcess = await ChildProcessPromise.exec('which node', {encoding: 'utf8'})
+      console.log(NodeExecutablePathProcess.stdout)
       assert.ok(NodeExecutablePathProcess.stdout.includes('pants'))
     })
   })
@@ -22,6 +23,7 @@ describe('Testing Yarnpkg Path Injection', () => {
     it('should contain "pants"', async () => {
       // This test will not pass outside of pants environment
       const NodeExecutablePathProcess = await ChildProcessPromise.exec('which npm', {encoding: 'utf8'})
+      console.log(NodeExecutablePathProcess.stdout)
       assert.ok(NodeExecutablePathProcess.stdout.includes('pants'))
     })
   })
@@ -29,6 +31,7 @@ describe('Testing Yarnpkg Path Injection', () => {
     it('should contain "pants"', async () => {
       // This test will not pass outside of pants environment
       const NodeExecutablePathProcess = await ChildProcessPromise.exec('which yarnpkg', {encoding: 'utf8'})
+      console.log(NodeExecutablePathProcess.stdout)
       assert.ok(NodeExecutablePathProcess.stdout.includes('pants'))
     })
   })

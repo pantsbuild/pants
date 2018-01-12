@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 class Tool(object):
   """Defines a third party tool dependency."""
+
   def __init__(self, name, version):
     self.name = name
     self.version = Tool._normalize_version(version)
@@ -64,6 +65,7 @@ class Tool(object):
 
 class InstallableTool(Tool):
   """Defines a third party tool dependency that needs to be installed."""
+
   def __init__(
     self, name, version,
     binary_util=None, support_dir=None, relative_bin_path=None, archive_filename=None):

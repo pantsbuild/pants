@@ -96,7 +96,7 @@ class NodeTask(Task):
   def run_script(
     self, script_name, target=None, package_manager=None, script_args=None, node_paths=None,
     workunit_name=None, workunit_labels=None):
-    package_manager = self.get_package_manager(target=target)
+    package_manager = package_manager or self.get_package_manager(target=target)
     command = self.node_distribution.run_script(
       script_name,
       script_args=script_args,
