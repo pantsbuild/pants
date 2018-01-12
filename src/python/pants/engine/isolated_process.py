@@ -80,10 +80,12 @@ def _snapshotted_process(input_conversion,
 
     return output_conversion(process_result, sandbox_dir)
 
+
 def _setup_process_execution(input_conversion, *args):
   """A pickleable top-level function to setup pre-execution.
   """
   return input_conversion(*args)
+
 
 def _post_process_execution(output_conversion, *args):
   """A pickleable top-level function to execute a process.
@@ -171,6 +173,7 @@ def create_snapshot_rules():
       SingletonRule(_Snapshots, _Snapshots('/dev/null'))
     ]
 
+
 class ExecuteProcess(object):
   """A static helper for defining a task rule to execute a process."""
 
@@ -211,6 +214,7 @@ class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env'])):
       raise ValueError('argv must be a tuple.')
     return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env))
 
+
 class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):
   pass
 
@@ -218,6 +222,7 @@ class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr',
 def create_process_rules():
   """Intrinsically replaced on the rust side."""
   return [execute_process_noop, RootRule(ExecuteProcessRequest)]
+
 
 @rule(ExecuteProcessResult, [Select(ExecuteProcessRequest)])
 def execute_process_noop(*args):

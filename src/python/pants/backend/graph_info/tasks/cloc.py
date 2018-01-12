@@ -74,11 +74,11 @@ class CountLinesOfCode(ConsoleTask):
           name='cloc',
           labels=[WorkUnitLabel.TOOL],
           cmd=' '.join(cmd)) as workunit:
-            result = subprocess.call(
-              cmd,
-              stdout=workunit.output('stdout'),
-              stderr=workunit.output('stderr')
-            )
+          result = subprocess.call(
+            cmd,
+            stdout=workunit.output('stdout'),
+            stderr=workunit.output('stderr')
+          )
       else:
         # TODO: Longer term we need to figure out what to put on $PATH in a remote execution env.
         # Currently, we are adding everything within $PATH to the request.
