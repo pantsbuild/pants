@@ -107,6 +107,15 @@ class AbstractTarget(object):
     """
     return hasattr(self, 'resources') and self.resources
 
+  @property
+  @deprecated('1.6.0.dev0', 'use type tests and check the value of the `provides` attribute.')
+  def is_exported(self):
+    """Returns True if the target provides an artifact exportable from the repo.
+
+    :API: public
+    """
+    return getattr(self, 'provides', None) is not None
+
   # DEPRECATED  to be removed after 0.0.29
   # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
   @property

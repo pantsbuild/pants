@@ -35,6 +35,9 @@ class WikiArtifact(object):
   def fingerprint(self):
     return combine_hashes([self.wiki.fingerprint(), stable_json_hash(self.config)])
 
+  def __str__(self):
+    return self.wiki.name
+
 
 class Wiki(object):
   """Identifies a wiki where pages can be published."""
