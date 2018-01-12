@@ -45,7 +45,7 @@ class ListTargets(ConsoleTask):
       )
 
       def print_provides(column_extractors, target):
-        if hasattr(target, 'provides'):
+        if getattr(target, 'provides', None):
           return ' '.join(extractor(target) for extractor in column_extractors)
 
       try:
