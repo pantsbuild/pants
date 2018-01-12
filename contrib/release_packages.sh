@@ -122,6 +122,18 @@ function pkg_cpp_install_test() {
       --explain compile | grep "cpp" &> /dev/null
 }
 
+PKG_CONFLUENCE=(
+  "pantsbuild.pants.contrib.confluence"
+  "//contrib/confluence/src/python/pants/contrib/confluence:plugin"
+  "pkg_confluence_install_test"
+)
+function pkg_confluence_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.confluence==${version}']" \
+      goals | grep "confluence" &> /dev/null
+}
+
 PKG_ERRORPRONE=(
   "pantsbuild.pants.contrib.errorprone"
   "//contrib/errorprone/src/python/pants/contrib/errorprone:plugin"
@@ -161,6 +173,7 @@ CONTRIB_PACKAGES=(
   PKG_SCALAJS
   PKG_FINDBUGS
   PKG_CPP
+  PKG_CONFLUENCE
   PKG_ERRORPRONE
   PKG_JAXWS
 )
