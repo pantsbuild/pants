@@ -9,21 +9,21 @@ import os
 import re
 
 from pants.backend.jvm.subsystems.shader import Shader
-from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.jvm.targets.junit_tests import JUnitTests
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
+from pants.task.transitive_option_mixin import TransitiveOptionMixin
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.xml_parser import XmlParser
 from twitter.common.collections import OrderedSet
 
 
-class FindBugs(NailgunTask):
+class FindBugs(TransitiveOptionMixin, NailgunTask):
   """Check Java code for findbugs violations."""
 
   _FINDBUGS_MAIN = 'edu.umd.cs.findbugs.FindBugs2'
@@ -35,9 +35,6 @@ class FindBugs(NailgunTask):
     super(FindBugs, cls).register_options(register)
 
     register('--skip', type=bool, help='Skip findbugs.')
-    register('--transitive', default=False, type=bool,
-             help='Run findbugs against transitive dependencies of targets specified on '
-                  'the command line.')
     register('--effort', default='default', fingerprint=True,
              choices=['min', 'less', 'default', 'more', 'max'],
              help='Effort of the bug finders.')
@@ -85,16 +82,21 @@ class FindBugs(NailgunTask):
     return [re.compile(x) for x in set(self.get_options().exclude_patterns or [])]
 
   def _is_findbugs_target(self, target):
-    if not isinstance(target, (JavaLibrary, JUnitTests)):
-      self.context.log.debug('Skipping [{}] because it is not a java library or java test'.format(target.address.spec))
+    # TODO: Share with similar code in errorprone.py?  Possibly the findbugs and errorprone
+    # packages can be merged into a "jvm bug autodetection" package?
+    if not (isinstance(target, JvmTarget) and target.has_sources('.java')):
+      self.context.log.debug('Skipping [{}] because it is not a JVM target '
+                             'with .java sources'.format(target.address.spec))
       return False
     if target.is_synthetic:
-      self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
+      self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(
+        target.address.spec))
       return False
     for pattern in self._exclude_patterns:
       if pattern.search(target.address.spec):
         self.context.log.debug(
-          "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+          "Skipping [{}] because it matches exclude pattern '{}'".format(
+            target.address.spec, pattern.pattern))
         return False
     return True
 
@@ -102,10 +104,7 @@ class FindBugs(NailgunTask):
     if self.get_options().skip:
       return
 
-    if self.get_options().transitive:
-      targets = self.context.targets(self._is_findbugs_target)
-    else:
-      targets = filter(self._is_findbugs_target, self.context.target_roots)
+    targets = self.targets_to_act_on(self._is_findbugs_target)
 
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
     target_count = 0
@@ -121,7 +120,8 @@ class FindBugs(NailgunTask):
         target_bug_counts = self.findbugs(vt.target)
         if not self.get_options().fail_on_error or sum(target_bug_counts.values()) == 0:
           vt.update()
-        bug_counts = {k: bug_counts.get(k, 0) + target_bug_counts.get(k, 0) for k in bug_counts.keys()}
+        bug_counts = {k: bug_counts.get(k, 0) + target_bug_counts.get(k, 0)
+                      for k in bug_counts.keys()}
 
       error_count = bug_counts.pop('error', 0)
       bug_counts['total'] = sum(bug_counts.values())
@@ -130,7 +130,8 @@ class FindBugs(NailgunTask):
         if error_count > 0:
           self.context.log.warn('Errors: {}'.format(error_count))
         if bug_counts['total'] > 0:
-          self.context.log.warn("Bugs: {total} (High: {high}, Normal: {normal}, Low: {low})".format(**bug_counts))
+          self.context.log.warn("Bugs: {total} (High: {high}, Normal: {normal}, Low: {low})".format(
+            **bug_counts))
         if self.get_options().fail_on_error:
           raise TaskError('failed with {bug} bugs and {err} errors'.format(
             bug=bug_counts['total'], err=error_count))
@@ -140,7 +141,8 @@ class FindBugs(NailgunTask):
     runtime_classpath = runtime_classpaths.get_for_targets(target.closure(bfs=True))
     aux_classpath = OrderedSet(jar for conf, jar in runtime_classpath if conf == 'default')
 
-    target_jars = OrderedSet(jar for conf, jar in runtime_classpaths.get_for_target(target) if conf == 'default')
+    target_jars = OrderedSet(jar for conf, jar in runtime_classpaths.get_for_target(target)
+                             if conf == 'default')
 
     bug_counts = { 'error': 0, 'high': 0, 'normal': 0, 'low': 0 }
 
@@ -164,10 +166,12 @@ class FindBugs(NailgunTask):
     ]
 
     if self.get_options().exclude_filter_file:
-      args.extend(['-exclude', os.path.join(get_buildroot(), self.get_options().exclude_filter_file)])
+      args.extend(['-exclude',
+                   os.path.join(get_buildroot(), self.get_options().exclude_filter_file)])
 
     if self.get_options().include_filter_file:
-      args.extend(['-include', os.path.join(get_buildroot(), self.get_options().include_filter_file)])
+      args.extend(['-include',
+                   os.path.join(get_buildroot(), self.get_options().include_filter_file)])
 
     if self.get_options().max_rank:
       args.extend(['-maxRank', str(self.get_options().max_rank)])
@@ -205,7 +209,8 @@ class FindBugs(NailgunTask):
         priority = 'low'
       bug_counts[priority] += 1
 
-      source_line = bug_instance.getElementsByTagName('Class')[0].getElementsByTagName('SourceLine')[0]
+      source_line = bug_instance.getElementsByTagName('Class')[0].getElementsByTagName(
+        'SourceLine')[0]
       self.context.log.warn('Bug[{priority}]: {type} {desc} {line}'.format(
         priority=priority,
         type=bug_instance.getAttribute('type'),

@@ -64,9 +64,6 @@ class PythonCheckStyleTask(Task):
              help='Only messages at this severity or higher are logged. [COMMENT WARNING ERROR].')
     register('--strict', fingerprint=True, type=bool,
              help='If enabled, have non-zero exit status for any nit at WARNING or higher.')
-    # Skip short circuits before fingerprinting
-    register('--skip', type=bool,
-             help='If enabled, skip this style checker.')
     register('--suppress', fingerprint=True, type=file_option, default=None,
              help='Takes a XML file where specific rules on specific files will be skipped.')
     register('--fail', fingerprint=True, default=True, type=bool,

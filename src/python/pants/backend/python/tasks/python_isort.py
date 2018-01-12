@@ -48,8 +48,6 @@ class IsortPythonTask(Task):
   @classmethod
   def register_options(cls, register):
     super(IsortPythonTask, cls).register_options(register)
-    register('--skip', type=bool, default=False,
-             help='If true, skip isort task.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5',
              help='Version of isort.')
 

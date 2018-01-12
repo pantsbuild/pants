@@ -33,14 +33,10 @@ class JavascriptStyle(NodeTask):
   @classmethod
   def register_options(cls, register):
     super(JavascriptStyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip javascriptstyle.')
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--javascriptstyle-dir', advanced=True, fingerprint=True,
              help='Package directory for lint tool.')
-    register('--transitive', type=bool, default=True,
-             help='True to run the tool transitively on targets in the context, false to run '
-                  'for only roots specified on the commandline.')
 
   def get_lintable_node_targets(self, targets):
     return filter(
@@ -57,12 +53,12 @@ class JavascriptStyle(NodeTask):
                        source.endswith(self._JSX_SOURCE_EXTENSION)))
     return sources
 
-  def _is_javascriptstyle_dir_valid(self, javascriptstyle_dir):
+  @staticmethod
+  def _is_javascriptstyle_dir_valid(javascriptstyle_dir):
     dir_exists = os.path.isdir(javascriptstyle_dir)
     if not dir_exists:
       raise TaskError(
         'javascriptstyle package does not exist: {}.'.format(javascriptstyle_dir))
-      return False
     else:
       lock_file = os.path.join(javascriptstyle_dir, 'yarn.lock')
       package_json = os.path.join(javascriptstyle_dir, 'package.json')
@@ -71,7 +67,6 @@ class JavascriptStyle(NodeTask):
         raise TaskError(
           'javascriptstyle cannot be installed because yarn.lock '
           'or package.json does not exist.')
-        return False
     return True
 
   @memoized_method

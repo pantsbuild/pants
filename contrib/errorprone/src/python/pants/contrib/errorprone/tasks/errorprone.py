@@ -9,16 +9,18 @@ import os
 import re
 
 from pants.backend.jvm.subsystems.shader import Shader, Shading
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.java.jar.jar_dependency import JarDependency
+from pants.task.transitive_option_mixin import TransitiveOptionMixin
 from pants.util.dirutil import safe_mkdir
 from pants.util.memo import memoized_property
 from pants.util.strutil import safe_shlex_split
 
 
-class ErrorProne(NailgunTask):
+class ErrorProne(TransitiveOptionMixin, NailgunTask):
   """Check Java code for Error Prone violations.  See http://errorprone.info/ for more details."""
 
   _ERRORPRONE_MAIN = 'com.google.errorprone.ErrorProneCompiler'
@@ -29,9 +31,6 @@ class ErrorProne(NailgunTask):
     super(ErrorProne, cls).register_options(register)
 
     register('--skip', type=bool, help='Skip Error Prone.')
-    register('--transitive', default=False, type=bool,
-             help='Run Error Prone against transitive dependencies of targets '
-                  'specified on the command line.')
     register('--command-line-options', type=list, default=[], fingerprint=True,
              help='Command line options passed to Error Prone')
     register('--exclude-patterns', type=list, default=[], fingerprint=True,
@@ -47,7 +46,8 @@ class ErrorProne(NailgunTask):
                           main=cls._ERRORPRONE_MAIN,
                           custom_rules=[
                             Shader.exclude_package('com.google.errorprone', recursive=True),
-                            Shading.create_exclude('*'), # https://github.com/pantsbuild/pants/issues/4288
+                            # https://github.com/pantsbuild/pants/issues/4288
+                            Shading.create_exclude('*'),
                           ]
                          )
 
@@ -61,16 +61,21 @@ class ErrorProne(NailgunTask):
     return [re.compile(x) for x in set(self.get_options().exclude_patterns or [])]
 
   def _is_errorprone_target(self, target):
-    if not target.has_sources(self._JAVA_SOURCE_EXTENSION):
-      self.context.log.debug('Skipping [{}] because it has no {} sources'.format(target.address.spec, self._JAVA_SOURCE_EXTENSION))
+    # TODO: Share with similar code in findbugs.py?  Possibly the findbugs and errorprone
+    # packages can be merged into a "jvm bug autodetection" package?
+    if not (isinstance(target, JvmTarget) and target.has_sources(self._JAVA_SOURCE_EXTENSION)):
+      self.context.log.debug('Skipping [{}] because it has no {} sources'.format(
+        target.address.spec, self._JAVA_SOURCE_EXTENSION))
       return False
     if target.is_synthetic:
-      self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(target.address.spec))
+      self.context.log.debug('Skipping [{}] because it is a synthetic target'.format(
+        target.address.spec))
       return False
     for pattern in self._exclude_patterns:
       if pattern.search(target.address.spec):
         self.context.log.debug(
-          "Skipping [{}] because it matches exclude pattern '{}'".format(target.address.spec, pattern.pattern))
+          "Skipping [{}] because it matches exclude pattern '{}'".format(
+            target.address.spec, pattern.pattern))
         return False
     return True
 
@@ -82,12 +87,7 @@ class ErrorProne(NailgunTask):
     if self.get_options().skip:
       return
 
-    if self.get_options().transitive:
-      targets = self.context.targets(self._is_errorprone_target)
-    else:
-      targets = filter(self._is_errorprone_target, self.context.target_roots)
-
-    targets = list(set(targets))
+    targets = list(set(self.targets_to_act_on(self._is_errorprone_target)))
 
     target_count = 0
     errorprone_failed = False
@@ -117,7 +117,8 @@ class ErrorProne(NailgunTask):
 
   def errorprone(self, target):
     runtime_classpaths = self.context.products.get_data('runtime_classpath')
-    runtime_classpath = [jar for conf, jar in runtime_classpaths.get_for_targets(target.closure(bfs=True))]
+    runtime_classpath = [jar for conf, jar in
+                         runtime_classpaths.get_for_targets(target.closure(bfs=True))]
 
     output_dir = os.path.join(self.workdir, target.id)
     safe_mkdir(output_dir)
