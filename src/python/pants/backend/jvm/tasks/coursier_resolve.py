@@ -158,7 +158,6 @@ class CoursierMixin(NailgunTask):
 
         for conf, result_list in results.items():
           for result in result_list:
-            print(result)
             self._load_json_result(conf, compile_classpath, coursier_cache_dir, invalidation_check,
                                    pants_jar_base_dir, result)
 
@@ -447,10 +446,6 @@ class CoursierMixin(NailgunTask):
               final_simple_coord = org_name_to_org_name_rev[org_name]
 
           if final_simple_coord:
-            from pprint import pprint
-            pprint("resolved jars:")
-            pprint(coord_to_resolved_jars)
-
             transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, jar.coordinate.classifier, coord_to_resolved_jars)
             if transitive_resolved_jars:
               compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
