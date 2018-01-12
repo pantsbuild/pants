@@ -18,6 +18,7 @@ from copy import copy
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.ossrh_publication_metadata import OSSRHPublicationMetadata
+from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jarable import Jarable
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
@@ -361,6 +362,10 @@ class JarPublish(ScmPublishMixin, JarTask):
     round_manager.require('javadoc')
     round_manager.require('scaladoc')
 
+  @staticmethod
+  def _is_exported(target):
+    return isinstance(target, ExportableJvmLibrary) and target.provides
+
   def __init__(self, *args, **kwargs):
     super(JarPublish, self).__init__(*args, **kwargs)
     self.cachedir = os.path.join(self.workdir, 'cache')
@@ -426,7 +431,7 @@ class JarPublish(ScmPublishMixin, JarTask):
             prompt = 'did you mean' if len(siblings) == 1 else 'maybe you meant one of these'
             raise TaskError('{} => {}?:\n    {}'.format(address, prompt,
                                                         '\n    '.join(str(a) for a in siblings)))
-          if not target.is_exported:
+          if not self._is_exported(target):
             raise TaskError('{} is not an exported target'.format(coordinate))
           return target.provides.org, target.provides.name
         except (BuildFile.BuildFileError,
@@ -811,7 +816,7 @@ class JarPublish(ScmPublishMixin, JarTask):
         derived_by_target[derived_target].add(walked_target)
       if not walked_target.has_sources() or not walked_target.sources_relative_to_buildroot():
         invalid[publish_target][walked_target].add('No sources.')
-      if not walked_target.is_exported:
+      if not self._is_exported(walked_target):
         invalid[publish_target][walked_target].add('Does not provide a binary artifact.')
 
     for target in targets:
@@ -865,7 +870,7 @@ class JarPublish(ScmPublishMixin, JarTask):
         candidates.update(get_synthetic('scala', candidate))
 
     def exportable(tgt):
-      return tgt in candidates and tgt.is_exported
+      return tgt in candidates and self._is_exported(tgt)
 
     return OrderedSet(filter(exportable,
                              reversed(sort_targets(filter(exportable, candidates)))))

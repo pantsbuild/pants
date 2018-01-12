@@ -36,20 +36,16 @@ class ListTargets(ConsoleTask):
 
   def console_output(self, targets):
     if self._provides:
-      def extract_artifact_id(target):
-        provided_jar, _ = target.get_artifact_info()
-        return '{0}#{1}'.format(provided_jar.org, provided_jar.name)
-
       extractors = dict(
           address=lambda target: target.address.spec,
-          artifact_id=extract_artifact_id,
+          artifact_id=lambda target: str(target.provides),
           repo_name=lambda target: target.provides.repo.name,
           repo_url=lambda target: target.provides.repo.url,
           push_db_basedir=lambda target: target.provides.repo.push_db_basedir,
       )
 
       def print_provides(column_extractors, target):
-        if target.is_exported:
+        if hasattr(target, 'provides'):
           return ' '.join(extractor(target) for extractor in column_extractors)
 
       try:
