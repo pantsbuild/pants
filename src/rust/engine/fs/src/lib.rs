@@ -8,9 +8,6 @@ pub use store::Store;
 mod pool;
 pub use pool::ResettablePool;
 
-#[cfg(test)]
-pub mod test_cas;
-
 extern crate bazel_protos;
 extern crate boxfuture;
 extern crate bytes;
@@ -26,6 +23,8 @@ extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
+#[cfg(test)]
+extern crate mock;
 extern crate ordermap;
 extern crate protobuf;
 extern crate sha2;
