@@ -8,10 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
-from pants.contrib.node.subsystems.command import command_gen
-from pants.contrib.node.subsystems.mixins import PackageManagerMixin, PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG
 from pants.fs.archive import TGZ
 from pants.util.memo import memoized_property
+
+from pants.contrib.node.subsystems.command import command_gen
+from pants.contrib.node.subsystems.mixins import (PACKAGE_MANAGER_NPM, PACKAGE_MANAGER_YARNPKG,
+                                                  PackageManagerMixin)
 
 
 logger = logging.getLogger(__name__)

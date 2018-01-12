@@ -11,11 +11,12 @@ from collections import namedtuple
 
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
-from pants.contrib.node.subsystems.command import command_gen
-from pants.contrib.node.subsystems import tool_binaries
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 from pants.util.process_handler import subprocess
+
+from pants.contrib.node.subsystems import tool_binaries
+from pants.contrib.node.subsystems.command import command_gen
 
 
 logger = logging.getLogger(__name__)
