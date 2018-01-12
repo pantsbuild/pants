@@ -38,6 +38,7 @@ class ProxyLogger(namedtuple('ProxyLogger', ['wrapped_object', 'log_path'])):
   ...
 
   """
+
   @classmethod
   def wrap_object(cls, obj, log_path=DEFAULT_LOG_PATH):
     return cls(obj, log_path)
