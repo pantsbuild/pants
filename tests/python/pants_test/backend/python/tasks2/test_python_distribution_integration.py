@@ -17,7 +17,6 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   # whl by setup.py) and an associated test to be consumed by the pants goals tested below.
   superhello_project = 'examples/src/python/example/python_distribution/hello/superhello'
   superhello_tests = 'examples/tests/python/example/python_distribution/hello/test_superhello'
-  superhello_testproject = 'examples/tests/python/example/python_distribution/hello/superhello_testproject'
 
   def test_pants_binary(self):
     command=['binary', '{}:main'.format(self.superhello_project)]
@@ -53,25 +52,3 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     pants_run = self.run_pants(command=command)
     self.assert_failure(pants_run)
     self.assertIn('Exception message: Could not satisfy all requirements', pants_run.stderr_data)
-
-  def test_pants_binary_with_two_targets(self):
-    # Test that targets with unique python_dist dependencies only build with their specific
-    # listed python_dist dependencies (i.e. that built dist products are filtered properly).
-    command=['binary', '{}:main'.format(self.superhello_project), '{}:bin_with_python_dist'.format(self.superhello_testproject)]
-    pants_run = self.run_pants(command=command)
-    self.assert_success(pants_run)
-    # Check that the pex was built.
-    pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
-    self.assertTrue(os.path.isfile(pex))
-    # Check that the pex runs.
-    output = subprocess.check_output(pex)
-    self.assertIn('Super hello', output)
-    # Check that the pex was built.
-    pex2 = os.path.join(get_buildroot(), 'dist', 'bin_with_python_dist.pex')
-    self.assertTrue(os.path.isfile(pex2))
-    # Check that the pex runs.
-    output = subprocess.check_output(pex2)
-    self.assertIn('A different Super hello', output)
-    # Cleanup
-    os.remove(pex)
-    os.remove(pex2)
