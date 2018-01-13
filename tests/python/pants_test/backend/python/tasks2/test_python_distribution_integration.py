@@ -42,13 +42,3 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     command=['test', '{}:superhello'.format(self.superhello_tests)]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
-
-  def test_with_conflicting_deps(self):
-    command=['run', '{}:main_with_conflicting_dep'.format(self.superhello_project)]
-    pants_run = self.run_pants(command=command)
-    self.assert_failure(pants_run)
-    self.assertIn('Exception message: Could not satisfy all requirements', pants_run.stderr_data)
-    command=['binary', '{}:main_with_conflicting_dep'.format(self.superhello_project)]
-    pants_run = self.run_pants(command=command)
-    self.assert_failure(pants_run)
-    self.assertIn('Exception message: Could not satisfy all requirements', pants_run.stderr_data)
