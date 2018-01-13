@@ -66,6 +66,9 @@ class PythonArtifact(PayloadField):
   def binaries(self):
     return self._binaries
 
+  def __str__(self):
+    return self.name
+
   def _compute_fingerprint(self):
     return sha1(json.dumps((self._kw, self._binaries),
                            ensure_ascii=True,

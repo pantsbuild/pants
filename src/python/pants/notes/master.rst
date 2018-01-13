@@ -4,6 +4,89 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.4.0rc0 (01/12/2018)
+---------------------
+
+The first release candidate for the ``1.4.x`` stable branch.
+
+It's been many months since the ``1.3.x`` branch was cut: part of this was due to a decision
+to tie "enabling pantsd by default" to the ``1.4.0`` release. It's taken longer to stabilize
+pantsd than we initially anticipated, and while we're very nearly comfortable with enabling it
+by default, we believe that we should be prioritizing frequent stable minor releases over
+releases being tied to particular features. So let's do this thing!
+
+New Features
+~~~~~~~~~~~~
+
+* Introduce a single-target mode to `JUnitRun`. (#5302)
+  `PR #5302 <https://github.com/pantsbuild/pants/pull/5302>`_
+
+* Remote ByteStore can write to a CAS (#5293)
+  `PR #5293 <https://github.com/pantsbuild/pants/pull/5293>`_
+
+* Improvements to the kythe extractor and indexer tasks. (#5297)
+  `PR #5297 <https://github.com/pantsbuild/pants/pull/5297>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Rename the `kythe` package to `codeanalysis` (#5299)
+  `PR #5299 <https://github.com/pantsbuild/pants/pull/5299>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix junit code coverage to be off by default. (#5306)
+  `PR #5306 <https://github.com/pantsbuild/pants/pull/5306>`_
+
+* Actually use the merge and report tool classpaths. (#5308)
+  `PR #5308 <https://github.com/pantsbuild/pants/pull/5308>`_
+
+* url quote classpath in MANIFEST.MF (#5301)
+  `PR #5301 <https://github.com/pantsbuild/pants/pull/5301>`_
+
+* Fix coursier resolve missing excludes for classpath product (#5298)
+  `PR #5298 <https://github.com/pantsbuild/pants/pull/5298>`_
+
+* Fix junit caching under coverage. (#5289)
+  `PR #5289 <https://github.com/pantsbuild/pants/pull/5289>`_
+
+* mypy plugin: add support for a mypy config file (#5296)
+  `PR #5296 <https://github.com/pantsbuild/pants/pull/5296>`_
+
+* Make the ivy resolution confs participate in the fingerprint. (#5270)
+  `PR #5270 <https://github.com/pantsbuild/pants/pull/5270>`_
+
+* Check in fs_util lockfile (#5275)
+  `PR #5275 <https://github.com/pantsbuild/pants/pull/5275>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Add debug logging utils. (#5313)
+  `PR #5313 <https://github.com/pantsbuild/pants/pull/5313>`_
+
+* Move grpc mocks to their own crate (#5305)
+  `PR #5305 <https://github.com/pantsbuild/pants/pull/5305>`_
+
+* Move hashing utilities into their own crate (#5304)
+  `PR #5304 <https://github.com/pantsbuild/pants/pull/5304>`_
+
+* Merge coverage per-batch. (#5286)
+  `PR #5286 <https://github.com/pantsbuild/pants/pull/5286>`_
+
+* Update cargo lockfiles (#5291)
+  `PR #5291 <https://github.com/pantsbuild/pants/pull/5291>`_
+
+* Install packages required to build a pants release (#5292)
+  `PR #5292 <https://github.com/pantsbuild/pants/pull/5292>`_
+
+* travis_ci Dockerfile actually works not on travis (#5278)
+  `PR #5278 <https://github.com/pantsbuild/pants/pull/5278>`_
+
+* Update grpcio to 0.2.0 (#5269)
+  `PR #5269 <https://github.com/pantsbuild/pants/pull/5269>`_
+
 1.4.0.dev27 (01/05/2018)
 ------------------------
 
