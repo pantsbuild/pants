@@ -18,11 +18,13 @@ from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
@@ -50,6 +52,10 @@ def is_scala(target):
 def is_java(target):
   return (isinstance(target, JavaLibrary) or
           isinstance(target, JvmTarget) and target.has_sources('.java'))
+
+
+def _is_test(target):
+  return isinstance(target, JUnitTests) or isinstance(target, PythonTests)
 
 
 class IdeGen(IvyTaskMixin, NailgunTask):
@@ -592,10 +598,10 @@ class Project(object):
             resources_by_basedir[resources.target_base].update(relative_sources(resources))
           for basedir, resources in resources_by_basedir.items():
             self.resource_extensions.update(Project.extract_resource_extensions(resources))
-            configure_source_sets(basedir, resources, is_test=target.is_test,
+            configure_source_sets(basedir, resources, is_test=_is_test(target),
                                   resources_only=True)
         if target.has_sources():
-          test = target.is_test
+          test = _is_test(target)
           self.has_tests = self.has_tests or test
           base = target.target_base
           configure_source_sets(base, relative_sources(target), is_test=test,
