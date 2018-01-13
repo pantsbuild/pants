@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import multiprocessing
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
@@ -25,7 +26,7 @@ class ThriftLinter(NailgunTask):
 
   @staticmethod
   def _is_thrift(target):
-    return target.is_thrift
+    return isinstance(target, JavaThriftLibrary)
 
   @classmethod
   def register_options(cls, register):
