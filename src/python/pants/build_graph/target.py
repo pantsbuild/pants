@@ -108,7 +108,7 @@ class AbstractTarget(object):
     return hasattr(self, 'resources') and self.resources
 
   @property
-  @deprecated('1.6.0.dev0', 'use type tests and check the value of the `provides` attribute.')
+  @deprecated('1.7.0.dev0', 'use type tests and check the value of the `provides` attribute.')
   def is_exported(self):
     """Returns True if the target provides an artifact exportable from the repo.
 
