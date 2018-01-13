@@ -6,12 +6,14 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from collections import namedtuple
 
 from pex.fetcher import Fetcher
 from pex.platforms import Platform
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
+from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -20,6 +22,7 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
 
@@ -105,6 +108,7 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
   # See which ones we need to build.
   reqs_to_build = OrderedSet()
   find_links = OrderedSet()
+
   for req in reqs:
     # TODO: should_build appears to be hardwired to always be True. Get rid of it?
     if req.should_build(interpreter.python, Platform.current()):
@@ -151,6 +155,7 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   for platform in platforms:
     requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
                                           str(interpreter.identity))
+    import pdb;pdb.set_trace()
     distributions[platform] = resolve(
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,
@@ -162,3 +167,37 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       allow_prereleases=python_setup.resolver_allow_prereleases)
 
   return distributions
+
+
+def build_req_libs_provided_by_setup_file(context, local_built_dists, cname):
+  # Create requirements library for transitive deps required in a
+  # user-defined setup.py. 
+  '''
+  dummy_req_libs = []
+  local_dist_transitive_dep_reqs = []
+  for tgt in local_dist_targets:
+    if tgt.install_requires:
+      for req_name in tgt.install_requires:
+        local_dist_req = PythonRequirement(req_name)
+        local_dist_transitive_dep_reqs.append(local_dist_req)
+  if local_dist_transitive_dep_reqs:
+    # Stub out a dummy instance of PythonRequirementLibrary to act as a
+    # container for a list of `PythonRequirement` objects.
+    dummy_req_lib_target = namedtuple('PythonRequirementLibrary', 'requirements')
+    dummy_req_lib_target.requirements = local_dist_transitive_dep_reqs
+    dummy_req_libs = [dummy_req_lib_target] + dummy_req_libs'''
+
+  # Create requirements library for wheels built locally by BuildLocalPythonDistributions task.
+  req_libs = []
+  local_whl_reqs = []
+  for whl_location in local_built_dists:
+    base = os.path.basename(whl_location)
+    whl_dir = os.path.dirname(whl_location)
+    whl_metadata = base.split('-')
+    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
+    local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
+  if local_whl_reqs:
+    addr = Address.parse(cname)
+    context.build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)
+    req_libs = [context.build_graph.get_target(addr)]
+  return req_libs

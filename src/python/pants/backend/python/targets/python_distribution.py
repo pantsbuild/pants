@@ -5,6 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import ast
+import os
+import re
+
 from pex.interpreter import PythonIdentity
 from twitter.common.collections import maybe_list
 
@@ -22,6 +26,16 @@ class PythonDistribution(Target):
   @classmethod
   def alias(cls):
     return 'python_dist'
+
+  @staticmethod
+  def get_setup_py_install_requires(setup_file_path):
+    with open(setup_file_path) as fp:
+      file_content = fp.read()
+      matches = re.findall(r'install_requires=\[.*\]', file_content)
+      ret = []
+      if matches:
+        ret = ast.literal_eval('[' + matches[-1].split('[')[1])
+      return ret
 
   def __init__(self,
                address=None,
@@ -51,7 +65,14 @@ class PythonDistribution(Target):
     super(PythonDistribution, self).__init__(address=address, payload=payload, **kwargs)
     self.add_labels('python')
 
-    if not 'setup.py' in sources:
+    setup_file_path = None
+    for path in self.sources_relative_to_buildroot():
+      if os.path.basename(path) == 'setup.py':
+        setup_file_path = path
+
+    self.install_requires = self.get_setup_py_install_requires(setup_file_path)
+
+    if not setup_file_path:
       raise TargetDefinitionException(
         self, 'A setup.py in the top-level directory relative to the target definition is required.'
       )

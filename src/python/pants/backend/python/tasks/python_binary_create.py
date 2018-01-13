@@ -14,9 +14,10 @@ from pex.pex_info import PexInfo
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks2.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
+from pants.backend.python.tasks2.pex_build_util import (build_req_libs_provided_by_setup_file,
+                                                        dump_requirements, dump_sources, 
                                                         has_python_requirements, has_python_sources,
-                                                        has_resources)
+                                                        has_resources, is_local_python_dist)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -129,6 +130,9 @@ class PythonBinaryCreate(Task):
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
         dump_sources(builder, tgt, self.context.log)
+      built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
+      local_dist_tgts = build_req_libs_provided_by_setup_file(self.context, built_dists, self.__class__.__name__)
+      req_tgts = local_dist_tgts + req_tgts
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Dump built python distributions, if any, into builder's chroot.
