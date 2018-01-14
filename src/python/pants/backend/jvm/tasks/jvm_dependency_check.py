@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -190,7 +191,7 @@ class JvmDependencyCheck(Task):
 
       if target in targets:
         return True
-      elif target.is_scala:
+      elif isinstance(target, ScalaLibrary):
         return any(t in targets for t in target.java_sources)
       else:
         return False

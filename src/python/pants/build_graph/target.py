@@ -130,13 +130,6 @@ class AbstractTarget(object):
     """Returns True if the target has or generates java sources."""
     return self.has_label('java')
 
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_scala(self):
-    """Returns True if the target has scala sources."""
-    return self.has_label('scala')
-
 
 class Target(AbstractTarget):
   """A generic target used to group dependencies.
