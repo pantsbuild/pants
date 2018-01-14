@@ -7,6 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractmethod
 
+from pants.backend.jvm.targets.annotation_processor import AnnotationProcessor
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
 
@@ -69,6 +72,14 @@ class CoverageEngine(AbstractClass):
     :returns: The path to the generated report iff it should be opened for the end user.
     :rtype: str
     """
+
+  @staticmethod
+  def is_coverage_target(tgt):
+    # TODO: Does this actually need to check AnnotationProcessor targets? It does so at present
+    # to preserve compatibility while migrating off target labels to type checks, but it seems
+    # likely that inclusion of AnnotationProcessor in the past was in error, and unnecessary.
+    return (isinstance(tgt, (AnnotationProcessor, JavaLibrary, ScalaLibrary))
+            and not tgt.is_synthetic)
 
 
 class NoCoverage(CoverageEngine):

@@ -116,13 +116,6 @@ class AbstractTarget(object):
     """
     return getattr(self, 'provides', None) is not None
 
-  # DEPRECATED  to be removed after 0.0.29
-  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
-  @property
-  def is_thrift(self):
-    """Returns True if the target has thrift IDL sources."""
-    return False
-
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
@@ -150,13 +143,6 @@ class AbstractTarget(object):
   def is_scala(self):
     """Returns True if the target has scala sources."""
     return self.has_label('scala')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_test(self):
-    """Returns True if the target is comprised of tests."""
-    return self.has_label('tests')
 
 
 class Target(AbstractTarget):
