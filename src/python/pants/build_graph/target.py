@@ -133,13 +133,6 @@ class AbstractTarget(object):
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
   @property
-  def is_python(self):
-    """Returns True if the target has python sources."""
-    return self.has_label('python')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
   def is_scala(self):
     """Returns True if the target has scala sources."""
     return self.has_label('scala')
