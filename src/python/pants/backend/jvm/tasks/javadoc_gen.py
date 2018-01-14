@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jvmdoc_gen import Jvmdoc, JvmdocGen
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
@@ -59,7 +61,7 @@ class JavadocGen(JvmdocGen):
         if jar.apidocs:
           offlinelinks.add(jar.apidocs)
     for target in targets:
-      target.walk(link, lambda t: t.is_jvm)
+      target.walk(link, lambda t: isinstance(t, (JvmTarget, JarLibrary)))
 
     for link in offlinelinks:
       args.extend(['-linkoffline', link, link])

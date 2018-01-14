@@ -54,6 +54,9 @@ def is_java(target):
           isinstance(target, JvmTarget) and target.has_sources('.java'))
 
 
+def _is_jvm(target):
+  return isinstance(target, (JvmTarget, JarLibrary))
+
 def _is_test(target):
   return isinstance(target, JUnitTests) or isinstance(target, PythonTests)
 
@@ -253,7 +256,7 @@ class IdeGen(IvyTaskMixin, NailgunTask):
     compiles = OrderedSet()
 
     def prune(target):
-      if target.is_jvm:
+      if _is_jvm(target):
         if target.excludes:
           excludes.update(target.excludes)
         jars.update(jar for jar in target.jar_dependencies)

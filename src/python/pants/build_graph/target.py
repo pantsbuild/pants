@@ -116,20 +116,6 @@ class AbstractTarget(object):
     """
     return getattr(self, 'provides', None) is not None
 
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_jvm(self):
-    """Returns True if the target produces jvm bytecode."""
-    return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_java(self):
-    """Returns True if the target has or generates java sources."""
-    return self.has_label('java')
-
 
 class Target(AbstractTarget):
   """A generic target used to group dependencies.
