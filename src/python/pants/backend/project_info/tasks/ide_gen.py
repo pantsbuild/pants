@@ -57,6 +57,7 @@ def is_java(target):
 def _is_jvm(target):
   return isinstance(target, (JvmTarget, JarLibrary))
 
+
 def _is_test(target):
   return isinstance(target, JUnitTests) or isinstance(target, PythonTests)
 
