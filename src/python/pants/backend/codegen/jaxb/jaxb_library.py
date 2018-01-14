@@ -30,8 +30,6 @@ class JaxbLibrary(JvmTarget):
     })
     super(JaxbLibrary, self).__init__(payload=payload, **kwargs)
 
-    self.add_labels('jaxb')
-
     if language != 'java':
       raise ValueError('Language "{lang}" not supported for {class_type}'
                        .format(lang=language, class_type=type(self).__name__))

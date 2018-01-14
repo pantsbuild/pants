@@ -31,7 +31,6 @@ class AndroidTarget(JvmTarget):
       to the BUILD file's directory.
     """
     super(AndroidTarget, self).__init__(address=address, **kwargs)
-    self.add_labels('android')
     # TODO(pl): These attributes should live in the payload
     self.build_tools_version = build_tools_version
     self._spec_path = address.spec_path

@@ -367,7 +367,6 @@ class Target(AbstractTarget):
     self._type_alias = type_alias
     self._tags = set(tags or [])
     self.description = description
-    self.labels = set()
 
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
@@ -835,18 +834,6 @@ class Target(AbstractTarget):
     :API: public
     """
     return self.closure_for_targets([self], *vargs, **kwargs)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def add_labels(self, *label):
-    self.labels.update(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def remove_label(self, label):
-    self.labels.remove(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def has_label(self, label):
-    return label in self.labels
 
   def __lt__(self, other):
     return self.address < other.address
