@@ -134,6 +134,18 @@ function pkg_errorprone_install_test() {
       --explain compile | grep "errorprone" &> /dev/null
 }
 
+PKG_CODEANALYSIS=(
+  "pantsbuild.pants.contrib.codeanalysis"
+  "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin"
+  "pkg_codeanalysis_install_test"
+)
+function pkg_codeanalysis_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
+      --explain compile | grep "kythe" &> /dev/null
+}
+
 PKG_JAXWS=(
   "pantsbuild.pants.contrib.jax_ws"
   "//contrib/jax_ws/src/python/pants/contrib/jax_ws:plugin"
@@ -162,5 +174,6 @@ CONTRIB_PACKAGES=(
   PKG_FINDBUGS
   PKG_CPP
   PKG_ERRORPRONE
+  PKG_CODEANALYSIS
   PKG_JAXWS
 )
