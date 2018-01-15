@@ -522,6 +522,30 @@ pub extern "C" fn set_panic_handler() {
   }));
 }
 
+#[no_mangle]
+pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| match scheduler
+    .core
+    .store
+    .garbage_collect() {
+    Ok(_) => {}
+    Err(err) => externs::log(externs::LogLevel::Critical, &err),
+  });
+}
+
+#[no_mangle]
+pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let digests = scheduler.core.graph.all_digests(scheduler.core.clone());
+    match scheduler.core.store.lease_all(
+      digests.iter().map(|digest| digest.0),
+    ) {
+      Ok(_) => {}
+      Err(err) => externs::log(externs::LogLevel::Critical, &err),
+    }
+  });
+}
+
 fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()

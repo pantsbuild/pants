@@ -36,3 +36,11 @@ python_library(
     ':pants_service'
   ]
 )
+
+python_library(
+  name = 'store_gc_service',
+  sources = ['store_gc_service.py'],
+  dependencies = [
+    ':pants_service',
+  ]
+)
