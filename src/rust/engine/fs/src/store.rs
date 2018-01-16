@@ -4,8 +4,9 @@ use bytes::Bytes;
 use futures::{Future, future};
 use hashing::Digest;
 use protobuf::core::Message;
+use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use pool::ResettablePool;
@@ -238,10 +239,57 @@ impl Store {
     };
     Ok(())
   }
+
+  fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
+    let accumulator = Arc::new(Mutex::new(HashMap::new()));
+
+    self.expand_directory_helper(digest, accumulator.clone()).map(|()| {
+      Arc::try_unwrap(accumulator).expect("Arc should have been unwrappable").into_inner().unwrap()
+    }).to_boxed()
+  }
+
+  fn expand_directory_helper(
+    &self,
+    digest: Digest,
+    accumulator: Arc<Mutex<HashMap<Digest, EntryType>>>,
+  ) -> BoxFuture<(), String> {
+    let store = self.clone();
+    self
+      .load_directory(digest)
+      .and_then(move |maybe_directory| match maybe_directory {
+        Some(directory) => {
+          {
+            let mut accumulator = accumulator.lock().unwrap();
+            accumulator.insert(digest, EntryType::Directory);
+            for file in directory.get_files().into_iter() {
+              accumulator.insert(file.get_digest().into(), EntryType::File);
+            }
+          }
+          future::join_all(
+            directory
+              .get_directories()
+              .into_iter()
+              .map(move |subdir| {
+                store.clone().expand_directory_helper(
+                  subdir.get_digest().into(),
+                  accumulator.clone(),
+                )
+              })
+              .collect::<Vec<_>>(),
+          ).map(|_| ())
+            .to_boxed()
+        }
+        None => {
+          return future::err(format!("Could not expand unknown directory: {:?}", digest))
+            .to_boxed() as BoxFuture<_, _>
+        }
+      })
+      .to_boxed()
+  }
 }
 
 // Only public for testing.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub enum EntryType {
   Directory,
   File,
@@ -318,7 +366,7 @@ mod local {
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
-    fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
+    pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
       let txn = self.inner.env.begin_ro_txn().map_err(|err| {
         format!("Failed to begin read transaction: {:?}", err)
       })?;
@@ -1500,6 +1548,7 @@ mod tests {
   use pool::ResettablePool;
   use protobuf::Message;
   use sha2::Sha256;
+  use std::collections::HashMap;
   use std::path::Path;
   use std::sync::Arc;
   use std::time::Duration;
@@ -1507,12 +1556,15 @@ mod tests {
 
   pub const STR: &str = "European Burmese";
   pub const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
+  pub const CATNIP_HASH: &str = "eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874";
   pub const DIRECTORY_HASH: &str = "63949aa823baf765eff07b946050d76e\
 c0033144c785a94d3ebd82baa931cd16";
   pub const OTHER_DIRECTORY_HASH: &str = "1b9357331e7df1f6efb50fe0b15ecb2b\
 ca58002b3fa97478e7c2c97640e72ee1";
   const EMPTY_DIRECTORY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb924\
 27ae41e4649b934ca495991b7852b855";
+  const RECURSIVE_DIRECTORY_HASH: &str = "636efb4d327248515bd8b2d1d8140a21\
+f41e9443e961b5127998715a526051f9";
 
   pub fn fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(HASH).unwrap()
@@ -1574,12 +1626,62 @@ ca58002b3fa97478e7c2c97640e72ee1";
     ))
   }
 
+
+  pub fn other_directory_fingerprint() -> Fingerprint {
+    Fingerprint::from_hex_string(OTHER_DIRECTORY_HASH).unwrap()
+  }
+
+  pub fn recursive_directory() -> bazel_protos::remote_execution::Directory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_directories().push({
+      let mut subdir = bazel_protos::remote_execution::DirectoryNode::new();
+      subdir.set_name("cats".to_string());
+      subdir.set_digest((&directory_digest()).into());
+      subdir
+    });
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("treats".to_string());
+      file.set_digest({
+        let mut digest = bazel_protos::remote_execution::Digest::new();
+        digest.set_hash(CATNIP_HASH.to_string());
+        digest.set_size_bytes(6);
+        digest
+      });
+      file.set_is_executable(false);
+      file
+    });
+    directory
+  }
+
   pub fn empty_directory_fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(EMPTY_DIRECTORY_HASH).unwrap()
   }
 
-  pub fn other_directory_fingerprint() -> Fingerprint {
-    Fingerprint::from_hex_string(OTHER_DIRECTORY_HASH).unwrap()
+  pub fn empty_directory_digest() -> Digest {
+    Digest(empty_directory_fingerprint(), 0)
+  }
+
+  pub fn recursive_directory_fingerprint() -> Fingerprint {
+    Fingerprint::from_hex_string(RECURSIVE_DIRECTORY_HASH).unwrap()
+  }
+
+  pub fn recursive_directory_digest() -> Digest {
+    Digest(
+      recursive_directory_fingerprint(),
+      recursive_directory()
+        .write_to_bytes()
+        .expect("Error serializing proto")
+        .len(),
+    )
+  }
+
+  pub fn catnip_fingerprint() -> Fingerprint {
+    Fingerprint::from_hex_string(CATNIP_HASH).unwrap()
+  }
+
+  pub fn catnip_digest() -> Digest {
+    Digest(catnip_fingerprint(), 6)
   }
 
   pub fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
@@ -1595,6 +1697,11 @@ ca58002b3fa97478e7c2c97640e72ee1";
       ].into_iter()
         .collect(),
     )
+  }
+
+  fn new_local_store<P: AsRef<Path>>(dir: P) -> Store {
+    Store::local_only(dir, Arc::new(ResettablePool::new("test-pool-".to_string())))
+      .expect("Error creating local store")
   }
 
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
@@ -1845,6 +1952,107 @@ ca58002b3fa97478e7c2c97640e72ee1";
     assert_eq!(
       local::tests::load_file_bytes(&local::tests::new_store(dir.path()), empty_fingerprint),
       Ok(None)
+    );
+  }
+
+  #[test]
+  fn expand_empty_directory() {
+    let dir = TempDir::new("store").unwrap();
+
+    new_local_store(dir.path())
+      .record_directory(&bazel_protos::remote_execution::Directory::new(), false)
+      .wait()
+      .expect("Error storing directory locally");
+
+    let expanded = new_local_store(dir.path())
+      .expand_directory(empty_directory_digest())
+      .wait()
+      .expect("Error expanding directory");
+    let want: HashMap<Digest, EntryType> = vec![(empty_directory_digest(), EntryType::Directory)]
+      .into_iter()
+      .collect();
+    assert_eq!(expanded, want);
+  }
+
+  #[test]
+  fn expand_flat_directory() {
+    let dir = TempDir::new("store").unwrap();
+
+    new_local_store(dir.path())
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+
+    let expanded = new_local_store(dir.path())
+      .expand_directory(directory_digest())
+      .wait()
+      .expect("Error expanding directory");
+    let want: HashMap<Digest, EntryType> = vec![
+      (directory_digest(), EntryType::Directory),
+      (digest(), EntryType::File),
+    ].into_iter()
+      .collect();
+    assert_eq!(expanded, want);
+  }
+
+  #[test]
+  fn expand_recursive_directory() {
+    let dir = TempDir::new("store").unwrap();
+
+    new_local_store(dir.path())
+      .record_directory(&recursive_directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    new_local_store(dir.path())
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+
+    let expanded = new_local_store(dir.path())
+      .expand_directory(recursive_directory_digest())
+      .wait()
+      .expect("Error expanding directory");
+    let want: HashMap<Digest, EntryType> = vec![
+      (recursive_directory_digest(), EntryType::Directory),
+      (directory_digest(), EntryType::Directory),
+      (digest(), EntryType::File),
+      (catnip_digest(), EntryType::File),
+    ].into_iter()
+      .collect();
+    assert_eq!(expanded, want);
+  }
+
+  #[test]
+  fn expand_missing_directory() {
+    let dir = TempDir::new("store").unwrap();
+    let error = new_local_store(dir.path())
+      .expand_directory(empty_directory_digest())
+      .wait()
+      .expect_err("Want error");
+    assert!(
+      error.contains(&format!("{:?}", empty_directory_digest())),
+      "Bad error message: {}",
+      error
+    );
+  }
+
+  #[test]
+  fn expand_directory_missing_subdir() {
+    let dir = TempDir::new("store").unwrap();
+
+    new_local_store(dir.path())
+      .record_directory(&recursive_directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+
+    let error = new_local_store(dir.path())
+      .expand_directory(recursive_directory_digest())
+      .wait()
+      .expect_err("Want error");
+    assert!(
+      error.contains(&format!("{}", directory_fingerprint())),
+      "Bad error message: {}",
+      error
     );
   }
 }
