@@ -1021,15 +1021,6 @@ c0033144c785a94d3ebd82baa931cd16";
   }
 
   #[test]
-  fn digest_to_bazel_digest() {
-    let digest = Digest(Fingerprint::from_hex_string(HASH).unwrap(), 16);
-    let mut bazel_digest = bazel_protos::remote_execution::Digest::new();
-    bazel_digest.set_hash(HASH.to_string());
-    bazel_digest.set_size_bytes(16);
-    assert_eq!(bazel_digest, digest.into());
-  }
-
-  #[test]
   fn load_file_prefers_local() {
     let dir = TempDir::new("store").unwrap();
 
