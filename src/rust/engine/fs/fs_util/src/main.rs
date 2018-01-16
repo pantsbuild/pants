@@ -150,7 +150,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         Store::backfills_from_remote(
           store_dir,
           pool.clone(),
-          cas_address.to_owned(),
+          cas_address,
           1,
           10 * 1024 * 1024,
           Duration::from_secs(30),

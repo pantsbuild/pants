@@ -48,7 +48,7 @@ impl Store {
   pub fn backfills_from_remote<P: AsRef<Path>>(
     path: P,
     pool: Arc<ResettablePool>,
-    cas_address: String,
+    cas_address: &str,
     thread_count: usize,
     chunk_size_bytes: usize,
     timeout: Duration,
@@ -545,13 +545,13 @@ mod remote {
 
   impl ByteStore {
     pub fn new(
-      cas_address: String,
+      cas_address: &str,
       thread_count: usize,
       chunk_size_bytes: usize,
       upload_timeout: Duration,
     ) -> ByteStore {
       let env = Arc::new(grpcio::Environment::new(thread_count));
-      let channel = grpcio::ChannelBuilder::new(env.clone()).connect(&cas_address);
+      let channel = grpcio::ChannelBuilder::new(env.clone()).connect(cas_address);
       let client = Arc::new(bazel_protos::bytestream_grpc::ByteStreamClient::new(
         channel,
       ));
@@ -830,7 +830,7 @@ mod remote {
     fn write_file_multiple_chunks() {
       let cas = StubCAS::empty();
 
-      let store = ByteStore::new(cas.address(), 1, 10 * 1024, Duration::from_secs(1));
+      let store = ByteStore::new(&cas.address(), 1, 10 * 1024, Duration::from_secs(1));
 
       let all_the_henries = {
         let mut f = File::open(
@@ -895,7 +895,7 @@ mod remote {
     #[test]
     fn write_connection_error() {
       let store = ByteStore::new(
-        "doesnotexist.example".to_owned(),
+        "doesnotexist.example",
         1,
         10 * 1024 * 1024,
         Duration::from_secs(1),
@@ -911,7 +911,7 @@ mod remote {
     }
 
     fn new_byte_store(cas: &StubCAS) -> ByteStore {
-      ByteStore::new(cas.address(), 1, 10 * 1024 * 1024, Duration::from_secs(1))
+      ByteStore::new(&cas.address(), 1, 10 * 1024 * 1024, Duration::from_secs(1))
     }
   }
 }
@@ -1022,7 +1022,7 @@ c0033144c785a94d3ebd82baa931cd16";
     Store::backfills_from_remote(
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
-      cas_address,
+      &cas_address,
       1,
       10 * 1024 * 1024,
       Duration::from_secs(1),
