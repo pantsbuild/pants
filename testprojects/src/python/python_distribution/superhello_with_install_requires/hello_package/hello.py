@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import flask
+import super_greet()
 
 def hello():
-  print(flask.__version__)
+  print(super_greet.hello())

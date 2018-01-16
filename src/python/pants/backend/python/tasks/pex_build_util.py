@@ -169,25 +169,16 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   return distributions
 
 
-def build_req_libs_provided_by_setup_file(context, local_built_dists, cname):
-  # Create requirements library for transitive deps required in a
-  # user-defined setup.py. 
-  '''
-  dummy_req_libs = []
-  local_dist_transitive_dep_reqs = []
-  for tgt in local_dist_targets:
-    if tgt.install_requires:
-      for req_name in tgt.install_requires:
-        local_dist_req = PythonRequirement(req_name)
-        local_dist_transitive_dep_reqs.append(local_dist_req)
-  if local_dist_transitive_dep_reqs:
-    # Stub out a dummy instance of PythonRequirementLibrary to act as a
-    # container for a list of `PythonRequirement` objects.
-    dummy_req_lib_target = namedtuple('PythonRequirementLibrary', 'requirements')
-    dummy_req_lib_target.requirements = local_dist_transitive_dep_reqs
-    dummy_req_libs = [dummy_req_lib_target] + dummy_req_libs'''
+def build_req_libs_provided_by_setup_file(context, local_built_dists, class_name):
+  """Build a requirements library from a local wheel.
 
-  # Create requirements library for wheels built locally by BuildLocalPythonDistributions task.
+  :param context: The context of the calling task needed for injecting synthetic targets.
+  :param local_built_dists: A list of paths to locally built wheels to package into
+  requirements libraries.
+  :param class_name: The name of the calling task class for naming synthetic targets.
+  :return: a :class: `PythonRequirementLibrary` containing a local wheel and its
+  transitive dependencies.
+  """
   req_libs = []
   local_whl_reqs = []
   for whl_location in local_built_dists:
@@ -197,7 +188,7 @@ def build_req_libs_provided_by_setup_file(context, local_built_dists, cname):
     req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
     local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
   if local_whl_reqs:
-    addr = Address.parse(cname)
+    addr = Address.parse(class_name)
     context.build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)
     req_libs = [context.build_graph.get_target(addr)]
   return req_libs

@@ -16,5 +16,5 @@ setup(
   version='1.0.0',
   ext_modules=[c_module],
   packages=find_packages(),
-  install_requires=['pycountry']
+  install_requires=['pycountry==17.1.2']
 )
