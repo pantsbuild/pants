@@ -150,6 +150,18 @@ function pkg_jax_ws_install_test() {
       targets | grep "jax_ws_library" &> /dev/null
 }
 
+PKG_MYPY=(
+  "pantsbuild.pants.contrib.mypy"
+  "//contrib/mypy/src/python/pants/contrib/mypy:plugin"
+  "pkg_mypy_install_test"
+)
+function pkg_mypy_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.mypy==${version}']" \
+    --explain mypy &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -163,4 +175,5 @@ CONTRIB_PACKAGES=(
   PKG_CPP
   PKG_ERRORPRONE
   PKG_JAXWS
+  PKG_MYPY
 )
