@@ -11,4 +11,4 @@ from hello_package import hello
 
 if __name__ == '__main__':
   hello.hello()
-  print(pycountry)
+  print(pycountry.countries.get(alpha_2='US').name)

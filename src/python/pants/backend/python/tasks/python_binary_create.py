@@ -130,9 +130,13 @@ class PythonBinaryCreate(Task):
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
         dump_sources(builder, tgt, self.context.log)
+
+      # Handle locally-built python distribution dependencies.
       built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-      local_dist_tgts = build_req_libs_provided_by_setup_file(self.context, built_dists, self.__class__.__name__)
-      req_tgts = local_dist_tgts + req_tgts
+      local_dist_req_libs = build_req_libs_provided_by_setup_file(self.context,
+                                                                  built_dists,
+                                                                  self.__class__.__name__)
+      req_tgts = local_dist_req_libs + req_tgts
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Dump built python distributions, if any, into builder's chroot.

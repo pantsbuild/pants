@@ -13,16 +13,25 @@ python_dist(
 )
 
 python_binary(
-  name='main_with_install_requires',
+  name='main_with_no_conflict',
   source='main.py',
   dependencies=[
-    ':superhello'
+    ':superhello',
+  ]
+)
+
+python_binary(
+  name='main_with_conflicting_dep',
+  source='main.py',
+  dependencies=[
+    ':superhello',
+    ':pycountry'
   ]
 )
 
 python_requirement_library(
-  name='flask_lib',
+  name='pycountry',
   requirements=[
-    python_requirement('flask==0.12.1'),
+    python_requirement('pycountry==17.9.23'),
   ]
 )

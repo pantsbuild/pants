@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-from collections import namedtuple
 
 from pex.fetcher import Fetcher
 from pex.platforms import Platform
@@ -108,7 +107,6 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
   # See which ones we need to build.
   reqs_to_build = OrderedSet()
   find_links = OrderedSet()
-
   for req in reqs:
     # TODO: should_build appears to be hardwired to always be True. Get rid of it?
     if req.should_build(interpreter.python, Platform.current()):
@@ -155,7 +153,6 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   for platform in platforms:
     requirements_cache_dir = os.path.join(python_setup.resolver_cache_dir,
                                           str(interpreter.identity))
-    import pdb;pdb.set_trace()
     distributions[platform] = resolve(
       requirements=[req.requirement for req in requirements],
       interpreter=interpreter,

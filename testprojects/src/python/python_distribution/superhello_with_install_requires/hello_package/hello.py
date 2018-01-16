@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import super_greet()
+import super_greet
 
 def hello():
-  print(super_greet.hello())
+  print(super_greet.super_greet())

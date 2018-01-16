@@ -11,8 +11,6 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks2.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants.backend.python.tasks2.pex_build_util import (build_req_libs_provided_by_setup_file,
@@ -59,22 +57,23 @@ class ResolveRequirementsTaskBase(Task):
       # to cover the empty case.
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
-          # Prepend mock req_libs objects that contain requirements parsed from a
-          # user-defined setup.py in a py_dist target.
+          # Handle locally-built python distribution dependencies.
           built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-          req_libs = build_req_libs_provided_by_setup_file(self.context, built_dists, self.__class__.__name__) + req_libs
+          local_dist_req_libs = build_req_libs_provided_by_setup_file(self.context,
+                                                                      built_dists,
+                                                                      self.__class__.__name__)
+          req_libs = local_dist_req_libs + req_libs
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)
 
   def _build_requirements_pex(self, interpreter, path, req_libs):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
-    import pdb;pdb.set_trace()
     dump_requirements(builder, interpreter, req_libs, self.context.log)
     # Dump built python distributions, if any, into the requirements pex.
     # NB: If a python_dist depends on a requirement X and another target in play requires
     # an incompatible version of X, this will cause the pex resolver to throw an incompatiblity
     # error and Pants will abort the build.
-    
+
     built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
     if built_dists:
       for dist in built_dists:

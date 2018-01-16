@@ -17,6 +17,7 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   # whl by setup.py) and an associated test to be consumed by the pants goals tested below.
   superhello_project = 'examples/src/python/example/python_distribution/hello/superhello'
   superhello_tests = 'examples/tests/python/example/python_distribution/hello/test_superhello'
+  superhello_install_requires = 'testprojects/src/python/python_distribution/superhello_with_install_requires'
 
   def test_pants_binary(self):
     command=['binary', '{}:main'.format(self.superhello_project)]
@@ -42,3 +43,26 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     command=['test', '{}:superhello'.format(self.superhello_tests)]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
+
+  def test_with_install_requires(self):
+    command=['run', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
+    pants_run = self.run_pants(command=command)
+    self.assert_success()
+    self.assertIn('United States', pants_run.stdout_data)
+    command=['binary', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
+    pants_run = self.run_pants(command=command)
+    self.assert_success()
+    output = subprocess.check_output(pex)
+    self.assertIn('United States', pants_run.stdout_data)
+
+  def test_with_conflicting_transitive_deps(self):
+    command=['run', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
+    pants_run = self.run_pants(command=command)
+    self.assert_failure(pants_run)
+    self.assertIn('Exception message: Could not satisfy all requirements', pants_run.stderr_data)
+    self.assertIn('17.9.23', pants_run.stderr_data)
+    command=['binary', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
+    pants_run = self.run_pants(command=command)
+    self.assert_failure(pants_run)
+    self.assertIn('Exception message: Could not satisfy all requirements', pants_run.stderr_data)
+    self.assertIn('17.9.23', pants_run.stderr_data)
