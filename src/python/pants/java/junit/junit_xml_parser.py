@@ -5,12 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import fnmatch
 import os
-import re
 from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.util.dirutil import safe_walk
 from pants.util.objects import datatype
 from pants.util.xml_parser import XmlParser
 
@@ -96,9 +97,6 @@ class RegistryOfTests(object):
     return {prop: tuple(tests) for prop, tests in properties.items()}
 
 
-_JUNIT_XML_MATCHER = re.compile(r'^TEST-.+\.xml$')
-
-
 class ParseError(Exception):
   """Indicates an error parsing a junit xml report file."""
 
@@ -163,9 +161,9 @@ def parse_failed_targets(test_registry, junit_xml_path, error_handler):
       error_handler(ParseError(path, e))
 
   if os.path.isdir(junit_xml_path):
-    for name in os.listdir(junit_xml_path):
-      if _JUNIT_XML_MATCHER.match(name):
-        parse_junit_xml_file(os.path.join(junit_xml_path, name))
+    for root, _, files in safe_walk(junit_xml_path):
+      for junit_xml_file in fnmatch.filter(files, 'TEST-*.xml'):
+        parse_junit_xml_file(os.path.join(root, junit_xml_file))
   else:
     parse_junit_xml_file(junit_xml_path)
 

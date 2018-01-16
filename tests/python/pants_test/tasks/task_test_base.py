@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import glob
 import os
-from contextlib import closing
+from contextlib import closing, contextmanager
 from StringIO import StringIO
 
 from pants.goal.goal import Goal
@@ -43,35 +43,10 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
                                  artifacts in the cache is non-zero.
   """
   def decorator(test_fn):
-
     def wrapper(self, *args, **kwargs):
-      with temporary_dir() as artifact_cache:
-        self.set_options_for_scope('cache.{}'.format(self.options_scope),
-                                   write_to=[artifact_cache])
-
+      with self.cache_check(expected_num_artifacts=expected_num_artifacts):
         test_fn(self, *args, **kwargs)
-
-        cache_subdir_glob_str = os.path.join(artifact_cache, '*/')
-        cache_subdirs = glob.glob(cache_subdir_glob_str)
-
-        if expected_num_artifacts == 0:
-          self.assertEqual(len(cache_subdirs), 0)
-          return
-
-        self.assertEqual(len(cache_subdirs), 1)
-        task_cache = cache_subdirs[0]
-
-        num_artifacts = 0
-        for (_, _, files) in os.walk(task_cache):
-          num_artifacts += len(files)
-
-        if expected_num_artifacts is None:
-          self.assertNotEqual(num_artifacts, 0)
-        else:
-          self.assertEqual(num_artifacts, expected_num_artifacts)
-
     return wrapper
-
   return decorator
 
 
@@ -154,6 +129,39 @@ class TaskTestBase(BaseTest):
     if workdir is None:
       workdir = self.test_workdir
     return self._testing_task_type(context, workdir)
+
+  @contextmanager
+  def cache_check(self, expected_num_artifacts=None):
+    """Sets up a temporary artifact cache and checks that the yielded-to code populates it.
+
+    :param expected_num_artifacts: Expected number of artifacts to be in the cache after yielding.
+                                   If unspecified, will assert that the number of artifacts in the
+                                   cache is non-zero.
+    """
+    with temporary_dir() as artifact_cache:
+      self.set_options_for_scope('cache.{}'.format(self.options_scope),
+                                 write_to=[artifact_cache])
+
+      yield
+
+      cache_subdir_glob_str = os.path.join(artifact_cache, '*/')
+      cache_subdirs = glob.glob(cache_subdir_glob_str)
+
+      if expected_num_artifacts == 0:
+        self.assertEqual(len(cache_subdirs), 0)
+        return
+
+      self.assertEqual(len(cache_subdirs), 1)
+      task_cache = cache_subdirs[0]
+
+      num_artifacts = 0
+      for (_, _, files) in os.walk(task_cache):
+        num_artifacts += len(files)
+
+      if expected_num_artifacts is None:
+        self.assertNotEqual(num_artifacts, 0)
+      else:
+        self.assertEqual(num_artifacts, expected_num_artifacts)
 
 
 class ConsoleTaskTestBase(TaskTestBase):

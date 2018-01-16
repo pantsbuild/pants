@@ -23,6 +23,33 @@ use std::io::{Read, Result};
 use std::path::{Path, PathBuf};
 
 fn main() {
+  // We depend on grpcio, which uses C++.
+  // On Linux, with g++, some part of that compilation depends on
+  // __gxx_personality_v0 which is present in the C++ standard library.
+  // I don't know why. It shouldn't, and before grpcio 0.2.0, it didn't.
+  //
+  // So we need to link against the C++ standard library. Nothing under us
+  // in the dependency tree appears to export this fact.
+  // Ideally, we would be linking dynamically, because statically linking
+  // against libstdc++ is kind of scary. But we're only doing it to pull in a
+  // bogus symbol anyway, so what's the worst that can happen?
+  //
+  // The only way I can find to dynamically link against libstdc++ is to pass
+  // `-C link-args=lstdc++` to rustc, but we can only do this from a
+  // .cargo/config file, which applies that argument to every compile/link which
+  // happens in a subdirectory of that directory, which isn't what we want to do.
+  // So we'll statically link. Because what's the worst that can happen?
+  //
+  // The following do not work:
+  //  * Using the link argument in Cargo.toml to specify stdc++.
+  //  * Specifying `rustc-flags=-lstdc++`
+  //    (which is equivalent to `-ldylib=stdc++`).
+  //  * Specifying `rustc-link-lib=stdc++`
+  //    (which is equivalent to `rustc-link-lib=dylib=stdc++).
+  if cfg!(target_os = "linux") {
+    println!("cargo:rustc-link-lib=static=stdc++");
+  }
+
   let mut config = cc::Build::new();
 
   // Don't implicitly set -Wall -Wextra because cffi generates code with warnings.

@@ -5,6 +5,7 @@ python_library(
   dependencies = [
     '3rdparty/python:six',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:validation',
     'src/python/pants/build_graph',

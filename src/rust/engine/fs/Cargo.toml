@@ -6,11 +6,13 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 [dependencies]
 bazel_protos = { path = "../process_execution/bazel_protos" }
 boxfuture = { path = "../boxfuture" }
+bytes = "0.4.5"
 digest = "0.6.2"
 futures = "0.1.16"
 futures-cpupool = "0.1.6"
 glob = "0.2.11"
-grpcio = { git = "https://github.com/illicitonion/grpc-rs", rev = "eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4", features = ["secure"] }
+grpcio = { version = "0.2.0", features = ["secure"] }
+hashing = { path = "../hashing" }
 hex = "0.3.1"
 ignore = "0.3.1"
 itertools = "0.7.2"
@@ -23,4 +25,5 @@ tar = "0.4.13"
 tempdir = "0.3.5"
 
 [dev-dependencies]
+mock = { path = "../testutil/mock" }
 testutil = { path = "../testutil" }

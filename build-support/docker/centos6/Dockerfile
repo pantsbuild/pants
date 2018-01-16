@@ -12,7 +12,10 @@ RUN yum install -y \
   devtoolset-7-gcc-c++ \
   git \
   java-1.8.0-openjdk-devel \
-  python27
+  python27 \
+  libffi \
+  libffi-devel \
+  openssl-devel
 
 # By default, execute in an environment with python27 enabled.
 ENTRYPOINT ["/usr/bin/scl", "enable", "python27", "devtoolset-7",  "--"]

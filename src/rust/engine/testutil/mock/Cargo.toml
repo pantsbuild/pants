@@ -1,0 +1,11 @@
+[package]
+name = "mock"
+version = "0.0.1"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+
+[dependencies]
+bazel_protos = { path = "../../process_execution/bazel_protos" }
+futures = "0.1.16"
+grpcio = { version = "0.2.0", features = ["secure"] }
+hashing = { path = "../../hashing" }
+protobuf = "1.4.1"

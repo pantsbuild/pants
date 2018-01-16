@@ -5,9 +5,9 @@ use bazel_protos;
 use boxfuture::{Boxable, BoxFuture};
 use futures::Future;
 use futures::future::join_all;
+use hashing::{Digest, Fingerprint};
 use itertools::Itertools;
-use {Digest, File, PathStat, Store};
-use hash::Fingerprint;
+use {File, PathStat, Store};
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
@@ -171,11 +171,12 @@ mod tests {
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::Future;
+  use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
   use self::testutil::make_file;
 
-  use super::super::{Digest, File, Fingerprint, GetFileDigest, PathGlobs, PathStat, PosixFS,
-                     ResettablePool, Snapshot, Store, VFS};
+  use super::super::{File, GetFileDigest, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
+                     Store, VFS};
 
   use std;
   use std::error::Error;

@@ -188,17 +188,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'coverage',
-  sources = ['coverage/test_cobertura.py'],
-  dependencies = [
-    ':jvm_binary_task_test_base',
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/tasks:coverage',
-  ]
-)
-
-python_tests(
   name = 'jar_dependency_management_setup',
   sources = ['test_jar_dependency_management_setup.py'],
   dependencies = [
@@ -429,7 +418,9 @@ python_tests(
   name = 'junit_run_integration',
   sources = ['test_junit_run_integration.py'],
   dependencies = [
+    '3rdparty/python:parameterized',
     ':missing_jvm_check',
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test:int-test',
   ],
@@ -441,6 +432,8 @@ python_tests(
   name = 'junit_tests_integration',
   sources = ['test_junit_tests_integration.py'],
   dependencies = [
+    '3rdparty/python:parameterized',
+    'src/python/pants/base:build_environment',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:int-test',
   ],
@@ -604,6 +597,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:resources_task',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
