@@ -59,7 +59,11 @@ If unspecified, local execution will be performed.",
 
   let request = process_execution::ExecuteProcessRequest { argv, env };
   let result = match server {
-    Some(addr) => process_execution::remote::run_command_remote(addr, request).unwrap(),
+    Some(addr) => {
+      process_execution::remote::CommandRunner::new(addr, 1)
+        .run_command_remote(request)
+        .unwrap()
+    }
     None => process_execution::local::run_command_locally(request).unwrap(),
   };
   print!("{}", String::from_utf8(result.stdout).unwrap());
