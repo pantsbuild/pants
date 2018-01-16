@@ -11,6 +11,16 @@ python_tests(
 )
 
 python_tests(
+  name = 'test_goal_options_mixin_integration',
+  sources = ['test_goal_options_mixin_integration.py'],
+  dependencies = [
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/task/echo_plugin:plugin',
+  ],
+  tags = {'integration'},
+)
+
+python_tests(
   name='mutex_task_mixin',
   sources=['test_mutex_task_mixin.py'],
   dependencies=[

@@ -302,7 +302,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-    :returns a tuple (returncode, stdout_data, stderr_data).
+    :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
       return self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)
@@ -316,7 +316,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     :param config: Optional data for a generated ini file. A map of <section-name> ->
     map of key -> value. If order in the ini file matters, this should be an OrderedDict.
     :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-    :returns a tuple (returncode, stdout_data, stderr_data).
+    :returns a PantsResult instance.
     """
     with self.temporary_workdir() as workdir:
       yield self.run_pants_with_workdir(command, workdir, config, stdin_data, extra_env, **kwargs)

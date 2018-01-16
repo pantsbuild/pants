@@ -194,13 +194,34 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self.context.options.for_scope(self.options_scope)
 
   def get_passthru_args(self):
-    """
+    """Returns the passthru args for this task, if it supports them.
+
     :API: public
     """
     if not self.supports_passthru_args():
       raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
+
+  # NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
+  # Instead, they query self.context.targets directly.
+  # TODO: Fix up existing targets to consult this method, for uniformity.
+  def get_targets(self, predicate=None):
+    """Returns the candidate targets this task should act on.
+
+    By default returns the entire transitive dependency closure of the target roots
+    specified on the command line.  Subclasses can override to provide more selective
+    behavior (e.g., based on option values).
+
+    Returned targets are filtered by the optional predicate.  Tasks that need finer-grained
+    control can call self.context.targets() with custom **kwargs as needed.
+
+    Note that returned targets have not been checked for invalidation. The caller should do
+    so as needed, typically by calling self.invalidated().
+
+    :API: public
+    """
+    return self.context.targets(predicate)
 
   @memoized_property
   def workdir(self):
