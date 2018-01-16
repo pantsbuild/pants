@@ -13,7 +13,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method, memoized_property
 
-from pants.contrib.node.subsystems.eslint_distribution import ESLintDistribution
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_task import NodeTask
 
@@ -28,15 +27,6 @@ class JavascriptStyle(NodeTask):
   _JSX_SOURCE_EXTENSION = '.jsx'
   INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = 'synthetic-install-javascriptstyle-module'
 
-  @classmethod
-  def subsystem_dependencies(cls):
-    return super(JavascriptStyle, cls).subsystem_dependencies() + (ESLintDistribution.Factory,)
-
-  @memoized_property
-  def eslint_distribution(self):
-    """A bootstrapped eslint distribution for use by javascript style checking."""
-    return ESLintDistribution.Factory.global_instance().create()
-
   def __init__(self, *args, **kwargs):
     super(JavascriptStyle, self).__init__(*args, **kwargs)
 
@@ -47,6 +37,7 @@ class JavascriptStyle(NodeTask):
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--color', type=bool, default=True, help='Enable or disable color.')
+    register('--default-eslint-version', default='4.15.0', help='Default ESLint version if not configured.')
     register('--transitive', type=bool, default=True,
              help='True to run the tool transitively on targets in the context, false to run '
                   'for only roots specified on the commandline.')
@@ -86,8 +77,10 @@ class JavascriptStyle(NodeTask):
   @memoized_method
   def _bootstrap_default_eslinter(self, bootstrap_dir):
     with pushd(bootstrap_dir):
+      default_version = self.get_options().default_eslint_version
+      eslint = 'eslint@{}'.format(default_version)
       result, yarn_add_command = self.execute_yarnpkg(
-        args=['add', 'eslint'],
+        args=['add', eslint],
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,
         workunit_labels=[WorkUnitLabel.PREP])
       if result != 0:
@@ -114,15 +107,11 @@ class JavascriptStyle(NodeTask):
     return bootstrap_dir
 
   def _get_target_ignore_patterns(self, target):
-    ignore_path = next((source for source in target.sources_relative_to_buildroot()
-                        if os.path.basename(source) == target.style_ignore_path), None)
-    ignore_patterns = []
-    if ignore_path:
-      root_dir = os.path.join('**', os.path.dirname(ignore_path))
-      with open(ignore_path) as f:
-        ignore_patterns = f.readlines()
-        ignore_patterns = [os.path.join(root_dir, p.strip()) for p in ignore_patterns]
-    return ignore_patterns
+    for source in target.sources_relative_to_buildroot():
+      if os.path.basename(source) == target.style_ignore_path:
+        root_dir = os.path.join('**', os.path.dirname(source))
+        with open(source) as f:
+          return [os.path.join(root_dir, p.strip()) for p in f]
 
   def _run_javascriptstyle(self, target, bootstrap_dir, files, config=None, ignore_path=None,
                            fix=False, other_args=None):
@@ -165,7 +154,7 @@ class JavascriptStyle(NodeTask):
       return
     failed_targets = []
 
-    bootstrap_dir, is_preconfigured = self.eslint_distribution.fetch_supportdir()
+    bootstrap_dir, is_preconfigured = self.node_distribution.fetch_eslint_supportdir()
 
     if not is_preconfigured:
       self.context.log.debug('ESLint is not pre-configured, bootstrapping with defaults.')
@@ -178,8 +167,8 @@ class JavascriptStyle(NodeTask):
         result_code, command = self._run_javascriptstyle(target,
                                                          bootstrap_dir,
                                                          files,
-                                                         config=self.eslint_distribution.eslint_config,
-                                                         ignore_path=self.eslint_distribution._eslint_ignore)
+                                                         config=self.node_distribution.eslint_config,
+                                                         ignore_path=self.node_distribution.eslint_ignore)
         if result_code != 0:
           if self.get_options().fail_slow:
             raise TaskError('Javascript style failed: \n'
@@ -205,6 +194,6 @@ class JavascriptStyleFmt(JavascriptStyle):
     return super(JavascriptStyleFmt, self)._run_javascriptstyle(target,
                                                                 javascriptstyle_bin_path,
                                                                 files,
-                                                                config=self.eslint_distribution.eslint_config,
-                                                                ignore_path=self.eslint_distribution._eslint_ignore,
+                                                                config=self.node_distribution.eslint_config,
+                                                                ignore_path=self.node_distribution._eslint_ignore,
                                                                 fix=fix)

@@ -34,7 +34,7 @@ class NodeLintIntegrationTest(PantsRunIntegrationTest):
 
     with self.temporary_file_content(path, content):
       command = ['lint',
-                'contrib/node/examples/src/node/javascriptstyle-empty']
+                 'contrib/node/examples/src/node/javascriptstyle-empty']
       pants_run = self.run_pants(command=command)
 
       self.assert_failure(pants_run)
