@@ -11,4 +11,5 @@ protobuf = "1.4.1"
 sha2 = "0.6.0"
 
 [dev-dependencies]
+mock = { path = "../testutil/mock" }
 testutil = { path = "../testutil" }

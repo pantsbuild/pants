@@ -37,8 +37,8 @@ class Jarable(AbstractClass):
     exported = bool(self.provides)
 
     org = self.provides.org if exported else 'internal'
-    module = self.provides.name if exported else self.identifier
+    name = self.provides.name if exported else self.identifier
 
     # TODO(John Sirois): This should return something less than a JarDependency encapsulating just
     # the org and name.  Perhaps a JarFamily?
-    return JarDependency(org=org, name=module, rev=None), exported
+    return JarDependency(org=org, name=name, rev=None), exported

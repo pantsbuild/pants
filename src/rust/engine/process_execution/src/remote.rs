@@ -139,12 +139,10 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
 
 #[cfg(test)]
 mod tests {
-  extern crate testutil;
-
   use bazel_protos;
   use protobuf::{self, Message, ProtobufEnum};
-  use test_server;
-  use self::testutil::{owned_string_vec, as_byte_owned_vec};
+  use mock;
+  use testutil::{owned_string_vec, as_byte_owned_vec};
 
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_remote};
   use std::collections::BTreeMap;
@@ -155,8 +153,8 @@ mod tests {
     let execute_request = echo_foo_request();
 
     let mock_server = {
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           "wrong-command".to_string(),
           super::make_execute_request(&ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
@@ -181,8 +179,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -212,8 +210,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           Vec::from_iter(
@@ -246,8 +244,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -284,8 +282,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -318,8 +316,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -353,8 +351,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -381,8 +379,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![

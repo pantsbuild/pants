@@ -108,20 +108,13 @@ class AbstractTarget(object):
     return hasattr(self, 'resources') and self.resources
 
   @property
+  @deprecated('1.7.0.dev0', 'use type tests and check the value of the `provides` attribute.')
   def is_exported(self):
     """Returns True if the target provides an artifact exportable from the repo.
 
     :API: public
     """
-    # TODO(John Sirois): fixup predicate dipping down into details here.
-    return self.has_label('exportable') and self.provides
-
-  # DEPRECATED  to be removed after 0.0.29
-  # do not use this method, use  isinstance(..., JavaThriftLibrary) or a yet-to-be-defined mixin
-  @property
-  def is_thrift(self):
-    """Returns True if the target has thrift IDL sources."""
-    return False
+    return getattr(self, 'provides', None) is not None
 
   # DEPRECATED to be removed after 0.0.29
   # do not use this method, use an isinstance check on a yet-to-be-defined mixin
@@ -150,20 +143,6 @@ class AbstractTarget(object):
   def is_scala(self):
     """Returns True if the target has scala sources."""
     return self.has_label('scala')
-
-  # DEPRECATED to be removed after 0.0.29
-  #  do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_scalac_plugin(self):
-    """Returns True if the target builds a scalac plugin."""
-    return self.has_label('scalac_plugin')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_test(self):
-    """Returns True if the target is comprised of tests."""
-    return self.has_label('tests')
 
 
 class Target(AbstractTarget):
@@ -423,8 +402,7 @@ class Target(AbstractTarget):
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
     self._cached_exports_map = {}
-    if no_cache:
-      self.add_labels('no_cache')
+    self._no_cache = no_cache
     if kwargs:
       self.Arguments.check(self, kwargs)
 
@@ -435,6 +413,10 @@ class Target(AbstractTarget):
   @property
   def transitive(self):
     return self.payload.transitive
+
+  @property
+  def no_cache(self):
+    return self._no_cache
 
   @property
   def type_alias(self):

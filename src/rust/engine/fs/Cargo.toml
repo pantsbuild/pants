@@ -25,4 +25,5 @@ tar = "0.4.13"
 tempdir = "0.3.5"
 
 [dev-dependencies]
+mock = { path = "../testutil/mock" }
 testutil = { path = "../testutil" }

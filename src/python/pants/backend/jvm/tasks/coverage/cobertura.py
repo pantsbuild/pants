@@ -105,10 +105,6 @@ class Cobertura(CoverageEngine):
     self._execute_java = functools.partial(execute_java_for_targets, targets)
 
   @staticmethod
-  def is_coverage_target(tgt):
-    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
-
-  @staticmethod
   def initialize_instrument_classpath(output_dir, settings, targets, instrumentation_classpath):
     """Clones the existing runtime_classpath and corresponding binaries to instrumentation specific
     paths.

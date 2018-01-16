@@ -697,8 +697,8 @@ mod remote {
 
     use super::{ByteStore, Fingerprint};
     use super::super::{ByteStore as ByteStoreTrait, Digest, EntryType};
-    use super::super::super::test_cas::StubCAS;
     use futures::Future;
+    use mock::StubCAS;
     use protobuf::Message;
     use std::fs::File;
     use std::io::Read;
@@ -919,12 +919,12 @@ mod remote {
 #[cfg(test)]
 mod tests {
   use super::{ByteStore, EntryType, Store, local};
-  use super::super::test_cas::StubCAS;
 
   use bazel_protos;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
   use hashing::{Digest, Fingerprint};
+  use mock::StubCAS;
   use pool::ResettablePool;
   use protobuf::Message;
   use sha2::Sha256;

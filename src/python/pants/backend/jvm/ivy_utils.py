@@ -20,6 +20,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
+from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.generator import Generator, TemplateData
 from pants.base.revision import Revision
@@ -1068,7 +1069,7 @@ class IvyUtils(object):
         global_excludes.update(target_excludes)
 
     def collect_provide_excludes(target):
-      if not target.is_exported:
+      if not (isinstance(target, ExportableJvmLibrary) and target.provides):
         return
       logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
         target.provides.org, target.provides.name, target))
