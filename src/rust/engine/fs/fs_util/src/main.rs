@@ -161,7 +161,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store = {
     let store_result = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        Store::backfills_from_remote(
+        Store::with_remote(
           store_dir,
           pool.clone(),
           cas_address,
