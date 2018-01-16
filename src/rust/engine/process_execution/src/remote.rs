@@ -140,6 +140,7 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
 #[cfg(test)]
 mod tests {
   use bazel_protos;
+  use bytes::Bytes;
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use testutil::{owned_string_vec, as_byte_owned_vec};
@@ -475,8 +476,8 @@ mod tests {
       let mut response_proto = bazel_protos::remote_execution::ExecuteResponse::new();
       response_proto.set_result({
         let mut action_result = bazel_protos::remote_execution::ActionResult::new();
-        action_result.set_stdout_raw(stdout.as_bytes().to_vec());
-        action_result.set_stderr_raw(stderr.as_bytes().to_vec());
+        action_result.set_stdout_raw(Bytes::from(stdout));
+        action_result.set_stderr_raw(Bytes::from(stderr));
         action_result.set_exit_code(exit_code);
         action_result
       });
