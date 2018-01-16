@@ -1,9 +1,9 @@
 Pants Deprecation Policy
 ========================
 
-For releases after 1.0.0, deprecations are in effect for release branches for the next 5 minor releases (e.g. if a feature is deprecated in 1.0.x it should remain available but deprecated until the 1.5.x stable branch has been cut, and can be removed when master bumps to 1.6.0.dev0).
+Deprecations should live for one entire `dev` series and stable release branch (at the minimum) before their code is removed. This ensures that there is always at least one stable release containing a deprecation, and allows users upgrading their copy of pants to consume only stable releases in order to observe all deprecations.
 
-This assumes an approximately one month lifetime per minor release, allowing for about 6 months warning between deprecation and removal.
+As an example: if a feature is deprecated during the `1.0.0.dev` series, it should remain available but deprecated for the entire `1.1.0.dev` series, and can be removed when master bumps to `1.2.0.dev0`.
 
 API Definition
 --------------
