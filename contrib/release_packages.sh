@@ -186,6 +186,18 @@ function pkg_mypy_install_test() {
     --explain mypy &> /dev/null
 }
 
+PKG_AVRO=(
+  "pantsbuild.pants.contrib.avro"
+  "//contrib/avro/src/python/pants/contrib/avro:plugin"
+  "pkg_avro_install_test"
+)
+function pkg_avro_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.avro==${version}']" \
+    --explain gen | grep "avro-java" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -202,4 +214,5 @@ CONTRIB_PACKAGES=(
   PKG_CODEANALYSIS
   PKG_JAXWS
   PKG_MYPY
+  PKG_AVRO
 )
