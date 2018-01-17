@@ -11,7 +11,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.util.contextutil import pushd
-from pants.util.memo import memoized_method, memoized_property
+from pants.util.memo import memoized_method
 
 from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_task import NodeTask
