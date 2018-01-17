@@ -982,7 +982,7 @@ c0033144c785a94d3ebd82baa931cd16";
       .wait()
   }
 
-  pub fn load_file_bytes2(
+  pub fn load_file_bytes_from_store(
     store: &Store,
     fingerprint: Fingerprint,
   ) -> Result<Option<Vec<u8>>, String> {
@@ -1040,7 +1040,7 @@ c0033144c785a94d3ebd82baa931cd16";
 
     let cas = new_cas(1024);
     assert_eq!(
-      load_file_bytes2(&new_store(dir.path(), cas.address()), fingerprint()),
+      load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint()),
       Ok(Some(str_bytes()))
     );
     assert_eq!(0, cas.read_request_count());
@@ -1071,7 +1071,7 @@ c0033144c785a94d3ebd82baa931cd16";
 
     let cas = new_cas(1024);
     assert_eq!(
-      load_file_bytes2(&new_store(dir.path(), cas.address()), fingerprint()),
+      load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint()),
       Ok(Some(str_bytes())),
       "Read from CAS"
     );
@@ -1110,7 +1110,7 @@ c0033144c785a94d3ebd82baa931cd16";
 
     let cas = StubCAS::empty();
     assert_eq!(
-      load_file_bytes2(&new_store(dir.path(), cas.address()), fingerprint()),
+      load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint()),
       Ok(None)
     );
     assert_eq!(1, cas.read_request_count());
@@ -1136,7 +1136,7 @@ c0033144c785a94d3ebd82baa931cd16";
     let dir = TempDir::new("store").unwrap();
 
     let cas = StubCAS::always_errors();
-    let error = load_file_bytes2(&new_store(dir.path(), cas.address()), fingerprint())
+    let error = load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint())
       .expect_err("Want error");
     assert_eq!(1, cas.read_request_count());
     assert!(
@@ -1227,7 +1227,8 @@ c0033144c785a94d3ebd82baa931cd16";
         .into_iter()
         .collect(),
     );
-    load_file_bytes2(&new_store(dir.path(), cas.address()), fingerprint()).expect_err("Want error");
+    load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint())
+      .expect_err("Want error");
 
     assert_eq!(
       load_file_bytes(&local::tests::new_store(dir.path()), fingerprint()),
@@ -1246,7 +1247,7 @@ c0033144c785a94d3ebd82baa931cd16";
         .into_iter()
         .collect(),
     );
-    load_file_bytes2(&new_store(dir.path(), cas.address()), empty_fingerprint)
+    load_file_bytes_from_store(&new_store(dir.path(), cas.address()), empty_fingerprint)
       .expect_err("Want error");
 
     assert_eq!(
