@@ -275,7 +275,6 @@ EOM
 
 function install_and_test_packages() {
   local VERSION=$1
-  local CORE_ONLY=$2
   shift 2
   local PIP_ARGS=(
     "${VERSION}"
@@ -291,12 +290,7 @@ function install_and_test_packages() {
   export PANTS_PLUGIN_CACHE_DIR=$(mktemp -d -t plugins_cache.XXXXX)
   trap "rm -rf ${PANTS_PLUGIN_CACHE_DIR}" EXIT
 
-  if [[ "${CORE_ONLY}" == "true" ]]
-  then
-    PACKAGES=("${CORE_PACKAGES[@]}")
-  else
-    PACKAGES=("${RELEASE_PACKAGES[@]}")
-  fi
+  PACKAGES=("${RELEASE_PACKAGES[@]}")
 
   export PANTS_PYTHON_REPOS_REPOS="${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
   for PACKAGE in "${PACKAGES[@]}"
@@ -316,11 +310,10 @@ function install_and_test_packages() {
 
 function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
-  local CORE_ONLY=$1
   local VERSION="${PANTS_UNSTABLE_VERSION}"
   build_pants_packages "${VERSION}" && \
   build_3rdparty_packages "${VERSION}" && \
-  install_and_test_packages "${VERSION}" "${CORE_ONLY}" \
+  install_and_test_packages "${VERSION}" \
     --only-binary=:all: \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
@@ -757,14 +750,12 @@ function usage() {
   echo " -t  Tests a live release."
   echo "       Ensures the latest packages have been propagated to PyPi"
   echo "       and can be installed in an ephemeral virtualenv."
-  echo " -c  Skips contrib during a dry or test run."
-  echo "       It is still necessary to pass -n or -t to trigger the test/dry run."
   echo " -l  Lists all pantsbuild packages that this script releases."
   echo " -o  Lists all pantsbuild package owners."
   echo " -e  Check that wheels are prebuilt for this release."
   echo " -p  Build a pex from prebuilt wheels for this release."
   echo
-  echo "All options (except for '-d' and '-c') are mutually exclusive."
+  echo "All options (except for '-d') are mutually exclusive."
 
   if (( $# > 0 )); then
     die "$@"
@@ -779,7 +770,6 @@ while getopts "hdntcloep" opt; do
     d) debug="true" ;;
     n) dry_run="true" ;;
     t) test_release="true" ;;
-    c) core_only="true" ;;
     l) list_packages ; exit $? ;;
     o) list_owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
@@ -798,13 +788,13 @@ if [[ "${dry_run}" == "true" && "${test_release}" == "true" ]]; then
 elif [[ "${dry_run}" == "true" ]]; then
   banner "Performing a dry run release" && \
   (
-    dry_run_install "${core_only}" && \
+    dry_run_install && \
     banner "Dry run release succeeded"
   ) || die "Dry run release failed."
 elif [[ "${test_release}" == "true" ]]; then
   banner "Installing and testing the latest released packages" && \
   (
-    install_and_test_packages "${PANTS_STABLE_VERSION}" "${core_only}" && \
+    install_and_test_packages "${PANTS_STABLE_VERSION}" && \
     banner "Successfully installed and tested the latest released packages"
   ) || die "Failed to install and test the latest released packages."
 else
