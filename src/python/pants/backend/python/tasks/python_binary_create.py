@@ -17,7 +17,7 @@ from pants.backend.python.tasks2.build_local_python_distributions import \
 from pants.backend.python.tasks2.pex_build_util import (build_req_libs_provided_by_setup_file,
                                                         dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
-                                                        has_resources, is_local_python_dist)
+                                                        has_resources)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes

@@ -65,7 +65,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
       'testprojects/tests/java/org/pantsbuild/testproject/depman:old-tests',
       'testprojects/tests/java/org/pantsbuild/testproject/htmlreport:htmlreport',
       'testprojects/tests/java/org/pantsbuild/testproject/parallel.*',
-      'testprojects/src/python/python_distribution/superhello_with_install_requires:main_with_no_conflict'
       'testprojects/src/python/python_distribution/superhello_with_install_requires:main_with_conflicting_dep'
     ]
 
