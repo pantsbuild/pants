@@ -13,9 +13,8 @@ function run_local_pants() {
   ${ROOT}/pants "$@"
 }
 
-# NB: Pants core should not have the ability to change its own version, so we compute the
-# suffix here, and pass it into the `pants-releases` subsystem in order to affect generated
-# setup_py definitions.
+# NB: Pants core does not have the ability to change its own version, so we compute the
+# suffix here and mutate the VERSION_FILE to affect the current version.
 readonly HEAD_SHA=$(git rev-parse --verify HEAD)
 readonly PANTS_STABLE_VERSION="$(run_local_pants --version 2>/dev/null)"
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
@@ -29,6 +28,10 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 readonly DEPLOY_PANTS_SDIST_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_SDIST_PATH}"
 
 readonly VERSION_FILE="${ROOT}/src/python/pants/VERSION"
+
+# A space-separated list of pants packages to include in any pexes that are built: by default,
+# only pants core is included.
+: ${PANTS_PEX_PACKAGES:="pantsbuild.pants"}
 
 source ${ROOT}/contrib/release_packages.sh
 
@@ -688,6 +691,11 @@ function build_pex() {
 
   activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.2.13" || die "Failed to install pex."
 
+  local requirements_string=""
+  for pkg_name in $PANTS_PEX_PACKAGES; do
+    requirements_string="${requirements_string} ${pkg_name}==${PANTS_UNSTABLE_VERSION}"
+  done
+
   pex \
     -o "${dest}" \
     --entry-point="pants.bin.pants_loader:main" \
@@ -698,8 +706,9 @@ function build_pex() {
     --platform="${linux_platform}" \
     -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    "pantsbuild.pants==${PANTS_UNSTABLE_VERSION}"
+    ${requirements_string}
 
+  banner "Successfully built ${dest}"
 }
 
 function publish_packages() {
