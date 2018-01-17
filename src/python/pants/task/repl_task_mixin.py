@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from abc import abstractmethod
 
 from pants.base.workunit import WorkUnitLabel
-from pants.console import stty_utils
+from pants.console.stty_utils import STTYSettings
 from pants.task.mutex_task_mixin import MutexTaskMixin
 
 
@@ -50,7 +50,7 @@ class ReplTaskMixin(MutexTaskMixin):
   def execute_for(self, targets):
     session_setup = self.setup_repl_session(targets)
     self.context.release_lock()
-    with stty_utils.preserve_stty_settings():
+    with STTYSettings.preserved():
       with self.context.new_workunit(name='repl', labels=[WorkUnitLabel.RUN]):
         print('')  # Start REPL output on a new line.
         try:

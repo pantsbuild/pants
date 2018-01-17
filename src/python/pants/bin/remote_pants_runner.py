@@ -8,8 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import signal
 import sys
+import termios
+import tty
 from contextlib import contextmanager
 
+from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
@@ -59,6 +62,7 @@ class RemotePantsRunner(object):
     """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\) handlers
     and handles them remotely."""
     def handle_control_c(signum, frame):
+      sys.stderr.write('User interrupt.')
       client.send_control_c()
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
@@ -102,7 +106,10 @@ class RemotePantsRunner(object):
                            err=self._stderr,
                            exit_on_broken_pipe=True)
 
-    with self._trapped_signals(client):
+    with self._trapped_signals(client), STTYSettings.preserved():
+      # attrs = tty.tcgetattr(self._stdin.fileno())
+      # attrs[3] = attrs[3] & ~termios.ICANON
+      # tty.tcsetattr(self._stdin.fileno(), termios.TCSANOW, attrs)
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 

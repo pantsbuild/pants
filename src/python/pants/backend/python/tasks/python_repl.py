@@ -52,5 +52,4 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
   # NB: **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
     env = pex_run_kwargs.pop('env', os.environ).copy()
-    po = pex.run(blocking=False, env=env, **pex_run_kwargs)
-    po.wait()
+    pex.run(env=env, **pex_run_kwargs)

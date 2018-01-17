@@ -140,14 +140,20 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   @classmethod
   @contextmanager
-  def open(cls, sock, chunk_type, chunk_eof_type, isatty, buf_size=None, select_timeout=None):
-    """Yields the write side of a pipe that will copy appropriately chunked values to the socket."""
-    with cls.open_multi(sock, (chunk_type,), chunk_eof_type, isattys=(isatty,)) as ctx:
+  def open(cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None):
+    """Yields the write side of a pipe that will copy appropriately chunked values to a socket."""
+    with cls.open_multi(sock,
+                        (chunk_type,),
+                        (isatty,),
+                        chunk_eof_type,
+                        buf_size,
+                        select_timeout) as ctx:
       yield ctx
 
   @classmethod
   @contextmanager
-  def open_multi(cls, sock, chunk_types, chunk_eof_type, isattys, buf_size=None, select_timeout=None):
+  def open_multi(cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None,
+                 select_timeout=None):
     """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
     cls._assert_aligned(chunk_types, isattys)
 
