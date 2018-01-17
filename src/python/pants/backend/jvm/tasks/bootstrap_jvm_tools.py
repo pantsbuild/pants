@@ -195,14 +195,14 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         callback = self.cached_bootstrap_classpath_callback(dep_spec, jvm_tool)
         callback_product_map[jvm_tool.scope][jvm_tool.key] = callback
       if self.get_options().eager:
-        for scope, callbacks_by_key in callback_product_map.items():
-          for key, callback in callbacks_by_key.items():
-            self.context.log.info('Eagerly resolving {} for scope {}.'.format(key, scope))
-            try:
-              callback()
-            except self.ToolUnderspecified:
-              pass  # We don't want to fail for placeholder registrations
-                    # (e.g., custom scala platform).
+        with self.context.new_workunit('eager'):
+          for scope, callbacks_by_key in callback_product_map.items():
+            for key, callback in callbacks_by_key.items():
+              try:
+                callback()
+              except self.ToolUnderspecified:
+                pass  # We don't want to fail for placeholder registrations
+                      # (e.g., custom scala platform).
 
   def _resolve_tool_targets(self, dep_spec, jvm_tool):
     try:
