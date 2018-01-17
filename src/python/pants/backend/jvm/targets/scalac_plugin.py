@@ -26,7 +26,6 @@ class ScalacPlugin(ScalaLibrary):
 
     self.plugin = plugin or self.name
     self.classname = classname
-    self.add_labels('scalac_plugin')
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):

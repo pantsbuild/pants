@@ -116,34 +116,6 @@ class AbstractTarget(object):
     """
     return getattr(self, 'provides', None) is not None
 
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_jvm(self):
-    """Returns True if the target produces jvm bytecode."""
-    return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_java(self):
-    """Returns True if the target has or generates java sources."""
-    return self.has_label('java')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_python(self):
-    """Returns True if the target has python sources."""
-    return self.has_label('python')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_scala(self):
-    """Returns True if the target has scala sources."""
-    return self.has_label('scala')
-
 
 class Target(AbstractTarget):
   """A generic target used to group dependencies.
@@ -395,7 +367,6 @@ class Target(AbstractTarget):
     self._type_alias = type_alias
     self._tags = set(tags or [])
     self.description = description
-    self.labels = set()
 
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
@@ -863,18 +834,6 @@ class Target(AbstractTarget):
     :API: public
     """
     return self.closure_for_targets([self], *vargs, **kwargs)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def add_labels(self, *label):
-    self.labels.update(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def remove_label(self, label):
-    self.labels.remove(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def has_label(self, label):
-    return label in self.labels
 
   def __lt__(self, other):
     return self.address < other.address

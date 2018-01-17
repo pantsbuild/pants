@@ -33,7 +33,6 @@ class PythonTests(PythonTarget):
     self._coverage = maybe_list(coverage) if coverage is not None else []
     self._timeout = timeout
     super(PythonTests, self).__init__(**kwargs)
-    self.add_labels('python')
 
   @property
   def coverage(self):

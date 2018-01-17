@@ -117,7 +117,6 @@ class PythonTarget(Target):
     })
     super(PythonTarget, self).__init__(address=address, payload=payload, **kwargs)
     self._resource_target_specs = resource_targets
-    self.add_labels('python')
 
     if provides and not isinstance(provides, PythonArtifact):
       raise TargetDefinitionException(self,
