@@ -11,6 +11,7 @@ Active Committers
 * Nick Howard
 * Stu Hood
 * Yi Cheng
+* Daniel Wagner-Hall
 
 Emeritus
 ========
