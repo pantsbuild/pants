@@ -192,7 +192,7 @@ class VersionedTarget(VersionedTargetSet):
     :return: `True` if this target's associated artifacts can be cached.
     :rtype: bool
     """
-    return super(VersionedTarget, self).cacheable and not self.target.has_label('no_cache')
+    return super(VersionedTarget, self).cacheable and not self.target.no_cache
 
   def create_results_dir(self):
     """Ensure that the empty results directory and a stable symlink exist for these versioned targets."""

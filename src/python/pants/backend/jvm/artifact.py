@@ -82,4 +82,7 @@ class Artifact(PayloadField):
     return not self.__eq__(other)
 
   def __repr__(self):
-    return "{}-{} -> {}".format(self.org, self.name, self.repo)
+    return '{}-{} -> {}'.format(self.org, self.name, self.repo)
+
+  def __str__(self):
+    return '{}#{}'.format(self.org, self.name)

@@ -16,10 +16,8 @@ class ExportableJvmLibrary(JvmTarget):
 
   def __init__(self, *args, **kwargs):
     """
-    :param provides:
-      An optional Dependency object indicating the The ivy artifact to export.
+    :param :class:`pants.backend.jvm.artifact.Artifact` provides:
+      An optional object indicating the ivy artifact to export.
     """
-
+    # TODO: Move provides argument out of the parent class and onto this one?
     super(ExportableJvmLibrary, self).__init__(*args, **kwargs)
-
-    self.add_labels('exportable')

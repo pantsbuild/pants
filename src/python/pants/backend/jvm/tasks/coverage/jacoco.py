@@ -78,7 +78,7 @@ class Jacoco(CoverageEngine):
     options = settings.options
     self._context = settings.context
     self._targets = targets
-    self._coverage_targets = {t for t in targets if Jacoco.is_coverage_target(t)}
+    self._coverage_targets = {t for t in targets if self.is_coverage_target(t)}
     self._agent_path = agent_path
     self._cli_path = cli_path
     self._execute_java = functools.partial(execute_java_for_targets, targets)
@@ -101,10 +101,6 @@ class Jacoco(CoverageEngine):
     agent_option = '-javaagent:{agent}=destfile={destfile}'.format(agent=self._agent_path,
                                                                    destfile=datafile)
     return self.RunModifications.create(extra_jvm_options=[agent_option])
-
-  @staticmethod
-  def is_coverage_target(tgt):
-    return (tgt.is_java or tgt.is_scala) and not tgt.is_test and not tgt.is_synthetic
 
   def _execute_jacoco_cli(self, workunit_name, args):
     main = 'org.jacoco.cli.internal.Main'
