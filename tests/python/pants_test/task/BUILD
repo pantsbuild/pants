@@ -11,7 +11,7 @@ python_tests(
 )
 
 python_tests(
-  name = 'test_goal_options_mixin_integration',
+  name = 'goal_options_mixin_integration',
   sources = ['test_goal_options_mixin_integration.py'],
   dependencies = [
     'tests/python/pants_test:int-test',

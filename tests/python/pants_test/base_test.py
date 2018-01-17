@@ -303,8 +303,8 @@ class BaseTest(unittest.TestCase):
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
       optionables.add(task_type)
-      # If task is expected to inherit goal-level options, register those directly
-      # on the task, by subclassing the goal options registrar and overriding its scope.
+      # If task is expected to inherit goal-level options, register those directly on the task,
+      # by subclassing the goal options registrar and settings its scope to the task scope.
       if issubclass(task_type, GoalOptionsMixin):
         subclass_name = b'test_{}_{}_{}'.format(
           task_type.__name__, task_type.goal_options_registrar_cls.options_scope,

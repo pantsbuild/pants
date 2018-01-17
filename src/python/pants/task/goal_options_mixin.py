@@ -18,6 +18,15 @@ class GoalOptionsRegistrar(Optionable):
   """
   options_scope_category = ScopeInfo.GOAL
 
+  @classmethod
+  def registrar_for_scope(cls, goal):
+    """Returns a subclass of this registrar suitable for registering on the specified goal.
+
+    Allows reuse of the same registrar for multiple goals, and also allows us to decouple task
+    code from knowing which goal(s) the task is to be registered in.
+    """
+    return type(b'{}_{}'.format(cls.__name__, goal), (cls, ), {b'options_scope': goal})
+
 
 class GoalOptionsMixin(object):
   """A mixin for tasks that inherit options registered at the goal level."""

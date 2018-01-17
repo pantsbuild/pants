@@ -5,15 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.task.goal_options_mixin import GoalOptionsMixin
-from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
-                                                  SkipAndTransitiveOptionsRegistrarBase)
+from pants.task.target_restriction_mixins import (HasSkipAndTransitiveGoalOptionsMixin,
+                                                  SkipAndTransitiveGoalOptionsRegistrar)
 
 
-class LintGoalOptionsRegistrar(SkipAndTransitiveOptionsRegistrarBase):
-  options_scope = 'lint'
-
-
-class LintTaskMixin(GoalOptionsMixin, HasSkipAndTransitiveOptionsMixin):
+class LintTaskMixin(HasSkipAndTransitiveGoalOptionsMixin):
   """A mixin to combine with lint tasks."""
-  goal_options_registrar_cls = LintGoalOptionsRegistrar
+  goal_options_registrar_cls = SkipAndTransitiveGoalOptionsRegistrar

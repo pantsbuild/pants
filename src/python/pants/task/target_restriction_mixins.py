@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.task.goal_options_mixin import GoalOptionsRegistrar
+from pants.task.goal_options_mixin import GoalOptionsRegistrar, GoalOptionsMixin
 
 
 class HasTransitiveOptionMixin(object):
@@ -24,11 +24,20 @@ class HasTransitiveOptionMixin(object):
   option was registered on the task (either directly or recursively from its goal).
   """
 
-  def get_targets(self, predicate=None):
-    if self.get_options().transitive:
-      return self.context.targets(predicate)
-    else:
-      return filter(predicate, self.context.target_roots)
+  @property
+  def transitive(self):
+    return self.get_options().transitive
+
+
+class TransitiveOptionRegistrar(object):
+  """Registrar of --transitive."""
+
+  @classmethod
+  def register_options(cls, register):
+    super(TransitiveOptionRegistrar, cls).register_options(register)
+    register('--transitive', type=bool, default=True, fingerprint=True, recursive=True,
+             help="If false, act only on the targets directly specified on the command line. "
+                  "If true, act on the transitive dependency closure of those targets.")
 
 
 class HasSkipOptionMixin(object):
@@ -41,27 +50,37 @@ class HasSkipOptionMixin(object):
   option was registered on the task (either directly or recursively from its goal).
   """
 
-  def get_targets(self, predicate=None):
-    if self.get_options().skip:
-      self.context.log.info('Skipping {}.'.format(self.options_scope))
-      return []
-    else:
-      return super(HasSkipOptionMixin, self).get_targets(predicate)
+  @property
+  def skip(self):
+    return self.get_options().skip
 
 
-# Note order of superclasses - it correctly ensures --skip is checked first.
+class SkipOptionRegistrar(object):
+  """Registrar of --skip."""
+
+  @classmethod
+  def register_options(cls, register):
+    super(SkipOptionRegistrar, cls).register_options(register)
+    register('--skip', type=bool, default=False, fingerprint=True, recursive=True,
+             help='Skip task.')
+
+
 class HasSkipAndTransitiveOptionsMixin(HasSkipOptionMixin, HasTransitiveOptionMixin):
   """A mixin for tasks that have a --transitive and a --skip option."""
   pass
 
 
-class SkipAndTransitiveOptionsRegistrarBase(GoalOptionsRegistrar):
-  """Shared base class for goal-level registrars of --skip and --transitive."""
+class HasSkipAndTransitiveGoalOptionsMixin(GoalOptionsMixin, HasSkipAndTransitiveOptionsMixin):
+  """A mixin for tasks that have a --transitive and a --skip option registered at the goal level."""
+  pass
 
-  @classmethod
-  def register_options(cls, register):
-    register('--skip', type=bool, default=False, fingerprint=True, recursive=True,
-             help='Skip task.')
-    register('--transitive', type=bool, default=True, fingerprint=True, recursive=True,
-             help="If false, act only on the targets directly specified on the command line. "
-                  "If true, act on the transitive dependency closure of those targets.")
+
+class SkipAndTransitiveOptionsRegistrar(SkipOptionRegistrar, TransitiveOptionRegistrar):
+  """Registrar of --skip and --transitive."""
+  pass
+
+
+class SkipAndTransitiveGoalOptionsRegistrar(SkipAndTransitiveOptionsRegistrar,
+                                            GoalOptionsRegistrar):
+  """Registrar of --skip and --transitive at the goal level."""
+  pass

@@ -5,15 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.task.goal_options_mixin import GoalOptionsMixin
-from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
-                                                  SkipAndTransitiveOptionsRegistrarBase)
+from pants.task.target_restriction_mixins import (HasSkipAndTransitiveGoalOptionsMixin,
+                                                  SkipAndTransitiveGoalOptionsRegistrar)
 
 
-class FmtGoalOptionsRegistrar(SkipAndTransitiveOptionsRegistrarBase):
-  options_scope = 'fmt'
-
-
-class FmtTaskMixin(GoalOptionsMixin, HasSkipAndTransitiveOptionsMixin):
+class FmtTaskMixin(HasSkipAndTransitiveGoalOptionsMixin):
   """A mixin to combine with code formatting tasks."""
-  goal_options_registrar_cls = FmtGoalOptionsRegistrar
+  goal_options_registrar_cls = SkipAndTransitiveGoalOptionsRegistrar

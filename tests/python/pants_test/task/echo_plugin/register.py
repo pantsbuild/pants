@@ -9,36 +9,30 @@ import os
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
-from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
+from pants.task.target_restriction_mixins import (HasSkipAndTransitiveGoalOptionsMixin,
+                                                  SkipAndTransitiveGoalOptionsRegistrar)
 from pants.task.task import Task
 
 
-class EchoOptionsRegistrar(GoalOptionsRegistrar):
-  options_scope = 'echo'
-
-  @classmethod
-  def register_options(cls, register):
-    register('--enable', type=bool, default=False, recursive=True, help='')
-
-
-class EchoTaskBase(GoalOptionsMixin, Task):
-  goal_options_registrar_cls = EchoOptionsRegistrar
-  to_echo = None
+class EchoTaskBase(HasSkipAndTransitiveGoalOptionsMixin, Task):
+  goal_options_registrar_cls = SkipAndTransitiveGoalOptionsRegistrar
+  prefix = None
 
   def execute(self):
     with open(os.path.join(self.workdir, 'output'), 'w') as fp:
-      fp.write(self.to_echo if self.get_options().enable else b'0')
+      fp.write(b'\n'.join(t.address.spec for t in self.get_targets()))
 
 
 class EchoOne(EchoTaskBase):
-  to_echo = b'1'
+  pass
 
 
 class EchoTwo(EchoTaskBase):
-  to_echo = b'2'
+  pass
 
 
 def register_goals():
-  Goal.register('echo', 'test tasks that echo', options_registrar_cls=EchoOptionsRegistrar)
+  Goal.register('echo', 'test tasks that echo their target set',
+                options_registrar_cls=SkipAndTransitiveGoalOptionsRegistrar)
   task(name='one', action=EchoOne).install('echo')
   task(name='two', action=EchoTwo).install('echo')

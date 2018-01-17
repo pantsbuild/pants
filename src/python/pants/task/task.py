@@ -203,25 +203,45 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
 
-  # NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
-  # Instead, they query self.context.targets directly.
-  # TODO: Fix up existing targets to consult this method, for uniformity.
+  @property
+  def skip(self):
+    """Whether this task should be skipped.
+
+    Tasks can override to specify skipping behavior (e.g., based on an option).
+
+    :API: public
+    """
+    return False
+
+  @property
+  def transitive(self):
+    """Whether this task should act on the transitive closure of the target roots.
+
+    Tasks can override to specify transitivity behavior (e.g., based on an option).
+    Note that this property is consulted by get_targets(), but tasks that bypass that
+    method must make their own decision on whether to act transitively or not.
+
+    :API: public
+    """
+    return True
+
   def get_targets(self, predicate=None):
     """Returns the candidate targets this task should act on.
 
-    By default returns the entire transitive dependency closure of the target roots
-    specified on the command line.  Subclasses can override to provide more selective
-    behavior (e.g., based on option values).
+    This method is a convenience for processing optional transitivity. Tasks may bypass it
+    and make their own decisions on which targets to act on.
 
-    Returned targets are filtered by the optional predicate.  Tasks that need finer-grained
-    control can call self.context.targets() with custom **kwargs as needed.
+    NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
+          Instead, they query self.context.targets directly.
+    TODO: Fix up existing targets to consult this method, for uniformity.
 
     Note that returned targets have not been checked for invalidation. The caller should do
     so as needed, typically by calling self.invalidated().
 
     :API: public
     """
-    return self.context.targets(predicate)
+    return (self.context.targets(predicate) if self.transitive
+            else filter(predicate, self.context.target_roots))
 
   @memoized_property
   def workdir(self):
