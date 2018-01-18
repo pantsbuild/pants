@@ -69,6 +69,8 @@ class ShadedToolFingerprintStrategy(IvyResolveFingerprintStrategy):
 
 
 class BootstrapJvmTools(IvyTaskMixin, JarTask):
+  class ToolUnderspecified(Exception):
+    pass
 
   @classmethod
   def product_types(cls):
@@ -77,6 +79,9 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
   @classmethod
   def register_options(cls, register):
     super(BootstrapJvmTools, cls).register_options(register)
+    register('--eager', type=bool, default=False,
+             help='Eagerly bootstrap all known JVM tools, instead of fetching them on-demand. '
+                  'Useful for creating a warm Pants workspace, e.g., for containerizing.')
     # Must be registered with the shader- prefix, as JarTask already registers --jvm-options
     # (indirectly, via NailgunTask).
     register('--shader-jvm-options', type=list, metavar='<option>...',
@@ -189,6 +194,15 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
         dep_spec = jvm_tool.dep_spec(self.context.options)
         callback = self.cached_bootstrap_classpath_callback(dep_spec, jvm_tool)
         callback_product_map[jvm_tool.scope][jvm_tool.key] = callback
+      if self.get_options().eager:
+        with self.context.new_workunit('eager'):
+          for scope, callbacks_by_key in callback_product_map.items():
+            for key, callback in callbacks_by_key.items():
+              try:
+                callback()
+              except self.ToolUnderspecified:
+                pass  # We don't want to fail for placeholder registrations
+                      # (e.g., custom scala platform).
 
   def _resolve_tool_targets(self, dep_spec, jvm_tool):
     try:
@@ -206,16 +220,13 @@ class BootstrapJvmTools(IvyTaskMixin, JarTask):
     # specified target we need to throw an exception for the user.
     # It is possible for tests to insert synthetic tool targets which we honor here.
 
-    class ToolUnderspecified(Exception):
-      pass
-
     # Bootstrapped tools are inserted as synthetic.  If they exist on disk they are later
     # updated as non synthetic targets.  If it's a synthetic target make sure it has a rev.
     synthetic_targets = [t.is_synthetic for t in targets]
     empty_revs = [cp.rev is None for cp in jvm_tool.classpath or []]
 
     if any(empty_revs) and any(synthetic_targets):
-      raise ToolUnderspecified(textwrap.dedent("""
+      raise self.ToolUnderspecified(textwrap.dedent("""
         Unable to bootstrap tool: '{}' because no rev was specified.  This usually
         means that the tool was not defined properly in your build files and no
         default option was provided to use for bootstrap.
