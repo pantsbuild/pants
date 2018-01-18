@@ -15,7 +15,7 @@ use std::io::{self, Write};
 
 const FINGERPRINT_SIZE: usize = 32;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Fingerprint(pub [u8; FINGERPRINT_SIZE]);
 
 impl Fingerprint {

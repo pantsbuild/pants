@@ -243,7 +243,7 @@ impl Store {
 }
 
 // Only public for testing.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum EntryType {
   Directory,
   File,
@@ -261,7 +261,6 @@ mod local {
              Transaction, WriteFlags};
   use lmdb::Error::{KeyExist, MapFull, NotFound};
   use sha2::Sha256;
-  use std::cmp::{Ord, Ordering};
   use std::collections::BinaryHeap;
   use std::error::Error;
   use std::path::Path;
@@ -331,8 +330,9 @@ mod local {
         .begin_rw_txn()
         .map_err(|err| format!("Error making lmdb transaction: {:?}", err))
         .and_then(|mut txn| {
+          let until = Self::default_lease_until_secs_since_epoch();
           for fingerprint in fingerprints {
-            self.lease(&fingerprint, &mut txn).map_err(|e| {
+            self.lease(&fingerprint, until, &mut txn).map_err(|e| {
               format!("Error leasing fingerprint {}: {:?}", fingerprint, e)
             })?;
           }
@@ -345,14 +345,21 @@ mod local {
         })
     }
 
-    fn lease(&self, fingerprint: &Fingerprint, txn: &mut RwTransaction) -> Result<(), lmdb::Error> {
+    fn default_lease_until_secs_since_epoch() -> u64 {
       let now_since_epoch = time::SystemTime::now()
         .duration_since(time::UNIX_EPOCH)
         .expect("Surely you're not before the unix epoch?");
-      let expires_at = (now_since_epoch + time::Duration::from_secs(60 * 60 * 2)).as_secs();
+      (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
+    }
+
+    fn lease(
+      &self,
+      fingerprint: &Fingerprint,
+      until_secs_since_epoch: u64,
+      txn: &mut RwTransaction,
+    ) -> Result<(), lmdb::Error> {
       let mut buf = [0; 8];
-      LittleEndian::write_u64(&mut buf, expires_at);
-      // This needs to be a standalone variable because otherwise rustfmt will complain.
+      LittleEndian::write_u64(&mut buf, until_secs_since_epoch);
       txn.put(
         self.inner.lease_database,
         &fingerprint.as_ref(),
@@ -367,6 +374,8 @@ mod local {
     ///
     /// Returns the size it was shrunk to, which may be larger than target_bytes.
     ///
+    /// TODO: Use LMDB database statistics when lmdb-rs exposes them.
+    ///
     pub fn shrink(&self, target_bytes: usize) -> Result<usize, String> {
       let mut used_bytes: usize = 0;
       let mut fingerprints_by_expired_ago = BinaryHeap::new();
@@ -379,13 +388,13 @@ mod local {
           {
             self.aged_fingerprints(
               &txn,
-              self.inner.file_database,
+              EntryType::File,
               &mut used_bytes,
               &mut fingerprints_by_expired_ago,
             );
             self.aged_fingerprints(
               &txn,
-              self.inner.directory_database,
+              EntryType::Directory,
               &mut used_bytes,
               &mut fingerprints_by_expired_ago,
             );
@@ -400,11 +409,26 @@ mod local {
             }
             txn
               .del(
-                aged_fingerprint.database,
+                match aged_fingerprint.entry_type {
+                  EntryType::File => self.inner.file_database,
+                  EntryType::Directory => self.inner.directory_database,
+                },
                 &aged_fingerprint.fingerprint.as_ref(),
                 None,
               )
               .expect("Failed to delete lmdb blob");
+
+            txn
+              .del(
+                self.inner.lease_database,
+                &aged_fingerprint.fingerprint.as_ref(),
+                None,
+              )
+              .or_else(|err| match err {
+                NotFound => Ok(()),
+                err => Err(err),
+              })
+              .expect("Failed to delete lmdb lease");
             used_bytes -= aged_fingerprint.size_bytes;
           }
           txn.commit()
@@ -419,12 +443,17 @@ mod local {
     fn aged_fingerprints<T>(
       &self,
       txn: &T,
-      database: Database,
+      entry_type: EntryType,
       used_bytes: &mut usize,
       fingerprints_by_expired_ago: &mut BinaryHeap<AgedFingerprint>,
     ) where
       T: Transaction,
     {
+      let database = match entry_type {
+        EntryType::File => self.inner.file_database,
+        EntryType::Directory => self.inner.directory_database,
+      };
+
       let mut cursor = txn.open_ro_cursor(database).expect(
         "Failed to open lmdb read cursor",
       );
@@ -452,10 +481,10 @@ mod local {
           .unwrap_or(0);
 
         fingerprints_by_expired_ago.push(AgedFingerprint {
+          expired_seconds_ago: expired_seconds_ago,
           fingerprint: Fingerprint::from_bytes_unsafe(key),
           size_bytes: bytes.len(),
-          database: database,
-          expired_seconds_ago: expired_seconds_ago,
+          entry_type: entry_type,
         });
       }
     }
@@ -487,7 +516,11 @@ mod local {
           let put_res = inner.env.begin_rw_txn().and_then(|mut txn| {
             txn.put(db, &fingerprint, &bytes, NO_OVERWRITE)?;
             if initial_lease {
-              bytestore.lease(&fingerprint, &mut txn)?;
+              bytestore.lease(
+                &fingerprint,
+                Self::default_lease_until_secs_since_epoch(),
+                &mut txn,
+              )?;
             }
             txn.commit()
           });
@@ -542,26 +575,13 @@ mod local {
     }
   }
 
-  #[derive(Eq, PartialEq)]
+  #[derive(Eq, PartialEq, Ord, PartialOrd)]
   struct AgedFingerprint {
+    // expired_seconds_ago must be the first field for the Ord implementation.
+    pub expired_seconds_ago: u64,
     pub fingerprint: Fingerprint,
     pub size_bytes: usize,
-    pub database: Database,
-    pub expired_seconds_ago: u64,
-  }
-
-  impl PartialOrd for AgedFingerprint {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-      self.expired_seconds_ago.partial_cmp(
-        &other.expired_seconds_ago,
-      )
-    }
-  }
-
-  impl Ord for AgedFingerprint {
-    fn cmp(&self, other: &Self) -> Ordering {
-      self.expired_seconds_ago.cmp(&other.expired_seconds_ago)
-    }
+    pub entry_type: EntryType,
   }
 
   #[cfg(test)]
