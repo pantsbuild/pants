@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated_module
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -19,6 +20,9 @@ from pants.contrib.android.tasks.sign_apk import SignApkTask
 from pants.contrib.android.tasks.unpack_libraries import UnpackLibraries
 from pants.contrib.android.tasks.zipalign import Zipalign
 
+
+deprecated_module('1.7.0.dev0',
+                  'Android backend is going away, unless you want to update and maintain it!')
 
 def build_file_aliases():
   return BuildFileAliases(
