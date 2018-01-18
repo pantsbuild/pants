@@ -11,7 +11,6 @@ import shutil
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.tasks2.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
