@@ -16,6 +16,7 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.targets.jar_library import JarLibrary
+from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
@@ -24,6 +25,7 @@ from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
+from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.python_task import PythonTask
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -72,7 +74,7 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
 
   @staticmethod
   def _is_jvm(dep):
-    return dep.is_jvm or isinstance(dep, JvmApp)
+    return  isinstance(dep, (JarLibrary, JvmTarget, JvmApp))
 
   @staticmethod
   def _jar_id(jar):
@@ -165,12 +167,14 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
       :type current_target:pants.build_graph.target.Target
       """
       def get_target_type(target):
-        if target.is_test:
+        def is_test(t):
+          return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
+        if is_test(target):
           return ExportTask.SourceRootTypes.TEST
         else:
           if (isinstance(target, Resources) and
               target in resource_target_map and
-              resource_target_map[target].is_test):
+                is_test(resource_target_map[target])):
             return ExportTask.SourceRootTypes.TEST_RESOURCE
           elif isinstance(target, Resources):
             return ExportTask.SourceRootTypes.RESOURCE

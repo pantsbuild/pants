@@ -31,8 +31,8 @@ class _StoppableDaemonThread(threading.Thread):
 
   JOIN_TIMEOUT = 3
 
-  def __init__(self):
-    super(_StoppableDaemonThread, self).__init__()
+  def __init__(self, *args, **kwargs):
+    super(_StoppableDaemonThread, self).__init__(*args, **kwargs)
     self.daemon = True
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._stopped = threading.Event()
@@ -75,7 +75,7 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     :param file write_handle: A file-like (usually the write end of a pipe/pty) onto which
       to write data decoded from the chunks.
     """
-    super(NailgunStreamStdinReader, self).__init__()
+    super(NailgunStreamStdinReader, self).__init__(name=self.__class__.__name__)
     self._socket = sock
     self._write_handle = write_handle
 
@@ -124,7 +124,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
     :param int buf_size: the buffer size for reads from the file descriptor.
     :param int select_timeout: the timeout (in seconds) for select.select() calls against the fd.
     """
-    super(NailgunStreamWriter, self).__init__()
+    super(NailgunStreamWriter, self).__init__(name=self.__class__.__name__)
     # Validates that we've received file descriptor numbers.
     self._in_fds = [int(f) for f in in_fds]
     self._socket = sock

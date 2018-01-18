@@ -1,3 +1,5 @@
 /target/
 # See http://doc.crates.io/faq.html#why-do-binaries-have-cargolock-in-version-control-but-not-libraries
 /*/**/Cargo.lock
+!fs/fs_util/Cargo.lock
+!process_executor/Cargo.lock

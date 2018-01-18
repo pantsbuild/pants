@@ -10,6 +10,7 @@ import re
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.base.exceptions import TaskError
@@ -436,7 +437,7 @@ class ClasspathProducts(object):
     return filter(_not_excluded_filter(excludes), classpath_target_tuples)
 
   def _add_excludes_for_target(self, target):
-    if target.is_exported:
+    if isinstance(target, ExportableJvmLibrary) and target.provides:
       self._excludes.add_for_target(target, [Exclude(target.provides.org,
                                                      target.provides.name)])
     if isinstance(target, JvmTarget) and target.excludes:

@@ -50,7 +50,6 @@ class ScalaLibrary(ExportableJvmLibrary):
       'java_sources': PrimitiveField(self.assert_list(java_sources, key_arg='java_sources')),
     })
     super(ScalaLibrary, self).__init__(payload=payload, **kwargs)
-    self.add_labels('scala')
 
   @classmethod
   def compute_injectable_specs(cls, kwargs=None, payload=None):

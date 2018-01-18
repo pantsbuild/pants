@@ -72,10 +72,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
       <url name="benjyw/binhost">
         <artifact pattern="https://github.com/benjyw/binhost/raw/99702052db865e0229998afbf19b5503d11225d3/[organisation]/${kythe.artifact}" />
       </url>
-
-      <!-- for retrieving jacoco snapshot, remove when a version containing cli is released -->
-      <!-- see https://github.com/pantsbuild/pants/issues/5010 -->
-      <ibiblio name="sonatype-nexus-snapshots" m2compatible="true" root="${sonatype.nexus.snapshots.url} "/>
     </chain>
   </resolvers>
 </ivysettings>

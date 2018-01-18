@@ -27,7 +27,6 @@ class JavacPlugin(JavaLibrary):
 
     self.plugin = plugin or self.name
     self.classname = classname
-    self.add_labels('javac_plugin')
 
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):

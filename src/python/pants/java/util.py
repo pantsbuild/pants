@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 import sys
+import urllib
 from zipfile import ZIP_STORED
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -274,7 +275,8 @@ def safe_classpath(classpath, synthetic_jar_dir, custom_name=None):
   else:
     synthetic_jar_dir = safe_mkdtemp()
 
-  bundled_classpath = relativize_classpath(classpath, synthetic_jar_dir)
+  # Quote the paths so that if they contain reserved characters can be safely passed to JVM classloader.
+  bundled_classpath = map(urllib.quote, relativize_classpath(classpath, synthetic_jar_dir))
 
   manifest = Manifest()
   manifest.addentry(Manifest.CLASS_PATH, ' '.join(bundled_classpath))

@@ -122,6 +122,8 @@ class CoursierMixin(NailgunTask):
       confs_for_fingerprint = ['sources'] * sources + ['javadoc'] * javadoc
       fp_strategy = CoursierResolveFingerprintStrategy(confs_for_fingerprint)
 
+      compile_classpath.add_excludes_for_targets(target_subset)
+
       with self.invalidated(target_subset,
                             invalidate_dependents=False,
                             silent=False,

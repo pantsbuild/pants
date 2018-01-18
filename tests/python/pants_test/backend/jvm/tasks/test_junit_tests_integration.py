@@ -7,31 +7,52 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from parameterized import parameterized
+
+from pants.base.build_environment import get_buildroot
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+
+
+OUTPUT_MODES = [('legacy_layout', ['--legacy-report-layout'], True),
+                ('nominal_layout', ['--no-legacy-report-layout'], False)]
 
 
 class JunitTestsIntegrationTest(PantsRunIntegrationTest):
 
-  def _assert_output_for_class(self, workdir, classname):
-    out_dir = os.path.join(workdir, 'test', 'junit')
-    self.assertTrue(os.path.exists(os.path.join(out_dir, '{}.out.txt'.format(classname))))
-    self.assertTrue(os.path.exists(os.path.join(out_dir, '{}.err.txt'.format(classname))))
+  def _assert_output_for_class(self, workdir, classname, expect_legacy=True):
+    def get_outdir(basedir):
+      return os.path.join(basedir, 'test', 'junit')
 
-  def _assert_junit_output(self, workdir):
-    self._assert_output_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
-    self._assert_output_for_class(workdir, 'org.pantsbuild.example.hello.welcome.WelSpec')
+    def get_stdout_file(basedir):
+      return os.path.join(basedir, '{}.out.txt'.format(classname))
 
-  def test_junit_test_custom_interpreter(self):
+    def get_stderr_file(basedir):
+      return os.path.join(basedir, '{}.err.txt'.format(classname))
+
+    outdir = get_outdir(os.path.join(get_buildroot(), 'dist'))
+    self.assertTrue(os.path.exists(get_stdout_file(outdir)))
+    self.assertTrue(os.path.exists(get_stderr_file(outdir)))
+
+    legacy_outdir = get_outdir(workdir)
+    self.assertEqual(expect_legacy, os.path.exists(get_stdout_file(legacy_outdir)))
+    self.assertEqual(expect_legacy, os.path.exists(get_stderr_file(legacy_outdir)))
+
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_test_custom_interpreter(self, unused_test_name, extra_args, expect_legacy):
     with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test',
-          'examples/tests/java/org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome',
-          '--python-setup-interpreter-constraints=CPython>=2.7,<3',
-          '--python-setup-interpreter-constraints=CPython>=3.3'],
+      pants_run = self.run_pants_with_workdir(
+          ['test.junit'] + extra_args +
+          ['examples/tests/java/org/pantsbuild/example/hello/greet',
+           'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
-      self._assert_junit_output(workdir)
+
+      self._assert_output_for_class(workdir=workdir,
+                                    classname='org.pantsbuild.example.hello.greet.GreetingTest',
+                                    expect_legacy=expect_legacy)
+      self._assert_output_for_class(workdir=workdir,
+                                    classname='org.pantsbuild.example.hello.welcome.WelSpec',
+                                    expect_legacy=expect_legacy)
 
   def test_junit_test(self):
     with self.temporary_workdir() as workdir:
@@ -41,38 +62,56 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
           workdir)
       self.assert_failure(pants_run)
 
-  def test_junit_test_with_test_option_with_relpath(self):
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_test_with_test_option_with_relpath(self,
+                                                    unused_test_name,
+                                                    extra_args,
+                                                    expect_legacy):
     with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test.junit',
-          '--test=examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
-          'examples/tests/java/org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
+      pants_run = self.run_pants_with_workdir(
+          ['test.junit'] + extra_args +
+          ['--test=examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
+           'examples/tests/java/org/pantsbuild/example/hello/greet',
+           'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
-      self._assert_output_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
+      self._assert_output_for_class(workdir=workdir,
+                                    classname='org.pantsbuild.example.hello.greet.GreetingTest',
+                                    expect_legacy=expect_legacy)
 
-  def test_junit_test_with_test_option_with_dot_slash_relpath(self):
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_test_with_test_option_with_dot_slash_relpath(self,
+                                                              unused_test_name,
+                                                              extra_args,
+                                                              expect_legacy):
     with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test.junit',
-          '--test=./examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
-          'examples/tests/java/org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
+      pants_run = self.run_pants_with_workdir(
+          ['test.junit'] + extra_args +
+          ['--test=./examples/tests/java/org/pantsbuild/example/hello/greet/GreetingTest.java',
+           'examples/tests/java/org/pantsbuild/example/hello/greet',
+           'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
-      self._assert_output_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
+      self._assert_output_for_class(workdir=workdir,
+                                    classname='org.pantsbuild.example.hello.greet.GreetingTest',
+                                    expect_legacy=expect_legacy)
 
-  def test_junit_test_with_test_option_with_classname(self):
+  @parameterized.expand(OUTPUT_MODES)
+  def test_junit_test_with_test_option_with_classname(self,
+                                                      unused_test_name,
+                                                      extra_args,
+                                                      expect_legacy):
     with self.temporary_workdir() as workdir:
-      pants_run = self.run_pants_with_workdir([
-          'test.junit',
-          '--test=org.pantsbuild.example.hello.greet.GreetingTest',
-          'examples/tests/java/org/pantsbuild/example/hello/greet',
-          'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
+      pants_run = self.run_pants_with_workdir(
+          ['test.junit'] + extra_args +
+          ['--test=org.pantsbuild.example.hello.greet.GreetingTest',
+           'examples/tests/java/org/pantsbuild/example/hello/greet',
+           'examples/tests/scala/org/pantsbuild/example/hello/welcome'],
           workdir)
       self.assert_success(pants_run)
-      self._assert_output_for_class(workdir, 'org.pantsbuild.example.hello.greet.GreetingTest')
+      self._assert_output_for_class(workdir=workdir,
+                                    classname='org.pantsbuild.example.hello.greet.GreetingTest',
+                                    expect_legacy=expect_legacy)
 
   def test_junit_test_requiring_cwd_fails_without_option_specified(self):
     pants_run = self.run_pants([
@@ -199,7 +238,7 @@ class JunitTestsIntegrationTest(PantsRunIntegrationTest):
                                                  mixed_addr],
                                                 workdir)
         group = [
-            'org/pantsbuild/tmp/tests:tests',
+            'org/pantsbuild/tmp/tests',
             'org.pantsbuild.tmp.tests.AllTests#test1Failure',
             'org.pantsbuild.tmp.tests.AllTests#test3Failure',
             'org.pantsbuild.tmp.tests.AllTests#test4Error',
