@@ -12,6 +12,7 @@ import shutil
 from pex.interpreter import PythonInterpreter
 
 from pants.backend.python.targets.python_distribution import PythonDistribution
+from pants.backend.python.tasks2.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -34,16 +35,12 @@ class BuildLocalPythonDistributions(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
 
-  @staticmethod
-  def is_distribution(target):
-    return isinstance(target, PythonDistribution)
-
   @property
   def cache_target_dirs(self):
     return True
 
   def execute(self):
-    dist_targets = self.context.targets(self.is_distribution)
+    dist_targets = self.context.targets(is_local_python_dist)
     built_dists = set()
     
     if dist_targets:
