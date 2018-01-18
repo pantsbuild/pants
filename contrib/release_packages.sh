@@ -155,7 +155,7 @@ function pkg_codeanalysis_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
-      --explain compile | grep "kythe" &> /dev/null
+      --explain index | grep "kythe" &> /dev/null
 }
 
 PKG_JAXWS=(
