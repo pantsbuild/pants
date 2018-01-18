@@ -234,6 +234,7 @@ Right now that's:
 - pantsbuild.pants.contrib.codeanalysis
 - pantsbuild.pants.contrib.jax_ws
 - pantsbuild.pants.contrib.mypy
+- pantsbuild.pants.contrib.avro
 
 You can run the following to get a full ownership roster for each
 package :
