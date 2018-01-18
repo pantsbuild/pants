@@ -56,7 +56,7 @@ function pkg_go_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.go==${version}']" \
-      buildgen test contrib/go/examples::
+      --explain test | grep "GoTest_test_go" &> /dev/null
 }
 
 PKG_NODE=(
@@ -68,7 +68,7 @@ function pkg_node_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.node==${version}']" \
-      test.node contrib/node/examples::
+      --explain test | grep "NodeTest_test_node" &> /dev/null
 }
 
 PKG_SCALAJS=(
@@ -80,7 +80,7 @@ function pkg_scalajs_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.scalajs==${version}']" \
-      test.pytest --no-timeouts contrib/scalajs::
+      --explain compile | grep "scala-js-link" &> /dev/null
 }
 
 PKG_PYTHON_CHECKS=(
@@ -131,7 +131,7 @@ function pkg_confluence_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.confluence==${version}']" \
-      --explain compile | grep "confluence" &> /dev/null
+      --explain confluence | grep "ConfluencePublish_confluence" &> /dev/null
 }
 
 PKG_ERRORPRONE=(
@@ -155,7 +155,7 @@ function pkg_codeanalysis_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
-      --explain compile | grep "kythe" &> /dev/null
+      --explain index | grep "kythe" &> /dev/null
 }
 
 PKG_JAXWS=(
