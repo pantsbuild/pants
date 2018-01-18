@@ -49,7 +49,6 @@ class PythonDistribution(Target):
       'compatibility': PrimitiveField(maybe_list(compatibility or ()))
     })
     super(PythonDistribution, self).__init__(address=address, payload=payload, **kwargs)
-    self.add_labels('python')
 
     if not 'setup.py' in sources:
       raise TargetDefinitionException(
