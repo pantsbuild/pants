@@ -227,9 +227,11 @@ Right now that's:
 - pantsbuild.pants.contrib.scalajs
 - pantsbuild.pants.contrib.findbugs
 - pantsbuild.pants.contrib.cpp
+- pantsbuild.pants.contrib.confluence
 - pantsbuild.pants.contrib.errorprone
 - pantsbuild.pants.contrib.codeanalysis
 - pantsbuild.pants.contrib.jax_ws
+- pantsbuild.pants.contrib.mypy
 
 You can run the following to get a full ownership roster for each
 package :
