@@ -11,6 +11,9 @@ import time
 
 from pants.pantsd.service.pants_service import PantsService
 
+_LEASE_EXTENSION_INTERVAL_SECONDS = 30 * 60
+_GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
+
 class StoreGCService(PantsService):
   """Store Garbage Collection Service.
 
@@ -31,15 +34,20 @@ class StoreGCService(PantsService):
   def _extend_lease(self):
     while True:
       self._logger.debug("Extending leases")
-      self._scheduler.lease_files_in_graph()
-      self._logger.debug("Done extending leases")
-      time.sleep(30 * 60)
+      # Grab the fork lock to ensure this thread isn't cloned by a fork while holding the graph
+      # lock.
+      self.fork_lock.acquire()
+      try:
+        self._scheduler.lease_files_in_graph()
+      finally:
+        self.fork_lock.release()
+        self._logger.debug("Done extending leases")
+      time.sleep(_LEASE_EXTENSION_INTERVAL_SECONDS)
 
   def _garbage_collect(self):
     while True:
-      time.sleep(4 * 60 * 60)
-      # Grab the fork lock to ensure this thread isn't cloned by a fork while holding the graph
-      # lock.
+      time.sleep(_GARBAGE_COLLECTION_INTERVAL_SECONDS)
+      # Grab the fork lock in case lmdb internally isn't fork-without-exec-safe.
       self.fork_lock.acquire()
       try:
         self._logger.debug("Garbage collecting store")

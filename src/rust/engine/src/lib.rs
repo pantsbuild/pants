@@ -536,7 +536,7 @@ pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
 #[no_mangle]
 pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    let digests = scheduler.core.graph.all_digests(scheduler.core.clone());
+    let digests = scheduler.core.graph.all_digests();
     match scheduler.core.store.lease_all(
       digests.iter().map(|digest| digest.0),
     ) {

@@ -6,19 +6,18 @@ use std::fs::File;
 use std::fs::OpenOptions;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use petgraph::Direction;
 use petgraph::stable_graph::{NodeIndex, StableDiGraph, StableGraph};
-use futures::Async;
 use futures::future::{self, Future};
 
 use externs;
 use boxfuture::{BoxFuture, Boxable};
-use context::{Context, ContextFactory, Core};
+use context::ContextFactory;
 use core::{Failure, FNV, Noop};
 use hashing;
-use nodes::{Node, NodeFuture, NodeKey, NodeResult, TryInto};
+use nodes::{DigestFile, Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
 
 // 2^32 Nodes ought to be more than enough for anyone!
@@ -446,32 +445,19 @@ impl InnerGraph {
     Ok(())
   }
 
-  pub fn all_digests(&self, core: Arc<Core>) -> Vec<hashing::Digest> {
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
     self
-      .nodes
-      .keys()
-      .map(|key| self.entry(key))
+      .pg
+      .node_indices()
+      .map(|node_index| self.pg.node_weight(node_index))
       .filter_map(|maybe_entry| maybe_entry)
-      .map(|entry| entry.node.clone())
-      .filter_map(|node| {
-        let node_key = node.content();
-        match (node_key, self.entry_id(&node)) {
-          (&NodeKey::DigestFile(ref digest_file), Some(entry_id)) => Some((
-            entry_id.clone(),
-            digest_file.clone(),
-          )),
-          _ => None,
-        }
+      .filter_map(|entry| match entry.node.content() {
+        &NodeKey::DigestFile(_) => Some(entry.peek::<DigestFile>()),
+        _ => None,
       })
-      .filter_map(|(entry_id, digest_file)| {
-        let context = Context {
-          entry_id: entry_id,
-          core: core.clone(),
-        };
-        match digest_file.run(context).poll() {
-          Ok(Async::Ready(digest)) => Some(digest),
-          _ => None,
-        }
+      .filter_map(|output| match output {
+        Some(Ok(digest)) => Some(digest),
+        _ => None,
       })
       .collect()
   }
@@ -586,9 +572,9 @@ impl Graph {
     inner.visualize(roots, path)
   }
 
-  pub fn all_digests(&self, core: Arc<Core>) -> Vec<hashing::Digest> {
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
     let inner = self.inner.lock().unwrap();
-    inner.all_digests(core)
+    inner.all_digests()
   }
 }
 
