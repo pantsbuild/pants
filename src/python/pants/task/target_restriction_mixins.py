@@ -5,7 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.task.goal_options_mixin import GoalOptionsRegistrar, GoalOptionsMixin
+from pants.task.goal_options_mixin import GoalOptionsMixin, GoalOptionsRegistrar
 
 
 class HasTransitiveOptionMixin(object):
@@ -25,7 +25,7 @@ class HasTransitiveOptionMixin(object):
   """
 
   @property
-  def transitive(self):
+  def act_transitively(self):
     return self.get_options().transitive
 
 
@@ -51,7 +51,7 @@ class HasSkipOptionMixin(object):
   """
 
   @property
-  def skip(self):
+  def skip_execution(self):
     return self.get_options().skip
 
 

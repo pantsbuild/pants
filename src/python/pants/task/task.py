@@ -204,7 +204,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return self.context.options.passthru_args_for_scope(self.options_scope)
 
   @property
-  def skip(self):
+  def skip_execution(self):
     """Whether this task should be skipped.
 
     Tasks can override to specify skipping behavior (e.g., based on an option).
@@ -214,7 +214,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return False
 
   @property
-  def transitive(self):
+  def act_transitively(self):
     """Whether this task should act on the transitive closure of the target roots.
 
     Tasks can override to specify transitivity behavior (e.g., based on an option).
@@ -240,7 +240,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return (self.context.targets(predicate) if self.transitive
+    return (self.context.targets(predicate) if self.act_transitively
             else filter(predicate, self.context.target_roots))
 
   @memoized_property
