@@ -76,7 +76,7 @@ impl AsRef<[u8]> for Fingerprint {
 /// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
 /// of needing to create an entire protobuf to pass around the two fields.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest(pub Fingerprint, pub usize);
 
 impl<'a> From<&'a Digest> for bazel_protos::remote_execution::Digest {
