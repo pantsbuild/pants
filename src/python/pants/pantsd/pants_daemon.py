@@ -36,16 +36,16 @@ from pants.util.memo import memoized_property
 class _LoggerStream(object):
   """A sys.{stdout,stderr} replacement that pipes output to a logger."""
 
-  def __init__(self, logger, log_level, logger_stream):
+  def __init__(self, logger, log_level, handler):
     """
     :param logging.Logger logger: The logger instance to emit writes to.
     :param int log_level: The log level to use for the given logger.
-    :param file logger_stream: The underlying file object the logger is writing to, for
-                               determining the fileno to support faulthandler logging.
+    :param Handler handler: The underlying log handler, for determining the fileno
+                            to support faulthandler logging.
     """
     self._logger = logger
     self._log_level = log_level
-    self._stream = logger_stream
+    self._handler = handler
 
   def write(self, msg):
     for line in msg.rstrip().splitlines():
@@ -58,7 +58,7 @@ class _LoggerStream(object):
     return False
 
   def fileno(self):
-    return self._stream.fileno()
+    return self._handler.stream.fileno()
 
 
 class PantsDaemon(FingerprintedProcessManager):
@@ -238,11 +238,11 @@ class PantsDaemon(FingerprintedProcessManager):
       # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
       # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
       # for `1,2`, and allow them to be used via `stdio_as`.
-      sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_stream)
-      sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_stream)
+      sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
+      sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
 
       self._logger.debug('logging initialized')
-      yield result.log_stream
+      yield result.log_handler.stream
 
   def _setup_services(self, services):
     assert self._lifecycle_lock is not None, 'PantsDaemon lock has not been set!'
@@ -297,6 +297,10 @@ class PantsDaemon(FingerprintedProcessManager):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
+    # TODO: `log_stream` as provided here points to the stream used by a `RotatingFileHandler`,
+    # which can change when logs are rotated. This means that the faulthandler stream can become
+    # invalid after a rotation event - but we currently have no way to detect or signal this to
+    # the daemon.
     with self._pantsd_logging() as log_stream:
       self._exiter.set_except_hook(log_stream)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
