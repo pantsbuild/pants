@@ -34,10 +34,12 @@ def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
   return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in snapshot.files)),
     snapshots=(snapshot,))
 
+
 def process_result_to_concatted_from_outfile(process_result, sandbox_dir):
   with open(os.path.join(sandbox_dir, 'outfile')) as f:
     # TODO might be better to allow for this to be done via Nodes. But I'm not sure how as yet.
     return Concatted(f.read())
+
 
 def process_result_to_concatted(process_result, sandbox_dir):
   return Concatted(process_result.stdout)
@@ -81,6 +83,7 @@ def java_sources_to_javac_args(sources_snapshot, out_dir):
                                    snapshots=(sources_snapshot,),
                                    directories_to_create=(out_dir.path,))
 
+
 def process_request_from_java_sources(binary):
   env = []
   return ExecuteProcessRequest(
@@ -94,13 +97,16 @@ class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
 
 def process_result_to_classpath_entry(process_result, sandbox_dir):
   if not process_result.exit_code:
-    # this implies that we should pass some / all of the inputs to the output conversion so they can grab config.
+    # this implies that we should pass some / all of the inputs to the output conversion so they
+    # can grab config.
     # TODO string name association isn't great.
     return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
 
+
 def execute_process_result_to_classpath(process_result, sandbox_dir):
   if not process_result.exit_code:
-   return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
+    return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
+
 
 class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
   def test_blows_up_on_unhashable_args(self):

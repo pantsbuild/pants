@@ -86,8 +86,8 @@ class CountLinesOfCode(ConsoleTask):
         req = ExecuteProcessRequest(cmd, env_path)
         execute_process_result, = self.context._scheduler.product_request(ExecuteProcessResult, [req])
         exit_code = execute_process_result.exit_code
-      if exit_code != 0:
-        raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
+        if exit_code != 0:
+          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
 
       with open(report_file, 'r') as report_file_in:
         for line in report_file_in.read().split('\n'):

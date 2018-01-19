@@ -306,6 +306,7 @@ impl Select {
         env: env,
       };
       // TODO: this should run off-thread, and asynchronously
+      // TODO: request the Node that invokes the process, rather than invoke directly
       let result = process_executor::local::run_command_locally(request).unwrap();
       vec![
         future::ok(externs::invoke_unsafe(
