@@ -14,6 +14,7 @@ from pants.pantsd.service.pants_service import PantsService
 _LEASE_EXTENSION_INTERVAL_SECONDS = 30 * 60
 _GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
 
+
 class StoreGCService(PantsService):
   """Store Garbage Collection Service.
 
