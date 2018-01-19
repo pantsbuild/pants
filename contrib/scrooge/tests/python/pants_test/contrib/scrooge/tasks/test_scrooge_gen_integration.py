@@ -43,7 +43,7 @@ class ScroogeGenTest(PantsRunIntegrationTest):
               '3rdparty:thrift-0.6.1',
               '3rdparty/jvm/com/twitter:finagle-thrift',
               '3rdparty/jvm/com/twitter:scrooge-core',
-            ]  
+            ]
           },
         'structs_deps': {
             'java': [
