@@ -578,6 +578,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
       return Work(lambda x: self.context.subproc_map(call_insert, x), [(args_tuples,)], 'insert')
     else:
+      self.context.log.info("RETURNING NONE FROM _get_update_artifact_cache_work")
       return None
 
   def _report_targets(self, prefix, targets, suffix, logger=None):

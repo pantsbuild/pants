@@ -583,16 +583,20 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
           try:
             # 1.) Write all results that will be potentially cached to output_dir.
             self._run_tests(test_registry, output_dir, coverage)
+            self.context.log.info("FINISHED RUNNING TESTS")
             reports.generate()
 
             cache_vts = self._vts_for_partition(invalidation_check)
             if invalidation_check.all_vts == invalidation_check.invalid_vts:
               # 2.) The full partition was invalid, cache results.
+              self.context.log.info("FULL PARTITION INVALID, CACHE NEW RESULTS")
               if self.artifact_cache_writes_enabled():
+                self.context.log.info("CACHE WRITES ENABLED, WRITE TO CACHE")
                 self.update_artifact_cache([(cache_vts, self._collect_files(output_dir))])
             elif not invalidation_check.invalid_vts:
               # 3.) The full partition was valid, our results will have been staged for/by caching
               # if not already local.
+              self.context.log.info("PARTITION VALID, PASS")
               pass
             else:
               # The partition was partially invalid.
@@ -602,9 +606,12 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
               # partition in a state that executes successfully; so when the 1st of the others
               # executes against this partition; they will hit `all_vts == invalid_vts` and
               # cache the results. That 1st of others is hopefully CI!
+              self.context.log.info("PARTITION PARTIALLY INVALID, INVALIDATE ALL")
               cache_vts.force_invalidate()
           except TaskError as e:
+            self.context.log.info("_execute:except clause SOMETHING WENT WRONG WHILE RUNNING TESTS")
             reports.generate(exc=e)
+            self.context.log.info("_execute:except clause REPORT GENERATED, RAISING ERROR {}".format(e))
             raise
         reports.maybe_open()
 
