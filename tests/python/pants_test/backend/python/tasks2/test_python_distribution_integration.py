@@ -52,8 +52,10 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     command=['binary', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
     self.assert_success()
+    pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
     output = subprocess.check_output(pex)
-    self.assertIn('United States', pants_run.stdout_data)
+    self.assertIn('United States', output)
+    os.remove(pex)
 
   def test_with_conflicting_transitive_deps(self):
     command=['run', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
