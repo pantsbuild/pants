@@ -101,12 +101,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
       classifier_and_no_classifier_lib.closure(bfs=True))
 
-    print('no cp', no_classifier_cp)
-    print('cp', classifier_cp)
-    print('both', classifier_and_no_classifier_cp)
-
     classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
-
 
     self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
     self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
