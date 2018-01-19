@@ -27,6 +27,11 @@ def git_version():
   return Revision.lenient(matches.group(1))
 
 
+def get_repo_root():
+  """Return the absolute path to the root directory of the Pants git repo."""
+  return subprocess.check_output(['git', 'rev-parse', '--show-toplevel']).strip()
+
+
 @contextmanager
 def initialize_repo(worktree, gitdir=None):
   """Initialize a git repository for the given `worktree`.

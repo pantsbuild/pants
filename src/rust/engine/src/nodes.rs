@@ -16,6 +16,7 @@ use core::{Failure, Key, Noop, TypeConstraint, Value, Variants, throw};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
 use process_execution as process_executor;
+use hashing;
 use rule_graph;
 use selectors::{self, Selector};
 use tasks;
@@ -816,9 +817,9 @@ impl From<ReadLink> for NodeKey {
 pub struct DigestFile(File);
 
 impl Node for DigestFile {
-  type Output = fs::Digest;
+  type Output = hashing::Digest;
 
-  fn run(self, context: Context) -> NodeFuture<fs::Digest> {
+  fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
     let file = self.0.clone();
     context
       .core
@@ -1223,7 +1224,7 @@ impl Node for NodeKey {
 #[derive(Clone, Debug)]
 pub enum NodeResult {
   Unit,
-  Digest(fs::Digest),
+  Digest(hashing::Digest),
   DirectoryListing(DirectoryListing),
   LinkDest(LinkDest),
   ProcessResult(ProcessResult),
@@ -1249,8 +1250,8 @@ impl From<fs::Snapshot> for NodeResult {
   }
 }
 
-impl From<fs::Digest> for NodeResult {
-  fn from(v: fs::Digest) -> Self {
+impl From<hashing::Digest> for NodeResult {
+  fn from(v: hashing::Digest) -> Self {
     NodeResult::Digest(v)
   }
 }
@@ -1337,7 +1338,7 @@ impl TryFrom<NodeResult> for fs::Snapshot {
   }
 }
 
-impl TryFrom<NodeResult> for fs::Digest {
+impl TryFrom<NodeResult> for hashing::Digest {
   type Err = ();
 
   fn try_from(nr: NodeResult) -> Result<Self, ()> {

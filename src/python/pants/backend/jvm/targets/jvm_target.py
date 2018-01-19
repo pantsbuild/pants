@@ -126,8 +126,6 @@ class JvmTarget(Target, Jarable):
     # compile fingerprint or javadoc fingerprint.  As such, its not a payload field.
     self._services = services or {}
 
-    self.add_labels('jvm')
-
   @property
   def strict_deps(self):
     """If set, whether to limit compile time deps to those that are directly declared.

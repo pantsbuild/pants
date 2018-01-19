@@ -7,7 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pants.backend.jvm.tasks.jvm_compile.zinc.zinc_compile import ZincCompile
 from pants.fs.archive import TarArchiver
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_walk
@@ -31,19 +30,17 @@ class JavaCompileIntegrationTest(BaseCompileIT):
 
   def test_nocache(self):
     with temporary_dir() as cache_dir:
-      bad_artifact_dir = os.path.join(cache_dir,
-          ZincCompile.stable_name(),
-          'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
-      good_artifact_dir = os.path.join(cache_dir,
-          ZincCompile.stable_name(),
-          'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
-                                  'testprojects/src/java/org/pantsbuild/testproject/nocache::'],
-                                 config)
-      self.assert_success(pants_run)
+      self.assert_success(self.run_pants([
+        'compile',
+        'testprojects/src/java/org/pantsbuild/testproject/nocache::',
+      ], config=config))
 
+      zinc_task_dir = self.get_cache_subdir(cache_dir)
+
+      bad_artifact_dir = os.path.join(zinc_task_dir, 'testprojects.src.java.org.pantsbuild.testproject.nocache.nocache')
+      good_artifact_dir = os.path.join(zinc_task_dir, 'testprojects.src.java.org.pantsbuild.testproject.nocache.cache_me')
       # The nocache target is labeled with no_cache so it should not be written to the
       # artifact cache.
       self.assertFalse(os.path.exists(bad_artifact_dir))
@@ -62,42 +59,57 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     # produces two different artifacts.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-          'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main')
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(self.create_platform_args(6) +
-                                 ['compile',
-                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
-                                 config)
-      self.assert_success(pants_run)
+      java_6_args = self.create_platform_args(6) + [
+        'compile',
+        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
+      ]
+      self.assert_success(self.run_pants(java_6_args, config))
 
+      java_6_artifact_dir = self.get_cache_subdir(cache_dir)
+      main_java_6_dir = os.path.join(
+        java_6_artifact_dir,
+        'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
+      )
       # One artifact for java 6
-      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+      self.assertEqual(len(os.listdir(main_java_6_dir)), 1)
 
       # Rerun for java 7
-      pants_run = self.run_pants(self.create_platform_args(7) +
-                                 ['compile',
-                                  'testprojects/src/java/org/pantsbuild/testproject/unicode/main'],
-                                 config)
-      self.assert_success(pants_run)
+      java_7_args = self.create_platform_args(7) + [
+        'compile',
+        'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
+      ]
+      self.assert_success(self.run_pants(java_7_args, config))
 
-      # One artifact for java 6 and one for 7
-      self.assertEqual(len(os.listdir(artifact_dir)), 2)
+      java_7_artifact_dir = self.get_cache_subdir(
+        cache_dir,
+        other_dirs=[java_6_artifact_dir],
+      )
+      main_java_7_dir = os.path.join(
+        java_7_artifact_dir,
+        'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
+      )
+      # java 7 platform args should change the result dir name
+      self.assertEqual(len(os.listdir(main_java_7_dir)), 1)
 
   def test_java_compile_reads_resource_mapping(self):
     # Ensure that if an annotation processor produces a resource-mapping,
     # the artifact contains that resource mapping.
 
     with temporary_dir() as cache_dir:
-      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-          'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main')
       config = {'cache.compile.zinc': {'write_to': [cache_dir]}}
 
-      pants_run = self.run_pants(['compile',
-                                  'testprojects/src/java/org/pantsbuild/testproject/annotation/main'],
-                                 config)
-      self.assert_success(pants_run)
+      self.assert_success(self.run_pants([
+        'compile',
+        'testprojects/src/java/org/pantsbuild/testproject/annotation/main',
+      ], config=config))
+
+      base_artifact_dir = self.get_cache_subdir(cache_dir)
+      artifact_dir = os.path.join(
+        base_artifact_dir,
+        'testprojects.src.java.org.pantsbuild.testproject.annotation.main.main',
+      )
 
       self.assertTrue(os.path.exists(artifact_dir))
       artifacts = os.listdir(artifact_dir)
@@ -151,8 +163,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
     with self.temporary_workdir() as workdir, temporary_dir() as cache_dir:
       path_prefix = 'testprojects/src/java/org/pantsbuild/testproject/jarversionincompatibility'
       dotted_path = path_prefix.replace(os.path.sep, '.')
-      artifact_dir = os.path.join(cache_dir, ZincCompile.stable_name(),
-                                  '{}.jarversionincompatibility'.format(dotted_path))
+
       config = {
           'cache.compile.zinc': {
             'write_to': [cache_dir],
@@ -163,24 +174,36 @@ class JavaCompileIntegrationTest(BaseCompileIT):
           },
       }
 
-      pants_run = self.run_pants_with_workdir(['compile',
-                                               ('{}:only-15-directly'.format(path_prefix))],
-                                              workdir,
-                                              config)
-      self.assert_success(pants_run)
+      self.assert_success(self.run_pants_with_workdir([
+        'compile',
+        '{}:only-15-directly'.format(path_prefix),
+      ], workdir, config))
+      guava_15_base_dir = self.get_cache_subdir(cache_dir)
+      guava_15_artifact_dir = os.path.join(
+        guava_15_base_dir,
+        '{}.jarversionincompatibility'.format(dotted_path),
+      )
 
       # One artifact for guava 15
-      self.assertEqual(len(os.listdir(artifact_dir)), 1)
+      self.assertEqual(len(os.listdir(guava_15_artifact_dir)), 1)
 
       # Rerun for guava 16
-      pants_run = self.run_pants_with_workdir(['compile',
-                                               (u'{}:alongside-16'.format(path_prefix))],
-                                              workdir,
-                                              config)
-      self.assert_success(pants_run)
+      self.assert_success(self.run_pants_with_workdir([
+        'compile',
+        (u'{}:alongside-16'.format(path_prefix)),
+      ], workdir, config))
+
+      guava_16_base_dir = self.get_cache_subdir(cache_dir)
+      # the zinc compile task has the same option values in both runs, so the
+      # results directory should be the same
+      guava_16_artifact_dir = os.path.join(
+        guava_16_base_dir,
+        '{}.jarversionincompatibility'.format(dotted_path),
+      )
 
       # One artifact for guava 15 and one for guava 16
-      self.assertEqual(len(os.listdir(artifact_dir)), 2)
+      self.assertEqual(guava_16_artifact_dir, guava_15_artifact_dir)
+      self.assertEqual(len(os.listdir(guava_16_artifact_dir)), 2)
 
   def test_java_compile_with_corrupt_remote(self):
     """Tests that a corrupt artifact in the remote cache still results in a successful compile."""
@@ -205,7 +228,7 @@ class JavaCompileIntegrationTest(BaseCompileIT):
         self.assertFalse("Compiling" in second_run.stdout_data)
 
         # Corrupt the remote artifact.
-        self.assertTrue(server.corrupt_artifacts(r'.*zinc.*matcher.*') == 1)
+        self.assertEqual(server.corrupt_artifacts(r'.*'), 1)
 
         # Ensure that the third run succeeds, despite a failed attempt to fetch.
         third_run = self.run_pants_with_workdir(['clean-all', 'test', target], workdir, config)

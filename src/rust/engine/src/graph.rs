@@ -379,11 +379,16 @@ impl InnerGraph {
 
     let is_bottom = |eid: EntryId| -> bool {
       match self.unsafe_entry_for_id(eid).peek::<NodeKey>() {
-        None |
         Some(Err(Failure::Invalidated)) => false,
         Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(..))) => false,
         Some(Ok(_)) => true,
+        None => {
+          // A Node with no state is either still running, or effectively cancelled
+          // because a dependent failed. In either case, it's not useful to render
+          // them, as we don't know whether they would have succeeded or failed.
+          true
+        }
       }
     };
 

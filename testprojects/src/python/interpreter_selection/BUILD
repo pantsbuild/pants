@@ -9,7 +9,7 @@ python_library(
   sources = ['echo_interpreter_version.py'],
   dependencies = [],
   # Play with this to test interpreter selection in the pex machinery.
-  compatibility = ['CPython>=2.7,<3', 'CPython>=3.3']
+  compatibility = ['CPython>=2.7,<4']
 )
 
 python_binary(

@@ -3,12 +3,14 @@ extern crate boxfuture;
 extern crate clap;
 extern crate fs;
 extern crate futures;
+extern crate hashing;
 extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
 use clap::{App, Arg, SubCommand};
-use fs::{Fingerprint, GetFileDigest, ResettablePool, Snapshot, Store, VFS};
+use fs::{GetFileDigest, ResettablePool, Snapshot, Store, VFS};
 use futures::future::{self, Future, join_all};
+use hashing::{Digest, Fingerprint};
 use protobuf::Message;
 use std::error::Error;
 use std::fs::File;
@@ -16,6 +18,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug)]
 enum ExitCode {
@@ -144,7 +147,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store = {
     let store_result = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        Store::backfills_from_remote(store_dir, pool.clone(), cas_address.to_owned())
+        Store::backfills_from_remote(
+          store_dir,
+          pool.clone(),
+          cas_address.to_owned(),
+          1,
+          10 * 1024 * 1024,
+          Duration::from_secs(30),
+        )
       }
       None => Store::local_only(store_dir, pool.clone()),
     };
@@ -327,7 +337,7 @@ struct FileSaver {
 }
 
 impl GetFileDigest<String> for FileSaver {
-  fn digest(&self, file: &fs::File) -> BoxFuture<fs::Digest, String> {
+  fn digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
     let file_copy = file.clone();
     let store = self.store.clone();
     self

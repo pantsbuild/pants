@@ -109,23 +109,37 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     def scope_to_flags(self):
       return {}
 
-    def get_fingerprintable_for_scope(self, scope, include_passthru=False):
+    def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
+      """Returns a list of fingerprintable (option type, option value) pairs for
+      the given scope.
+
+      Note that this method only collects values for a single scope, NOT from
+      all enclosing scopes as in the Options class!
+
+      :param str bottom_scope: The scope to gather fingerprintable options for.
+      :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
+                                    fingerprintable options.
+      """
       pairs = []
-      if include_passthru and passthru_args:
-        pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
-      option_values = self.for_scope(scope)
-      pairs.extend((option_type, option_values[option_name])
-                   for option_name, option_type in fingerprintable[scope].items())
+      if include_passthru:
+        passthru_args = self.passthru_args_for_scope(bottom_scope)
+        pairs.extend((str, arg) for arg in passthru_args)
+
+      option_values = self.for_scope(bottom_scope)
+      for option_name, option_type in fingerprintable[bottom_scope].items():
+        pairs.append((option_type, option_values[option_name]))
       return pairs
 
-    def __getitem__(self, key):
-      return self.for_scope(key)
+    def __getitem__(self, scope):
+      return self.for_scope(scope)
+
   return FakeOptions()
 
 
 def create_options_for_optionables(optionables,
                                    extra_scopes=None,
                                    options=None,
+                                   options_fingerprintable=None,
                                    passthru_args=None):
   """Create a fake Options object for testing with appropriate defaults for the given optionables.
 
@@ -135,6 +149,9 @@ def create_options_for_optionables(optionables,
   :param iterable extra_scopes: An optional series of extra known scopes in play.
   :param dict options: A dict of scope -> (dict of option name -> value) representing option values
                        explicitly set via the command line.
+  :param dict options_fingerprintable: A dict of scope -> (dict of option name -> option type)
+                                       representing the fingerprintable options
+                                       and the scopes they are registered for.
   :param list passthru_args: A list of passthrough args (specified after `--` on the command line).
   :returns: A fake `Options` object with defaults populated for the given `optionables` and any
             explicitly set `options` overlayed.
@@ -142,6 +159,15 @@ def create_options_for_optionables(optionables,
   all_options = defaultdict(dict)
   fingerprintable_options = defaultdict(dict)
   bootstrap_option_values = None
+
+  # NB(cosmicexplorer): we do this again for all_options after calling
+  # register_func below, this is a hack
+  if options:
+    for scope, opts in options.items():
+      all_options[scope].update(opts)
+  if options_fingerprintable:
+    for scope, opts in options_fingerprintable.items():
+      fingerprintable_options[scope].update(opts)
 
   def complete_scopes(scopes):
     """Return all enclosing scopes.
@@ -151,7 +177,7 @@ def create_options_for_optionables(optionables,
     """
     completed_scopes = set(scopes)
     for scope in scopes:
-      while scope != '':
+      while scope != GLOBAL_SCOPE:
         if scope not in completed_scopes:
           completed_scopes.add(scope)
         scope = enclosing_scope(scope)

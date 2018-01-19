@@ -5,9 +5,9 @@ use bazel_protos;
 use boxfuture::{Boxable, BoxFuture};
 use futures::Future;
 use futures::future::join_all;
+use hashing::{Digest, Fingerprint};
 use itertools::Itertools;
-use {Digest, File, PathStat, Store};
-use hash::Fingerprint;
+use {File, PathStat, Store};
 use protobuf;
 use std::ffi::OsString;
 use std::fmt;
@@ -64,7 +64,7 @@ impl Snapshot {
                 .and_then(move |digest| {
                   let mut file_node = bazel_protos::remote_execution::FileNode::new();
                   file_node.set_name(osstring_as_utf8(first_component)?);
-                  file_node.set_digest(digest.into());
+                  file_node.set_digest((&digest).into());
                   file_node.set_is_executable(is_executable);
                   Ok(file_node)
                 })
@@ -79,7 +79,7 @@ impl Snapshot {
                 .map(move |digest| {
                   let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
                   directory_node.set_name(osstring_as_utf8(first_component).unwrap());
-                  directory_node.set_digest(digest.into());
+                  directory_node.set_digest((&digest).into());
                   directory_node
                 })
                 .to_boxed(),
@@ -96,7 +96,7 @@ impl Snapshot {
           ).and_then(move |snapshot| {
             let mut dir_node = bazel_protos::remote_execution::DirectoryNode::new();
             dir_node.set_name(osstring_as_utf8(first_component)?);
-            dir_node.set_digest(snapshot.digest.unwrap().into());
+            dir_node.set_digest((&snapshot.digest.unwrap()).into());
             Ok(dir_node)
           })
             .to_boxed(),
@@ -171,11 +171,12 @@ mod tests {
 
   use boxfuture::{BoxFuture, Boxable};
   use futures::future::Future;
+  use hashing::{Digest, Fingerprint};
   use tempdir::TempDir;
   use self::testutil::make_file;
 
-  use super::super::{Digest, File, Fingerprint, GetFileDigest, PathGlobs, PathStat, PosixFS,
-                     ResettablePool, Snapshot, Store, VFS};
+  use super::super::{File, GetFileDigest, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
+                     Store, VFS};
 
   use std;
   use std::error::Error;

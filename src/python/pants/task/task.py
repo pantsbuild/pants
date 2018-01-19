@@ -179,12 +179,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._task_name = type(self).__name__
     self._cache_key_errors = set()
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
-    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
     self._force_invalidated = False
 
   @memoized_method
   def _build_invalidator(self, root=False):
-    build_task = None if root else self.stable_name()
+    build_task = None if root else self.fingerprint
     return BuildInvalidator.Factory.create(build_task=build_task)
 
   def get_options(self):
@@ -216,16 +215,16 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    pairs = self.context.options.get_fingerprintable_for_scope(
+    options_hasher = sha1()
+    options_hasher.update(scope)
+    options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
-      include_passthru=self.supports_passthru_args()
+      self.context.options,
+      build_graph=self.context.build_graph,
+      include_passthru=self.supports_passthru_args(),
     )
-    hasher = sha1()
-    for (option_type, option_val) in pairs:
-      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-      if fp is not None:
-        hasher.update(fp)
-    return hasher.hexdigest()
+    options_hasher.update(options_fp)
+    return options_hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
@@ -238,6 +237,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     hasher = sha1()
+    hasher.update(self.stable_name())
     hasher.update(self._options_fingerprint(self.options_scope))
     hasher.update(self.implementation_version_str())
     # TODO: this is not recursive, but should be: see #2739
@@ -364,9 +364,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         targets.extend(vt.targets)
 
       if len(targets):
-        msg_elements = ['Invalidated ',
-                        items_to_report_element([t.address.reference() for t in targets], 'target'),
-                        '.']
+        target_address_references = [t.address.reference() for t in targets]
+        msg_elements = [
+          'Invalidated ',
+          items_to_report_element(target_address_references, 'target'),
+          '.',
+        ]
         self.context.log.info(*msg_elements)
 
     self._update_invalidation_report(invalidation_check, 'pre-check')
@@ -581,12 +584,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return None
 
   def _report_targets(self, prefix, targets, suffix, logger=None):
-    logger = logger or self.context.log.info
-    logger(
+    target_address_references = [t.address.reference() for t in targets]
+    msg_elements = [
       prefix,
-      items_to_report_element([t.address.reference() for t in targets], 'target'),
+      items_to_report_element(target_address_references, 'target'),
       suffix,
-    )
+    ]
+    logger = logger or self.context.log.info
+    logger(*msg_elements)
 
   def require_single_root_target(self):
     """If a single target was specified on the cmd line, returns that target.

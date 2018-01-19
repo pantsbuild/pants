@@ -74,7 +74,8 @@ class ProcessMetadataManager(object):
   class MetadataError(Exception): pass
   class Timeout(Exception): pass
 
-  FILE_WAIT_SEC = 10
+  FAIL_WAIT_SEC = 10
+  INFO_INTERVAL_SEC = 5
   WAIT_INTERVAL_SEC = .1
 
   def __init__(self, metadata_base_dir=None):
@@ -105,38 +106,47 @@ class ProcessMetadataManager(object):
       return item
 
   @classmethod
-  def _deadline_until(cls, closure, timeout, wait_interval=WAIT_INTERVAL_SEC):
+  def _deadline_until(cls, closure, action_msg, timeout=FAIL_WAIT_SEC,
+                      wait_interval=WAIT_INTERVAL_SEC, info_interval=INFO_INTERVAL_SEC):
     """Execute a function/closure repeatedly until a True condition or timeout is met.
 
     :param func closure: the function/closure to execute (should not block for long periods of time
                          and must return True on success).
+    :param str action_msg: a description of the action that is being executed, to be rendered as
+                           info while we wait, and as part of any rendered exception.
     :param float timeout: the maximum amount of time to wait for a true result from the closure in
                           seconds. N.B. this is timing based, so won't be exact if the runtime of
                           the closure exceeds the timeout.
     :param float wait_interval: the amount of time to sleep between closure invocations.
+    :param float info_interval: the amount of time to wait before and between reports via info
+                                logging that we're still waiting for the closure to succeed.
     :raises: :class:`ProcessManager.Timeout` on execution timeout.
     """
-    deadline = time.time() + timeout
+    now = time.time()
+    deadline = now + timeout
+    info_deadline = now + info_interval
     while 1:
       if closure():
         return True
-      elif time.time() > deadline:
-        raise cls.Timeout('exceeded timeout of {} seconds for {}'.format(timeout, closure))
+
+      now = time.time()
+      if now > deadline:
+        raise cls.Timeout('exceeded timeout of {} seconds while waiting for {}'.format(timeout, action_msg))
+
+      if now > info_deadline:
+        logger.info('waiting for {}...'.format(action_msg))
+        info_deadline = info_deadline + info_interval
       elif wait_interval:
         time.sleep(wait_interval)
 
   @classmethod
-  def _wait_for_file(cls, filename, timeout=FILE_WAIT_SEC, want_content=True):
+  def _wait_for_file(cls, filename, timeout=FAIL_WAIT_SEC, want_content=True):
     """Wait up to timeout seconds for filename to appear with a non-zero size or raise Timeout()."""
     def file_waiter():
       return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
 
-    try:
-      return cls._deadline_until(file_waiter, timeout)
-    except cls.Timeout:
-      # Re-raise with a more helpful exception message.
-      raise cls.Timeout('exceeded timeout of {} seconds while waiting for file {} to appear'
-                         .format(timeout, filename))
+    action_msg = 'file {} to appear'.format(filename)
+    return cls._deadline_until(file_waiter, action_msg, timeout=timeout)
 
   def _get_metadata_dir_by_name(self, name):
     """Retrieve the metadata dir by name.
@@ -407,7 +417,7 @@ class ProcessManager(ProcessMetadataManager):
 
         # Wait up to kill_wait seconds to terminate or move onto the next signal.
         try:
-          if self._deadline_until(self.is_dead, kill_wait):
+          if self._deadline_until(self.is_dead, 'daemon to exit', timeout=kill_wait):
             alive = False
             logger.debug('successfully terminated pid {}'.format(pid))
             break

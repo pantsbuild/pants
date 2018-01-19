@@ -5,7 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
+import tokenize
+from StringIO import StringIO
 
 import six
 
@@ -14,8 +17,11 @@ from pants.base.parse_context import ParseContext
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
 from pants.engine.mapper import UnaddressableObjectError
 from pants.engine.objects import Serializable
-from pants.engine.parser import Parser
+from pants.engine.parser import ParseError, Parser
 from pants.util.memo import memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 class LegacyPythonCallbacksParser(Parser):
@@ -28,16 +34,20 @@ class LegacyPythonCallbacksParser(Parser):
   macros and target factories.
   """
 
-  def __init__(self, symbol_table, aliases):
+  def __init__(self, symbol_table, aliases, build_file_imports_behavior):
     """
     :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
       additional aliases.
     :type symbol_table: :class:`pants.engine.parser.SymbolTable`
     :param aliases: Additional BuildFileAliases to register.
     :type aliases: :class:`pants.build_graph.build_file_aliases.BuildFileAliases`
+    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+      import statements. Valid values: "allow", "warn", "error".
+    :type build_file_imports_behavior: string
     """
     super(LegacyPythonCallbacksParser, self).__init__()
     self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
+    self._build_file_imports_behavior = build_file_imports_behavior
 
   @staticmethod
   def _generate_symbols(symbol_table, aliases):
@@ -126,4 +136,32 @@ class LegacyPythonCallbacksParser(Parser):
     # this juncture.
     self._parse_context._storage.clear(os.path.dirname(filepath))
     six.exec_(python, dict(self._symbols))
+
+    # Perform this check after successful execution, so we know the python is valid (and should
+    # tokenize properly!)
+    # Note that this is incredibly poor sandboxing. There are many ways to get around it.
+    # But it's sufficient to tell most users who aren't being actively malicious that they're doing
+    # something wrong, and it has a low performance overhead.
+    if self._build_file_imports_behavior != 'allow' and 'import' in python:
+      for token in tokenize.generate_tokens(StringIO(python).readline):
+        if token[1] == 'import':
+          line_being_tokenized = token[4]
+          if self._build_file_imports_behavior == 'warn':
+            logger.warn('{} tried to import - import statements should be avoided ({})'.format(
+              filepath,
+              line_being_tokenized
+            ))
+          elif self._build_file_imports_behavior == 'error':
+            raise ParseError(
+              'import statements have been banned, but tried to import: {}'.format(
+                line_being_tokenized
+              )
+            )
+          else:
+            raise ParseError(
+              "Didn't know what to do for build_file_imports_behavior value {}".format(
+                self._build_file_imports_behavior
+              )
+            )
+
     return list(self._parse_context._storage.objects)

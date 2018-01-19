@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.core_tasks.bash_completion import BashCompletion
-from pants.core_tasks.changed_target_tasks import CompileChanged, TestChanged
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
@@ -21,7 +20,6 @@ from pants.core_tasks.run_prep_command import (RunBinaryPrepCommand, RunCompileP
                                                RunTestPrepCommand)
 from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
 from pants.core_tasks.targets_help import TargetsHelp
-from pants.core_tasks.what_changed import WhatChanged
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -84,12 +82,6 @@ def register_goals():
 
   # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
   task(name='test', action=NoopTest).install('test')
-
-  # Operations on files that the SCM detects as changed.
-  # TODO: Remove these in `1.5.0dev0` as part of the changed goal deprecations.
-  task(name='changed', action=WhatChanged).install()
-  task(name='compile-changed', action=CompileChanged).install()
-  task(name='test-changed', action=TestChanged).install()
 
   # Workspace information.
   task(name='roots', action=ListRoots).install()

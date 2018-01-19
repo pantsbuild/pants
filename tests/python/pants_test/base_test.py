@@ -6,9 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import itertools
+import logging
 import os
 import unittest
 from collections import defaultdict
+from contextlib import contextmanager
 from tempfile import mkdtemp
 from textwrap import dedent
 
@@ -275,10 +277,13 @@ class BaseTest(unittest.TestCase):
   def set_options_for_scope(self, scope, **kwargs):
     self.options[scope].update(kwargs)
 
-  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
-              console_outstream=None, workspace=None, for_subsystems=None):
+  def context(self, for_task_types=None, for_subsystems=None, options=None,
+              target_roots=None, console_outstream=None, workspace=None,
+              **kwargs):
     """
     :API: public
+
+    :param dict **kwargs: keyword arguments passed in to `create_options_for_optionables`.
     """
     # Many tests use source root functionality via the SourceRootConfig.global_instance().
     # (typically accessed via Target.target_base), so we always set it up, for convenience.
@@ -309,10 +314,8 @@ class BaseTest(unittest.TestCase):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    options = create_options_for_optionables(optionables,
-                                             extra_scopes=extra_scopes,
-                                             options=options,
-                                             passthru_args=passthru_args)
+    options = create_options_for_optionables(
+      optionables, extra_scopes=extra_scopes, options=options, **kwargs)
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(options)
@@ -455,3 +458,31 @@ class BaseTest(unittest.TestCase):
     # Can't parse any options without a pants.ini.
     self.create_file('pants.ini')
     return OptionsBootstrapper(args=cli_options).get_bootstrap_options().for_global_scope()
+
+  class LoggingRecorder(object):
+    """Simple logging handler to record warnings."""
+
+    def __init__(self):
+      self._records = []
+      self.level = logging.DEBUG
+
+    def handle(self, record):
+      self._records.append(record)
+
+    def _messages_for_level(self, levelname):
+      return ['{}: {}'.format(record.name, record.getMessage())
+              for record in self._records if record.levelname == levelname]
+
+    def infos(self):
+      return self._messages_for_level('INFO')
+
+    def warnings(self):
+      return self._messages_for_level('WARNING')
+
+  @contextmanager
+  def captured_logging(self):
+    handler = self.LoggingRecorder()
+    logger = logging.getLogger('')
+    logger.addHandler(handler)
+    yield handler
+    logger.removeHandler(handler)

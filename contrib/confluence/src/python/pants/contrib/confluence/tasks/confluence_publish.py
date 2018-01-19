@@ -8,12 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import textwrap
 
+from pants.backend.docgen.targets.doc import Page
 from pants.base.exceptions import TaskError
 from pants.task.task import Task
 from pants.util import desktop
 from pants.util.dirutil import safe_open
 
-from pants.contrib.confluence.targets.doc_page import Page
 from pants.contrib.confluence.util.confluence_util import Confluence, ConfluenceError
 
 
@@ -45,9 +45,6 @@ class ConfluencePublish(Task):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
     
     self.url = self.get_options().url
-    if not self.url:
-      raise TaskError('Unable to proceed publishing to confluence. Please set the url option.')
-    
     self.force = self.get_options().force
     self.open = self.get_options().open
     self._wiki = None
@@ -60,6 +57,9 @@ class ConfluencePublish(Task):
     return 'confluence1'
   
   def execute(self):
+    if not self.url:
+      raise TaskError('Unable to proceed publishing to confluence. Please set the url option.')
+
     pages = []
     targets = self.context.targets()
     for target in targets:

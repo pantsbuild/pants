@@ -9,13 +9,12 @@ import logging
 import os
 import time
 from collections import namedtuple
-from logging import Formatter, StreamHandler
-from logging.handlers import RotatingFileHandler
+from logging import FileHandler, Formatter, StreamHandler
 
 from pants.util.dirutil import safe_mkdir
 
 
-class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_stream'])):
+class LoggingSetupResult(namedtuple('LoggingSetupResult', ['log_filename', 'log_handler'])):
   """A structured result for logging setup."""
 
 
@@ -48,7 +47,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # standard logging knob.
 
   log_filename = None
-  log_stream = None
+  file_handler = None
 
   logger = logging.getLogger(scope)
   for handler in logger.handlers:
@@ -63,28 +62,29 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   if log_dir:
     safe_mkdir(log_dir)
     log_filename = os.path.join(log_dir, log_name or 'pants.log')
-    file_handler = RotatingFileHandler(log_filename, maxBytes=10 * 1024 * 1024, backupCount=4)
-    log_stream = file_handler.stream
+    file_handler = FileHandler(log_filename)
 
     class GlogFormatter(Formatter):
       LEVEL_MAP = {
-          logging.FATAL: 'F',
-          logging.ERROR: 'E',
-          logging.WARN: 'W',
-          logging.INFO: 'I',
-          logging.DEBUG: 'D'}
+        logging.FATAL: 'F',
+        logging.ERROR: 'E',
+        logging.WARN: 'W',
+        logging.INFO: 'I',
+        logging.DEBUG: 'D'
+      }
 
       def format(self, record):
         datetime = time.strftime('%m%d %H:%M:%S', time.localtime(record.created))
         micros = int((record.created - int(record.created)) * 1e6)
         return '{levelchar}{datetime}.{micros:06d} {process} {filename}:{lineno}] {msg}'.format(
-            levelchar=self.LEVEL_MAP[record.levelno],
-            datetime=datetime,
-            micros=micros,
-            process=record.process,
-            filename=record.filename,
-            lineno=record.lineno,
-            msg=record.getMessage())
+          levelchar=self.LEVEL_MAP[record.levelno],
+          datetime=datetime,
+          micros=micros,
+          process=record.process,
+          filename=record.filename,
+          lineno=record.lineno,
+          msg=record.getMessage()
+        )
 
     file_handler.setFormatter(GlogFormatter())
     file_handler.setLevel(level)
@@ -95,4 +95,4 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   # This routes warnings through our loggers instead of straight to raw stderr.
   logging.captureWarnings(True)
 
-  return LoggingSetupResult(log_filename, log_stream)
+  return LoggingSetupResult(log_filename, file_handler)

@@ -14,7 +14,17 @@ import static org.junit.Assert.assertEquals;
 /** Ensure our greetings are polite */
 public class CucumberTest {
   @Test
-  public void testUnicodeClass() {
-    assertEquals("Have a nice day!", new CucumberAnnotatedExample().pleasantry());
+  public void testUnicodeClass1() {
+    assertEquals("Have a nice day one!", new CucumberAnnotatedExample().pleasantry1());
+  }
+
+  @Test
+  public void testUnicodeClass2() {
+    assertEquals("Have a nice day two!", new CucumberAnnotatedExample().pleasantry2());
+  }
+
+  @Test
+  public void testUnicodeClass3() {
+    assertEquals("Have a nice day three!", new CucumberAnnotatedExample().pleasantry3());
   }
 }

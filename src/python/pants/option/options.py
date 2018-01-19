@@ -13,7 +13,7 @@ from pants.option.arg_splitter import GLOBAL_SCOPE, ArgSplitter
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.parser_hierarchy import ParserHierarchy, enclosing_scope
+from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import ScopeInfo
 
 
@@ -86,11 +86,9 @@ class Options(object):
     # components) we can replace this line with `for si in scope_infos:`, because it will
     # not be possible for a deprecated_scope to introduce any new intermediate scopes.
     for si in copy.copy(ret):
-      scope = si.scope
-      while scope != '':
+      for scope in all_enclosing_scopes(si.scope, allow_global=False):
         if scope not in original_scopes:
           ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
-        scope = enclosing_scope(scope)
     return ret
 
   @classmethod
@@ -312,15 +310,18 @@ class Options(object):
 
     return values
 
-  def get_fingerprintable_for_scope(self, scope, include_passthru=False, fingerprint_key=None,
-                                    invert=False):
+  def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False,
+                                    fingerprint_key=None, invert=False):
     """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
     Fingerprintable options are options registered via a "fingerprint=True" kwarg. This flag
     can be parameterized with `fingerprint_key` for special cases.
 
-    :param str scope: The scope to gather fingerprintable options for.
-    :param bool include_passthru: Whether to include passthru args captured by `scope` in the
+    This method also searches enclosing options scopes of `bottom_scope` to determine the set of
+    fingerprintable pairs.
+
+    :param str bottom_scope: The scope to gather fingerprintable options for.
+    :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
                                   fingerprintable options.
     :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
     :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
@@ -328,39 +329,36 @@ class Options(object):
     :API: public
     """
     fingerprint_key = fingerprint_key or 'fingerprint'
-    fingerprint_default = False if invert else None
+    fingerprint_default = bool(invert)
     pairs = []
 
     if include_passthru:
       # Passthru args can only be sent to outermost scopes so we gather them once here up-front.
-      passthru_args = self.passthru_args_for_scope(scope)
+      passthru_args = self.passthru_args_for_scope(bottom_scope)
       # NB: We can't sort passthru args, the underlying consumer may be order-sensitive.
-      pairs.extend((str, passthru_arg) for passthru_arg in passthru_args)
+      pairs.extend((str, pass_arg) for pass_arg in passthru_args)
 
-    # Note that we iterate over options registered at `scope` and at all enclosing scopes, since
-    # option-using code can read those values indirectly via its own OptionValueContainer, so
-    # they can affect that code's output.
-    registration_scope = scope
-    while registration_scope is not None:
+    # Note that we iterate over options registered at `bottom_scope` and at all
+    # enclosing scopes, since option-using code can read those values indirectly
+    # via its own OptionValueContainer, so they can affect that code's output.
+    for registration_scope in all_enclosing_scopes(bottom_scope):
       parser = self._parser_hierarchy.get_parser_by_scope(registration_scope)
       # Sort the arguments, so that the fingerprint is consistent.
       for (_, kwargs) in sorted(parser.option_registrations_iter()):
-        if kwargs.get('recursive') and not kwargs.get('recursive_root'):
+        if kwargs.get('recursive', False) and not kwargs.get('recursive_root', False):
           continue  # We only need to fprint recursive options once.
-        if kwargs.get(fingerprint_key, fingerprint_default) is not (False if invert else True):
+        if kwargs.get(fingerprint_key, fingerprint_default) is not True:
           continue
         # Note that we read the value from scope, even if the registration was on an enclosing
         # scope, to get the right value for recursive options (and because this mirrors what
         # option-using code does).
-        val = self.for_scope(scope)[kwargs['dest']]
+        val = self.for_scope(bottom_scope)[kwargs['dest']]
         # If we have a list then we delegate to the fingerprinting implementation of the members.
         if is_list_option(kwargs):
           val_type = kwargs.get('member_type', str)
         else:
           val_type = kwargs.get('type', str)
         pairs.append((val_type, val))
-      registration_scope = (None if registration_scope == ''
-                            else enclosing_scope(registration_scope))
     return pairs
 
   def __getitem__(self, scope):

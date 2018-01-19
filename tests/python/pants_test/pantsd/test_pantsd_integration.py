@@ -244,6 +244,22 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         pantsd_run(cmd[1:], {'GLOBAL': {'level': cmd[0]}})
         checker.assert_running()
 
+  def test_pantsd_lifecycle_non_invalidation(self):
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, _):
+      variants = (
+        ['-q', 'help'],
+        ['--no-colors', 'help'],
+        ['help']
+      )
+      last_pid = None
+      for cmd in itertools.chain(*itertools.repeat(variants, 3)):
+        # Run with a CLI flag.
+        pantsd_run(cmd)
+        next_pid = checker.await_pantsd()
+        if last_pid is not None:
+          self.assertEqual(last_pid, next_pid)
+        last_pid = next_pid
+
   def test_pantsd_stray_runners(self):
     # Allow env var overrides for local stress testing.
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_STRESS_ATTEMPTS', 20))
@@ -275,9 +291,9 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       daemon_runs = [pantsd_run(cmd) for cmd in cmds]
       checker.await_pantsd()
 
-    for run in daemon_runs:
-      self.assertEqual(run.stderr_data.strip(), '')
-      self.assertNotEqual(run.stdout_data, '')
+    for cmd, run in zip(cmds, daemon_runs):
+      self.assertEqual(run.stderr_data.strip(), '', 'Non-empty stderr for {}'.format(cmd))
+      self.assertNotEqual(run.stdout_data, '', 'Empty stdout for {}'.format(cmd))
 
     for run_pairs in zip(non_daemon_runs, daemon_runs):
       self.assertEqual(*(run.stdout_data for run in run_pairs))

@@ -269,12 +269,14 @@ class PythonTestBuilderTest(PythonTestBuilderTestBase):
     self.run_failing_tests(targets=[self.red], failed_targets=[self.red])
 
   def test_fail_fast_skips_second_red_test_with_single_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red],
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red],
                            fail_fast=True,
                            fast=False)
 
   def test_fail_fast_skips_second_red_test_with_isolated_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class], failed_targets=[self.red],
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red],
                            fail_fast=True,
                            fast=True)
 

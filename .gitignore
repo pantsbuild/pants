@@ -49,3 +49,4 @@ GPATH
 GRTAGS
 GSYMS
 GTAGS
+.mypy_cache/

@@ -56,6 +56,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:file_test_util',
+    'tests/python/pants_test/testutils:pexrc_util',
   ]
 )
 

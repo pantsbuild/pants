@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import hashlib
+import json
 
 
 def hash_all(strs, digest=None):
@@ -31,6 +32,22 @@ def hash_file(path, digest=None):
       digest.update(s)
       s = fd.read(8192)
   return digest.hexdigest()
+
+
+def stable_json_hash(obj, digest=None, encoder=None):
+  """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
+
+  :param obj: An object that can be rendered to json using the given `encoder`.
+  :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
+  :param encoder: An optional custom json encoder.
+  :type encoder: :class:`json.JSONEncoder`
+  :returns: A stable hash of the given `obj`.
+  :rtype: str
+
+  :API: public
+  """
+  json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
+  return hash_all(json_str, digest=digest)
 
 
 class Sharder(object):

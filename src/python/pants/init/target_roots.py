@@ -12,8 +12,6 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import SingleAddress
-from pants.init.options_initializer import OptionsInitializer
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedRequest
 
 
@@ -40,16 +38,12 @@ class TargetRoots(object):
     return OrderedSet(spec_parser.parse_spec(spec_str) for spec_str in target_specs)
 
   @classmethod
-  def create(cls, options=None, args=None, build_root=None, change_calculator=None):
+  def create(cls, options, build_root=None, change_calculator=None):
     """
-    :param Options options: An `Options` instance to use, if available.
-    :param string args: Raw cli args to use for parsing if an `Options` instance isn't available.
+    :param Options options: An `Options` instance to use.
     :param string build_root: The build root.
     :param ChangeCalculator change_calculator: A `ChangeCalculator` for calculating changes.
     """
-    if not options:
-      assert args is not None, 'must pass `args` if not passing `options`'
-      options, _ = OptionsInitializer(OptionsBootstrapper(args=args)).setup(init_logging=False)
 
     # Determine the literal target roots.
     spec_roots = cls.parse_specs(options.target_specs, build_root)
@@ -59,7 +53,7 @@ class TargetRoots(object):
     changed_options = options.for_scope('changed')
     changed_request = ChangedRequest.from_options(changed_options)
 
-    logger.debug('args are: %s', args)
+
     logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)
 

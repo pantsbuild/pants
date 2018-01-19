@@ -14,7 +14,7 @@ public class CucumberMain {
 
   public static void main(String[] args) {
     CucumberAnnotatedExample example = new CucumberAnnotatedExample();
-    System.out.println(example.pleasantry());
+    System.out.println(example.pleasantry1());
     System.out.println(ShapelessExample.greek());
   }
 }

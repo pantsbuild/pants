@@ -101,6 +101,7 @@ class GoalRunnerFactory(object):
         graph_helper = EngineInitializer.setup_legacy_graph(
           pants_ignore_patterns,
           workdir,
+          self._global_options.build_file_imports,
           native=native,
           build_file_aliases=self._build_config.registered_aliases(),
           build_ignore_patterns=build_ignore_patterns,
@@ -150,13 +151,6 @@ class GoalRunnerFactory(object):
             yield target
 
     return list(generate_targets(specs))
-
-  def _maybe_launch_pantsd(self, pantsd_launcher):
-    """Launches pantsd if configured to do so."""
-    if self._global_options.enable_pantsd:
-      # Avoid runtracker output if pantsd is disabled. Otherwise, show up to inform the user its on.
-      with self._run_tracker.new_workunit(name='pantsd', labels=[WorkUnitLabel.SETUP]):
-        pantsd_launcher.maybe_launch()
 
   def _should_be_quiet(self, goals):
     if self._explain:

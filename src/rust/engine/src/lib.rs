@@ -17,6 +17,7 @@ extern crate boxfuture;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
+extern crate hashing;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;

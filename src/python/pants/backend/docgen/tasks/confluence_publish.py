@@ -45,9 +45,6 @@ class ConfluencePublish(Task):
     super(ConfluencePublish, self).__init__(*args, **kwargs)
 
     self.url = self.get_options().url
-    if not self.url:
-      raise TaskError('Unable to proceed publishing to confluence. Please set the url option.')
-
     self.force = self.get_options().force
     self.open = self.get_options().open
     self._wiki = None
@@ -60,6 +57,8 @@ class ConfluencePublish(Task):
     return 'confluence1'
 
   def execute(self):
+    if not self.url:
+      raise TaskError('Unable to proceed publishing to confluence. Please set the url option.')
     deprecated_conditional(
       lambda: True,
       '1.6.0.dev0',

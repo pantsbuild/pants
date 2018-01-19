@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import json
 import os
 from hashlib import sha1
@@ -12,6 +13,7 @@ from hashlib import sha1
 import six
 
 from pants.base.build_environment import get_buildroot
+from pants.base.hash_utils import stable_json_hash
 from pants.option.custom_types import UnsetBool, dict_with_files_option, file_option, target_option
 
 
@@ -22,12 +24,7 @@ class Encoder(json.JSONEncoder):
     return super(Encoder, self).default(o)
 
 
-def stable_json_dumps(obj):
-  return json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=Encoder)
-
-
-def stable_json_sha1(obj):
-  return sha1(stable_json_dumps(obj)).hexdigest()
+stable_json_sha1 = functools.partial(stable_json_hash, encoder=Encoder)
 
 
 class OptionsFingerprinter(object):
@@ -37,24 +34,23 @@ class OptionsFingerprinter(object):
   """
 
   @classmethod
-  def combined_options_fingerprint_for_scope(cls, scope, options, fingerprint_key=None,
-                                             invert=None, build_graph=None):
+  def combined_options_fingerprint_for_scope(cls, scope, options,
+                                             build_graph=None, **kwargs):
     """Given options and a scope, compute a combined fingerprint for the scope.
 
     :param string scope: The scope to fingerprint.
     :param Options options: The `Options` object to fingerprint.
-    :param string fingerprint_key: The options kwarg to filter against.
-    :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
     :param BuildGraph build_graph: A `BuildGraph` instance, only needed if fingerprinting
                                    target options.
+    :param dict **kwargs: Keyword parameters passed on to
+                          `Options#get_fingerprintable_for_scope`.
+    :return: Hexadecimal string representing the fingerprint for all `options`
+             values in `scope`.
     """
     fingerprinter = cls(build_graph)
     hasher = sha1()
-    for (option_type, option_value) in options.get_fingerprintable_for_scope(
-      scope,
-      fingerprint_key=fingerprint_key,
-      invert=invert
-    ):
+    pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
+    for (option_type, option_value) in pairs:
       hasher.update(
         # N.B. `OptionsFingerprinter.fingerprint()` can return `None`,
         # so we always cast to bytes here.

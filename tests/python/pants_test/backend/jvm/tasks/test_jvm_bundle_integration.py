@@ -17,7 +17,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       'testprojects/src/java/org/pantsbuild/testproject/unicode/main',
       'testprojects.src.java.org.pantsbuild.testproject.unicode.main.main',
       bundle_jar_name='unicode-testproject')
-    self.assertIn("Have a nice day!", stdout)
+    self.assertIn("Have a nice day one!", stdout)
     self.assertIn("shapeless success", stdout)
 
   def test_bundle_colliding_resources(self):

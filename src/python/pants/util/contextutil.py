@@ -55,16 +55,47 @@ def environment_as(**kwargs):
 
 
 @contextmanager
-def stdio_as(stdout, stderr, stdin=None):
-  """Redirect sys.{stdout, stderr, stdin} to alternate file-like objects."""
-  old_stdout, sys.stdout = sys.stdout, stdout
-  old_stderr, sys.stderr = sys.stderr, stderr
-  if stdin:
-    old_stdin, sys.stdin = sys.stdin, stdin
-  yield
-  sys.stdout, sys.stderr = old_stdout, old_stderr
-  if stdin:
-    sys.stdin = old_stdin
+def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
+  """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
+  if src_fd == -1:
+    src = open('/dev/null', mode)
+    src_fd = src.fileno()
+
+  # Capture the python and os level file handles.
+  old_dst = getattr(sys, dst_sys_attribute)
+  old_dst_fd = os.dup(dst_fd)
+  if src_fd != dst_fd:
+    os.dup2(src_fd, dst_fd)
+
+  # Open up a new file handle to temporarily replace the python-level io object, then yield.
+  new_dst = os.fdopen(dst_fd, mode)
+  setattr(sys, dst_sys_attribute, new_dst)
+  try:
+    yield
+  finally:
+    new_dst.close()
+
+    # Restore the python and os level file handles.
+    os.dup2(old_dst_fd, dst_fd)
+    setattr(sys, dst_sys_attribute, old_dst)
+
+
+@contextmanager
+def stdio_as(stdout_fd, stderr_fd, stdin_fd):
+  """Redirect sys.{stdout, stderr, stdin} to alternate file descriptors.
+
+  As a special case, if a given destination fd is `-1`, we will replace it with an open file handle
+  to `/dev/null`.
+
+  NB: If the filehandles for sys.{stdout, stderr, stdin} have previously been closed, it's
+  possible that the OS has repurposed fds `0, 1, 2` to represent other files or sockets. It's
+  impossible for this method to locate all python objects which refer to those fds, so it's up
+  to the caller to guarantee that `0, 1, 2` are safe to replace.
+  """
+  with _stdio_stream_as(stdin_fd,  0, 'stdin',  'rb'),\
+       _stdio_stream_as(stdout_fd, 1, 'stdout', 'wb'),\
+       _stdio_stream_as(stderr_fd, 2, 'stderr', 'wb'):
+    yield
 
 
 @contextmanager

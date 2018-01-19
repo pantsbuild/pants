@@ -16,6 +16,7 @@ python_library(
   dependencies=[
     '3rdparty/python:six',
     ':repository',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:payload_field',
   ],
 )

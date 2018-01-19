@@ -136,9 +136,7 @@ class GlobalOptionsRegistrar(Optionable):
              default=['.*/', default_rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
-                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
-                  'This currently only affects the v2 engine. '
-                  'To experiment with v2 engine, try --enable-v2-engine option.')
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
@@ -157,8 +155,9 @@ class GlobalOptionsRegistrar(Optionable):
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
     # This facilitates use of the v2 engine, sans daemon.
-    # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
     register('--enable-v2-engine', advanced=True, type=bool, default=True,
+             removal_version='1.5.0.dev0',
+             removal_hint='The v2 engine is necessary to use pantsd, and will soon be required.',
              help='Enables use of the v2 engine.')
 
     # These facilitate configuring the native engine.
@@ -203,7 +202,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='The number of workers to use for the filesystem event service executor pool.')
 
     # Watchman options.
-    register('--watchman-version', advanced=True, default='4.5.0', help='Watchman version.')
+    register('--watchman-version', advanced=True, default='4.9.0', help='Watchman version.')
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
                   'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
@@ -215,6 +214,11 @@ class GlobalOptionsRegistrar(Optionable):
     register('--watchman-socket-path', type=str, advanced=True, default=None,
              help='The path to the watchman UNIX socket. This can be overridden if the default '
                   'absolute path length exceeds the maximum allowed by the OS.')
+
+    # This option changes the parser behavior in a fundamental way (which currently invalidates
+    # all caches), and needs to be parsed out early, so we make it a bootstrap option.
+    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
+      help='Whether to allow import statements in BUILD files')
 
   @classmethod
   def register_options(cls, register):

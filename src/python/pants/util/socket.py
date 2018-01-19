@@ -48,6 +48,16 @@ class RecvBufferedSocket(object):
     self._chunk_size = chunk_size
     self._select_timeout = select_timeout
     self._buffer = b''
+    self._maybe_tune_socket(sock)
+
+  def _maybe_tune_socket(self, sock):
+    try:
+      # Disable Nagle's algorithm to improve latency.
+      sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    except (OSError, IOError):
+      # This can fail in tests where `socket.socketpair()` is used, or potentially
+      # in odd environments - but we shouldn't ever crash over it.
+      return
 
   def recv(self, bufsize):
     """Buffers up to _chunk_size bytes when the internal buffer has less than `bufsize` bytes."""

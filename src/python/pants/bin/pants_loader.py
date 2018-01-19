@@ -46,7 +46,7 @@ class PantsLoader(object):
 
   @staticmethod
   def determine_entrypoint(env_var, default):
-    return os.environ.get(env_var) or default
+    return os.environ.pop(env_var, default)
 
   @staticmethod
   def load_and_execute(entrypoint):
