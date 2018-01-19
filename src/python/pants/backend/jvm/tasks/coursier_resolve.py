@@ -362,12 +362,12 @@ class CoursierMixin(NailgunTask):
       # Force requires specifying the coord again with -V
       if j.force:
         cmd_args.append('-V')
-        cmd_args.append(module)
+        cmd_args.append(j.coordinate.simple_coord)
 
     # Force pinned coordinates
-    for j in pinned_coords:
+    for m2coord in pinned_coords:
       cmd_args.append('-V')
-      cmd_args.append(j.simple_coord)
+      cmd_args.append(m2coord.simple_coord)
 
     # Local exclusions
     local_exclude_args = []
