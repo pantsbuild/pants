@@ -8,8 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import signal
 import sys
-import termios
-import tty
+# import termios
+# import tty
 from contextlib import contextmanager
 
 from pants.console.stty_utils import STTYSettings
