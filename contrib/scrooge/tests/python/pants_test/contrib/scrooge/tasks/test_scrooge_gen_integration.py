@@ -92,7 +92,8 @@ class ScroogeGenTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
   def test_exports_of_thrift(self):
-    # compiling against a thrift service should work because the necessary transitive dependencies will be exported.
+    # Compiling against a thrift service with strict_deps=True should work
+    # because the necessary transitive dependencies will be exported.
     cmd = ['compile', 'contrib/scrooge/tests/scala/org/pantsbuild/contrib/scrooge/scrooge_gen']
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
