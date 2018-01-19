@@ -34,13 +34,14 @@ class STTYSettings(object):
 
   def save_tty_flags(self):
     # N.B. `stty(1)` operates against stdin.
-    self._tty_flags = tty.tcgetattr(sys.stdin.fileno())
+    try:
+      self._tty_flags = tty.tcgetattr(sys.stdin.fileno())
+    except termios.error as e:
+      logger.debug('masking tcgetattr exception: {!r}'.format(e))
 
   def restore_tty_flags(self):
     if self._tty_flags:
       try:
         tty.tcsetattr(sys.stdin.fileno(), tty.TCSANOW, self._tty_flags)
       except termios.error as e:
-        # N.B. This can happen if e.g. sys.stdin is closed (EBADF) etc and
-        # shouldn't necessarily result in a pants error.
         logger.debug('masking tcsetattr exception: {!r}'.format(e))
