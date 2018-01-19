@@ -40,9 +40,6 @@ class IndexJava(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(IndexJava, cls).register_options(register)
-    register('--dist', type=str, choices=['none', 'uncompressed', 'tar', 'zip', 'gztar', 'bztar'],
-             default='none', fingerprint=True,
-             help='Copy the (optionally compressed) entries file to the dist directory.')
     cls.register_jvm_tool(register,
                           'kythe-indexer',
                           main=cls._KYTHE_INDEXER_MAIN)
