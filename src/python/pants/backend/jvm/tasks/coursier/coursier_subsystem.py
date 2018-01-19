@@ -36,12 +36,12 @@ class CoursierSubsystem(Subsystem):
     register('--fetch-options', type=list, fingerprint=True,
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
     register('--bootstrap-jar-url', fingerprint=True,
-             default='https://dl.dropboxusercontent.com/s/o3co27056238ivl/coursier-cli-1.0.0.074421b62dfa4c6a297866239b3aebbb8d093df9.jar?dl=0',
+             default='https://dl.dropboxusercontent.com/s/18o1rli8sstptnd/coursier-cli-1.0.0.2b75cefb88c60b64d794fef0bfbc60facc465c98.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')
     # TODO(wisechengyi): currently using a custom url for fast iteration.
     # Once the coursier builds are stable, move the logic to binary_util
     register('--version', type=str, fingerprint=True,
-             default='1.0.0.074421b62dfa4c6a297866239b3aebbb8d093df9',
+             default='1.0.0.2b75cefb88c60b64d794fef0bfbc60facc465c98',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
     register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
              help='Timeout the fetch if the connection is idle for longer than this value.')
