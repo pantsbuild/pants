@@ -321,7 +321,7 @@ class CoursierMixin(NailgunTask):
 
     with self.context.new_workunit(name='coursier', labels=[WorkUnitLabel.TOOL]) as workunit:
       return_code = self.runjava(
-        classpath=['/Users/yic/workspace/coursier_dev/dist/coursier-cli.jar'],
+        classpath=[coursier_jar],
         main='coursier.cli.Coursier',
         args=cmd_args,
         jvm_options=self.get_options().jvm_options,
@@ -352,7 +352,7 @@ class CoursierMixin(NailgunTask):
 
       module = j.coordinate.simple_coord
       if j.coordinate.classifier:
-        module += '#classifier={}'.format(j.coordinate.classifier)
+        module += ',classifier={}'.format(j.coordinate.classifier)
 
       if j.intransitive:
         cmd_args.append('--intransitive')
