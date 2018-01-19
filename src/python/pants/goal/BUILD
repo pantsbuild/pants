@@ -62,6 +62,11 @@ python_library(
 )
 
 python_library(
+  name = 'pantsd_stats',
+  sources = ['pantsd_stats.py'],
+)
+
+python_library(
   name = 'products',
   sources = ['products.py'],
   dependencies = [
