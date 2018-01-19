@@ -402,7 +402,7 @@ class LocalScheduler(object):
     if logger.isEnabledFor(logging.DEBUG):
       logger.debug('invalidated %d nodes for: %s', invalidated, filenames)
     else:
-      logger.info('invalidated %d nodes for %s file changes', invalidated, len(filenames))
+      logger.info('invalidated %d nodes for %d file changes', invalidated, len(filenames))
     return invalidated
 
   def node_count(self):
