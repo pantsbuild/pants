@@ -1,4 +1,4 @@
-package org.pantsbuild.contrib.scrooge.scroog_gen
+package org.pantsbuild.contrib.scrooge.scrooge_gen
 
 // NOTE: FutureIface is deprecated in a later version of scrooge according to
 //       https://twitter.github.io/scrooge/Finagle.html#creating-a-server
