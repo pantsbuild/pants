@@ -13,5 +13,4 @@ contrib_plugin(
   distribution_name='pantsbuild.pants.contrib.confluence',
   description='Confluence pants plugin',
   register_goals=True,
-  build_file_aliases=True,
 )

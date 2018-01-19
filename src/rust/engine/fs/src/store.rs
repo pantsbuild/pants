@@ -982,6 +982,15 @@ c0033144c785a94d3ebd82baa931cd16";
       .wait()
   }
 
+  pub fn load_file_bytes_from_store(
+    store: &Store,
+    fingerprint: Fingerprint,
+  ) -> Result<Option<Vec<u8>>, String> {
+    store
+      .load_file_bytes_with(fingerprint, |bytes: &[u8]| bytes.to_vec())
+      .wait()
+  }
+
   pub fn load_directory_proto_bytes<B: ByteStore>(
     store: &B,
     fingerprint: Fingerprint,
@@ -1021,15 +1030,6 @@ c0033144c785a94d3ebd82baa931cd16";
   }
 
   #[test]
-  fn digest_to_bazel_digest() {
-    let digest = Digest(Fingerprint::from_hex_string(HASH).unwrap(), 16);
-    let mut bazel_digest = bazel_protos::remote_execution::Digest::new();
-    bazel_digest.set_hash(HASH.to_string());
-    bazel_digest.set_size_bytes(16);
-    assert_eq!(bazel_digest, digest.into());
-  }
-
-  #[test]
   fn load_file_prefers_local() {
     let dir = TempDir::new("store").unwrap();
 
@@ -1040,9 +1040,7 @@ c0033144c785a94d3ebd82baa931cd16";
 
     let cas = new_cas(1024);
     assert_eq!(
-      new_store(dir.path(), cas.address())
-        .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
-        .wait(),
+      load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint()),
       Ok(Some(str_bytes()))
     );
     assert_eq!(0, cas.read_request_count());
@@ -1073,21 +1071,13 @@ c0033144c785a94d3ebd82baa931cd16";
 
     let cas = new_cas(1024);
     assert_eq!(
-      new_store(dir.path(), cas.address())
-        .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
-        .wait(),
+      load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint()),
       Ok(Some(str_bytes())),
       "Read from CAS"
     );
     assert_eq!(1, cas.read_request_count());
     assert_eq!(
-      local::tests::new_store(dir.path())
-        .load_bytes_with(
-          EntryType::File,
-          fingerprint(),
-          |bytes: &[u8]| Vec::from(bytes),
-        )
-        .wait(),
+      load_file_bytes(&local::tests::new_store(dir.path()), fingerprint()),
       Ok(Some(str_bytes())),
       "Read from local cache"
     );
@@ -1106,13 +1096,10 @@ c0033144c785a94d3ebd82baa931cd16";
     );
     assert_eq!(1, cas.read_request_count());
     assert_eq!(
-      local::tests::new_store(dir.path())
-        .load_bytes_with(
-          EntryType::Directory,
-          directory_fingerprint(),
-          |bytes: &[u8]| Vec::from(bytes),
-        )
-        .wait(),
+      load_directory_proto_bytes(
+        &local::tests::new_store(dir.path()),
+        directory_fingerprint(),
+      ),
       Ok(Some(directory().write_to_bytes().unwrap()))
     );
   }
@@ -1123,9 +1110,7 @@ c0033144c785a94d3ebd82baa931cd16";
 
     let cas = StubCAS::empty();
     assert_eq!(
-      new_store(dir.path(), cas.address())
-        .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
-        .wait(),
+      load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint()),
       Ok(None)
     );
     assert_eq!(1, cas.read_request_count());
@@ -1151,9 +1136,7 @@ c0033144c785a94d3ebd82baa931cd16";
     let dir = TempDir::new("store").unwrap();
 
     let cas = StubCAS::always_errors();
-    let error = new_store(dir.path(), cas.address())
-      .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
-      .wait()
+    let error = load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint())
       .expect_err("Want error");
     assert_eq!(1, cas.read_request_count());
     assert!(
@@ -1189,11 +1172,7 @@ c0033144c785a94d3ebd82baa931cd16";
       .expect_err("Want error");
 
     assert_eq!(
-      local::tests::new_store(dir.path())
-        .load_bytes_with(EntryType::Directory, fingerprint(), |bytes: &[u8]| {
-          Vec::from(bytes)
-        })
-        .wait(),
+      load_directory_proto_bytes(&local::tests::new_store(dir.path()), fingerprint()),
       Ok(None)
     );
   }
@@ -1233,13 +1212,7 @@ c0033144c785a94d3ebd82baa931cd16";
       .expect_err("Want error");
 
     assert_eq!(
-      local::tests::new_store(dir.path())
-        .load_bytes_with(
-          EntryType::Directory,
-          directory_fingerprint,
-          |bytes: &[u8]| Vec::from(bytes),
-        )
-        .wait(),
+      load_directory_proto_bytes(&local::tests::new_store(dir.path()), directory_fingerprint),
       Ok(None)
     );
   }
@@ -1254,19 +1227,11 @@ c0033144c785a94d3ebd82baa931cd16";
         .into_iter()
         .collect(),
     );
-    new_store(dir.path(), cas.address())
-      .load_file_bytes_with(fingerprint(), |bytes| Vec::from(bytes))
-      .wait()
+    load_file_bytes_from_store(&new_store(dir.path(), cas.address()), fingerprint())
       .expect_err("Want error");
 
     assert_eq!(
-      local::tests::new_store(dir.path())
-        .load_bytes_with(
-          EntryType::File,
-          fingerprint(),
-          |bytes: &[u8]| Vec::from(bytes),
-        )
-        .wait(),
+      load_file_bytes(&local::tests::new_store(dir.path()), fingerprint()),
       Ok(None)
     );
   }
@@ -1282,17 +1247,11 @@ c0033144c785a94d3ebd82baa931cd16";
         .into_iter()
         .collect(),
     );
-    new_store(dir.path(), cas.address())
-      .load_file_bytes_with(empty_fingerprint, |bytes| Vec::from(bytes))
-      .wait()
+    load_file_bytes_from_store(&new_store(dir.path(), cas.address()), empty_fingerprint)
       .expect_err("Want error");
 
     assert_eq!(
-      local::tests::new_store(dir.path())
-        .load_bytes_with(EntryType::File, empty_fingerprint, |bytes: &[u8]| {
-          Vec::from(bytes)
-        })
-        .wait(),
+      load_file_bytes(&local::tests::new_store(dir.path()), empty_fingerprint),
       Ok(None)
     );
   }

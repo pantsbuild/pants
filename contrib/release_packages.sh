@@ -56,7 +56,7 @@ function pkg_go_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.go==${version}']" \
-      buildgen test contrib/go/examples::
+      --explain test | grep "GoTest_test_go" &> /dev/null
 }
 
 PKG_NODE=(
@@ -68,7 +68,7 @@ function pkg_node_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.node==${version}']" \
-      test.node contrib/node/examples::
+      --explain test | grep "NodeTest_test_node" &> /dev/null
 }
 
 PKG_SCALAJS=(
@@ -80,7 +80,7 @@ function pkg_scalajs_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.scalajs==${version}']" \
-      test.pytest --no-timeouts contrib/scalajs::
+      --explain compile | grep "scala-js-link" &> /dev/null
 }
 
 PKG_PYTHON_CHECKS=(
@@ -131,7 +131,7 @@ function pkg_confluence_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.confluence==${version}']" \
-      --explain compile | grep "confluence" &> /dev/null
+      --explain confluence | grep "ConfluencePublish_confluence" &> /dev/null
 }
 
 PKG_ERRORPRONE=(
@@ -144,6 +144,18 @@ function pkg_errorprone_install_test() {
   execute_packaged_pants_with_internal_backends \
       --plugins="['pantsbuild.pants.contrib.errorprone==${version}']" \
       --explain compile | grep "errorprone" &> /dev/null
+}
+
+PKG_CODEANALYSIS=(
+  "pantsbuild.pants.contrib.codeanalysis"
+  "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin"
+  "pkg_codeanalysis_install_test"
+)
+function pkg_codeanalysis_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+      --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
+      --explain index | grep "kythe" &> /dev/null
 }
 
 PKG_JAXWS=(
@@ -162,6 +174,30 @@ function pkg_jax_ws_install_test() {
       targets | grep "jax_ws_library" &> /dev/null
 }
 
+PKG_MYPY=(
+  "pantsbuild.pants.contrib.mypy"
+  "//contrib/mypy/src/python/pants/contrib/mypy:plugin"
+  "pkg_mypy_install_test"
+)
+function pkg_mypy_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.mypy==${version}']" \
+    --explain mypy &> /dev/null
+}
+
+PKG_AVRO=(
+  "pantsbuild.pants.contrib.avro"
+  "//contrib/avro/src/python/pants/contrib/avro:plugin"
+  "pkg_avro_install_test"
+)
+function pkg_avro_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.avro==${version}']" \
+    --explain gen | grep "avro-java" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -175,5 +211,8 @@ CONTRIB_PACKAGES=(
   PKG_CPP
   PKG_CONFLUENCE
   PKG_ERRORPRONE
+  PKG_CODEANALYSIS
   PKG_JAXWS
+  PKG_MYPY
+  PKG_AVRO
 )
