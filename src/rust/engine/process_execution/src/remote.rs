@@ -159,7 +159,7 @@ mod tests {
         test_server::MockExecution::new(
           "wrong-command".to_string(),
           super::make_execute_request(&ExecuteProcessRequest {
-            args: owned_string_vec(&["/bin/echo", "-n", "bar"]),
+            argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
           }).unwrap(),
           vec![],
