@@ -9,8 +9,7 @@ import logging
 import os
 import time
 from collections import namedtuple
-from logging import Formatter, StreamHandler
-from logging.handlers import RotatingFileHandler
+from logging import FileHandler, Formatter, StreamHandler
 
 from pants.util.dirutil import safe_mkdir
 
@@ -63,7 +62,7 @@ def setup_logging(level, console_stream=None, log_dir=None, scope=None, log_name
   if log_dir:
     safe_mkdir(log_dir)
     log_filename = os.path.join(log_dir, log_name or 'pants.log')
-    file_handler = RotatingFileHandler(log_filename, maxBytes=30 * 1024 * 1024, backupCount=3)
+    file_handler = FileHandler(log_filename)
 
     class GlogFormatter(Formatter):
       LEVEL_MAP = {

@@ -297,10 +297,6 @@ class PantsDaemon(FingerprintedProcessManager):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
     self._close_stdio()
-    # TODO: `log_stream` as provided here points to the stream used by a `RotatingFileHandler`,
-    # which can change when logs are rotated. This means that the faulthandler stream can become
-    # invalid after a rotation event - but we currently have no way to detect or signal this to
-    # the daemon.
     with self._pantsd_logging() as log_stream:
       self._exiter.set_except_hook(log_stream)
       self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
