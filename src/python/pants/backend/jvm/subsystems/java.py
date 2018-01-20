@@ -9,7 +9,6 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.tools_jar import ToolsJar
 from pants.build_graph.address import Address
-from pants.option.custom_types import target_option
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -39,11 +38,6 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
                           help='Java compiler to use.  If unspecified, we use the compiler '
                                'embedded in the Java distribution we run on.')
 
-    register('--compiler-plugin-deps', advanced=True, type=list, member_type=target_option,
-             removal_version='1.5.0.dev0',
-             removal_hint='See http://www.pantsbuild.org/javac_plugins.html#depending-on-plugins.',
-             fingerprint=True)
-
   def injectables(self, build_graph):
     tools_jar_address = Address.parse(self._tools_jar_spec)
     if not build_graph.contains_address(tools_jar_address):
@@ -54,7 +48,6 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
   @property
   def injectables_spec_mapping(self):
     return {
-      'plugin': self._plugin_dependency_specs,
       # Zinc directly accesses the javac tool.
       'javac': [self._javac_spec],
       # The ProvideToolsJar task will first attempt to use the (optional) configured
@@ -79,9 +72,6 @@ class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
     # TODO: These checks are a continuation of the hack that allows tests to pass without
     # caring about this subsystem.
     self._javac_spec = getattr(opts, 'javac', self._default_javac_spec)
-    self._plugin_dependency_specs = [
-      Address.parse(spec).spec for spec in getattr(opts, 'compiler_plugin_deps', [])
-    ]
     self._tools_jar_spec = '//:tools-jar-synthetic'
 
   def javac_classpath(self, products):

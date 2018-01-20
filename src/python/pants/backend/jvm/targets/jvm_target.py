@@ -223,27 +223,6 @@ class JvmTarget(Target, Jarable):
   def has_resources(self):
     return len(self.resources) > 0
 
-  @classmethod
-  def compute_dependency_specs(cls, kwargs=None, payload=None):
-    for spec in super(JvmTarget, cls).compute_dependency_specs(kwargs, payload):
-      yield spec
-
-    target_representation = kwargs or payload.as_dict()
-    resources = target_representation.get('resources')
-    if resources:
-      for spec in resources:
-        yield spec
-
-    # TODO: https://github.com/pantsbuild/pants/issues/3409
-    if Java.is_initialized():
-      # Add deps on anything we might need to find plugins.
-      # Note that this will also add deps from scala targets to javac plugins, but there's
-      # no real harm in that, and the alternative is to check for .java sources, which would
-      # eagerly evaluate all the globs, which would be a performance drag for goals that
-      # otherwise wouldn't do that (like `list`).
-      for spec in Java.global_instance().injectables_specs_for_key('plugin'):
-        yield spec
-
   @property
   def provides(self):
     return self.payload.provides
