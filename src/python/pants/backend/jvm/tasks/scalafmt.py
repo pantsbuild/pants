@@ -73,8 +73,6 @@ class ScalaFmtCheckFormat(ScalaFmt):
 
   :API: public
   """
-  deprecated_options_scope = 'compile.scalafmt'
-  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   sideeffecting = False
   additional_args = ['--test']
