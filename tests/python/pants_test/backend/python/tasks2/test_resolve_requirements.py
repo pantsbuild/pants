@@ -26,6 +26,11 @@ class ResolveRequirementsTest(TaskTestBase):
   def task_type(cls):
     return ResolveRequirements
 
+  def test_resolve_no_targets(self):
+    empty_tgt = self.make_target(spec=':empty')
+    pex = self._resolve_requirements([empty_tgt])
+    self.assertTrue(pex is None)
+
   def test_resolve_simple_requirements(self):
     noreqs_tgt = self._fake_target('noreqs', [])
     ansicolors_tgt = self._fake_target('ansicolors', ['ansicolors==1.0.2'])
