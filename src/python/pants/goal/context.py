@@ -61,7 +61,7 @@ class Context(object):
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
                build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
-               workspace=None, invalidation_report=None):
+               workspace=None, invalidation_report=None, scheduler=None):
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -80,6 +80,9 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
+    # TODO(#4769): This should not be exposed to anyone.
+    # Note that the Context created in unit tests by BaseTest uses a different codepath.
+    self._scheduler = scheduler
 
   @property
   def options(self):

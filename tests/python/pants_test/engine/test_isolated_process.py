@@ -10,7 +10,9 @@ import tarfile
 import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
-from pants.engine.isolated_process import Binary, SnapshottedProcess, SnapshottedProcessRequest
+from pants.engine.isolated_process import (Binary, ExecuteProcess, ExecuteProcessRequest,
+  ExecuteProcessResult, SnapshottedProcess,
+  SnapshottedProcessRequest, create_process_rules)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import SingletonRule
 from pants.engine.selectors import Select
@@ -30,7 +32,7 @@ class ShellCat(Binary):
 
 def file_list_to_args_for_cat_with_snapshot_subjects_and_output_file(snapshot):
   return SnapshottedProcessRequest(args=tuple(sorted(f.path for f in snapshot.files)),
-                                   snapshots=(snapshot,))
+    snapshots=(snapshot,))
 
 
 def process_result_to_concatted_from_outfile(process_result, sandbox_dir):
@@ -82,14 +84,27 @@ def java_sources_to_javac_args(sources_snapshot, out_dir):
                                    directories_to_create=(out_dir.path,))
 
 
+def process_request_from_java_sources(binary):
+  env = []
+  return ExecuteProcessRequest(
+    argv=binary.prefix_of_command() + ('-version',),
+    env=env)
+
+
 class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
   """A classpath entry for a subject."""
 
 
 def process_result_to_classpath_entry(process_result, sandbox_dir):
   if not process_result.exit_code:
-    # this implies that we should pass some / all of the inputs to the output conversion so they can grab config.
+    # this implies that we should pass some / all of the inputs to the output conversion so they
+    # can grab config.
     # TODO string name association isn't great.
+    return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
+
+
+def execute_process_result_to_classpath(process_result, sandbox_dir):
+  if not process_result.exit_code:
     return ClasspathEntry(os.path.join(sandbox_dir, 'build'))
 
 
@@ -104,21 +119,19 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
-
   def test_integration_concat_with_snapshot_subjects_test(self):
     scheduler = self.mk_scheduler_in_example_fs([
       # subject to files / product of subject to files for snapshot.
       SnapshottedProcess.create(product_type=Concatted,
-                                binary_type=ShellCatToOutFile,
-                                input_selectors=(Select(Snapshot),),
-                                input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
-                                output_conversion=process_result_to_concatted_from_outfile),
+        binary_type=ShellCatToOutFile,
+        input_selectors=(Select(Snapshot),),
+        input_conversion=file_list_to_args_for_cat_with_snapshot_subjects_and_output_file,
+        output_conversion=process_result_to_concatted_from_outfile),
       SingletonRule(ShellCatToOutFile, ShellCatToOutFile()),
     ])
 
     request = scheduler.execution_request([Concatted],
-                                          [PathGlobs.create('', include=['fs_test/a/b/*'])])
-
+      [PathGlobs.create('', include=['fs_test/a/b/*'])])
     root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
     state = self.assertFirstEntryIsReturn(root_entries, scheduler)
@@ -126,15 +139,33 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
 
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
 
+  def test_javac_version_example(self):
+    sources = PathGlobs.create('', include=['inputs/src/java/simple/Simple.java'])
+    scheduler = self.mk_scheduler_in_example_fs([
+      ExecuteProcess.create_in(product_type=ExecuteProcessRequest,
+        input_selectors=(Select(Javac),),
+        input_conversion=process_request_from_java_sources),
+      SingletonRule(Javac, Javac()),
+    ])
+    req = scheduler.product_request(ExecuteProcessRequest, [sources])
+    request = scheduler.execution_request([ExecuteProcessResult], req)
+    root_entries = scheduler.execute(request).root_products
+
+    self.assertEquals(1, len(root_entries))
+    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
+    result = state.value
+    self.assertEqual(0, result.exit_code)
+    self.assertIn('javac', result.stderr)
+
   def test_javac_compilation_example(self):
     sources = PathGlobs.create('', include=['scheduler_inputs/src/java/simple/Simple.java'])
 
     scheduler = self.mk_scheduler_in_example_fs([
       SnapshottedProcess.create(ClasspathEntry,
-                                Javac,
-                                (Select(Snapshot), Select(JavaOutputDir)),
-                                java_sources_to_javac_args,
-                                process_result_to_classpath_entry),
+        Javac,
+        (Select(Snapshot), Select(JavaOutputDir)),
+        java_sources_to_javac_args,
+        process_result_to_classpath_entry),
       SingletonRule(JavaOutputDir, JavaOutputDir('build')),
       SingletonRule(Javac, Javac()),
     ])
@@ -208,7 +239,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     return fs_tree
 
   def mk_scheduler_in_example_fs(self, rules):
-    rules = list(rules) + create_fs_rules()
+    rules = list(rules) + create_fs_rules() + create_process_rules()
     return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())
 
   def assertReturn(self, state, scheduler):
