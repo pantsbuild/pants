@@ -154,12 +154,6 @@ class GlobalOptionsRegistrar(Optionable):
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
 
-    # This facilitates use of the v2 engine, sans daemon.
-    register('--enable-v2-engine', advanced=True, type=bool, default=True,
-             removal_version='1.5.0.dev0',
-             removal_hint='The v2 engine is necessary to use pantsd, and will soon be required.',
-             help='Enables use of the v2 engine.')
-
     # These facilitate configuring the native engine.
     register('--native-engine-version', advanced=True, default='DEPRECATED',
              removal_version='1.6.0.dev0',
@@ -194,10 +188,6 @@ class GlobalOptionsRegistrar(Optionable):
              help='The port to bind the pants nailgun server to. Defaults to a random port.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
-    register('--pantsd-fs-event-detection', advanced=True, type=bool,
-             removal_version='1.5.0.dev0',
-             removal_hint='This option is now implied by `--enable-pantsd`.',
-             help='Whether or not to use filesystem event detection.')
     register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
              help='The number of workers to use for the filesystem event service executor pool.')
 
@@ -262,10 +252,6 @@ class GlobalOptionsRegistrar(Optionable):
              'the command up into multiple invocations.')
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
-    register('--build-file-rev', advanced=True,
-             removal_hint='Lightly used feature, scheduled for removal.', removal_version='1.5.0.dev0',
-             help='Read BUILD files from this scm rev instead of from the working tree.  This is '
-             'useful for implementing pants-aware sparse checkouts.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')

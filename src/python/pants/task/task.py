@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
@@ -614,14 +613,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :param string goal_name: The goal name to use for any warning emissions.
     :param callable predicate: The predicate to pass to `context.scan().targets(predicate=X)`.
     """
-    deprecated_conditional(
-        lambda: not self.context.target_roots,
-        '1.5.0.dev0',
-        '`./pants {0}` (with no explicit targets) will soon become an error. Please specify '
-        'one or more explicit target specs (e.g. `./pants {0} ::`).'.format(goal_name))
-    if not self.context.target_roots and not self.get_options().enable_v2_engine:
-      # For the v1 path, continue the behavior of e.g. `./pants list` implies `./pants list ::`.
-      return self.context.scan().targets(predicate=predicate)
+    if not self.context.target_roots:
+      raise TaskError('Please specify one or more explicit target '
+                      'specs (e.g. `./pants {0} ::`).'.format(goal_name))
 
     # For the v2 path, e.g. `./pants list` is a functional no-op. This matches the v2 mode behavior
     # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.

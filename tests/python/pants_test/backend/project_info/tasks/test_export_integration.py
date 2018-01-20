@@ -15,8 +15,7 @@ from pants.base.build_environment import get_buildroot
 from pants.build_graph.intermediate_target_factory import hash_target
 from pants.util.process_handler import subprocess
 from pants_test.backend.project_info.tasks.resolve_jars_test_mixin import ResolveJarsTestMixin
-from pants_test.pants_run_integration_test import (PantsRunIntegrationTest, ensure_engine,
-                                                   ensure_resolver)
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_resolver
 
 
 class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
@@ -220,7 +219,6 @@ class ExportIntegrationTest(ResolveJarsTestMixin, PantsRunIntegrationTest):
       self.assertEquals('java8', json_data['targets'][test_target]['test_platform'])
 
   @ensure_resolver
-  @ensure_engine
   def test_intellij_integration(self):
     with self.temporary_workdir() as workdir:
       exported_file = os.path.join(workdir, "export_file.json")

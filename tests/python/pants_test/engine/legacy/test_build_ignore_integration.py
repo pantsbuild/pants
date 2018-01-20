@@ -8,13 +8,12 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import tempfile
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
   """Tests the functionality of the build_ignore_patterns option in pants.ini ."""
 
-  @ensure_engine
   def test_build_ignore_patterns_pants_ini(self):
     def output_to_list(output_filename):
       with open(output_filename, 'r') as results_file:
@@ -61,7 +60,6 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     self.assertNotIn('testprojects/src/java/org/pantsbuild/testproject/phrases:there-was-a-duck',
                      results)
 
-  @ensure_engine
   def test_build_ignore_dependency(self):
     run_result = self.run_pants(['-q',
                                  'list',
@@ -78,7 +76,6 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
     # Error message complains dependency dir has no BUILD files.
     self.assertIn('testprojects/src/thrift/org/pantsbuild/constants_only', run_result.stderr_data)
 
-  @ensure_engine
   def test_build_ignore_dependency_success(self):
     run_result = self.run_pants(['-q',
                                  'list',
