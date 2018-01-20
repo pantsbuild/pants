@@ -232,13 +232,6 @@ class GlobalOptionsRegistrar(Optionable):
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, type=bool,
              help='Kill nailguns before exiting')
-    register('-i', '--interpreter', advanced=True, default=[], type=list,
-             metavar='<requirement>',
-             removal_version='1.5.0.dev0',
-             removal_hint='Use --interpreter-constraints in scope python-setup instead.',
-             help="Constrain what Python interpreters to use.  Uses Requirement format from "
-                  "pkg_resources, e.g. 'CPython>=2.7,<3' or 'PyPy'. By default, no constraints "
-                  "are used.  Multiple constraints may be added.  They will be ORed together.")
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
