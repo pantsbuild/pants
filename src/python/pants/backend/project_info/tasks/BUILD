@@ -87,7 +87,6 @@ python_library(
     'src/python/pants/backend/jvm/tasks:ivy_task_mixin',
     'src/python/pants/backend/jvm:ivy_utils',
     'src/python/pants/backend/python/targets',
-    'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:revision',

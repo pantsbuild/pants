@@ -15,10 +15,10 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.pex_build_util import has_python_sources
-from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
-from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks.gather_sources import GatherSources
+from pants.backend.python.tasks.pex_build_util import has_python_sources
+from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet

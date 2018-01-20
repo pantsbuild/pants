@@ -12,7 +12,7 @@ from pex.interpreter import PythonInterpreter
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.tasks2.gather_sources import GatherSources
+from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.build_graph.files import Files
 from pants.build_graph.resources import Resources
 from pants.python.python_repos import PythonRepos

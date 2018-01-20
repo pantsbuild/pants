@@ -6,6 +6,6 @@ python_tests(
   sources=['test_python_eval.py'],
   dependencies=[
     'contrib/python/src/python/pants/contrib/python/checks/tasks:python',
-    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'tests/python/pants_test/backend/python/tasks2:python_task_test_base',
   ]
 )

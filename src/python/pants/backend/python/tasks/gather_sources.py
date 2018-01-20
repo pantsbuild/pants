@@ -11,7 +11,7 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.pex_build_util import (dump_sources, has_python_sources,
+from pants.backend.python.tasks.pex_build_util import (dump_sources, has_python_sources,
                                                         has_resources)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task

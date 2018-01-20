@@ -1,23 +1,28 @@
 # coding=utf-8
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pex.pex_info import PexInfo
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.python_task import PythonTask
+from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
 from pants.task.repl_task_mixin import ReplTaskMixin
 
 
-class PythonRepl(ReplTaskMixin, PythonTask):
+class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
+  """Launch an interactive Python interpreter session."""
+
   @classmethod
   def register_options(cls, register):
     super(PythonRepl, cls).register_options(register)
+    # TODO: Create a python equivalent of register_jvm_tool, and use that instead of these
+    # ad-hoc options.
     register('--ipython', type=bool,
              help='Run an IPython REPL instead of the standard python one.')
     register('--ipython-entry-point', advanced=True, default='IPython:start_ipython',
@@ -29,27 +34,23 @@ class PythonRepl(ReplTaskMixin, PythonTask):
   def select_targets(cls, target):
     return isinstance(target, (PythonTarget, PythonRequirementLibrary))
 
-  def setup_repl_session(self, targets):
-    interpreter = self.select_interpreter_for_targets(targets)
+  def extra_requirements(self):
+    if self.get_options().ipython:
+      return [self.get_options().ipython_requirements]
+    else:
+      return []
 
-    extra_requirements = []
+  def setup_repl_session(self, targets):
     if self.get_options().ipython:
       entry_point = self.get_options().ipython_entry_point
-      for req in self.get_options().ipython_requirements:
-        extra_requirements.append(PythonRequirement(req))
     else:
       entry_point = 'code:interact'
-
     pex_info = PexInfo.default()
     pex_info.entry_point = entry_point
-    chroot = self.cached_chroot(interpreter=interpreter,
-                                pex_info=pex_info,
-                                targets=targets,
-                                platforms=None,
-                                extra_requirements=extra_requirements)
-    return chroot.pex()
+    return self.create_pex(pex_info)
 
   # NB: **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
-    po = pex.run(blocking=False, **pex_run_kwargs)
+    env = pex_run_kwargs.pop('env', os.environ).copy()
+    po = pex.run(blocking=False, env=env, **pex_run_kwargs)
     po.wait()
