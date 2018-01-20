@@ -82,8 +82,8 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     def coordinates_for(cp):
       return {resolved_jar.coordinate for conf, resolved_jar in cp}
 
-    no_classifier = JarDependency('junit', 'junit', rev='4.12')
-    classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
+    no_classifier = JarDependency('org.apache.commons', 'commons-compress', rev='1.4.1')
+    classifier = JarDependency('org.apache.commons', 'commons-compress', rev='1.4.1', classifier='tests')
 
     self.set_options_for_scope('coursier', fetch_options=['-A', 'jar,bundle,test-jar,maven-plugin,src,doc'])
 
