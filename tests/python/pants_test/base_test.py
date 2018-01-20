@@ -393,7 +393,6 @@ class BaseTest(unittest.TestCase):
     self.add_to_build_file(path, dedent('''
           %(target_type)s(name='%(name)s',
             %(sources)s
-            %(resources)s
             %(java_sources)s
             %(provides)s
             %(dependencies)s
@@ -402,8 +401,6 @@ class BaseTest(unittest.TestCase):
                    name=name,
                    sources=('sources=%s,' % repr(sources)
                               if sources else ''),
-                   resources=('resources=["%s"],' % kwargs.get('resources')
-                              if 'resources' in kwargs else ''),
                    java_sources=('java_sources=[%s],'
                                  % ','.join(map(lambda str_target: '"%s"' % str_target,
                                                 kwargs.get('java_sources')))

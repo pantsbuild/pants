@@ -449,7 +449,6 @@ class TestSetupPy(SetupPyTestBase):
 
   def test_resources(self):
     self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
-    self.create_file(relpath='src/python/monster/group.res', contents='196883')
     self.create_file(relpath='src/python/monster/__init__.py', contents='')
     self.create_file(relpath='src/python/monster/research_programme.py',
                      contents='# Look for more off-by-one "errors"!')
@@ -460,8 +459,7 @@ class TestSetupPy(SetupPyTestBase):
       python_library(
         name='conway',
         sources=['__init__.py', 'research_programme.py'],
-        resources=['group.res'],
-        resource_targets=[
+        dependencies=[
           ':j-function',
         ],
         provides=setup_py(
@@ -487,12 +485,8 @@ class TestSetupPy(SetupPyTestBase):
         self.assertEqual({path('setup.py'),
                           path('src/monster/__init__.py'),
                           path('src/monster/research_programme.py'),
-                          path('src/monster/group.res'),
                           path('src/monster/j-function.res')},
                          py_files)
-
-        with open(path('src/monster/group.res')) as fp:
-          self.assertEqual('196883', fp.read())
 
         with open(path('src/monster/j-function.res')) as fp:
           self.assertEqual('196884', fp.read())
@@ -511,11 +505,18 @@ class TestSetupPy(SetupPyTestBase):
       python_library(
         name='conway',
         sources=['__init__.py', 'research_programme.py'],
-        resources=['group.res'],
+        dependencies=[
+          ':group_res',
+        ],
         provides=setup_py(
           name='monstrous.moonshine',
           version='0.0.0',
         )
+      )
+
+      resources(
+        name='group_res',
+        sources=['group.res']
       )
       """))
     conway = self.target('src/python/monster:conway')

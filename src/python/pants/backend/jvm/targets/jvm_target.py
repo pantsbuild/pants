@@ -11,7 +11,6 @@ from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jarable import Jarable
-from pants.base.deprecated import deprecated_conditional
 from pants.base.payload import Payload
 from pants.base.payload_field import ExcludesField, PrimitiveField, SetOfPrimitivesField
 from pants.build_graph.resources import Resources
@@ -36,7 +35,6 @@ class JvmTarget(Target, Jarable):
                sources=None,
                provides=None,
                excludes=None,
-               resources=None,
                services=None,
                platform=None,
                strict_deps=None,
@@ -94,12 +92,6 @@ class JvmTarget(Target, Jarable):
     :param scalac_plugins: names of compiler plugins to use when compiling this target with scalac.
     :param dict scalac_plugin_args: Map from scalac plugin name to list of arguments for that plugin.
     """
-    deprecated_conditional(
-      lambda: resources is not None,
-      '1.5.0.dev0',
-      'The `resources=` JVM target argument found on target {}'.format(address.spec),
-      'Use `dependencies=` instead.'
-    )
 
     self.address = address  # Set in case a TargetDefinitionException is thrown early
     payload = payload or Payload()
@@ -108,7 +100,6 @@ class JvmTarget(Target, Jarable):
       'sources': self.create_sources_field(sources, address.spec_path, key_arg='sources'),
       'provides': provides,
       'excludes': excludes,
-      'resources': PrimitiveField(self.assert_list(resources, key_arg='resources')),
       'platform': PrimitiveField(platform),
       'strict_deps': PrimitiveField(strict_deps),
       'exports': SetOfPrimitivesField(exports),

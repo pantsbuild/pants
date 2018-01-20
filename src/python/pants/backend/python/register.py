@@ -23,7 +23,7 @@ from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.backend.python.tasks.setup_py import SetupPy
 from pants.backend.python.tasks.python_isort import IsortPythonTask
-from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -31,9 +31,9 @@ from pants.goal.task_registrar import TaskRegistrar as task
 def build_file_aliases():
   return BuildFileAliases(
     targets={
-      PythonBinary.alias(): TargetMacro.Factory.wrap(PythonBinary.create, PythonBinary),
-      PythonLibrary.alias(): TargetMacro.Factory.wrap(PythonLibrary.create, PythonLibrary),
-      PythonTests.alias(): TargetMacro.Factory.wrap(PythonTests.create, PythonTests),
+      PythonBinary.alias(): PythonBinary,
+      PythonLibrary.alias(): PythonLibrary,
+      PythonTests.alias(): PythonTests,
       'python_requirement_library': PythonRequirementLibrary,
       Resources.alias(): Resources,
     },
