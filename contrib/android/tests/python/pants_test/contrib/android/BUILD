@@ -3,18 +3,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'android_integration_test',
-  sources = [
-    'android_integration_test.py',
-  ],
-  dependencies = [
-    'src/python/pants/java/distribution:distribution',
-    'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:int-test',
-  ],
-)
-
-python_library(
   name = 'android_base',
   sources = [
     'test_android_base.py',
