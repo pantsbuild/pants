@@ -10,8 +10,6 @@ from abc import abstractproperty
 
 from six import string_types
 
-from pants.base.deprecated import deprecated_conditional
-from pants.build_graph.target import Target
 from pants.engine.addressable import Exactly, addressable_list
 from pants.engine.fs import PathGlobs
 from pants.engine.objects import Locatable
@@ -42,17 +40,9 @@ class TargetAdaptor(StructWithDeps):
     # N.B. Here we check specifically for `sources is None`, as it's possible for sources
     # to be e.g. an explicit empty list (sources=[]).
     if sources is None and self.default_sources_globs is not None:
-      if self.default_sources:
-        return Globs(*self.default_sources_globs,
-                     spec_path=self.address.spec_path,
-                     exclude=self.default_sources_exclude_globs or [])
-      else:
-        deprecated_conditional(lambda: True, '1.5.0.dev0',
-                               'default empty sources list',
-                               'Targets which do not explicitly pass sources will soon get a default set. '
-                               'Please pass an explicit set of sources for target: {address}'
-                            .format(address=self.address.spec))
-        return Files(spec_path=self.address.spec_path)
+      return Globs(*self.default_sources_globs,
+                    spec_path=self.address.spec_path,
+                    exclude=self.default_sources_exclude_globs or [])
     return sources
 
   @property
@@ -65,11 +55,6 @@ class TargetAdaptor(StructWithDeps):
       base_globs = BaseGlobs.from_sources_field(sources, self.address.spec_path)
       path_globs = base_globs.to_path_globs(self.address.spec_path)
       return (SourcesField(self.address, 'sources', base_globs.filespecs, path_globs),)
-
-  @property
-  def default_sources(self):
-    """True if this adaptor should use default sources if they are defined."""
-    return Target.Arguments.global_instance().get_options().implicit_sources
 
   @property
   def default_sources_globs(self):
