@@ -551,13 +551,13 @@ class TestSetupPy(SetupPyTestBase):
                            dedent("""
                            prep_command(
                              name='prepare_binary_compile',
-                             goal='compile',
+                             goals=['compile'],
                              prep_executable='/bin/true',
                            )
 
                            prep_command(
                              name='prepare_binary_test',
-                             goal='test',
+                             goals=['test'],
                              prep_executable='/bin/true',
                            )
 
@@ -572,11 +572,11 @@ class TestSetupPy(SetupPyTestBase):
     prepare_binary_compile = self.make_target(spec='build-support/thrift:prepare_binary_compile',
                                               target_type=PrepCommand,
                                               prep_executable='/bin/true',
-                                              goal='compile')
+                                              goals=['compile'])
     prepare_binary_test = self.make_target(spec='build-support/thrift:prepare_binary_test',
                                            target_type=PrepCommand,
                                            prep_executable='/bin/true',
-                                           goal='test')
+                                           goals=['test'])
     self.make_target(spec='build-support/thrift:prepare_binary',
                      dependencies=[
                        prepare_binary_compile,

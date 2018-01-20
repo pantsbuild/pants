@@ -15,5 +15,4 @@ class JvmTargetTest(BaseTest):
   def test_compute_dependency_specs(self):
     self.make_target(':resource_target', Resources)
     target = self.make_target(':foo', JvmTarget, resources=[':resource_target'])
-    self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([':resource_target'], list(target.compute_dependency_specs(payload=target.payload)))

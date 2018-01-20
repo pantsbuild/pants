@@ -29,7 +29,7 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
         fp.write(dedent("""
           prep_command(
             name='{name}',
-            goal='{goal}',
+            goals=['{goal}'],
             prep_executable='touch',
             prep_args=['{tmpdir}/{touch_target}'],
           )

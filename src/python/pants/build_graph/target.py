@@ -98,8 +98,10 @@ class AbstractTarget(object):
     """
     raise NotImplementedError()
 
-  # TODO: Kill this in 1.5.0.dev0, once this old-style resource specification is gone.
   @property
+  @deprecated('1.7.0.dev0',
+              'Old style resource specification is gone: check for dependencies of type '
+              '`Resources` instead.')
   def has_resources(self):
     """Returns True if the target has an associated set of Resources.
 
@@ -623,29 +625,6 @@ class Target(AbstractTarget):
     :API: public
     """
     return self._build_graph.get_concrete_derived_from(self.address)
-
-  @property
-  @deprecated('1.5.0.dev0', 'Use `Target.compute_injectable_specs()` instead.')
-  def traversable_specs(self):
-    """
-    :API: public
-
-    :return: specs referenced by this target to be injected into the build graph
-    :rtype: list of strings
-    """
-    return []
-
-  @property
-  @deprecated('1.5.0.dev0', 'Use `Target.compute_dependency_specs()` instead.')
-  def traversable_dependency_specs(self):
-    """
-    :API: public
-
-    :return: specs representing dependencies of this target that will be injected to the build
-    graph and linked in the graph as dependencies of this target
-    :rtype: list of strings
-    """
-    return []
 
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
