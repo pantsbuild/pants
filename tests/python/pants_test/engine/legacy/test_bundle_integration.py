@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from pants.base.deprecated import deprecated_conditional
 from pants.util.contextutil import temporary_dir
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
@@ -49,15 +48,9 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
     with self.bundled('directory') as bundle_dir:
       root = os.path.join(bundle_dir, 'a/b')
       self.assertTrue(os.path.isdir(root))
-      # NB: The behaviour of this test will change with the relevant deprecation
-      # in `pants.backend.jvm.tasks.bundle_create`, because the parent directory
-      # will not be symlinked.
-      deprecated_conditional(
-          lambda: os.path.isfile(os.path.join(root, 'file1.txt')),
-          '1.5.0.dev0',
-          'default recursive inclusion of files in directory',
-          'A non-recursive/literal glob should no longer include child paths.'
-      )
+      # NB: The behaviour of this test changed as scheduled in 1.5.0.dev0, because the
+      # parent directory is no longer symlinked.
+      self.assertFalse(os.path.isfile(os.path.join(root, 'file1.txt')))
 
   def test_bundle_explicit_recursion(self):
     with self.bundled('explicit_recursion') as bundle_dir:
