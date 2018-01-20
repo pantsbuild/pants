@@ -81,7 +81,7 @@ class JvmDependencyCheck(Task):
     return True
 
   def execute(self):
-    if self.skip(self.get_options()):
+    if self._skip(self.get_options()):
       return
     with self.invalidated(self.context.targets(),
                           invalidate_dependents=True) as invalidation_check:
