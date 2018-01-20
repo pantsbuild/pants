@@ -53,6 +53,12 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     register('--structs-deps', default={}, advanced=True, type=dict,
              help='A map of language to targets to add as dependencies of '
                   'synthetic thrift libraries that contain structs.')
+    register('--service-exports', default={}, advanced=True, type=dict,
+             help='A map of language to targets to add as exports of '
+                  'synthetic thrift libraries that contain services.')
+    register('--structs-exports', default={}, advanced=True, type=dict,
+             help='A map of language to targets to add as exports of '
+                  'synthetic thrift libraries that contain structs.')
     register('--target-types',
              default={'scala': 'scala_library', 'java': 'java_library', 'android': 'java_library'},
              advanced=True,
@@ -293,6 +299,17 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
     deps.update(target.dependencies)
     return deps
 
+  def synthetic_target_extra_exports(self, target, target_workdir):
+    dep_info = self._resolved_export_info
+    target_declares_service = any(self._declares_service(source)
+                                  for source in target.sources_relative_to_buildroot())
+    language = self._thrift_defaults.language(target)
+
+    if target_declares_service:
+      return dep_info.service[language]
+    else:
+      return dep_info.structs[language]
+
   def _thrift_dependencies_for_target(self, target):
     dep_info = self._resolved_dep_info
     target_declares_service_or_exception = any(self._declares_service(source) or self._declares_exception(source)
@@ -308,6 +325,11 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
   def _resolved_dep_info(self):
     return ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_deps),
                               self._resolve_deps(self.get_options().structs_deps))
+
+  @memoized_property
+  def _resolved_export_info(self):
+    return ScroogeGen.DepInfo(self._resolve_deps(self.get_options().service_exports),
+                              self._resolve_deps(self.get_options().structs_exports))
 
   @property
   def _copy_target_attributes(self):
