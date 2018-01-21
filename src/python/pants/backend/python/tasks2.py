@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.tasks import SelectInterpreter, ResolveRequirements, GatherSources, PythonRun, PytestPrep, PytestRun, PythonRepl, SetupPy, PythonBinaryCreate
+from pants.backend.python.tasks import (GatherSources, PytestPrep, PytestRun, PythonBinaryCreate,
+                                        PythonRepl, PythonRun, ResolveRequirements,
+                                        SelectInterpreter, SetupPy)
 from pants.base.deprecated import deprecated_module
 
 

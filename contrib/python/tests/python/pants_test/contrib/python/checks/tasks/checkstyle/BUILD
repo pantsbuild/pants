@@ -10,7 +10,7 @@ python_tests(
     ':lib',
     'contrib/python/src/python/pants/contrib/python/checks/tasks/checkstyle:all',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test/backend/python/tasks2:python_task_test_base',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/option/util',
     'tests/python/pants_test:base_test',
   ]
