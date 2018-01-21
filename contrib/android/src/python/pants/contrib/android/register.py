@@ -24,6 +24,7 @@ from pants.contrib.android.tasks.zipalign import Zipalign
 deprecated_module('1.7.0.dev0',
                   'Android backend is going away, unless you want to update and maintain it!')
 
+
 def build_file_aliases():
   return BuildFileAliases(
     targets={
