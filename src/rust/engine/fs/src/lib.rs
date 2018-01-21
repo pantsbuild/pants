@@ -10,6 +10,7 @@ pub use pool::ResettablePool;
 
 extern crate bazel_protos;
 extern crate boxfuture;
+extern crate byteorder;
 extern crate bytes;
 extern crate digest;
 extern crate futures;

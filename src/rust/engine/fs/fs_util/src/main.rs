@@ -346,7 +346,7 @@ impl GetFileDigest<String> for FileSaver {
       .map_err(move |err| {
         format!("Error reading file {:?}: {}", file_copy, err.description())
       })
-      .and_then(move |content| store.store_file_bytes(content.content))
+      .and_then(move |content| store.store_file_bytes(content.content, true))
       .to_boxed()
   }
 }

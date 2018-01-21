@@ -27,6 +27,7 @@ from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
 from pants.pantsd.service.scheduler_service import SchedulerService
+from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
 from pants.util.contextutil import stdio_as
@@ -137,10 +138,11 @@ class PantsDaemon(FingerprintedProcessManager):
         target_roots_class=TargetRoots,
         scheduler_service=scheduler_service
       )
+      store_gc_service = StoreGCService(legacy_graph_helper.scheduler)
 
       return (
         # Services.
-        (fs_event_service, scheduler_service, pailgun_service),
+        (fs_event_service, scheduler_service, pailgun_service, store_gc_service),
         # Port map.
         dict(pailgun=pailgun_service.pailgun_port)
       )

@@ -75,7 +75,7 @@ impl Snapshot {
             // Because there are no children of this Dir, it must be empty.
             dir_futures.push(
               store
-                .record_directory(&bazel_protos::remote_execution::Directory::new())
+                .record_directory(&bazel_protos::remote_execution::Directory::new(), true)
                 .map(move |digest| {
                   let mut directory_node = bazel_protos::remote_execution::DirectoryNode::new();
                   directory_node.set_name(osstring_as_utf8(first_component).unwrap());
@@ -109,7 +109,7 @@ impl Snapshot {
         let mut directory = bazel_protos::remote_execution::Directory::new();
         directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
         directory.set_files(protobuf::RepeatedField::from_vec(files));
-        store.record_directory(&directory).map(move |digest| {
+        store.record_directory(&directory, true).map(move |digest| {
           Snapshot {
             fingerprint: digest.0,
             digest: Some(digest),
@@ -292,7 +292,7 @@ mod tests {
         .map_err(move |err| {
           format!("Error reading file {:?}: {}", file_copy, err.description())
         })
-        .and_then(move |content| store.store_file_bytes(content.content))
+        .and_then(move |content| store.store_file_bytes(content.content, true))
         .to_boxed()
     }
   }

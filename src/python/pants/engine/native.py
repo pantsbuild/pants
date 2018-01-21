@@ -207,6 +207,10 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 void nodes_destroy(RawNodes*);
 
 void set_panic_handler(void);
+
+void lease_files_in_graph(Scheduler*);
+
+void garbage_collect_store(Scheduler*);
 '''
 
 CFFI_EXTERNS = '''

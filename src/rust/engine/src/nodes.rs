@@ -833,9 +833,11 @@ impl Node for DigestFile {
         ))
       })
       .and_then(move |c| {
-        context.core.store.store_file_bytes(c.content).map_err(
-          |e| throw(&e),
-        )
+        context
+          .core
+          .store
+          .store_file_bytes(c.content, true)
+          .map_err(|e| throw(&e))
       })
       .to_boxed()
   }

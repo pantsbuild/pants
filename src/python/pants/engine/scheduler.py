@@ -296,6 +296,12 @@ class WrappedNativeScheduler(object):
       self._native.lib.nodes_destroy(raw_roots)
     return roots
 
+  def lease_files_in_graph(self):
+    self._native.lib.lease_files_in_graph(self._scheduler)
+
+  def garbage_collect_store(self):
+    self._native.lib.garbage_collect_store(self._scheduler)
+
 
 class LocalScheduler(object):
   """A scheduler that expands a product Graph by executing user defined Rules."""
@@ -503,3 +509,9 @@ class LocalScheduler(object):
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects)[product]
+
+  def lease_files_in_graph(self):
+    self._scheduler.lease_files_in_graph()
+
+  def garbage_collect_store(self):
+    self._scheduler.garbage_collect_store()
