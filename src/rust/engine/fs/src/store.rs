@@ -1038,13 +1038,9 @@ mod remote {
 
   use bazel_protos;
   use boxfuture::{Boxable, BoxFuture};
-  use bytes::Bytes;
-  use digest::{Digest as DigestTrait, FixedOutput};
-  use futures::{self, future, Future, Sink, Stream};
-  use hashing::{Digest, Fingerprint};
+  use futures::{future, Future, Stream};
+  use hashing::Fingerprint;
   use grpcio;
-  use sha2::Sha256;
-  use std::cmp::min;
   use std::sync::Arc;
   use std::time::Duration;
 
@@ -1073,85 +1069,6 @@ mod remote {
         env,
         chunk_size_bytes,
         upload_timeout,
-      }
-    }
-
-    pub fn store_bytes(&self, bytes_vec: Vec<u8>) -> BoxFuture<Digest, String> {
-      let bytes = Bytes::from(bytes_vec);
-      let mut hasher = Sha256::default();
-      hasher.input(&bytes);
-      let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
-      let len = bytes.len();
-      let resource_name = format!(
-        "{}/uploads/{}/blobs/{}/{}",
-        "",
-        "",
-        fingerprint,
-        bytes.len()
-      );
-      match self.client.write_opt(
-        grpcio::CallOption::default().timeout(
-          self.upload_timeout,
-        ),
-      ) {
-        Err(err) => {
-          future::err(format!(
-            "Error attempting to connect to upload fingerprint {}: {:?}",
-            fingerprint,
-            err
-          )).to_boxed() as BoxFuture<_, _>
-        }
-        Ok((sender, receiver)) => {
-          let chunk_size_bytes = self.chunk_size_bytes;
-          let stream =
-            futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
-              0 as usize,
-              move |offset| if offset >= bytes.len() {
-                None
-              } else {
-                let mut req = bazel_protos::bytestream::WriteRequest::new();
-                req.set_resource_name(resource_name.clone());
-                req.set_write_offset(offset as i64);
-                let next_offset = min(offset + chunk_size_bytes, bytes.len());
-                req.set_finish_write(next_offset == bytes.len());
-                req.set_data(bytes.slice(offset, next_offset).to_vec());
-                Some(future::ok(
-                  ((req, grpcio::WriteFlags::default()), next_offset),
-                ))
-              },
-            );
-
-          future::ok(self.client.clone())
-            .join(sender.send_all(stream).map_err(move |e| {
-              format!(
-                "Error attempting to upload fingerprint {}: {:?}",
-                fingerprint,
-                e
-              )
-            }))
-            .and_then(move |_| {
-              receiver.map_err(move |e| {
-                format!(
-                  "Error from server when uploading fingerprint {}: {:?}",
-                  fingerprint,
-                  e
-                )
-              })
-            })
-            .and_then(move |received| if received.get_committed_size() !=
-              len as i64
-            {
-              Err(format!(
-                "Uploading file with fingerprint {}: want commited size {} but got {}",
-                fingerprint,
-                len,
-                received.get_committed_size()
-              ))
-            } else {
-              Ok(Digest(fingerprint, len))
-            })
-            .to_boxed()
-        }
       }
     }
 
