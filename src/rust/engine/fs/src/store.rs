@@ -1,5 +1,6 @@
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
+use bytes::Bytes;
 use futures::{Future, future};
 use hashing::Digest;
 use protobuf::core::Message;
@@ -66,7 +67,7 @@ impl Store {
     })
   }
 
-  pub fn store_file_bytes(&self, bytes: Vec<u8>, initial_lease: bool) -> BoxFuture<Digest, String> {
+  pub fn store_file_bytes(&self, bytes: Bytes, initial_lease: bool) -> BoxFuture<Digest, String> {
     let len = bytes.len();
     self
       .local
@@ -79,7 +80,7 @@ impl Store {
   /// Loads the bytes of the file with the passed fingerprint, and returns the result of applying f
   /// to that value.
   ///
-  pub fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+  pub fn load_file_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
     &self,
     digest: Digest,
     f: F,
@@ -92,8 +93,8 @@ impl Store {
     self.load_bytes_with(
       EntryType::File,
       digest,
-      move |v: &[u8]| Ok(f_local(v)),
-      move |v: &[u8]| Ok(f_remote(v)),
+      move |v: Bytes| Ok(f_local(v)),
+      move |v: Bytes| Ok(f_remote(v)),
     )
   }
 
@@ -112,7 +113,7 @@ impl Store {
     })).and_then(move |bytes| {
       let len = bytes.len();
       local
-        .store_bytes(EntryType::Directory, bytes, initial_lease)
+        .store_bytes(EntryType::Directory, Bytes::from(bytes), initial_lease)
         .map(move |fingerprint| Digest(fingerprint, len))
     })
       .to_boxed()
@@ -132,9 +133,9 @@ impl Store {
       digest,
       // Trust that locally stored values were canonical when they were written into the CAS,
       // don't bother to check this, as it's slightly expensive.
-      move |bytes: &[u8]| {
+      move |bytes: Bytes| {
         let mut directory = bazel_protos::remote_execution::Directory::new();
-        directory.merge_from_bytes(bytes).map_err(|e| {
+        directory.merge_from_bytes(&bytes).map_err(|e| {
           format!(
             "LMDB corruption: Directory bytes for {:?} were not valid: {:?}",
             digest,
@@ -145,9 +146,9 @@ impl Store {
       },
       // Eagerly verify that CAS-returned Directories are canonical, so that we don't write them
       // into our local store.
-      move |bytes: &[u8]| {
+      move |bytes: Bytes| {
         let mut directory = bazel_protos::remote_execution::Directory::new();
-        directory.merge_from_bytes(bytes).map_err(|e| {
+        directory.merge_from_bytes(&bytes).map_err(|e| {
           format!(
             "CAS returned Directory proto for {:?} which was not valid: {:?}",
             digest,
@@ -162,8 +163,8 @@ impl Store {
 
   fn load_bytes_with<
     T: Send + 'static,
-    FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
-    FRemote: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
+    FLocal: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+    FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
     entry_type: EntryType,
@@ -186,10 +187,10 @@ impl Store {
         (None, None) => future::ok(None).to_boxed() as BoxFuture<_, _>,
         (None, Some(remote)) => {
           remote
-            .load_bytes_with(entry_type, digest, move |bytes: &[u8]| Vec::from(bytes))
-            .and_then(move |maybe_bytes: Option<Vec<u8>>| match maybe_bytes {
+            .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
+            .and_then(move |maybe_bytes: Option<Bytes>| match maybe_bytes {
               Some(bytes) => {
-                future::done(f_remote(&bytes))
+                future::done(f_remote(bytes.clone()))
                   .and_then(move |value| {
                     let len = bytes.len();
                     local.store_bytes(entry_type, bytes, true).and_then(
@@ -251,6 +252,7 @@ mod local {
 
   use boxfuture::{Boxable, BoxFuture};
   use byteorder::{ByteOrder, LittleEndian};
+  use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use hashing::{Digest, Fingerprint};
   use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, RwTransaction,
@@ -487,7 +489,7 @@ mod local {
     pub fn store_bytes(
       &self,
       entry_type: EntryType,
-      bytes: Vec<u8>,
+      bytes: Bytes,
       initial_lease: bool,
     ) -> BoxFuture<Fingerprint, String> {
       let db = match entry_type {
@@ -532,7 +534,7 @@ mod local {
         .to_boxed()
     }
 
-    pub fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+    pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
       &self,
       entry_type: EntryType,
       fingerprint: Fingerprint,
@@ -552,7 +554,7 @@ mod local {
             format!("Failed to begin read transaction: {:?}", err)
           });
           ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
-            Ok(bytes) => Ok(Some(f(bytes))),
+            Ok(bytes) => Ok(Some(f(Bytes::from(bytes)))),
             Err(NotFound) => Ok(None),
             Err(err) => Err(format!(
               "Error loading fingerprint {}: {:?}",
@@ -576,17 +578,17 @@ mod local {
 
   #[cfg(test)]
   pub mod tests {
+    use bytes::Bytes;
     use futures::Future;
     use hashing::{Digest, Fingerprint};
     use super::{ByteStore, EntryType, ResettablePool};
     use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
-    use protobuf::Message;
     use std::path::Path;
     use std::sync::Arc;
     use tempdir::TempDir;
 
-    use super::super::tests::{DIRECTORY_HASH, directory, directory_fingerprint, fingerprint,
-                              other_directory, other_directory_fingerprint, str_bytes};
+    use super::super::tests::{DIRECTORY_HASH, directory_bytes, directory_fingerprint, fingerprint,
+                              other_directory_bytes, other_directory_fingerprint, str_bytes};
 
     #[test]
     fn save_file() {
@@ -620,7 +622,7 @@ mod local {
     fn save_file_collision_preserves_first() {
       let dir = TempDir::new("store").unwrap();
 
-      let bogus_value: Vec<u8> = vec![];
+      let bogus_value = Bytes::new();
 
       let env = Environment::new().set_max_dbs(1).open(dir.path()).unwrap();
       let database = env.create_db(Some("files"), DatabaseFlags::empty());
@@ -678,11 +680,7 @@ mod local {
 
       assert_eq!(
         &new_store(dir.path())
-          .store_bytes(
-            EntryType::Directory,
-            directory().write_to_bytes().unwrap(),
-            false,
-          )
+          .store_bytes(EntryType::Directory, directory_bytes(), false)
           .wait()
           .unwrap()
           .to_hex(),
@@ -691,7 +689,7 @@ mod local {
 
       assert_eq!(
         load_directory_proto_bytes(&new_store(dir.path()), directory_fingerprint()),
-        Ok(Some(directory().write_to_bytes().unwrap()))
+        Ok(Some(directory_bytes()))
       );
     }
 
@@ -724,7 +722,7 @@ mod local {
     fn garbage_collect_nothing_to_do() {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
-      let bytes = "0123456789".as_bytes().to_vec();
+      let bytes = Bytes::from("0123456789");
       store
         .store_bytes(EntryType::File, bytes.clone(), false)
         .wait()
@@ -746,7 +744,7 @@ mod local {
     fn garbage_collect_nothing_to_do_with_lease() {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
-      let bytes = "0123456789".as_bytes().to_vec();
+      let bytes = Bytes::from("0123456789");
       store
         .store_bytes(EntryType::File, bytes.clone(), false)
         .wait()
@@ -769,11 +767,11 @@ mod local {
     fn garbage_collect_remove_one_of_two_files_no_leases() {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
-      let bytes_1 = "0123456789".as_bytes().to_vec();
+      let bytes_1 = Bytes::from("0123456789");
       let fingerprint_1 = Fingerprint::from_hex_string(
         "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
       ).unwrap();
-      let bytes_2 = "9876543210".as_bytes().to_vec();
+      let bytes_2 = Bytes::from("9876543210");
       let fingerprint_2 = Fingerprint::from_hex_string(
         "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
       ).unwrap();
@@ -805,11 +803,11 @@ mod local {
     fn garbage_collect_remove_both_files_no_leases() {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
-      let bytes_1 = "0123456789".as_bytes().to_vec();
+      let bytes_1 = Bytes::from("0123456789");
       let fingerprint_1 = Fingerprint::from_hex_string(
         "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
       ).unwrap();
-      let bytes_2 = "9876543210".as_bytes().to_vec();
+      let bytes_2 = Bytes::from("9876543210");
       let fingerprint_2 = Fingerprint::from_hex_string(
         "7619ee8cea49187f309616e30ecf54be072259b43760f1f550a644945d5572f2",
       ).unwrap();
@@ -841,19 +839,11 @@ mod local {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
       store
-        .store_bytes(
-          EntryType::Directory,
-          directory().write_to_bytes().unwrap(),
-          false,
-        )
+        .store_bytes(EntryType::Directory, directory_bytes(), false)
         .wait()
         .expect("Error storing");
       store
-        .store_bytes(
-          EntryType::Directory,
-          other_directory().write_to_bytes().unwrap(),
-          false,
-        )
+        .store_bytes(EntryType::Directory, other_directory_bytes(), false)
         .wait()
         .expect("Error storing");
       store.shrink(80).expect("Error shrinking");
@@ -879,16 +869,16 @@ mod local {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
 
-      let directory_bytes = directory().write_to_bytes().unwrap();
+      let directory_bytes = directory_bytes();
       store
         .store_bytes(EntryType::Directory, directory_bytes.clone(), true)
         .wait()
         .expect("Error storing");
 
-      let file_bytes = "0123456789012345678901234567890123456789\
-0123456789012345678901234567890123456789"
-        .as_bytes()
-        .to_vec();
+      let file_bytes = Bytes::from(
+        "0123456789012345678901234567890123456789\
+0123456789012345678901234567890123456789",
+      );
       let file_fingerprint = Fingerprint::from_hex_string(
         "af1909413b96cbb29927b3a67f3a8879c801a37be383e5f9b31df5fa8d10fa2b",
       ).unwrap();
@@ -916,17 +906,13 @@ mod local {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
       store
-        .store_bytes(
-          EntryType::Directory,
-          directory().write_to_bytes().unwrap(),
-          false,
-        )
+        .store_bytes(EntryType::Directory, directory_bytes(), false)
         .wait()
         .expect("Error storing");
-      let file_bytes = "0123456789012345678901234567890123456789\
-0123456789012345678901234567890123456789"
-        .as_bytes()
-        .to_vec();
+      let file_bytes = Bytes::from(
+        "0123456789012345678901234567890123456789\
+0123456789012345678901234567890123456789",
+      );
       let file_fingerprint = Fingerprint::from_hex_string(
         "af1909413b96cbb29927b3a67f3a8879c801a37be383e5f9b31df5fa8d10fa2b",
       ).unwrap();
@@ -954,17 +940,13 @@ mod local {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
       store
-        .store_bytes(
-          EntryType::Directory,
-          directory().write_to_bytes().unwrap(),
-          true,
-        )
+        .store_bytes(EntryType::Directory, directory_bytes(), true)
         .wait()
         .expect("Error storing");
-      let file_bytes = "01234567890123456789012345678901234567890\
-123456789012345678901234567890123456789"
-        .as_bytes()
-        .to_vec();
+      let file_bytes = Bytes::from(
+        "01234567890123456789012345678901234567890\
+123456789012345678901234567890123456789",
+      );
       let file_fingerprint = Fingerprint::from_hex_string(
         "af1909413b96cbb29927b3a67f3a8879c801a37be383e5f9b31df5fa8d10fa2b",
       ).unwrap();
@@ -987,7 +969,7 @@ mod local {
       );
       assert_eq!(
         load_bytes(&store, EntryType::Directory, directory_fingerprint()),
-        Ok(Some(directory().write_to_bytes().unwrap())),
+        Ok(Some(directory_bytes())),
         "Leased directory should still be present"
       );
       // Whether the unleased file is present is undefined.
@@ -1000,14 +982,14 @@ mod local {
     pub fn load_file_bytes(
       store: &ByteStore,
       fingerprint: Fingerprint,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Bytes>, String> {
       load_bytes(&store, EntryType::File, fingerprint)
     }
 
     pub fn load_directory_proto_bytes(
       store: &ByteStore,
       fingerprint: Fingerprint,
-    ) -> Result<Option<Vec<u8>>, String> {
+    ) -> Result<Option<Bytes>, String> {
       load_bytes(&store, EntryType::Directory, fingerprint)
     }
 
@@ -1015,10 +997,8 @@ mod local {
       store: &ByteStore,
       entry_type: EntryType,
       fingerprint: Fingerprint,
-    ) -> Result<Option<Vec<u8>>, String> {
-      store
-        .load_bytes_with(entry_type, fingerprint, |b| b.to_vec())
-        .wait()
+    ) -> Result<Option<Bytes>, String> {
+      store.load_bytes_with(entry_type, fingerprint, |b| b).wait()
     }
   }
 }
@@ -1028,7 +1008,7 @@ mod remote {
 
   use bazel_protos;
   use boxfuture::{Boxable, BoxFuture};
-  use bytes::Bytes;
+  use bytes::{Bytes, BytesMut};
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, Sink, Stream};
   use hashing::{Digest, Fingerprint};
@@ -1066,8 +1046,7 @@ mod remote {
       }
     }
 
-    pub fn store_bytes(&self, bytes_vec: Vec<u8>) -> BoxFuture<Digest, String> {
-      let bytes = Bytes::from(bytes_vec);
+    pub fn store_bytes(&self, bytes: Bytes) -> BoxFuture<Digest, String> {
       let mut hasher = Sha256::default();
       hasher.input(&bytes);
       let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
@@ -1104,7 +1083,7 @@ mod remote {
                 req.set_write_offset(offset as i64);
                 let next_offset = min(offset + chunk_size_bytes, bytes.len());
                 req.set_finish_write(next_offset == bytes.len());
-                req.set_data(bytes.slice(offset, next_offset).to_vec());
+                req.set_data(bytes.slice(offset, next_offset));
                 Some(future::ok(
                   ((req, grpcio::WriteFlags::default()), next_offset),
                 ))
@@ -1145,7 +1124,7 @@ mod remote {
       }
     }
 
-    pub fn load_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
+    pub fn load_bytes_with<T: Send + 'static, F: Fn(Bytes) -> T + Send + Sync + 'static>(
       &self,
       _entry_type: EntryType,
       digest: Digest,
@@ -1159,12 +1138,18 @@ mod remote {
         req.set_read_limit(0);
         req
       }) {
-        Ok(stream) =>
-        // We shouldn't have to pass around the client here, it's a workaround for
-        // https://github.com/pingcap/grpc-rs/issues/123
-        future::ok(self.client.clone())
-            .join(stream.map(|r| r.data).concat2())
-            .map(|(_client, bytes)| Some(bytes))
+        Ok(stream) => {
+          // We shouldn't have to pass around the client here, it's a workaround for
+          // https://github.com/pingcap/grpc-rs/issues/123
+          future::ok(self.client.clone())
+            .join(stream.fold(
+              BytesMut::with_capacity(digest.1),
+              move |mut bytes, r| {
+                bytes.extend_from_slice(&r.data);
+                future::ok::<_, grpcio::Error>(bytes)
+              },
+            ))
+            .map(|(_client, bytes)| Some(bytes.freeze()))
             .or_else(|e| match e {
               grpcio::Error::RpcFailure(grpcio::RpcStatus {
                                           status: grpcio::RpcStatusCode::NotFound, ..
@@ -1174,17 +1159,16 @@ mod remote {
                 e
               )),
             })
-            .map(move |maybe_bytes| {
-              maybe_bytes.map(|bytes: Vec<u8>| f(&bytes))
-            })
-            .to_boxed(),
-        Err(err) => future::err(
-          format!(
+            .map(move |maybe_bytes| maybe_bytes.map(|bytes| f(bytes)))
+            .to_boxed()
+        }
+        Err(err) => {
+          future::err(format!(
             "Error making CAS read request for {:?}: {:?}",
             digest,
             err
-          )
-        ).to_boxed() as BoxFuture<_, _>
+          )).to_boxed() as BoxFuture<_, _>
+        }
       }
     }
   }
@@ -1196,16 +1180,17 @@ mod remote {
 
     use super::{ByteStore, Fingerprint};
     use super::super::EntryType;
+    use bytes::Bytes;
     use futures::Future;
     use hashing::Digest;
     use mock::StubCAS;
-    use protobuf::Message;
     use std::fs::File;
     use std::io::Read;
     use std::path::PathBuf;
     use std::time::Duration;
 
-    use super::super::tests::{digest, directory, directory_digest, fingerprint, new_cas, str_bytes};
+    use super::super::tests::{digest, directory_bytes, directory_digest, fingerprint, new_cas,
+                              str_bytes};
 
     #[test]
     fn loads_file() {
@@ -1231,7 +1216,7 @@ mod remote {
 
       assert_eq!(
         load_directory_proto_bytes(&new_byte_store(&cas), directory_digest()),
-        Ok(Some(directory().write_to_bytes().unwrap()))
+        Ok(Some(directory_bytes()))
       );
     }
 
@@ -1335,7 +1320,7 @@ mod remote {
         f.read_to_end(&mut bytes).expect(
           "Error reading all_the_henries",
         );
-        bytes
+        Bytes::from(bytes)
       };
 
       let fingerprint = Fingerprint::from_hex_string(
@@ -1403,28 +1388,23 @@ mod remote {
       ByteStore::new(&cas.address(), 1, 10 * 1024 * 1024, Duration::from_secs(1))
     }
 
-    pub fn load_file_bytes(
-      store: &ByteStore,
-      fingerprint: Digest,
-    ) -> Result<Option<Vec<u8>>, String> {
-      load_bytes(&store, EntryType::File, fingerprint)
+    pub fn load_file_bytes(store: &ByteStore, digest: Digest) -> Result<Option<Bytes>, String> {
+      load_bytes(&store, EntryType::File, digest)
     }
 
     pub fn load_directory_proto_bytes(
       store: &ByteStore,
-      fingerprint: Digest,
-    ) -> Result<Option<Vec<u8>>, String> {
-      load_bytes(&store, EntryType::Directory, fingerprint)
+      digest: Digest,
+    ) -> Result<Option<Bytes>, String> {
+      load_bytes(&store, EntryType::Directory, digest)
     }
 
     fn load_bytes(
       store: &ByteStore,
       entry_type: EntryType,
-      fingerprint: Digest,
-    ) -> Result<Option<Vec<u8>>, String> {
-      store
-        .load_bytes_with(entry_type, fingerprint, |b| b.to_vec())
-        .wait()
+      digest: Digest,
+    ) -> Result<Option<Bytes>, String> {
+      store.load_bytes_with(entry_type, digest, |b| b).wait()
     }
   }
 }
@@ -1434,6 +1414,7 @@ mod tests {
   use super::{EntryType, Store, local};
 
   use bazel_protos;
+  use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::Future;
   use hashing::{Digest, Fingerprint};
@@ -1463,8 +1444,8 @@ ca58002b3fa97478e7c2c97640e72ee1";
     Digest(fingerprint(), STR.len())
   }
 
-  pub fn str_bytes() -> Vec<u8> {
-    STR.as_bytes().to_owned()
+  pub fn str_bytes() -> Bytes {
+    Bytes::from(STR)
   }
 
   pub fn directory() -> bazel_protos::remote_execution::Directory {
@@ -1492,6 +1473,12 @@ ca58002b3fa97478e7c2c97640e72ee1";
     directory
   }
 
+  pub fn directory_bytes() -> Bytes {
+    Bytes::from(directory().write_to_bytes().expect(
+      "Error serializing proto",
+    ))
+  }
+
   pub fn directory_fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(DIRECTORY_HASH).unwrap()
   }
@@ -1499,21 +1486,22 @@ ca58002b3fa97478e7c2c97640e72ee1";
   pub fn directory_digest() -> Digest {
     Digest(
       Fingerprint::from_hex_string(DIRECTORY_HASH).unwrap(),
-      directory()
-        .write_to_bytes()
-        .expect("Error serializing proto")
-        .len(),
+      directory_bytes().len(),
     )
+  }
+
+  pub fn other_directory_bytes() -> Bytes {
+    Bytes::from(other_directory().write_to_bytes().expect(
+      "Error serializing proto",
+    ))
   }
 
   pub fn other_directory_fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(OTHER_DIRECTORY_HASH).unwrap()
   }
 
-  pub fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Vec<u8>>, String> {
-    store
-      .load_file_bytes_with(digest, |bytes: &[u8]| bytes.to_vec())
-      .wait()
+  pub fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
+    store.load_file_bytes_with(digest, |bytes| bytes).wait()
   }
 
   pub fn new_cas(chunk_size_bytes: usize) -> StubCAS {
@@ -1521,10 +1509,7 @@ ca58002b3fa97478e7c2c97640e72ee1";
       chunk_size_bytes as i64,
       vec![
         (fingerprint(), str_bytes()),
-        (
-          directory_fingerprint(),
-          directory().write_to_bytes().unwrap()
-        ),
+        (directory_fingerprint(), directory_bytes()),
       ].into_iter()
         .collect(),
     )
@@ -1563,11 +1548,7 @@ ca58002b3fa97478e7c2c97640e72ee1";
     let dir = TempDir::new("store").unwrap();
 
     local::tests::new_store(dir.path())
-      .store_bytes(
-        EntryType::Directory,
-        directory().write_to_bytes().unwrap(),
-        false,
-      )
+      .store_bytes(EntryType::Directory, directory_bytes(), false)
       .wait()
       .expect("Store failed");
 
@@ -1616,7 +1597,7 @@ ca58002b3fa97478e7c2c97640e72ee1";
         &local::tests::new_store(dir.path()),
         directory_fingerprint(),
       ),
-      Ok(Some(directory().write_to_bytes().unwrap()))
+      Ok(Some(directory_bytes()))
     );
   }
 
@@ -1695,8 +1676,8 @@ ca58002b3fa97478e7c2c97640e72ee1";
 
   #[test]
   fn non_canonical_remote_directory_is_error() {
-    let mut directory = directory();
-    directory.mut_files().push({
+    let mut non_canonical_directory = directory();
+    non_canonical_directory.mut_files().push({
       let mut file = bazel_protos::remote_execution::FileNode::new();
       file.set_name("roland".to_string());
       file.set_digest({
@@ -1707,20 +1688,30 @@ ca58002b3fa97478e7c2c97640e72ee1";
       });
       file
     });
-    let directory_bytes = directory.write_to_bytes().unwrap();
-    let directory_fingerprint = {
+    let non_canonical_directory_bytes =
+      Bytes::from(non_canonical_directory.write_to_bytes().expect(
+        "Error serializing proto",
+      ));
+    let non_canonical_directory_fingerprint = {
       let mut hasher = Sha256::default();
-      hasher.input(&directory_bytes);
+      hasher.input(&non_canonical_directory_bytes);
       Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
     };
-    let directory_digest = Digest(directory_fingerprint, directory_bytes.len());
+    let directory_digest = Digest(
+      non_canonical_directory_fingerprint,
+      non_canonical_directory_bytes.len(),
+    );
 
     let dir = TempDir::new("store").unwrap();
 
     let cas = StubCAS::new(
       1024,
-      vec![(directory_fingerprint.clone(), directory_bytes.clone())]
-        .into_iter()
+      vec![
+        (
+          non_canonical_directory_fingerprint.clone(),
+          non_canonical_directory_bytes
+        ),
+      ].into_iter()
         .collect(),
     );
     new_store(dir.path(), cas.address())
@@ -1731,7 +1722,7 @@ ca58002b3fa97478e7c2c97640e72ee1";
     assert_eq!(
       local::tests::load_directory_proto_bytes(
         &local::tests::new_store(dir.path()),
-        directory_fingerprint,
+        non_canonical_directory_fingerprint,
       ),
       Ok(None)
     );
@@ -1743,7 +1734,7 @@ ca58002b3fa97478e7c2c97640e72ee1";
 
     let cas = StubCAS::new(
       1024,
-      vec![(fingerprint(), directory().write_to_bytes().unwrap())]
+      vec![(fingerprint(), directory_bytes())]
         .into_iter()
         .collect(),
     );
@@ -1763,7 +1754,7 @@ ca58002b3fa97478e7c2c97640e72ee1";
 
     let cas = StubCAS::new(
       1024,
-      vec![(empty_fingerprint, directory().write_to_bytes().unwrap())]
+      vec![(empty_fingerprint, directory_bytes())]
         .into_iter()
         .collect(),
     );

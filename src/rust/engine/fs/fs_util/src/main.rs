@@ -1,5 +1,6 @@
 extern crate bazel_protos;
 extern crate boxfuture;
+extern crate bytes;
 extern crate clap;
 extern crate fs;
 extern crate futures;
@@ -7,6 +8,7 @@ extern crate hashing;
 extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
+use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
 use fs::{GetFileDigest, ResettablePool, Snapshot, Store, VFS};
 use futures::future::{self, Future, join_all};
@@ -327,17 +329,15 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match store
-        .load_file_bytes_with(digest, |bytes| Vec::from(bytes))
-        .wait()? {
+      let v = match store.load_file_bytes_with(digest, |bytes| bytes).wait()? {
         None => {
           store
             .load_directory(digest)
             .map(|maybe_dir| {
               maybe_dir.map(|dir| {
-                dir.write_to_bytes().expect(
+                Bytes::from(dir.write_to_bytes().expect(
                   "Error serializing Directory proto",
-                )
+                ))
               })
             })
             .wait()?
@@ -447,7 +447,7 @@ fn materialize_file(
   store
     .load_file_bytes_with(digest, move |bytes| {
       File::create(&destination)
-        .and_then(|mut f| f.write_all(bytes))
+        .and_then(|mut f| f.write_all(&bytes))
         .map_err(|e| {
           format!("Error writing file {:?}: {}", destination, e.description())
         })

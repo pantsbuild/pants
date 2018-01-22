@@ -1,3 +1,4 @@
+extern crate bytes;
 extern crate futures;
 extern crate grpcio;
 extern crate protobuf;

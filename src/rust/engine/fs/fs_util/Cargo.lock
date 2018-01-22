@@ -25,6 +25,7 @@ dependencies = [
 name = "bazel_protos"
 version = "0.0.1"
 dependencies = [
+ "bytes 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -177,6 +178,7 @@ version = "0.0.1"
 dependencies = [
  "bazel_protos 0.0.1",
  "boxfuture 0.0.1",
+ "bytes 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.29.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -400,6 +402,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "protobuf"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bytes 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "rand"

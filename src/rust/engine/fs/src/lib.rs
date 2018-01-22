@@ -40,6 +40,7 @@ use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
 
+use bytes::Bytes;
 use futures::future::{self, Future};
 use futures_cpupool::CpuFuture;
 use glob::Pattern;
@@ -445,7 +446,10 @@ impl PosixFS {
         std::fs::File::open(&path_abs).and_then(|mut f| {
           let mut content = Vec::new();
           f.read_to_end(&mut content)?;
-          Ok(FileContent { path, content })
+          Ok(FileContent {
+            path: path,
+            content: Bytes::from(content),
+          })
         })
       })
       .to_boxed()
@@ -777,7 +781,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 
 pub struct FileContent {
   pub path: PathBuf,
-  pub content: Vec<u8>,
+  pub content: Bytes,
 }
 
 impl fmt::Debug for FileContent {
@@ -1040,7 +1044,7 @@ impl Snapshots {
         io::Read::read_to_end(&mut entry, &mut content)?;
         files_content.push(FileContent {
           path: path,
-          content: content,
+          content: Bytes::from(content),
         });
       }
     }
