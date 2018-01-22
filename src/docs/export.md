@@ -90,13 +90,13 @@ The following is an abbreviated export file from a command in the pants repo:
     },
    "jvm_platforms": {
         "platforms": {
-            "java6": {
-                "source_level": "1.6",
+            "java8": {
+                "source_level": "1.8",
                 "args": [],
-                "target_level": "1.6"
+                "target_level": "1.8"
             }
         },
-        "default_platform": "java6"
+        "default_platform": "java8"
     },
     "python_setup": {
         "interpreters": {
@@ -117,7 +117,7 @@ The following is an abbreviated export file from a command in the pants repo:
                 "org.hamcrest:hamcrest-core:1.3",
                 "junit:junit:latest.integration"
             ],
-            "platform": "java6",
+            "platform": "java8",
             "pants_target_type": "junit_tests",
             "globs": {
                 "globs": [

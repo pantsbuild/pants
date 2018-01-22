@@ -80,7 +80,7 @@ class CodeCoverage(Subsystem, SubsystemClientMixin):
 
     register('--coverage-jvm-options', advanced=True, type=list, fingerprint=True,
              help='JVM flags to be added when running the coverage processor. For example: '
-                  '{flag}=-Xmx4g {flag}=-XX:MaxPermSize=1g'.format(flag='--coverage-jvm-options'))
+                  '{flag}=-Xmx4g {flag}=-Xms2g'.format(flag='--coverage-jvm-options'))
     register('--coverage-force', advanced=True, type=bool,
              help='Attempt to run the reporting phase of coverage even if tests failed '
                   '(defaults to False, as otherwise the coverage results would be unreliable).')
