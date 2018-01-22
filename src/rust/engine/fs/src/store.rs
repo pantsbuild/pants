@@ -241,7 +241,7 @@ impl Store {
 }
 
 // Only public for testing.
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum EntryType {
   Directory,
   File,
@@ -315,6 +315,36 @@ mod local {
           lease_database,
         }),
       })
+    }
+
+    // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
+    fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
+      let txn = self.inner.env.begin_ro_txn().map_err(|err| {
+        format!("Failed to begin read transaction: {:?}", err)
+      })?;
+      match txn.get(self.inner.directory_database, &fingerprint.as_ref()) {
+        Ok(_) => return Ok(Some(EntryType::Directory)),
+        Err(NotFound) => {}
+        Err(err) => {
+          return Err(format!(
+            "Error reading from store when determining type of fingerprint {}: {:?}",
+            fingerprint,
+            err
+          ))
+        }
+      };
+      match txn.get(self.inner.file_database, &fingerprint.as_ref()) {
+        Ok(_) => return Ok(Some(EntryType::File)),
+        Err(NotFound) => {}
+        Err(err) => {
+          return Err(format!(
+            "Error reading from store when determining type of fingerprint {}: {:?}",
+            fingerprint,
+            err
+          ))
+        }
+      };
+      return Ok(None);
     }
 
     pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -587,8 +617,9 @@ mod local {
     use std::sync::Arc;
     use tempdir::TempDir;
 
-    use super::super::tests::{DIRECTORY_HASH, directory_bytes, directory_fingerprint, fingerprint,
-                              other_directory_bytes, other_directory_fingerprint, str_bytes};
+    use super::super::tests::{DIRECTORY_HASH, directory_bytes, directory_fingerprint,
+                              empty_directory_fingerprint, fingerprint, other_directory_bytes,
+                              other_directory_fingerprint, str_bytes};
 
     #[test]
     fn save_file() {
@@ -973,6 +1004,53 @@ mod local {
         "Leased directory should still be present"
       );
       // Whether the unleased file is present is undefined.
+    }
+
+    fn entry_type_for_file() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      store
+        .store_bytes(EntryType::Directory, directory_bytes(), false)
+        .wait()
+        .expect("Error storing");
+      store
+        .store_bytes(EntryType::File, str_bytes(), false)
+        .wait()
+        .expect("Error storing");
+      assert_eq!(store.entry_type(&fingerprint()), Ok(Some(EntryType::File)))
+    }
+
+    #[test]
+    fn entry_type_for_directory() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      store
+        .store_bytes(EntryType::Directory, directory_bytes(), false)
+        .wait()
+        .expect("Error storing");
+      store
+        .store_bytes(EntryType::File, str_bytes(), false)
+        .wait()
+        .expect("Error storing");
+      assert_eq!(
+        store.entry_type(&directory_fingerprint()),
+        Ok(Some(EntryType::Directory))
+      )
+    }
+
+    #[test]
+    fn entry_type_for_missing() {
+      let dir = TempDir::new("store").unwrap();
+      let store = new_store(dir.path());
+      store
+        .store_bytes(EntryType::Directory, directory_bytes(), false)
+        .wait()
+        .expect("Error storing");
+      store
+        .store_bytes(EntryType::File, str_bytes(), false)
+        .wait()
+        .expect("Error storing");
+      assert_eq!(store.entry_type(&empty_directory_fingerprint()), Ok(None))
     }
 
     pub fn new_store<P: AsRef<Path>>(dir: P) -> ByteStore {
@@ -1494,6 +1572,10 @@ ca58002b3fa97478e7c2c97640e72ee1";
     Bytes::from(other_directory().write_to_bytes().expect(
       "Error serializing proto",
     ))
+  }
+
+  pub fn empty_directory_fingerprint() -> Fingerprint {
+    Fingerprint::from_hex_string(EMPTY_DIRECTORY_HASH).unwrap()
   }
 
   pub fn other_directory_fingerprint() -> Fingerprint {
