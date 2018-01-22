@@ -38,6 +38,6 @@ class IndexableJavaTargets(Subsystem):
     # jar_library we actually want to act on the derived java_library wrapping the decompiled
     # sources.
     for t in requested_targets:
-      requested_targets.extend(context.build_graph.get_all_derivatives(t.address))
+      expanded_targets.extend(context.build_graph.get_all_derivatives(t.address))
 
     return [t for t in expanded_targets if isinstance(t, JvmTarget) and t.has_sources('.java')]
