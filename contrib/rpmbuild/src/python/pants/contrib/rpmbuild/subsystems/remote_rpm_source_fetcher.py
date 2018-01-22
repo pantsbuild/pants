@@ -28,8 +28,8 @@ class RemoteRpmSourceUtil(BinaryUtil):
     def create(cls):
       options = cls.global_instance().get_options()
       return RemoteRpmSourceUtil(
-        options.baseurls, options.fetch_timeout_secs, options.pants_bootstrapdir, options.path_by_id
-      )
+        options.binaries_baseurls, options.binaries_fetch_timeout_secs,
+        options.pants_bootstrapdir, options.binaries_path_by_id)
 
   @staticmethod
   def uname_func():
