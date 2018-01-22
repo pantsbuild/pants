@@ -99,7 +99,7 @@ class NodeDistribution(object):
     tarball_filepath = self._binary_util.select_binary(
       supportdir=supportdir, version=version, name=filename)
     logger.debug('Tarball for %s(%s): %s', supportdir, version, tarball_filepath)
-    work_dir = os.path.dirname(tarball_filepath)
+    work_dir = os.path.join(os.path.dirname(tarball_filepath), 'out')
     TGZ.extract(tarball_filepath, work_dir, concurrency_safe=True)
     return work_dir
 
