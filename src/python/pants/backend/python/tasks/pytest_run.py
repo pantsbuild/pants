@@ -39,17 +39,21 @@ from pants.util.strutil import safe_shlex_split
 from pants.util.xml_parser import XmlParser
 
 
-class _Workdirs(datatype('_Workdirs', ['root_dir'])):
+class _Workdirs(datatype('_Workdirs', ['root_dir', 'partition'])):
   @classmethod
-  def for_targets(cls, work_dir, targets):
-    root_dir = os.path.join(work_dir, Target.maybe_readable_identify(targets))
+  def for_partition(cls, work_dir, partition):
+    root_dir = os.path.join(work_dir, Target.maybe_readable_identify(partition))
     safe_mkdir(root_dir, clean=False)
-    return cls(root_dir=root_dir)
+    return cls(root_dir=root_dir, partition=partition)
+
+  @memoized_method
+  def target_set_id(self, *targets):
+    return Target.maybe_readable_identify(targets or self.partition)
 
   @memoized_method
   def junitxml_path(self, *targets):
     xml_path = os.path.join(self.root_dir, 'junitxml',
-                            'TEST-{}.xml'.format(Target.maybe_readable_identify(targets)))
+                            'TEST-{}.xml'.format(self.target_set_id(*targets)))
     safe_mkdir_for(xml_path)
     return xml_path
 
@@ -618,12 +622,10 @@ class PytestRun(TestRunnerTaskMixin, Task):
       # 1.) output -> workdir
       # 2.) [iff all == invalid] workdir -> cache: We do this manually for now.
       # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
-      # 4.) [iff user-specified final locations] workdir -> final-locations: We perform this step
-      #     as an unconditional post-process.
 
       # 1.) Write all results that will be potentially cached to workdir.
-      workdirs = _Workdirs.for_targets(self.workdir, partition)
-      result = self._run_pytest(workdirs, invalid_tgts).checked()
+      workdirs = _Workdirs.for_partition(self.workdir, partition)
+      result = self._run_pytest_checked(workdirs, invalid_tgts)
 
       cache_vts = self._vts_for_partition(invalidation_check)
       if invalidation_check.all_vts == invalidation_check.invalid_vts:
@@ -644,31 +646,37 @@ class PytestRun(TestRunnerTaskMixin, Task):
         # cache the results. That 1st of others is hopefully CI!
         cache_vts.force_invalidate()
 
-      # 4.) Pluck any results that an end user might need to interact with from the workdir to the
-      # locations they expect.
-      self.expose_results(invalid_tgts, partition, workdirs)
-
       return result
 
-  def expose_results(self, invalid_tgts, partition, workdirs):
+  def _expose_results(self, invalid_tgts, workdirs):
     external_junit_xml_dir = self.get_options().junit_xml_dir
     if external_junit_xml_dir:
       # Either we just ran pytest for a set of invalid targets and generated a junit xml file
       # specific to that (sub)set or else we hit the cache for the whole partition and skipped
       # running pytest, simply retrieving the partition's full junit xml file.
-      junitxml_path = workdirs.junitxml_path(*(invalid_tgts or partition))
+      junitxml_path = workdirs.junitxml_path(*invalid_tgts)
 
       safe_mkdir(external_junit_xml_dir)
       shutil.copy2(junitxml_path, external_junit_xml_dir)
+
     if self.get_options().coverage:
       coverage_output_dir = self.get_options().coverage_output_dir
       if coverage_output_dir:
         target_dir = coverage_output_dir
       else:
-        relpath = Target.maybe_readable_identify(partition)
         pants_distdir = self.context.options.for_global_scope().pants_distdir
+        relpath = workdirs.target_set_id()
         target_dir = os.path.join(pants_distdir, 'coverage', relpath)
       mergetree(workdirs.coverage_path, target_dir)
+
+  def _run_pytest_checked(self, workdirs, targets):
+    result = self._run_pytest(workdirs, targets)
+
+    # Unconditionally pluck any results that an end user might need to interact with from the
+    # workdir to the locations they expect.
+    self._expose_results(targets, workdirs)
+
+    return result.checked()
 
   def _run_pytest(self, workdirs, targets):
     if not targets:

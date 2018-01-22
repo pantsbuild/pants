@@ -17,7 +17,7 @@ from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
-from pants.util.contextutil import pushd
+from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.tasks.task_test_base import ensure_cached
@@ -31,14 +31,9 @@ class PytestTestBase(PythonTaskTestBase):
   _CONFTEST_CONTENT = '# I am an existing root-level conftest file.'
 
   def run_tests(self, targets, *passthru_args, **options):
-    """Run the tests in the specified targets, with the specified PytestRun task options.
-
-    Returns the path of the sources pex, so that calling code can map files from the
-    source tree to files as pytest saw them.
-    """
+    """Run the tests in the specified targets, with the specified PytestRun task options."""
     context = self._prepare_test_run(targets, *passthru_args, **options)
     self._do_run_tests(context)
-    return context
 
   def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
     context = self._prepare_test_run(targets, *passthru_args, **options)
@@ -475,13 +470,37 @@ class PytestTest(PytestTestBase):
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red_test_in_class(self):
-    # for test in a class, the failure line is in the following format
-    # F testprojects/tests/python/pants/constants_only/test_fail.py::TestClassName::test_boom
     self.run_failing_tests(targets=[self.red_in_class], failed_targets=[self.red_in_class])
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_mixed(self):
     self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red])
+
+  def assert_test_info(self, junit_xml_dir, *expected):
+    test_info = PytestRun.parse_test_info(xml_path=junit_xml_dir, error_handler=self.assertIsNone)
+    self.assertEqual({name for (name, _) in expected}, set(test_info.keys()))
+    for name, result in expected:
+      test_details = test_info[name]
+      self.assertEqual(result, test_details['result_code'])
+      self.assertGreater(test_details['time'], 0)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_green_junit_xml_dir(self):
+    with temporary_dir() as junit_xml_dir:
+      self.run_tests(targets=[self.green], junit_xml_dir=junit_xml_dir)
+
+      self.assert_test_info(junit_xml_dir, ('test_one', 'success'))
+
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  def test_red_junit_xml_dir(self):
+    with temporary_dir() as junit_xml_dir:
+      self.run_failing_tests(targets=[self.red, self.green],
+                             failed_targets=[self.red],
+                             junit_xml_dir=junit_xml_dir,
+                             fast=True,
+                             fail_fast=False)
+
+      self.assert_test_info(junit_xml_dir, ('test_one', 'success'), ('test_two', 'failure'))
 
   def coverage_data_file(self):
     return os.path.join(self.build_root, '.coverage')
