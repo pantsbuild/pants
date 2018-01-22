@@ -849,7 +849,7 @@ class JarPublish(TransitiveOptionRegistrar, HasTransitiveOptionMixin, ScmPublish
 
   def exported_targets(self):
     candidates = set(self.get_targets())
-    if not self.transitive:
+    if not self.act_transitively:
       def get_synthetic(lang, target):
         mappings = self.context.products.get(lang).get(target)
         if mappings:
