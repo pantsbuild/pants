@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
-
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -24,6 +22,7 @@ class ListIntegrationTest(PantsRunIntegrationTest):
 
   def test_list_none(self):
     pants_run = self.do_command('list', success=False)
+    self.assertIn('Please specify one or more explicit target', pants_run.stdout_data)
 
   def test_list_invalid_dir(self):
     pants_run = self.do_command('list', 'abcde::', success=False)
