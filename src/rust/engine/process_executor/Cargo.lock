@@ -387,8 +387,10 @@ name = "process_execution"
 version = "0.0.1"
 dependencies = [
  "bazel_protos 0.0.1",
+ "boxfuture 0.0.1",
  "digest 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
  "protobuf 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -402,6 +404,7 @@ version = "0.0.1"
 dependencies = [
  "clap 2.30.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
+ "futures 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "process_execution 0.0.1",
 ]
 
