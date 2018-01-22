@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.tasks2.python_execution_task_base import PythonExecutionTaskBase
+from pants.backend.python.tasks.python_execution_task_base import PythonExecutionTaskBase
 
 
 class PytestPrep(PythonExecutionTaskBase):

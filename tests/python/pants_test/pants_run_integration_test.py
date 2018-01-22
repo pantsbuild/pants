@@ -60,16 +60,6 @@ def ensure_cached(expected_num_artifacts=None):
   return decorator
 
 
-# TODO: Remove this in 1.5.0dev0, when `--enable-v2-engine` is removed.
-def ensure_engine(f):
-  """A decorator for running an integration test with and without the v2 engine enabled."""
-  def wrapper(self, *args, **kwargs):
-    for env_var_value in ('false', 'true'):
-      with environment_as(HERMETIC_ENV='PANTS_ENABLE_V2_ENGINE', PANTS_ENABLE_V2_ENGINE=env_var_value):
-        f(self, *args, **kwargs)
-  return wrapper
-
-
 def ensure_resolver(f):
   """A decorator for running an integration test with ivy and coursier as the resolver."""
   def wrapper(self, *args, **kwargs):
@@ -471,14 +461,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
     """Wrapper around run_pants method.
 
     :param args: command line arguments used to run pants
-    :param kwargs: handles 2 keys
+    :param kwargs: handles 1 key
       success - indicate whether to expect pants run to succeed or fail.
-      enable_v2_engine - indicate whether to use v2 engine or not.
     :return: a PantsResult object
     """
     success = kwargs.get('success', True)
-    enable_v2_engine = kwargs.get('enable_v2_engine', False)
-    cmd = ['--enable-v2-engine'] if enable_v2_engine else []
+    cmd = []
     cmd.extend(list(args))
     pants_run = self.run_pants(cmd)
     if success:

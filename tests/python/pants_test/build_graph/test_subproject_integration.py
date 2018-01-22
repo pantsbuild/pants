@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.dirutil import safe_file_dump, safe_rmtree
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 SUBPROJ_SPEC = 'testprojects/src/python/subproject_test/'
@@ -85,7 +85,6 @@ def harness():
 
 class SubprojectIntegrationTest(PantsRunIntegrationTest):
 
-  @ensure_engine
   def test_subproject_without_flag(self):
     """
     Assert that when getting the dependencies of a project which relies
@@ -96,7 +95,6 @@ class SubprojectIntegrationTest(PantsRunIntegrationTest):
       pants_args = ['dependencies', SUBPROJ_SPEC]
       self.assert_failure(self.run_pants(pants_args))
 
-  @ensure_engine
   def test_subproject_with_flag(self):
     """
     Assert that when getting the dependencies of a project which relies on

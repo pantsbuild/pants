@@ -49,12 +49,6 @@ class DeferredSourcesMapper(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data('unpacked_archives')
 
-  @classmethod
-  def register_options(cls, register):
-    register('--allow-from-target', default=True, type=bool,
-             removal_hint='from_target was removed in 1.3.0', removal_version='1.5.0.dev0',
-             help='This option has no effect, because from_target has been removed.')
-
   def process_remote_sources(self):
     """Create synthetic targets with populated sources from remote_sources targets."""
     unpacked_sources = self.context.products.get_data('unpacked_archives')

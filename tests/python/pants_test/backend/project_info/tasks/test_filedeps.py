@@ -97,12 +97,10 @@ class FileDepsTest(ConsoleTaskTestBase):
                         'lib1.java'
                       ],
                       dependencies=[
+                        'src/resources/lib',
                         'src/scala/core',
                         'src/thrift/storage'
                       ],
-                      resources=[
-                        'src/resources/lib'
-                      ]
                     )
                   """),
                   sources=['lib1.java'])

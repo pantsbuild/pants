@@ -13,7 +13,7 @@ from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
+from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.build_environment import get_buildroot
 from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file

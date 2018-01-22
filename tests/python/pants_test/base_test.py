@@ -180,10 +180,6 @@ class BaseTest(unittest.TestCase):
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
     traversables = [target.compute_dependency_specs(payload=target.payload)]
-    # Only poke `traversable_dependency_specs` if a concrete implementation is defined
-    # in order to avoid spurious deprecation warnings.
-    if type(target).traversable_dependency_specs is not Target.traversable_dependency_specs:
-      traversables.append(target.traversable_dependency_specs)
 
     for dependency_spec in itertools.chain(*traversables):
       dependency_address = Address.parse(dependency_spec, relative_to=address.spec_path)
@@ -397,7 +393,6 @@ class BaseTest(unittest.TestCase):
     self.add_to_build_file(path, dedent('''
           %(target_type)s(name='%(name)s',
             %(sources)s
-            %(resources)s
             %(java_sources)s
             %(provides)s
             %(dependencies)s
@@ -406,8 +401,6 @@ class BaseTest(unittest.TestCase):
                    name=name,
                    sources=('sources=%s,' % repr(sources)
                               if sources else ''),
-                   resources=('resources=["%s"],' % kwargs.get('resources')
-                              if 'resources' in kwargs else ''),
                    java_sources=('java_sources=[%s],'
                                  % ','.join(map(lambda str_target: '"%s"' % str_target,
                                                 kwargs.get('java_sources')))

@@ -123,17 +123,6 @@ python_tests(
   ]
 )
 
-python_tests(
-  name = 'pants_ignore_scm',
-  sources = ['test_pants_ignore_scm.py'],
-  dependencies = [
-    ':pants_ignore_test_base',
-    'src/python/pants/base:project_tree',
-    'src/python/pants/scm:git',
-    'src/python/pants/util:process_handler',
-  ]
-)
-
 python_library(
   name = 'pants_ignore_test_base',
   sources = ['pants_ignore_test_base.py'],
@@ -189,19 +178,6 @@ python_tests(
     'src/python/pants/base:run_info',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
-  name = 'scm_build_file',
-  sources = ['test_scm_build_file.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    ':build_file_test_base',
-    'src/python/pants/base:project_tree',
-    'src/python/pants/scm:git',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:process_handler',
   ]
 )
 

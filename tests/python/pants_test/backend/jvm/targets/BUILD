@@ -78,16 +78,6 @@ python_tests(
 )
 
 python_tests(
-  name='jvm_target',
-  sources=['test_jvm_target.py'],
-  dependencies=[
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
-  ]
-)
-
-python_tests(
   name='unpacked_jars',
   sources=['test_unpacked_jars.py'],
   dependencies=[
