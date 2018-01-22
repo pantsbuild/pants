@@ -47,12 +47,12 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
   def test_with_install_requires(self):
     command=['run', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
-    self.assert_success()
+    self.assert_success(pants_run)
     self.assertIn('United States', pants_run.stdout_data)
     command=['binary', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
-    self.assert_success()
-    pex = os.path.join(get_buildroot(), 'dist', 'main.pex')
+    self.assert_success(pants_run)
+    pex = os.path.join(get_buildroot(), 'dist', 'main_with_no_conflict.pex')
     output = subprocess.check_output(pex)
     self.assertIn('United States', output)
     os.remove(pex)

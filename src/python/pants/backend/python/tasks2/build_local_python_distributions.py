@@ -14,7 +14,7 @@ from pex.interpreter import PythonInterpreter
 from pants.backend.python.tasks2.pex_build_util import is_local_python_dist
 from pants.backend.python.tasks2.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
+from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
 from pants.task.task import Task
 from pants.util.dirutil import safe_mkdir
@@ -50,6 +50,11 @@ class BuildLocalPythonDistributions(Task):
           if vt.valid:
             built_dists.add(self._get_whl_from_dir(os.path.join(vt.results_dir, 'dist')))
           else:
+            if vt.target.dependencies :
+              raise TargetDefinitionException(
+                vt.target, 'The `dependencies` field is disallowed on `python_dist` targets. List any 3rd '
+                           'party requirements in the install_requirements argument of your setup function.'
+              )
             built_dists.add(self._create_dist(vt.target, vt.results_dir))
 
     self.context.products.register_data(self.PYTHON_DISTS, built_dists)
