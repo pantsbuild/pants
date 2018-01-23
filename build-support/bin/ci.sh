@@ -29,7 +29,6 @@ function usage() {
   echo "              if running core python tests, divide them into"
   echo "              TOTAL_SHARDS shards and just run those in SHARD_NUMBER"
   echo "              to run only even tests: '-u 0/2', odd: '-u 1/2'"
-  echo " -a           skip android targets when running tests"
   echo " -n           skip contrib python tests"
   echo " -e           skip rust tests"
   echo " -y SHARD_NUMBER/TOTAL_SHARDS"
@@ -76,18 +75,11 @@ while getopts "hfxbkmsrjlpeu:ny:ci:at" opt; do
     y) python_contrib_shard=${OPTARG} ;;
     c) skip_integration="true" ;;
     i) python_intg_shard=${OPTARG} ;;
-    a) skip_android="true" ;;
     t) skip_lint="true" ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
 shift $((${OPTIND} - 1))
-
-# Android testing requires the SDK to be installed and configured in Pants.
-# Skip if ANDROID_HOME isn't configured in the environment
-if [[ -z "${ANDROID_HOME}"  || "${skip_android:-false}" == "true" ]] ; then
-  export SKIP_ANDROID_PATTERN='contrib/android'
-fi
 
 echo
 if [[ $# > 0 ]]; then

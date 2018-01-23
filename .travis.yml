@@ -1,8 +1,6 @@
 env:
   global:
     - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.ini"
-    - ANDROID_SDK_INSTALL_LOCATION="${HOME}/opt/android-sdk-install"
-    - ANDROID_HOME="$ANDROID_SDK_INSTALL_LOCATION/android-sdk-linux"
 
 before_cache:
   # Ensure permissions to do the below removals, which happen with or without caching enabled.
@@ -31,7 +29,6 @@ before_cache:
   #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
   # NB: We do _not_ prune the cargo cache, since that holds compiled tools and outputs, and
   # individually resolved artifacts.
-  - rm -rf ${HOME}/.cache/pants/bin
   - rm -rf ${HOME}/.cache/pants/rust/rustup
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
@@ -90,25 +87,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
-      before_script:
-        # The lint shard attempts to ivy resolve against the Android SDK due to
-        # references in `build-support/ivy/ivysettings.xml`.
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Various pants self checks and lint"
       script:
@@ -120,21 +104,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 1"
       script:
@@ -146,21 +121,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Unit tests for pants and pants-plugins - shard 2"
       script:
@@ -172,24 +138,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
-      before_script:
-        # Contrib tests need Android.
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python contrib tests - shard 1"
       script:
@@ -201,24 +155,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
-      before_script:
-        # Contrib tests need Android.
-        - ./build-support/bin/install-android-sdk.sh
       env:
         - SHARD="Python contrib tests - shard 2"
       script:
@@ -230,21 +172,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
@@ -256,21 +189,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
@@ -282,21 +206,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 3"
       script:
@@ -308,21 +223,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 4"
       script:
@@ -334,21 +240,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 5"
       script:
@@ -360,21 +257,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 6"
       script:
@@ -386,21 +274,12 @@ matrix:
       addons:
         apt:
           packages:
-            - lib32stdc++6
-            - lib32z1
-            - lib32z1-dev
             - gcc-multilib
             - python-dev
             - openssl
             - libssl-dev
       language: python
       python: "2.7.13"
-      before_install:
-        # Remove bad openjdk6 from trusty image, so
-        # Pants will pick up oraclejdk6 from `packages` above.
-        - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
-        - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
-        - jdk_switcher use oraclejdk8
       env:
         - SHARD="Python integration tests for pants - shard 7"
       script:
