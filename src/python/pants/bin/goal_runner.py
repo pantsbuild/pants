@@ -250,7 +250,7 @@ class GoalRunner(object):
 
     try:
       result = self._execute_engine()
-      self._run_tracker.pantsd_stats.set_resulting_graph_size(self._context.scheduler.graph_len())
+      self._context.set_resulting_graph_size_in_runtracker()
       if result:
         self._run_tracker.set_root_outcome(WorkUnit.FAILURE)
     except KeyboardInterrupt:

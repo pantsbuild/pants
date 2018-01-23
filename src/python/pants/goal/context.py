@@ -143,11 +143,6 @@ class Context(object):
     return self._scm
 
   @property
-  def scheduler(self):
-    """Returns the scheduler instance used for this run."""
-    return self._scheduler
-
-  @property
   def workspace(self):
     """Returns the current workspace, if any."""
     return self._workspace
@@ -159,6 +154,12 @@ class Context(object):
   def __str__(self):
     ident = Target.identify(self.targets())
     return 'Context(id:{}, targets:{})'.format(ident, self.targets())
+
+  def set_resulting_graph_size_in_runtracker(self):
+    """Sets the resulting graph size in the run tracker's daemon stats object."""
+    node_count = self._scheduler.graph_len()
+    self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
+    return node_count
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """
