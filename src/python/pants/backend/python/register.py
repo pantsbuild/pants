@@ -14,17 +14,12 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks2.build_local_python_distributions import \
+from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks2.gather_sources import GatherSources
-from pants.backend.python.tasks2.pytest_prep import PytestPrep
-from pants.backend.python.tasks2.pytest_run import PytestRun
-from pants.backend.python.tasks2.python_binary_create import PythonBinaryCreate
-from pants.backend.python.tasks2.python_repl import PythonRepl
-from pants.backend.python.tasks2.python_run import PythonRun
-from pants.backend.python.tasks2.resolve_requirements import ResolveRequirements
-from pants.backend.python.tasks2.select_interpreter import SelectInterpreter
-from pants.backend.python.tasks2.setup_py import SetupPy
+from pants.backend.python.tasks.gather_sources import GatherSources
+from pants.backend.python.tasks.pytest_prep import PytestPrep
+from pants.backend.python.tasks.pytest_run import PytestRun
+from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_isort import IsortPythonTask
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun

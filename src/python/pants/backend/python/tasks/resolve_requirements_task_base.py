@@ -11,9 +11,9 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks2.build_local_python_distributions import \
+from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks2.pex_build_util import (build_req_libs_provided_by_setup_file,
+from pants.backend.python.tasks.pex_build_util import (build_req_libs_provided_by_setup_file,
                                                         dump_requirements, is_local_python_dist)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task

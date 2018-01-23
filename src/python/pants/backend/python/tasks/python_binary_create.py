@@ -12,9 +12,9 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.tasks2.build_local_python_distributions import \
+from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks2.pex_build_util import (build_req_libs_provided_by_setup_file,
+from pants.backend.python.tasks.pex_build_util import (build_req_libs_provided_by_setup_file,
                                                         dump_requirements, dump_sources,
                                                         has_python_requirements, has_python_sources,
                                                         has_resources)

@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.python.targets.python_distribution import PythonDistribution
-from pants.backend.python.tasks2.build_local_python_distributions import \
+from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
@@ -39,8 +39,8 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase):
     for rel_path, content in self.filemap.items():
       self.create_file(rel_path, content)
 
-    self.python_dist_tgt = self.make_target(spec='src/python/dist:my_dist', 
-                                            target_type=PythonDistribution, 
+    self.python_dist_tgt = self.make_target(spec='src/python/dist:my_dist',
+                                            target_type=PythonDistribution,
                                             sources=sources)
 
   def test_python_create_distributions(self):

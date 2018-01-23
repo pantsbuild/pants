@@ -11,8 +11,8 @@ import shutil
 
 from pex.interpreter import PythonInterpreter
 
-from pants.backend.python.tasks2.pex_build_util import is_local_python_dist
-from pants.backend.python.tasks2.setup_py import SetupPyRunner
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist
+from pants.backend.python.tasks.setup_py import SetupPyRunner
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.fingerprint_strategy import DefaultFingerprintStrategy
@@ -41,7 +41,7 @@ class BuildLocalPythonDistributions(Task):
   def execute(self):
     dist_targets = self.context.targets(is_local_python_dist)
     built_dists = set()
-    
+
     if dist_targets:
       with self.invalidated(dist_targets,
                             fingerprint_strategy=DefaultFingerprintStrategy(),
