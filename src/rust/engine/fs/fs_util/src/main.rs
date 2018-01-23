@@ -158,19 +158,22 @@ to this directory.",
 fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local-store-path").unwrap();
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
-  let store = {
-    let store_result = match top_match.value_of("server-address") {
+  let (store, store_has_remote) = {
+    let (store_result, store_has_remote) = match top_match.value_of("server-address") {
       Some(cas_address) => {
-        Store::with_remote(
-          store_dir,
-          pool.clone(),
-          cas_address,
-          1,
-          10 * 1024 * 1024,
-          Duration::from_secs(30),
+        (
+          Store::with_remote(
+            store_dir,
+            pool.clone(),
+            cas_address,
+            1,
+            10 * 1024 * 1024,
+            Duration::from_secs(30),
+          ),
+          true,
         )
       }
-      None => Store::local_only(store_dir, pool.clone()),
+      None => (Store::local_only(store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
       format!(
@@ -179,7 +182,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         e
       )
     })?;
-    Arc::new(store)
+    (Arc::new(store), store_has_remote)
   };
 
   match top_match.subcommand() {
@@ -224,11 +227,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           match file {
             fs::Stat::File(f) => {
               let digest = FileSaver {
-                store: store,
+                store: store.clone(),
                 posix_fs: Arc::new(posix_fs),
               }.digest(&f)
                 .wait()
                 .unwrap();
+              if store_has_remote {
+                store.ensure_remote_has_recursive(vec![digest]).wait()?;
+              }
               Ok(println!("{} {}", digest.0, digest.1))
             }
             o => Err(
@@ -259,6 +265,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
+          let store_copy = store.clone();
           let digest = posix_fs
             .expand(fs::PathGlobs::create(
               &args
@@ -271,9 +278,9 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .map_err(|e| format!("Error expanding globs: {}", e.description()))
             .and_then(move |paths| {
               Snapshot::from_path_stats(
-                store.clone(),
+                store_copy.clone(),
                 Arc::new(FileSaver {
-                  store: store.clone(),
+                  store: store_copy,
                   posix_fs: posix_fs,
                 }),
                 paths,
@@ -281,6 +288,9 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             })
             .map(|snapshot| snapshot.digest.unwrap())
             .wait()?;
+          if store_has_remote {
+            store.ensure_remote_has_recursive(vec![digest]).wait()?;
+          }
           Ok(println!("{} {}", digest.0, digest.1))
         }
         ("cat-proto", Some(args)) => {
