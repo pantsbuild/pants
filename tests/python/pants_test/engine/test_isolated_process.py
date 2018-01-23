@@ -134,7 +134,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
       [PathGlobs.create('', include=['fs_test/a/b/*'])])
     root_entries = scheduler.execute(request).root_products
     self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
+    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
     concatted = state.value
 
     self.assertEqual(Concatted('one\ntwo\n'), concatted)
@@ -152,7 +152,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     root_entries = scheduler.execute(request).root_products
 
     self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
+    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
     result = state.value
     self.assertEqual(0, result.exit_code)
     self.assertIn('javac', result.stderr)
@@ -176,7 +176,7 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     root_entries = scheduler.execute(request).root_products
 
     self.assertEquals(1, len(root_entries))
-    state = self.assertFirstEntryIsReturn(root_entries, scheduler)
+    state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
     classpath_entry = state.value
     self.assertIsInstance(classpath_entry, ClasspathEntry)
     self.assertTrue(os.path.exists(os.path.join(classpath_entry.path, 'simple', 'Simple.class')))
@@ -219,9 +219,9 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     self.assertFirstEntryIsThrow(root_entries,
                                  in_msg='Failed in output conversion!')
 
-  def assertFirstEntryIsReturn(self, root_entries, scheduler):
+  def assertFirstEntryIsReturn(self, root_entries, scheduler, execution_request):
     root, state = root_entries[0]
-    self.assertReturn(state, scheduler)
+    self.assertReturn(state, scheduler, execution_request)
     return state
 
   def assertFirstEntryIsThrow(self, root_entries, in_msg=None):
@@ -242,13 +242,13 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     rules = list(rules) + create_fs_rules() + create_process_rules()
     return self.mk_scheduler(rules=rules, project_tree=self.mk_example_fs_tree())
 
-  def assertReturn(self, state, scheduler):
+  def assertReturn(self, state, scheduler, execution_request):
     is_return = isinstance(state, Return)
     if is_return:
       return
     else:
       self.fail('Expected a Return, but found a {}. trace below:\n{}'
-                .format(state, '\n'.join(scheduler.trace())))
+                .format(state, '\n'.join(scheduler.trace(execution_request))))
 
   def assertPathContains(self, expected_files, path):
     for i in expected_files:
