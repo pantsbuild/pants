@@ -14,6 +14,7 @@ from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
+from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
 
@@ -48,17 +49,12 @@ class IsortPythonTask(Task):
   @classmethod
   def register_options(cls, register):
     super(IsortPythonTask, cls).register_options(register)
-    register('--skip', type=bool, default=False,
-             help='If true, skip isort task.')
     register('--version', advanced=True, fingerprint=True, default='4.2.5',
              help='Version of isort.')
 
   def execute(self, test_output_file=None):
-
-    if self.options.skip:
-      return
-
-    sources = self._calculate_isortable_python_sources(self.context.target_roots)
+    sources = self._calculate_isortable_python_sources(
+      self.get_targets(self.is_non_synthetic_python_target))
 
     if not sources:
       logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
@@ -77,9 +73,8 @@ class IsortPythonTask(Task):
 
   def _calculate_isortable_python_sources(self, targets):
     """Generate a set of source files from the given targets."""
-    python_eval_targets = filter(self.is_non_synthetic_python_target, targets)
     sources = set()
-    for target in python_eval_targets:
+    for target in targets:
       sources.update(
         source for source in target.sources_relative_to_buildroot()
         if os.path.splitext(source)[1] == self._PYTHON_SOURCE_EXTENSION
