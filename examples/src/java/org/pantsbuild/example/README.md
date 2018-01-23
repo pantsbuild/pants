@@ -229,6 +229,8 @@ eventually. Example config to use coursier:
     [cache.resolve.coursier]
     # In order to enable remote caching, need to relativize the classpath entries serialized.
     # https://github.com/pantsbuild/pants/issues/5187
+    # We still want to compute fingerprints so we can validate or invalidate,
+    # but do not want to check local or remote cache.
     read: False
     write: False
 
@@ -259,12 +261,6 @@ eventually. Example config to use coursier:
         # Specify the type of artifacts to fetch
         '-A', 'jar,bundle,test-jar,maven-plugin,src,doc,aar'
       ]
-
-    [cache.resolve.coursier]
-    # We still want to compute fingerprints so we can validate or invalidate,
-    # but do not want to check local or remote cache.
-    read: False
-    write: False
 
 Pants uses [Nailgun](https://github.com/martylamb/nailgun) to speed up compiles. Nailgun is a
 JVM daemon that runs in the background. This means you don't need to start up a JVM and load
