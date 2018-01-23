@@ -31,7 +31,6 @@ before_cache:
   #   see https://docs.travis-ci.com/user/caching/#Things-not-to-cache
   # NB: We do _not_ prune the cargo cache, since that holds compiled tools and outputs, and
   # individually resolved artifacts.
-  - rm -rf ${HOME}/.cache/pants/bin
   - rm -rf ${HOME}/.cache/pants/rust/rustup
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
