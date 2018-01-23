@@ -61,3 +61,27 @@ python_tests(
   tags={'integration'},
   timeout=2400
 )
+
+python_tests(
+  name='python_isort_task_integration',
+  sources=['test_python_isort_integration.py'],
+  dependencies=[
+    'tests/python/pants_test:int-test',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+  ],
+  tags={'integration'},
+)
+
+python_tests(
+  name='python_isort_task',
+  sources=['test_python_isort.py'],
+  dependencies=[
+    'src/python/pants/util:dirutil',
+    'tests/python/pants_test/backend/python/tasks:python_task_test_base',
+    'src/python/pants/util:process_handler',
+    'tests/python/pants_test:base_test',
+    'tests/python/pants_test/subsystem:subsystem_utils',
+    'tests/python/pants_test/tasks:task_test_base',
+  ],
+  timeout=300
+)
