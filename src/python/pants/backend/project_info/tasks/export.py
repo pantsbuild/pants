@@ -74,7 +74,7 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
 
   @staticmethod
   def _is_jvm(dep):
-    return dep.is_jvm or isinstance(dep, JvmApp)
+    return  isinstance(dep, (JarLibrary, JvmTarget, JvmApp))
 
   @staticmethod
   def _jar_id(jar):

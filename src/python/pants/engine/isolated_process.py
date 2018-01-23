@@ -11,7 +11,7 @@ import os
 from abc import abstractproperty
 from binascii import hexlify
 
-from pants.engine.rules import SingletonRule, TaskRule
+from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Select
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_mkdir
@@ -29,7 +29,7 @@ def _run_command(binary, sandbox_dir, process_request):
                            stderr=subprocess.PIPE,
                            stdout=subprocess.PIPE,
                            cwd=sandbox_dir)
-  # TODO At some point, we may want to replace this blocking wait with a timed one that returns
+  # TODO: At some point, we may want to replace this blocking wait with a timed one that returns
   # some kind of in progress state.
   popen.wait()
   logger.debug('Done running command in {}'.format(sandbox_dir))
@@ -58,7 +58,6 @@ def _snapshotted_process(input_conversion,
 
   Receives two conversion functions, some required inputs, and the user-declared inputs.
   """
-
   process_request = input_conversion(*args)
 
   # TODO resolve what to do with output files, then make these tmp dirs cleaned up.
@@ -80,6 +79,20 @@ def _snapshotted_process(input_conversion,
                                                                              process_result.exit_code))
 
     return output_conversion(process_result, sandbox_dir)
+
+
+def _setup_process_execution(input_conversion, *args):
+  """A pickleable top-level function to setup pre-execution.
+  """
+  return input_conversion(*args)
+
+
+def _post_process_execution(output_conversion, *args):
+  """A pickleable top-level function to execute a process.
+
+  Receives two conversion functions, some required inputs, and the user-declared inputs.
+  """
+  return output_conversion(*args)
 
 
 class Binary(object):
@@ -159,3 +172,62 @@ def create_snapshot_rules():
   return [
       SingletonRule(_Snapshots, _Snapshots('/dev/null'))
     ]
+
+
+class ExecuteProcess(object):
+  """A static helper for defining a task rule to execute a process."""
+
+  def __new__(cls, *args):
+    raise ValueError('Use `create` to declare a task function representing a process.')
+
+  @staticmethod
+  def create_in(product_type, input_selectors, input_conversion):
+    # TODO: combine create_in/create_out fucntions
+    func = functools.partial(_setup_process_execution, input_conversion)
+    func.__name__ = '{}_and_then_execute_process'.format(input_conversion.__name__)
+    inputs =  list(input_selectors)
+
+    # Return a task triple that executes the function to produce the product type.
+    return TaskRule(product_type, inputs, func)
+
+  @staticmethod
+  def create_out(product_type, input_selectors, output_conversion):
+    func = functools.partial(_post_process_execution,
+      output_conversion)
+    func.__name__ = 'execute_process_and_then_{}'.format(output_conversion.__name__)
+    inputs = list(input_selectors)
+
+    # Return a task triple that executes the function to produce the product type.
+    return TaskRule(product_type, inputs, func)
+
+
+class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env'])):
+  """Request for execution with args and snapshots to extract."""
+
+  def __new__(cls, argv, env):
+    """
+
+    :param args: Arguments to the process being run.
+    :param env: A tuple of environment variables and values.
+    """
+    if not isinstance(argv, tuple):
+      raise ValueError('argv must be a tuple.')
+    return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env))
+
+
+class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):
+  pass
+
+
+def create_process_rules():
+  """Intrinsically replaced on the rust side."""
+  return [execute_process_noop, RootRule(ExecuteProcessRequest)]
+
+
+@rule(ExecuteProcessResult, [Select(ExecuteProcessRequest)])
+def execute_process_noop(*args):
+  raise Exception('This task is replaced intrinsically, and should never run.')
+
+
+
+

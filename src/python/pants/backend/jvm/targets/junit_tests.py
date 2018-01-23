@@ -93,10 +93,6 @@ class JUnitTests(JvmTarget):
                                       "The value for 'concurrency' must be one of "
                                       + repr(self.VALID_CONCURRENCY_OPTS) + " got: " + concurrency)
 
-    # TODO(John Sirois): These could be scala, clojure, etc.  'jvm' and 'tests' are the only truly
-    # applicable labels - fixup the 'java' misnomer.
-    self.add_labels('java')
-
   @classmethod
   def compute_dependency_specs(cls, kwargs=None, payload=None):
     for spec in super(JUnitTests, cls).compute_dependency_specs(kwargs, payload):

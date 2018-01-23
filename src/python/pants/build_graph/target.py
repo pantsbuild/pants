@@ -98,8 +98,10 @@ class AbstractTarget(object):
     """
     raise NotImplementedError()
 
-  # TODO: Kill this in 1.5.0.dev0, once this old-style resource specification is gone.
   @property
+  @deprecated('1.7.0.dev0',
+              'Old style resource specification is gone: check for dependencies of type '
+              '`Resources` instead.')
   def has_resources(self):
     """Returns True if the target has an associated set of Resources.
 
@@ -115,34 +117,6 @@ class AbstractTarget(object):
     :API: public
     """
     return getattr(self, 'provides', None) is not None
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_jvm(self):
-    """Returns True if the target produces jvm bytecode."""
-    return self.has_label('jvm')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_java(self):
-    """Returns True if the target has or generates java sources."""
-    return self.has_label('java')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_python(self):
-    """Returns True if the target has python sources."""
-    return self.has_label('python')
-
-  # DEPRECATED to be removed after 0.0.29
-  # do not use this method, use an isinstance check on a yet-to-be-defined mixin
-  @property
-  def is_scala(self):
-    """Returns True if the target has scala sources."""
-    return self.has_label('scala')
 
 
 class Target(AbstractTarget):
@@ -395,7 +369,6 @@ class Target(AbstractTarget):
     self._type_alias = type_alias
     self._tags = set(tags or [])
     self.description = description
-    self.labels = set()
 
     self._cached_fingerprint_map = {}
     self._cached_all_transitive_fingerprint_map = {}
@@ -653,29 +626,6 @@ class Target(AbstractTarget):
     """
     return self._build_graph.get_concrete_derived_from(self.address)
 
-  @property
-  @deprecated('1.5.0.dev0', 'Use `Target.compute_injectable_specs()` instead.')
-  def traversable_specs(self):
-    """
-    :API: public
-
-    :return: specs referenced by this target to be injected into the build graph
-    :rtype: list of strings
-    """
-    return []
-
-  @property
-  @deprecated('1.5.0.dev0', 'Use `Target.compute_dependency_specs()` instead.')
-  def traversable_dependency_specs(self):
-    """
-    :API: public
-
-    :return: specs representing dependencies of this target that will be injected to the build
-    graph and linked in the graph as dependencies of this target
-    :rtype: list of strings
-    """
-    return []
-
   @staticmethod
   def _validate_target_representation_args(kwargs, payload):
     assert (kwargs is None) ^ (payload is None), 'must provide either kwargs or payload'
@@ -863,18 +813,6 @@ class Target(AbstractTarget):
     :API: public
     """
     return self.closure_for_targets([self], *vargs, **kwargs)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def add_labels(self, *label):
-    self.labels.update(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def remove_label(self, label):
-    self.labels.remove(label)
-
-  # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-  def has_label(self, label):
-    return label in self.labels
 
   def __lt__(self, other):
     return self.address < other.address

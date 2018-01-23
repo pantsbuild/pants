@@ -398,7 +398,6 @@ python_tests(
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/jvm/tasks:junit_run',
-    'src/python/pants/backend/python/tasks:python',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/goal:products',

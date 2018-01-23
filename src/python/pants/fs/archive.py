@@ -38,7 +38,7 @@ class Archiver(AbstractClass):
     """
     if concurrency_safe:
       with temporary_dir() as temp_dir:
-        cls._extract(path, temp_dir)
+        cls._extract(path, temp_dir, filter_func=filter_func)
         safe_concurrent_rename(temp_dir, outdir)
     else:
       # Leave the existing default behavior unchanged and allows overlay of contents.

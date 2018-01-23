@@ -1,3 +1,4 @@
+extern crate bytes;
 extern crate futures;
 extern crate grpcio;
 extern crate protobuf;
@@ -6,6 +7,7 @@ pub mod bytestream;
 pub mod bytestream_grpc;
 pub mod code;
 pub mod empty;
+pub mod error_details;
 pub mod operations;
 pub mod operations_grpc;
 pub mod remote_execution;

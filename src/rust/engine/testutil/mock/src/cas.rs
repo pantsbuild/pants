@@ -5,6 +5,7 @@ use bazel_protos;
 use futures;
 use grpcio;
 
+use bytes::Bytes;
 use futures::{Future, IntoFuture, Stream};
 use hashing::Fingerprint;
 
@@ -16,7 +17,7 @@ pub struct StubCAS {
   server_transport: grpcio::Server,
   read_request_count: Arc<Mutex<usize>>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
-  pub blobs: Arc<Mutex<HashMap<Fingerprint, Vec<u8>>>>,
+  pub blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
 }
 
 impl StubCAS {
@@ -28,7 +29,7 @@ impl StubCAS {
   ///                        If a negative value is given, all requests will receive an error.
   /// * `blobs`            - Known Fingerprints and their content responses. These are not checked
   ///                        for correctness.
-  pub fn new(chunk_size_bytes: i64, blobs: HashMap<Fingerprint, Vec<u8>>) -> StubCAS {
+  pub fn new(chunk_size_bytes: i64, blobs: HashMap<Fingerprint, Bytes>) -> StubCAS {
     let env = Arc::new(grpcio::Environment::new(1));
     let read_request_count = Arc::new(Mutex::new(0));
     let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
@@ -81,7 +82,7 @@ impl StubCAS {
 #[derive(Clone, Debug)]
 pub struct StubCASResponder {
   chunk_size_bytes: i64,
-  blobs: Arc<Mutex<HashMap<Fingerprint, Vec<u8>>>>,
+  blobs: Arc<Mutex<HashMap<Fingerprint, Bytes>>>,
   pub read_request_count: Arc<Mutex<usize>>,
   pub write_message_sizes: Arc<Mutex<Vec<usize>>>,
 }
@@ -126,7 +127,7 @@ impl StubCASResponder {
           .chunks(self.chunk_size_bytes as usize)
           .map(|b| {
             let mut resp = bazel_protos::bytestream::ReadResponse::new();
-            resp.set_data(b.to_vec());
+            resp.set_data(Bytes::from(b));
             resp
           })
           .collect(),
@@ -197,7 +198,7 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
         .and_then(move |reqs| {
           let mut maybe_resource_name = None;
           let mut want_next_offset = 0;
-          let mut bytes: Vec<u8> = Vec::new();
+          let mut bytes = Bytes::new();
           for req in reqs {
             match maybe_resource_name {
               None => maybe_resource_name = Some(req.get_resource_name().to_owned()),

@@ -39,20 +39,18 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
   def _extract_exclude_output(self, test_name):
     stdout_data = self.do_command('filemap',
                                   self._mk_target(test_name),
-                                  success=True,
-                                  enable_v2_engine=True).stdout_data
+                                  success=True).stdout_data
 
     return {s.split(' ')[0].replace(self.PATH_PREFIX, '')
             for s in stdout_data.split('\n') if s.startswith(self.PATH_PREFIX)}
 
   def test_testprojects(self):
-    self.do_command('filemap', 'testprojects::', success=True, enable_v2_engine=True)
+    self.do_command('filemap', 'testprojects::', success=True)
 
   def test_python_sources(self):
     run = self.do_command('filemap',
                           'testprojects/src/python/sources',
-                          success=True,
-                          enable_v2_engine=True)
+                          success=True)
     self.assertIn('testprojects/src/python/sources/sources.py', run.stdout_data)
 
   def test_exclude_invalid_string(self):
@@ -63,8 +61,7 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
     with self.temporary_file_content(build_path, build_content):
       pants_run = self.do_command('filemap',
                                   self._mk_target('exclude_strings_disallowed'),
-                                  success=False,
-                                  enable_v2_engine=True)
+                                  success=False)
       self.assertRegexpMatches(pants_run.stderr_data,
                                r'Excludes of type `.*` are not supported')
 

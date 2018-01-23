@@ -34,4 +34,3 @@ class JaxWsLibrary(ExportableJvmLibrary):
       'extra_args': PrimitiveField(self.assert_list(extra_args, key_arg='extra_args')),
     })
     super(JaxWsLibrary, self).__init__(payload=payload, **kwargs)
-    self.add_labels('codegen')

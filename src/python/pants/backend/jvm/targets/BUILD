@@ -13,10 +13,8 @@ python_library(
   sources = [
     'benchmark.py',
     'credentials.py',
-    'exclude.py',
     'exportable_jvm_library.py',
     'import_jars_mixin.py',
-    'jar_dependency.py',
     'jar_library.py',
     'jarable.py',
     'junit_tests.py',

@@ -7,9 +7,10 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 bazel_protos = { path = "bazel_protos" }
 digest = "0.6.2"
 grpcio = { version = "0.2.0", features = ["secure"] }
-protobuf = "1.4.1"
+protobuf = { version = "1.4.1", features = ["with-bytes"] }
 sha2 = "0.6.0"
 
 [dev-dependencies]
+bytes = "0.4.5"
 mock = { path = "../testutil/mock" }
 testutil = { path = "../testutil" }

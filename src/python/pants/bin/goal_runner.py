@@ -9,14 +9,11 @@ import logging
 import sys
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.project_tree_factory import get_project_tree
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.bin.engine_initializer import EngineInitializer
 from pants.bin.repro import Reproducer
 from pants.binaries.binary_util import BinaryUtil
-from pants.build_graph.build_file_address_mapper import BuildFileAddressMapper
 from pants.build_graph.build_file_parser import BuildFileParser
-from pants.build_graph.mutable_build_graph import MutableBuildGraph
 from pants.engine.native import Native
 from pants.engine.round_engine import RoundEngine
 from pants.goal.context import Context
@@ -76,12 +73,11 @@ class GoalRunnerFactory(object):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self, use_engine, pants_ignore_patterns, build_ignore_patterns,
+  def _init_graph(self, pants_ignore_patterns, build_ignore_patterns,
                   exclude_target_regexps, target_specs, workdir, graph_helper=None,
                   subproject_build_roots=None):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
-    :param bool use_engine: Whether or not to use the v2 engine to construct the BuildGraph.
     :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
     :param list build_ignore_patterns: The build ignore patterns from '--build-ignore',
                                        applied during BUILD file searching.
@@ -90,39 +86,29 @@ class GoalRunnerFactory(object):
     :param list target_specs: The original target specs.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper, spec_roots).
+    :returns: A tuple of (BuildGraph, AddressMapper, opt Scheduler, spec_roots).
     """
-    # N.B. Use of the daemon implies use of the v2 engine.
-    if graph_helper or use_engine:
-      # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
-      if not graph_helper:
-        native = Native.create(self._global_options)
-        native.set_panic_handler()
-        graph_helper = EngineInitializer.setup_legacy_graph(
-          pants_ignore_patterns,
-          workdir,
-          self._global_options.build_file_imports,
-          native=native,
-          build_file_aliases=self._build_config.registered_aliases(),
-          build_ignore_patterns=build_ignore_patterns,
-          exclude_target_regexps=exclude_target_regexps,
-          subproject_roots=subproject_build_roots,
-          include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
-        )
+    # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
+    if not graph_helper:
+      native = Native.create(self._global_options)
+      native.set_panic_handler()
+      graph_helper = EngineInitializer.setup_legacy_graph(
+        pants_ignore_patterns,
+        workdir,
+        self._global_options.build_file_imports,
+        native=native,
+        build_file_aliases=self._build_config.registered_aliases(),
+        build_ignore_patterns=build_ignore_patterns,
+        exclude_target_regexps=exclude_target_regexps,
+        subproject_roots=subproject_build_roots,
+        include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
+      )
 
-      target_roots = TargetRoots.create(options=self._options,
-                                        build_root=self._root_dir,
-                                        change_calculator=graph_helper.change_calculator)
-      graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
-      return graph, address_mapper, target_roots.as_specs()
-    else:
-      spec_roots = TargetRoots.parse_specs(target_specs, self._root_dir)
-      address_mapper = BuildFileAddressMapper(self._build_file_parser,
-                                              get_project_tree(self._global_options),
-                                              build_ignore_patterns,
-                                              exclude_target_regexps,
-                                              subproject_build_roots)
-      return MutableBuildGraph(address_mapper), address_mapper, spec_roots
+    target_roots = TargetRoots.create(options=self._options,
+                                      build_root=self._root_dir,
+                                      change_calculator=graph_helper.change_calculator)
+    graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
+    return graph, address_mapper, graph_helper.scheduler, target_roots.as_specs()
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
@@ -163,8 +149,7 @@ class GoalRunnerFactory(object):
 
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._build_graph, self._address_mapper, spec_roots = self._init_graph(
-        self._global_options.enable_v2_engine,
+      self._build_graph, self._address_mapper, scheduler, spec_roots = self._init_graph(
         self._global_options.pants_ignore,
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
@@ -194,7 +179,8 @@ class GoalRunnerFactory(object):
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
                         address_mapper=self._address_mapper,
-                        invalidation_report=invalidation_report)
+                        invalidation_report=invalidation_report,
+                        scheduler=scheduler)
       return goals, context
 
   def setup(self):

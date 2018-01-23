@@ -20,6 +20,52 @@ class ScroogeGenTest(PantsRunIntegrationTest):
         'pythonpath': ["%(buildroot)s/contrib/scrooge/src/python"],
         'backend_packages': ["pants.backend.codegen", "pants.backend.jvm", "pants.contrib.scrooge"]
       },
+      'scala-platform': { 'version': '2.11' },
+      'gen.scrooge': {
+        'service_deps': {
+            'java': [
+              '3rdparty:slf4j-api',
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:finagle-thrift',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ],
+            'scala': [
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:finagle-thrift',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ],
+          },
+        'service_exports': {
+            'java': [
+              '3rdparty:thrift-0.6.1',
+            ],
+            'scala': [
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:finagle-thrift',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ]
+          },
+        'structs_deps': {
+            'java': [
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ],
+            'scala': [
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ],
+          },
+        'structs_exports': {
+            'java': [
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ],
+            'scala': [
+              '3rdparty:thrift-0.6.1',
+              '3rdparty/jvm/com/twitter:scrooge-core',
+            ],
+          }
+      }
     }
     if config:
       for scope, scoped_cfgs in config.items():
@@ -42,6 +88,13 @@ class ScroogeGenTest(PantsRunIntegrationTest):
   def test_both_compiler_args_and_rpc_style(self):
     # scrooge_gen should pass when both compiler_args and rpc_style are specified
     cmd = ['gen', self.thrift_test_target('both-compiler-args-and-rpc-style')]
+    pants_run = self.run_pants(cmd)
+    self.assert_success(pants_run)
+
+  def test_exports_of_thrift(self):
+    # Compiling against a thrift service with strict_deps=True should work
+    # because the necessary transitive dependencies will be exported.
+    cmd = ['compile', 'contrib/scrooge/tests/scala/org/pantsbuild/contrib/scrooge/scrooge_gen']
     pants_run = self.run_pants(cmd)
     self.assert_success(pants_run)
 

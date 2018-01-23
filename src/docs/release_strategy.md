@@ -21,11 +21,13 @@ or `rc` release from master should happen every week. Stable branches will be cr
 following criteria:
 
 1. Decide whether to create a _new_ `stable` branch:
-    * If it has been approximately [[three months|pants('src/docs:deprecation_policy')]] since the
+    * If it has been approximately [[one month|pants('src/docs:deprecation_policy')]] since the
 previous `stable` branch, the release manager should inspect the changes in the current
-[release milestone](https://github.com/pantsbuild/pants/milestones), and decide whether the changes
-justify a new `stable` release (this is intentionally left open for discussion). If a new `stable`
-release is justified, it will be made from either a `major` or `minor` stable branch (described below).
+[release milestone](https://github.com/pantsbuild/pants/milestones), and decide whether changes
+that are still open justify delaying the `stable` release (this is intentionally left open for
+discussion). If the `stable` release is not blocked (in general, we should bias toward creating
+stable releases frequently), it will be made from either a `major` or `minor` stable branch
+(described below).
     * If a new `stable` branch is _not_ created (because of insufficient time/change to justify the
 stable vetting process), the release manager must cut a `dev` release from master instead.
 2. In addition to any `dev` release or newly-created `stable` branches, the release manager should
@@ -46,18 +48,17 @@ is applied to `stable` releases. They help to ensure a steady release cadence fr
 in the gaps between the (generally more time consuming) `stable` releases.
 
 ### `stable` releases
-`stable` release cycles generally happen every few months, provided that there are enough user
+`stable` release cycles generally happen every month, provided that there are enough user
 facing changes to warrant a new `stable` release. For each release candidate for a `stable` release,
 five business days should be allocated to bugfixing and testing by pants contributors on a release
 candidate announcement thread (described below).  If any changes are needed to the stable release
-based on feedback a new `rc` release will be created from the stable branch.
+based on feedback, a new `rc` release will be created from the stable branch.
 
 #### `major` and `minor` stable branches
 The decision to create a `major` or a `minor` stable branch is based on consensus on
 [[pants-devel@|pants('src/docs:howto_contribute')]] as to the impact of the changes.
 `major` releases signify large or breaking changes. `minor` releases however should be compatible
-with the last two `minor` releases. In other words if a feature is deprecated in version `1.2.x`
-you should be able to continue using that feature at least through version `1.4.0`.
+with the last five `minor` releases (see the [[deprecation policy|pants('src/docs:deprecation_policy')]]).
 
 #### `patch` stable Releases
 In order to allow us to react quickly to bugs, `patch` fixes are released for `stable` branches as

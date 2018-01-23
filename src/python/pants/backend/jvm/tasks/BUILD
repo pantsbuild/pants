@@ -339,6 +339,7 @@ python_library(
   sources = ['javadoc_gen.py'],
   dependencies = [
     ':jvmdoc_gen',
+    'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/util:memo',
@@ -506,6 +507,7 @@ python_library(
     ':jvm_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/task',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',

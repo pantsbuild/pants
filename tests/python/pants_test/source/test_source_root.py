@@ -166,7 +166,6 @@ class SourceRootTest(BaseTest):
     self.create_dir('not/a/srcroot/java')
 
     options = {
-      'build_file_rev': None,
       'pants_ignore': [],
 
       'source_root_patterns': ['src/*', 'src/example/*'],

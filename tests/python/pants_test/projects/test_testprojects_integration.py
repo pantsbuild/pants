@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import math
 
 from pants.util.memo import memoized_property
-from pants_test.pants_run_integration_test import ensure_engine, ensure_resolver
+from pants_test.pants_run_integration_test import ensure_resolver
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
@@ -18,7 +18,7 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
   # on), we shard all of the targets under `testprojects` into _SHARDS test methods.
   #
   # NB: Do not change this value without matching the number of test methods.
-  _SHARDS = 32
+  _SHARDS = 64
 
   @memoized_property
   def targets(self):
@@ -114,7 +114,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     return self.targets[offset:offset + per_shard]
 
   @ensure_resolver
-  @ensure_engine
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
     pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',
@@ -221,3 +220,99 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
 
   def test_shard_31(self):
     self.run_shard(31)
+
+  def test_shard_32(self):
+    self.run_shard(32)
+
+  def test_shard_33(self):
+    self.run_shard(33)
+
+  def test_shard_34(self):
+    self.run_shard(34)
+
+  def test_shard_35(self):
+    self.run_shard(35)
+
+  def test_shard_36(self):
+    self.run_shard(36)
+
+  def test_shard_37(self):
+    self.run_shard(37)
+
+  def test_shard_38(self):
+    self.run_shard(38)
+
+  def test_shard_39(self):
+    self.run_shard(39)
+
+  def test_shard_40(self):
+    self.run_shard(40)
+
+  def test_shard_41(self):
+    self.run_shard(41)
+
+  def test_shard_42(self):
+    self.run_shard(42)
+
+  def test_shard_43(self):
+    self.run_shard(43)
+
+  def test_shard_44(self):
+    self.run_shard(44)
+
+  def test_shard_45(self):
+    self.run_shard(45)
+
+  def test_shard_46(self):
+    self.run_shard(46)
+
+  def test_shard_47(self):
+    self.run_shard(47)
+
+  def test_shard_48(self):
+    self.run_shard(48)
+
+  def test_shard_49(self):
+    self.run_shard(49)
+
+  def test_shard_50(self):
+    self.run_shard(50)
+
+  def test_shard_51(self):
+    self.run_shard(51)
+
+  def test_shard_52(self):
+    self.run_shard(52)
+
+  def test_shard_53(self):
+    self.run_shard(53)
+
+  def test_shard_54(self):
+    self.run_shard(54)
+
+  def test_shard_55(self):
+    self.run_shard(55)
+
+  def test_shard_56(self):
+    self.run_shard(56)
+
+  def test_shard_57(self):
+    self.run_shard(57)
+
+  def test_shard_58(self):
+    self.run_shard(58)
+
+  def test_shard_59(self):
+    self.run_shard(59)
+
+  def test_shard_60(self):
+    self.run_shard(60)
+
+  def test_shard_61(self):
+    self.run_shard(61)
+
+  def test_shard_62(self):
+    self.run_shard(62)
+
+  def test_shard_63(self):
+    self.run_shard(63)

@@ -30,6 +30,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
+from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -180,10 +181,6 @@ class BaseTest(unittest.TestCase):
     # TODO(John Sirois): This re-creates a little bit too much work done by the BuildGraph.
     # Fixup the BuildGraph to deal with non BuildFileAddresses better and just leverage it.
     traversables = [target.compute_dependency_specs(payload=target.payload)]
-    # Only poke `traversable_dependency_specs` if a concrete implementation is defined
-    # in order to avoid spurious deprecation warnings.
-    if type(target).traversable_dependency_specs is not Target.traversable_dependency_specs:
-      traversables.append(target.traversable_dependency_specs)
 
     for dependency_spec in itertools.chain(*traversables):
       dependency_address = Address.parse(dependency_spec, relative_to=address.spec_path)
@@ -302,6 +299,15 @@ class BaseTest(unittest.TestCase):
       if scope is None:
         raise TaskError('You must set a scope on your task type before using it in tests.')
       optionables.add(task_type)
+      # If task is expected to inherit goal-level options, register those directly on the task,
+      # by subclassing the goal options registrar and settings its scope to the task scope.
+      if issubclass(task_type, GoalOptionsMixin):
+        subclass_name = b'test_{}_{}_{}'.format(
+          task_type.__name__, task_type.goal_options_registrar_cls.options_scope,
+          task_type.options_scope)
+        optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
+                             {b'options_scope': task_type.options_scope}))
+
       extra_scopes.update([si.scope for si in task_type.known_scope_infos()])
       optionables.update(Subsystem.closure(
         set([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()]) |
@@ -397,7 +403,6 @@ class BaseTest(unittest.TestCase):
     self.add_to_build_file(path, dedent('''
           %(target_type)s(name='%(name)s',
             %(sources)s
-            %(resources)s
             %(java_sources)s
             %(provides)s
             %(dependencies)s
@@ -406,8 +411,6 @@ class BaseTest(unittest.TestCase):
                    name=name,
                    sources=('sources=%s,' % repr(sources)
                               if sources else ''),
-                   resources=('resources=["%s"],' % kwargs.get('resources')
-                              if 'resources' in kwargs else ''),
                    java_sources=('java_sources=[%s],'
                                  % ','.join(map(lambda str_target: '"%s"' % str_target,
                                                 kwargs.get('java_sources')))
