@@ -9,11 +9,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 class PantsDaemonStats(object):
   """Tracks various stats about the daemon."""
 
-  def __init__(self, dir):
+  def __init__(self):
     self.resident_graph_size = None
     self.resulting_graph_size = None
-    # TODO: Dir is currently unused, but plumbed for later use.
-    self._dir = dir
 
   def set_resident_graph_size(self, size):
     self.resident_graph_size = size

@@ -189,8 +189,8 @@ class RunTracker(Subsystem):
     self.artifact_cache_stats = ArtifactCacheStats(os.path.join(self.run_info_dir,
                                                                 'artifact_cache_stats'))
 
-    # Hit/miss stats for the artifact cache.
-    self.pantsd_stats = PantsDaemonStats(os.path.join(self.run_info_dir, 'pantsd_stats'))
+    # Daemon stats.
+    self.pantsd_stats = PantsDaemonStats()
 
     return run_id
 
