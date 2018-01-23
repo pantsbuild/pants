@@ -67,6 +67,12 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* A lightweight mechanism for registering options at the goal level. (#5325)
+  `PR #5325 <https://github.com/pantsbuild/pants/pull/5325>`_
+
+* Ensure test report results are always exposed. (#5368)
+  `PR #5368 <https://github.com/pantsbuild/pants/pull/5368>`_
+
 * Add error_details proto (#5367)
   `PR #5367 <https://github.com/pantsbuild/pants/pull/5367>`_
 
