@@ -75,7 +75,7 @@ class LocalPantsRunner(object):
         repro.capture(run_tracker.run_info.get_as_dict())
 
       # Record the preceding product graph size.
-      run_tracker.pantsd_stats.set_resident_graph_size(self._preceding_graph_size)
+      run_tracker.pantsd_stats.set_preceding_graph_size(self._preceding_graph_size)
 
       # Setup and run GoalRunner.
       goal_runner = GoalRunner.Factory(root_dir,

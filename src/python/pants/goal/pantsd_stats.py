@@ -10,17 +10,17 @@ class PantsDaemonStats(object):
   """Tracks various stats about the daemon."""
 
   def __init__(self):
-    self.resident_graph_size = None
+    self.preceding_graph_size = None
     self.resulting_graph_size = None
 
-  def set_resident_graph_size(self, size):
-    self.resident_graph_size = size
+  def set_preceding_graph_size(self, size):
+    self.preceding_graph_size = size
 
   def set_resulting_graph_size(self, size):
     self.resulting_graph_size = size
 
   def get_all(self):
     return {
-      'resident_graph_size': self.resident_graph_size,
+      'preceding_graph_size': self.preceding_graph_size,
       'resulting_graph_size': self.resulting_graph_size,
     }
