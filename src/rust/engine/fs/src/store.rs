@@ -22,7 +22,8 @@ const MAX_LOCAL_STORE_SIZE_BYTES: usize = 4 * 1024 * 1024 * 1024;
 /// as specified by the gRPC remote execution interface (see
 /// https://github.com/googleapis/googleapis/blob/master/google/devtools/remoteexecution/v1test/)
 ///
-/// In the future, it will gain the ability to write back to the gRPC server, too.
+/// It can also write back to a remote gRPC server, but will only do so when explicitly instructed
+/// to do so.
 ///
 #[derive(Clone)]
 pub struct Store {
@@ -49,7 +50,7 @@ impl Store {
   /// Make a store which uses local storage, and if it is missing a value which it tries to load,
   /// will attempt to back-fill its local storage from a remote CAS.
   ///
-  pub fn backfills_from_remote<P: AsRef<Path>>(
+  pub fn with_remote<P: AsRef<Path>>(
     path: P,
     pool: Arc<ResettablePool>,
     cas_address: &str,
@@ -216,6 +217,78 @@ impl Store {
             .to_boxed()
         }
       })
+      .to_boxed()
+  }
+
+  ///
+  /// Ensures that the remote ByteStore has a copy of each passed Fingerprint, including any files
+  /// contained in any Directories in the list.
+  ///
+  /// At some point in the future we may want to make a call to
+  /// ContentAddressableStorage.FindMissingBlobs to avoid uploading things which are already present
+  /// remotely, but this optimization has not yet been made.
+  ///
+  pub fn ensure_remote_has_recursive(&self, digests: Vec<Digest>) -> BoxFuture<(), String> {
+    let remote = match self.remote {
+      Some(ref remote) => remote,
+      None => {
+        return future::err(format!("Cannot ensure remote has blobs without a remote")).to_boxed()
+      }
+    };
+
+    let mut expanding_futures = Vec::new();
+
+    let mut expanded_digests = HashMap::new();
+    for digest in digests.into_iter() {
+      match self.local.entry_type(&digest.0) {
+        Ok(Some(EntryType::File)) => {
+          expanded_digests.insert(digest, EntryType::File);
+        }
+        Ok(Some(EntryType::Directory)) => {
+          expanding_futures.push(self.expand_directory(digest));
+        }
+        Ok(None) => {
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest))
+            .to_boxed() as BoxFuture<_, _>
+        }
+        Err(err) => {
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err))
+            .to_boxed() as BoxFuture<_, _>
+        }
+      };
+    }
+
+    let local = self.local.clone();
+    let remote = remote.clone();
+    future::join_all(expanding_futures)
+      .map(move |futures| {
+        for mut digests in futures {
+          for (digest, entry_type) in digests.drain() {
+            expanded_digests.insert(digest, entry_type);
+          }
+        }
+        expanded_digests
+      })
+      .and_then(move |digests| {
+        future::join_all(
+          digests
+            .into_iter()
+            .map(move |(digest, entry_type)| {
+              let remote = remote.clone();
+              local
+                .load_bytes_with(entry_type, digest.0, move |bytes| {
+                  remote.store_bytes(Bytes::from(bytes))
+                })
+                .and_then(move |maybe_future| match maybe_future {
+                  Some(future) => Ok(future),
+                  None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
+                })
+            })
+            .collect::<Vec<_>>(),
+        )
+      })
+      .and_then(move |futures| future::join_all(futures))
+      .map(|_| ())
       .to_boxed()
   }
 
@@ -1705,7 +1778,7 @@ f41e9443e961b5127998715a526051f9";
   }
 
   fn new_store<P: AsRef<Path>>(dir: P, cas_address: String) -> Store {
-    Store::backfills_from_remote(
+    Store::with_remote(
       dir,
       Arc::new(ResettablePool::new("test-pool-".to_string())),
       &cas_address,
@@ -2053,6 +2126,108 @@ f41e9443e961b5127998715a526051f9";
       error.contains(&format!("{}", directory_fingerprint())),
       "Bad error message: {}",
       error
+    );
+  }
+
+  #[test]
+  fn uploads_files() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    new_local_store(dir.path())
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    assert_eq!(cas.blobs.lock().unwrap().get(&fingerprint()), None);
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![digest()])
+      .wait()
+      .expect("Error uploading file");
+
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&fingerprint()),
+      Some(&str_bytes())
+    );
+  }
+
+  #[test]
+  fn uploads_directories_recursively() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    new_local_store(dir.path())
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+    new_local_store(dir.path())
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error storing file locally");
+
+    assert_eq!(cas.blobs.lock().unwrap().get(&fingerprint()), None);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      None
+    );
+
+    new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![directory_digest()])
+      .wait()
+      .expect("Error uploading directory");
+
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      Some(&directory_bytes())
+    );
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&fingerprint()),
+      Some(&str_bytes())
+    );
+  }
+
+  #[test]
+  fn upload_missing_files() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    assert_eq!(cas.blobs.lock().unwrap().get(&fingerprint()), None);
+
+    let error = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![digest()])
+      .wait()
+      .expect_err("Want error");
+    assert_eq!(
+      error,
+      format!("Failed to upload digest {:?}: Not found", digest())
+    );
+  }
+
+  #[test]
+  fn upload_missing_file_in_directory() {
+    let dir = TempDir::new("store").unwrap();
+    let cas = StubCAS::empty();
+
+    new_local_store(dir.path())
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error storing directory locally");
+
+    assert_eq!(cas.blobs.lock().unwrap().get(&fingerprint()), None);
+    assert_eq!(
+      cas.blobs.lock().unwrap().get(&directory_fingerprint()),
+      None
+    );
+
+    let error = new_store(dir.path(), cas.address())
+      .ensure_remote_has_recursive(vec![directory_digest()])
+      .wait()
+      .expect_err("Want error");
+    assert_eq!(
+      error,
+      format!("Failed to upload digest {:?}: Not found", digest()),
+      "Bad error message"
     );
   }
 }
