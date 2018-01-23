@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from textwrap import dedent
 
 import coverage
@@ -458,15 +457,14 @@ class PytestTest(PytestTestBase):
     self.run_failing_tests(targets=[self.red, self.red_in_class],
                            failed_targets=[self.red],
                            fail_fast=True,
-                           fast=False)
-
-  @unittest.skip('TODO: Skipped to expedite landing #5363; see: #5369.')
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_fail_fast_skips_second_red_test_with_isolated_chroot(self):
-    self.run_failing_tests(targets=[self.red, self.red_in_class],
-                           failed_targets=[self.red_in_class],
-                           fail_fast=True,
                            fast=True)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  def test_fail_fast_skips_second_red_test_with_isolated_chroots(self):
+    self.run_failing_tests(targets=[self.red, self.red_in_class],
+                           failed_targets=[self.red],
+                           fail_fast=True,
+                           fast=False)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_red_test_in_class(self):
