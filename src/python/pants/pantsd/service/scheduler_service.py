@@ -87,6 +87,13 @@ class SchedulerService(PantsService):
 
     self._event_queue.task_done()
 
+  def product_graph_len(self):
+    """Provides the size of the captive product graph.
+
+    :returns: The node count for the captive product graph.
+    """
+    return self._scheduler.graph_len()
+
   def warm_product_graph(self, spec_roots):
     """Runs an execution request against the captive scheduler given a set of input specs to warm.
 
