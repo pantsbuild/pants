@@ -265,7 +265,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
     :API: public
     """
-    return self.cache_target_dirs or False
+    return self.cache_target_dirs
 
   @property
   def cache_target_dirs(self):
