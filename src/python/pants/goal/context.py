@@ -80,8 +80,6 @@ class Context(object):
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
-    # TODO(#4769): This should not be exposed to anyone.
-    # Note that the Context created in unit tests by BaseTest uses a different codepath.
     self._scheduler = scheduler
 
   @property
@@ -156,6 +154,12 @@ class Context(object):
   def __str__(self):
     ident = Target.identify(self.targets())
     return 'Context(id:{}, targets:{})'.format(ident, self.targets())
+
+  def set_resulting_graph_size_in_runtracker(self):
+    """Sets the resulting graph size in the run tracker's daemon stats object."""
+    node_count = self._scheduler.graph_len()
+    self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
+    return node_count
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """

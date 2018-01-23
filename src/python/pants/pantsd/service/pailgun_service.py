@@ -57,25 +57,28 @@ class PailgunService(PantsService):
       graph_helper = None
       deferred_exc = None
 
+      # Capture the size of the graph prior to any warming, for stats.
+      preceding_graph_size = self._scheduler_service.product_graph_len()
+      self._logger.debug('resident graph size: %s', preceding_graph_size)
+
       self._logger.debug('execution commandline: %s', arguments)
-      if self._scheduler_service:
-        self._logger.debug('args are: %s', arguments)
-        options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
-        target_roots = self._target_roots_class.create(
-          options,
-          change_calculator=self._scheduler_service.change_calculator
+      options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
+      target_roots = self._target_roots_class.create(
+        options,
+        change_calculator=self._scheduler_service.change_calculator
+      )
+
+      try:
+        self._logger.debug('warming the product graph via %s', self._scheduler_service)
+        # N.B. This call is made in the pre-fork daemon context for reach and reuse of the
+        # resident scheduler.
+        graph_helper = self._scheduler_service.warm_product_graph(target_roots)
+      except Exception:
+        deferred_exc = sys.exc_info()
+        self._logger.warning(
+          'encountered exception during SchedulerService.warm_product_graph(), deferring:\n%s',
+          ''.join(traceback.format_exception(*deferred_exc))
         )
-        try:
-          self._logger.debug('warming the product graph via %s', self._scheduler_service)
-          # N.B. This call is made in the pre-fork daemon context for reach and reuse of the
-          # resident scheduler.
-          graph_helper = self._scheduler_service.warm_product_graph(target_roots)
-        except Exception:
-          deferred_exc = sys.exc_info()
-          self._logger.warning(
-            'encountered exception during SchedulerService.warm_product_graph(), deferring:\n%s',
-            ''.join(traceback.format_exception(*deferred_exc))
-          )
 
       return self._runner_class(
         sock,
@@ -84,6 +87,7 @@ class PailgunService(PantsService):
         environment,
         graph_helper,
         self.fork_lock,
+        preceding_graph_size,
         deferred_exc
       )
 

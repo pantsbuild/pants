@@ -31,6 +31,10 @@ class LocalPantsRunner(object):
     self._env = env
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
+    self._preceding_graph_size = -1
+
+  def set_preceding_graph_size(self, size):
+    self._preceding_graph_size = size
 
   def run(self):
     profile_path = self._env.get('PANTS_PROFILE')
@@ -69,6 +73,9 @@ class LocalPantsRunner(object):
       repro = Reproducer.global_instance().create_repro()
       if repro:
         repro.capture(run_tracker.run_info.get_as_dict())
+
+      # Record the preceding product graph size.
+      run_tracker.pantsd_stats.set_preceding_graph_size(self._preceding_graph_size)
 
       # Setup and run GoalRunner.
       goal_runner = GoalRunner.Factory(root_dir,

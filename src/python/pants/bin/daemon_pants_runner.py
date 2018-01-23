@@ -72,7 +72,8 @@ class DaemonPantsRunner(ProcessManager):
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
 
-  def __init__(self, socket, exiter, args, env, graph_helper, fork_lock, deferred_exception=None):
+  def __init__(self, socket, exiter, args, env, graph_helper, fork_lock, preceding_graph_size,
+               deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
@@ -82,6 +83,7 @@ class DaemonPantsRunner(ProcessManager):
                                            construction. In the event of an exception, this will be
                                            None.
     :param threading.RLock fork_lock: A lock to use during forking for thread safety.
+    :param int preceding_graph_size: The size of the graph pre-warming, for stats.
     :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
                                          If present, this will be re-raised in the client context.
     """
@@ -92,6 +94,7 @@ class DaemonPantsRunner(ProcessManager):
     self._env = env
     self._graph_helper = graph_helper
     self._fork_lock = fork_lock
+    self._preceding_graph_size = preceding_graph_size
     self._deferred_exception = deferred_exception
 
   def _make_identity(self):
@@ -201,7 +204,9 @@ class DaemonPantsRunner(ProcessManager):
         self._raise_deferred_exc()
 
         # Otherwise, conduct a normal run.
-        LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper).run()
+        runner = LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper)
+        runner.set_preceding_graph_size(self._preceding_graph_size)
+        runner.run()
       except KeyboardInterrupt:
         self._exiter.exit(1, msg='Interrupted by user.\n')
       except Exception:

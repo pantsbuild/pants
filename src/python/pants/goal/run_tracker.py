@@ -25,6 +25,7 @@ from pants.base.workunit import WorkUnit
 from pants.build_graph.target import Target
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.artifact_cache_stats import ArtifactCacheStats
+from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.reporting.report import Report
 from pants.stats.statsdb import StatsDBFactory
 from pants.subsystem.subsystem import Subsystem
@@ -92,6 +93,7 @@ class RunTracker(Subsystem):
     self.cumulative_timings = None
     self.self_timings = None
     self.artifact_cache_stats = None
+    self.pantsd_stats = None
 
     # Initialized in `start()`.
     self.report = None
@@ -160,8 +162,10 @@ class RunTracker(Subsystem):
     # Initialize the run.
     millis = int((self._run_timestamp * 1000) % 1000)
     run_id = 'pants_run_{}_{}_{}'.format(
-      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)), millis,
-      uuid.uuid4().hex)
+      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)),
+      millis,
+      uuid.uuid4().hex
+    )
 
     info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
     self.run_info_dir = os.path.join(info_dir, run_id)
@@ -182,8 +186,11 @@ class RunTracker(Subsystem):
     self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, 'self_timings'))
 
     # Hit/miss stats for the artifact cache.
-    self.artifact_cache_stats = \
-      ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
+    self.artifact_cache_stats = ArtifactCacheStats(os.path.join(self.run_info_dir,
+                                                                'artifact_cache_stats'))
+
+    # Daemon stats.
+    self.pantsd_stats = PantsDaemonStats()
 
     return run_id
 
@@ -342,6 +349,7 @@ class RunTracker(Subsystem):
       'cumulative_timings': self.cumulative_timings.get_all(),
       'self_timings': self.self_timings.get_all(),
       'artifact_cache_stats': self.artifact_cache_stats.get_all(),
+      'pantsd_stats': self.pantsd_stats.get_all(),
       'outcomes': self.outcomes
     }
     # Dump individual stat file.
