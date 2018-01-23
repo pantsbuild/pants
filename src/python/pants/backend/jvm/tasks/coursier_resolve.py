@@ -422,7 +422,8 @@ class CoursierMixin(NailgunTask):
           transitive_jar_path_for_coord = []
           if my_simple_coord in flattened_resolution:
             # TODO(wisechengyi): this only grabs jar with matching classifier the current coordinate
-            # and it still takes the jars wholesome for its transitive dependencies.
+            # and it still takes the jars wholesale for its transitive dependencies.
+            # https://github.com/coursier/coursier/issues/743
             resolved_jars_with_matching_classifier = filter(
               lambda x: x.coordinate.classifier == classifier or x.coordinate.classifier in ['sources', 'javadoc'],
               resolved_jars[my_simple_coord])

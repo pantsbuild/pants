@@ -36,12 +36,14 @@ class CoursierSubsystem(Subsystem):
     register('--fetch-options', type=list, fingerprint=True,
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
     register('--bootstrap-jar-url', fingerprint=True,
-             default='https://dl.dropboxusercontent.com/s/18o1rli8sstptnd/coursier-cli-1.0.0.2b75cefb88c60b64d794fef0bfbc60facc465c98.jar?dl=0',
+             default='https://dl.dropboxusercontent.com/s/iqdg7iht09rlvsy/coursier-cli-1.0.0.d5de1477516e3429f4d0a522fc0361f2d7b27944.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')
     # TODO(wisechengyi): currently using a custom url for fast iteration.
-    # Once the coursier builds are stable, move the logic to binary_util
+    # Once the coursier builds are stable, move the logic to binary_util. https://github.com/pantsbuild/pants/issues/5381
+    # Ths sha in the version corresponds to the sha in the PR https://github.com/coursier/coursier/pull/735
+    # The jar is built by following https://github.com/coursier/coursier/blob/master/DEVELOPMENT.md#build-with-pants
     register('--version', type=str, fingerprint=True,
-             default='1.0.0.2b75cefb88c60b64d794fef0bfbc60facc465c98',
+             default='1.0.0.d5de1477516e3429f4d0a522fc0361f2d7b27944',
              help='Version paired with --bootstrap-jar-url, in order to invalidate and fetch the new version.')
     register('--bootstrap-fetch-timeout-secs', type=int, advanced=True, default=10,
              help='Timeout the fetch if the connection is idle for longer than this value.')
