@@ -193,13 +193,54 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self.context.options.for_scope(self.options_scope)
 
   def get_passthru_args(self):
-    """
+    """Returns the passthru args for this task, if it supports them.
+
     :API: public
     """
     if not self.supports_passthru_args():
       raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
+
+  @property
+  def skip_execution(self):
+    """Whether this task should be skipped.
+
+    Tasks can override to specify skipping behavior (e.g., based on an option).
+
+    :API: public
+    """
+    return False
+
+  @property
+  def act_transitively(self):
+    """Whether this task should act on the transitive closure of the target roots.
+
+    Tasks can override to specify transitivity behavior (e.g., based on an option).
+    Note that this property is consulted by get_targets(), but tasks that bypass that
+    method must make their own decision on whether to act transitively or not.
+
+    :API: public
+    """
+    return True
+
+  def get_targets(self, predicate=None):
+    """Returns the candidate targets this task should act on.
+
+    This method is a convenience for processing optional transitivity. Tasks may bypass it
+    and make their own decisions on which targets to act on.
+
+    NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
+          Instead, they query self.context.targets directly.
+    TODO: Fix up existing targets to consult this method, for uniformity.
+
+    Note that returned targets have not been checked for invalidation. The caller should do
+    so as needed, typically by calling self.invalidated().
+
+    :API: public
+    """
+    return (self.context.targets(predicate) if self.act_transitively
+            else filter(predicate, self.context.target_roots))
 
   @memoized_property
   def workdir(self):

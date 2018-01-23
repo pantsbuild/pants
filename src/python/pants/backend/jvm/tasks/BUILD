@@ -507,6 +507,7 @@ python_library(
     ':jvm_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util',
+    'src/python/pants/task',
     'src/python/pants/util:desktop',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
