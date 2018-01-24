@@ -157,7 +157,7 @@ class Context(object):
 
   def set_resulting_graph_size_in_runtracker(self):
     """Sets the resulting graph size in the run tracker's daemon stats object."""
-    node_count = self._scheduler.graph_len()
+    node_count = self._scheduler.graph_len() if self._scheduler else -1
     self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
     return node_count
 
