@@ -45,11 +45,11 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     self.assert_success(pants_run)
 
   def test_with_install_requires(self):
-    command=['run', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
+    command=['clean-all', 'run', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
     self.assertIn('United States', pants_run.stdout_data)
-    command=['binary', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
+    command=['clean-all', 'binary', '{}:main_with_no_conflict'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
     pex = os.path.join(get_buildroot(), 'dist', 'main_with_no_conflict.pex')
@@ -58,12 +58,12 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     os.remove(pex)
 
   def test_with_conflicting_transitive_deps(self):
-    command=['run', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
+    command=['clean-all', 'run', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
     self.assert_failure(pants_run)
     self.assertIn('pycountry', pants_run.stderr_data)
     self.assertIn('superhello', pants_run.stderr_data)
-    command=['binary', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
+    command=['clean-all', 'binary', '{}:main_with_conflicting_dep'.format(self.superhello_install_requires)]
     pants_run = self.run_pants(command=command)
     self.assert_failure(pants_run)
     self.assertIn('pycountry', pants_run.stderr_data)
