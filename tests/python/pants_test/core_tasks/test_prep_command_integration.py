@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.util.dirutil import safe_open
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class PrepCommandIntegrationTest(PantsRunIntegrationTest):
@@ -29,7 +29,7 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
         fp.write(dedent("""
           prep_command(
             name='{name}',
-            goal='{goal}',
+            goals=['{goal}'],
             prep_executable='touch',
             prep_args=['{tmpdir}/{touch_target}'],
           )
@@ -61,21 +61,18 @@ class PrepCommandIntegrationTest(PantsRunIntegrationTest):
       self.assert_success(pants_run)
       yield workdir
 
-  @ensure_engine
   def test_prep_command_in_compile(self):
     with self._execute_pants('compile') as workdir:
       self._assert_goal_ran(workdir, 'compile')
       self._assert_goal_did_not_run(workdir, 'test')
       self._assert_goal_did_not_run(workdir, 'binary')
 
-  @ensure_engine
   def test_prep_command_in_test(self):
     with self._execute_pants('test') as workdir:
       self._assert_goal_ran(workdir, 'compile')
       self._assert_goal_ran(workdir, 'test')
       self._assert_goal_did_not_run(workdir, 'binary')
 
-  @ensure_engine
   def test_prep_command_in_binary(self):
     with self._execute_pants('binary') as workdir:
       self._assert_goal_ran(workdir, 'compile')

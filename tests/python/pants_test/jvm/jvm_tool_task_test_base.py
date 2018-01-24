@@ -19,7 +19,6 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.util.dirutil import safe_mkdir
-
 from pants_test.jvm.jvm_task_test_base import JvmTaskTestBase
 
 
@@ -89,20 +88,13 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
 
     Bootstrapper.reset_instance()
 
-  def context(self, for_task_types=None, options=None, passthru_args=None, target_roots=None,
-              console_outstream=None, workspace=None, for_subsystems=None):
+  def context(self, for_task_types=None, **kwargs):
     """
     :API: public
     """
     # Add in the bootstrapper task type, so its options get registered and set.
     for_task_types = [self.bootstrap_task_type] + (for_task_types or [])
-    return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types,
-                                                    options=options,
-                                                    passthru_args=passthru_args,
-                                                    target_roots=target_roots,
-                                                    console_outstream=console_outstream,
-                                                    workspace=workspace,
-                                                    for_subsystems=for_subsystems)
+    return super(JvmToolTaskTestBase, self).context(for_task_types=for_task_types, **kwargs)
 
   def prepare_execute(self, context):
     """Prepares a jvm tool-using task for execution, first bootstrapping any required jvm tools.
@@ -114,8 +106,8 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
 
     :returns: The prepared Task instance.
     """
-    task = self.create_task(context)
-    task.invalidate()
+    # test_workdir is an @property
+    workdir = self.test_workdir
 
     # Bootstrap the tools needed by the task under test.
     # We need the bootstrap task's workdir to be under the test's .pants.d, so that it can
@@ -123,8 +115,10 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     self.bootstrap_task_type.get_alternate_target_roots(context.options,
                                                         self.address_mapper,
                                                         self.build_graph)
-    bootstrap_workdir = os.path.join(os.path.dirname(task.workdir), 'bootstrap_jvm_tools')
+    bootstrap_workdir = os.path.join(os.path.dirname(workdir), 'bootstrap_jvm_tools')
     self.bootstrap_task_type(context, bootstrap_workdir).execute()
+
+    task = self.create_task(context, workdir)
     return task
 
   def execute(self, context):

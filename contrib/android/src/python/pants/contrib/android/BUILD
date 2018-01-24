@@ -6,6 +6,7 @@ contrib_plugin(
   dependencies=[
     'contrib/android/src/python/pants/contrib/android/targets:android',
     'contrib/android/src/python/pants/contrib/android/tasks:all',
+    'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],

@@ -6,7 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import threading
+import sys
 
 import mock
 
@@ -45,14 +45,12 @@ class LoggerStreamTest(BaseTest):
 class PantsDaemonTest(BaseTest):
   def setUp(self):
     super(PantsDaemonTest, self).setUp()
-    lock = threading.RLock()
     mock_options = mock.Mock()
     mock_options.pants_subprocessdir = 'non_existent_dir'
     self.pantsd = PantsDaemon(None,
                               'test_buildroot',
                               'test_work_dir',
                               logging.INFO,
-                              lock,
                               [],
                               {},
                               '/tmp/pants_test_metadata_dir',
@@ -62,15 +60,14 @@ class PantsDaemonTest(BaseTest):
     self.mock_service = mock.create_autospec(PantsService, spec_set=True)
 
   @mock.patch('os.close', **PATCH_OPTS)
-  def test_close_fds(self, mock_close):
-    mock_fd = mock.Mock()
-    mock_fd.fileno.side_effect = [0, 1, 2]
-
-    with stdio_as(mock_fd, mock_fd, mock_fd):
-      self.pantsd._close_fds()
-
-    self.assertEquals(mock_fd.close.call_count, 3)
-    mock_close.assert_has_calls(mock.call(x) for x in [0, 1, 2])
+  def test_close_stdio(self, mock_close):
+    with stdio_as(-1, -1, -1):
+      handles = (sys.stdin, sys.stdout, sys.stderr)
+      fds = [h.fileno() for h in handles]
+      self.pantsd._close_stdio()
+      mock_close.assert_has_calls(mock.call(x) for x in fds)
+      for handle in handles:
+        self.assertTrue(handle.closed, '{} was not closed'.format(handle))
 
   def test_shutdown(self):
     mock_thread = mock.Mock()
@@ -80,7 +77,7 @@ class PantsDaemonTest(BaseTest):
 
     self.mock_service.terminate.assert_called_once_with()
     self.assertTrue(self.pantsd.is_killed)
-    mock_thread.join.assert_called_once_with()
+    mock_thread.join.assert_called_once_with(PantsDaemon.JOIN_TIMEOUT_SECONDS)
 
   def test_run_services_no_services(self):
     self.pantsd._run_services([])

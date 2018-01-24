@@ -4,6 +4,451 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.5.0.dev0 (01/22/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* add avro/java contrib plugin to the release process (#5346)
+  `PR #5346 <https://github.com/pantsbuild/pants/pull/5346>`_
+
+* Add the mypy contrib module to pants release process (#5335)
+  `PR #5335 <https://github.com/pantsbuild/pants/pull/5335>`_
+
+* Publish the codeanalysis contrib plugin. (#5322)
+  `PR #5322 <https://github.com/pantsbuild/pants/pull/5322>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Remove 1.5.0.dev0 deprecations (#5363)
+  `PR #5363 <https://github.com/pantsbuild/pants/pull/5363>`_
+
+* Deprecate the Android contrib backend. (#5343)
+  `PR #5343 <https://github.com/pantsbuild/pants/pull/5343>`_
+
+* [contrib/scrooge] Add exports support to scrooge (#5357)
+  `PR #5357 <https://github.com/pantsbuild/pants/pull/5357>`_
+
+* Remove superfluous --dist flag from kythe indexer task. (#5344)
+  `PR #5344 <https://github.com/pantsbuild/pants/pull/5344>`_
+
+* Delete deprecated modules removable in 1.5.0dev0. (#5337)
+  `PR #5337 <https://github.com/pantsbuild/pants/pull/5337>`_
+
+* An --eager option for BootstrapJvmTools. (#5336)
+  `PR #5336 <https://github.com/pantsbuild/pants/pull/5336>`_
+
+* Deprecate the v1 engine option. (#5338)
+  `PR #5338 <https://github.com/pantsbuild/pants/pull/5338>`_
+
+* Remove the target labels mechanism  (#5320)
+  `PR #5320 <https://github.com/pantsbuild/pants/pull/5320>`_
+
+* Remove wiki-related targets from contrib and back to docgen (#5319)
+  `PR #5319 <https://github.com/pantsbuild/pants/pull/5319>`_
+
+* Get rid of the is_thrift and is_test target properties. (#5318)
+  `PR #5318 <https://github.com/pantsbuild/pants/pull/5318>`_
+
+* First of a series of changes to get rid of target labels. (#5312)
+  `PR #5312 <https://github.com/pantsbuild/pants/pull/5312>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix a silly bug when computing indexable targets. (#5359)
+  `PR #5359 <https://github.com/pantsbuild/pants/pull/5359>`_
+
+* [pantsd] Repair daemon wedge on log rotation. (#5358)
+  `PR #5358 <https://github.com/pantsbuild/pants/pull/5358>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* A lightweight mechanism for registering options at the goal level. (#5325)
+  `PR #5325 <https://github.com/pantsbuild/pants/pull/5325>`_
+
+* Ensure test report results are always exposed. (#5368)
+  `PR #5368 <https://github.com/pantsbuild/pants/pull/5368>`_
+
+* Add error_details proto (#5367)
+  `PR #5367 <https://github.com/pantsbuild/pants/pull/5367>`_
+
+* Store can expand directories into transitive fingerprints (#5331)
+  `PR #5331 <https://github.com/pantsbuild/pants/pull/5331>`_
+
+* Store can tell what the EntryType of a Fingerprint is (#5332)
+  `PR #5332 <https://github.com/pantsbuild/pants/pull/5332>`_
+
+* Protobuf implementation uses Bytes instead of Vec (#5329)
+  `PR #5329 <https://github.com/pantsbuild/pants/pull/5329>`_
+
+* Store and remote::ByteStore use Digests not Fingerprints (#5347)
+  `PR #5347 <https://github.com/pantsbuild/pants/pull/5347>`_
+
+* Garbage collect Store entries (#5345)
+  `PR #5345 <https://github.com/pantsbuild/pants/pull/5345>`_
+
+* Port IsolatedProcess implementation from Python to Rust - Split 1  (#5239)
+  `PR #5239 <https://github.com/pantsbuild/pants/pull/5239>`_
+
+* python2: do not resolve requirements if no python targets in targets closure (#5361)
+  `PR #5361 <https://github.com/pantsbuild/pants/pull/5361>`_
+
+* Store takes a reference, not an owned type (#5334)
+  `PR #5334 <https://github.com/pantsbuild/pants/pull/5334>`_
+
+* Bump to pex==1.2.16. (#5355)
+  `PR #5355 <https://github.com/pantsbuild/pants/pull/5355>`_
+
+* Reenable lighter contrib sanity checks (#5340)
+  `PR #5340 <https://github.com/pantsbuild/pants/pull/5340>`_
+
+* Use helper functions in tests (#5328)
+  `PR #5328 <https://github.com/pantsbuild/pants/pull/5328>`_
+
+* Add support for alternate packages in the pex that is built. (#5283)
+  `PR #5283 <https://github.com/pantsbuild/pants/pull/5283>`_
+
+* List failed crates when running all rust tests (#5327)
+  `PR #5327 <https://github.com/pantsbuild/pants/pull/5327>`_
+
+* More sharding to alleviate flaky timeout from integration tests (#5324)
+  `PR #5324 <https://github.com/pantsbuild/pants/pull/5324>`_
+
+* Update lockfile for fs_util (#5326)
+  `PR #5326 <https://github.com/pantsbuild/pants/pull/5326>`_
+
+* Implement From in both directions for Digests (#5330)
+  `PR #5330 <https://github.com/pantsbuild/pants/pull/5330>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* add mypy to list of released plugins in docs (#5341)
+  `PR #5341 <https://github.com/pantsbuild/pants/pull/5341>`_
+
+* Incorporate the more-frequent-stable release proposal (#5311)
+  `PR #5311 <https://github.com/pantsbuild/pants/pull/5311>`_
+
+1.4.0rc0 (01/12/2018)
+---------------------
+
+The first release candidate for the ``1.4.x`` stable branch.
+
+It's been many months since the ``1.3.x`` branch was cut: part of this was due to a decision
+to tie "enabling pantsd by default" to the ``1.4.0`` release. It's taken longer to stabilize
+pantsd than we initially anticipated, and while we're very nearly comfortable with enabling it
+by default, we believe that we should be prioritizing frequent stable minor releases over
+releases being tied to particular features. So let's do this thing!
+
+New Features
+~~~~~~~~~~~~
+
+* Introduce a single-target mode to `JUnitRun`. (#5302)
+  `PR #5302 <https://github.com/pantsbuild/pants/pull/5302>`_
+
+* Remote ByteStore can write to a CAS (#5293)
+  `PR #5293 <https://github.com/pantsbuild/pants/pull/5293>`_
+
+* Improvements to the kythe extractor and indexer tasks. (#5297)
+  `PR #5297 <https://github.com/pantsbuild/pants/pull/5297>`_
+
+API Changes
+~~~~~~~~~~~
+
+* Rename the `kythe` package to `codeanalysis` (#5299)
+  `PR #5299 <https://github.com/pantsbuild/pants/pull/5299>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix junit code coverage to be off by default. (#5306)
+  `PR #5306 <https://github.com/pantsbuild/pants/pull/5306>`_
+
+* Actually use the merge and report tool classpaths. (#5308)
+  `PR #5308 <https://github.com/pantsbuild/pants/pull/5308>`_
+
+* url quote classpath in MANIFEST.MF (#5301)
+  `PR #5301 <https://github.com/pantsbuild/pants/pull/5301>`_
+
+* Fix coursier resolve missing excludes for classpath product (#5298)
+  `PR #5298 <https://github.com/pantsbuild/pants/pull/5298>`_
+
+* Fix junit caching under coverage. (#5289)
+  `PR #5289 <https://github.com/pantsbuild/pants/pull/5289>`_
+
+* mypy plugin: add support for a mypy config file (#5296)
+  `PR #5296 <https://github.com/pantsbuild/pants/pull/5296>`_
+
+* Make the ivy resolution confs participate in the fingerprint. (#5270)
+  `PR #5270 <https://github.com/pantsbuild/pants/pull/5270>`_
+
+* Check in fs_util lockfile (#5275)
+  `PR #5275 <https://github.com/pantsbuild/pants/pull/5275>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Add debug logging utils. (#5313)
+  `PR #5313 <https://github.com/pantsbuild/pants/pull/5313>`_
+
+* Move grpc mocks to their own crate (#5305)
+  `PR #5305 <https://github.com/pantsbuild/pants/pull/5305>`_
+
+* Move hashing utilities into their own crate (#5304)
+  `PR #5304 <https://github.com/pantsbuild/pants/pull/5304>`_
+
+* Merge coverage per-batch. (#5286)
+  `PR #5286 <https://github.com/pantsbuild/pants/pull/5286>`_
+
+* Update cargo lockfiles (#5291)
+  `PR #5291 <https://github.com/pantsbuild/pants/pull/5291>`_
+
+* Install packages required to build a pants release (#5292)
+  `PR #5292 <https://github.com/pantsbuild/pants/pull/5292>`_
+
+* travis_ci Dockerfile actually works not on travis (#5278)
+  `PR #5278 <https://github.com/pantsbuild/pants/pull/5278>`_
+
+* Update grpcio to 0.2.0 (#5269)
+  `PR #5269 <https://github.com/pantsbuild/pants/pull/5269>`_
+
+1.4.0.dev27 (01/05/2018)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Support for finding all the targets derived from a given target. (#5271)
+  `PR #5271 <https://github.com/pantsbuild/pants/pull/5271>`_
+
+* Support merging of junit xml in reports. (#5257)
+  `PR #5257 <https://github.com/pantsbuild/pants/pull/5257>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Scrub PANTS_ENTRYPOINT env var upon use. (#5262)
+  `PR #5262 <https://github.com/pantsbuild/pants/pull/5262>`_
+
+* Fix junit report data loss under batching. (#5259)
+  `PR #5259 <https://github.com/pantsbuild/pants/pull/5259>`_
+
+* add safe extract for archivers (#5248)
+  `PR #5248 <https://github.com/pantsbuild/pants/pull/5248>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Bump rust version. (#5274)
+  `PR #5274 <https://github.com/pantsbuild/pants/pull/5274>`_
+
+* Deprecate legacy junit "public" workdir reports. (#5267)
+  `PR #5267 <https://github.com/pantsbuild/pants/pull/5267>`_
+
+* Upgrade to jacoco 0.8.0. (#5268)
+  `PR #5268 <https://github.com/pantsbuild/pants/pull/5268>`_
+
+* [pantsd] Kill dead method. (#5263)
+  `PR #5263 <https://github.com/pantsbuild/pants/pull/5263>`_
+
+* Give travis just the AWS permissions it needs. (#5261)
+  `PR #5261 <https://github.com/pantsbuild/pants/pull/5261>`_
+
+* Relocate stable_json_sha1 to hash_utils. (#5258)
+  `PR #5258 <https://github.com/pantsbuild/pants/pull/5258>`_
+
+1.4.0.dev26 (12/30/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add [resolve.coursier] as an experimental task (#5133)
+  `PR #5133 <https://github.com/pantsbuild/pants/pull/5133>`_
+
+* mypy contrib plugin (#5172)
+  `PR #5172 <https://github.com/pantsbuild/pants/pull/5172>`_
+
+Bugfixes
+~~~~~~~~
+
+* Swap stdio file descriptors at the os level (#5247)
+  `PR #5247 <https://github.com/pantsbuild/pants/pull/5247>`_
+
+* Don't render cancelled nodes in trace (#5252)
+  `PR #5252 <https://github.com/pantsbuild/pants/pull/5252>`_
+
+* Correction on ensure_resolver (#5250)
+  `PR #5250 <https://github.com/pantsbuild/pants/pull/5250>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Support fetching sources and javadoc in export using coursier (#5254)
+  `PR #5254 <https://github.com/pantsbuild/pants/pull/5254>`_
+
+1.4.0.dev25 (12/22/2017)
+------------------------
+
+New Features
+~~~~~~~~~~~~
+* Integrate PEX interpreter selection based on target-level interpreter compatibility constraints (#5160)
+  `PR #5160 <https://github.com/pantsbuild/pants/pull/5160>`_
+
+* Import statements can be banned in BUILD files (#5180)
+  `PR #5180 <https://github.com/pantsbuild/pants/pull/5180>`_
+
+Bugfixes
+~~~~~~~~
+
+* revert log statement edits from #5170 that break console logging (#5233)
+  `PR #5233 <https://github.com/pantsbuild/pants/pull/5233>`_
+
+* [pantsd] Repair daemon lifecycle options fingerprinting. (#5232)
+  `PR #5232 <https://github.com/pantsbuild/pants/pull/5232>`_
+
+* use task fingerprint for build invalidation to avoid `results_dir` clashes (#5170)
+  `PR #5170 <https://github.com/pantsbuild/pants/pull/5170>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* [pantsd] Bump watchman version. (#5238)
+  `PR #5238 <https://github.com/pantsbuild/pants/pull/5238>`_
+
+* [pantsd] Improve stream latency by disabling Nagle's algorithm. (#5237)
+  `PR #5237 <https://github.com/pantsbuild/pants/pull/5237>`_
+
+* Log and increase pantsd startup timeout (#5231)
+  `PR #5231 <https://github.com/pantsbuild/pants/pull/5231>`_
+
+* [pantsd] Improve artifact cache progress output when daemon is enabled. (#5236)
+  `PR #5236 <https://github.com/pantsbuild/pants/pull/5236>`_
+
+* download_binary.sh takes hostname as a parameter (#5234)
+  `PR #5234 <https://github.com/pantsbuild/pants/pull/5234>`_
+
+* Kill noisy NodeModule.__init__() debug logging. (#5215)
+  `PR #5215 <https://github.com/pantsbuild/pants/pull/5215>`_
+
+* TargetRoots always requires options (#5217)
+  `PR #5217 <https://github.com/pantsbuild/pants/pull/5217>`_
+
+
+1.4.0.dev24 (12/16/2017)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+* Add --ignore-optional commandline flag for yarn install process. (#5209)
+  `PR #5209 <https://github.com/pantsbuild/pants/pull/5209>`_
+
+New Features
+~~~~~~~~~~~~
+* contrib plugin for Avro/Java code generation (#5144)
+  `PR #5144 <https://github.com/pantsbuild/pants/pull/5144>`_
+
+* Release fs_util as part of the regular release (#5196)
+  `PR #5196 <https://github.com/pantsbuild/pants/pull/5196>`_
+
+Bugfixes
+~~~~~~~~
+* Cross-compiling Go binaries works (#5197)
+  `PR #5197 <https://github.com/pantsbuild/pants/pull/5197>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Log if artifact downloads are slow (#5208)
+  `PR #5208 <https://github.com/pantsbuild/pants/pull/5208>`_
+
+* [pantsd] Improve service locking. (#5201)
+  `PR #5201 <https://github.com/pantsbuild/pants/pull/5201>`_
+
+* Fix RunTracker re-initialization with pantsd (#5211)
+  `PR #5211 <https://github.com/pantsbuild/pants/pull/5211>`_
+
+* [pantsd] Catch ESRCH on os.kill of pantsd-runner. (#5213)
+  `PR #5213 <https://github.com/pantsbuild/pants/pull/5213>`_
+
+* Update junit-runner to 1.0.23 (#5206)
+  `PR #5206 <https://github.com/pantsbuild/pants/pull/5206>`_
+
+* Reset swappable streams in JUnit runner before closing the TeeOutputStreams to the log files and close XML Files after use (#5204)
+  `PR #5204 <https://github.com/pantsbuild/pants/pull/5204>`_
+
+* Use centos6 in travis, and remove the wheezy image. (#5202)
+  `PR #5202 <https://github.com/pantsbuild/pants/pull/5202>`_
+
+* Add a centos6 Dockerfile (#5167)
+  `PR #5167 <https://github.com/pantsbuild/pants/pull/5167>`_
+
+* Add integration test to cover the fix for #5169. (#5192)
+  `PR #5192 <https://github.com/pantsbuild/pants/pull/5192>`_
+
+* [pantsd] Repair stdio truncation. (#5156)
+  `PR #5156 <https://github.com/pantsbuild/pants/pull/5156>`_
+
+
+1.4.0.dev23 (12/08/2017)
+------------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Relativize the classpaths that are recorded during a JVM compile (#5139)
+  `PR #5139 <https://github.com/pantsbuild/pants/pull/5139>`_
+
+New Features
+~~~~~~~~~~~~
+
+* fs_util backfills from remote CAS if --server-address is set (#5179)
+  `PR #5179 <https://github.com/pantsbuild/pants/pull/5179>`_
+
+* Store backfills from a remote CAS (#5166)
+  `PR #5166 <https://github.com/pantsbuild/pants/pull/5166>`_
+
+* ByteStore impl for reading from the gRPC ContentAddressableStorage service (#5155)
+  `PR #5155 <https://github.com/pantsbuild/pants/pull/5155>`_
+
+* Add the ability to build a pex to the release script (#5159)
+  `PR #5159 <https://github.com/pantsbuild/pants/pull/5159>`_
+
+Bugfixes
+~~~~~~~~
+
+* Installing a duplicate task into a goal should not throw error if replace=True (#5188)
+  `PR #5188 <https://github.com/pantsbuild/pants/pull/5188>`_
+
+* Close suiteCaptures after all tests are finished instead of after each test (#5173)
+  `PR #5173 <https://github.com/pantsbuild/pants/pull/5173>`_
+
+* Fix thrift handling in the new python pipeline. (#5168)
+  `PR #5168 <https://github.com/pantsbuild/pants/pull/5168>`_
+
+* [pantsd] Improve SIGQUIT handling in the thin client. (#5177)
+  `PR #5177 <https://github.com/pantsbuild/pants/pull/5177>`_
+
+* Fix showing test output that happens after the tests are finished (#5165)
+  `PR #5165 <https://github.com/pantsbuild/pants/pull/5165>`_
+
+* Post suffixed-wheel release fixups (#5152)
+  `PR #5152 <https://github.com/pantsbuild/pants/pull/5152>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove scheduler lock (#5178)
+  `PR #5178 <https://github.com/pantsbuild/pants/pull/5178>`_
+
+* Kill obsolete `ThritNamespacePackagesTest`. (#5183)
+  `PR #5183 <https://github.com/pantsbuild/pants/pull/5183>`_
+
+* Prefactor Store wrapper (#5154)
+  `PR #5154 <https://github.com/pantsbuild/pants/pull/5154>`_
+
 1.4.0.dev22 (12/01/2017)
 ------------------------
 

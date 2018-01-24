@@ -14,6 +14,7 @@ from textwrap import dedent
 from pants.backend.jvm.register import build_file_aliases as register_jvm
 from pants.backend.jvm.subsystems.junit import JUnit
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
+from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
 from pants.backend.jvm.subsystems.scala_platform import ScalaPlatform
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -118,9 +119,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.make_target(
       'project_info:java_test',
       target_type=JUnitTests,
-      dependencies=[jar_lib],
+      dependencies=[jar_lib, test_resource],
       sources=['this/is/a/test/source/FooTest.scala'],
-      resources=[test_resource.address.spec],
     )
 
     jvm_binary = self.make_target(
@@ -144,9 +144,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.make_target(
         'project_info:target_type',
         target_type=ScalaLibrary,
-        dependencies=[jvm_binary],
+        dependencies=[jvm_binary, src_resource],
         sources=[],
-        resources=[src_resource.address.spec],
     )
 
     self.make_target(
@@ -178,6 +177,9 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def execute_export(self, *specs, **options_overrides):
     options = {
+      JvmResolveSubsystem.options_scope: {
+        'resolver': 'ivy'
+      },
       JvmPlatform.options_scope: {
         'default_platform': 'java6',
         'platforms': {
@@ -231,7 +233,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
   def test_version(self):
     result = self.execute_export_json('project_info:first')
     # If you have to update this test, make sure export.md is updated with changelog notes
-    self.assertEqual('1.0.9', result['version'])
+    self.assertEqual('1.0.10', result['version'])
 
   def test_sources(self):
     self.set_options(sources=True)
@@ -404,18 +406,6 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       result['targets']['src/python/z:z']['globs']
     )
 
-  # TODO: Delete this test in 1.5.0.dev0, once we remove support for resources=.
-  def test_synthetic_target(self):
-    # Create a BUILD file then add itself as resources
-    self.add_to_build_file('src/python/alpha/BUILD', """
-        python_library(name="alpha", sources=zglobs("**/*.py"), resources=["BUILD"])
-      """.strip())
-
-    result = self.execute_export_json('src/python/alpha')
-    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources'])
-    # But not the origin target
-    self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
-
   @contextmanager
   def fake_distribution(self, version):
     with temporary_dir() as java_home:
@@ -450,5 +440,10 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         }
 
         export_json = self.execute_export_json(**options)
-        self.assertEqual({'strict': strict_home, 'non_strict': non_strict_home},
-                         export_json['preferred_jvm_distributions']['java9999'])
+        self.assertEqual(strict_home, export_json['preferred_jvm_distributions']['java9999']['strict'],
+                         "strict home does not match")
+
+        # Since it is non-strict, it can be either.
+        self.assertIn(export_json['preferred_jvm_distributions']['java9999']['non_strict'],
+                      [non_strict_home, strict_home],
+                      "non-strict home does not match")

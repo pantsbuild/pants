@@ -52,7 +52,8 @@ class GoCompile(GoWorkspaceTask):
           self._sync_binary_dep_links(vt.target, gopath, lib_binary_map)
           self._go_install(vt.target, gopath)
         if self.is_binary(vt.target):
-          binary_path = os.path.join(gopath, 'bin', os.path.basename(vt.target.address.spec_path))
+          subdir, extension = self._get_cross_compiling_subdir_and_extension(gopath)
+          binary_path = os.path.join(gopath, 'bin', subdir, os.path.basename(vt.target.address.spec_path) + extension)
           go_exec_binary[vt.target] = binary_path
           go_deployable_archive.add(vt.target, os.path.dirname(binary_path)).append(os.path.basename(binary_path))
         else:
@@ -105,3 +106,21 @@ class GoCompile(GoWorkspaceTask):
         os.symlink(lib_binary, lib_binary_link)
       required_links.add(lib_binary_link)
     self.remove_unused_links(os.path.join(gopath, 'pkg'), required_links)
+
+  def _get_cross_compiling_subdir_and_extension(self, gopath):
+    # Note that environment variables don't invalidate the build graph, so changes to GOOS or GOARCH
+    # require a clean-all.
+
+    host_goos = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTOS"]).check_output().strip()
+    target_goos = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOOS"]).check_output().strip()
+    host_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOARCH"]).check_output().strip()
+    target_arch = self.go_dist.create_go_cmd('env', gopath=gopath, args=["GOHOSTARCH"]).check_output().strip()
+
+    host_pair = "{}_{}".format(host_goos, host_arch)
+    target_pair = "{}_{}".format(target_goos, target_arch)
+
+    ext = ".exe" if target_goos == "windows" else ""
+
+    if host_pair != target_pair:
+      return (target_pair, ext)
+    return (".", ext)

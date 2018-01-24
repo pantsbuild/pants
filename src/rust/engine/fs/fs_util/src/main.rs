@@ -1,20 +1,26 @@
 extern crate bazel_protos;
 extern crate boxfuture;
+extern crate bytes;
 extern crate clap;
 extern crate fs;
 extern crate futures;
+extern crate hashing;
 extern crate protobuf;
 
 use boxfuture::{Boxable, BoxFuture};
+use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{Fingerprint, GetFileDigest, ResettablePool, Snapshot, Store, VFS};
+use fs::{GetFileDigest, ResettablePool, Snapshot, Store, VFS};
 use futures::future::{self, Future, join_all};
+use hashing::{Digest, Fingerprint};
+use protobuf::Message;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug)]
 enum ExitCode {
@@ -41,6 +47,9 @@ fn main() {
               .about("Output the contents of a file by fingerprint.")
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
+              ))
+              .arg(Arg::with_name("size_bytes").required(true).takes_value(
+                true,
               )),
           )
           .subcommand(
@@ -61,6 +70,9 @@ Outputs a fingerprint of its contents and its size in bytes, separated by a spac
 Destination must not exist before this command is run.",
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
+                true,
+              ))
+              .arg(Arg::with_name("size_bytes").required(true).takes_value(
                 true,
               ))
               .arg(Arg::with_name("destination").required(true).takes_value(
@@ -103,6 +115,9 @@ to this directory.",
               )
               .arg(Arg::with_name("fingerprint").required(true).takes_value(
                 true,
+              ))
+              .arg(Arg::with_name("size_bytes").required(true).takes_value(
+                true,
               )),
           ),
       )
@@ -113,6 +128,9 @@ to this directory.",
           )
           .arg(Arg::with_name("fingerprint").required(true).takes_value(
             true,
+          ))
+          .arg(Arg::with_name("size_bytes").required(true).takes_value(
+            true,
           )),
       )
       .arg(
@@ -121,6 +139,12 @@ to this directory.",
           .long("local-store-path")
           .required(true),
       )
+        .arg(
+          Arg::with_name("server-address")
+              .takes_value(true)
+              .long("server-address")
+              .required(false)
+        )
       .get_matches(),
   ) {
     Ok(_) => {}
@@ -134,25 +158,47 @@ to this directory.",
 fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let store_dir = top_match.value_of("local-store-path").unwrap();
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
-  let store = Arc::new(Store::new(store_dir, pool.clone()).map_err(|e| {
-    format!(
-      "Failed to open/create store for directory {}: {}",
-      store_dir,
-      e
-    )
-  })?);
+  let store = {
+    let store_result = match top_match.value_of("server-address") {
+      Some(cas_address) => {
+        Store::with_remote(
+          store_dir,
+          pool.clone(),
+          cas_address,
+          1,
+          10 * 1024 * 1024,
+          Duration::from_secs(30),
+        )
+      }
+      None => Store::local_only(store_dir, pool.clone()),
+    };
+    let store = store_result.map_err(|e| {
+      format!(
+        "Failed to open/create store for directory {}: {}",
+        store_dir,
+        e
+      )
+    })?;
+    Arc::new(store)
+  };
 
   match top_match.subcommand() {
     ("file", Some(sub_match)) => {
       match sub_match.subcommand() {
         ("cat", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+          let size_bytes = args
+            .value_of("size_bytes")
+            .unwrap()
+            .parse::<usize>()
+            .expect("size_bytes must be a non-negative number");
+          let digest = Digest(fingerprint, size_bytes);
           let write_result = store
-            .load_file_bytes_with(fingerprint, |bytes| io::stdout().write_all(&bytes).unwrap())
+            .load_file_bytes_with(digest, |bytes| io::stdout().write_all(&bytes).unwrap())
             .wait()?;
           write_result.ok_or_else(|| {
             ExitError(
-              format!("File with fingerprint {} not found", fingerprint),
+              format!("File with digest {:?} not found", digest),
               ExitCode::NotFound,
             )
           })
@@ -203,7 +249,13 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         ("materialize", Some(args)) => {
           let destination = PathBuf::from(args.value_of("destination").unwrap());
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-          materialize_directory(store, destination, fingerprint).wait()
+          let size_bytes = args
+            .value_of("size_bytes")
+            .unwrap()
+            .parse::<usize>()
+            .expect("size_bytes must be a non-negative number");
+          let digest = Digest(fingerprint, size_bytes);
+          materialize_directory(store, destination, digest).wait()
         }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
@@ -233,14 +285,22 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         }
         ("cat-proto", Some(args)) => {
           let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
+          let size_bytes = args
+            .value_of("size_bytes")
+            .unwrap()
+            .parse::<usize>()
+            .expect("size_bytes must be a non-negative number");
+          let digest = Digest(fingerprint, size_bytes);
           let proto_bytes = match args.value_of("output-format").unwrap() {
-            "binary" => store.load_directory_proto_bytes(fingerprint).wait(),
+            "binary" => {
+              store.load_directory(digest).wait().map(|maybe_d| {
+                maybe_d.map(|d| d.write_to_bytes().unwrap())
+              })
+            }
             "text" => {
-              store.load_directory_proto(fingerprint).wait().map(
-                |maybe_p| {
-                  maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
-                },
-              )
+              store.load_directory(digest).wait().map(|maybe_p| {
+                maybe_p.map(|p| format!("{:?}\n", p).as_bytes().to_vec())
+              })
             }
             format => Err(format!(
               "Unexpected value of --output-format arg: {}",
@@ -253,10 +313,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               Ok(())
             }
             None => Err(ExitError(
-              format!(
-                "Directory with fingerprint {} not found",
-                fingerprint
-              ),
+              format!("Directory with digest {:?} not found", digest),
               ExitCode::NotFound,
             )),
           }
@@ -266,8 +323,25 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
     }
     ("cat", Some(args)) => {
       let fingerprint = Fingerprint::from_hex_string(args.value_of("fingerprint").unwrap())?;
-      let v = match store.load_file_bytes(fingerprint).wait()? {
-        None => store.load_directory_proto_bytes(fingerprint).wait()?,
+      let size_bytes = args
+        .value_of("size_bytes")
+        .unwrap()
+        .parse::<usize>()
+        .expect("size_bytes must be a non-negative number");
+      let digest = Digest(fingerprint, size_bytes);
+      let v = match store.load_file_bytes_with(digest, |bytes| bytes).wait()? {
+        None => {
+          store
+            .load_directory(digest)
+            .map(|maybe_dir| {
+              maybe_dir.map(|dir| {
+                Bytes::from(dir.write_to_bytes().expect(
+                  "Error serializing Directory proto",
+                ))
+              })
+            })
+            .wait()?
+        }
         some => some,
       };
       match v {
@@ -276,7 +350,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
           Ok(())
         }
         None => Err(ExitError(
-          format!("Fingerprint {} not found", fingerprint),
+          format!("Digest {:?} not found", digest),
           ExitCode::NotFound,
         )),
       }
@@ -296,7 +370,7 @@ struct FileSaver {
 }
 
 impl GetFileDigest<String> for FileSaver {
-  fn digest(&self, file: &fs::File) -> BoxFuture<fs::Digest, String> {
+  fn digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
     let file_copy = file.clone();
     let store = self.store.clone();
     self
@@ -305,7 +379,7 @@ impl GetFileDigest<String> for FileSaver {
       .map_err(move |err| {
         format!("Error reading file {:?}: {}", file_copy, err.description())
       })
-      .and_then(move |content| store.store_file_bytes(content.content))
+      .and_then(move |content| store.store_file_bytes(content.content, true))
       .to_boxed()
   }
 }
@@ -313,13 +387,13 @@ impl GetFileDigest<String> for FileSaver {
 fn materialize_directory(
   store: Arc<Store>,
   destination: PathBuf,
-  fingerprint: Fingerprint,
+  digest: Digest,
 ) -> BoxFuture<(), ExitError> {
   let mkdir = make_clean_dir(&destination).map_err(|e| {
     format!(
-      "Error making directory {:?}: {}",
+      "Error making directory {:?}: {:?}",
       destination,
-      e.description()
+      e,
     ).into()
   });
   match mkdir {
@@ -327,12 +401,12 @@ fn materialize_directory(
     Err(e) => return future::err(e).to_boxed(),
   };
   store
-    .load_directory_proto(fingerprint)
+    .load_directory(digest)
     .map_err(|e| e.into())
     .and_then(move |directory_opt| {
       directory_opt.ok_or_else(|| {
         ExitError(
-          format!("Directory with fingerprint {} not found", fingerprint),
+          format!("Directory with digest {:?} not found", digest),
           ExitCode::NotFound,
         )
       })
@@ -344,12 +418,8 @@ fn materialize_directory(
         .map(|file_node| {
           let store = store.clone();
           let path = destination.join(file_node.get_name());
-          future::result(Fingerprint::from_hex_string(
-            file_node.get_digest().get_hash(),
-          )).map_err(|e| e.into())
-            .and_then(move |fingerprint| {
-              materialize_file(store, path, fingerprint)
-            })
+          let digest: Digest = file_node.get_digest().into();
+          materialize_file(store, path, digest)
         })
         .collect::<Vec<_>>();
       let directory_futures = directory
@@ -358,12 +428,8 @@ fn materialize_directory(
         .map(|directory_node| {
           let store = store.clone();
           let path = destination.join(directory_node.get_name());
-          future::result(Fingerprint::from_hex_string(
-            directory_node.get_digest().get_hash(),
-          )).map_err(|e| e.into())
-            .and_then(move |fingerprint| {
-              materialize_directory(store, path, fingerprint)
-            })
+          let digest: Digest = directory_node.get_digest().into();
+          materialize_directory(store, path, digest)
         })
         .collect::<Vec<_>>();
       join_all(file_futures)
@@ -376,12 +442,12 @@ fn materialize_directory(
 fn materialize_file(
   store: Arc<Store>,
   destination: PathBuf,
-  fingerprint: Fingerprint,
+  digest: Digest,
 ) -> BoxFuture<(), ExitError> {
   store
-    .load_file_bytes_with(fingerprint, move |bytes| {
+    .load_file_bytes_with(digest, move |bytes| {
       File::create(&destination)
-        .and_then(|mut f| f.write_all(bytes))
+        .and_then(|mut f| f.write_all(&bytes))
         .map_err(|e| {
           format!("Error writing file {:?}: {}", destination, e.description())
         })
@@ -392,7 +458,7 @@ fn materialize_file(
       Some(Err(e)) => Err(e.into()),
       None => {
         Err(ExitError(
-          format!("File with fingerprint {} not found", fingerprint),
+          format!("File with digest {:?} not found", digest),
           ExitCode::NotFound,
         ))
       }

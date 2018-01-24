@@ -11,6 +11,7 @@ import shutil
 from pex.interpreter import PythonIdentity, PythonInterpreter
 from pex.package import EggPackage, Package, SourcePackage
 from pex.resolver import resolve
+from pex.variables import Variables
 
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TaskError
@@ -38,6 +39,22 @@ class PythonInterpreterCache(object):
     for interpreter in interpreters:
       if cls._matches(interpreter, filters):
         yield interpreter
+
+  @classmethod
+  def pex_python_paths(cls):
+    """A list of paths to Python interpreter binaries as defined by a
+    PEX_PYTHON_PATH defined in either in '/etc/pexrc', '~/.pexrc'.
+    PEX_PYTHON_PATH defines a colon-seperated list of paths to interpreters
+    that a pex can be built and ran against.
+
+    :return: paths to interpreters as specified by PEX_PYTHON_PATH
+    :rtype: list
+    """
+    ppp = Variables.from_rc().get('PEX_PYTHON_PATH')
+    if ppp:
+      return ppp.split(os.pathsep)
+    else:
+      return []
 
   def __init__(self, python_setup, python_repos, logger=None):
     self._python_setup = python_setup
@@ -132,6 +149,7 @@ class PythonInterpreterCache(object):
     # an escape hatch.
     filters = filters if any(filters) else self._python_setup.interpreter_constraints
     setup_paths = (paths
+                   or self.pex_python_paths()
                    or self._python_setup.interpreter_search_paths
                    or os.getenv('PATH').split(os.pathsep))
 

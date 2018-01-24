@@ -16,7 +16,8 @@ use externs;
 use boxfuture::{BoxFuture, Boxable};
 use context::ContextFactory;
 use core::{Failure, FNV, Noop};
-use nodes::{Node, NodeFuture, NodeKey, NodeResult, TryInto};
+use hashing;
+use nodes::{DigestFile, Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
 
 // 2^32 Nodes ought to be more than enough for anyone!
@@ -150,23 +151,25 @@ struct InnerGraph {
 
 impl InnerGraph {
   fn entry(&self, node: &EntryKey) -> Option<&Entry> {
-    self.entry_id(node).map(|&id| self.entry_for_id(id))
+    self.entry_id(node).and_then(|&id| self.entry_for_id(id))
   }
 
   fn entry_id(&self, node: &EntryKey) -> Option<&EntryId> {
     self.nodes.get(node)
   }
 
-  fn entry_for_id(&self, id: EntryId) -> &Entry {
-    self.pg.node_weight(id).unwrap_or_else(|| {
-      panic!("Invalid EntryId: {:?}", id)
-    })
+  fn entry_for_id(&self, id: EntryId) -> Option<&Entry> {
+    self.pg.node_weight(id)
   }
 
-  fn entry_for_id_mut(&mut self, id: EntryId) -> &mut Entry {
-    self.pg.node_weight_mut(id).unwrap_or_else(|| {
-      panic!("Invalid EntryId: {:?}", id)
-    })
+  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry> {
+    self.pg.node_weight_mut(id)
+  }
+
+  fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry {
+    self.pg.node_weight(id).expect(
+      "The unsafe_entry_for_id method should only be used in read-only methods!",
+    )
   }
 
   fn ensure_entry(&mut self, node: EntryKey) -> EntryId {
@@ -318,6 +321,7 @@ impl InnerGraph {
       None |
       Some(Err(Failure::Noop(_))) => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = viz_colors.len();
         viz_colors
@@ -342,7 +346,7 @@ impl InnerGraph {
     let predicate = |_| true;
 
     for eid in self.walk(root_entries, false) {
-      let entry = self.entry_for_id(eid);
+      let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format::<NodeKey>();
 
       // Write the node header.
@@ -353,7 +357,7 @@ impl InnerGraph {
       )));
 
       for dep_id in self.pg.neighbors(eid) {
-        let dep_entry = self.entry_for_id(dep_id);
+        let dep_entry = self.unsafe_entry_for_id(dep_id);
         if !predicate(dep_entry) {
           continue;
         }
@@ -375,11 +379,17 @@ impl InnerGraph {
     let mut f = BufWriter::new(file);
 
     let is_bottom = |eid: EntryId| -> bool {
-      match self.entry_for_id(eid).peek::<NodeKey>() {
-        None |
+      match self.unsafe_entry_for_id(eid).peek::<NodeKey>() {
+        Some(Err(Failure::Invalidated)) => false,
         Some(Err(Failure::Noop(..))) => true,
         Some(Err(Failure::Throw(..))) => false,
         Some(Ok(_)) => true,
+        None => {
+          // A Node with no state is either still running, or effectively cancelled
+          // because a dependent failed. In either case, it's not useful to render
+          // them, as we don't know whether they would have succeeded or failed.
+          true
+        }
       }
     };
 
@@ -395,7 +405,7 @@ impl InnerGraph {
     };
 
     let _format = |eid: EntryId, level: Level| -> String {
-      let entry = self.entry_for_id(eid);
+      let entry = self.unsafe_entry_for_id(eid);
       let indent = _indent(level);
       let output = format!("{}Computing {}", indent, entry.node.content().format());
       if is_one_level_above_bottom(eid) {
@@ -414,6 +424,7 @@ impl InnerGraph {
             )
           }
           Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
+          Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
         };
         format!("{}\n{}  {}", output, indent, state_str)
       } else {
@@ -432,6 +443,23 @@ impl InnerGraph {
 
     try!(f.write_all(b"\n"));
     Ok(())
+  }
+
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+    self
+      .pg
+      .node_indices()
+      .map(|node_index| self.pg.node_weight(node_index))
+      .filter_map(|maybe_entry| maybe_entry)
+      .filter_map(|entry| match entry.node.content() {
+        &NodeKey::DigestFile(_) => Some(entry.peek::<DigestFile>()),
+        _ => None,
+      })
+      .filter_map(|output| match output {
+        Some(Ok(digest)) => Some(digest),
+        _ => None,
+      })
+      .collect()
   }
 }
 
@@ -497,7 +525,12 @@ impl Graph {
 
       // Declare the dep, and return the state of the destination.
       inner.pg.add_edge(src_id, dst_id, ());
-      inner.entry_for_id_mut(dst_id).state(context, dst_id)
+      inner
+        .entry_for_id_mut(dst_id)
+        .map(|entry| entry.state(context, dst_id))
+        .unwrap_or_else(|| {
+          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
+        })
     };
 
     // Got the destination's state. Now that we're outside the graph locks, we can safely
@@ -513,7 +546,12 @@ impl Graph {
     let state = {
       let mut inner = self.inner.lock().unwrap();
       let id = inner.ensure_entry(EntryKey::Valid(node.into()));
-      inner.entry_for_id_mut(id).state(context, id)
+      inner
+        .entry_for_id_mut(id)
+        .map(|entry| entry.state(context, id))
+        .unwrap_or_else(|| {
+          (future::err(Failure::Invalidated).to_boxed() as BoxFuture<_, _>).shared()
+        })
     };
     // ...but only `get` it outside the lock.
     state.get::<N>()
@@ -532,6 +570,11 @@ impl Graph {
   pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
     let inner = self.inner.lock().unwrap();
     inner.visualize(roots, path)
+  }
+
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+    let inner = self.inner.lock().unwrap();
+    inner.all_digests()
   }
 }
 

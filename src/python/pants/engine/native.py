@@ -98,6 +98,7 @@ typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, TypeConstrai
 typedef _Bool            (*extern_ptr_satisfied_by_type)(ExternContext*, TypeConstraint*, TypeId*);
 typedef Value            (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, _Bool);
 typedef Value            (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
+typedef Value            (*extern_ptr_store_i32)(ExternContext*, int32_t);
 typedef Value            (*extern_ptr_project)(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
 typedef ValueBuffer      (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
@@ -106,11 +107,7 @@ typedef RunnableComplete (*extern_ptr_invoke_runnable)(ExternContext*, Value*, V
 
 typedef void Tasks;
 typedef void Scheduler;
-
-typedef struct {
-  uint64_t runnable_count;
-  uint64_t scheduling_iterations;
-} ExecutionStat;
+typedef void ExecutionRequest;
 
 typedef struct {
   Key             subject;
@@ -140,6 +137,7 @@ void externs_set(ExternContext*,
                  extern_ptr_satisfied_by_type,
                  extern_ptr_store_list,
                  extern_ptr_store_bytes,
+                 extern_ptr_store_i32,
                  extern_ptr_project,
                  extern_ptr_project_ignoring_type,
                  extern_ptr_project_multi,
@@ -167,6 +165,9 @@ Scheduler* scheduler_create(Tasks*,
                             Function,
                             Function,
                             Function,
+                            Function,
+                            TypeConstraint,
+                            TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
                             TypeConstraint,
@@ -186,15 +187,17 @@ Scheduler* scheduler_create(Tasks*,
 void scheduler_pre_fork(Scheduler*);
 void scheduler_destroy(Scheduler*);
 
+
+ExecutionRequest* execution_request_create(void);
+void execution_request_destroy(ExecutionRequest*);
+
 uint64_t graph_len(Scheduler*);
 uint64_t graph_invalidate(Scheduler*, BufferBuffer);
-void graph_visualize(Scheduler*, char*);
-void graph_trace(Scheduler*, char*);
+void graph_visualize(Scheduler*, ExecutionRequest*, char*);
+void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
-void execution_reset(Scheduler*);
-void execution_add_root_select(Scheduler*, Key, TypeConstraint);
-ExecutionStat execution_execute(Scheduler*);
-RawNodes* execution_roots(Scheduler*);
+void execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
+RawNodes* execution_execute(Scheduler*, ExecutionRequest*);
 
 Value validator_run(Scheduler*);
 
@@ -204,6 +207,10 @@ void rule_subgraph_visualize(Scheduler*, TypeId, TypeConstraint, char*);
 void nodes_destroy(RawNodes*);
 
 void set_panic_handler(void);
+
+void lease_files_in_graph(Scheduler*);
+
+void garbage_collect_store(Scheduler*);
 '''
 
 CFFI_EXTERNS = '''
@@ -219,6 +226,7 @@ extern "Python" {
   _Bool            extern_satisfied_by_type(ExternContext*, TypeConstraint*, TypeId*);
   Value            extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
   Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
+  Value            extern_store_i32(ExternContext*, int32_t);
   Value            extern_project(ExternContext*, Value*, uint8_t*, uint64_t, TypeId*);
   Value            extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
   ValueBuffer      extern_project_multi(ExternContext*, Value*, uint8_t*, uint64_t);
@@ -360,6 +368,12 @@ def _initialize_externs(ffi):
     """Given a context and raw bytes, return a new Value to represent the content."""
     c = ffi.from_handle(context_handle)
     return c.to_value(bytes(ffi.buffer(bytes_ptr, bytes_len)))
+
+  @ffi.def_extern()
+  def extern_store_i32(context_handle, i32):
+    """Given a context and int32_t, return a new Value to represent the int32_t."""
+    c = ffi.from_handle(context_handle)
+    return c.to_value(i32)
 
   @ffi.def_extern()
   def extern_project(context_handle, val, field_str_ptr, field_str_len, type_id):
@@ -628,6 +642,7 @@ class Native(object):
                            self.ffi_lib.extern_satisfied_by_type,
                            self.ffi_lib.extern_store_list,
                            self.ffi_lib.extern_store_bytes,
+                           self.ffi_lib.extern_store_i32,
                            self.ffi_lib.extern_project,
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
@@ -661,6 +676,9 @@ class Native(object):
   def new_tasks(self):
     return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
+  def new_execution_request(self):
+    return self.gc(self.lib.execution_request_create(), self.lib.execution_request_destroy)
+
   def new_scheduler(self,
                     tasks,
                     root_subject_types,
@@ -675,6 +693,7 @@ class Native(object):
                     construct_dir,
                     construct_file,
                     construct_link,
+                    construct_process_result,
                     constraint_has_products,
                     constraint_address,
                     constraint_variants,
@@ -684,7 +703,9 @@ class Native(object):
                     constraint_files_content,
                     constraint_dir,
                     constraint_file,
-                    constraint_link):
+                    constraint_link,
+                    constraint_process_request,
+                    constraint_process_result):
     """Create and return an ExternContext and native Scheduler."""
 
     def tc(constraint):
@@ -701,6 +722,7 @@ class Native(object):
         Function(self.context.to_id(construct_dir)),
         Function(self.context.to_id(construct_file)),
         Function(self.context.to_id(construct_link)),
+        Function(self.context.to_id(construct_process_result)),
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_has_products),
@@ -712,6 +734,8 @@ class Native(object):
         tc(constraint_dir),
         tc(constraint_file),
         tc(constraint_link),
+        tc(constraint_process_request),
+        tc(constraint_process_result),
         # Types.
         TypeId(self.context.to_id(six.text_type)),
         TypeId(self.context.to_id(six.binary_type)),

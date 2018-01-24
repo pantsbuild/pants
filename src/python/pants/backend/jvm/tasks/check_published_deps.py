@@ -5,6 +5,7 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.tasks.jar_publish import PushDb
@@ -30,7 +31,7 @@ class CheckPublishedDeps(ConsoleTask):
     self._artifacts_to_targets = {}
 
     def is_published(tgt):
-      return tgt.is_exported
+      return isinstance(tgt, ExportableJvmLibrary) and tgt.provides
 
     for target in self.context.scan().targets(predicate=is_published):
       provided_jar, _ = target.get_artifact_info()

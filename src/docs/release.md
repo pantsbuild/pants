@@ -72,9 +72,6 @@ script fail:
         username: <fill me in>
         password: <fill me in>
         EOF
-        
-  - The release script requires Bash 4.  If you're on MacOS you may have to run `brew install bash`,
-    as the Bash that ships with MacOS is ancient.
     
   - Note that the release script expects your pantsbuild/pants git remote to be named `origin`.
     If you have another name for it, you should `git remote rename othername origin` before running
@@ -115,7 +112,7 @@ the release manager may also need to do a release from a stable branch.*
      * Create a new page() in `src/python/pants/notes/BUILD` corresponding to the new notes. <br/>
    For additional information on generating documentation see the
    [docs reference](http://www.pantsbuild.org/docs#generating-the-site)
-4. Bring the CONTRIBUTORS roster (from master) in
+4. Bring the CONTRIBUTORS roster in
    [CONTRIBUTORS.md](https://github.com/pantsbuild/pants/tree/master/CONTRIBUTORS.md)
    up to date by running `build-support/bin/contributors.sh`.
 5. Create and land a review for changes in the master branch.
@@ -163,7 +160,8 @@ is not required.
 3. Publish to PyPi
 ------------------
 
-Now that we've smoke-tested this release, we can publish to PyPi:
+Once the first two travis shards (the "binary builder" shards) have completed for your
+release commit, you can publish to PyPi:
 
     :::bash
     $ ./build-support/bin/release.sh
@@ -204,13 +202,11 @@ Name              | Email                       | PYPI Usename
 ------------------|-----------------------------|---------------
 John Sirois       | john.sirois@gmail.com       | john.sirois
 Benjy Weinberger  | benjyw@gmail.com            | benjyw
-Eric Ayers        | ericzundel@squareup.com     | ericzundel
 Ity Kaul          | itykaul@gmail.com           | ity
 Stu Hood          | stuhood@gmail.com           | stuhood
-Patrick Lawson    | patrick.a.lawson@gmail.com  | Patrick.Lawson
-Garrett Malmquist | garrett.malmquist@gmail.com | gmalmquist
-Matt Olsen        | digwanderlust@gmail.com     | digiwanderlust
 Mateo Rodriguez   | mateorod9@gmail.com         | mateor
+Yi Cheng          | wisechengyi@gmail.com       | wisechengyi
+Daniel Wagner-Hall| dawagner@gmail.com          | illicitonion
 
 And the current list of packages that these folks can release can
 be obtained via:
@@ -231,8 +227,12 @@ Right now that's:
 - pantsbuild.pants.contrib.scalajs
 - pantsbuild.pants.contrib.findbugs
 - pantsbuild.pants.contrib.cpp
+- pantsbuild.pants.contrib.confluence
 - pantsbuild.pants.contrib.errorprone
+- pantsbuild.pants.contrib.codeanalysis
 - pantsbuild.pants.contrib.jax_ws
+- pantsbuild.pants.contrib.mypy
+- pantsbuild.pants.contrib.avro
 
 You can run the following to get a full ownership roster for each
 package :

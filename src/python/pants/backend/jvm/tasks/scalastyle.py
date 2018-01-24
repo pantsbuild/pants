@@ -66,9 +66,6 @@ class Scalastyle(NailgunTask):
   def subsystem_dependencies(cls):
     return super(Scalastyle, cls).subsystem_dependencies() + (ScalaPlatform, )
 
-  deprecated_options_scope = 'compile.scalastyle'
-  deprecated_options_scope_removal_version = '1.5.0.dev0'
-
   @classmethod
   def register_options(cls, register):
     super(Scalastyle, cls).register_options(register)

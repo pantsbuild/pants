@@ -14,6 +14,41 @@ from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 class IvyResolveIntegrationTest(PantsRunIntegrationTest):
 
+  # Override parent method so we can inject resolver config since there is also
+  # the option to select coursier as the resolver, so we want to be explicit.
+  def run_pants(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
+    config = config or {}
+    config.update(
+      {'resolver': {'resolver': 'ivy'}}
+    )
+    return super(IvyResolveIntegrationTest, self).run_pants(
+      command,
+      config,
+      stdin_data,
+      extra_env,
+      **kwargs
+    )
+
+  # Override parent method so we can inject resolver config since there is also
+  # the option to select coursier as the resolver, so we want to be explicit.
+  def run_pants_with_workdir(self, command, workdir, config=None, stdin_data=None, extra_env=None,
+                             build_root=None, tee_output=False, **kwargs):
+
+    config = config or {}
+    config.update(
+      {'resolver': {'resolver': 'ivy'}}
+    )
+    return super(IvyResolveIntegrationTest, self).run_pants_with_workdir(
+      command,
+      workdir,
+      config,
+      stdin_data,
+      extra_env,
+      build_root,
+      tee_output,
+      **kwargs
+    )
+
   def test_java_compile_with_ivy_report(self):
     # Ensure the ivy report file gets generated
     with self.temporary_workdir() as workdir:

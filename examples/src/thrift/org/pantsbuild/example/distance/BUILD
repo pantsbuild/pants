@@ -18,3 +18,7 @@ python_thrift_library(name='distance-python',
     version='0.0.1',
   )
 )
+
+python_thrift_library(name='unexported-distance-python',
+  sources=['distance.thrift'],
+)

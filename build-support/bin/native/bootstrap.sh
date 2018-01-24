@@ -74,7 +74,7 @@ function ensure_native_build_prerequisites() {
   export CARGO_HOME="${rust_toolchain_root}/cargo"
   export RUSTUP_HOME="${rust_toolchain_root}/rustup"
 
-  local rust_toolchain="1.21.0"
+  local rust_toolchain="1.23.0"
 
   # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
   if [[ ! -x "${CARGO_HOME}/bin/rustup" ]]
@@ -100,37 +100,30 @@ function ensure_native_build_prerequisites() {
   # We need to do this before we install grpcio-compiler to pre-fetch its repo.
   _wait_noisily "${CARGO_HOME}/bin/cargo" fetch --manifest-path "${NATIVE_ROOT}/Cargo.toml" || die
 
-  if [[ ! -x "${CARGO_HOME}/bin/protoc-gen-rust" ]]; then
-    "${CARGO_HOME}/bin/cargo" install protobuf >&2
+  if [[ ! -x "${CARGO_HOME}/bin/cargo-ensure-installed" ]]; then
+    "${CARGO_HOME}/bin/cargo" install cargo-ensure-installed >&2
   fi
-  if [[ ! -x "${CARGO_HOME}/bin/grpc_rust_plugin" ]] || ! grep '^"grpcio-compiler .*eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4' "${CARGO_HOME}/.crates.toml" >/dev/null 2>/dev/null; then
-    # Force install of a version we know is compatible with the version of grpc we use.
-    # There hasn't been a release since the changes we depend on (https://github.com/pingcap/grpc-rs/pull/101)
-    # so we need to manually mess with versions here.
-    "${CARGO_HOME}/bin/cargo" install --force --git=https://github.com/illicitonion/grpc-rs --rev=eb0ca7eb50a19777e2e1d61b3b734a265d3d64e4 grpcio-compiler >&2
-  fi
-  if [[ ! -x "${CARGO_HOME}/bin/rustfmt" ]]; then
-    "${CARGO_HOME}/bin/cargo" install rustfmt >&2
-  fi
+  "${CARGO_HOME}/bin/cargo" ensure-installed --package=cargo-ensure-installed --version=0.1.0 >&2
+  "${CARGO_HOME}/bin/cargo" ensure-installed --package=protobuf --version=1.4.2 >&2
+  "${CARGO_HOME}/bin/cargo" ensure-installed --package=grpcio-compiler --version=0.2.0 >&2
+  "${CARGO_HOME}/bin/cargo" ensure-installed --package=rustfmt --version=0.9.0 >&2
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
-  local readonly cmakeroot="$("${download_binary}" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
-  local readonly goroot="$("${download_binary}" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
+  local readonly cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
+  local readonly goroot="$("${download_binary}" "binaries.pantsbuild.org" "go" "1.7.3" "go.tar.gz")/go" || die "Failed to fetch go"
 
   export GOROOT="${goroot}"
   export EXTRA_PATH_FOR_CARGO="${cmakeroot}/bin:${goroot}/bin"
 }
 
-# Echos directories to add to $PATH.
-function prepare_to_build_native_code() {
-  # Must happen in the pants venv and have PANTS_SRCPATH set.
-
-  ensure_native_build_prerequisites || die
-  _ensure_cffi_sources || die
-}
-
 function run_cargo() {
-  prepare_to_build_native_code || die
+  # Exports $EXTRA_PATH_FOR_CARGO which should be put on the $PATH
+  ensure_native_build_prerequisites || die
+
+  if [[ "${ensure_cffi_sources}" == "1" ]]; then
+    # Must happen in the pants venv and have PANTS_SRCPATH set.
+    _ensure_cffi_sources || die
+  fi
 
   local readonly cargo="${CARGO_HOME}/bin/cargo"
   # We change to the ${REPO_ROOT} because if we're not in a subdirectory of it, .cargo/config isn't picked up.
@@ -157,7 +150,7 @@ function _wait_noisily() {
 function _build_native_code() {
   # Builds the native code, and echos the path of the built binary.
 
-  run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
+  ensure_cffi_sources=1 run_cargo build ${MODE_FLAG} --manifest-path ${NATIVE_ROOT}/Cargo.toml || die
   echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 

@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import threading
+from contextlib import contextmanager
 
 from setproctitle import setproctitle as set_process_title
 
@@ -26,24 +27,26 @@ from pants.pantsd.process_manager import FingerprintedProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pailgun_service import PailgunService
 from pants.pantsd.service.scheduler_service import SchedulerService
+from pants.pantsd.service.store_gc_service import StoreGCService
 from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.collections import combined_dict
+from pants.util.contextutil import stdio_as
 from pants.util.memo import memoized_property
 
 
 class _LoggerStream(object):
   """A sys.{stdout,stderr} replacement that pipes output to a logger."""
 
-  def __init__(self, logger, log_level, logger_stream):
+  def __init__(self, logger, log_level, handler):
     """
     :param logging.Logger logger: The logger instance to emit writes to.
     :param int log_level: The log level to use for the given logger.
-    :param file logger_stream: The underlying file object the logger is writing to, for
-                               determining the fileno to support faulthandler logging.
+    :param Handler handler: The underlying log handler, for determining the fileno
+                            to support faulthandler logging.
     """
     self._logger = logger
     self._log_level = log_level
-    self._stream = logger_stream
+    self._handler = handler
 
   def write(self, msg):
     for line in msg.rstrip().splitlines():
@@ -56,7 +59,7 @@ class _LoggerStream(object):
     return False
 
   def fileno(self):
-    return self._stream.fileno()
+    return self._handler.stream.fileno()
 
 
 class PantsDaemon(FingerprintedProcessManager):
@@ -97,7 +100,6 @@ class PantsDaemon(FingerprintedProcessManager):
         build_root,
         bootstrap_options_values.pants_workdir,
         bootstrap_options_values.level.upper(),
-        legacy_graph_helper.scheduler.lock,
         services,
         port_map,
         bootstrap_options_values.pants_subprocessdir,
@@ -114,6 +116,7 @@ class PantsDaemon(FingerprintedProcessManager):
       return EngineInitializer.setup_legacy_graph(
         bootstrap_options.pants_ignore,
         bootstrap_options.pants_workdir,
+        bootstrap_options.build_file_imports,
         native=native,
         build_ignore_patterns=bootstrap_options.build_ignore,
         exclude_target_regexps=bootstrap_options.exclude_target_regexp,
@@ -135,15 +138,16 @@ class PantsDaemon(FingerprintedProcessManager):
         target_roots_class=TargetRoots,
         scheduler_service=scheduler_service
       )
+      store_gc_service = StoreGCService(legacy_graph_helper.scheduler)
 
       return (
         # Services.
-        (fs_event_service, scheduler_service, pailgun_service),
+        (fs_event_service, scheduler_service, pailgun_service, store_gc_service),
         # Port map.
         dict(pailgun=pailgun_service.pailgun_port)
       )
 
-  def __init__(self, native, build_root, work_dir, log_level, lock, services, socket_map,
+  def __init__(self, native, build_root, work_dir, log_level, services, socket_map,
                metadata_base_dir, bootstrap_options=None):
     """
     :param Native native: A `Native` instance.
@@ -158,13 +162,18 @@ class PantsDaemon(FingerprintedProcessManager):
     self._build_root = build_root
     self._work_dir = work_dir
     self._log_level = log_level
-    self._lock = lock
     self._services = services
     self._socket_map = socket_map
     self._bootstrap_options = bootstrap_options
 
     self._log_dir = os.path.join(work_dir, self.name)
     self._logger = logging.getLogger(__name__)
+    # A lock to guard the service thread lifecycles. This can be used by individual services
+    # to safeguard daemon-synchronous sections that should be protected from abrupt teardown.
+    self._lifecycle_lock = threading.RLock()
+    # A lock to guard pantsd->runner forks. This can be used by services to safeguard resources
+    # held by threads at fork time, so that we can fork without deadlocking.
+    self._fork_lock = threading.RLock()
     # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
     self._kill_switch = threading.Event()
     self._exiter = Exiter()
@@ -188,16 +197,16 @@ class PantsDaemon(FingerprintedProcessManager):
 
   def shutdown(self, service_thread_map):
     """Gracefully terminate all services and kill the main PantsDaemon loop."""
-    with self._lock:
+    with self._lifecycle_lock:
       for service, service_thread in service_thread_map.items():
         self._logger.info('terminating pantsd service: {}'.format(service))
         service.terminate()
-        service_thread.join()
+        service_thread.join(self.JOIN_TIMEOUT_SECONDS)
       self._logger.info('terminating pantsd')
       self._kill_switch.set()
 
   @staticmethod
-  def _close_fds():
+  def _close_stdio():
     """Close stdio streams to avoid output in the tty that launched pantsd."""
     for fd in (sys.stdin, sys.stdout, sys.stderr):
       file_no = fd.fileno()
@@ -205,27 +214,50 @@ class PantsDaemon(FingerprintedProcessManager):
       fd.close()
       os.close(file_no)
 
-  def _setup_logging(self, log_level):
-    """Initializes logging."""
-    # Reinitialize logging for the daemon context.
-    result = setup_logging(log_level, log_dir=self._log_dir, log_name=self.LOG_NAME)
+  @contextmanager
+  def _pantsd_logging(self):
+    """A context manager that runs with pantsd logging.
 
-    # Close out tty file descriptors.
-    self._close_fds()
+    Asserts that stdio (represented by file handles 0, 1, 2) is closed to ensure that
+    we can safely reuse those fd numbers.
+    """
 
-    # Redirect stdio to the root logger.
-    sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_stream)
-    sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_stream)
+    # Ensure that stdio is closed so that we can safely reuse those file descriptors.
+    for fd in (0, 1, 2):
+      try:
+        os.fdopen(fd)
+        raise AssertionError(
+            'pantsd logging cannot initialize while stdio is open: {}'.format(fd))
+      except OSError:
+        pass
 
-    self._logger.debug('logging initialized')
+    # Redirect stdio to /dev/null for the rest of the run, to reserve those file descriptors
+    # for further forks.
+    with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
+      # Reinitialize logging for the daemon context.
+      result = setup_logging(self._log_level, log_dir=self._log_dir, log_name=self.LOG_NAME)
 
-    return result.log_stream
+      # Do a python-level redirect of stdout/stderr, which will not disturb `0,1,2`.
+      # TODO: Consider giving these pipes/actual fds, in order to make them "deep" replacements
+      # for `1,2`, and allow them to be used via `stdio_as`.
+      sys.stdout = _LoggerStream(logging.getLogger(), logging.INFO, result.log_handler)
+      sys.stderr = _LoggerStream(logging.getLogger(), logging.WARN, result.log_handler)
+
+      self._logger.debug('logging initialized')
+      yield result.log_handler.stream
 
   def _setup_services(self, services):
-    assert self._lock is not None, 'PantsDaemon lock has not been set!'
+    assert self._lifecycle_lock is not None, 'PantsDaemon lock has not been set!'
+    assert self._fork_lock is not None, 'PantsDaemon fork lock has not been set!'
     for service in services:
       self._logger.info('setting up service {}'.format(service))
-      service.setup(self._lock)
+      service.setup(self._lifecycle_lock, self._fork_lock)
+
+  @staticmethod
+  def _make_thread(target):
+    t = threading.Thread(target=target)
+    t.daemon = True
+    return t
 
   def _run_services(self, services):
     """Service runner main loop."""
@@ -233,7 +265,7 @@ class PantsDaemon(FingerprintedProcessManager):
       self._logger.critical('no services to run, bailing!')
       return
 
-    service_thread_map = {service: threading.Thread(target=service.run) for service in services}
+    service_thread_map = {service: self._make_thread(service.run) for service in services}
 
     # Start services.
     for service, service_thread in service_thread_map.items():
@@ -266,21 +298,22 @@ class PantsDaemon(FingerprintedProcessManager):
   def run_sync(self):
     """Synchronously run pantsd."""
     # Switch log output to the daemon's log stream from here forward.
-    log_stream = self._setup_logging(self._log_level)
-    self._exiter.set_except_hook(log_stream)
-    self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
+    self._close_stdio()
+    with self._pantsd_logging() as log_stream:
+      self._exiter.set_except_hook(log_stream)
+      self._logger.info('pantsd starting, log level is {}'.format(self._log_level))
 
-    self._native.set_panic_handler()
+      self._native.set_panic_handler()
 
-    # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
-    set_process_title('pantsd [{}]'.format(self._build_root))
+      # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
+      set_process_title('pantsd [{}]'.format(self._build_root))
 
-    # Write service socket information to .pids.
-    self._write_named_sockets(self._socket_map)
+      # Write service socket information to .pids.
+      self._write_named_sockets(self._socket_map)
 
-    # Enter the main service runner loop.
-    self._setup_services(self._services)
-    self._run_services(self._services)
+      # Enter the main service runner loop.
+      self._setup_services(self._services)
+      self._run_services(self._services)
 
   def post_fork_child(self):
     """Post-fork() child callback for ProcessManager.daemon_spawn()."""
@@ -308,8 +341,8 @@ class PantsDaemon(FingerprintedProcessManager):
         self.terminate(include_watchman=False)
         self._logger.debug('launching pantsd')
         self.daemon_spawn()
-        # Wait up to 10 seconds for pantsd to write its pidfile so we can display the pid to the user.
-        self.await_pid(10)
+        # Wait up to 60 seconds for pantsd to write its pidfile.
+        self.await_pid(60)
       listening_port = self.read_named_socket('pailgun', int)
       pantsd_pid = self.pid
     self._logger.debug('released lock: {}'.format(self.process_lock))

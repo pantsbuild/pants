@@ -5,11 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
 import os
 from contextlib import contextmanager
 
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_open
+
+
+logger = logging.getLogger(__name__)
 
 
 @contextmanager
@@ -37,6 +41,7 @@ def safe_args(args,
   max_args = max_args or options.max_subprocess_args
   if len(args) > max_args:
     def create_argfile(f):
+      logger.debug('Creating argfile {} with contents {}'.format(f.name, ' '.join(args)))
       f.write(delimiter.join(args))
       f.close()
       return [quoter(f.name) if quoter else '@{}'.format(f.name)]

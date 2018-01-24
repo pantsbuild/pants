@@ -11,6 +11,8 @@ import sys
 import traceback
 from contextlib import contextmanager
 
+from pants.init.options_initializer import OptionsInitializer
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pailgun_server import PailgunServer
 from pants.pantsd.service.pants_service import PantsService
 
@@ -57,10 +59,10 @@ class PailgunService(PantsService):
 
       self._logger.debug('execution commandline: %s', arguments)
       if self._scheduler_service:
-        # N.B. This parses sys.argv by way of OptionsInitializer/OptionsBootstrapper prior to
-        # the main pants run to derive target roots for caching in the underlying product graph.
+        self._logger.debug('args are: %s', arguments)
+        options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
         target_roots = self._target_roots_class.create(
-          args=arguments,
+          options,
           change_calculator=self._scheduler_service.change_calculator
         )
         try:
@@ -75,14 +77,23 @@ class PailgunService(PantsService):
             ''.join(traceback.format_exception(*deferred_exc))
           )
 
-      return self._runner_class(sock, exiter, arguments, environment, graph_helper, deferred_exc)
+      return self._runner_class(
+        sock,
+        exiter,
+        arguments,
+        environment,
+        graph_helper,
+        self.fork_lock,
+        deferred_exc
+      )
 
+    # Plumb the daemon's lifecycle lock to the `PailgunServer` to safeguard teardown.
     @contextmanager
-    def context_lock():
-      with self.lock:
+    def lifecycle_lock():
+      with self.lifecycle_lock:
         yield
 
-    return PailgunServer(self._bind_addr, runner_factory, context_lock)
+    return PailgunServer(self._bind_addr, runner_factory, lifecycle_lock)
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""

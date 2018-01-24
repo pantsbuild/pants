@@ -53,5 +53,4 @@ class NodeModule(NodePackage):
       'output_dir': PrimitiveField(output_dir),
       'dev_dependency': PrimitiveField(dev_dependency),
     })
-    logger.debug('NodeModule payload: %s', payload.fields)
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)

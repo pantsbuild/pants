@@ -35,6 +35,7 @@ python_library(
     'src/python/pants/init',
     'src/python/pants/source',
     'src/python/pants/subsystem',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/base:context_utils',
     'tests/python/pants_test/option/util',
@@ -56,6 +57,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:file_test_util',
+    'tests/python/pants_test/testutils:pexrc_util',
   ]
 )
 

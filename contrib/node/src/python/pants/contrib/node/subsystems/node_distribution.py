@@ -99,8 +99,8 @@ class NodeDistribution(object):
     tarball_filepath = self._binary_util.select_binary(
       supportdir=supportdir, version=version, name=filename)
     logger.debug('Tarball for %s(%s): %s', supportdir, version, tarball_filepath)
-    work_dir = os.path.dirname(tarball_filepath)
-    TGZ.extract(tarball_filepath, work_dir)
+    work_dir = os.path.join(os.path.dirname(tarball_filepath), 'out')
+    TGZ.extract(tarball_filepath, work_dir, concurrency_safe=True)
     return work_dir
 
   @memoized_method
@@ -165,6 +165,7 @@ class NodeDistribution(object):
       :rtype: :class:`subprocess.Popen`
       """
       env, kwargs = self._prepare_env(kwargs)
+      logger.debug('Running command {}'.format(self.cmd))
       return subprocess.Popen(self.cmd, env=env, **kwargs)
 
     def check_output(self, **kwargs):

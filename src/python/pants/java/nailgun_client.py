@@ -23,15 +23,18 @@ logger = logging.getLogger(__name__)
 class NailgunClientSession(NailgunProtocol):
   """Handles a single nailgun client session."""
 
-  def __init__(self, sock, in_fd, out_fd, err_fd, exit_on_broken_pipe=False):
+  def __init__(self, sock, in_file, out_file, err_file, exit_on_broken_pipe=False):
     self._sock = sock
-    if in_fd:
-      self._input_writer = NailgunStreamWriter(in_fd, self._sock,
-                                               ChunkType.STDIN, ChunkType.STDIN_EOF)
-    else:
-      self._input_writer = None
-    self._stdout = out_fd
-    self._stderr = err_fd
+    self._input_writer = None
+    if in_file:
+      self._input_writer = NailgunStreamWriter(
+        (in_file.fileno(),),
+        self._sock,
+        (ChunkType.STDIN,),
+        ChunkType.STDIN_EOF
+      )
+    self._stdout = out_file
+    self._stderr = err_file
     self._exit_on_broken_pipe = exit_on_broken_pipe
     self.remote_pid = None
 
@@ -40,8 +43,9 @@ class NailgunClientSession(NailgunProtocol):
       self._input_writer.start()
 
   def _maybe_stop_input_writer(self):
-    if self._input_writer:
+    if self._input_writer and self._input_writer.is_alive():
       self._input_writer.stop()
+      self._input_writer.join()
 
   def _write_flush(self, fd, payload=None):
     """Write a payload to a given fd (if provided) and flush the fd."""
@@ -144,7 +148,12 @@ class NailgunClient(object):
   def send_control_c(self):
     """Sends SIGINT to a nailgun server using pid information from the active session."""
     if self._session and self._session.remote_pid is not None:
-      os.kill(self._session.remote_pid, signal.SIGINT)
+      try:
+        os.kill(self._session.remote_pid, signal.SIGINT)
+      except (OSError, IOError) as e:
+        # Ignore "No such process" errors.
+        if e.errno != errno.ESRCH:
+          raise
 
   def execute(self, main_class, cwd=None, *args, **environment):
     """Executes the given main_class with any supplied args in the given environment.

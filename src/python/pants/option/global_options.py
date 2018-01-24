@@ -136,9 +136,7 @@ class GlobalOptionsRegistrar(Optionable):
              default=['.*/', default_rel_distdir],
              help='Paths to ignore for all filesystem operations performed by pants '
                   '(e.g. BUILD file scanning, glob matching, etc). '
-                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). '
-                  'This currently only affects the v2 engine. '
-                  'To experiment with v2 engine, try --enable-v2-engine option.')
+                  'Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore).')
     register('--exclude-target-regexp', advanced=True, type=list, default=[], daemon=False,
              metavar='<regexp>', help='Exclude target roots that match these regexes.')
     register('--subproject-roots', type=list, advanced=True, fromfile=True, default=[],
@@ -155,11 +153,6 @@ class GlobalOptionsRegistrar(Optionable):
     # without resorting to heavier options parsing.
     register('--enable-pantsd', advanced=True, type=bool, default=False,
              help='Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)')
-
-    # This facilitates use of the v2 engine, sans daemon.
-    # TODO: Add removal_version='1.5.0.dev0' before 1.4 lands.
-    register('--enable-v2-engine', advanced=True, type=bool, default=True,
-             help='Enables use of the v2 engine.')
 
     # These facilitate configuring the native engine.
     register('--native-engine-version', advanced=True, default='DEPRECATED',
@@ -195,15 +188,11 @@ class GlobalOptionsRegistrar(Optionable):
              help='The port to bind the pants nailgun server to. Defaults to a random port.')
     register('--pantsd-log-dir', advanced=True, default=None,
              help='The directory to log pantsd output to.')
-    register('--pantsd-fs-event-detection', advanced=True, type=bool,
-             removal_version='1.5.0.dev0',
-             removal_hint='This option is now implied by `--enable-pantsd`.',
-             help='Whether or not to use filesystem event detection.')
     register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
              help='The number of workers to use for the filesystem event service executor pool.')
 
     # Watchman options.
-    register('--watchman-version', advanced=True, default='4.5.0', help='Watchman version.')
+    register('--watchman-version', advanced=True, default='4.9.0', help='Watchman version.')
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
                   'the binary with --binary-util-baseurls and --pants-bootstrapdir.')
@@ -215,6 +204,11 @@ class GlobalOptionsRegistrar(Optionable):
     register('--watchman-socket-path', type=str, advanced=True, default=None,
              help='The path to the watchman UNIX socket. This can be overridden if the default '
                   'absolute path length exceeds the maximum allowed by the OS.')
+
+    # This option changes the parser behavior in a fundamental way (which currently invalidates
+    # all caches), and needs to be parsed out early, so we make it a bootstrap option.
+    register('--build-file-imports', choices=['allow', 'warn', 'error'], default='warn',
+      help='Whether to allow import statements in BUILD files')
 
   @classmethod
   def register_options(cls, register):
@@ -238,13 +232,6 @@ class GlobalOptionsRegistrar(Optionable):
     # TODO: After moving to the new options system these abstraction leaks can go away.
     register('-k', '--kill-nailguns', advanced=True, type=bool,
              help='Kill nailguns before exiting')
-    register('-i', '--interpreter', advanced=True, default=[], type=list,
-             metavar='<requirement>',
-             removal_version='1.5.0.dev0',
-             removal_hint='Use --interpreter-constraints in scope python-setup instead.',
-             help="Constrain what Python interpreters to use.  Uses Requirement format from "
-                  "pkg_resources, e.g. 'CPython>=2.7,<3' or 'PyPy'. By default, no constraints "
-                  "are used.  Multiple constraints may be added.  They will be ORed together.")
     register('--fail-fast', advanced=True, type=bool, recursive=True,
              help='Exit as quickly as possible on error, rather than attempting to continue '
                   'to process the non-erroneous subset of the input.')
@@ -258,10 +245,6 @@ class GlobalOptionsRegistrar(Optionable):
              'the command up into multiple invocations.')
     register('--print-exception-stacktrace', advanced=True, type=bool,
              help='Print to console the full exception stack trace if encountered.')
-    register('--build-file-rev', advanced=True,
-             removal_hint='Lightly used feature, scheduled for removal.', removal_version='1.5.0.dev0',
-             help='Read BUILD files from this scm rev instead of from the working tree.  This is '
-             'useful for implementing pants-aware sparse checkouts.')
     register('--lock', advanced=True, type=bool, default=True,
              help='Use a global lock to exclude other versions of pants from running during '
                   'critical operations.')

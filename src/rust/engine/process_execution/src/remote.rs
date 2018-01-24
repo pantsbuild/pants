@@ -139,12 +139,11 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
 
 #[cfg(test)]
 mod tests {
-  extern crate testutil;
-
   use bazel_protos;
+  use bytes::Bytes;
   use protobuf::{self, Message, ProtobufEnum};
-  use test_server;
-  use self::testutil::{owned_string_vec, as_byte_owned_vec};
+  use mock;
+  use testutil::{owned_string_vec, as_byte_owned_vec};
 
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_remote};
   use std::collections::BTreeMap;
@@ -155,8 +154,8 @@ mod tests {
     let execute_request = echo_foo_request();
 
     let mock_server = {
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           "wrong-command".to_string(),
           super::make_execute_request(&ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
@@ -181,8 +180,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -212,8 +211,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           Vec::from_iter(
@@ -246,8 +245,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -284,8 +283,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -318,8 +317,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -353,8 +352,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -381,8 +380,8 @@ mod tests {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
 
-      test_server::TestServer::new(
-        test_server::MockExecution::new(
+      mock::execution_server::TestServer::new(
+        mock::execution_server::MockExecution::new(
           op_name.clone(),
           super::make_execute_request(&execute_request).unwrap(),
           vec![
@@ -477,8 +476,8 @@ mod tests {
       let mut response_proto = bazel_protos::remote_execution::ExecuteResponse::new();
       response_proto.set_result({
         let mut action_result = bazel_protos::remote_execution::ActionResult::new();
-        action_result.set_stdout_raw(stdout.as_bytes().to_vec());
-        action_result.set_stderr_raw(stderr.as_bytes().to_vec());
+        action_result.set_stdout_raw(Bytes::from(stdout));
+        action_result.set_stderr_raw(Bytes::from(stderr));
         action_result.set_exit_code(exit_code);
         action_result
       });

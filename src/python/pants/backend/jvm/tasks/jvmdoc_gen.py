@@ -13,6 +13,8 @@ import re
 
 from pants.backend.jvm.tasks.jvm_task import JvmTask
 from pants.base.exceptions import TaskError
+from pants.task.target_restriction_mixins import (HasSkipAndTransitiveOptionsMixin,
+                                                  SkipAndTransitiveOptionsRegistrar)
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
 from pants.util.memo import memoized_property
@@ -23,7 +25,12 @@ Jvmdoc = collections.namedtuple('Jvmdoc', ['tool_name', 'product_type'])
 
 
 # TODO: Shouldn't this be a NailgunTask?
-class JvmdocGen(JvmTask):
+# TODO(John Sirois): The --skip flag supports the JarPublish task and is an abstraction leak.
+# It allows folks doing a local-publish to skip an expensive and un-needed step.
+# Remove this flag and instead support conditional requirements being registered against
+# the round manager.  This may require incremental or windowed flag parsing that happens bit by
+# bit as tasks are recursively prepared vs. the current all-at once style.
+class JvmdocGen(SkipAndTransitiveOptionsRegistrar, HasSkipAndTransitiveOptionsMixin, JvmTask):
 
   @classmethod
   def jvmdoc(cls):
@@ -38,11 +45,6 @@ class JvmdocGen(JvmTask):
     register('--include-codegen', type=bool,
              fingerprint=True,
              help='Create {0} for generated code.'.format(tool_name))
-
-    register('--transitive', default=True, type=bool,
-             fingerprint=True,
-             help='Create {0} for the transitive closure of internal targets reachable from the '
-                  'roots specified on the command line.'.format(tool_name))
 
     register('--combined', type=bool,
              fingerprint=True,
@@ -59,15 +61,6 @@ class JvmdocGen(JvmTask):
     register('--exclude-patterns', type=list, default=[], fingerprint=True,
              help='Patterns for targets to be excluded from doc generation.')
 
-    # TODO(John Sirois): This supports the JarPublish task and is an abstraction leak.
-    # It allows folks doing a local-publish to skip an expensive and un-needed step.
-    # Remove this flag and instead support conditional requirements being registered against
-    # the round manager.  This may require incremental or windowed flag parsing that happens bit by
-    # bit as tasks are recursively prepared vs. the current all-at once style.
-    register('--skip', type=bool,
-             fingerprint=True,
-             help='Skip {0} generation.'.format(tool_name))
-
   @classmethod
   def product_types(cls):
     return [cls.jvmdoc().product_type]
@@ -77,11 +70,9 @@ class JvmdocGen(JvmTask):
 
     options = self.get_options()
     self._include_codegen = options.include_codegen
-    self.transitive = options.transitive
     self.open = options.open
     self.combined = self.open or options.combined
     self.ignore_failure = options.ignore_failure
-    self.skip = options.skip
 
   @memoized_property
   def _exclude_patterns(self):
@@ -96,9 +87,6 @@ class JvmdocGen(JvmTask):
     create_jvmdoc_command: (classpath, directory, *targets) -> command (string) that will generate
                            documentation documentation for targets
     """
-    if self.skip:
-      return
-
     catalog = self.context.products.isrequired(self.jvmdoc().product_type)
     if catalog and self.combined:
       raise TaskError(
@@ -118,7 +106,7 @@ class JvmdocGen(JvmTask):
           return False
       return True
 
-    targets = self.context.targets(predicate=docable)
+    targets = self.get_targets(predicate=docable)
     if not targets:
       return
 
@@ -127,11 +115,7 @@ class JvmdocGen(JvmTask):
         invalid_targets = set()
         for vt in invalidation_check.invalid_vts:
           invalid_targets.update(vt.targets)
-
-        if self.transitive:
-          return invalid_targets
-        else:
-          return set(invalid_targets).intersection(set(self.context.target_roots))
+        return invalid_targets
 
       jvmdoc_targets = list(find_jvmdoc_targets())
       if self.combined:

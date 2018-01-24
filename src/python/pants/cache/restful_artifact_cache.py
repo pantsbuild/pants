@@ -6,6 +6,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+import multiprocessing
+import Queue
+import threading
 
 import requests
 from requests import RequestException
@@ -66,14 +69,26 @@ class RESTfulArtifactCache(ArtifactCache):
     if self._localcache.has(cache_key):
       return self._localcache.use_cached_files(cache_key, results_dir)
 
+    queue = multiprocessing.Queue()
     try:
       response = self._request('GET', cache_key)
       if response is not None:
+        threading.Thread(
+          target=_log_if_no_response,
+          args=(
+            60,
+            "Still downloading artifacts (either they're very large or the connection to the cache is slow)",
+            queue.get,
+          )
+        ).start()
         # Delegate storage and extraction to local cache
         byte_iter = response.iter_content(self.READ_SIZE_BYTES)
-        return self._localcache.store_and_use_artifact(cache_key, byte_iter, results_dir)
+        res = self._localcache.store_and_use_artifact(cache_key, byte_iter, results_dir)
+        queue.put(None)
+        return res
     except Exception as e:
       logger.warn('\nError while reading from remote artifact cache: {0}\n'.format(e))
+      queue.put(None)
       # TODO(peiyu): clean up partially downloaded local file if any
       return UnreadableArtifact(cache_key, e)
 
@@ -122,3 +137,12 @@ class RESTfulArtifactCache(ArtifactCache):
     path_prefix = url.path.rstrip(b'/')
     path = '{0}/{1}'.format(path_prefix, self._url_suffix_for_key(cache_key))
     return '{0}://{1}{2}'.format(url.scheme, url.netloc, path)
+
+
+def _log_if_no_response(timeout_seconds, message, getter):
+  while True:
+    try:
+      getter(True, timeout_seconds)
+      return
+    except Queue.Empty:
+      logger.info(message)

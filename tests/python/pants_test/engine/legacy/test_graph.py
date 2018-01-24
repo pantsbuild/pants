@@ -42,11 +42,12 @@ class GraphTestBase(unittest.TestCase):
     return options
 
   @contextmanager
-  def graph_helper(self, build_file_aliases=None):
+  def graph_helper(self, build_file_aliases=None, build_file_imports_behavior='allow'):
     with temporary_dir() as work_dir:
       path_ignore_patterns = ['.*']
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                           work_dir,
+                                                          build_file_imports_behavior,
                                                           build_file_aliases=build_file_aliases,
                                                           native=self._native)
       yield graph_helper
@@ -65,7 +66,7 @@ class GraphTestBase(unittest.TestCase):
     return graph, target_roots
 
   def create_target_roots(self, specs):
-    return TargetRoots.create(options=self._make_setup_args(specs))
+    return TargetRoots.create(self._make_setup_args(specs))
 
 
 class GraphTargetScanFailureTests(GraphTestBase):

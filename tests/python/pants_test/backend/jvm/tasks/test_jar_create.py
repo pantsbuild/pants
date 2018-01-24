@@ -16,8 +16,10 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_create import JarCreate, is_jvm_library
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.util.contextutil import open_zip
 from pants_test.jvm.jar_task_test_base import JarTaskTestBase
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import ensure_cached
 
 
@@ -42,6 +44,7 @@ class JarCreateTestBase(JarTaskTestBase):
   def setUp(self):
     super(JarCreateTestBase, self).setUp()
     self.set_options(compressed=False, pants_bootstrapdir='~/.cache/pants', max_subprocess_args=100)
+    init_subsystem(Target.Arguments)
 
 
 class JarCreateMiscTest(JarCreateTestBase):
@@ -65,14 +68,14 @@ class JarCreateExecuteTest(JarCreateTestBase):
   def scala_library(self, path, name, sources, **kwargs):
     return self.create_library(path, 'scala_library', name, sources, **kwargs)
 
-  def jvm_binary(self, path, name, source=None, resources=None):
+  def jvm_binary(self, path, name, source=None, dependencies=None):
     self.create_files(path, [source])
     self.add_to_build_file(path, dedent("""
           jvm_binary(name=%(name)r,
             source=%(source)r,
-            resources=[%(resources)r],
+            dependencies=[%(dependencies)r],
           )
-        """ % dict(name=name, source=source, resources=resources)))
+        """ % dict(name=name, source=source, dependencies=dependencies)))
     return self.target('%s:%s' % (path, name))
 
   def java_thrift_library(self, path, name, *sources):
@@ -94,7 +97,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
 
     self.res = self.create_resources(test_path('src/resources/com/twitter'), 'spam', 'r.txt')
     self.jl = self.java_library(test_path('src/java/com/twitter'), 'foo', ['a.java'],
-                                resources=test_path('src/resources/com/twitter:spam'))
+                                dependencies=[test_path('src/resources/com/twitter:spam')])
     self.sl = self.scala_library(test_path('src/scala/com/twitter'), 'bar', ['c.scala'])
     self.jtl = self.java_thrift_library(test_path('src/thrift/com/twitter'), 'baz', 'd.thrift')
     self.java_lib_foo = self.java_library(test_path('src/java/com/twitter/foo'),
@@ -106,7 +109,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
                                         java_sources=[
                                           test_path('src/java/com/twitter/foo:java_foo')])
     self.binary = self.jvm_binary(test_path('src/java/com/twitter/baz'), 'baz', source='b.java',
-                                  resources=test_path('src/resources/com/twitter:spam'))
+                                  dependencies=test_path('src/resources/com/twitter:spam'))
     self.empty_sl = self.scala_library(test_path('src/scala/com/foo'), 'foo', ['dupe.scala'])
 
   def context(self, **kwargs):

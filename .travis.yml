@@ -61,7 +61,7 @@ matrix:
         - SHARD="OSX Native Engine Binary Builder"
         - PREPARE_DEPLOY=1
       script:
-        - ./pants --version && ./build-support/bin/release.sh -nc
+        - ./pants --version && ./build-support/bin/release.sh -n
 
     - os: linux
       language: generic
@@ -82,7 +82,7 @@ matrix:
           -v "${HOME}:/travis/home"
           -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
           travis_ci:latest
-          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -nc"
+          sh -c "git clean -xfd && ./pants --version && ./build-support/bin/release.sh -n"
 
     - os: linux
       dist: trusty
@@ -423,9 +423,9 @@ matrix:
 deploy:
   # See: https://docs.travis-ci.com/user/deployment/s3/
   provider: s3
-  access_key_id: AKIAIQHTQI5E42SQBSNA
+  access_key_id: AKIAIWOKBXVU3JLY6EGQ
   secret_access_key:
-    secure: RQVzsNfZL8AgsXdjZ67j2tWs5Tjl/FKpmE1fyVgldMbua/xhW8dzdFrtOeWjTPX4/+sJZ4U7/tZectBtWejmrXUJiZQKJwJBnsyYxysENTWOV80BEYyoz2RPr8HSVbMZ1ZHtUafzO3OqV1x+Pvgpg8FUeUfsy3TGUk0JREO90Q0=
+    secure: UBVbpdYJ81OsDGKlPRBw6FlPJGlxosnFQ4A1xBbU5GwEBfv90GoKc6J0UwF+I4CDwytj/BlAks1XbW0zYX0oeIlXDnl1Vfikm1k4hfIr6VCLHKppiU69FlEs+ph0Dktz8+aUWhrvJzICZs6Gu08kTBQ5++3ulDWDeTHqjr713YM=
   bucket: binaries.pantsbuild.org
   local_dir: dist/deploy
   # Otherwise travis will stash dist/deploy and the deploy will fail.

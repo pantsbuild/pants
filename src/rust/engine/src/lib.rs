@@ -17,6 +17,7 @@ extern crate boxfuture;
 extern crate fnv;
 extern crate fs;
 extern crate futures;
+extern crate hashing;
 #[macro_use]
 extern crate lazy_static;
 extern crate ordermap;
@@ -37,19 +38,19 @@ use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
               ExternContext, Externs, IdToStrExtern, InvokeRunnable, LogExtern, KeyForExtern,
               ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern, SatisfiedByExtern,
-              SatisfiedByTypeExtern, StoreListExtern, StoreBytesExtern, TypeIdBuffer,
-              ValForExtern, ValToStrExtern};
+              StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern, StoreBytesExtern,
+              TypeIdBuffer, ValForExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
-use scheduler::{RootResult, Scheduler, ExecutionStat};
+use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
 use types::Types;
 
 #[repr(C)]
 enum RawStateTag {
-  Empty = 0,
   Return = 1,
   Throw = 2,
   Noop = 3,
+  Invalidated = 4,
 }
 
 #[repr(C)]
@@ -62,17 +63,19 @@ pub struct RawNode {
 }
 
 impl RawNode {
-  fn create(subject: &Key, product: &TypeConstraint, state: Option<RootResult>) -> RawNode {
+  fn create(subject: &Key, product: &TypeConstraint, state: RootResult) -> RawNode {
     let (state_tag, state_value) = match state {
-      None => (
-        RawStateTag::Empty as u8,
-        externs::create_exception("No value"),
-      ),
-      Some(Ok(v)) => (RawStateTag::Return as u8, v),
-      Some(Err(Failure::Throw(exc, _))) => (RawStateTag::Throw as u8, exc),
-      Some(Err(Failure::Noop(noop))) => (
+      Ok(v) => (RawStateTag::Return as u8, v),
+      Err(Failure::Throw(exc, _)) => (RawStateTag::Throw as u8, exc),
+      Err(Failure::Noop(noop)) => (
         RawStateTag::Noop as u8,
         externs::create_exception(&format!("{:?}", noop)),
+      ),
+      Err(Failure::Invalidated) => (
+        RawStateTag::Invalidated as u8,
+        externs::create_exception(
+          "Exhausted retries due to changed files.",
+        ),
       ),
     };
 
@@ -93,7 +96,7 @@ pub struct RawNodes {
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<(&Key, &TypeConstraint, Option<RootResult>)>) -> Box<RawNodes> {
+  fn create(node_states: Vec<(&Key, &TypeConstraint, RootResult)>) -> Box<RawNodes> {
     let nodes = node_states
       .into_iter()
       .map(|(subject, product, state)| {
@@ -105,7 +108,7 @@ impl RawNodes {
       nodes_len: 0,
       nodes: nodes,
     });
-    // NB: Unsafe! See comment on similar pattern in RawExecution::new().
+    // Creates a pointer into the struct itself, which is not possible to do in safe rust.
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
@@ -126,6 +129,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
+  store_i32: StoreI32Extern,
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -146,6 +150,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_list,
     store_bytes,
+    store_i32,
     project,
     project_ignoring_type,
     project_multi,
@@ -172,6 +177,7 @@ pub extern "C" fn scheduler_create(
   construct_dir: Function,
   construct_file: Function,
   construct_link: Function,
+  construct_process_result: Function,
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
@@ -182,6 +188,8 @@ pub extern "C" fn scheduler_create(
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
   type_link: TypeConstraint,
+  type_process_request: TypeConstraint,
+  type_process_result: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -207,6 +215,7 @@ pub extern "C" fn scheduler_create(
       construct_dir: construct_dir,
       construct_file: construct_file,
       construct_link: construct_link,
+      construct_process_result: construct_process_result,
       address: type_address,
       has_products: type_has_products,
       has_variants: type_has_variants,
@@ -217,6 +226,8 @@ pub extern "C" fn scheduler_create(
       dir: type_dir,
       file: type_file,
       link: type_link,
+      process_request: type_process_request,
+      process_result: type_process_result,
       string: type_string,
       bytes: type_bytes,
     },
@@ -239,30 +250,28 @@ pub extern "C" fn scheduler_destroy(scheduler_ptr: *mut Scheduler) {
 }
 
 #[no_mangle]
-pub extern "C" fn execution_reset(scheduler_ptr: *mut Scheduler) {
-  with_scheduler(scheduler_ptr, |scheduler| { scheduler.reset(); })
-}
-
-#[no_mangle]
 pub extern "C" fn execution_add_root_select(
   scheduler_ptr: *mut Scheduler,
+  execution_request_ptr: *mut ExecutionRequest,
   subject: Key,
   product: TypeConstraint,
 ) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.add_root_select(subject, product);
+    with_execution_request(execution_request_ptr, |execution_request| {
+      scheduler.add_root_select(execution_request, subject, product);
+    })
   })
 }
 
 #[no_mangle]
-pub extern "C" fn execution_execute(scheduler_ptr: *mut Scheduler) -> ExecutionStat {
-  with_scheduler(scheduler_ptr, |scheduler| scheduler.execute())
-}
-
-#[no_mangle]
-pub extern "C" fn execution_roots(scheduler_ptr: *mut Scheduler) -> *const RawNodes {
+pub extern "C" fn execution_execute(
+  scheduler_ptr: *mut Scheduler,
+  execution_request_ptr: *mut ExecutionRequest,
+) -> *const RawNodes {
   with_scheduler(scheduler_ptr, |scheduler| {
-    Box::into_raw(RawNodes::create(scheduler.root_states()))
+    with_execution_request(execution_request_ptr, |execution_request| {
+      Box::into_raw(RawNodes::create(scheduler.execute(execution_request)))
+    })
   })
 }
 
@@ -372,8 +381,6 @@ pub extern "C" fn tasks_task_end(tasks_ptr: *mut Tasks) {
 
 #[no_mangle]
 pub extern "C" fn tasks_destroy(tasks_ptr: *mut Tasks) {
-  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
-  // to be destroyed at the end of this function.
   let _ = unsafe { Box::from_raw(tasks_ptr) };
 }
 
@@ -395,34 +402,58 @@ pub extern "C" fn graph_len(scheduler_ptr: *mut Scheduler) -> u64 {
 }
 
 #[no_mangle]
-pub extern "C" fn graph_visualize(scheduler_ptr: *mut Scheduler, path_ptr: *const raw::c_char) {
+pub extern "C" fn graph_visualize(
+  scheduler_ptr: *mut Scheduler,
+  execution_request_ptr: *mut ExecutionRequest,
+  path_ptr: *const raw::c_char,
+) {
   with_scheduler(scheduler_ptr, |scheduler| {
-    let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-    let path = PathBuf::from(path_str);
-    // TODO: This should likely return an error condition to python.
-    //   see https://github.com/pantsbuild/pants/issues/4025
-    scheduler.visualize(path.as_path()).unwrap_or_else(|e| {
-      println!("Failed to visualize to {}: {:?}", path.display(), e);
-    });
+    with_execution_request(execution_request_ptr, |execution_request| {
+      let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
+      let path = PathBuf::from(path_str);
+      // TODO: This should likely return an error condition to python.
+      //   see https://github.com/pantsbuild/pants/issues/4025
+      scheduler
+        .visualize(execution_request, path.as_path())
+        .unwrap_or_else(|e| {
+          println!("Failed to visualize to {}: {:?}", path.display(), e);
+        });
+    })
   })
 }
 
 #[no_mangle]
-pub extern "C" fn graph_trace(scheduler_ptr: *mut Scheduler, path_ptr: *const raw::c_char) {
+pub extern "C" fn graph_trace(
+  scheduler_ptr: *mut Scheduler,
+  execution_request_ptr: *mut ExecutionRequest,
+  path_ptr: *const raw::c_char,
+) {
   let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
   with_scheduler(scheduler_ptr, |scheduler| {
-    scheduler.trace(path.as_path()).unwrap_or_else(|e| {
-      println!("Failed to write trace to {}: {:?}", path.display(), e);
+    with_execution_request(execution_request_ptr, |execution_request| {
+      scheduler
+        .trace(execution_request, path.as_path())
+        .unwrap_or_else(|e| {
+          println!("Failed to write trace to {}: {:?}", path.display(), e);
+        });
     });
   });
 }
 
 #[no_mangle]
 pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
-  // convert the raw pointer back to a Box (without `forget`ing it) in order to cause it
-  // to be destroyed at the end of this function.
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
+}
+
+#[no_mangle]
+pub extern "C" fn execution_request_create() -> *const ExecutionRequest {
+  Box::into_raw(Box::new(ExecutionRequest::new()))
+}
+
+#[no_mangle]
+pub extern "C" fn execution_request_destroy(ptr: *mut ExecutionRequest) {
+  let _ = unsafe { Box::from_raw(ptr) };
 }
 
 #[no_mangle]
@@ -491,6 +522,28 @@ pub extern "C" fn set_panic_handler() {
   }));
 }
 
+#[no_mangle]
+pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| match scheduler
+    .core
+    .store
+    .garbage_collect() {
+    Ok(_) => {}
+    Err(err) => externs::log(externs::LogLevel::Critical, &err),
+  });
+}
+
+#[no_mangle]
+pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let digests = scheduler.core.graph.all_digests();
+    match scheduler.core.store.lease_all(digests.iter()) {
+      Ok(_) => {}
+      Err(err) => externs::log(externs::LogLevel::Critical, &err),
+    }
+  });
+}
+
 fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {
   let graph_maker = GraphMaker::new(&scheduler.core.tasks, subject_types);
   graph_maker.full_graph()
@@ -518,6 +571,16 @@ where
   let mut scheduler = unsafe { Box::from_raw(scheduler_ptr) };
   let t = f(&mut scheduler);
   mem::forget(scheduler);
+  t
+}
+
+fn with_execution_request<F, T>(execution_request_ptr: *mut ExecutionRequest, f: F) -> T
+where
+  F: FnOnce(&mut ExecutionRequest) -> T,
+{
+  let mut execution_request = unsafe { Box::from_raw(execution_request_ptr) };
+  let t = f(&mut execution_request);
+  mem::forget(execution_request);
   t
 }
 

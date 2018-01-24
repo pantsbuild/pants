@@ -6,7 +6,9 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 [dependencies]
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
+bytes = "0.4.5"
 clap = "2"
 fs = { path = ".." }
 futures = "0.1.16"
-protobuf = "1.4.1"
+hashing = { path = "../../hashing" }
+protobuf = { version = "1.4.1", features = ["with-bytes"] }

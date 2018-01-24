@@ -23,6 +23,7 @@ boxfuture = { path = "boxfuture" }
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.16"
+hashing = { path = "hashing" }
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.5"

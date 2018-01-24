@@ -12,6 +12,7 @@ from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
+from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
@@ -93,10 +94,9 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     logger.debug('target_roots are: %r', target_roots)
     graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
-    with self.scheduler.lock:
-      # Ensure the entire generator is unrolled.
-      for _ in graph.inject_specs_closure(target_roots.as_specs()):
-        pass
+    # Ensure the entire generator is unrolled.
+    for _ in graph.inject_specs_closure(target_roots.as_specs()):
+      pass
 
     address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
@@ -109,6 +109,7 @@ class EngineInitializer(object):
   @staticmethod
   def setup_legacy_graph(pants_ignore_patterns,
                          workdir,
+                         build_file_imports_behavior,
                          build_root=None,
                          native=None,
                          build_file_aliases=None,
@@ -121,6 +122,9 @@ class EngineInitializer(object):
     :param list pants_ignore_patterns: A list of path ignore patterns for FileSystemProjectTree,
                                        usually taken from the '--pants-ignore' global option.
     :param str workdir: The pants workdir.
+    :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
+      import statements. Valid values: "allow", "warn", "error".
+    :type build_file_imports_behavior: string
     :param str build_root: A path to be used as the build root. If None, then default is used.
     :param Native native: An instance of the native-engine subsystem.
     :param build_file_aliases: BuildFileAliases to register.
@@ -141,12 +145,17 @@ class EngineInitializer(object):
     if not build_file_aliases:
       _, build_config = OptionsInitializer(OptionsBootstrapper()).setup(init_logging=False)
       build_file_aliases = build_config.registered_aliases()
+
     symbol_table = LegacySymbolTable(build_file_aliases)
 
     project_tree = FileSystemProjectTree(build_root, pants_ignore_patterns)
 
     # Register "literal" subjects required for these tasks.
-    parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
+    parser = LegacyPythonCallbacksParser(
+      symbol_table,
+      build_file_aliases,
+      build_file_imports_behavior
+    )
     address_mapper = AddressMapper(parser=parser,
                                    build_ignore_patterns=build_ignore_patterns,
                                    exclude_target_regexps=exclude_target_regexps,
@@ -160,7 +169,8 @@ class EngineInitializer(object):
     tasks = (
       create_legacy_graph_tasks(symbol_table) +
       create_fs_rules() +
-      create_graph_rules(address_mapper, symbol_table)
+      create_graph_rules(address_mapper, symbol_table) +
+      create_process_rules()
     )
 
     scheduler = LocalScheduler(workdir, dict(), tasks, project_tree, native, include_trace_on_error=include_trace_on_error)

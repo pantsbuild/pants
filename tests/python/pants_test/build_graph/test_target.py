@@ -76,7 +76,6 @@ class TargetTest(BaseTest):
 
   def test_empty_traversable_properties(self):
     target = self.make_target(':foo', Target)
-    self.assertSequenceEqual([], list(target.traversable_specs))
     self.assertSequenceEqual([], list(target.compute_dependency_specs(payload=target.payload)))
 
   def test_validate_target_representation_args_invalid_exactly_one(self):

@@ -72,10 +72,8 @@ public class ConsoleRunnerImpl {
       this.original = out;
     }
 
-    OutputStream swap(OutputStream out) {
-      OutputStream old = this.out;
+    void swap(OutputStream out) {
       this.out = out;
-      return old;
     }
 
     /**
@@ -96,16 +94,11 @@ public class ConsoleRunnerImpl {
     private final File err;
     private OutputStream errstream;
 
-    private int useCount;
     private boolean closed;
 
-    StreamCapture(File out, File err) throws IOException {
+    StreamCapture(File out, File err) {
       this.out = out;
       this.err = err;
-    }
-
-    void incrementUseCount() {
-      this.useCount++;
     }
 
     OutputStream getOutputStream() throws FileNotFoundException {
@@ -123,7 +116,7 @@ public class ConsoleRunnerImpl {
     }
 
     void close() throws IOException {
-      if (--useCount <= 0 && !closed) {
+      if (!closed) {
         if (outstream != null) {
           Closeables.close(outstream, /* swallowIOException */ true);
         }
@@ -132,11 +125,6 @@ public class ConsoleRunnerImpl {
         }
         closed = true;
       }
-    }
-
-    void dispose() throws IOException {
-      useCount = 0;
-      close();
     }
 
     byte[] readOut() throws IOException {
@@ -185,15 +173,15 @@ public class ConsoleRunnerImpl {
       }
     }
 
-    byte[] readOut() throws IOException {
+    byte[] readOut() {
       return read(outstream);
     }
 
-    byte[] readErr() throws IOException {
+    byte[] readErr() {
       return read(errstream);
     }
 
-    private byte[] read(ByteArrayOutputStream stream) throws IOException {
+    private byte[] read(ByteArrayOutputStream stream) {
       Preconditions.checkState(closed, "Capture must be closed by all users before it can be read");
       return stream.toByteArray();
     }
@@ -243,15 +231,16 @@ public class ConsoleRunnerImpl {
             suiteCapture = new StreamCapture(out, err);
             suiteCaptures.put(test.getTestClass(), suiteCapture);
           }
-          suiteCapture.incrementUseCount();
         }
       }
     }
 
     @Override
     public void testRunFinished(Result result) throws Exception {
+      swappableOut.swap(swappableOut.getOriginal());
+      swappableErr.swap(swappableErr.getOriginal());
       for (StreamCapture capture : suiteCaptures.values()) {
-        capture.dispose();
+        capture.close();
       }
       caseCaptures.clear();
       super.testRunFinished(result);
@@ -259,6 +248,9 @@ public class ConsoleRunnerImpl {
 
     @Override
     public void testStarted(Description description) throws Exception {
+      if (!Util.isRunnable(description)) {
+        return;
+      }
       StreamCapture suiteCapture = suiteCaptures.get(description.getTestClass());
       OutputStream suiteOut = suiteCapture.getOutputStream();
       OutputStream suiteErr = suiteCapture.getErrorStream();
@@ -295,7 +287,8 @@ public class ConsoleRunnerImpl {
           swappableErr.getOriginal().append(new String(capture.readErr(), UTF_8));
         } else {
           // Do nothing.
-          // In case of exception in @BeforeClass method testFailure executes without testStarted.
+          // When there is an exception in a @BeforeClass method the testStarted callback is not
+          // called before the testFailure callback so there will be no caseCapture for the test.
         }
       }
       super.testFailure(failure);
@@ -303,7 +296,9 @@ public class ConsoleRunnerImpl {
 
     @Override
     public void testFinished(Description description) throws Exception {
-      suiteCaptures.get(description.getTestClass()).close();
+      if (!Util.isRunnable(description)) {
+        return;
+      }
       if (caseCaptures.containsKey(description)) {
         caseCaptures.remove(description).close();
       }

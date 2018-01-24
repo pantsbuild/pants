@@ -83,40 +83,23 @@ class RunTracker(Subsystem):
     :API: public
     """
     super(RunTracker, self).__init__(*args, **kwargs)
-    run_timestamp = time.time()
-    cmd_line = ' '.join(['pants'] + sys.argv[1:])
+    self._run_timestamp = time.time()
+    self._cmd_line = ' '.join(['pants'] + sys.argv[1:])
 
-    # run_id is safe for use in paths.
-    millis = int((run_timestamp * 1000) % 1000)
-    run_id = 'pants_run_{}_{}_{}'.format(
-      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(run_timestamp)), millis,
-      uuid.uuid4().hex)
+    # Initialized in `initialize()`.
+    self.run_info_dir = None
+    self.run_info = None
+    self.cumulative_timings = None
+    self.self_timings = None
+    self.artifact_cache_stats = None
 
-    info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
-    self.run_info_dir = os.path.join(info_dir, run_id)
-    self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
-    self.run_info.add_basic_info(run_id, run_timestamp)
-    self.run_info.add_info('cmd_line', cmd_line)
-
-    # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
-    link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
-
-    relative_symlink(self.run_info_dir, link_to_latest)
+    # Initialized in `start()`.
+    self.report = None
+    self._main_root_workunit = None
 
     # A lock to ensure that adding to stats at the end of a workunit
     # operates thread-safely.
     self._stats_lock = threading.Lock()
-
-    # Time spent in a workunit, including its children.
-    self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
-                                                             'cumulative_timings'))
-
-    # Time spent in a workunit, not including its children.
-    self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, 'self_timings'))
-
-    # Hit/miss stats for the artifact cache.
-    self.artifact_cache_stats = \
-      ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
 
     # Log of success/failure/aborted for each workunit.
     self.outcomes = {}
@@ -127,15 +110,9 @@ class RunTracker(Subsystem):
     # Number of threads for background work.
     self._num_background_workers = self.get_options().num_background_workers
 
-    # We report to this Report.
-    self.report = None
-
     # self._threadlocal.current_workunit contains the current workunit for the calling thread.
     # Note that multiple threads may share a name (e.g., all the threads in a pool).
     self._threadlocal = threading.local()
-
-    # For main thread work. Created on start().
-    self._main_root_workunit = None
 
     # For background work.  Created lazily if needed.
     self._background_worker_pool = None
@@ -172,19 +149,72 @@ class RunTracker(Subsystem):
     """Is the workunit running under the main thread's root."""
     return workunit.root() == self._main_root_workunit
 
+  def initialize(self):
+    """Create run_info and relevant directories, and return the run id.
+
+    Must be called before `start`.
+    """
+    if self.run_info:
+      raise AssertionError('RunTracker.initialize must not be called multiple times.')
+
+    # Initialize the run.
+    millis = int((self._run_timestamp * 1000) % 1000)
+    run_id = 'pants_run_{}_{}_{}'.format(
+      time.strftime('%Y_%m_%d_%H_%M_%S', time.localtime(self._run_timestamp)), millis,
+      uuid.uuid4().hex)
+
+    info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
+    self.run_info_dir = os.path.join(info_dir, run_id)
+    self.run_info = RunInfo(os.path.join(self.run_info_dir, 'info'))
+    self.run_info.add_basic_info(run_id, self._run_timestamp)
+    self.run_info.add_info('cmd_line', self._cmd_line)
+
+    # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
+    link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), 'latest')
+
+    relative_symlink(self.run_info_dir, link_to_latest)
+
+    # Time spent in a workunit, including its children.
+    self.cumulative_timings = AggregatedTimings(os.path.join(self.run_info_dir,
+                                                             'cumulative_timings'))
+
+    # Time spent in a workunit, not including its children.
+    self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, 'self_timings'))
+
+    # Hit/miss stats for the artifact cache.
+    self.artifact_cache_stats = \
+      ArtifactCacheStats(os.path.join(self.run_info_dir, 'artifact_cache_stats'))
+
+    return run_id
+
   def start(self, report):
-    """Start tracking this pants run.
+    """Start tracking this pants run using the given Report.
+
+    `RunTracker.initialize` must have been called first to create the run_info_dir and
+    run_info. TODO: This lifecycle represents a delicate dance with the `Reporting.initialize`
+    method, and portions of the `RunTracker` should likely move to `Reporting` instead.
 
     report: an instance of pants.reporting.Report.
     """
+    if not self.run_info:
+      raise AssertionError('RunTracker.initialize must be called before RunTracker.start.')
+
     self.report = report
     self.report.open()
 
+    # And create the workunit.
     self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
     self._main_root_workunit.start()
     self.report.start_workunit(self._main_root_workunit)
+
+    # Log reporting details.
+    url = self.run_info.get_info('report_url')
+    if url:
+      self.log(Report.INFO, 'See a report at: {}'.format(url))
+    else:
+      self.log(Report.INFO, '(To run a reporting server: ./pants server)')
 
   def set_root_outcome(self, outcome):
     """Useful for setup code that doesn't have a reference to a workunit."""

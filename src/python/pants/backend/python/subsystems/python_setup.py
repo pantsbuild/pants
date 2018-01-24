@@ -20,18 +20,14 @@ class PythonSetup(Subsystem):
   @classmethod
   def register_options(cls, register):
     super(PythonSetup, cls).register_options(register)
-    # TODO: On removal, make ['CPython>=2.7,<3'] the default for --interpreter-constraints.
-    register('--interpreter-requirement', advanced=True, default='CPython>=2.7,<3',
-             removal_version='1.5.0.dev0', removal_hint='Use --interpreter-constraints instead.',
-             help='The interpreter requirement string for this python environment.')
-    # Note: This will replace two options:
+    # Note: This replaces two options:
     # A) The global --interpreter option in the old python tasks.
     #    That flag is only relevant in the python backend, and should never have been
     #    global to begin with.
     # B) The --interpreter-requirement option above.  That flag merely served to set the
     #    effective default for when no other constraints were set, so we might as well
     #    roll that into the more general constraints.
-    register('--interpreter-constraints', advanced=True, default=[], type=list,
+    register('--interpreter-constraints', advanced=True, default=['CPython>=2.7,<3'], type=list,
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' or 'PyPy'. Multiple constraints will be ORed together. "
@@ -64,7 +60,9 @@ class PythonSetup(Subsystem):
                   'If unspecified, a standard path under the workdir is used.')
     register('--interpreter-search-paths', advanced=True, type=list, default=[],
              metavar='<binary-paths>',
-             help='A list of paths to search for python interpreters.')
+             help='A list of paths to search for python interpreters. Note that if a PEX_PYTHON_PATH '
+              'variable is defined in a pexrc file, those interpreter paths will take precedence over ' 
+              'this option.')
 
   @property
   def interpreter_constraints(self):

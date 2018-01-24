@@ -5,11 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import hashlib
 import logging
 from abc import abstractmethod
 
-from pants.base.deprecated import deprecated
 from pants.util.meta import AbstractClass
 
 
@@ -71,45 +69,3 @@ class DefaultFingerprintStrategy(DefaultFingerprintHashingMixin, FingerprintStra
     :API: public
     """
     return target.payload.fingerprint()
-
-
-class TaskIdentityFingerprintStrategy(FingerprintStrategy):
-  """Fingerprint strategy which includes the current task fingerprint when fingerprinting target.
-
-  :API: public
-  """
-
-  @deprecated('1.5.0.dev0',
-              'The information that was previously included in the fingerprint by '
-              'TaskIdentityFingerprintStrategy is now included by default in all Tasks. '
-              'If you were extending this class, extend FingerprintStrategy directly instead.')
-  def __init__(self, task):
-    self._task = task
-
-  def _build_hasher(self, target):
-    hasher = hashlib.sha1()
-
-    payload_fingerprint = target.payload.fingerprint() or ''
-    logger.debug('payload fingerprint for %s is: %s', target, payload_fingerprint)
-    hasher.update(payload_fingerprint)
-
-    task_fingerprint = self._task.fingerprint or ''
-    logger.debug('task fingerprint for %s is: %s', self._task, task_fingerprint)
-    hasher.update(task_fingerprint)
-
-    return hasher
-
-  def compute_fingerprint(self, target):
-    """
-    :API: public
-    """
-    hasher = self._build_hasher(target)
-    digest = hasher.hexdigest()
-    logger.debug('target fingerprint for %s is: %s', target, digest)
-    return digest
-
-  def __hash__(self):
-    return hash(self._task.fingerprint)
-
-  def __eq__(self, other):
-    return self._task.fingerprint == other._task.fingerprint

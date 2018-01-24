@@ -10,8 +10,8 @@ from abc import abstractmethod
 from collections import OrderedDict
 from zipfile import ZIP_DEFLATED
 
-from pants.util.contextutil import open_tar, open_zip
-from pants.util.dirutil import safe_walk
+from pants.util.contextutil import open_tar, open_zip, temporary_dir
+from pants.util.dirutil import safe_concurrent_rename, safe_walk
 from pants.util.meta import AbstractClass
 from pants.util.strutil import ensure_text
 
@@ -22,8 +22,30 @@ from pants.util.strutil import ensure_text
 class Archiver(AbstractClass):
 
   @classmethod
-  def extract(cls, path, outdir):
-    """Extracts an archive's contents to the specified outdir."""
+  def extract(cls, path, outdir, filter_func=None, concurrency_safe=False):
+    """Extracts an archive's contents to the specified outdir with an optional filter.
+
+    :API: public
+
+    :param string path: path to the zipfile to extract from
+    :param string outdir: directory to extract files into
+    :param function filter_func: optional filter with the filename as the parameter.  Returns True
+      if the file should be extracted.  Note that filter_func is ignored for non-zip archives.
+    :param bool concurrency_safe: True to use concurrency safe method.  Concurrency safe extraction
+      will be performed on a temporary directory and the extacted directory will then be renamed
+      atomically to the outdir.  As a side effect, concurrency safe extraction will not allow
+      overlay of extracted contents onto an existing outdir.
+    """
+    if concurrency_safe:
+      with temporary_dir() as temp_dir:
+        cls._extract(path, temp_dir, filter_func=filter_func)
+        safe_concurrent_rename(temp_dir, outdir)
+    else:
+      # Leave the existing default behavior unchanged and allows overlay of contents.
+      cls._extract(path, outdir, filter_func=filter_func)
+
+  @classmethod
+  def _extract(cls, path, outdir):
     raise NotImplementedError()
 
   @abstractmethod
@@ -41,10 +63,7 @@ class TarArchiver(Archiver):
   """
 
   @classmethod
-  def extract(cls, path, outdir):
-    """
-    :API: public
-    """
+  def _extract(cls, path, outdir, **kwargs):
     with open_tar(path, errorlevel=1) as tar:
       tar.extractall(outdir)
 
@@ -75,16 +94,8 @@ class ZipArchiver(Archiver):
   """
 
   @classmethod
-  def extract(cls, path, outdir, filter_func=None):
-    """Extract from a zip file, with an optional filter
-
-    :API: public
-
-    :param string path: path to the zipfile to extract from
-    :param string outdir: directory to extract files into
-    :param function filter_func: optional filter with the filename as the parameter.  Returns True if
-      the file should be extracted.
-    """
+  def _extract(cls, path, outdir, filter_func=None, **kwargs):
+    """Extract from a zip file, with an optional filter."""
     with open_zip(path) as archive_file:
       for name in archive_file.namelist():
         # While we're at it, we also perform this safety test.

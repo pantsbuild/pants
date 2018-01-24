@@ -9,7 +9,7 @@ import os
 
 from pants.base.payload import Payload
 from pants.build_graph.target import Target
-from pants.cache.cache_setup import CacheSetup
+from pants.cache.cache_setup import CacheFactory, CacheSetup
 from pants.task.task import Task
 from pants.util.contextutil import open_tar, temporary_dir
 from pants.util.dirutil import safe_open
@@ -80,8 +80,11 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
     return None
 
   def _get_artifact_path(self, vt):
-    return "{}.tgz".format(
-      os.path.join(self.artifact_cache, self.task.stable_name(), self.target.id, vt.cache_key.hash)
+    return os.path.join(
+      self.artifact_cache,
+      CacheFactory.make_task_cache_dirname(self.task),
+      self.target.id,
+      '{}.tgz'.format(vt.cache_key.hash),
     )
 
   def _prepare_task(self, deference, regular_file, regular_file_in_results_dir):

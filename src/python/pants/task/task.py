@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
@@ -179,12 +178,11 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     self._task_name = type(self).__name__
     self._cache_key_errors = set()
     self._cache_factory = CacheSetup.create_cache_factory_for_task(self)
-    self._options_fingerprinter = OptionsFingerprinter(self.context.build_graph)
     self._force_invalidated = False
 
   @memoized_method
   def _build_invalidator(self, root=False):
-    build_task = None if root else self.stable_name()
+    build_task = None if root else self.fingerprint
     return BuildInvalidator.Factory.create(build_task=build_task)
 
   def get_options(self):
@@ -195,13 +193,54 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self.context.options.for_scope(self.options_scope)
 
   def get_passthru_args(self):
-    """
+    """Returns the passthru args for this task, if it supports them.
+
     :API: public
     """
     if not self.supports_passthru_args():
       raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
+
+  @property
+  def skip_execution(self):
+    """Whether this task should be skipped.
+
+    Tasks can override to specify skipping behavior (e.g., based on an option).
+
+    :API: public
+    """
+    return False
+
+  @property
+  def act_transitively(self):
+    """Whether this task should act on the transitive closure of the target roots.
+
+    Tasks can override to specify transitivity behavior (e.g., based on an option).
+    Note that this property is consulted by get_targets(), but tasks that bypass that
+    method must make their own decision on whether to act transitively or not.
+
+    :API: public
+    """
+    return True
+
+  def get_targets(self, predicate=None):
+    """Returns the candidate targets this task should act on.
+
+    This method is a convenience for processing optional transitivity. Tasks may bypass it
+    and make their own decisions on which targets to act on.
+
+    NOTE: This method was introduced in 2018, so at the time of writing few tasks consult it.
+          Instead, they query self.context.targets directly.
+    TODO: Fix up existing targets to consult this method, for uniformity.
+
+    Note that returned targets have not been checked for invalidation. The caller should do
+    so as needed, typically by calling self.invalidated().
+
+    :API: public
+    """
+    return (self.context.targets(predicate) if self.act_transitively
+            else filter(predicate, self.context.target_roots))
 
   @memoized_property
   def workdir(self):
@@ -216,16 +255,16 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return self._workdir
 
   def _options_fingerprint(self, scope):
-    pairs = self.context.options.get_fingerprintable_for_scope(
+    options_hasher = sha1()
+    options_hasher.update(scope)
+    options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
       scope,
-      include_passthru=self.supports_passthru_args()
+      self.context.options,
+      build_graph=self.context.build_graph,
+      include_passthru=self.supports_passthru_args(),
     )
-    hasher = sha1()
-    for (option_type, option_val) in pairs:
-      fp = self._options_fingerprinter.fingerprint(option_type, option_val)
-      if fp is not None:
-        hasher.update(fp)
-    return hasher.hexdigest()
+    options_hasher.update(options_fp)
+    return options_hasher.hexdigest()
 
   @memoized_property
   def fingerprint(self):
@@ -238,6 +277,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     A task's fingerprint is only valid afer the task has been fully initialized.
     """
     hasher = sha1()
+    hasher.update(self.stable_name())
     hasher.update(self._options_fingerprint(self.options_scope))
     hasher.update(self.implementation_version_str())
     # TODO: this is not recursive, but should be: see #2739
@@ -364,9 +404,12 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
         targets.extend(vt.targets)
 
       if len(targets):
-        msg_elements = ['Invalidated ',
-                        items_to_report_element([t.address.reference() for t in targets], 'target'),
-                        '.']
+        target_address_references = [t.address.reference() for t in targets]
+        msg_elements = [
+          'Invalidated ',
+          items_to_report_element(target_address_references, 'target'),
+          '.',
+        ]
         self.context.log.info(*msg_elements)
 
     self._update_invalidation_report(invalidation_check, 'pre-check')
@@ -581,12 +624,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return None
 
   def _report_targets(self, prefix, targets, suffix, logger=None):
-    logger = logger or self.context.log.info
-    logger(
+    target_address_references = [t.address.reference() for t in targets]
+    msg_elements = [
       prefix,
-      items_to_report_element([t.address.reference() for t in targets], 'target'),
+      items_to_report_element(target_address_references, 'target'),
       suffix,
-    )
+    ]
+    logger = logger or self.context.log.info
+    logger(*msg_elements)
 
   def require_single_root_target(self):
     """If a single target was specified on the cmd line, returns that target.
@@ -609,14 +654,9 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :param string goal_name: The goal name to use for any warning emissions.
     :param callable predicate: The predicate to pass to `context.scan().targets(predicate=X)`.
     """
-    deprecated_conditional(
-        lambda: not self.context.target_roots,
-        '1.5.0.dev0',
-        '`./pants {0}` (with no explicit targets) will soon become an error. Please specify '
-        'one or more explicit target specs (e.g. `./pants {0} ::`).'.format(goal_name))
-    if not self.context.target_roots and not self.get_options().enable_v2_engine:
-      # For the v1 path, continue the behavior of e.g. `./pants list` implies `./pants list ::`.
-      return self.context.scan().targets(predicate=predicate)
+    if not self.context.target_roots:
+      raise TaskError('Please specify one or more explicit target '
+                      'specs (e.g. `./pants {0} ::`).'.format(goal_name))
 
     # For the v2 path, e.g. `./pants list` is a functional no-op. This matches the v2 mode behavior
     # of e.g. `./pants --changed-parent=HEAD list` (w/ no changes) returning an empty result.

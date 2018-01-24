@@ -14,10 +14,10 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
-                                                        has_python_requirements, has_python_sources)
-from pants.backend.python.tasks2.python_execution_task_base import WrappedPEX
-from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_sources,
+                                                       has_python_requirements, has_python_sources)
+from pants.backend.python.tasks.python_execution_task_base import WrappedPEX
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -55,9 +55,6 @@ class PythonEval(ResolveRequirementsTaskBase):
   @staticmethod
   def _is_evalable(target):
     return isinstance(target, (PythonLibrary, PythonBinary))
-
-  deprecated_options_scope = 'compile.python-eval'
-  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   @classmethod
   def register_options(cls, register):

@@ -34,8 +34,9 @@ class EngineTest(unittest.TestCase):
                                         subjects=addresses)
 
   def test_serial_execution_simple(self):
-    result = self.scheduler.execute(self.request(['compile'], self.java))
-    self.scheduler.visualize_graph_to_file('blah/run.0.dot')
+    request = self.request(['compile'], self.java)
+    result = self.scheduler.execute(request)
+    self.scheduler.visualize_graph_to_file(request, 'blah/run.0.dot')
     self.assertEqual(Return(Classpath(creator='javac')), result.root_products[0][1])
     self.assertIsNone(result.error)
 
@@ -52,6 +53,14 @@ class A(object):
 
 
 class B(object):
+  pass
+
+
+class C(object):
+  pass
+
+
+class D(object):
   pass
 
 
@@ -123,5 +132,36 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
               File LOCATION-INFO, in fn_raises
                 raise Exception('An exception for {}'.format(type(x).__name__))
             Exception: An exception for B
+      ''').lstrip()+'\n',
+      remove_locations_from_traceback(str(cm.exception)))
+
+  def test_trace_does_not_include_cancellations(self):
+    # Tests that when the computation of `Select(C)` fails, the cancellation of `Select(D)`
+    # is not rendered as a failure.
+    rules = [
+      RootRule(B),
+      TaskRule(D, [Select(B)], D),
+      TaskRule(C, [Select(B)], nested_raise),
+      TaskRule(A, [Select(C), Select(D)], A),
+    ]
+
+    scheduler = self.scheduler(rules, include_trace_on_error=True)
+    with self.assertRaises(Exception) as cm:
+      list(scheduler.product_request(A, subjects=[(B())]))
+
+    self.assert_equal_with_printing(dedent('''
+      Received unexpected Throw state(s):
+      Computing Select(<pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+        Computing Task(<class 'pants_test.engine.test_engine.A'>, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =A)
+          Computing Task(<function nested_raise at 0xEEEEEEEEE>, <pants_test.engine.test_engine.B object at 0xEEEEEEEEE>, =C)
+            Throw(An exception for B)
+              Traceback (most recent call last):
+                File LOCATION-INFO, in extern_invoke_runnable
+                  val = runnable(*args)
+                File LOCATION-INFO, in nested_raise
+                  fn_raises(x)
+                File LOCATION-INFO, in fn_raises
+                  raise Exception('An exception for {}'.format(type(x).__name__))
+              Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))

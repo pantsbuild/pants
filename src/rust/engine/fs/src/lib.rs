@@ -1,27 +1,31 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-mod hash;
-pub use hash::Fingerprint;
 mod snapshot;
 pub use snapshot::{GetFileDigest, Snapshot};
 mod store;
-pub use store::{Digest, Store};
+pub use store::Store;
 mod pool;
 pub use pool::ResettablePool;
 
 extern crate bazel_protos;
 extern crate boxfuture;
+extern crate byteorder;
+extern crate bytes;
 extern crate digest;
 extern crate futures;
 extern crate futures_cpupool;
 extern crate glob;
+extern crate grpcio;
+extern crate hashing;
 extern crate hex;
 extern crate ignore;
 extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
+#[cfg(test)]
+extern crate mock;
 extern crate ordermap;
 extern crate protobuf;
 extern crate sha2;
@@ -36,15 +40,16 @@ use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
 
+use bytes::Bytes;
 use futures::future::{self, Future};
 use futures_cpupool::CpuFuture;
 use glob::Pattern;
+use hashing::{Fingerprint, WriterHasher};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ordermap::OrderMap;
 use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
-use hash::WriterHasher;
 
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -441,7 +446,10 @@ impl PosixFS {
         std::fs::File::open(&path_abs).and_then(|mut f| {
           let mut content = Vec::new();
           f.read_to_end(&mut content)?;
-          Ok(FileContent { path, content })
+          Ok(FileContent {
+            path: path,
+            content: Bytes::from(content),
+          })
         })
       })
       .to_boxed()
@@ -773,7 +781,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
 
 pub struct FileContent {
   pub path: PathBuf,
-  pub content: Vec<u8>,
+  pub content: Bytes,
 }
 
 impl fmt::Debug for FileContent {
@@ -1036,7 +1044,7 @@ impl Snapshots {
         io::Read::read_to_end(&mut entry, &mut content)?;
         files_content.push(FileContent {
           path: path,
-          content: content,
+          content: Bytes::from(content),
         });
       }
     }
