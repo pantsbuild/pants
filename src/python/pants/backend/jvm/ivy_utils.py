@@ -18,7 +18,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 import six
 from twitter.common.collections import OrderedSet
 
-from pants.backend.jvm.resolution_utils import (JvmResolveError, ResolutionUtils)
+from pants.backend.jvm.resolution_utils import JvmResolveError, ResolutionUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary

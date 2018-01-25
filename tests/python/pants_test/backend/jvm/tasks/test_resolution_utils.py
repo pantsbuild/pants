@@ -16,9 +16,8 @@ from twitter.common.collections import OrderedSet
 from pants.backend.jvm.ivy_utils import (FrozenResolution, IvyFetchStep, IvyInfo, IvyModule,
                                          IvyModuleRef, IvyResolveMappingError, IvyResolveResult,
                                          IvyResolveStep, IvyUtils)
-from pants.backend.jvm.resolution_utils import (ResolutionUtils)
-
 from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.resolution_utils import ResolutionUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import JarDependencyManagement
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.base.build_environment import get_buildroot

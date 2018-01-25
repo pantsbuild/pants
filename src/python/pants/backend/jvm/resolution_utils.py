@@ -33,6 +33,7 @@ from pants.java.util import execute_runner
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir, safe_open
 from pants.util.fileutil import atomic_copy
 
+
 logger = logging.getLogger(__name__)
 
 class JvmResolveError(Exception):
