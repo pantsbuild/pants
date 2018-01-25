@@ -21,7 +21,7 @@ from pants.util.collections import combined_dict
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
-from pants_test.testutils.process_test_util import assert_no_process_exists_by_command
+from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
 
 class PantsDaemonMonitor(ProcessManager):
@@ -86,32 +86,32 @@ def launch_file_toucher(f):
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
   @contextmanager
   def pantsd_test_context(self, log_level='info'):
-    with self.temporary_workdir() as workdir_base:
-      pid_dir = os.path.join(workdir_base, '.pids')
-      workdir = os.path.join(workdir_base, '.workdir.pants.d')
-      print('\npantsd log is {}/pantsd/pantsd.log'.format(workdir))
-      pantsd_config = {
-        'GLOBAL': {
-          'enable_pantsd': True,
-          # The absolute paths in CI can exceed the UNIX socket path limitation
-          # (>104-108 characters), so we override that here with a shorter path.
-          'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
-          'level': log_level,
-          'pants_subprocessdir': pid_dir
+    with no_lingering_process_by_command('pantsd-runner'):
+      with self.temporary_workdir() as workdir_base:
+        pid_dir = os.path.join(workdir_base, '.pids')
+        workdir = os.path.join(workdir_base, '.workdir.pants.d')
+        print('\npantsd log is {}/pantsd/pantsd.log'.format(workdir))
+        pantsd_config = {
+          'GLOBAL': {
+            'enable_pantsd': True,
+            # The absolute paths in CI can exceed the UNIX socket path limitation
+            # (>104-108 characters), so we override that here with a shorter path.
+            'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
+            'level': log_level,
+            'pants_subprocessdir': pid_dir
+          }
         }
-      }
-      checker = PantsDaemonMonitor(pid_dir)
-      self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
-      try:
-        yield workdir, pantsd_config, checker
-      finally:
-        banner('BEGIN pantsd.log')
-        for line in read_pantsd_log(workdir):
-          print(line)
-        banner('END pantsd.log')
+        checker = PantsDaemonMonitor(pid_dir)
         self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
-        checker.assert_stopped()
-        assert_no_process_exists_by_command('pantsd-runner')
+        try:
+          yield workdir, pantsd_config, checker
+        finally:
+          banner('BEGIN pantsd.log')
+          for line in read_pantsd_log(workdir):
+            print(line)
+          banner('END pantsd.log')
+          self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
+          checker.assert_stopped()
 
   @contextmanager
   def pantsd_successful_run_context(self, log_level='info'):
@@ -206,22 +206,21 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       self.assertIn('Current thread 0x', '\n'.join(read_pantsd_log(workdir)))
 
   def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
-    with self.pantsd_test_context() as (workdir, pantsd_config, checker):
-      # Run target that throws an exception in pants.
-      self.assert_failure(
-        self.run_pants_with_workdir(
-          ['bundle', 'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'],
-          workdir,
-          pantsd_config)
-      )
-      checker.await_pantsd()
+    # Check for no stray pantsd-runner prcesses.
+    with no_lingering_process_by_command('pantsd-runner'):
+      with self.pantsd_test_context() as (workdir, pantsd_config, checker):
+        # Run target that throws an exception in pants.
+        self.assert_failure(
+          self.run_pants_with_workdir(
+            ['bundle', 'testprojects/src/java/org/pantsbuild/testproject/bundle:missing-files'],
+            workdir,
+            pantsd_config)
+        )
+        checker.await_pantsd()
 
-      # Check for no stray pantsd-runner prcesses.
-      assert_no_process_exists_by_command('pantsd-runner')
-
-      # Assert pantsd is in a good functional state.
-      self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
-      checker.assert_running()
+        # Assert pantsd is in a good functional state.
+        self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
+        checker.assert_running()
 
   def test_pantsd_lifecycle_invalidation(self):
     """Runs pants commands with pantsd enabled, in a loop, alternating between options that
@@ -292,15 +291,16 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     # Allow env var overrides for local stress testing.
     attempts = int(os.environ.get('PANTS_TEST_PANTSD_STRESS_ATTEMPTS', 20))
     cmd = os.environ.get('PANTS_TEST_PANTSD_STRESS_CMD', 'help').split()
-    with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _):
-      pantsd_run(cmd)
-      checker.await_pantsd()
-      for _ in range(attempts):
+
+    with no_lingering_process_by_command('pantsd-runner'):
+      with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _):
         pantsd_run(cmd)
-        checker.assert_running()
-      # The runner can sometimes exit more slowly than the thin client caller.
-      time.sleep(3)
-      assert_no_process_exists_by_command('pantsd-runner')
+        checker.await_pantsd()
+        for _ in range(attempts):
+          pantsd_run(cmd)
+          checker.assert_running()
+        # The runner can sometimes exit more slowly than the thin client caller.
+        time.sleep(3)
 
   def test_pantsd_aligned_output(self):
     # Set for pytest output display.
