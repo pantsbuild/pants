@@ -10,7 +10,7 @@ import json
 import os
 from collections import defaultdict
 
-from pants.backend.jvm.ivy_utils import IvyUtils
+from pants.backend.jvm.resolution_utils import ResolutionUtils
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
@@ -115,8 +115,7 @@ class CoursierMixin(NailgunTask):
     jar_targets = manager.targets_by_artifact_set(targets)
 
     for artifact_set, target_subset in jar_targets.items():
-      # TODO(wisechengyi): this is the only place we are using IvyUtil method, which isn't specific to ivy really.
-      raw_jar_deps, global_excludes = IvyUtils.calculate_classpath(target_subset)
+      raw_jar_deps, global_excludes = ResolutionUtils.calculate_classpath(target_subset)
 
       # ['sources'] * False = [], ['sources'] * True = ['sources']
       confs_for_fingerprint = ['sources'] * sources + ['javadoc'] * javadoc

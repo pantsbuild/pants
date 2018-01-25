@@ -18,6 +18,7 @@ from collections import OrderedDict, defaultdict, namedtuple
 import six
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.resolution_utils import (JvmResolveError, ResolutionUtils)
 from pants.backend.jvm.subsystems.jar_dependency_management import (JarDependencyManagement,
                                                                     PinnedJarArtifactSet)
 from pants.backend.jvm.targets.exportable_jvm_library import ExportableJvmLibrary
@@ -696,7 +697,7 @@ class IvyUtils(object):
 
   INTERNAL_ORG_NAME = 'internal'
 
-  class IvyError(Exception):
+  class IvyError(JvmResolveError):
     """Indicates an error preparing an ivy operation."""
 
   class IvyResolveReportError(IvyError):
@@ -1035,100 +1036,11 @@ class IvyUtils(object):
 
     :returns: A pair of a list of JarDependencies, and a set of excludes to apply globally.
     """
-    jars = OrderedDict()
-    global_excludes = set()
-    provide_excludes = set()
-    targets_processed = set()
-
-    # Support the ivy force concept when we sanely can for internal dep conflicts.
-    # TODO(John Sirois): Consider supporting / implementing the configured ivy revision picking
-    # strategy generally.
-    def add_jar(jar):
-      # TODO(John Sirois): Maven allows for depending on an artifact at one rev and one of its
-      # attachments (classified artifacts) at another.  Ivy does not, allow this, the dependency
-      # can carry only 1 rev and that hosts multiple artifacts for that rev.  This conflict
-      # resolution happens at the classifier level, allowing skew in a
-      # multi-artifact/multi-classifier dependency.  We only find out about the skew later in
-      # `_generate_jar_template` below which will blow up with a conflict.  Move this logic closer
-      # together to get a more clear validate, then emit ivy.xml then resolve flow instead of the
-      # spread-out validations happening here.
-      # See: https://github.com/pantsbuild/pants/issues/2239
-      coordinate = (jar.org, jar.name, jar.classifier)
-      existing = jars.get(coordinate)
-      jars[coordinate] = jar if not existing else cls._resolve_conflict(existing=existing,
-                                                                        proposed=jar)
-
-    def collect_jars(target):
-      if isinstance(target, JarLibrary):
-        for jar in target.jar_dependencies:
-          add_jar(jar)
-
-    def collect_excludes(target):
-      target_excludes = target.payload.get_field_value('excludes')
-      if target_excludes:
-        global_excludes.update(target_excludes)
-
-    def collect_provide_excludes(target):
-      if not (isinstance(target, ExportableJvmLibrary) and target.provides):
-        return
-      logger.debug('Automatically excluding jar {}.{}, which is provided by {}'.format(
-        target.provides.org, target.provides.name, target))
-      provide_excludes.add(Exclude(org=target.provides.org, name=target.provides.name))
-
-    def collect_elements(target):
-      targets_processed.add(target)
-      collect_jars(target)
-      collect_excludes(target)
-      collect_provide_excludes(target)
-
-    for target in targets:
-      target.walk(collect_elements, predicate=lambda target: target not in targets_processed)
-
-    # If a source dep is exported (ie, has a provides clause), it should always override
-    # remote/binary versions of itself, ie "round trip" dependencies.
-    # TODO: Move back to applying provides excludes as target-level excludes when they are no
-    # longer global.
-    if provide_excludes:
-      additional_excludes = tuple(provide_excludes)
-      new_jars = OrderedDict()
-      for coordinate, jar in jars.items():
-        new_jars[coordinate] = jar.copy(excludes=jar.excludes + additional_excludes)
-      jars = new_jars
-
-    return jars.values(), global_excludes
+    return ResolutionUtils.calculate_classpath(targets)
 
   @classmethod
   def _resolve_conflict(cls, existing, proposed):
-    if existing.rev is None:
-      return proposed
-    if proposed.rev is None:
-      return existing
-    if proposed == existing:
-      if proposed.force:
-        return proposed
-      return existing
-    elif existing.force and proposed.force:
-      raise cls.IvyResolveConflictingDepsError('Cannot force {}#{};{} to both rev {} and {}'.format(
-        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
-      ))
-    elif existing.force:
-      logger.debug('Ignoring rev {} for {}#{};{} already forced to {}'.format(
-        proposed.rev, proposed.org, proposed.name, proposed.classifier or '', existing.rev
-      ))
-      return existing
-    elif proposed.force:
-      logger.debug('Forcing {}#{};{} from {} to {}'.format(
-        proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev
-      ))
-      return proposed
-    else:
-      if Revision.lenient(proposed.rev) > Revision.lenient(existing.rev):
-        logger.debug('Upgrading {}#{};{} from rev {}  to {}'.format(
-          proposed.org, proposed.name, proposed.classifier or '', existing.rev, proposed.rev,
-        ))
-        return proposed
-      else:
-        return existing
+    return ResolutionUtils._resolve_conflict(existing, proposed)
 
   @classmethod
   def _generate_jar_template(cls, jars):
