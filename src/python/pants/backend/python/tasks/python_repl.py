@@ -51,11 +51,11 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
     pex_info.entry_point = entry_point
     return self.create_pex(pex_info)
 
-  # NB: **pex_run_kwargs is used by tests only.
+  # N.B. **pex_run_kwargs is used by tests only.
   def launch_repl(self, pex, **pex_run_kwargs):
-    # N.B. while the repl subprocess is synchronously spawned, we rely on process
-    # group signalling for a SIGINT to reach the repl subprocess directly - and want
-    # to do nothing in response on the parent side.
+    # While the repl subprocess is synchronously spawned, we rely on process group
+    # signalling for a SIGINT to reach the repl subprocess directly - and want to
+    # do nothing in response on the parent side.
     def ignore_control_c(signum, frame): pass
 
     with signal_handler_as(signal.SIGINT, ignore_control_c):
