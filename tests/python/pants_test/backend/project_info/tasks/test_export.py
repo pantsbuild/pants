@@ -181,9 +181,9 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         'resolver': 'ivy'
       },
       JvmPlatform.options_scope: {
-        'default_platform': 'java6',
+        'default_platform': 'java8',
         'platforms': {
-          'java6': {'source': '1.6', 'target': '1.6'}
+          'java8': {'source': '1.8', 'target': '1.8'}
         }
       },
     }
@@ -298,7 +298,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'target_type': 'SOURCE',
       'transitive' : True,
       'pants_target_type': 'scala_library',
-      'platform': 'java6',
+      'platform': 'java8',
     }
     self.assertEqual(jvm_target, expected_jvm_target)
 
@@ -343,7 +343,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_target_platform(self):
     result = self.execute_export_json('project_info:target_type')
-    self.assertEqual('java6',
+    self.assertEqual('java8',
                      result['targets']['project_info:target_type']['platform'])
 
   def test_output_file(self):

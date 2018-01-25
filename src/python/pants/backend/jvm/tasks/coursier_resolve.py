@@ -271,45 +271,20 @@ class CoursierMixin(NailgunTask):
   def _get_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve,
                                 coursier_work_temp_dir,
                                 pinned_coords):
-    def construct_classifier_to_jar(jars):
-      """
-      Reshape jars by classifier
-
-      For example:
-      [
-        ResolvedJar('sources', 'a-sources.jar'),
-        ResolvedJar('sources', 'b-sources.jar'),
-        ResolvedJar('', 'a.jar'),
-      ]
-      should yield:
-      {
-        'sources': [ResolvedJar('sources', 'a-sources.jar'),ResolvedJar('sources', 'b-sources.jar')],
-        '':  [ResolvedJar('', 'a.jar') ]
-      }
-      """
-      product = defaultdict(list)
-      for x in jars:
-        product[x.coordinate.classifier or ''].append(x)
-      return product
-
-    # Divide the resolve by classifier because coursier treats classifier option globally.
-    classifier_to_jars = construct_classifier_to_jar(jars_to_resolve)
 
     # Variable to store coursier result each run.
     results = defaultdict(list)
-    for classifier, classified_jars in classifier_to_jars.items():
-      with temporary_file(coursier_work_temp_dir, cleanup=False) as f:
-        output_fn = f.name
+    with temporary_file(coursier_work_temp_dir, cleanup=False) as f:
+      output_fn = f.name
 
-      cmd_args = self._construct_cmd_args(classified_jars,
-                                          classifier,
-                                          common_args,
-                                          global_excludes if self.get_options().allow_global_excludes else [],
-                                          pinned_coords,
-                                          coursier_work_temp_dir,
-                                          output_fn)
+    cmd_args = self._construct_cmd_args(jars_to_resolve,
+                                        common_args,
+                                        global_excludes if self.get_options().allow_global_excludes else [],
+                                        pinned_coords,
+                                        coursier_work_temp_dir,
+                                        output_fn)
 
-      results['default'].append(self._call_coursier(cmd_args, coursier_jar, output_fn))
+    results['default'].append(self._call_coursier(cmd_args, coursier_jar, output_fn))
 
     return results
 
@@ -333,7 +308,7 @@ class CoursierMixin(NailgunTask):
     if javadoc:
       special_args.append('--javadoc')
 
-    cmd_args = self._construct_cmd_args(jars_to_resolve, '', common_args,
+    cmd_args = self._construct_cmd_args(jars_to_resolve, common_args,
                                         global_excludes if self.get_options().allow_global_excludes else [],
                                         pinned_coords, coursier_work_temp_dir, output_fn)
     cmd_args.extend(special_args)
@@ -362,26 +337,27 @@ class CoursierMixin(NailgunTask):
         return json.loads(f.read())
 
   @staticmethod
-  def _construct_cmd_args(classified_jars, classifier, common_args, global_excludes,
+  def _construct_cmd_args(jars, common_args, global_excludes,
                           pinned_coords, coursier_workdir, json_output_path):
 
     # Make a copy, so there is no side effect or others using `common_args`
     cmd_args = list(common_args)
 
     cmd_args.extend(['--json-output-file', json_output_path])
-    # Append classifier if not default
-    if classifier != '':
-      cmd_args.extend(['--classifier', classifier])
 
     # Dealing with intransitivity and forced versions.
-    for j in classified_jars:
+    for j in jars:
       if not j.rev:
         continue
+
+      module = j.coordinate.simple_coord
+      if j.coordinate.classifier:
+        module += ',classifier={}'.format(j.coordinate.classifier)
 
       if j.intransitive:
         cmd_args.append('--intransitive')
 
-      cmd_args.append(j.coordinate.simple_coord)
+      cmd_args.append(module)
 
       # Force requires specifying the coord again with -V
       if j.force:
@@ -389,13 +365,13 @@ class CoursierMixin(NailgunTask):
         cmd_args.append(j.coordinate.simple_coord)
 
     # Force pinned coordinates
-    for j in pinned_coords:
+    for m2coord in pinned_coords:
       cmd_args.append('-V')
-      cmd_args.append(j.simple_coord)
+      cmd_args.append(m2coord.simple_coord)
 
     # Local exclusions
     local_exclude_args = []
-    for jar in classified_jars:
+    for jar in jars:
       for ex in jar.excludes:
         # `--` means exclude. See --local-exclude-file in `coursier fetch --help`
         # If ex.name does not exist, that means the whole org needs to be excluded.
@@ -442,10 +418,19 @@ class CoursierMixin(NailgunTask):
     for vt in invalidation_check.all_vts:
       t = vt.target
       if isinstance(t, JarLibrary):
-        def get_transitive_resolved_jars(my_simple_coord, resolved_jars):
+        def get_transitive_resolved_jars(my_simple_coord, classifier, resolved_jars):
           transitive_jar_path_for_coord = []
           if my_simple_coord in flattened_resolution:
-            for c in [my_simple_coord] + flattened_resolution[my_simple_coord]:
+            # TODO(wisechengyi): this only grabs jar with matching classifier the current coordinate
+            # and it still takes the jars wholesale for its transitive dependencies.
+            # https://github.com/coursier/coursier/issues/743
+            resolved_jars_with_matching_classifier = filter(
+              lambda x: x.coordinate.classifier == classifier or x.coordinate.classifier in ['sources', 'javadoc'],
+              resolved_jars[my_simple_coord])
+
+            transitive_jar_path_for_coord.extend(resolved_jars_with_matching_classifier)
+
+            for c in flattened_resolution[my_simple_coord]:
               transitive_jar_path_for_coord.extend(resolved_jars[c])
 
           return transitive_jar_path_for_coord
@@ -464,7 +449,7 @@ class CoursierMixin(NailgunTask):
               final_simple_coord = org_name_to_org_name_rev[org_name]
 
           if final_simple_coord:
-            transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, coord_to_resolved_jars)
+            transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, jar.coordinate.classifier, coord_to_resolved_jars)
             if transitive_resolved_jars:
               compile_classpath.add_jars_for_targets([t], conf, transitive_resolved_jars)
 
