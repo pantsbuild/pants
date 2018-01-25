@@ -8,8 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import signal
 import sys
-# import termios
-# import tty
 from contextlib import contextmanager
 
 from pants.console.stty_utils import STTYSettings
@@ -111,9 +109,6 @@ class RemotePantsRunner(object):
                            exit_on_broken_pipe=True)
 
     with self._trapped_signals(client), STTYSettings.preserved():
-      # attrs = tty.tcgetattr(self._stdin.fileno())
-      # attrs[3] = attrs[3] & ~termios.ICANON
-      # tty.tcsetattr(self._stdin.fileno(), termios.TCSANOW, attrs)
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
