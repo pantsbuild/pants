@@ -9,47 +9,63 @@ use sha2::Sha256;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 
-///
-/// Runs a command via a gRPC service implementing the Bazel Remote Execution API
-/// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
-///
-/// Loops until the server gives a response, either successful or error. Does not have any timeout:
-/// polls in a tight loop.
-///
-pub fn run_command_remote(
-  addr: &str,
-  req: ExecuteProcessRequest,
-) -> Result<ExecuteProcessResult, String> {
-  let execute_request = make_execute_request(&req)?;
+pub struct CommandRunner {
+  execution_client: bazel_protos::remote_execution_grpc::ExecutionClient,
+  operations_client: bazel_protos::operations_grpc::OperationsClient,
+}
 
-  let env = Arc::new(grpcio::Environment::new(1));
-  let channel = || grpcio::ChannelBuilder::new(env.clone()).connect(addr);
-  let execution_client = bazel_protos::remote_execution_grpc::ExecutionClient::new(channel());
+impl CommandRunner {
+  pub fn new(address: &str, thread_count: usize) -> CommandRunner {
+    let env = Arc::new(grpcio::Environment::new(thread_count));
+    let channel = grpcio::ChannelBuilder::new(env.clone()).connect(address);
+    let execution_client =
+      bazel_protos::remote_execution_grpc::ExecutionClient::new(channel.clone());
+    let operations_client = bazel_protos::operations_grpc::OperationsClient::new(channel.clone());
 
-  let initial_result = map_grpc_result(execution_client.execute(&execute_request))?;
-
-  match extract_execute_response(&initial_result)? {
-    Some(value) => {
-      return Ok(value);
+    CommandRunner {
+      execution_client,
+      operations_client,
     }
-    None => {}
   }
 
-  let operation_client = bazel_protos::operations_grpc::OperationsClient::new(channel());
-  let mut operation_request = bazel_protos::operations::GetOperationRequest::new();
-  operation_request.set_name(initial_result.get_name().to_string());
-  loop {
-    // TODO: Use some better looping-frequency strategy than a tight-loop.
-    let operation_result = map_grpc_result(operation_client.get_operation(&operation_request))?;
+  ///
+  /// Runs a command via a gRPC service implementing the Bazel Remote Execution API
+  /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
+  ///
+  /// Loops until the server gives a response, either successful or error. Does not have any
+  /// timeout: polls in a tight loop.
+  ///
+  pub fn run_command_remote(
+    &self,
+    req: ExecuteProcessRequest,
+  ) -> Result<ExecuteProcessResult, String> {
+    let execute_request = make_execute_request(&req)?;
 
-    let result = extract_execute_response(&operation_result)?;
+    let initial_result = map_grpc_result(self.execution_client.execute(&execute_request))?;
 
-    match result {
+    match extract_execute_response(&initial_result)? {
       Some(value) => {
-        break Ok(value);
+        return Ok(value);
       }
-      None => {
-        continue;
+      None => {}
+    }
+
+    let mut operation_request = bazel_protos::operations::GetOperationRequest::new();
+    operation_request.set_name(initial_result.get_name().to_string());
+    loop {
+      // TODO: Use some better looping-frequency strategy than a tight-loop.
+      let operation_result =
+        map_grpc_result(self.operations_client.get_operation(&operation_request))?;
+
+      let result = extract_execute_response(&operation_result)?;
+
+      match result {
+        Some(value) => {
+          break Ok(value);
+        }
+        None => {
+          continue;
+        }
       }
     }
   }
@@ -145,7 +161,7 @@ mod tests {
   use mock;
   use testutil::{owned_string_vec, as_byte_owned_vec};
 
-  use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_remote};
+  use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult};
   use std::collections::BTreeMap;
   use std::iter::{self, FromIterator};
 
@@ -492,5 +508,12 @@ mod tests {
       response_wrapper
     });
     op
+  }
+
+  fn run_command_remote(
+    address: &str,
+    request: ExecuteProcessRequest,
+  ) -> Result<ExecuteProcessResult, String> {
+    CommandRunner::new(address, 1).run_command_remote(request)
   }
 }
