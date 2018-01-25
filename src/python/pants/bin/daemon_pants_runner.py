@@ -150,6 +150,8 @@ class DaemonPantsRunner(ProcessManager):
             writer.join()
             stdout.close()
             stderr.close()
+        # Instruct the thin client to begin reading and sending stdin.
+        NailgunProtocol.send_start_reading_input(sock)
         yield finalizer
 
   def _setup_sigint_handler(self):
