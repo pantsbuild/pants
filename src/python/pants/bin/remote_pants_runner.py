@@ -60,17 +60,12 @@ class RemotePantsRunner(object):
     """A contextmanager that overrides the SIGINT (control-c) and SIGQUIT (control-\) handlers
     and handles them remotely."""
     def handle_control_c(signum, frame):
-      sys.stderr.write('^C')
-      client.send_control_c()
-
-    def handle_control_slash(signum, frame):
-      sys.stderr.write('^\\')
       client.send_control_c()
 
     existing_sigint_handler = signal.signal(signal.SIGINT, handle_control_c)
     # N.B. SIGQUIT will abruptly kill the pantsd-runner, which will shut down the other end
     # of the Pailgun connection - so we send a gentler SIGINT here instead.
-    existing_sigquit_handler = signal.signal(signal.SIGQUIT, handle_control_slash)
+    existing_sigquit_handler = signal.signal(signal.SIGQUIT, handle_control_c)
 
     # Retry interrupted system calls.
     signal.siginterrupt(signal.SIGINT, False)
