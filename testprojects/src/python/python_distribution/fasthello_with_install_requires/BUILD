@@ -3,7 +3,7 @@
 
 
 python_dist(
-  name='superhello',
+  name='fasthello',
   sources=[
     'super_greet.c',
     'hello_package/hello.py',
@@ -16,7 +16,7 @@ python_binary(
   name='main_with_no_conflict',
   source='main.py',
   dependencies=[
-    ':superhello',
+    ':fasthello',
   ]
 )
 
@@ -24,7 +24,7 @@ python_binary(
   name='main_with_conflicting_dep',
   source='main.py',
   dependencies=[
-    ':superhello',
+    ':fasthello',
     ':pycountry'
   ]
 )

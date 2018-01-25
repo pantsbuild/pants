@@ -5,9 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-# hello_package is a python module within the superhello python_distribution
-from hello_package import hello
+from setuptools import setup, find_packages
+from distutils.core import Extension
 
 
-if __name__ == '__main__':
-  hello.hello()
+c_module = Extension(str('super_greet'), sources=[str('super_greet.c')])
+
+setup(
+  name='fasthello',
+  version='1.0.0',
+  ext_modules=[c_module],
+  packages=find_packages(),
+)

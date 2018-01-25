@@ -245,7 +245,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk
-        - sudo rm ~/.cache/pants/python_cache/requirements/CPython-2.7.14/superhello*
       env:
         - SHARD="Python integration tests for pants - shard 1"
       script:
@@ -272,7 +271,6 @@ matrix:
         - sudo rm -rf /usr/lib/jvm/java-1.6.0-openjdk-amd64
         - sudo rm -rf /usr/lib/jvm/java-6-openjdk-amd64
         - jdk_switcher use oraclejdk8
-        - sudo rm ~/.cache/pants/python_cache/requirements/CPython-2.7.14/superhello*
       env:
         - SHARD="Python integration tests for pants - shard 2"
       script:
