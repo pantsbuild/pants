@@ -898,11 +898,11 @@ pub struct Snapshot {
 impl Snapshot {
   fn create(context: Context, path_globs: PathGlobs) -> NodeFuture<fs::Snapshot> {
     // Recursively expand PathGlobs into PathStats.
-    // We rely on Context::expand tracking dependencies for scandirs,
+    // We rely on Context::expand tracking dependencies for Scandirs and ReadLinks,
     // and fs::Snapshot::from_path_stats tracking dependencies for file digests.
     context
       .expand(path_globs)
-      .map_err(|e| format!("PlatGlobs expansion failed: {:?}", e))
+      .map_err(|e| format!("PathGlobs expansion failed: {:?}", e))
       .and_then(move |path_stats| {
         fs::Snapshot::from_path_stats(context.core.store.clone(), context.clone(), path_stats)
           .map_err(move |e| format!("Snapshot failed: {}", e))

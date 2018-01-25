@@ -419,7 +419,7 @@ mod local {
         // try to perform multiple write transactions concurrently. Fortunately, this property
         // holds for us.
         .set_flags(NO_TLS)
-          // 3 DBs; one for file contents, one for directories, one for leases.
+        // 3 DBs; one for file contents, one for directories, one for leases.
         .set_max_dbs(3)
         .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
         .open(path.as_ref())
