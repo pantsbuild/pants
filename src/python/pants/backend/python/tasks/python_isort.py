@@ -19,7 +19,7 @@ from pants.task.task import Task
 from pants.util.process_handler import subprocess
 
 
-class IsortPythonTask(Task):
+class IsortPythonTask(FmtTaskMixin, Task):
   """Autoformats Python source files with isort.
 
   isort binary is built at contrib/python/src/python/pants/contrib/python/isort,
