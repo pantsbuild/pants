@@ -23,21 +23,28 @@ def _safe_iter_matching_processes(name):
       pass
 
 
-def _matching_process_set(name):
-  return {p for p in _safe_iter_matching_processes(name)}
+def _make_process_table(processes):
+  line_tmpl = '{0:>7} {1:>7} {2}'
+  proc_tuples = [(p.pid, p.ppid(), ''.join(p.cmdline())) for p in processes]
+  return '\n'.join(
+    [
+      line_tmpl.format('PID', 'PGID', 'CMDLINE')
+    ] + [
+      line_tmpl.format(*t) for t in sorted(proc_tuples)
+    ]
+  )
 
 
 @contextmanager
 def no_lingering_process_by_command(name):
   """Asserts that no process exists for a given command with a helpful error, excluding
   existing processes outside of the scope of the contextmanager."""
-  existing_processes = _matching_process_set(name)
+  before_processes = set(_safe_iter_matching_processes(name))
   yield
-  delta_processes = existing_processes.difference(_matching_process_set(name))
+  after_processes = set(_safe_iter_matching_processes(name))
+  delta_processes = after_processes.difference(before_processes)
   if delta_processes:
-    pids = [p.pid for p in delta_processes]
-    cmdlines = [''.join(p.cmdline()) for p in delta_processes]
     raise ProcessStillRunning(
-      '{} {} processes were detected at PIDS {} (cmdlines={})'
-      .format(len(delta_processes), name, pids, cmdlines)
+      '{} {} processes lingered after tests:\n{}'
+      .format(len(delta_processes), name, _make_process_table(delta_processes))
     )
