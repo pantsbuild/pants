@@ -85,6 +85,8 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     with _pipe(isatty) as (read_fd, write_fd):
       reader = NailgunStreamStdinReader(sock, os.fdopen(write_fd, 'wb'))
       with reader.running():
+        # Instruct the thin client to begin reading and sending stdin.
+        NailgunProtocol.send_start_reading_input(sock)
         yield read_fd
 
   def run(self):

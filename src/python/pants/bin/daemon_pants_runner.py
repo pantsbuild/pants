@@ -150,8 +150,6 @@ class DaemonPantsRunner(ProcessManager):
             writer.join()
             stdout.close()
             stderr.close()
-        # Instruct the thin client to begin reading and sending stdin.
-        NailgunProtocol.send_start_reading_input(sock)
         yield finalizer
 
   def _setup_sigint_handler(self):
@@ -204,7 +202,7 @@ class DaemonPantsRunner(ProcessManager):
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
     # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
-    # they can send signals (i.e. SIGINT) to all processes in the runners process group.
+    # they can send signals (e.g. SIGINT) to all processes in the runners process group.
     NailgunProtocol.send_pid(self._socket, bytes(os.getpgrp() * -1))
 
     # Setup a SIGINT signal handler.
