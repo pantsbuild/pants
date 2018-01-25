@@ -50,8 +50,8 @@ class BuildGraph(AbstractClass):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
-  class DepthAgnosticWalk(object):
-    """This is a utility class to aid in graph traversals that don't care about the depth."""
+  class NoDepPredicateWalk(object):
+    """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
     def __init__(self):
       self._worked = set()
@@ -75,12 +75,28 @@ class BuildGraph(AbstractClass):
       self._expanded.add(vertex)
       return True
 
+    def dep_predicate(self, target, dep, level):
+      return True
+
+
+  class DepthAgnosticWalk(NoDepPredicateWalk):
+    """This is a utility class to aid in graph traversals that don't care about the depth."""
+
+    def __init__(self, dep_predicate):
+      super(BuildGraph.DepthAgnosticWalk, self).__init__()
+      self._dep_predicate = dep_predicate
+
+    def dep_predicate(self, target, dep, level):
+      return self._dep_predicate(target, dep)
+
+
   class DepthAwareWalk(DepthAgnosticWalk):
     """This is a utility class to aid in graph traversals that care about the depth."""
 
-    def __init__(self):
+    def __init__(self, leveled_predicate):
       super(BuildGraph.DepthAwareWalk, self).__init__()
       self._expanded = defaultdict(set)
+      self._leveled_predicate = leveled_predicate
 
     def expand_once(self, vertex, level):
       """Returns True if this (vertex, level) pair has never been expanded, and False otherwise.
@@ -92,6 +108,10 @@ class BuildGraph(AbstractClass):
         return False
       self._expanded[vertex].add(level)
       return True
+
+    def dep_predicate(self, target, dep, level):
+      return self._leveled_predicate(dep, level)
+
 
   @staticmethod
   def closure(*vargs, **kwargs):
@@ -367,8 +387,15 @@ class BuildGraph(AbstractClass):
       raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
     # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
     # slow things down by few millis.
-    walker = self.DepthAwareWalk if leveled_predicate else self.DepthAgnosticWalk
-    walk = walker()
+
+    walk = None
+    if leveled_predicate:
+      walk = self.DepthAwareWalk(leveled_predicate)
+    elif dep_predicate:
+      walk = self.DepthAgnosticWalk(dep_predicate)
+    else:
+      walk = self.NoDepPredicateWalk()
+
     def _walk_rec(addr, level=0):
       # If we've followed an edge to this address, stop recursing.
       if not walk.expand_once(addr, level):
@@ -385,13 +412,7 @@ class BuildGraph(AbstractClass):
       for dep_address in self._target_dependencies_by_address[addr]:
         if walk.expanded_or_worked(dep_address):
           continue
-        if not dep_predicate and not leveled_predicate:
-          _walk_rec(dep_address, level + 1)
-        elif dep_predicate \
-                and dep_predicate(target, self._target_by_address[dep_address]):
-          _walk_rec(dep_address, level + 1)
-        elif leveled_predicate \
-                and leveled_predicate(self._target_by_address[dep_address], level):
+        if walk.dep_predicate(target, self._target_by_address[dep_address], level):
           _walk_rec(dep_address, level + 1)
 
       if postorder and walk.do_work_once(addr):
@@ -505,8 +526,13 @@ class BuildGraph(AbstractClass):
     ordered_closure = OrderedSet()
     # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
     # slow things down by few millis.
-    walker = self.DepthAwareWalk if leveled_predicate else self.DepthAgnosticWalk
-    walk = walker()
+    walk = None
+    if leveled_predicate:
+      walk = self.DepthAwareWalk(leveled_predicate)
+    elif dep_predicate:
+      walk = self.DepthAgnosticWalk(dep_predicate)
+    else:
+      walk = self.NoDepPredicateWalk()
     to_walk = deque((0, addr) for addr in addresses)
     while len(to_walk) > 0:
       level, address = to_walk.popleft()
@@ -519,17 +545,11 @@ class BuildGraph(AbstractClass):
         continue
       if walk.do_work_once(address):
         ordered_closure.add(target)
-      for addr in self._target_dependencies_by_address[address]:
-        if walk.expanded_or_worked(addr):
+      for dep_address in self._target_dependencies_by_address[address]:
+        if walk.expanded_or_worked(dep_address):
           continue
-        if not dep_predicate and not leveled_predicate:
-          to_walk.append((level + 1, addr))
-        elif dep_predicate \
-                and dep_predicate(target, self._target_by_address[addr]):
-          to_walk.append((level + 1, addr))
-        elif leveled_predicate \
-                and leveled_predicate(self._target_by_address[addr], level):
-          to_walk.append((level + 1, addr))
+        if walk.dep_predicate(target, self._target_by_address[dep_address], level):
+          to_walk.append((level + 1, dep_address))
     return ordered_closure
 
   @abstractmethod
