@@ -98,12 +98,6 @@ class PythonEvalTest(PythonTaskTestBase):
     compiled = python_eval.execute()
     self.assertEqual([self.a_library], compiled)
 
-  def test_skip(self):
-    self.set_options(skip=True)
-    python_eval = self._create_task(target_roots=[self.a_library], options={'transitive': False})
-    compiled = python_eval.execute()
-    self.assertIsNone(compiled)
-
   def test_compile_incremental(self):
     python_eval = self._create_task(target_roots=[self.a_library], options={'transitive': False})
     compiled = python_eval.execute()
