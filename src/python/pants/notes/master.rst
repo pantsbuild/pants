@@ -4,6 +4,78 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.5.0.dev1 (01/26/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* [pantsd] Add RunTracker stats. (#5374)
+  `PR #5374 <https://github.com/pantsbuild/pants/pull/5374>`_
+
+API Changes
+~~~~~~~~~~~
+
+* [pantsd] Bump to watchman 4.9.0-pants1. (#5386)
+  `PR #5386 <https://github.com/pantsbuild/pants/pull/5386>`_
+
+Bugfixes
+~~~~~~~~
+
+* Single resolve with coursier (#5362)
+  `Issue #743 <https://github.com/coursier/coursier/issues/743>`_
+  `PR #5362 <https://github.com/pantsbuild/pants/pull/5362>`_
+  `PR #735 <https://github.com/coursier/coursier/pull/735>`_
+
+* Repoint the 'current' symlink even for valid VTs. (#5375)
+  `PR #5375 <https://github.com/pantsbuild/pants/pull/5375>`_
+
+* Do not download node package multiple times (#5372)
+  `PR #5372 <https://github.com/pantsbuild/pants/pull/5372>`_
+
+* Fix calls to trace (#5366)
+  `Issue #5365 <https://github.com/pantsbuild/pants/issues/5365>`_
+  `PR #5366 <https://github.com/pantsbuild/pants/pull/5366>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Update the rust readme. (#5393)
+  `PR #5393 <https://github.com/pantsbuild/pants/pull/5393>`_
+
+* Update our JVM-related config and documentation. (#5370)
+  `PR #5370 <https://github.com/pantsbuild/pants/pull/5370>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Apply goal-level skip/transitive options to lint/fmt tasks. (#5383)
+  `PR #5383 <https://github.com/pantsbuild/pants/pull/5383>`_
+
+* [pantsd] StoreGCService improvements. (#5391)
+  `PR #5391 <https://github.com/pantsbuild/pants/pull/5391>`_
+
+* Remove unused field (#5390)
+  `PR #5390 <https://github.com/pantsbuild/pants/pull/5390>`_
+
+* Extract CommandRunner struct (#5377)
+  `PR #5377 <https://github.com/pantsbuild/pants/pull/5377>`_
+
+* [pantsd] Repair pantsd integration tests for execution via pantsd. (#5387)
+  `PR #5387 <https://github.com/pantsbuild/pants/pull/5387>`_
+
+* fs_util writes to remote CAS if it's present (#5378)
+  `PR #5378 <https://github.com/pantsbuild/pants/pull/5378>`_
+
+* Add back isort tests (#5380)
+  `PR #5380 <https://github.com/pantsbuild/pants/pull/5380>`_
+
+* Fix fail-fast tests. (#5371)
+  `PR #5371 <https://github.com/pantsbuild/pants/pull/5371>`_
+
+* Store can copy Digests from local to remote (#5333)
+  `PR #5333 <https://github.com/pantsbuild/pants/pull/5333>`_
+
 1.5.0.dev0 (01/22/2018)
 -----------------------
 
