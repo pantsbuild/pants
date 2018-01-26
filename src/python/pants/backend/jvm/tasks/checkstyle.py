@@ -15,10 +15,11 @@ from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import dict_with_files_option, file_option
 from pants.process.xargs import Xargs
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_open
 
 
-class Checkstyle(NailgunTask):
+class Checkstyle(LintTaskMixin, NailgunTask):
   """Check Java code for style violations.
 
   :API: public
@@ -33,8 +34,6 @@ class Checkstyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Checkstyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True,
-             help='Skip checkstyle.')
     register('--configuration', advanced=True, type=file_option, fingerprint=True,
              help='Path to the checkstyle configuration file.')
     register('--properties', advanced=True, type=dict_with_files_option, default={},
@@ -79,9 +78,7 @@ class Checkstyle(NailgunTask):
     return True
 
   def execute(self):
-    if self.get_options().skip:
-      return
-    targets = self.context.targets(self._is_checked)
+    targets = self.get_targets(self._is_checked)
     with self.invalidated(targets) as invalidation_check:
       invalid_targets = [vt.target for vt in invalidation_check.invalid_vts]
       sources = self.calculate_sources(invalid_targets)

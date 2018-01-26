@@ -22,14 +22,10 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
   @classmethod
   def register_options(cls, register):
     super(ScalaRewriteBase, cls).register_options(register)
-    register('--skip', type=bool, default=False, help='Skip running the tool.')
     register('--target-types',
              default=['scala_library', 'junit_tests', 'java_tests'],
              advanced=True, type=list,
              help='The target types to apply formatting to.')
-    register('--transitive', type=bool, default=True,
-             help='True to run the tool transitively on targets in the context, false to run '
-                  'for only roots specified on the commandline.')
 
   @memoized_property
   def _formatted_target_types(self):
@@ -45,11 +41,7 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
 
   def execute(self):
     """Runs the tool on all Scala source files that are located."""
-    if self.get_options().skip:
-      return
-
-    targets = self.context.targets() if self.get_options().transitive else self.context.target_roots
-    relevant_targets = self._get_non_synthetic_scala_targets(targets)
+    relevant_targets = self._get_non_synthetic_scala_targets(self.get_targets())
 
     if self.sideeffecting:
       # Always execute sideeffecting tasks without invalidation.

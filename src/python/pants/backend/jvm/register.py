@@ -208,7 +208,7 @@ def register_goals():
   task(name='scalastyle', action=Scalastyle, serialize=False).install('lint')
   task(name='checkstyle', action=Checkstyle, serialize=False).install('lint')
 
-  # Formating.
+  # Formatting.
   task(name='scalafmt', action=ScalaFmtFormat, serialize=False).install('fmt')
   task(name='scalafix', action=ScalaFixFix).install('fmt')
 
