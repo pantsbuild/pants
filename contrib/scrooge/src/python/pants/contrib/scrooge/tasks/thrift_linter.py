@@ -14,9 +14,9 @@ from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.option.ranked_value import RankedValue
+from pants.task.lint_task_mixin import LintTaskMixin
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
-from pants.task.lint_task_mixin import LintTaskMixin
 
 
 class ThriftLintError(Exception):
