@@ -119,8 +119,9 @@ class DaemonPantsRunner(ProcessManager):
     if all((stdin_isatty, stdout_isatty, stderr_isatty)):
       stdin_ttyname, stdout_ttyname, stderr_ttyname = NailgunProtocol.ttynames_from_env(self._env)
       assert stdin_ttyname == stdout_ttyname == stderr_ttyname, (
-        'expected all stdio ttys to be the same! '
+        'expected all stdio ttys to be the same, but instead got: {}\n'
         'please file a bug at http://github.com/pantsbuild/pants'
+        .format([stdin_ttyname, stdout_ttyname, stderr_ttyname])
       )
       with open(stdin_ttyname, 'rb+wb', 0) as tty:
         tty_fileno = tty.fileno()
