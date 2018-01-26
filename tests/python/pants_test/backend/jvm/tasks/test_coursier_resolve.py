@@ -78,45 +78,40 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEqual('default', conf)
     self.assertEqual('guava-16.0.1.jar', os.path.basename(path))
 
-    # TODO(wisechengyi): this is a valid test case for testing classifiers
-    # @ensure_cached(CoursierResolve, expected_num_artifacts=1)
-    # def test_resolve_multiple_artifacts(self):
-    #   def coordinates_for(cp):
-    #     return {resolved_jar.coordinate for conf, resolved_jar in cp}
-    #
-    #   no_classifier = JarDependency('junit', 'junit', rev='4.12')
-    #   classifier = JarDependency('junit', 'junit', rev='4.12', classifier='sources')
-    #
-    #   no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
-    #   classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier])
-    #   classifier_and_no_classifier_lib = self.make_target('//:c', JarLibrary,
-    #                                                       jars=[classifier, no_classifier])
-    #
-    #   compile_classpath = self.resolve([no_classifier_lib,
-    #                                     classifier_lib,
-    #                                     classifier_and_no_classifier_lib])
-    #
-    #   no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
-    #   classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
-    #   classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
-    #     classifier_and_no_classifier_lib.closure(bfs=True))
-    #
-    #   print('no cp', no_classifier_cp)
-    #   print('cp', classifier_cp)
-    #   print('both', classifier_and_no_classifier_cp)
-    #
-    #   classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
-    #
-    #
-    #   self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
-    #   self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
-    #
-    #   self.assertNotIn(classifier.coordinate, coordinates_for(no_classifier_cp))
-    #   self.assertIn(no_classifier.coordinate, coordinates_for(no_classifier_cp))
-    #
-    #   self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
-    #   self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
-  #
+  def test_resolve_multiple_artifacts(self):
+    def coordinates_for(cp):
+      return {resolved_jar.coordinate for conf, resolved_jar in cp}
+
+    no_classifier = JarDependency('org.apache.commons', 'commons-compress', rev='1.4.1')
+    classifier = JarDependency('org.apache.commons', 'commons-compress', rev='1.4.1', classifier='tests')
+
+    self.set_options_for_scope('coursier', fetch_options=['-A', 'jar,bundle,test-jar,maven-plugin,src,doc'])
+
+    no_classifier_lib = self.make_target('//:a', JarLibrary, jars=[no_classifier])
+    classifier_lib = self.make_target('//:b', JarLibrary, jars=[classifier])
+    classifier_and_no_classifier_lib = self.make_target('//:c', JarLibrary,
+                                                        jars=[classifier, no_classifier])
+
+    compile_classpath = self.resolve([no_classifier_lib,
+                                      classifier_lib,
+                                      classifier_and_no_classifier_lib])
+
+    no_classifier_cp = compile_classpath.get_classpath_entries_for_targets([no_classifier_lib])
+    classifier_cp = compile_classpath.get_classpath_entries_for_targets([classifier_lib])
+    classifier_and_no_classifier_cp = compile_classpath.get_classpath_entries_for_targets(
+      classifier_and_no_classifier_lib.closure(bfs=True))
+
+    classifier_and_no_classifier_coords = coordinates_for(classifier_and_no_classifier_cp)
+
+    self.assertIn(no_classifier.coordinate, classifier_and_no_classifier_coords)
+    self.assertIn(classifier.coordinate, classifier_and_no_classifier_coords)
+
+    self.assertNotIn(classifier.coordinate, coordinates_for(no_classifier_cp))
+    self.assertIn(no_classifier.coordinate, coordinates_for(no_classifier_cp))
+
+    self.assertNotIn(no_classifier.coordinate, coordinates_for(classifier_cp))
+    self.assertIn(classifier.coordinate, coordinates_for(classifier_cp))
+
   def test_excludes_in_java_lib_excludes_all_from_jar_lib(self):
     junit_jar_lib = self._make_junit_target()
 

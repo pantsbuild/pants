@@ -192,7 +192,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='The number of workers to use for the filesystem event service executor pool.')
 
     # Watchman options.
-    register('--watchman-version', advanced=True, default='4.9.0', help='Watchman version.')
+    register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')
     register('--watchman-supportdir', advanced=True, default='bin/watchman',
              help='Find watchman binaries under this dir. Used as part of the path to lookup '
                   'the binary with --binary-util-baseurls and --pants-bootstrapdir.')

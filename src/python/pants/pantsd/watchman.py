@@ -51,6 +51,7 @@ class Watchman(ProcessManager):
 
     self._state_file = os.path.join(self._watchman_work_dir, '{}.state'.format(self.name))
     self._log_file = os.path.join(self._watchman_work_dir, '{}.log'.format(self.name))
+    self._pid_file = os.path.join(self._watchman_work_dir, '{}.pid'.format(self.name))
     self._sock_file = socket_path_override or os.path.join(self._watchman_work_dir,
                                                            '{}.sock'.format(self.name))
 
@@ -83,10 +84,12 @@ class Watchman(ProcessManager):
     # Initialize watchman with an empty, but valid statefile so it doesn't complain on startup.
     safe_file_dump(self._state_file, '{}')
 
-  def _construct_cmd(self, cmd_parts, state_file, sock_file, log_file, log_level):
+  def _construct_cmd(self, cmd_parts, state_file, sock_file, pid_file, log_file, log_level):
     return [part for part in cmd_parts] + ['--no-save-state',
+                                           '--no-site-spawner',
                                            '--statefile={}'.format(state_file),
                                            '--sockname={}'.format(sock_file),
+                                           '--pidfile={}'.format(pid_file),
                                            '--logfile={}'.format(log_file),
                                            '--log-level', log_level]
 
@@ -111,6 +114,7 @@ class Watchman(ProcessManager):
     cmd = self._construct_cmd((self._watchman_path, 'get-pid'),
                               state_file=self._state_file,
                               sock_file=self._sock_file,
+                              pid_file=self._pid_file,
                               log_file=self._log_file,
                               log_level=str(self._log_level))
     self._logger.debug('watchman cmd is: {}'.format(' '.join(cmd)))

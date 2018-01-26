@@ -53,8 +53,6 @@ logger = logging.getLogger(__name__)
 class BaseZincCompile(JvmCompile):
   """An abstract base class for zinc compilation tasks."""
 
-  _supports_concurrent_execution = True
-
   _name = 'zinc'
 
   @staticmethod

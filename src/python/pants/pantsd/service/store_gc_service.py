@@ -12,10 +12,6 @@ import time
 from pants.pantsd.service.pants_service import PantsService
 
 
-_LEASE_EXTENSION_INTERVAL_SECONDS = 30 * 60
-_GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
-
-
 class StoreGCService(PantsService):
   """Store Garbage Collection Service.
 
@@ -23,50 +19,49 @@ class StoreGCService(PantsService):
   performs occasional garbage collection to bound the size of the engine's Store.
   """
 
+  _LEASE_EXTENSION_INTERVAL_SECONDS = 30 * 60
+  _GARBAGE_COLLECTION_INTERVAL_SECONDS = 4 * 60 * 60
+
   def __init__(self, scheduler):
     super(StoreGCService, self).__init__()
     self._scheduler = scheduler
     self._logger = logging.getLogger(__name__)
-    self._lease_extension_thread = None
-    self._garbage_collection_thread = None
 
-  def setup(self, lifecycle_lock, fork_lock):
-    super(StoreGCService, self).setup(lifecycle_lock, fork_lock)
+  @staticmethod
+  def _launch_thread(f):
+    t = threading.Thread(target=f)
+    t.daemon = True
+    t.start()
+    return t
 
   def _extend_lease(self):
-    while True:
-      self._logger.debug("Extending leases")
-      # Grab the fork lock to ensure this thread isn't cloned by a fork while holding the graph
-      # lock.
-      self.fork_lock.acquire()
-      try:
+    while 1:
+      # Use the fork lock to ensure this thread isn't cloned via fork while holding the graph lock.
+      with self.fork_lock:
+        self._logger.debug('Extending leases')
         self._scheduler.lease_files_in_graph()
-      finally:
-        self.fork_lock.release()
-        self._logger.debug("Done extending leases")
-      time.sleep(_LEASE_EXTENSION_INTERVAL_SECONDS)
+        self._logger.debug('Done extending leases')
+      time.sleep(self._LEASE_EXTENSION_INTERVAL_SECONDS)
 
   def _garbage_collect(self):
-    while True:
-      time.sleep(_GARBAGE_COLLECTION_INTERVAL_SECONDS)
+    while 1:
+      time.sleep(self._GARBAGE_COLLECTION_INTERVAL_SECONDS)
       # Grab the fork lock in case lmdb internally isn't fork-without-exec-safe.
-      self.fork_lock.acquire()
-      try:
-        self._logger.debug("Garbage collecting store")
+      with self.fork_lock:
+        self._logger.debug('Garbage collecting store')
         self._scheduler.garbage_collect_store()
-      finally:
-        self.fork_lock.release()
-        self._logger.debug("Done garbage collecting store")
+        self._logger.debug('Done garbage collecting store')
 
   def run(self):
     """Main service entrypoint. Called via Thread.start() via PantsDaemon.run()."""
-    self._lease_extension_thread = threading.Thread(target=self._extend_lease)
-    self._lease_extension_thread.daemon = False
-    self._lease_extension_thread.start()
-
-    self._garbage_collection_thread = threading.Thread(target=self._garbage_collect)
-    self._garbage_collection_thread.daemon = False
-    self._garbage_collection_thread.start()
+    jobs = (self._extend_lease, self._garbage_collect)
+    threads = [self._launch_thread(job) for job in jobs]
 
     while not self.is_killed:
-      time.sleep(1)
+      for thread in threads:
+        # If any job threads die, we want to exit the `PantsService` thread to cause
+        # a daemon teardown.
+        if not thread.isAlive():
+          self._logger.warn('thread {} died - aborting!'.format(thread))
+          return
+        thread.join(.1)
