@@ -1,24 +1,16 @@
 A native-code implementation of the pants v2 engine. See:
 
-    https://docs.google.com/document/d/1C64MreDeVoZAl3HrqtWUVE-qnj3MyWW0NQ52xeWw/edit
+    https://docs.google.com/document/d/1C64MreDeVoZAl3HrqtWUVE-qnj3MyWW0NQ52xejjaWw/edit?usp=sharing
 
-To build for development, run:
+To build for development, simply run pants from the root of the repo:
 
-    cargo build
+    ./pants list 3rdparty::
 
-To run tests for any particular crate, cd into it and run:
+If you plan to iterate on changes to the rust code, it is recommended to set `MODE=debug`, which
+will compile the engine more quickly, but result in a much slower binary:
 
-    cargo test
+    MODE=debug ./pants list 3rdparty::
 
-Or to run tests for all crates, run:
+To run tests for all crates, run:
 
     ./run-all-tests.sh
-
-To build for release, and enable optimization:
-
-    cargo build --release
-
-For development purposes, it's usually fastest to then place the resulting shared library directly
-where `binary_utils` would fetch them to (TODO: expand before commit):
-
-    cp target/release/libengine.dylib ~/.cache/pants/dylib/native-engine/mac/10.11/0.0.1/native-engine
