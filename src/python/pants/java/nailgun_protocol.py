@@ -11,6 +11,9 @@ import struct
 import six
 
 
+STDIO_DESCRIPTORS = (0, 1, 2)
+
+
 class ChunkType(object):
   """Nailgun protocol chunk types.
 
@@ -240,7 +243,7 @@ class NailgunProtocol(object):
     :returns: A dict containing the tty capability environment variables.
     """
     def gen_env_vars():
-      for fd_id, fd in enumerate((stdin, stdout, stderr)):
+      for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
         is_atty = fd.isatty()
         yield (cls.TTY_ENV_TMPL.format(fd_id), bytes(int(is_atty)))
         if is_atty:
@@ -257,7 +260,9 @@ class NailgunProtocol(object):
     def str_int_bool(i):
       return i.isdigit() and bool(int(i))  # Environment variable values should always be strings.
 
-    return tuple(str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), '0')) for fd_id in range(3))
+    return tuple(
+      str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), '0')) for fd_id in STDIO_DESCRIPTORS
+    )
 
   @classmethod
   def ttynames_from_env(cls, env):
@@ -266,4 +271,4 @@ class NailgunProtocol(object):
     :param dict env: A dictionary representing the environment.
     :returns: A tuple of boolean values indicating ttyname paths or None for (stdin, stdout, stderr).
     """
-    return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in range(3))
+    return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
