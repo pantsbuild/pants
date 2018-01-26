@@ -24,8 +24,6 @@ class ThriftLintError(Exception):
 
 
 class ThriftLinterBase(NailgunTask):
-  """Print linter warnings for thrift files."""
-
   @staticmethod
   def _is_thrift(target):
     return isinstance(target, JavaThriftLibrary)
@@ -137,6 +135,8 @@ class ThriftLinterBase(NailgunTask):
 
 
 class DeprecatedThriftLinter(ThriftLinterBase):
+  """Print lint warnings for thrift files."""
+  
   @classmethod
   def register_options(cls, register):
     super(DeprecatedThriftLinter, cls).register_options(register)
@@ -151,6 +151,8 @@ class DeprecatedThriftLinter(ThriftLinterBase):
 
 
 # TODO: After removing DeprecatedThriftLinter, merge this with ThriftLinterBase
-# (i.e., mix LintTaskMixin into ThriftLinterBase and rename it to ThriftLinter).
+# (i.e., mix LintTaskMixin into ThriftLinterBase, copy the docstring,
+# and rename ThriftLinterBase to ThriftLinter).
 class ThriftLinter(LintTaskMixin, ThriftLinterBase):
+  """Print lint warnings for thrift files."""
   pass
