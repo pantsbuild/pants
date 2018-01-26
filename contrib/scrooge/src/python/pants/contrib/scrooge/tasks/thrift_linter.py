@@ -9,19 +9,21 @@ import multiprocessing
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work, WorkerPool
 from pants.base.workunit import WorkUnitLabel
 from pants.option.ranked_value import RankedValue
 
 from pants.contrib.scrooge.tasks.thrift_util import calculate_compile_sources
+from pants.task.lint_task_mixin import LintTaskMixin
 
 
 class ThriftLintError(Exception):
   """Raised on a lint failure."""
 
 
-class ThriftLinter(NailgunTask):
+class ThriftLinterBase(NailgunTask):
   """Print linter warnings for thrift files."""
 
   @staticmethod
@@ -30,8 +32,7 @@ class ThriftLinter(NailgunTask):
 
   @classmethod
   def register_options(cls, register):
-    super(ThriftLinter, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip thrift linting.')
+    super(ThriftLinterBase, cls).register_options(register)
     register('--strict', type=bool, fingerprint=True,
              help='Fail the goal if thrift linter errors are found. Overrides the '
                   '`strict-default` option.')
@@ -105,10 +106,7 @@ class ThriftLinter(NailgunTask):
         'Lint errors in target {0} for {1}.'.format(target.address.spec, paths))
 
   def execute(self):
-    if self.get_options().skip:
-      return
-
-    thrift_targets = self.context.targets(self._is_thrift)
+    thrift_targets = self.get_targets(self._is_thrift)
     with self.invalidated(thrift_targets) as invalidation_check:
       if not invalidation_check.invalid_vts:
         return
@@ -136,3 +134,23 @@ class ThriftLinter(NailgunTask):
 
         if errors:
           raise TaskError('\n'.join(errors))
+
+
+class DeprecatedThriftLinter(ThriftLinterBase):
+  @classmethod
+  def register_options(cls, register):
+    super(DeprecatedThriftLinter, cls).register_options(register)
+    register('--skip', type=bool, fingerprint=True, help='Skip thrift linting.')
+
+  def execute(self):
+    deprecated_conditional(
+      lambda: True, removal_version='1.7.0.dev0',
+      entity_description='The thrift-linter goal',
+      hint_message='Use the lint goal and the lint.thrift options scope instead.')
+    super(DeprecatedThriftLinter, self).execute()
+
+
+# TODO: After removing DeprecatedThriftLinter, merge this with ThriftLinterBase
+# (i.e., mix LintTaskMixin into ThriftLinterBase and rename it to ThriftLinter).
+class ThriftLinter(LintTaskMixin, ThriftLinterBase):
+  pass
