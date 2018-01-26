@@ -9,6 +9,7 @@ pub struct Types {
   pub construct_dir: Function,
   pub construct_file: Function,
   pub construct_link: Function,
+  pub construct_process_result: Function,
   pub address: TypeConstraint,
   pub has_products: TypeConstraint,
   pub has_variants: TypeConstraint,
@@ -19,6 +20,8 @@ pub struct Types {
   pub dir: TypeConstraint,
   pub file: TypeConstraint,
   pub link: TypeConstraint,
+  pub process_request: TypeConstraint,
+  pub process_result: TypeConstraint,
   pub string: TypeId,
   pub bytes: TypeId,
 }

@@ -8,8 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.task.fmt_task_mixin import FmtTaskMixin
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
 
@@ -17,7 +20,7 @@ from pants.contrib.node.targets.node_package import NodePackage
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class JavascriptStyle(NodeTask):
+class JavascriptStyleBase(NodeTask):
   """ Check javascript source files to ensure they follow the style guidelines.
 
   :API: public
@@ -27,20 +30,18 @@ class JavascriptStyle(NodeTask):
   _JSX_SOURCE_EXTENSION = '.jsx'
   INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = 'synthetic-install-javascriptstyle-module'
 
-  def __init__(self, *args, **kwargs):
-    super(JavascriptStyle, self).__init__(*args, **kwargs)
-
   @classmethod
   def register_options(cls, register):
-    super(JavascriptStyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip javascriptstyle.')
+    super(JavascriptStyleBase, cls).register_options(register)
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--javascriptstyle-dir', advanced=True, fingerprint=True,
              help='Package directory for lint tool.')
-    register('--transitive', type=bool, default=True,
-             help='True to run the tool transitively on targets in the context, false to run '
-                  'for only roots specified on the commandline.')
+
+  @property
+  def fix(self):
+    """Whether to fix discovered style errors."""
+    raise NotImplementedError()
 
   def get_lintable_node_targets(self, targets):
     return filter(
@@ -57,12 +58,12 @@ class JavascriptStyle(NodeTask):
                        source.endswith(self._JSX_SOURCE_EXTENSION)))
     return sources
 
-  def _is_javascriptstyle_dir_valid(self, javascriptstyle_dir):
+  @staticmethod
+  def _is_javascriptstyle_dir_valid(javascriptstyle_dir):
     dir_exists = os.path.isdir(javascriptstyle_dir)
     if not dir_exists:
       raise TaskError(
         'javascriptstyle package does not exist: {}.'.format(javascriptstyle_dir))
-      return False
     else:
       lock_file = os.path.join(javascriptstyle_dir, 'yarn.lock')
       package_json = os.path.join(javascriptstyle_dir, 'package.json')
@@ -71,7 +72,6 @@ class JavascriptStyle(NodeTask):
         raise TaskError(
           'javascriptstyle cannot be installed because yarn.lock '
           'or package.json does not exist.')
-        return False
     return True
 
   @memoized_method
@@ -87,9 +87,9 @@ class JavascriptStyle(NodeTask):
     javascriptstyle_bin_path = os.path.join(javascriptstyle_dir, 'bin', 'cli.js')
     return javascriptstyle_bin_path
 
-  def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=False):
+  def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files):
     args = [javascriptstyle_bin_path]
-    if fix:
+    if self.fix:
       self.context.log.info('Autoformatting is enabled for javascriptstyle.')
       args.extend(['--fix'])
     args.extend(files)
@@ -103,12 +103,7 @@ class JavascriptStyle(NodeTask):
     return result
 
   def execute(self):
-    if self.get_options().skip:
-      self.context.log.info('Skipping javascript style check.')
-      return
-
-    all_targets = self.context.targets() if self.get_options().transitive else self.context.target_roots
-    targets = self.get_lintable_node_targets(all_targets)
+    targets = self.get_lintable_node_targets(self.get_targets())
     if not targets:
       return
     failed_targets = []
@@ -127,7 +122,9 @@ class JavascriptStyle(NodeTask):
     javascriptstyle_dir = self.get_options().javascriptstyle_dir
     if not (javascriptstyle_dir and self._is_javascriptstyle_dir_valid(javascriptstyle_dir)):
       self.context.log.warn('javascriptstyle is not configured, skipping javascript style check.')
-      self.context.log.warn('See https://github.com/pantsbuild/pants/tree/master/build-support/javascriptstyle/README.md')
+      self.context.log.warn(
+        'See https://github.com/pantsbuild/pants/tree/master/build-support/'
+        'javascriptstyle/README.md')
       return
 
     javascriptstyle_bin_path = self._install_javascriptstyle(javascriptstyle_dir)
@@ -146,14 +143,24 @@ class JavascriptStyle(NodeTask):
     return
 
 
-class JavascriptStyleFmt(JavascriptStyle):
+class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
+  """Check source files to ensure they follow the style guidelines.
+
+  :API: public
+  """
+  fix = False
+
+
+class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   """Check and fix source files to ensure they follow the style guidelines.
 
   :API: public
   """
+  fix = True
 
-  def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=True):
-    return super(JavascriptStyleFmt, self)._run_javascriptstyle(target,
-                                                                javascriptstyle_bin_path,
-                                                                files,
-                                                                fix=fix)
+
+# Deprecated old name for class.
+class JavascriptStyle(JavascriptStyleLint):
+  @deprecated('1.7.0.dev0', 'Replace with JavascriptStyleLint.')
+  def __init__(self, *args, **kwargs):
+    super(JavascriptStyle, self).__init__(*args, **kwargs)

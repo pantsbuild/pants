@@ -50,7 +50,7 @@ function usage() {
 
 bootstrap_compile_args=(
   lint.python-eval
-  --closure
+  --transitive
 )
 
 # No python test sharding (1 shard) by default.

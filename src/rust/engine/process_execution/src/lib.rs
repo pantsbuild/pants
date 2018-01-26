@@ -1,4 +1,6 @@
 extern crate bazel_protos;
+#[cfg(test)]
+extern crate bytes;
 extern crate digest;
 extern crate grpcio;
 #[cfg(test)]

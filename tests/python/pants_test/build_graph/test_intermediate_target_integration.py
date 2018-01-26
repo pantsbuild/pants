@@ -6,12 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.build_graph.intermediate_target_factory import hash_target
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
 
-  @ensure_engine
   def test_scoped(self):
     test_path = 'testprojects/src/java/org/pantsbuild/testproject/runtime'
     scoped_address = '3rdparty:gson'
@@ -29,7 +28,6 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
       stdout_list
     )
 
-  @ensure_engine
   def test_intransitive(self):
     test_path = 'testprojects/src/java/org/pantsbuild/testproject/intransitive'
     stdout_list = self.run_pants(['-q', 'list', '{}:'.format(test_path)]).stdout_data.strip().split()
@@ -48,7 +46,6 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
       stdout_list
     )
 
-  @ensure_engine
   def test_provided(self):
     test_path = 'testprojects/maven_layout/provided_patching'
     stdout_list = self.run_pants(['-q', 'list', '{}::'.format(test_path)]).stdout_data.strip().split()
@@ -78,7 +75,6 @@ class IntermediateTargetIntegrationTest(PantsRunIntegrationTest):
       stdout_list
     )
 
-  @ensure_engine
   def test_no_redundant_target(self):
     # TODO: Create another BUILD.other file with same provided scope,
     # once we resolve https://github.com/pantsbuild/pants/issues/3933

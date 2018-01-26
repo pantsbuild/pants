@@ -6,7 +6,6 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/confluence/src/python/pants/contrib/confluence/targets',
     'contrib/confluence/src/python/pants/contrib/confluence/tasks',
     'contrib/confluence/src/python/pants/contrib/confluence/util',
     'src/python/pants/build_graph',
@@ -14,5 +13,4 @@ contrib_plugin(
   distribution_name='pantsbuild.pants.contrib.confluence',
   description='Confluence pants plugin',
   register_goals=True,
-  build_file_aliases=True,
 )

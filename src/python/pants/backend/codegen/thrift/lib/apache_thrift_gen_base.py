@@ -40,10 +40,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
              help='Run thrift compiler with strict warnings.')
     # The old --gen-options was string-typed, so we keep it that way for backwards compatibility,
     # and reluctantly use the clunky name --gen-options-map for the new, map-typed options.
-    # TODO: Once --gen-options is gone, do a deprecation cycle to restore the old name.
-    register('--gen-options', advanced=True, fingerprint=True,
-             removal_version='1.5.0.dev0', removal_hint='Use --gen-options-map instead',
-             help='Use these options for the {} generator.'.format(cls.thrift_generator))
+    # TODO: Do a deprecation cycle to restore the old name.
     register('--gen-options-map', type=dict, advanced=True, fingerprint=True,
              default=cls.default_gen_options_map,
              help='Use these options for the {} generator.'.format(cls.thrift_generator))
@@ -126,8 +123,6 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
     gen_opts_map = self.get_options().gen_options_map or {}
     gen_opts = [opt_str(item) for item in gen_opts_map.items()]
-    if self.get_options().gen_options:  # Add the deprecated, old options.
-      gen_opts.append(self.get_options().gen_options)
 
     generator_spec = ('{}:{}'.format(self.thrift_generator, ','.join(gen_opts)) if gen_opts
                       else self.thrift_generator)

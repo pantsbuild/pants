@@ -69,6 +69,7 @@ class TestWatchman(BaseTest):
     output = self.watchman._construct_cmd(['cmd', 'parts', 'etc'],
                                           'state_file',
                                           'sock_file',
+                                          'pid_file',
                                           'log_file',
                                           'log_level')
 
@@ -76,8 +77,10 @@ class TestWatchman(BaseTest):
                                'parts',
                                'etc',
                                '--no-save-state',
+                               '--no-site-spawner',
                                '--statefile=state_file',
                                '--sockname=sock_file',
+                               '--pidfile=pid_file',
                                '--logfile=log_file',
                                '--log-level',
                                'log_level'])

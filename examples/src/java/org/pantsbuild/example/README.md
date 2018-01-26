@@ -218,7 +218,7 @@ classes for each JVM-based operation. Things go faster.
 Pants uses Zinc, a dependency tracking compiler facade that supports sub-target incremental
 compilation for Java and Scala.
 
-Java7 vs Java6, Which Java
+Java9 vs Java8, Which Java
 --------------------------
 
 Pants first looks through any JDKs specified by the `paths` map in pants.ini's jvm-distributions
@@ -228,11 +228,11 @@ section, eg:
     [jvm-distributions]
     paths = {
         'macos': [
-          '/Library/Java/JavaVirtualMachines/jdk1.7.0_79.jdk',
+          '/Library/Java/JavaVirtualMachines/jdk-9.0.4.jdk',
           '/Library/Java/JavaVirtualMachines/jdk1.8.0_45.jdk',
         ],
         'linux': [
-          '/usr/java/jdk1.7.0_80',
+          '/usr/java/jdk1.8.0_152',
         ]
       }
 
@@ -241,18 +241,18 @@ or `PATH`. If no `paths` are specified in pants.ini, you can use JDK_HOME to set
 for just one pants invocation:
 
     :::bash
-    $ JDK_HOME=/usr/lib/jvm/java-1.7.0-openjdk-amd64 ./pants ...
+    $ JDK_HOME=/usr/lib/jvm/java-1.8.0-openjdk-amd64 ./pants ...
 
-If you sometimes need to compile some code in Java 6 and sometimes Java 7, you can define
+If you sometimes need to compile some code in Java 8 and sometimes Java 9, you can define
 jvm-platforms in pants.ini, and set what targets use which platforms. For example, in pants.ini:
 
     :::ini
     [jvm-platform]
-    default_platform: java6
+    default_platform: java8
     platforms: {
-        'java6': {'source': '6', 'target': '6', 'args': [] },
         'java7': {'source': '7', 'target': '7', 'args': [] },
         'java8': {'source': '8', 'target': '8', 'args': [] },
+        java9': {'source': '9', 'target': '9', 'args': [] },
       }
 
 And then in a BUILD file:
@@ -260,13 +260,13 @@ And then in a BUILD file:
     :::python
     java_library(name='my-library',
       sources=globs('*.java'),
-      platform='java7',
+      platform='java8',
     )
 
 You can also override these on the cli:
 
     :::bash
-    ./pants compile --jvm-platform-default-platform=java8 examples/src/java/org/pantsbuild/example/hello/main
+    ./pants compile --jvm-platform-default-platform=java9 examples/src/java/org/pantsbuild/example/hello/main
 
 If you want to set the `-bootclasspath` (or `-Xbootclasspath`) to use the
 appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
@@ -274,7 +274,7 @@ appropriate java distribution, you can use the `$JAVA_HOME` symbol in the
 
     :::ini
     [jvm-platform]
-    default_platform: java6
+    default_platform: java8
     platforms: {
         'java7': {'source': '7', 'target': '7', 'args': ["-C-bootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"] },
       }

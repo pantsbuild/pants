@@ -14,14 +14,15 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks2.pex_build_util import (dump_requirements, dump_sources,
-                                                        has_python_requirements, has_python_sources)
-from pants.backend.python.tasks2.python_execution_task_base import WrappedPEX
-from pants.backend.python.tasks2.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_sources,
+                                                       has_python_requirements, has_python_sources)
+from pants.backend.python.tasks.python_execution_task_base import WrappedPEX
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.python.python_repos import PythonRepos
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import safe_concurrent_creation, safe_mkdir
 from pants.util.memo import memoized_property
 from pex.pex import PEX
@@ -29,7 +30,7 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 
-class PythonEval(ResolveRequirementsTaskBase):
+class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
   class Error(TaskError):
     """A richer failure exception type useful for tests."""
 
@@ -56,30 +57,36 @@ class PythonEval(ResolveRequirementsTaskBase):
   def _is_evalable(target):
     return isinstance(target, (PythonLibrary, PythonBinary))
 
-  deprecated_options_scope = 'compile.python-eval'
-  deprecated_options_scope_removal_version = '1.5.0.dev0'
-
   @classmethod
   def register_options(cls, register):
     super(PythonEval, cls).register_options(register)
-    register('--skip', type=bool,
-             help='If enabled, skip eval of python targets.')
     register('--fail-slow', type=bool,
              help='Compile all targets and present the full list of errors.')
     register('--closure', type=bool,
+             removal_version='1.7.0.dev0', removal_hint='Use --transitive instead.',
              help='Eval all targets in the closure individually instead of just the targets '
                   'specified on the command line.')
 
   def execute(self):
-    if self.get_options().skip:
-      return
-
-    targets = self.context.targets() if self.get_options().closure else self.context.target_roots
-    with self.invalidated(filter(self._is_evalable, targets),
+    # The default for --closure is False, while the default for --transitive is True, so we
+    # can't just OR the two values, and have to explicitly detect when --transitive is not
+    # explicitly specified.
+    if self.get_options().is_default('transitive'):
+      if self.get_options().skip:
+        targets = []
+      else:
+        targets = (self.context.targets(self._is_evalable) if self.get_options().closure
+                   else filter(self._is_evalable, self.context.target_roots))
+    else:
+      # TODO(benjy): After removing --closure, targets should always be set to this, and the
+      # entire other branch of this if statement (and the if statement itself) should be removed.
+      targets = self.get_targets(self._is_evalable)
+    with self.invalidated(targets,
                           invalidate_dependents=True,
                           topological_order=True) as invalidation_check:
       compiled = self._compile_targets(invalidation_check.invalid_vts)
       return compiled  # Collected and returned for tests
+      # TODO: BAD! Find another way to detect task action in tests.
 
   @memoized_property
   def _interpreter_cache(self):

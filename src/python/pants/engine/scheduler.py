@@ -15,7 +15,8 @@ from pants.base.project_tree import Dir, File, Link
 from pants.build_graph.address import Address
 from pants.engine.addressable import SubclassesOf
 from pants.engine.fs import FileContent, FilesContent, Path, PathGlobs, Snapshot
-from pants.engine.isolated_process import _Snapshots, create_snapshot_rules
+from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcessResult, _Snapshots,
+                                           create_snapshot_rules)
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
@@ -97,6 +98,7 @@ class WrappedNativeScheduler(object):
       Dir,
       File,
       Link,
+      ExecuteProcessResult,
       has_products_constraint,
       constraint_for(Address),
       constraint_for(Variants),
@@ -107,6 +109,8 @@ class WrappedNativeScheduler(object):
       constraint_for(Dir),
       constraint_for(File),
       constraint_for(Link),
+      constraint_for(ExecuteProcessRequest),
+      constraint_for(ExecuteProcessResult),
     )
 
   def _root_type_ids(self):
@@ -291,6 +295,12 @@ class WrappedNativeScheduler(object):
     finally:
       self._native.lib.nodes_destroy(raw_roots)
     return roots
+
+  def lease_files_in_graph(self):
+    self._native.lib.lease_files_in_graph(self._scheduler)
+
+  def garbage_collect_store(self):
+    self._native.lib.garbage_collect_store(self._scheduler)
 
 
 class LocalScheduler(object):
@@ -499,3 +509,9 @@ class LocalScheduler(object):
     :returns: A list of the requested products, with length match len(subjects).
     """
     return self.products_request([product], subjects)[product]
+
+  def lease_files_in_graph(self):
+    self._scheduler.lease_files_in_graph()
+
+  def garbage_collect_store(self):
+    self._scheduler.garbage_collect_store()

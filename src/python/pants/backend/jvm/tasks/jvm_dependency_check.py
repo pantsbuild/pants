@@ -10,6 +10,7 @@ from collections import defaultdict
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jvm_dependency_analyzer import JvmDependencyAnalyzer
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
@@ -51,7 +52,7 @@ class JvmDependencyCheck(Task):
                   'legitimately have BUILD dependencies that are unused in practice.')
 
   @classmethod
-  def skip(cls, options):
+  def _skip(cls, options):
     """Return true if the task should be entirely skipped, and thus have no product requirements."""
     values = [options.missing_deps, options.missing_direct_deps, options.unnecessary_deps]
     return all(v == 'off' for v in values)
@@ -59,7 +60,7 @@ class JvmDependencyCheck(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     super(JvmDependencyCheck, cls).prepare(options, round_manager)
-    if not cls.skip(options):
+    if not cls._skip(options):
       round_manager.require_data('runtime_classpath')
       round_manager.require_data('product_deps_by_src')
 
@@ -81,7 +82,7 @@ class JvmDependencyCheck(Task):
     return True
 
   def execute(self):
-    if self.skip(self.get_options()):
+    if self._skip(self.get_options()):
       return
     with self.invalidated(self.context.targets(),
                           invalidate_dependents=True) as invalidation_check:
@@ -190,7 +191,7 @@ class JvmDependencyCheck(Task):
 
       if target in targets:
         return True
-      elif target.is_scala:
+      elif isinstance(target, ScalaLibrary):
         return any(t in targets for t in target.java_sources)
       else:
         return False

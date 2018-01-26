@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.payload import Payload
 from pants.base.payload_field import PrimitiveField
@@ -44,7 +43,7 @@ class PrepCommand(Target):
     return PrepCommand._goals
 
   def __init__(self, address=None, payload=None, prep_executable=None, prep_args=None,
-               prep_environ=False, goal=None, goals=None, **kwargs):
+               prep_environ=False, goals=None, **kwargs):
     """
     :API: public
 
@@ -54,8 +53,6 @@ class PrepCommand(Target):
       a \\\\0-separated list of key=value pairs to insert into the environment.
       Note that this will pollute the environment for all future tests, so
       avoid it if at all possible.
-    :param goal: (deprecated) Pants goal to run this command in [test, binary or compile]. If not
-      specified, runs in the 'test' goal.
     :param goals: One or more pants goals to run this command in [test, binary or compile]. If not
       specified, runs in the 'test' goal.
     """
@@ -64,14 +61,9 @@ class PrepCommand(Target):
 
     if not prep_executable:
       raise_bad_target('prep_executable must be specified.')
-    if goal and goals:
-      raise_bad_target('Either `goal` or `goals` (preferred) should be specified, but not both.')
 
     if goals:
       goals = sorted(goals)
-    elif goal:
-      warn_or_error('1.5.0.dev0', 'goal', hint='Use `goals=[{!r}]` instead.'.format(goal))
-      goals = [goal]
     else:
       goals = ['test']
 

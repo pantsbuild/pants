@@ -79,7 +79,7 @@ class InstallableTool(Tool):
     tarball_filepath = self._binary_util.select_binary(
       supportdir=self._supportdir, version=self.version, name=self._archive_filename)
     logger.debug('Tarball for %s(%s): %s', self._supportdir, self.version, tarball_filepath)
-    workdir = os.path.dirname(tarball_filepath)
+    work_dir = os.path.join(os.path.dirname(tarball_filepath), 'out')
     TGZ.extract(tarball_filepath, workdir, concurrency_safe=True)
     return os.path.join(workdir, self._relative_bin_path)
 

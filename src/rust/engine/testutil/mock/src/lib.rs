@@ -1,4 +1,5 @@
 extern crate bazel_protos;
+extern crate bytes;
 extern crate futures;
 extern crate grpcio;
 extern crate hashing;

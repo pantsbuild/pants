@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from collections import namedtuple
 
-from pants.base.deprecated import deprecated
 from pants.util.dirutil import longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -276,24 +275,10 @@ class BuildFileAddress(Address):
     super(BuildFileAddress, self).__init__(spec_path=spec_path,
                                            target_name=target_name or os.path.basename(spec_path))
     self.rel_path = rel_path
-    self._build_file = build_file
 
   def to_address(self):
     """Convert this BuildFileAddress to an Address."""
     return Address(spec_path=self.spec_path, target_name=self.target_name)
-
-  @property
-  @deprecated('1.5.0.dev0',
-              hint_message='Use `BuildFileAddress.rel_path` to access the relative path to the '
-                           'BUILD file for a target.')
-  def build_file(self):
-    """The build file that contains the object this address points to.
-
-    :API: public
-
-    :rtype: :class:`pants.base.build_file.BuildFile`
-    """
-    return self._build_file
 
   def __repr__(self):
     return ('BuildFileAddress({rel_path}, {target_name})'

@@ -20,8 +20,6 @@ from pants.binaries.thrift_binary import ThriftBinary
 # to have a BUILD file entry for the default spec to point to.
 class ApacheThriftJavaGen(ApacheThriftGenBase):
   """Generate Java source files from thrift IDL files."""
-  deprecated_options_scope = 'gen.thrift'  # New scope is gen.thrift-java.
-  deprecated_options_scope_removal_version = '1.5.0.dev0'
 
   gentarget_type = JavaThriftLibrary
   thrift_generator = 'java'

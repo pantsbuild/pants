@@ -13,18 +13,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'aapt_builder_integration',
-  sources = [
-    'test_aapt_builder_integration.py',
-  ],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'aapt_gen',
   sources = [
     'test_aapt_gen.py',
@@ -33,18 +21,6 @@ python_tests(
     'contrib/android/src/python/pants/contrib/android/tasks:all',
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
   ],
-)
-
-python_tests(
-  name = 'aapt_gen_integration',
-  sources = [
-    'test_aapt_gen_integration.py',
-  ],
-  dependencies = [
-    'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-    'src/python/pants/util:contextutil',
-  ],
-  tags = {'integration'},
 )
 
 python_tests(
@@ -74,17 +50,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'dx_compile_integration',
-  sources = [
-    'test_dx_compile_integration.py',
-  ],
-  dependencies = [
-    'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'sign_apk',
   sources = [
     'test_sign_apk.py',
@@ -95,17 +60,6 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/util:contextutil',
   ],
-)
-
-python_tests(
-  name = 'sign_apk_integration',
-  sources = [
-    'test_sign_apk_integration.py',
-  ],
-  dependencies = [
-    'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-  ],
-  tags = {'integration'},
 )
 
 python_tests(
@@ -127,17 +81,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'unpack_libraries_integration',
-  sources = [
-    'test_unpack_libraries_integration.py',
-  ],
-  dependencies = [
-    'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'zipalign',
   sources = [
     'test_zipalign.py',
@@ -147,15 +90,4 @@ python_tests(
     'contrib/android/tests/python/pants_test/contrib/android:android_base',
     'src/python/pants/util:contextutil',
   ],
-)
-
-python_tests(
-  name = 'zipalign_integration',
-  sources = [
-    'test_zipalign_integration.py',
-  ],
-  dependencies = [
-    'contrib/android/tests/python/pants_test/contrib/android:android_integration_test',
-  ],
-  tags = {'integration'},
 )
