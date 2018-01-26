@@ -101,6 +101,11 @@ def stdio_as(stdout_fd, stderr_fd, stdin_fd):
 
 @contextmanager
 def signal_handler_as(sig, handler):
+  """Temporarily replaces a signal handler for the given signal and restores the old handler.
+
+  :param int sig: The target signal to replace the handler for (e.g. signal.SIGINT).
+  :param func handler: The new temporary handler.
+  """
   old_handler = signal.signal(sig, handler)
   try:
     yield
