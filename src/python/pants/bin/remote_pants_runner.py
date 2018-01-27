@@ -10,6 +10,7 @@ import signal
 import sys
 from contextlib import contextmanager
 
+from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
 from pants.pantsd.pants_daemon import PantsDaemon
@@ -102,7 +103,7 @@ class RemotePantsRunner(object):
                            err=self._stderr,
                            exit_on_broken_pipe=True)
 
-    with self._trapped_signals(client):
+    with self._trapped_signals(client), STTYSettings.preserved():
       # Execute the command on the pailgun.
       result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
 
