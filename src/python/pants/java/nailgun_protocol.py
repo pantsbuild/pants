@@ -5,9 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
 import struct
 
 import six
+
+
+STDIO_DESCRIPTORS = (0, 1, 2)
 
 
 class ChunkType(object):
@@ -63,6 +67,7 @@ class NailgunProtocol(object):
 
   ENVIRON_SEP = '='
   TTY_ENV_TMPL = 'NAILGUN_TTY_{}'
+  TTY_PATH_ENV = 'NAILGUN_TTY_PATH_{}'
   HEADER_FMT = b'>Ic'
   HEADER_BYTES = 5
 
@@ -237,10 +242,13 @@ class NailgunProtocol(object):
     :param file stderr: The stream to check for stderr tty capabilities.
     :returns: A dict containing the tty capability environment variables.
     """
-    fds = (stdin, stdout, stderr)
-    return {
-      cls.TTY_ENV_TMPL.format(fd_id): bytes(int(fd.isatty())) for fd_id, fd in enumerate(fds)
-    }
+    def gen_env_vars():
+      for fd_id, fd in zip(STDIO_DESCRIPTORS, (stdin, stdout, stderr)):
+        is_atty = fd.isatty()
+        yield (cls.TTY_ENV_TMPL.format(fd_id), bytes(int(is_atty)))
+        if is_atty:
+          yield (cls.TTY_PATH_ENV.format(fd_id), os.ttyname(fd.fileno()) or '')
+    return dict(gen_env_vars())
 
   @classmethod
   def isatty_from_env(cls, env):
@@ -252,4 +260,15 @@ class NailgunProtocol(object):
     def str_int_bool(i):
       return i.isdigit() and bool(int(i))  # Environment variable values should always be strings.
 
-    return tuple(str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), '0')) for fd_id in range(3))
+    return tuple(
+      str_int_bool(env.get(cls.TTY_ENV_TMPL.format(fd_id), '0')) for fd_id in STDIO_DESCRIPTORS
+    )
+
+  @classmethod
+  def ttynames_from_env(cls, env):
+    """Determines the ttynames for remote file descriptors (if ttys).
+
+    :param dict env: A dictionary representing the environment.
+    :returns: A tuple of boolean values indicating ttyname paths or None for (stdin, stdout, stderr).
+    """
+    return tuple(env.get(cls.TTY_PATH_ENV.format(fd_id)) for fd_id in STDIO_DESCRIPTORS)
