@@ -53,8 +53,6 @@ logger = logging.getLogger(__name__)
 class BaseZincCompile(JvmCompile):
   """An abstract base class for zinc compilation tasks."""
 
-  _supports_concurrent_execution = True
-
   _name = 'zinc'
 
   @staticmethod
@@ -523,9 +521,6 @@ class ZincCompile(BaseZincCompile):
              help='Use these scalac plugins.')
     register('--scalac-plugin-args', advanced=True, type=dict, default={}, fingerprint=True,
              help='Map from scalac plugin name to list of arguments for that plugin.')
-    cls.register_jvm_tool(register, 'scalac-plugin-jars', classpath=[],
-                          removal_version='1.5.0.dev0',
-                          removal_hint='Use --compile-zinc-scalac-plugin-dep instead.')
     cls.register_jvm_tool(register, 'scalac-plugin-dep', classpath=[],
                           help='Search for scalac plugins here, as well as in any '
                                'explicit dependencies.')

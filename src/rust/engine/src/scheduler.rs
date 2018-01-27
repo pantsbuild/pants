@@ -97,7 +97,7 @@ impl Scheduler {
       .find_root_edges(subject_type.clone(), selector.clone())
       .expect(&format!(
         "Edges to have been found TODO handle this selector: {:?}, subject {:?}",
-        selector,
+        rule_graph::selector_str(&selector),
         subject_type
       ))
   }

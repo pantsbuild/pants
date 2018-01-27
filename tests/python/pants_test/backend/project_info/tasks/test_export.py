@@ -119,9 +119,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.make_target(
       'project_info:java_test',
       target_type=JUnitTests,
-      dependencies=[jar_lib],
+      dependencies=[jar_lib, test_resource],
       sources=['this/is/a/test/source/FooTest.scala'],
-      resources=[test_resource.address.spec],
     )
 
     jvm_binary = self.make_target(
@@ -145,9 +144,8 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     self.make_target(
         'project_info:target_type',
         target_type=ScalaLibrary,
-        dependencies=[jvm_binary],
+        dependencies=[jvm_binary, src_resource],
         sources=[],
-        resources=[src_resource.address.spec],
     )
 
     self.make_target(
@@ -183,9 +181,9 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
         'resolver': 'ivy'
       },
       JvmPlatform.options_scope: {
-        'default_platform': 'java6',
+        'default_platform': 'java8',
         'platforms': {
-          'java6': {'source': '1.6', 'target': '1.6'}
+          'java8': {'source': '1.8', 'target': '1.8'}
         }
       },
     }
@@ -300,7 +298,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       'target_type': 'SOURCE',
       'transitive' : True,
       'pants_target_type': 'scala_library',
-      'platform': 'java6',
+      'platform': 'java8',
     }
     self.assertEqual(jvm_target, expected_jvm_target)
 
@@ -345,7 +343,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
 
   def test_target_platform(self):
     result = self.execute_export_json('project_info:target_type')
-    self.assertEqual('java6',
+    self.assertEqual('java8',
                      result['targets']['project_info:target_type']['platform'])
 
   def test_output_file(self):
@@ -407,18 +405,6 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       {'globs': ['src/python/z/**/*.py']},
       result['targets']['src/python/z:z']['globs']
     )
-
-  # TODO: Delete this test in 1.5.0.dev0, once we remove support for resources=.
-  def test_synthetic_target(self):
-    # Create a BUILD file then add itself as resources
-    self.add_to_build_file('src/python/alpha/BUILD', """
-        python_library(name="alpha", sources=zglobs("**/*.py"), resources=["BUILD"])
-      """.strip())
-
-    result = self.execute_export_json('src/python/alpha')
-    self.assertTrue(result['targets']['src/python/alpha:alpha_synthetic_resources'])
-    # But not the origin target
-    self.assertFalse(result['targets']['src/python/alpha:alpha']['is_synthetic'])
 
   @contextmanager
   def fake_distribution(self, version):

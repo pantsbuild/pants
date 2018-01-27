@@ -6,10 +6,11 @@ python_library(
     ':resources',
     '3rdparty/python:pex',
     'src/python/pants/backend/python/targets:python',
-    'src/python/pants/backend/python/tasks2',
+    'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
+    'src/python/pants/task',
     'src/python/pants/util:dirutil',
   ]
 )

@@ -16,7 +16,8 @@ use externs;
 use boxfuture::{BoxFuture, Boxable};
 use context::ContextFactory;
 use core::{Failure, FNV, Noop};
-use nodes::{Node, NodeFuture, NodeKey, NodeResult, TryInto};
+use hashing;
+use nodes::{DigestFile, Node, NodeFuture, NodeKey, NodeResult, TryInto};
 
 
 // 2^32 Nodes ought to be more than enough for anyone!
@@ -443,6 +444,23 @@ impl InnerGraph {
     try!(f.write_all(b"\n"));
     Ok(())
   }
+
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+    self
+      .pg
+      .node_indices()
+      .map(|node_index| self.pg.node_weight(node_index))
+      .filter_map(|maybe_entry| maybe_entry)
+      .filter_map(|entry| match entry.node.content() {
+        &NodeKey::DigestFile(_) => Some(entry.peek::<DigestFile>()),
+        _ => None,
+      })
+      .filter_map(|output| match output {
+        Some(Ok(digest)) => Some(digest),
+        _ => None,
+      })
+      .collect()
+  }
 }
 
 ///
@@ -552,6 +570,11 @@ impl Graph {
   pub fn visualize(&self, roots: &Vec<NodeKey>, path: &Path) -> io::Result<()> {
     let inner = self.inner.lock().unwrap();
     inner.visualize(roots, path)
+  }
+
+  pub fn all_digests(&self) -> Vec<hashing::Digest> {
+    let inner = self.inner.lock().unwrap();
+    inner.all_digests()
   }
 }
 

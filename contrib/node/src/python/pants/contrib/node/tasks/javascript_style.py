@@ -8,8 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
+from pants.task.fmt_task_mixin import FmtTaskMixin
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.contextutil import pushd
 from pants.util.memo import memoized_method
 
@@ -17,7 +20,7 @@ from pants.contrib.node.targets.node_module import NodeModule
 from pants.contrib.node.tasks.node_task import NodeTask
 
 
-class JavascriptStyle(NodeTask):
+class JavascriptStyleBase(NodeTask):
   """ Check javascript source files to ensure they follow the style guidelines.
 
   :API: public
@@ -27,20 +30,18 @@ class JavascriptStyle(NodeTask):
   _JSX_SOURCE_EXTENSION = '.jsx'
   INSTALL_JAVASCRIPTSTYLE_TARGET_NAME = 'synthetic-install-javascriptstyle-module'
 
-  def __init__(self, *args, **kwargs):
-    super(JavascriptStyle, self).__init__(*args, **kwargs)
-
   @classmethod
   def register_options(cls, register):
-    super(JavascriptStyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip javascriptstyle.')
+    super(JavascriptStyleBase, cls).register_options(register)
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--color', type=bool, default=True, help='Enable or disable color.')
-    register('--default-eslint-version', default='4.15.0', help='Default ESLint version if not configured.')
-    register('--transitive', type=bool, default=True,
-             help='True to run the tool transitively on targets in the context, false to run '
-                  'for only roots specified on the commandline.')
+    register('--eslint-version', default='4.15.0', help='Default ESLint version if not configured.')
+
+  @property
+  def fix(self):
+    """Whether to fix discovered style errors."""
+    raise NotImplementedError()
 
   def get_lintable_node_targets(self, targets):
     return filter(
@@ -57,12 +58,12 @@ class JavascriptStyle(NodeTask):
                        source.endswith(self._JSX_SOURCE_EXTENSION)))
     return sources
 
-  def _is_javascriptstyle_dir_valid(self, javascriptstyle_dir):
+  @staticmethod
+  def _is_javascriptstyle_dir_valid(javascriptstyle_dir):
     dir_exists = os.path.isdir(javascriptstyle_dir)
     if not dir_exists:
       raise TaskError(
         'javascriptstyle package does not exist: {}.'.format(javascriptstyle_dir))
-      return False
     else:
       lock_file = os.path.join(javascriptstyle_dir, 'yarn.lock')
       package_json = os.path.join(javascriptstyle_dir, 'package.json')
@@ -71,13 +72,12 @@ class JavascriptStyle(NodeTask):
         raise TaskError(
           'javascriptstyle cannot be installed because yarn.lock '
           'or package.json does not exist.')
-        return False
     return True
 
   @memoized_method
-  def _bootstrap_default_eslinter(self, bootstrap_dir):
+  def _bootstrap_eslinter(self, bootstrap_dir):
     with pushd(bootstrap_dir):
-      default_version = self.get_options().default_eslint_version
+      default_version = self.get_options().eslint_version
       eslint = 'eslint@{}'.format(default_version)
       result, yarn_add_command = self.execute_yarnpkg(
         args=['add', eslint],
@@ -114,7 +114,7 @@ class JavascriptStyle(NodeTask):
           return [os.path.join(root_dir, p.strip()) for p in f]
 
   def _run_javascriptstyle(self, target, bootstrap_dir, files, config=None, ignore_path=None,
-                           fix=False, other_args=None):
+                           other_args=None):
     args = ['eslint', '--']
     if config:
       args.extend(['--config', config])
@@ -122,7 +122,7 @@ class JavascriptStyle(NodeTask):
       args.extend(['--no-eslintrc'])
     if ignore_path:
       args.extend(['--ignore-path', ignore_path])
-    if fix:
+    if self.fix:
       self.context.log.info('Autoformatting is enabled for javascriptstyle.')
       args.extend(['--fix'])
     if self.get_options().color:
@@ -144,21 +144,14 @@ class JavascriptStyle(NodeTask):
     return (result, yarn_run_command)
 
   def execute(self):
-    if self.get_options().skip:
-      self.context.log.info('Skipping javascript style check.')
-      return
-
-    all_targets = self.context.targets() if self.get_options().transitive else self.context.target_roots
-    targets = self.get_lintable_node_targets(all_targets)
+    targets = self.get_lintable_node_targets(self.get_targets())
     if not targets:
       return
     failed_targets = []
-
     bootstrap_dir, is_preconfigured = self.node_distribution.fetch_eslint_supportdir()
-
     if not is_preconfigured:
       self.context.log.debug('ESLint is not pre-configured, bootstrapping with defaults.')
-      self._bootstrap_default_eslinter(bootstrap_dir)
+      self._bootstrap_eslinter(bootstrap_dir)
     else:
       self._install_eslint(bootstrap_dir)
     for target in targets:
@@ -184,16 +177,23 @@ class JavascriptStyle(NodeTask):
     return
 
 
-class JavascriptStyleFmt(JavascriptStyle):
+class JavascriptStyleLint(LintTaskMixin, JavascriptStyleBase):
+  """Check source files to ensure they follow the style guidelines.
+
+  :API: public
+  """
+  fix = False
+
+
+class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   """Check and fix source files to ensure they follow the style guidelines.
 
   :API: public
   """
+  fix = True
 
-  def _run_javascriptstyle(self, target, javascriptstyle_bin_path, files, fix=True):
-    return super(JavascriptStyleFmt, self)._run_javascriptstyle(target,
-                                                                javascriptstyle_bin_path,
-                                                                files,
-                                                                config=self.node_distribution.eslint_config,
-                                                                ignore_path=self.node_distribution._eslint_ignore,
-                                                                fix=fix)
+# Deprecated old name for class.
+class JavascriptStyle(JavascriptStyleLint):
+  @deprecated('1.7.0.dev0', 'Replace with JavascriptStyleLint.')
+  def __init__(self, *args, **kwargs):
+    super(JavascriptStyle, self).__init__(*args, **kwargs)

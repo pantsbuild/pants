@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import math
 
 from pants.util.memo import memoized_property
-from pants_test.pants_run_integration_test import ensure_engine, ensure_resolver
+from pants_test.pants_run_integration_test import ensure_resolver
 from pants_test.projects.base_project_integration_test import ProjectIntegrationTest
 
 
@@ -114,7 +114,6 @@ class TestProjectsIntegrationTest(ProjectIntegrationTest):
     return self.targets[offset:offset + per_shard]
 
   @ensure_resolver
-  @ensure_engine
   def run_shard(self, shard):
     targets = self.targets_for_shard(shard)
     pants_run = self.pants_test(targets + ['--jvm-platform-default-platform=java7',

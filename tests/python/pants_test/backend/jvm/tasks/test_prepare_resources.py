@@ -41,15 +41,15 @@ class PrepareResourcesTest(TaskTestBase):
     resources4 = self.make_target('resources:target4', target_type=Resources)
     jvm_target = self.make_target('jvm:target',
                                   target_type=JvmTarget,
-                                  resources=[resources1.address.spec])
+                                  dependencies=[resources1])
     java_library = self.make_target('java:target', target_type=JavaLibrary, sources=[])
     java_library2 = self.make_target('java:target2',
                                      target_type=JavaLibrary,
                                      sources=[],
-                                     resources=[resources4.address.spec])
+                                     dependencies=[resources4])
     other_target = self.make_target('other:target',
                                     target_type=self.NonJvmResourcesUsingTarget,
-                                    resources=[resources3.address.spec])
+                                    dependencies=[resources3])
 
     task = self.create_task(self.context(target_roots=[resources2,
                                                        jvm_target,

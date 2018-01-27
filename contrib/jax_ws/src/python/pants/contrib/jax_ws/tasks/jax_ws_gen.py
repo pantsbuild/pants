@@ -18,6 +18,7 @@ from pants.util.process_handler import subprocess
 
 from pants.contrib.jax_ws.targets.jax_ws_library import JaxWsLibrary
 
+
 logger = logging.getLogger(__name__)
 
 

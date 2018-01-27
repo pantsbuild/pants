@@ -46,14 +46,13 @@ class InvalidationCacheManagerTest(BaseTest):
     shutil.rmtree(self._dir, ignore_errors=True)
     super(InvalidationCacheManagerTest, self).tearDown()
 
-  def make_vt(self, invalid=False):
-    # Create an arbitrary VT. If invalid is False, it will mimic the state of the VT handed back by a task.
+  def make_vt(self):
+    # Create an arbitrary VT. It will mimic the state of the VT handed back by a task.
     a_target = self.make_target(':a', dependencies=[])
     ic = self.cache_manager.check([a_target])
     vt = ic.all_vts[0]
-    if not invalid:
-      self.task_execute(vt)
-      vt.update()
+    self.task_execute(vt)
+    vt.update()
     return vt
 
   def task_execute(self, vt):
@@ -67,9 +66,17 @@ class InvalidationCacheManagerTest(BaseTest):
     parent, unstable_dir_name = os.path.split(vt._current_results_dir)
     self.assertSetEqual({'current', unstable_dir_name}, set(os.listdir(parent)))
     symlink = os.path.join(parent, 'current')
+
     self.assertTrue(os.path.islink(symlink))
-    self.assertTrue(unstable_dir_name, os.readlink(symlink))
+    self.assertEquals(unstable_dir_name, os.readlink(symlink))
     self.assertEquals(symlink, vt.results_dir)
+    # Repoint the symlink, but keep the vt valid (simulates the case where the underlying target's
+    # version has changed, so the symlink is pointed to that version, but now the version has
+    # reverted, so we must point it back).
+    os.unlink(symlink)
+    os.symlink(unstable_dir_name + '.other', symlink)
+    vt.create_results_dir()
+    self.assertEquals(unstable_dir_name, os.readlink(symlink))
 
   def test_creates_stable_results_dir_prefix_symlink(self):
     parent, unstable_dir_name = os.path.split(self.cache_manager._results_dir_prefix)

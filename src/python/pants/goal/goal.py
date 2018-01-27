@@ -22,7 +22,7 @@ class Goal(object):
     raise TypeError('Do not instantiate {0}. Call by_name() instead.'.format(cls))
 
   @classmethod
-  def register(cls, name, description):
+  def register(cls, name, description, options_registrar_cls=None):
     """Register a goal description.
 
     Otherwise the description must be set when registering some task on the goal,
@@ -38,11 +38,15 @@ class Goal(object):
 
     :param string name: The name of the goal; ie: the way to specify it on the command line.
     :param string description: A description of the tasks in the goal do.
+    :param :class:pants.option.Optionable options_registrar_cls: A class for registering options
+           at the goal scope. Useful for registering recursive options on all tasks in a goal.
     :return: The freshly registered goal.
     :rtype: :class:`_Goal`
     """
     goal = cls.by_name(name)
     goal._description = description
+    goal._options_registrar_cls = (options_registrar_cls.registrar_for_scope(name)
+                                   if options_registrar_cls else None)
     return goal
 
   @classmethod
@@ -102,6 +106,7 @@ class _Goal(object):
     Optionable.validate_scope_name_component(name)
     self.name = name
     self._description = ''
+    self._options_registrar_cls = None
     self.serialize = False
     self._task_type_by_name = {}  # name -> Task subclass.
     self._ordered_task_names = []  # The task names, in the order imposed by registration.
@@ -121,6 +126,8 @@ class _Goal(object):
     return ''
 
   def register_options(self, options):
+    if self._options_registrar_cls:
+      self._options_registrar_cls.register_options_on_scope(options)
     for task_type in sorted(self.task_types(), key=lambda cls: cls.options_scope):
       task_type.register_options_on_scope(options)
 

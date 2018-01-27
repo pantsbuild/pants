@@ -13,7 +13,6 @@ from pants.build_graph.source_mapper import SourceMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import HydratedTargets
 from pants.source.filespec import matches_filespec
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 
 
 def iter_resolve_and_parse_specs(rel_path, specs):
@@ -67,35 +66,6 @@ class EngineSourceMapper(SourceMapper):
     target_sources = target_kwargs.get('sources', [])
     if target_sources and self._match_source(source, target_sources):
       return True
-
-    # Handle `resources`-declaring targets.
-    # TODO: Remember to get rid of this in 1.5.0.dev0, when the deprecation of `resources` is complete.
-    target_resources = target_kwargs.get('resources')
-    if target_resources:
-      # N.B. `resources` params come in two flavors:
-      #
-      # 1) Strings of filenames, which are represented in kwargs by an EagerFilesetWithSpec e.g.:
-      #
-      #      python_library(..., resources=['file.txt', 'file2.txt'])
-      #
-      if isinstance(target_resources, EagerFilesetWithSpec):
-        if self._match_source(source, target_resources):
-          return True
-      # 2) Strings of addresses, which are represented in kwargs by a list of strings:
-      #
-      #      java_library(..., resources=['testprojects/src/resources/...:resource'])
-      #
-      #    which is closer in premise to the `resource_targets` param.
-      elif isinstance(target_resources, list):
-        resource_dep_subjects = resolve_and_parse_specs(legacy_target.adaptor.address.spec_path,
-                                                        target_resources)
-        for hydrated_targets in self._scheduler.product_request(HydratedTargets, resource_dep_subjects):
-          for hydrated_target in hydrated_targets.dependencies:
-            resource_sources = hydrated_target.adaptor.kwargs().get('sources')
-            if resource_sources and self._match_source(source, resource_sources):
-              return True
-      else:
-        raise AssertionError('Could not process target_resources with type {}'.format(type(target_resources)))
 
     return False
 

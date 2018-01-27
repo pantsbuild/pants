@@ -31,15 +31,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'pathdeps',
-  sources = ['test_pathdeps.py'],
-  dependencies = [
-    'src/python/pants/backend/graph_info/tasks',
-    'tests/python/pants_test/tasks:task_test_base',
-  ]
-)
-
-python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [

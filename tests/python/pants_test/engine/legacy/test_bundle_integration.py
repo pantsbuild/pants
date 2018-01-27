@@ -8,9 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 from contextlib import contextmanager
 
-from pants.base.deprecated import deprecated_conditional
 from pants.util.contextutil import temporary_dir
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest, ensure_engine
+from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 
 
 class BundleIntegrationTest(PantsRunIntegrationTest):
@@ -19,7 +18,7 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_basic(self):
     args = ['-q', 'bundle', self.TARGET_PATH]
-    self.do_command(*args, success=True, enable_v2_engine=True)
+    self.do_command(*args, success=True)
 
   @contextmanager
   def bundled(self, target_name):
@@ -33,35 +32,25 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
         yield os.path.join(temp_distdir,
                            '{}.{}-bundle'.format(self.TARGET_PATH.replace('/', '.'), target_name))
 
-  @ensure_engine
   def test_bundle_mapper(self):
     with self.bundled('mapper') as bundle_dir:
       self.assertTrue(os.path.isfile(os.path.join(bundle_dir, 'bundle_files/file1.txt')))
 
-  @ensure_engine
   def test_bundle_relative_to(self):
     with self.bundled('relative_to') as bundle_dir:
       self.assertTrue(os.path.isfile(os.path.join(bundle_dir, 'b/file1.txt')))
 
-  @ensure_engine
   def test_bundle_rel_path(self):
     with self.bundled('rel_path') as bundle_dir:
       self.assertTrue(os.path.isfile(os.path.join(bundle_dir, 'b/file1.txt')))
 
-  @ensure_engine
   def test_bundle_directory(self):
     with self.bundled('directory') as bundle_dir:
       root = os.path.join(bundle_dir, 'a/b')
       self.assertTrue(os.path.isdir(root))
-      # NB: The behaviour of this test will change with the relevant deprecation
-      # in `pants.backend.jvm.tasks.bundle_create`, because the parent directory
-      # will not be symlinked.
-      deprecated_conditional(
-          lambda: os.path.isfile(os.path.join(root, 'file1.txt')),
-          '1.5.0.dev0',
-          'default recursive inclusion of files in directory',
-          'A non-recursive/literal glob should no longer include child paths.'
-      )
+      # NB: The behaviour of this test changed as scheduled in 1.5.0.dev0, because the
+      # parent directory is no longer symlinked.
+      self.assertFalse(os.path.isfile(os.path.join(root, 'file1.txt')))
 
   def test_bundle_explicit_recursion(self):
     with self.bundled('explicit_recursion') as bundle_dir:
@@ -69,7 +58,6 @@ class BundleIntegrationTest(PantsRunIntegrationTest):
       self.assertTrue(os.path.isdir(root))
       self.assertTrue(os.path.isfile(os.path.join(root, 'file1.txt')))
 
-  @ensure_engine
   def test_bundle_resource_ordering(self):
     """Ensures that `resources=` ordering is respected."""
     pants_run = self.run_pants(

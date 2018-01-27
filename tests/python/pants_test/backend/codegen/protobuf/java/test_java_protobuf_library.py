@@ -37,8 +37,6 @@ class JavaProtobufLibraryTest(BaseTest):
     target = self.target('//:foo')
     self.assertIsInstance(target, JavaProtobufLibrary)
     self.assertSequenceEqual([], target.imported_jars)
-    traversable_specs = [seq for seq in target.traversable_specs]
-    self.assertSequenceEqual([], traversable_specs)
 
   def test_jar_library_imports(self):
     self.add_to_build_file('BUILD', dedent('''
@@ -86,12 +84,12 @@ class JavaProtobufLibraryTest(BaseTest):
     with self.assertRaises(JarLibrary.ExpectedAddressError):
       self.target('//:foo')
 
-  def test_traversable_specs(self):
+  def test_compute_dependency_specs(self):
     self.add_to_build_file('BUILD', dedent('''
     java_protobuf_library(name='foo',
       sources=[],
       imports=[':import_jars',],
-      # Note: Should not be a part of traversable_specs
+      # Note: Should not be a part of dependency specs.
       dependencies=[
         ':proto_dep',
       ]

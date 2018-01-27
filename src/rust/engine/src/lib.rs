@@ -38,8 +38,8 @@ use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
               ExternContext, Externs, IdToStrExtern, InvokeRunnable, LogExtern, KeyForExtern,
               ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern, SatisfiedByExtern,
-              SatisfiedByTypeExtern, StoreListExtern, StoreBytesExtern, TypeIdBuffer,
-              ValForExtern, ValToStrExtern};
+              StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern, StoreBytesExtern,
+              TypeIdBuffer, ValForExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
@@ -129,6 +129,7 @@ pub extern "C" fn externs_set(
   satisfied_by_type: SatisfiedByTypeExtern,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
+  store_i32: StoreI32Extern,
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
@@ -149,6 +150,7 @@ pub extern "C" fn externs_set(
     satisfied_by_type,
     store_list,
     store_bytes,
+    store_i32,
     project,
     project_ignoring_type,
     project_multi,
@@ -175,6 +177,7 @@ pub extern "C" fn scheduler_create(
   construct_dir: Function,
   construct_file: Function,
   construct_link: Function,
+  construct_process_result: Function,
   type_address: TypeConstraint,
   type_has_products: TypeConstraint,
   type_has_variants: TypeConstraint,
@@ -185,6 +188,8 @@ pub extern "C" fn scheduler_create(
   type_dir: TypeConstraint,
   type_file: TypeConstraint,
   type_link: TypeConstraint,
+  type_process_request: TypeConstraint,
+  type_process_result: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -210,6 +215,7 @@ pub extern "C" fn scheduler_create(
       construct_dir: construct_dir,
       construct_file: construct_file,
       construct_link: construct_link,
+      construct_process_result: construct_process_result,
       address: type_address,
       has_products: type_has_products,
       has_variants: type_has_variants,
@@ -220,6 +226,8 @@ pub extern "C" fn scheduler_create(
       dir: type_dir,
       file: type_file,
       link: type_link,
+      process_request: type_process_request,
+      process_result: type_process_result,
       string: type_string,
       bytes: type_bytes,
     },
@@ -512,6 +520,28 @@ pub extern "C" fn set_panic_handler() {
     let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
     externs::log(externs::LogLevel::Critical, &panic_file_bug_str);
   }));
+}
+
+#[no_mangle]
+pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| match scheduler
+    .core
+    .store
+    .garbage_collect() {
+    Ok(_) => {}
+    Err(err) => externs::log(externs::LogLevel::Critical, &err),
+  });
+}
+
+#[no_mangle]
+pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let digests = scheduler.core.graph.all_digests();
+    match scheduler.core.store.lease_all(digests.iter()) {
+      Ok(_) => {}
+      Err(err) => externs::log(externs::LogLevel::Critical, &err),
+    }
+  });
 }
 
 fn graph_full(scheduler: &mut Scheduler, subject_types: Vec<TypeId>) -> RuleGraph {

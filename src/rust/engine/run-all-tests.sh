@@ -12,14 +12,20 @@ source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
 
 activate_pants_venv
 
-exit_code=0
+failed=()
 
 for crate in $(find ${here} -name Cargo.toml); do
   (
     echo >&2 "Running tests for ${crate}:"
     RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test ${MODE_FLAG} \
       --manifest-path=${crate}
-  ) || exit_code=1
+  ) || failed=("${failed[@]}" "${crate}")
 done
 
-exit ${exit_code}
+if [[ ${#failed[@]} -gt 0 ]]; then
+  echo >&2 "The following crates failed:"
+  for crate in "${failed[@]}"; do
+    echo "${crate}"
+  done
+  exit 1
+fi

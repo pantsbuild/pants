@@ -24,8 +24,4 @@ class AnnotationProcessor(ExportableJvmLibrary):
       annotation processors this library exports.
     """
     super(AnnotationProcessor, self).__init__(*args, **kwargs)
-
     self.processors = processors
-
-    # TODO(Eric Ayers) As of 2/5/2015 this call is DEPRECATED and should be removed soon
-    self.add_labels('java', 'apt')

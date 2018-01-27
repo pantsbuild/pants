@@ -35,8 +35,8 @@ class WireIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_wire_normal(self):
     with self.pants_results(['bundle.jvm',
-                         '--deployjar',
-                         'examples/src/java/org/pantsbuild/example/wire/temperatureservice']
+                             '--deployjar',
+                             'examples/src/java/org/pantsbuild/example/wire/temperatureservice']
                         ) as pants_run:
       self.assert_success(pants_run)
       out_path = os.path.join(get_buildroot(), 'dist',
@@ -53,12 +53,11 @@ class WireIntegrationTest(PantsRunIntegrationTest):
 
   def test_bundle_wire_dependent_targets(self):
     with self.pants_results(['bundle.jvm',
-                             '--deployjar',
                              'examples/src/java/org/pantsbuild/example/wire/element']
                             ) as pants_run:
       self.assert_success(pants_run)
       out_path = os.path.join(get_buildroot(), 'dist',
-                              'examples.src.java.org.pantsbuild.example.wire.element.element-bundle')
+          'examples.src.java.org.pantsbuild.example.wire.element.element-bundle')
 
       java_run = subprocess.Popen(['java', '-cp', 'wire-element-example.jar',
                                    'org.pantsbuild.example.wire.element.WireElementExample'],
@@ -75,7 +74,7 @@ class WireIntegrationTest(PantsRunIntegrationTest):
                     'atomic_number=1}}', java_out)
 
   def test_compile_wire_roots(self):
-    pants_run = self.run_pants(['bundle.jvm', '--deployjar',
+    pants_run = self.run_pants(['binary.jvm',
                                 'examples/src/java/org/pantsbuild/example/wire/roots'])
     self.assert_success(pants_run)
     out_path = os.path.join(get_buildroot(), 'dist', 'wire-roots-example.jar')

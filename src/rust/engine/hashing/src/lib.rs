@@ -15,7 +15,7 @@ use std::io::{self, Write};
 
 const FINGERPRINT_SIZE: usize = 32;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Ord, PartialOrd)]
 pub struct Fingerprint(pub [u8; FINGERPRINT_SIZE]);
 
 impl Fingerprint {
@@ -76,15 +76,24 @@ impl AsRef<[u8]> for Fingerprint {
 /// It is equivalent to a Bazel Remote Execution Digest, but without the overhead (and awkward API)
 /// of needing to create an entire protobuf to pass around the two fields.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Digest(pub Fingerprint, pub usize);
 
-impl Into<bazel_protos::remote_execution::Digest> for Digest {
-  fn into(self) -> bazel_protos::remote_execution::Digest {
+impl<'a> From<&'a Digest> for bazel_protos::remote_execution::Digest {
+  fn from(d: &Digest) -> Self {
     let mut digest = bazel_protos::remote_execution::Digest::new();
-    digest.set_hash(self.0.to_hex());
-    digest.set_size_bytes(self.1 as i64);
+    digest.set_hash(d.0.to_hex());
+    digest.set_size_bytes(d.1 as i64);
     digest
+  }
+}
+
+impl<'a> From<&'a bazel_protos::remote_execution::Digest> for Digest {
+  fn from(d: &bazel_protos::remote_execution::Digest) -> Self {
+    Digest(
+      Fingerprint::from_hex_string(d.get_hash()).expect("Bad fingerprint in Digest"),
+      d.get_size_bytes() as usize,
+    )
   }
 }
 
@@ -127,7 +136,7 @@ impl<W: Write> Write for WriterHasher<W> {
 
 #[cfg(test)]
 mod fingerprint_tests {
-  use super::Fingerprint;
+  use super::{Digest, Fingerprint, bazel_protos};
 
   #[test]
   fn from_bytes_unsafe() {
@@ -284,5 +293,39 @@ mod fingerprint_tests {
       Fingerprint::from_hex_string(hex).unwrap().to_hex(),
       hex.to_lowercase()
     )
+  }
+
+  #[test]
+  fn from_our_digest() {
+    let our_digest = &Digest(
+      Fingerprint::from_hex_string(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      ).unwrap(),
+      10,
+    );
+    let converted: bazel_protos::remote_execution::Digest = our_digest.into();
+    let mut want = bazel_protos::remote_execution::Digest::new();
+    want.set_hash(
+      "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned(),
+    );
+    want.set_size_bytes(10);
+    assert_eq!(converted, want);
+  }
+
+  #[test]
+  fn from_bazel_digest() {
+    let mut bazel_digest = bazel_protos::remote_execution::Digest::new();
+    bazel_digest.set_hash(
+      "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned(),
+    );
+    bazel_digest.set_size_bytes(10);
+    let converted: Digest = (&bazel_digest).into();
+    let want = Digest(
+      Fingerprint::from_hex_string(
+        "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff",
+      ).unwrap(),
+      10,
+    );
+    assert_eq!(converted, want);
   }
 }

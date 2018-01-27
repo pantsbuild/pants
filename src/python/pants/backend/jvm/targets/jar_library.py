@@ -47,7 +47,6 @@ class JarLibrary(Target):
     # NB: Waiting to validate until superclasses are initialized.
     if not jars:
       raise TargetDefinitionException(self, 'Must have a non-empty list of jars.')
-    self.add_labels('jars', 'jvm')
 
   @property
   def managed_dependencies(self):

@@ -224,7 +224,6 @@ class JvmCompile(NailgunTaskBase):
   # Subclasses must implement.
   # --------------------------
   _name = None
-  _supports_concurrent_execution = None
 
   @classmethod
   def subsystem_dependencies(cls):

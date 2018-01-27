@@ -7,7 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.jvm_app import JvmApp
+from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.base.exceptions import TaskError
 from pants.base.payload_field import JarsField, PythonRequirementsField
 from pants.task.console_task import ConsoleTask
@@ -18,7 +20,7 @@ class Dependencies(ConsoleTask):
 
   @staticmethod
   def _is_jvm(target):
-    return target.is_jvm or isinstance(target, JvmApp)
+    return isinstance(target, (JarLibrary, JvmTarget, JvmApp))
 
   @classmethod
   def register_options(cls, register):

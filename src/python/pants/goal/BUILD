@@ -62,6 +62,11 @@ python_library(
 )
 
 python_library(
+  name = 'pantsd_stats',
+  sources = ['pantsd_stats.py'],
+)
+
+python_library(
   name = 'products',
   sources = ['products.py'],
   dependencies = [
@@ -76,6 +81,7 @@ python_library(
   dependencies = [
     ':aggregated_timings',
     ':artifact_cache_stats',
+    ':pantsd_stats',
     '3rdparty/python:requests',
     '3rdparty/python:pyopenssl',
     'src/python/pants/base:build_environment',

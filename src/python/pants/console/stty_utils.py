@@ -5,33 +5,42 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+import sys
+import termios
 from contextlib import contextmanager
 
-from pants.util.process_handler import subprocess
 
-
-@contextmanager
-def preserve_stty_settings():
-  """Run potentially stty-modifying operations, e.g., REPL execution, in this contextmanager."""
-  stty_settings = STTYSettings()
-  stty_settings.save_stty_options()
-  yield
-  stty_settings.restore_ssty_options()
+logger = logging.getLogger(__name__)
 
 
 class STTYSettings(object):
   """Saves/restores stty settings, e.g., during REPL execution."""
 
+  @classmethod
+  @contextmanager
+  def preserved(cls):
+    """Run potentially stty-modifying operations, e.g., REPL execution, in this contextmanager."""
+    inst = cls()
+    inst.save_tty_flags()
+    try:
+      yield
+    finally:
+      inst.restore_tty_flags()
+
   def __init__(self):
-    self._stty_options = None
+    self._tty_flags = None
 
-  def save_stty_options(self):
-    self._stty_options = self._run_cmd('stty -g 2>/dev/null')
+  def save_tty_flags(self):
+    # N.B. `stty(1)` operates against stdin.
+    try:
+      self._tty_flags = termios.tcgetattr(sys.stdin.fileno())
+    except termios.error as e:
+      logger.debug('masking tcgetattr exception: {!r}'.format(e))
 
-  def restore_ssty_options(self):
-    self._run_cmd('stty ' + self._stty_options)
-
-  def _run_cmd(self, cmd):
-    po = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    stdout, _ = po.communicate()
-    return stdout
+  def restore_tty_flags(self):
+    if self._tty_flags:
+      try:
+        termios.tcsetattr(sys.stdin.fileno(), termios.TCSANOW, self._tty_flags)
+      except termios.error as e:
+        logger.debug('masking tcsetattr exception: {!r}'.format(e))
