@@ -161,7 +161,9 @@ is not required.
 ------------------
 
 Once the first two travis shards (the "binary builder" shards) have completed for your
-release commit, you can publish to PyPi:
+release commit, you can publish to PyPi. First, ensure your are on your clone's master
+branch at the release commit. If new commits have landed after your release commit,
+you can reset to your commit (`git reset --hard <sha>`). Then, publish the release:
 
     :::bash
     $ ./build-support/bin/release.sh
