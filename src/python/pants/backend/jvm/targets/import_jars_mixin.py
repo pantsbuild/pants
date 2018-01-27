@@ -65,7 +65,7 @@ class ImportJarsMixin(Target):
   @memoized_property
   def imported_jars(self):
     """:returns: the string specs of JarDependencies referenced by imported_jar_library_specs
-    :rtype: list of string
+    :rtype: list of JarDependency
     """
     return JarLibrary.to_jar_dependencies(self.address,
                                           self.imported_jar_library_specs(payload=self.payload),
