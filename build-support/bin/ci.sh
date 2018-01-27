@@ -162,7 +162,7 @@ fi
 if [[ "${skip_lint:-false}" == "false" ]]; then
   start_travis_section "Lint" "Running lint checks"
   (
-    ./pants.pex ${PANTS_ARGS[@]} lint contrib:: examples:: src:: tests:: zinc::
+    ./pants.pex ${PANTS_ARGS[@]} --tag=-nolint lint contrib:: examples:: src:: tests:: zinc::
   ) || die "Lint check failure"
   end_travis_section
 fi
