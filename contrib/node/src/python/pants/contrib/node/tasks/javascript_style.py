@@ -36,7 +36,6 @@ class JavascriptStyleBase(NodeTask):
     register('--fail-slow', type=bool,
              help='Check all targets and present the full list of errors.')
     register('--color', type=bool, default=True, help='Enable or disable color.')
-    register('--eslint-version', default='4.15.0', help='Default ESLint version if not configured.')
 
   @property
   def fix(self):
@@ -77,8 +76,8 @@ class JavascriptStyleBase(NodeTask):
   @memoized_method
   def _bootstrap_eslinter(self, bootstrap_dir):
     with pushd(bootstrap_dir):
-      default_version = self.get_options().eslint_version
-      eslint = 'eslint@{}'.format(default_version)
+      eslint_version = self.node_distribution.eslint_version
+      eslint = 'eslint@{}'.format(eslint_version)
       result, yarn_add_command = self.execute_yarnpkg(
         args=['add', eslint],
         workunit_name=self.INSTALL_JAVASCRIPTSTYLE_TARGET_NAME,

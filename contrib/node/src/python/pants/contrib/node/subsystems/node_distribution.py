@@ -50,12 +50,11 @@ class NodeDistribution(object):
                help='Yarnpkg version. Used for binary utils')
       register('--eslint-setupdir', advanced=True, fingerprint=True,
                help='Find the package.json under this dir for installing eslint and plugins.')
-      register('--eslint-supportdir', advanced=True, default='bin/eslint',
-               help='Find the ESLint distribution under this dir.')
       register('--eslint-config', advanced=True, fingerprint=True,
                help='The path to the global eslint configuration file specifying all the rules')
       register('--eslint-ignore', advanced=True, fingerprint=True,
                help='The path to the global eslint ignore path')
+      register('--eslint-version', default='4.15.0', help='Use this ESLint version if not configured.')
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
@@ -66,9 +65,8 @@ class NodeDistribution(object):
       global_options = self.global_instance().get_options()
       pants_bootstrapdir = global_options.pants_bootstrapdir
       return NodeDistribution(
-        binary_util, options.supportdir, options.version,
-        options.eslint_setupdir, options.eslint_supportdir,
-        options.eslint_config, options.eslint_ignore, pants_bootstrapdir,
+        binary_util, options.supportdir, options.version, options.eslint_setupdir,
+        options.eslint_config, options.eslint_ignore, pants_bootstrapdir, options.eslint_version,
         package_manager=options.package_manager,
         yarnpkg_version=options.yarnpkg_version,)
 
@@ -92,16 +90,17 @@ class NodeDistribution(object):
     # 'X.Y.Z'.
     return version if version.startswith('v') else 'v' + version
 
-  def __init__(self, binary_util, supportdir, version, eslint_setupdir, eslint_supportdir,
-               eslint_config, eslint_ignore, pants_bootstrapdir, package_manager, yarnpkg_version):
+  def __init__(self, binary_util, supportdir, version, eslint_setupdir,
+               eslint_config, eslint_ignore, pants_bootstrapdir, eslint_version,
+               package_manager, yarnpkg_version):
     self._binary_util = binary_util
     self._supportdir = supportdir
     self._version = self._normalize_version(version)
     self._eslint_setupdir = eslint_setupdir
-    self._eslint_supportdir = eslint_supportdir
     self._eslint_config = eslint_config or None
     self._eslint_ignore = eslint_ignore or None
     self._pants_bootstrapdir = pants_bootstrapdir
+    self._eslint_version = eslint_version
     self.package_manager = self.validate_package_manager(package_manager=package_manager)
     self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
     logger.debug('Node.js version: %s package manager from config: %s',
@@ -122,8 +121,11 @@ class NodeDistribution(object):
 
   @property
   def eslint_supportdir(self):
-    return self._eslint_supportdir
+    return 'bin/eslint'
 
+  @property
+  def eslint_version(self):
+    return self._eslint_version
   @property
   def eslint_config(self):
     return self._eslint_config
@@ -277,31 +279,35 @@ class NodeDistribution(object):
 
   def _configure_eslinter(self, bootstrapped_support_path):
     logger.debug('Copying {setupdir} to bootstrapped dir: {support_path}'
-                           .format(setupdir=self._eslint_setupdir, support_path=bootstrapped_support_path))
+                           .format(setupdir=self.eslint_setupdir, support_path=bootstrapped_support_path))
     safe_rmtree(bootstrapped_support_path)
-    shutil.copytree(self._eslint_setupdir, bootstrapped_support_path)
+    shutil.copytree(self.eslint_setupdir, bootstrapped_support_path)
     return True
 
   def fetch_eslint_supportdir(self):
     """ Returns the path where the ESLint is bootstrapped.
 
-    :returns: The path where ESLint is bootstrapped and whether or not it already installed
+    :returns: The path where ESLint is bootstrapped and whether or not it is configured
     :rtype: (string, bool)
     """
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     # TODO(nsaechao): ./pants clean-all should handle removing this directory.
-    bootstrapped_support_path = os.path.join(bootstrap_dir, self._eslint_supportdir)
+    bootstrapped_support_path = os.path.join(bootstrap_dir, self.eslint_supportdir)
 
+    # If the eslint_setupdir is not provided or missing required files, then
+    # clean up the directory so that Pants can install a pre-defined eslint version later on.
+    # Otherwise, if there is no configurations changes, rely on the cache.
+    # If there is a config change detected, use the new configuration.
     configured = False
-    if self._eslint_setupdir:
-      configured = self._binary_util.is_bin_valid(self._eslint_setupdir,
+    if self.eslint_setupdir:
+      configured = self._binary_util.is_bin_valid(self.eslint_setupdir,
                                            [BinaryUtil.BinaryFileSpec('package.json'),
                                             BinaryUtil.BinaryFileSpec('yarn.lock')])
     if not configured:
       safe_mkdir(bootstrapped_support_path, clean=True)
     else:
       binary_file_specs = [
-        BinaryUtil.BinaryFileSpec(f, hash_file(os.path.join(self._eslint_setupdir, f)))
+        BinaryUtil.BinaryFileSpec(f, hash_file(os.path.join(self.eslint_setupdir, f)))
         for f in ['yarn.lock', 'package.json']]
       installed = self._binary_util.is_bin_valid(bootstrapped_support_path, binary_file_specs)
       if not installed:
