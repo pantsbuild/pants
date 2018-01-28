@@ -22,7 +22,6 @@ from twitter.common.dirutil.chroot import Chroot
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks2.gather_sources import GatherSources
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses
@@ -343,7 +342,6 @@ class SetupPy(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data(GatherSources.PYTHON_SOURCES)
     round_manager.require_data(PythonInterpreter)
 
   @classmethod
