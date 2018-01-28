@@ -131,13 +131,18 @@ class UnpackJarsTest(TaskTestBase):
         self._add_dummy_product(context, unpacked_jar_tgt, bar_jar, bar_coords)
         unpack_task.execute()
 
-        expected= ['a/b/c/foo.proto']
+        expected_files = {'a/b/c/foo.proto'}
         if not intransitive:
-          expected.append('a/b/c/bar.proto')
+          expected_files.add('a/b/c/bar.proto')
+
+        actual = {k: [set(v[0]), v[1]]
+                  for k, v in context.products.get_data('unpacked_archives', dict).items()}
+
         self.assertEquals(
           {unpacked_jar_tgt:
-             [expected, '.pants.d/pants_backend_jvm_tasks_unpack_jars_UnpackJars/unpack.foo']},
-          context.products.get_data('unpacked_archives', dict))
+             [expected_files,
+              '.pants.d/pants_backend_jvm_tasks_unpack_jars_UnpackJars/unpack.foo']},
+          actual)
 
   def test_transitive(self):
     self._do_test_products(intransitive=False)
