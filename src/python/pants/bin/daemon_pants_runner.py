@@ -9,6 +9,7 @@ import datetime
 import os
 import signal
 import sys
+import termios
 import time
 from contextlib import contextmanager
 
@@ -110,31 +111,47 @@ class DaemonPantsRunner(ProcessManager):
     # Determine output tty capabilities from the environment.
     stdin_isatty, stdout_isatty, stderr_isatty = NailgunProtocol.isatty_from_env(self._env)
 
-    # Launch a thread to read stdin data from the socket (the only messages expected from the client
-    # for the remainder of the protocol), and threads to copy from stdout/stderr pipes onto the
-    # socket.
-    with NailgunStreamWriter.open_multi(
-           sock,
-           (ChunkType.STDOUT, ChunkType.STDERR),
-           None,
-           (stdout_isatty, stderr_isatty)
-         ) as ((stdout_fd, stderr_fd), writer),\
-         NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin_fd,\
-         stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
-      # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
-      # exit chunk, to avoid any socket shutdown vs write races.
-      stdout, stderr = sys.stdout, sys.stderr
-      def finalizer():
-        try:
-          stdout.flush()
-          stderr.flush()
-        finally:
-          time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
-          writer.stop()
-          writer.join()
-          stdout.close()
-          stderr.close()
-      yield finalizer
+    # If all stdio is a tty, there's only one logical I/O device (the tty device). This happens to
+    # be addressable as a file in OSX and Linux, so we take advantage of that and directly open the
+    # character device for output redirection - eliminating the need to directly marshall any
+    # interactive stdio back/forth across the socket and permitting full, correct tty control with
+    # no middle-man.
+    if all((stdin_isatty, stdout_isatty, stderr_isatty)):
+      stdin_ttyname, stdout_ttyname, stderr_ttyname = NailgunProtocol.ttynames_from_env(self._env)
+      assert stdin_ttyname == stdout_ttyname == stderr_ttyname, (
+        'expected all stdio ttys to be the same, but instead got: {}\n'
+        'please file a bug at http://github.com/pantsbuild/pants'
+        .format([stdin_ttyname, stdout_ttyname, stderr_ttyname])
+      )
+      with open(stdin_ttyname, 'rb+wb', 0) as tty:
+        tty_fileno = tty.fileno()
+        with stdio_as(stdin_fd=tty_fileno, stdout_fd=tty_fileno, stderr_fd=tty_fileno):
+          def finalizer():
+            termios.tcdrain(tty_fileno)
+          yield finalizer
+    else:
+      stdio_writers = (
+        (ChunkType.STDOUT, stdout_isatty),
+        (ChunkType.STDERR, stderr_isatty)
+      )
+      types, ttys = zip(*(stdio_writers))
+      with NailgunStreamStdinReader.open(sock, stdin_isatty) as stdin_fd,\
+           NailgunStreamWriter.open_multi(sock, types, ttys) as ((stdout_fd, stderr_fd), writer),\
+           stdio_as(stdout_fd=stdout_fd, stderr_fd=stderr_fd, stdin_fd=stdin_fd):
+        # N.B. This will be passed to and called by the `DaemonExiter` prior to sending an
+        # exit chunk, to avoid any socket shutdown vs write races.
+        stdout, stderr = sys.stdout, sys.stderr
+        def finalizer():
+          try:
+            stdout.flush()
+            stderr.flush()
+          finally:
+            time.sleep(.001)  # HACK: Sleep 1ms in the main thread to free the GIL.
+            writer.stop()
+            writer.join()
+            stdout.close()
+            stderr.close()
+        yield finalizer
 
   def _setup_sigint_handler(self):
     """Sets up a control-c signal handler for the daemon runner context."""
@@ -185,8 +202,9 @@ class DaemonPantsRunner(ProcessManager):
     # Set context in the process title.
     set_process_title('pantsd-runner [{}]'.format(' '.join(self._args)))
 
-    # Broadcast our pid to the remote client so they can send us signals (i.e. SIGINT).
-    NailgunProtocol.send_pid(self._socket, bytes(os.getpid()))
+    # Broadcast our process group ID (in PID form - i.e. negated) to the remote client so
+    # they can send signals (e.g. SIGINT) to all processes in the runners process group.
+    NailgunProtocol.send_pid(self._socket, bytes(os.getpgrp() * -1))
 
     # Setup a SIGINT signal handler.
     self._setup_sigint_handler()

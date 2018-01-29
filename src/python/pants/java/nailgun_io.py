@@ -85,6 +85,8 @@ class NailgunStreamStdinReader(_StoppableDaemonThread):
     with _pipe(isatty) as (read_fd, write_fd):
       reader = NailgunStreamStdinReader(sock, os.fdopen(write_fd, 'wb'))
       with reader.running():
+        # Instruct the thin client to begin reading and sending stdin.
+        NailgunProtocol.send_start_reading_input(sock)
         yield read_fd
 
   def run(self):
@@ -140,14 +142,20 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
   @classmethod
   @contextmanager
-  def open(cls, sock, chunk_type, chunk_eof_type, isatty, buf_size=None, select_timeout=None):
-    """Yields the write side of a pipe that will copy appropriately chunked values to the socket."""
-    with cls.open_multi(sock, (chunk_type,), chunk_eof_type, isattys=(isatty,)) as ctx:
+  def open(cls, sock, chunk_type, isatty, chunk_eof_type=None, buf_size=None, select_timeout=None):
+    """Yields the write side of a pipe that will copy appropriately chunked values to a socket."""
+    with cls.open_multi(sock,
+                        (chunk_type,),
+                        (isatty,),
+                        chunk_eof_type,
+                        buf_size,
+                        select_timeout) as ctx:
       yield ctx
 
   @classmethod
   @contextmanager
-  def open_multi(cls, sock, chunk_types, chunk_eof_type, isattys, buf_size=None, select_timeout=None):
+  def open_multi(cls, sock, chunk_types, isattys, chunk_eof_type=None, buf_size=None,
+                 select_timeout=None):
     """Yields the write sides of pipes that will copy appropriately chunked values to the socket."""
     cls._assert_aligned(chunk_types, isattys)
 

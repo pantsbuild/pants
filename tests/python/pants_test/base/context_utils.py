@@ -14,7 +14,6 @@ from twitter.common.collections import maybe_list
 from pants.base.workunit import WorkUnit
 from pants.build_graph.target import Target
 from pants.goal.context import Context
-from pants_test.option.util.fakes import create_options
 
 
 class TestContext(Context):
@@ -57,6 +56,28 @@ class TestContext(Context):
 
     def report_target_info(self, scope, target, keys, val): pass
 
+
+  class TestLogger(logging.getLoggerClass()):
+    """A logger that converts our structured records into flat ones.
+
+    This is so we can use a regular logger in tests instead of our reporting machinery.
+    """
+
+    def makeRecord(self, name, lvl, fn, lno, msg, args, exc_info, func=None, extra=None):
+      msg = ''.join([msg] + [a[0] if isinstance(a, (list, tuple)) else a for a in args])
+      args = []
+      return super(TestContext.TestLogger, self).makeRecord(
+        name, lvl, fn, lno, msg, args, exc_info, func, extra)
+
+  def __init__(self, *args, **kwargs):
+    super(TestContext, self).__init__(*args, **kwargs)
+    logger_cls = logging.getLoggerClass()
+    try:
+      logging.setLoggerClass(self.TestLogger)
+      self._logger = logging.getLogger('test')
+    finally:
+      logging.setLoggerClass(logger_cls)
+
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """
@@ -70,7 +91,7 @@ class TestContext(Context):
     """
     :API: public
     """
-    return logging.getLogger('test')
+    return self._logger
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """
@@ -87,30 +108,6 @@ class TestContext(Context):
     """
     # Just execute in-process.
     return map(f, items)
-
-
-# TODO: Make Console and Workspace into subsystems, and simplify this signature.
-def create_context(options=None, passthru_args=None, target_roots=None, build_graph=None,
-                   build_file_parser=None, address_mapper=None,
-                   console_outstream=None, workspace=None, scheduler=None):
-  """Creates a ``Context`` with no options or targets by default.
-
-  :API: public
-
-  :param options: A map of scope -> (map of key to value).
-
-  Other params are as for ``Context``.
-  """
-  options = create_options(options or {}, passthru_args=passthru_args)
-  return create_context_from_options(options,
-                                     passthru_args=passthru_args,
-                                     target_roots=target_roots,
-                                     build_graph=build_graph,
-                                     build_file_parser=build_file_parser,
-                                     address_mapper=address_mapper,
-                                     console_outstream=console_outstream,
-                                     workspace=workspace,
-                                     scheduler=scheduler)
 
 
 def create_context_from_options(options, target_roots=None, build_graph=None,

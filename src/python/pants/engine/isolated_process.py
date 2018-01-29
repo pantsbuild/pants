@@ -227,7 +227,3 @@ def create_process_rules():
 @rule(ExecuteProcessResult, [Select(ExecuteProcessRequest)])
 def execute_process_noop(*args):
   raise Exception('This task is replaced intrinsically, and should never run.')
-
-
-
-

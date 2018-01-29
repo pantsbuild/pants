@@ -5,10 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.task.fmt_task_mixin import FmtTaskMixin
+
 from pants.contrib.go.tasks.go_fmt_task_base import GoFmtTaskBase
 
 
-class GoFmt(GoFmtTaskBase):
+class GoFmt(FmtTaskMixin, GoFmtTaskBase):
   """Format Go code using gofmt."""
 
   def execute(self):

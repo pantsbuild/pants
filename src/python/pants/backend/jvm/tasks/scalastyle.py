@@ -14,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.build_graph.target import Target
 from pants.option.custom_types import file_option
 from pants.process.xargs import Xargs
+from pants.task.lint_task_mixin import LintTaskMixin
 from pants.util.dirutil import touch
 
 
@@ -40,7 +41,7 @@ class FileExcluder(object):
     return True
 
 
-class Scalastyle(NailgunTask):
+class Scalastyle(LintTaskMixin, NailgunTask):
   """Checks scala source files to ensure they're stylish.
 
   Scalastyle only checks scala sources in non-synthetic targets.
@@ -69,7 +70,6 @@ class Scalastyle(NailgunTask):
   @classmethod
   def register_options(cls, register):
     super(Scalastyle, cls).register_options(register)
-    register('--skip', type=bool, fingerprint=True, help='Skip scalastyle.')
     register('--config', type=file_option, advanced=True, fingerprint=True,
              help='Path to scalastyle config file.')
     register('--excludes', type=file_option, advanced=True, fingerprint=True,
@@ -120,12 +120,8 @@ class Scalastyle(NailgunTask):
     return True
 
   def execute(self):
-    if self.get_options().skip:
-      self.context.log.info('Skipping scalastyle.')
-      return
-
     # Don't even try and validate options if we're irrelevant.
-    targets = self.get_non_synthetic_scala_targets(self.context.targets())
+    targets = self.get_non_synthetic_scala_targets(self.get_targets())
     if not targets:
       return
 

@@ -43,4 +43,7 @@ page(
 page(
   name='page',
   source='page.md',
+  dependencies=[
+    'src/docs:howto_contribute'
+  ]
 )

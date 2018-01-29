@@ -3,5 +3,6 @@ java_thrift_library(
   compiler='scrooge',
   language='android',
   compiler_args=['--finagle'],
-  dependencies=['3rdparty:thrift-0.6.1']
+  dependencies=['3rdparty:thrift-0.6.1'],
+  tags=['nolint']
 )

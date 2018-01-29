@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import pstats
 import shutil
+import signal
 import sys
 import unittest
 import uuid
@@ -18,7 +19,8 @@ import mock
 
 from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as,
                                     exception_logging, hard_exit_handler, maybe_profiled, open_zip,
-                                    pushd, stdio_as, temporary_dir, temporary_file)
+                                    pushd, signal_handler_as, stdio_as, temporary_dir,
+                                    temporary_file)
 from pants.util.process_handler import subprocess
 
 
@@ -250,6 +252,22 @@ class ContextutilTest(unittest.TestCase):
         self.assertEquals(b'', sys.stdin.read())
         print('garbage', file=sys.stdout)
         print('garbage', file=sys.stderr)
+
+  def test_signal_handler_as(self):
+    mock_initial_handler = 1
+    mock_new_handler = 2
+    with mock.patch('signal.signal', **PATCH_OPTS) as mock_signal:
+      mock_signal.return_value = mock_initial_handler
+      try:
+        with signal_handler_as(signal.SIGUSR2, mock_new_handler):
+          raise NotImplementedError('blah')
+      except NotImplementedError:
+        pass
+    self.assertEquals(mock_signal.call_count, 2)
+    mock_signal.assert_has_calls([
+      mock.call(signal.SIGUSR2, mock_new_handler),
+      mock.call(signal.SIGUSR2, mock_initial_handler)
+    ])
 
   def test_permissions(self):
     with temporary_file(permissions=0700) as f:
