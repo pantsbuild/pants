@@ -50,6 +50,7 @@ class BuildGraph(AbstractClass):
       super(BuildGraph.ManualSyntheticTargetError, self).__init__(
           'Found a manually-defined target at synthetic address {}'.format(addr.spec))
 
+
   class NoDepPredicateWalk(object):
     """This is a utility class to aid in graph traversals that don't have predicates on dependency edges."""
 
@@ -111,7 +112,6 @@ class BuildGraph(AbstractClass):
 
     def dep_predicate(self, target, dep, level):
       return self._leveled_predicate(dep, level)
-
 
   @staticmethod
   def closure(*vargs, **kwargs):
