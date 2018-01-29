@@ -686,43 +686,52 @@ class Target(AbstractTarget):
       respect_intransitive = closure_kwargs.get('respect_intransitive')
       include_scopes = closure_kwargs.get('include_scopes')
       exclude_scopes = closure_kwargs.get('exclude_scopes')
-      def predicate(source, dependency):
+      def dep_predicate(source, dependency):
+        # Always expand aliases.
         if type(source) in dep_context.alias_types:
           return True
+
+        # If the dependency isn't in scope, don't use it.
         if not dependency.scope.in_scope(
             include_scopes=include_scopes,
             exclude_scopes=exclude_scopes):
           return False
 
-        if source is self: # then just include all the direct deps.
-          return True
+        # if the dependency is intransitive, ignore it.
         if respect_intransitive and not dependency.transitive:
           return False
-        if dependency.address in source.export_addresses or \
-           dependency.is_synthetic and (dependency.concrete_derived_from.address in source.export_addresses):
-          return True
 
+        # Traverse other dependencies if they are exported.
+        if source._dep_is_exported(dependency):
+          return True
         return False
 
-
+      dep_addresses = [d.address for d in self.dependencies
+                        if d.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes)
+                      ]
       result = self._build_graph.transitive_subgraph_of_addresses_bfs(
-        addresses=[self.address],
-        dep_predicate=predicate
+        addresses=dep_addresses,
+        dep_predicate=dep_predicate
       )
 
       strict_deps = OrderedSet()
       for declared in result:
-        if declared is self:
-          continue
         if type(declared) in dep_context.alias_types:
           continue
         if isinstance(declared, dep_context.compiler_plugin_types):
-          strict_deps.update(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
+          strict_deps.update(declared.closure(bfs=True,
+            respect_intransitive=respect_intransitive,
+            include_scopes=include_scopes,
+            exclude_scopes=exclude_scopes))
         strict_deps.add(declared)
 
       strict_deps = list(strict_deps)
       self._cached_strict_dependencies_map[dep_context] = strict_deps
     return strict_deps
+
+  def _dep_is_exported(self, dependency):
+    return dependency.address in self.export_addresses or \
+           dependency.is_synthetic and (dependency.concrete_derived_from.address in self.export_addresses)
 
   @property
   def dependents(self):
