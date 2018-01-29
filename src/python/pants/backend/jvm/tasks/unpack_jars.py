@@ -82,7 +82,7 @@ class UnpackJars(Task):
     return True
 
   @classmethod
-  def _compile_patterns(cls, patterns, field_name="Unknown", spec="Unknown"):
+  def compile_patterns(cls, patterns, field_name="Unknown", spec="Unknown"):
     compiled_patterns = []
     for p in patterns:
       try:
@@ -100,12 +100,12 @@ class UnpackJars(Task):
     :param list includes: List of include patterns to pass to _file_filter.
     :param list excludes: List of exclude patterns to pass to _file_filter.
     """
-    include_patterns = cls._compile_patterns(includes or [],
-                                             field_name='include_patterns',
-                                             spec=spec)
-    exclude_patterns = cls._compile_patterns(excludes or [],
-                                             field_name='exclude_patterns',
-                                             spec=spec)
+    include_patterns = cls.compile_patterns(includes or [],
+                                            field_name='include_patterns',
+                                            spec=spec)
+    exclude_patterns = cls.compile_patterns(excludes or [],
+                                            field_name='exclude_patterns',
+                                            spec=spec)
     return lambda f: cls._file_filter(f, include_patterns, exclude_patterns)
 
   # TODO(mateor) move unpack code that isn't jar-specific to fs.archive or an Unpack base class.
@@ -130,28 +130,25 @@ class UnpackJars(Task):
     if not os.path.exists(unpack_dir):
       os.makedirs(unpack_dir)
 
+    direct_coords = {jar.coordinate for jar in unpacked_jars.imported_jars}
     unpack_filter = self.get_unpack_filter(unpacked_jars)
     jar_import_products = self.context.products.get_data(JarImportProducts)
     for coordinate, jar_path in jar_import_products.imports(unpacked_jars):
-      self.context.log.debug('Unpacking jar {coordinate} from {jar_path} to {unpack_dir}.'
-                             .format(coordinate=coordinate,
-                                     jar_path=jar_path,
-                                     unpack_dir=unpack_dir))
-      ZIP.extract(jar_path, unpack_dir, filter_func=unpack_filter)
+      if not unpacked_jars.payload.intransitive or coordinate in direct_coords:
+        self.context.log.info('Unpacking jar {coordinate} from {jar_path} to {unpack_dir}.'.format(
+          coordinate=coordinate, jar_path=jar_path, unpack_dir=unpack_dir))
+        ZIP.extract(jar_path, unpack_dir, filter_func=unpack_filter)
 
   def execute(self):
     addresses = [target.address for target in self.context.targets()]
     closure = self.context.build_graph.transitive_subgraph_of_addresses(addresses)
     unpacked_jars_list = [t for t in closure if isinstance(t, UnpackedJars)]
 
-    unpacked_targets = []
     with self.invalidated(unpacked_jars_list,
                           fingerprint_strategy=UnpackJarsFingerprintStrategy(),
                           invalidate_dependents=True) as invalidation_check:
-      if invalidation_check.invalid_vts:
-        unpacked_targets.extend([vt.target for vt in invalidation_check.invalid_vts])
-        for target in unpacked_targets:
-          self._unpack(target)
+      for vt in invalidation_check.invalid_vts:
+        self._unpack(vt.target)
 
     for unpacked_jars_target in unpacked_jars_list:
       unpack_dir = self._unpack_dir(unpacked_jars_target)
@@ -167,6 +164,3 @@ class UnpackJars(Task):
       rel_unpack_dir = os.path.relpath(unpack_dir, get_buildroot())
       unpacked_sources_product = self.context.products.get_data('unpacked_archives', lambda: {})
       unpacked_sources_product[unpacked_jars_target] = [found_files, rel_unpack_dir]
-
-    # Returning the list of unpacked targets for testing purposes
-    return unpacked_targets
