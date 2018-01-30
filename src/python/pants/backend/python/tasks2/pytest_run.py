@@ -11,11 +11,13 @@ import shutil
 import time
 import traceback
 import uuid
+from collections import OrderedDict
 from contextlib import contextmanager
 from textwrap import dedent
 
 from six import StringIO
 from six.moves import configparser
+from twitter.common.collections import OrderedSet
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks2.gather_sources import GatherSources
@@ -192,12 +194,6 @@ class PytestRun(TestRunnerTaskMixin, Task):
     return self.get_options().level == 'debug'
 
   def _generate_coverage_config(self, source_mappings):
-    # For the benefit of macos testing, add the 'real' path the directory as an equivalent.
-    def add_realpath(path):
-      realpath = os.path.realpath(path)
-      if realpath != canonical and realpath not in alternates:
-        realpaths.add(realpath)
-
     cp = configparser.SafeConfigParser()
     cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
@@ -205,15 +201,16 @@ class PytestRun(TestRunnerTaskMixin, Task):
     # coverage data files into canonical form.
     # See the "[paths]" entry here: http://nedbatchelder.com/code/coverage/config.html for details.
     cp.add_section('paths')
-    for canonical, alternates in source_mappings.items():
+    for canonical, alternate in source_mappings.items():
       key = canonical.replace(os.sep, '.')
-      realpaths = set()
-      add_realpath(canonical)
-      for path in alternates:
-        add_realpath(path)
-      cp.set('paths',
-             key,
-             self._format_string_list([canonical] + list(alternates) + list(realpaths)))
+
+      # For the benefit of macos testing, add the 'real' paths as equivalents.
+      paths = OrderedSet([canonical,
+                          alternate,
+                          os.path.realpath(canonical),
+                          os.path.realpath(alternate)])
+
+      cp.set('paths', key, self._format_string_list(paths))
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:
@@ -250,14 +247,15 @@ class PytestRun(TestRunnerTaskMixin, Task):
       yield []
       return
 
-    pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
+    def pex_src_root(tgt):
+      return os.path.relpath(self._source_chroot_path([tgt]), get_buildroot())
 
     source_mappings = {}
     for target in targets:
       libs = (tgt for tgt in target.closure()
               if tgt.has_sources('.py') and not isinstance(tgt, PythonTests))
       for lib in libs:
-        source_mappings[lib.target_base] = [pex_src_root]
+        source_mappings[lib.target_base] = pex_src_root(lib)
 
     def ensure_trailing_sep(path):
       return path if path.endswith(os.path.sep) else path + os.path.sep
@@ -287,13 +285,13 @@ class PytestRun(TestRunnerTaskMixin, Task):
           rel_source = os.path.relpath(source, get_buildroot())
           rel_source = ensure_trailing_sep(rel_source)
           found_target_base = False
-          for target_base in source_mappings:
+          for target_base, pex_root in source_mappings.items():
             prefix = ensure_trailing_sep(target_base)
             if rel_source.startswith(prefix):
               # ... rel_source will match on prefix=src/python/ ...
               suffix = rel_source[len(prefix):]
               # ... suffix will equal foo/bar ...
-              coverage_sources.append(os.path.join(pex_src_root, suffix))
+              coverage_sources.append(os.path.join(pex_root, suffix))
               found_target_base = True
               # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
               break
@@ -312,8 +310,11 @@ class PytestRun(TestRunnerTaskMixin, Task):
         env = {
           'PEX_MODULE': 'coverage.cmdline:main'
         }
-        def pex_run(arguments):
-          return self._pex_run(pex, workunit_name='coverage', args=arguments, env=env)
+        def coverage_run(subcommand, arguments):
+          return self._pex_run(pex,
+                               workunit_name='coverage-{}'.format(subcommand),
+                               args=[subcommand] + arguments,
+                               env=env)
 
         # On failures or timeouts, the .coverage file won't be written.
         if not os.path.exists('.coverage'):
@@ -323,13 +324,15 @@ class PytestRun(TestRunnerTaskMixin, Task):
           # This swaps the /tmp pex chroot source paths for the local original source paths
           # the pex was generated from and which the user understands.
           shutil.move('.coverage', '.coverage.raw')
-          pex_run(['combine', '--rcfile', coverage_rc])
-          pex_run(['report', '-i', '--rcfile', coverage_rc])
+          # N.B.: This transforms the contents of .coverage.raw and moves it back into .coverage.
+          coverage_run('combine', ['--rcfile', coverage_rc])
+
+          coverage_run('report', ['-i', '--rcfile', coverage_rc])
 
           coverage_workdir = workdirs.coverage_path
-          pex_run(['html', '-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
+          coverage_run('html', ['-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
           coverage_xml = os.path.join(coverage_workdir, 'coverage.xml')
-          pex_run(['xml', '-i', '--rcfile', coverage_rc, '-o', coverage_xml])
+          coverage_run('xml', ['-i', '--rcfile', coverage_rc, '-o', coverage_xml])
 
   def _get_shard_conftest_content(self):
     shard_spec = self.get_options().test_shard
@@ -386,7 +389,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       import pytest
 
       # Map from source path relative to chroot -> source path relative to buildroot.
-      _SOURCES_MAP = {}
+      _SOURCES_MAP = {!r}
 
       @pytest.hookimpl(hookwrapper=True)
       def pytest_runtest_protocol(item, nextitem):
@@ -400,7 +403,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
           yield
         finally:
           item._nodeid = real_nodeid
-    """.format(sources_map))
+    """.format(dict(sources_map)))
     # Add in the sharding conftest, if any.
     shard_conftest_content = self._get_shard_conftest_content()
     return (console_output_conftest_content + shard_conftest_content).encode('utf8')
@@ -463,7 +466,7 @@ class PytestRun(TestRunnerTaskMixin, Task):
       return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
-    pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
+    pex_src_root = os.path.relpath(self._source_chroot_path(targets), get_buildroot())
     # First map chrooted sources back to their targets.
     relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
       for src in target.sources_relative_to_source_root()}
@@ -505,7 +508,15 @@ class PytestRun(TestRunnerTaskMixin, Task):
     # TODO(John Sirois): Consume `py.test` pexes matched to the partitioning in effect after
     # https://github.com/pantsbuild/pants/pull/4638 lands.
     if self.get_options().fast:
-      yield tuple(targets)
+      targets_by_target_base = OrderedDict()
+      for target in targets:
+        targets_for_base = targets_by_target_base.get(target.target_base)
+        if targets_for_base is None:
+          targets_for_base = []
+          targets_by_target_base[target.target_base] = targets_for_base
+        targets_for_base.append(target)
+      for targets in targets_by_target_base.values():
+        yield tuple(targets)
     else:
       for target in targets:
         yield (target,)
@@ -685,10 +696,10 @@ class PytestRun(TestRunnerTaskMixin, Task):
     if self._run_in_chroot:
       path_func = lambda rel_src: rel_src
     else:
-      source_chroot = os.path.relpath(self._source_chroot_path, get_buildroot())
+      source_chroot = os.path.relpath(self._source_chroot_path(targets), get_buildroot())
       path_func = lambda rel_src: os.path.join(source_chroot, rel_src)
 
-    sources_map = {}  # Path from chroot -> Path from buildroot.
+    sources_map = OrderedDict()  # Path from chroot -> Path from buildroot.
     for t in targets:
       for p in t.sources_relative_to_source_root():
         sources_map[path_func(p)] = os.path.join(t.target_base, p)
@@ -726,7 +737,8 @@ class PytestRun(TestRunnerTaskMixin, Task):
       if os.path.exists(junitxml_path):
         os.unlink(junitxml_path)
 
-      result = self._do_run_tests_with_args(pex, args)
+      with self._maybe_run_in_chroot(targets):
+        result = self._do_run_tests_with_args(pex, args)
 
       # There was a problem prior to test execution preventing junit xml file creation so just let
       # the failure result bubble.
@@ -748,9 +760,16 @@ class PytestRun(TestRunnerTaskMixin, Task):
 
       return result.with_failed_targets(failed_targets)
 
-  @memoized_property
-  def _source_chroot_path(self):
-    return self.context.products.get_data(GatherSources.PYTHON_SOURCES).path()
+  def _source_chroot_path(self, targets):
+    if len(targets) > 1:
+      target_bases = {target.target_base for target in targets}
+      assert len(target_bases) == 1, ('Expected targets to live in the same source root, given '
+                                      'targets living under the following source roots: {}'
+                                      .format(', '.join(sorted(target_bases))))
+    representative_target = targets[0]
+
+    python_sources = self.context.products.get_data(GatherSources.PythonSources)
+    return python_sources.for_target(representative_target).path()
 
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
@@ -764,21 +783,20 @@ class PytestRun(TestRunnerTaskMixin, Task):
     return self.get_options().chroot
 
   @contextmanager
-  def _maybe_run_in_chroot(self):
+  def _maybe_run_in_chroot(self, targets):
     if self._run_in_chroot:
-      with pushd(self._source_chroot_path):
+      with pushd(self._source_chroot_path(targets)):
         yield
     else:
       yield
 
   def _spawn(self, pex, workunit, args, setsid=False, env=None):
-    with self._maybe_run_in_chroot():
-      env = env or {}
-      process = pex.run(args,
-                        with_chroot=False,  # We handle chrooting ourselves.
-                        blocking=False,
-                        setsid=setsid,
-                        env=env,
-                        stdout=workunit.output('stdout'),
-                        stderr=workunit.output('stderr'))
-      return SubprocessProcessHandler(process)
+    env = env or {}
+    process = pex.run(args,
+                      with_chroot=False,  # We handle chrooting ourselves.
+                      blocking=False,
+                      setsid=setsid,
+                      env=env,
+                      stdout=workunit.output('stdout'),
+                      stderr=workunit.output('stderr'))
+    return SubprocessProcessHandler(process)
