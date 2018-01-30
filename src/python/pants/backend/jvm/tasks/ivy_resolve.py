@@ -95,6 +95,8 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
 
     targets = self.context.targets()
     if all(not isinstance(target, JarLibrary) for target in targets):
+      if self._report:
+        self.context.log.info("Not generating a report. No resolution performed.")
       return
 
     executor = self.create_java_executor()
