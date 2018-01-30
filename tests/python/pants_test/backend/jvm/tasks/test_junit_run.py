@@ -195,8 +195,7 @@ class JUnitRunnerTest(JvmToolTaskTestBase):
                                  r'must include a non-empty set of sources'):
       task.execute()
 
-  # We should skip the execution (and caching) phase when there are no test sources.
-  @ensure_cached(JUnitRun, expected_num_artifacts=0)
+  @ensure_cached(JUnitRun, expected_num_artifacts=1)
   def test_allow_empty_sources(self):
     self.add_to_build_file('foo', dedent("""
         junit_tests(
