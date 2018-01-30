@@ -12,6 +12,7 @@ from textwrap import dedent
 
 from pants.backend.jvm.ivy_utils import IvyUtils
 from pants.backend.jvm.subsystems.resolve_subsystem import JvmResolveSubsystem
+from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
@@ -89,10 +90,16 @@ class IvyResolve(IvyTaskMixin, NailgunTask):
     if JvmResolveSubsystem.global_instance().get_options().resolver != 'ivy':
       return
 
-    executor = self.create_java_executor()
-    targets = self.context.targets()
     compile_classpath = self.context.products.get_data('compile_classpath',
         init_func=ClasspathProducts.init_func(self.get_options().pants_workdir))
+
+    targets = self.context.targets()
+    if all(not isinstance(target, JarLibrary) for target in targets):
+      if self._report:
+        self.context.log.info("Not generating a report. No resolution performed.")
+      return
+
+    executor = self.create_java_executor()
     results = self.resolve(executor=executor,
                                       targets=targets,
                                       classpath_products=compile_classpath,
