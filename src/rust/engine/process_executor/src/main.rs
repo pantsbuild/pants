@@ -44,17 +44,20 @@ If unspecified, local execution will be performed.",
     .unwrap()
     .map(|v| v.to_string())
     .collect();
-  let env: BTreeMap<String, String> = args
-    .values_of("env")
-    .unwrap()
-    .map(|v| {
-      let mut parts = v.splitn(2, "=");
-      (
-        parts.next().unwrap().to_string(),
-        parts.next().unwrap_or_default().to_string(),
-      )
-    })
-    .collect();
+  let env: BTreeMap<String, String> = match args.values_of("env") {
+    Some(values) => {
+      values
+        .map(|v| {
+          let mut parts = v.splitn(2, "=");
+          (
+            parts.next().unwrap().to_string(),
+            parts.next().unwrap_or_default().to_string(),
+          )
+        })
+        .collect()
+    }
+    None => BTreeMap::new(),
+  };
   let server = args.value_of("server");
 
   let request = process_execution::ExecuteProcessRequest { argv, env };
