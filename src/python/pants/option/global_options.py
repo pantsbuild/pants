@@ -106,7 +106,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='The directory to use for tracking subprocess metadata, if any. This should '
                   'live outside of the dir used by `--pants-workdir` to allow for tracking '
                   'subprocesses that outlive the workdir data (e.g. `./pants server`).')
-    register('--pants-config-files', advanced=True, type=list,
+    register('--pants-config-files', advanced=True, type=list, daemon=False,
              default=[get_default_pants_config_file()], help='Paths to Pants config files.')
     # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
     # to set extra config file locations in an initial bootstrap config file.
@@ -116,7 +116,7 @@ class GlobalOptionsRegistrar(Optionable):
              help='A second config file, to override pants.ini.')
     register('--pantsrc', advanced=True, type=bool, default=True,
              help='Use pantsrc files.')
-    register('--pantsrc-files', advanced=True, type=list, metavar='<path>',
+    register('--pantsrc-files', advanced=True, type=list, metavar='<path>', daemon=False,
              default=['/etc/pantsrc', '~/.pants.rc'],
              help='Override config with values from these files. '
                   'Later files override earlier ones.')
