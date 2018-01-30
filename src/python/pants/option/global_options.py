@@ -145,7 +145,7 @@ class GlobalOptionsRegistrar(Optionable):
 
     # These logging options are registered in the bootstrap phase so that plugins can log during
     # registration and not so that their values can be interpolated in configs.
-    register('-d', '--logdir', advanced=True, metavar='<dir>', daemon=False,
+    register('-d', '--logdir', advanced=True, metavar='<dir>',
              help='Write logs to files under this directory.')
 
     # This facilitates bootstrap-time configuration of pantsd usage such that we can
