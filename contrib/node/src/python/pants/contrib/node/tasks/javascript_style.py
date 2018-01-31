@@ -191,6 +191,7 @@ class JavascriptStyleFmt(FmtTaskMixin, JavascriptStyleBase):
   """
   fix = True
 
+
 # Deprecated old name for class.
 class JavascriptStyle(JavascriptStyleLint):
   @deprecated('1.7.0.dev0', 'Replace with JavascriptStyleLint.')
