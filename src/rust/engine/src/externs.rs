@@ -168,9 +168,13 @@ pub fn create_exception(msg: &str) -> Value {
   })
 }
 
-pub fn invoke_runnable(func: &Value, args: &[Value]) -> Result<Value, Failure> {
+pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
+  call(&project_ignoring_type(&value, method), args)
+}
+
+pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
   with_externs(|e| {
-    (e.invoke_runnable)(e.context, func, args.as_ptr(), args.len() as u64)
+    (e.call)(e.context, func, args.as_ptr(), args.len() as u64)
   }).into()
 }
 
@@ -178,8 +182,8 @@ pub fn invoke_runnable(func: &Value, args: &[Value]) -> Result<Value, Failure> {
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
 ///
-pub fn invoke_unsafe(func: &Function, args: &Vec<Value>) -> Value {
-  invoke_runnable(&val_for_id(func.0), args, false).unwrap_or_else(|e| {
+pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
+  call(&val_for_id(func.0), args).unwrap_or_else(|e| {
     panic!("Core function `{}` failed: {:?}", id_to_str(func.0), e);
   })
 }
@@ -218,7 +222,8 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   context: *const ExternContext,
   log: LogExtern,
-  eval: Eval,
+  call: CallExtern,
+  eval: EvalExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -235,7 +240,6 @@ pub struct Externs {
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
-  invoke_runnable: InvokeRunnable,
   // TODO: This type is also declared on `types::Types`.
   py_str_type: TypeId,
 }
@@ -248,6 +252,8 @@ impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
     log: LogExtern,
+    call: CallExtern,
+    eval: EvalExtern,
     key_for: KeyForExtern,
     val_for: ValForExtern,
     clone_val: CloneValExtern,
@@ -263,12 +269,13 @@ impl Externs {
     project_ignoring_type: ProjectIgnoringTypeExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
-    invoke_runnable: InvokeRunnable,
     py_str_type: TypeId,
   ) -> Externs {
     Externs {
       context: ext_context,
       log: log,
+      call: call,
+      eval: eval,
       key_for: key_for,
       val_for: val_for,
       clone_val: clone_val,
@@ -285,7 +292,6 @@ impl Externs {
       id_to_str: id_to_str,
       val_to_str: val_to_str,
       create_exception: create_exception,
-      invoke_runnable: invoke_runnable,
       py_str_type: py_str_type,
     }
   }
@@ -340,16 +346,12 @@ pub enum LogLevel {
 pub struct PyResult {
   is_throw: bool,
   value: Value,
-  traceback: Buffer,
 }
 
 impl From<PyResult> for Result<Value, Failure> {
   fn from(result: PyResult) -> Self {
     if result.is_throw {
-      let method_val = externs::project_ignoring_type(&result.value, "format_exc");
-      let traceback = externs::invoke_runnable(&method_val, &[], false)
-        .map(|exc_str| externs::val_to_str(exc_str))
-        .unwrap_or_else("<failed to capture exception traceback.>");
+      let traceback = project_str(&result.value, "_formatted_exc");
       Err(Failure::Throw(result.value, traceback))
     } else {
       Ok(result.value)
@@ -481,11 +483,11 @@ pub type CreateExceptionExtern = extern "C" fn(*const ExternContext,
                                                str_len: u64)
                                                -> Value;
 
-pub type InvokeRunnable = extern "C" fn(*const ExternContext, *const Value, *const Value, u64)
-                                        -> PyResult;
+pub type CallExtern = extern "C" fn(*const ExternContext, *const Value, *const Value, u64)
+                                    -> PyResult;
 
-pub type Eval = extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64)
-                              -> PyResult;
+pub type EvalExtern = extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64)
+                                    -> PyResult;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
 where

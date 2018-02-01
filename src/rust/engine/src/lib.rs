@@ -36,9 +36,9 @@ use std::path::{Path, PathBuf};
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
-              ExternContext, Externs, IdToStrExtern, InvokeRunnable, LogExtern, KeyForExtern,
-              ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern, PyResult,
-              SatisfiedByExtern, StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern,
+              ExternContext, Externs, IdToStrExtern, CallExtern, EvalExtern, LogExtern,
+              KeyForExtern, ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern,
+              PyResult, SatisfiedByExtern, StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern,
               StoreBytesExtern, TypeIdBuffer, ValForExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
@@ -119,6 +119,8 @@ impl RawNodes {
 pub extern "C" fn externs_set(
   ext_context: *const ExternContext,
   log: LogExtern,
+  call: CallExtern,
+  eval: EvalExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -134,12 +136,13 @@ pub extern "C" fn externs_set(
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
   create_exception: CreateExceptionExtern,
-  invoke_runnable: InvokeRunnable,
   py_str_type: TypeId,
 ) {
   externs::set_externs(Externs::new(
     ext_context,
     log,
+    call,
+    eval,
     key_for,
     val_for,
     clone_val,
@@ -155,7 +158,6 @@ pub extern "C" fn externs_set(
     project_ignoring_type,
     project_multi,
     create_exception,
-    invoke_runnable,
     py_str_type,
   ));
 }

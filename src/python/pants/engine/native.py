@@ -102,7 +102,8 @@ typedef Value            (*extern_ptr_project)(ExternContext*, Value*, uint8_t*,
 typedef ValueBuffer      (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
-typedef PyResult (*extern_ptr_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, _Bool);
+typedef PyResult         (*extern_ptr_call)(ExternContext*, Value*, Value*, uint64_t);
+typedef PyResult         (*extern_ptr_eval)(ExternContext*, uint8_t*, uint64_t);
 
 typedef void Tasks;
 typedef void Scheduler;
@@ -126,6 +127,8 @@ typedef struct {
 CFFI_HEADERS = '''
 void externs_set(ExternContext*,
                  extern_ptr_log,
+                 extern_ptr_call,
+                 extern_ptr_eval,
                  extern_ptr_key_for,
                  extern_ptr_val_for,
                  extern_ptr_clone_val,
@@ -141,7 +144,6 @@ void externs_set(ExternContext*,
                  extern_ptr_project_ignoring_type,
                  extern_ptr_project_multi,
                  extern_ptr_create_exception,
-                 extern_ptr_invoke_runnable,
                  TypeId);
 
 Tasks* tasks_create(void);
@@ -215,6 +217,8 @@ void garbage_collect_store(Scheduler*);
 CFFI_EXTERNS = '''
 extern "Python" {
   void             extern_log(ExternContext*, uint8_t, uint8_t*, uint64_t);
+  PyResult         extern_call(ExternContext*, Value*, Value*, uint64_t);
+  PyResult         extern_eval(ExternContext*, uint8_t*, uint64_t);
   Key              extern_key_for(ExternContext*, Value*);
   Value            extern_val_for(ExternContext*, Key*);
   Value            extern_clone_val(ExternContext*, Value*);
@@ -230,7 +234,6 @@ extern "Python" {
   Value            extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
   ValueBuffer      extern_project_multi(ExternContext*, Value*, uint8_t*, uint64_t);
   Value            extern_create_exception(ExternContext*, uint8_t*, uint64_t);
-  PyResult         extern_invoke_runnable(ExternContext*, Value*, Value*, uint64_t);
 }
 '''
 
@@ -281,6 +284,17 @@ def _initialize_externs(ffi):
 
   def to_py_str(msg_ptr, msg_len):
     return bytes(ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
+
+  def call(c, func, args):
+    try:
+      val = func(*args)
+      is_throw = False
+    except Exception as e:
+      val = e
+      is_throw = True
+      e._formatted_exc = traceback.format_exc()
+
+    return PyResult(is_throw, c.to_value(val))
 
   @ffi.def_extern()
   def extern_log(context_handle, level, msg_ptr, msg_len):
@@ -415,22 +429,18 @@ def _initialize_externs(ffi):
     return c.to_value(Exception(msg))
 
   @ffi.def_extern()
-  def extern_invoke_runnable(context_handle, func, args_ptr, args_len):
-    """Given a destructured rawRunnable, run it."""
+  def extern_call(context_handle, func, args_ptr, args_len):
+    """Given a callable, call it."""
     c = ffi.from_handle(context_handle)
     runnable = c.from_value(func)
     args = tuple(c.from_value(arg) for arg in ffi.unpack(args_ptr, args_len))
+    return call(c, runnable, args)
 
-    try:
-      val = runnable(*args)
-      is_throw = False
-      traceback_str = ''
-    except Exception as e:
-      val = e
-      is_throw = True
-      traceback_str = traceback.format_exc()
-
-    return PyResult(is_throw, c.to_value(val), c.utf8_buf(traceback_str))
+  @ffi.def_extern()
+  def extern_eval(context_handle, python_code_str_ptr, python_code_str_len):
+    """Given an evalable string, eval it and return a Value for its result."""
+    c = ffi.from_handle(context_handle)
+    return call(c, eval, [to_py_str(python_code_str_ptr, python_code_str_len)])
 
 
 class Value(datatype('Value', ['handle'])):
@@ -453,7 +463,7 @@ class TypeId(datatype('TypeId', ['id_'])):
   """Corresponds to the native object of the same name."""
 
 
-class PyResult(datatype('PyResult', ['is_throw', 'value', 'traceback'])):
+class PyResult(datatype('PyResult', ['is_throw', 'value'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -631,6 +641,8 @@ class Native(object):
       context = ExternContext(self.ffi)
       self.lib.externs_set(context.handle,
                            self.ffi_lib.extern_log,
+                           self.ffi_lib.extern_call,
+                           self.ffi_lib.extern_eval,
                            self.ffi_lib.extern_key_for,
                            self.ffi_lib.extern_val_for,
                            self.ffi_lib.extern_clone_val,
@@ -646,7 +658,6 @@ class Native(object):
                            self.ffi_lib.extern_project_ignoring_type,
                            self.ffi_lib.extern_project_multi,
                            self.ffi_lib.extern_create_exception,
-                           self.ffi_lib.extern_invoke_runnable,
                            TypeId(context.to_id(str)))
       return context
 
