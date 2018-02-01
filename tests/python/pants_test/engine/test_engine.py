@@ -165,3 +165,16 @@ class EngineTraceTest(unittest.TestCase, SchedulerTestBase):
               Exception: An exception for B
       ''').lstrip()+'\n',
       remove_locations_from_traceback(str(cm.exception)))
+
+  def test_illegal_root_selection(self):
+    rules = [
+      RootRule(B),
+    ]
+
+    scheduler = self.scheduler(rules, include_trace_on_error=False)
+
+    # No rules are available to compute A.
+    with self.assertRaises(Exception) as cm:
+      list(scheduler.product_request(A, subjects=[(B())]))
+
+    self.assert_equal_with_printing('No installed rules can satisfy Select(A) for a root subject of type B.', str(cm.exception))

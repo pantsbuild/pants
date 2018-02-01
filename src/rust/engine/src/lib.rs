@@ -37,9 +37,9 @@ use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
               ExternContext, Externs, IdToStrExtern, InvokeRunnable, LogExtern, KeyForExtern,
-              ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern, SatisfiedByExtern,
-              StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern, StoreBytesExtern,
-              TypeIdBuffer, ValForExtern, ValToStrExtern};
+              ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern, PyResult,
+              SatisfiedByExtern, StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern,
+              StoreBytesExtern, TypeIdBuffer, ValForExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
@@ -255,10 +255,12 @@ pub extern "C" fn execution_add_root_select(
   execution_request_ptr: *mut ExecutionRequest,
   subject: Key,
   product: TypeConstraint,
-) {
+) -> PyResult {
   with_scheduler(scheduler_ptr, |scheduler| {
     with_execution_request(execution_request_ptr, |execution_request| {
-      scheduler.add_root_select(execution_request, subject, product);
+      scheduler
+        .add_root_select(execution_request, subject, product)
+        .into()
     })
   })
 }

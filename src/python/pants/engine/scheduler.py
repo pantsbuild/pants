@@ -265,10 +265,12 @@ class WrappedNativeScheduler(object):
     self._native.lib.execution_reset(self._scheduler)
 
   def add_root_selection(self, execution_request, subject, product):
-    self._native.lib.execution_add_root_select(self._scheduler,
-                                               execution_request,
-                                               self._to_key(subject),
-                                               self._to_constraint(product))
+    res = self._native.lib.execution_add_root_select(self._scheduler,
+                                                     execution_request,
+                                                     self._to_key(subject),
+                                                     self._to_constraint(product))
+    if res.is_throw:
+      raise self._from_value(res.value)
 
   def visualize_to_dir(self):
     return self._native.visualize_to_dir

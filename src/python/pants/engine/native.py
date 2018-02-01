@@ -79,10 +79,9 @@ typedef struct {
 } BufferBuffer;
 
 typedef struct {
-  Value  value;
   _Bool  is_throw;
-  Buffer traceback;
-} RunnableComplete;
+  Value  value;
+} PyResult;
 
 typedef void ExternContext;
 
@@ -103,7 +102,7 @@ typedef Value            (*extern_ptr_project)(ExternContext*, Value*, uint8_t*,
 typedef ValueBuffer      (*extern_ptr_project_multi)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_project_ignoring_type)(ExternContext*, Value*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_create_exception)(ExternContext*, uint8_t*, uint64_t);
-typedef RunnableComplete (*extern_ptr_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, _Bool);
+typedef PyResult (*extern_ptr_invoke_runnable)(ExternContext*, Value*, Value*, uint64_t, _Bool);
 
 typedef void Tasks;
 typedef void Scheduler;
@@ -196,7 +195,7 @@ uint64_t graph_invalidate(Scheduler*, BufferBuffer);
 void graph_visualize(Scheduler*, ExecutionRequest*, char*);
 void graph_trace(Scheduler*, ExecutionRequest*, char*);
 
-void execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
+PyResult  execution_add_root_select(Scheduler*, ExecutionRequest*, Key, TypeConstraint);
 RawNodes* execution_execute(Scheduler*, ExecutionRequest*);
 
 Value validator_run(Scheduler*);
@@ -231,7 +230,7 @@ extern "Python" {
   Value            extern_project_ignoring_type(ExternContext*, Value*, uint8_t*, uint64_t);
   ValueBuffer      extern_project_multi(ExternContext*, Value*, uint8_t*, uint64_t);
   Value            extern_create_exception(ExternContext*, uint8_t*, uint64_t);
-  RunnableComplete extern_invoke_runnable(ExternContext*, Value*, Value*, uint64_t, _Bool);
+  PyResult         extern_invoke_runnable(ExternContext*, Value*, Value*, uint64_t);
 }
 '''
 
@@ -416,7 +415,7 @@ def _initialize_externs(ffi):
     return c.to_value(Exception(msg))
 
   @ffi.def_extern()
-  def extern_invoke_runnable(context_handle, func, args_ptr, args_len, cacheable):
+  def extern_invoke_runnable(context_handle, func, args_ptr, args_len):
     """Given a destructured rawRunnable, run it."""
     c = ffi.from_handle(context_handle)
     runnable = c.from_value(func)
@@ -431,7 +430,7 @@ def _initialize_externs(ffi):
       is_throw = True
       traceback_str = traceback.format_exc()
 
-    return RunnableComplete(c.to_value(val), is_throw, c.utf8_buf(traceback_str))
+    return PyResult(is_throw, c.to_value(val), c.utf8_buf(traceback_str))
 
 
 class Value(datatype('Value', ['handle'])):
@@ -454,7 +453,7 @@ class TypeId(datatype('TypeId', ['id_'])):
   """Corresponds to the native object of the same name."""
 
 
-class RunnableComplete(datatype('RunnableComplete', ['value', 'is_throw', 'traceback'])):
+class PyResult(datatype('PyResult', ['is_throw', 'value', 'traceback'])):
   """Corresponds to the native object of the same name."""
 
 

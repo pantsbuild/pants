@@ -19,6 +19,12 @@ pub fn log(level: LogLevel, msg: &str) {
   })
 }
 
+pub fn eval(python: &str) -> Result<Value, Failure> {
+  with_externs(|e| {
+    (e.eval)(e.context, python.as_ptr(), python.len() as u64)
+  }).into()
+}
+
 pub fn key_for(val: &Value) -> Key {
   with_externs(|e| (e.key_for)(e.context, val))
 }
@@ -162,22 +168,10 @@ pub fn create_exception(msg: &str) -> Value {
   })
 }
 
-pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<Value, Failure> {
-  let result = with_externs(|e| {
-    (e.invoke_runnable)(e.context, func, args.as_ptr(), args.len() as u64, cacheable)
-  });
-  if result.is_throw {
-    let traceback = result.traceback.to_string().unwrap_or_else(|e| {
-      format!(
-        "<failed to decode unicode for {:?}: {}>",
-        result.traceback,
-        e
-      )
-    });
-    Err(Failure::Throw(result.value, traceback))
-  } else {
-    Ok(result.value)
-  }
+pub fn invoke_runnable(func: &Value, args: &[Value]) -> Result<Value, Failure> {
+  with_externs(|e| {
+    (e.invoke_runnable)(e.context, func, args.as_ptr(), args.len() as u64)
+  }).into()
 }
 
 ///
@@ -224,6 +218,7 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   context: *const ExternContext,
   log: LogExtern,
+  eval: Eval,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -342,10 +337,36 @@ pub enum LogLevel {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct RunnableComplete {
-  value: Value,
+pub struct PyResult {
   is_throw: bool,
+  value: Value,
   traceback: Buffer,
+}
+
+impl From<PyResult> for Result<Value, Failure> {
+  fn from(result: PyResult) -> Self {
+    if result.is_throw {
+      let method_val = externs::project_ignoring_type(&result.value, "format_exc");
+      let traceback = externs::invoke_runnable(&method_val, &[], false)
+        .map(|exc_str| externs::val_to_str(exc_str))
+        .unwrap_or_else("<failed to capture exception traceback.>");
+      Err(Failure::Throw(result.value, traceback))
+    } else {
+      Ok(result.value)
+    }
+  }
+}
+
+impl From<Result<(), String>> for PyResult {
+  fn from(res: Result<(), String>) -> Self {
+    match res {
+      Ok(()) => PyResult { is_throw: false, value: eval("None").unwrap() },
+      Err(msg) => PyResult {
+        is_throw: true,
+        value: create_exception(&msg),
+      },
+    }
+  }
 }
 
 // Points to an array containing a series of values allocated by Python.
@@ -460,12 +481,11 @@ pub type CreateExceptionExtern = extern "C" fn(*const ExternContext,
                                                str_len: u64)
                                                -> Value;
 
-pub type InvokeRunnable = extern "C" fn(*const ExternContext,
-                                        *const Value,
-                                        *const Value,
-                                        u64,
-                                        bool)
-                                        -> RunnableComplete;
+pub type InvokeRunnable = extern "C" fn(*const ExternContext, *const Value, *const Value, u64)
+                                        -> PyResult;
+
+pub type Eval = extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64)
+                              -> PyResult;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
 where
