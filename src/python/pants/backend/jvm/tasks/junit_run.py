@@ -406,7 +406,11 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
   def _batched(self):
     return self._batch_size != self._BATCH_ALL
 
-  def _run_junit(self, test_registry, output_dir, coverage):
+  def _run_junit(self, test_targets, output_dir, coverage):
+    test_registry = self._collect_test_targets(test_targets)
+    if test_registry.empty:
+      return TestResult.rc(0)
+
     coverage.instrument(output_dir)
 
     def parse_error_handler(parse_error):
@@ -590,7 +594,8 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for target in targets:
         yield (target,), os.path.join(output_dir, target.id)
     else:
-      yield tuple(targets), output_dir
+      if targets:
+        yield tuple(targets), output_dir
 
   def _execute(self, all_targets):
     with self._isolation(all_targets) as (output_dir, reports, coverage):
@@ -599,7 +604,9 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       for (partition, partition_output_dir) in self._iter_partitions(self._get_test_targets(),
                                                                      output_dir):
         try:
-          rv = self._run_partition(partition, partition_output_dir, coverage)
+          rv = self._run_partition(test_targets=partition,
+                                   output_dir=partition_output_dir,
+                                   coverage=coverage)
         except ErrorWhileTesting as e:
           rv = TestResult.from_error(e)
 
@@ -642,22 +649,14 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       if error:
         raise error
 
-  def _run_partition(self, targets, output_dir, coverage):
-    with self.invalidated(targets=targets,
+  def _run_partition(self, test_targets, output_dir, coverage):
+    with self.invalidated(targets=test_targets,
                           # Re-run tests when the code they test (and depend on) changes.
                           invalidate_dependents=True) as invalidation_check:
 
-      all_test_tgts, invalid_test_tgts = [], []
-      is_test_target = self._test_target_filter()
-      for vts in invalidation_check.all_vts:
-        test_targets = [tgt for tgt in vts.targets if is_test_target(tgt)]
-        all_test_tgts.extend(test_targets)
-        if not vts.valid:
-          invalid_test_tgts.extend(test_targets)
-
-      test_registry = self._collect_test_targets(invalid_test_tgts)
-      if test_registry.empty:
-        return TestResult.rc(0)
+      invalid_test_tgts = [invalid_test_tgt
+                           for vts in invalidation_check.invalid_vts
+                           for invalid_test_tgt in vts.targets]
 
       # Processing proceeds through:
       # 1.) output -> output_dir
@@ -665,7 +664,7 @@ class JUnitRun(TestRunnerTaskMixin, JvmToolTaskMixin, JvmTask):
       # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
 
       # 1.) Write all results that will be potentially cached to output_dir.
-      result = self._run_junit(test_registry, output_dir, coverage).checked()
+      result = self._run_junit(invalid_test_tgts, output_dir, coverage).checked()
 
       cache_vts = self._vts_for_partition(invalidation_check)
       if invalidation_check.all_vts == invalidation_check.invalid_vts:
