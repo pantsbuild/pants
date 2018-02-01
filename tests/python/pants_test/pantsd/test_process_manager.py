@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import logging
 import os
 import sys
 from contextlib import contextmanager
@@ -141,7 +142,7 @@ class TestProcessMetadataManager(BaseTest):
 
   def test_deadline_until(self):
     with self.assertRaises(self.pmm.Timeout):
-      with self.captured_logging() as captured:
+      with self.captured_logging(logging.INFO) as captured:
         self.pmm._deadline_until(lambda: False, 'the impossible', timeout=.5, info_interval=.1)
     self.assertTrue(4 <= len(captured.infos()) <= 6,
                     'Expected between 4 and 6 infos, got: {}'.format(captured.infos()))
