@@ -14,7 +14,6 @@ from contextlib import contextmanager
 import mock
 import psutil
 
-from pants.pantsd import process_manager
 from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
