@@ -487,12 +487,13 @@ class LocalScheduler(object):
         cumulative_trace = '\n'.join(self.trace(request))
         raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 
-      if len(throw_root_states) == 1:
+      unique_exceptions = set(t.exc for t in throw_root_states)
+      if len(unique_exceptions) == 1:
         raise throw_root_states[0].exc
       else:
         raise ExecutionError('Multiple exceptions encountered:\n  {}'
-                             .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
-                                                 for t in throw_root_states)))
+                             .format('\n  '.join('{}: {}'.format(type(t).__name__, str(t))
+                                                                 for t in unique_exceptions)))
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.
