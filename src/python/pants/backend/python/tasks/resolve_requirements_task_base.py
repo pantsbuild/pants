@@ -58,10 +58,12 @@ class ResolveRequirementsTaskBase(Task):
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
           # Handle locally-built python distribution dependencies.
+          local_dist_req_libs = []
           built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-          local_dist_req_libs = build_req_libs_provided_by_setup_file(self.context,
-                                                                      built_dists,
-                                                                      self.__class__.__name__)
+          if built_dists:
+            local_dist_req_libs = build_req_libs_provided_by_setup_file(self.context,
+                                                                        built_dists,
+                                                                        self.__class__.__name__)
           req_libs = local_dist_req_libs + req_libs
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)

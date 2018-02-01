@@ -178,15 +178,14 @@ def build_req_libs_provided_by_setup_file(context, local_built_dists, class_name
   """
   req_libs = []
   local_whl_reqs = []
-  if local_built_dists:
-    for whl_location in local_built_dists:
-      base = os.path.basename(whl_location)
-      whl_dir = os.path.dirname(whl_location)
-      whl_metadata = base.split('-')
-      req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
-      local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
-    if local_whl_reqs:
-      addr = Address.parse(class_name)
-      context.build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)
-      req_libs = [context.build_graph.get_target(addr)]
+  for whl_location in local_built_dists:
+    base = os.path.basename(whl_location)
+    whl_dir = os.path.dirname(whl_location)
+    whl_metadata = base.split('-')
+    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
+    local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
+  if local_whl_reqs:
+    addr = Address.parse(class_name)
+    context.build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)
+    req_libs = [context.build_graph.get_target(addr)]
   return req_libs
