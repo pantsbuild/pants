@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import errno
+import logging
 import os
 import sys
 from contextlib import contextmanager
@@ -13,6 +14,7 @@ from contextlib import contextmanager
 import mock
 import psutil
 
+from pants.pantsd import process_manager
 from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessMetadataManager,
                                           swallow_psutil_exceptions)
 from pants.util.contextutil import temporary_dir
@@ -141,7 +143,7 @@ class TestProcessMetadataManager(BaseTest):
 
   def test_deadline_until(self):
     with self.assertRaises(self.pmm.Timeout):
-      with self.captured_logging() as captured:
+      with self.captured_logging(logging.INFO) as captured:
         self.pmm._deadline_until(lambda: False, 'the impossible', timeout=.5, info_interval=.1)
     self.assertTrue(4 <= len(captured.infos()) <= 6,
                     'Expected between 4 and 6 infos, got: {}'.format(captured.infos()))
