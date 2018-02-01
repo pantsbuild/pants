@@ -7,9 +7,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from textwrap import dedent
 
+from pants.backend.python.subsystems.python_setup import PythonSetup
+from pants.python.python_repos import PythonRepos
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
-from pants.contrib.python.checks.tasks.python_eval import PythonEval
+from pants.contrib.python.checks.tasks2.python_eval import PythonEval
 
 
 class PythonEvalTest(PythonTaskTestBase):
@@ -74,42 +76,44 @@ class PythonEvalTest(PythonTaskTestBase):
     self.h_binary = self.create_python_binary('src/python/h', 'h', 'a.a')
 
   def _create_task(self, target_roots, options=None):
+    # Until the --closure options is removed, we must explicitly set --transitive
+    # to True, even though that's the default.  See comment in the task code for details.
+    # TODO(benjy): Once --closure is removed, delete these three lines.
+    options = options or {}
+    if 'transitive' not in options:
+      options['transitive'] = True
+
     if options:
       self.set_options(**options)
-    return self.create_task(self.context(target_roots=target_roots))
+    return self.create_task(self.context(target_roots=target_roots,
+                                         for_subsystems=[PythonSetup, PythonRepos]))
 
   def test_noop(self):
-    python_eval = self._create_task(target_roots=[])
+    python_eval = self._create_task(target_roots=[], options={'transitive': False})
     compiled = python_eval.execute()
     self.assertEqual([], compiled)
 
   def test_compile(self):
-    python_eval = self._create_task(target_roots=[self.a_library])
+    python_eval = self._create_task(target_roots=[self.a_library], options={'transitive': False})
     compiled = python_eval.execute()
     self.assertEqual([self.a_library], compiled)
-
-  def test_skip(self):
-    self.set_options(skip=True)
-    python_eval = self._create_task(target_roots=[self.a_library])
-    compiled = python_eval.execute()
-    self.assertIsNone(compiled)
 
   def test_compile_incremental(self):
-    python_eval = self._create_task(target_roots=[self.a_library])
+    python_eval = self._create_task(target_roots=[self.a_library], options={'transitive': False})
     compiled = python_eval.execute()
     self.assertEqual([self.a_library], compiled)
 
-    python_eval = self._create_task(target_roots=[self.a_library])
+    python_eval = self._create_task(target_roots=[self.a_library], options={'transitive': False})
     compiled = python_eval.execute()
     self.assertEqual([], compiled)
 
   def test_compile_closure(self):
-    python_eval = self._create_task(target_roots=[self.d_library], options={'closure': True})
+    python_eval = self._create_task(target_roots=[self.d_library])
     compiled = python_eval.execute()
     self.assertEqual({self.d_library, self.a_library}, set(compiled))
 
   def test_compile_fail_closure(self):
-    python_eval = self._create_task(target_roots=[self.b_library], options={'closure': True})
+    python_eval = self._create_task(target_roots=[self.b_library])
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
@@ -117,7 +121,7 @@ class PythonEvalTest(PythonTaskTestBase):
     self.assertEqual([self.b_library], e.exception.failed)
 
   def test_compile_incremental_progress(self):
-    python_eval = self._create_task(target_roots=[self.b_library], options={'closure': True})
+    python_eval = self._create_task(target_roots=[self.b_library])
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
@@ -125,13 +129,13 @@ class PythonEvalTest(PythonTaskTestBase):
     self.assertEqual([self.b_library], e.exception.failed)
 
     self._create_graph(broken_b_library=False)
-    python_eval = self._create_task(target_roots=[self.b_library], options={'closure': True})
+    python_eval = self._create_task(target_roots=[self.b_library])
 
     compiled = python_eval.execute()
     self.assertEqual([self.b_library], compiled)
 
   def test_compile_fail_missing_build_dep(self):
-    python_eval = self._create_task(target_roots=[self.b_library])
+    python_eval = self._create_task(target_roots=[self.b_library], options={'transitive': False})
 
     with self.assertRaises(python_eval.Error) as e:
       python_eval.execute()
@@ -139,7 +143,7 @@ class PythonEvalTest(PythonTaskTestBase):
     self.assertEqual([self.b_library], e.exception.failed)
 
   def test_compile_fail_compile_time_check_decorator(self):
-    python_eval = self._create_task(target_roots=[self.b_library])
+    python_eval = self._create_task(target_roots=[self.b_library], options={'transitive': False})
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
@@ -148,7 +152,7 @@ class PythonEvalTest(PythonTaskTestBase):
 
   def test_compile_failslow(self):
     python_eval = self._create_task(target_roots=[self.a_library, self.b_library, self.d_library],
-                                    options={'fail_slow': True})
+                                    options={'fail_slow': True, 'transitive': False})
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
@@ -156,19 +160,19 @@ class PythonEvalTest(PythonTaskTestBase):
     self.assertEqual([self.b_library], e.exception.failed)
 
   def test_entry_point_module(self):
-    python_eval = self._create_task(target_roots=[self.e_binary])
+    python_eval = self._create_task(target_roots=[self.e_binary], options={'transitive': False})
 
     compiled = python_eval.execute()
     self.assertEqual([self.e_binary], compiled)
 
   def test_entry_point_function(self):
-    python_eval = self._create_task(target_roots=[self.f_binary])
+    python_eval = self._create_task(target_roots=[self.f_binary], options={'transitive': False})
 
     compiled = python_eval.execute()
     self.assertEqual([self.f_binary], compiled)
 
   def test_entry_point_does_not_exist(self):
-    python_eval = self._create_task(target_roots=[self.g_binary])
+    python_eval = self._create_task(target_roots=[self.g_binary], options={'transitive': False})
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
@@ -176,7 +180,7 @@ class PythonEvalTest(PythonTaskTestBase):
     self.assertEqual([self.g_binary], e.exception.failed)
 
   def test_entry_point_missing_build_dep(self):
-    python_eval = self._create_task(target_roots=[self.h_binary])
+    python_eval = self._create_task(target_roots=[self.h_binary], options={'transitive': False})
 
     with self.assertRaises(PythonEval.Error) as e:
       python_eval.execute()
