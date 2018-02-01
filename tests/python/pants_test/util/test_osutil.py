@@ -5,6 +5,8 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.util.osutil import OS_ALIASES, known_os_names, normalize_os_name
 from pants_test.base_test import BaseTest
 
@@ -22,14 +24,14 @@ class OsutilTest(BaseTest):
 
   def test_no_warnings_on_known_names(self):
     for name in known_os_names():
-      with self.captured_logging() as captured:
+      with self.captured_logging(logging.WARNING) as captured:
         normalize_os_name(name)
         self.assertEqual(0, len(captured.warnings()),
                          'Recieved unexpected warnings: {}'.format(captured.warnings()))
 
   def test_warnings_on_unknown_names(self):
     name = 'I really hope no one ever names an operating system with this string.'
-    with self.captured_logging() as captured:
+    with self.captured_logging(logging.WARNING) as captured:
       normalize_os_name(name)
       self.assertEqual(1, len(captured.warnings()),
                        'Expected exactly one warning, but got: {}'.format(captured.warnings()))
