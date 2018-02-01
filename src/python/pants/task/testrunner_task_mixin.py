@@ -12,6 +12,9 @@ from abc import abstractmethod
 from threading import Timer
 
 from pants.base.exceptions import ErrorWhileTesting, TaskError
+from pants.build_graph.files import Files
+from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.task.task import Task
 from pants.util.process_handler import subprocess
 
 
@@ -377,3 +380,231 @@ class TestRunnerTaskMixin(object):
     :param all_targets: list of the targets whose tests are to be run
     """
     raise NotImplementedError
+
+
+class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
+  """A mixin for test tasks that support running tests over both individual targets and batches.
+
+  Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
+  helps ensure correct caching behavior in either mode.
+
+  It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
+  correct successful test result caching.
+  """
+
+  @classmethod
+  def register_options(cls, register):
+    super(PartitionedTestRunnerTaskMixin, cls).register_options(register)
+
+    # TODO(John Sirois): Implement sanity checks on options wrt caching:
+    # https://github.com/pantsbuild/pants/issues/5073
+
+    register('--fast', type=bool, default=True, fingerprint=True,
+             help='Run all tests in a single pytest invocation. If turned off, each test target '
+                  'will run in its own pytest invocation, which will be slower, but isolates '
+                  'tests from process-wide state created by tests in other targets.')
+    register('--chroot', advanced=True, fingerprint=True, type=bool, default=False,
+             help='Run tests in a chroot. Any loose files tests depend on via `{}` dependencies '
+                  'will be copied to the chroot.'
+             .format(Files.alias()))
+
+  @staticmethod
+  def _vts_for_partition(invalidation_check):
+    return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+
+  def check_artifact_cache_for(self, invalidation_check):
+    # Tests generate artifacts, namely junit.xml and coverage reports, that cover the full target
+    # set whether that is all targets in the context (`--fast`) or each target individually
+    # (`--no-fast`).
+    return [self._vts_for_partition(invalidation_check)]
+
+  @property
+  def run_tests_in_chroot(self):
+    """Return `True` if tests should be run in a chroot.
+
+    Chrooted tests are expected to be run with $PWD set to a directory with only files explicitly
+    (transitively) depended on by the test targets present.
+
+    :rtype: bool
+    """
+    return self.get_options().chroot
+
+  def _execute(self, all_targets):
+    test_targets = self._get_test_targets()
+    if not test_targets:
+      return
+
+    self.context.release_lock()
+
+    per_target = not self.get_options().fast
+    fail_fast = self.get_options().fail_fast
+
+    results = {}
+    failure = False
+    with self.partitions(per_target, all_targets, test_targets) as partitions:
+      for (partition, args) in partitions():
+        try:
+          rv = self._run_partition(fail_fast, partition, *args)
+        except ErrorWhileTesting as e:
+          rv = self.result_from_error(e)
+
+        results[partition] = rv
+        if not rv.success:
+          failure = True
+          if fail_fast:
+            break
+
+      for partition in sorted(results):
+        rv = results[partition]
+        if len(partition) == 1 or rv.success:
+          log = self.context.log.info if rv.success else self.context.log.error
+          for target in partition:
+            log('{0:80}.....{1:>10}'.format(target.address.reference(), rv))
+        else:
+          # There is not much useful we can display in summary for a multi-target partition with
+          # failures without parsing those failures to link them to individual targets; ie: targets
+          # 2 and 8 failed in this partition of 10 targets.
+          # TODO(John Sirois): Punting here works for our 2 common partitionings:
+          # 1. All targets in singleton partitions
+          # 2. All targets in 1 partition
+          # PytestRun supports multiple partitions with multiple targets each when there sre
+          # multiple python source roots, and so some sort of summary for the multi-target
+          # partitions is needed: https://github.com/pantsbuild/pants/issues/5415
+          pass
+
+      msgs = [str(_rv) for _rv in results.values() if not _rv.success]
+      failed_targets = [target
+                        for _rv in results.values() if not _rv.success
+                        for target in _rv.failed_targets]
+      if len(failed_targets) > 0:
+        raise ErrorWhileTesting('\n'.join(msgs), failed_targets=failed_targets)
+      elif failure:
+        # A low-level test execution failure occurred before tests were run.
+        raise TaskError()
+
+  # Some notes on invalidation vs caching as used in `run_partition` below. Here invalidation
+  # refers to executing task work in `Task.invalidated` blocks against invalid targets. Caching
+  # refers to storing the results of that work in the artifact cache using
+  # `VersionedTargetSet.results_dir`. One further bit of terminology is partition, which is the
+  # name for the set of targets passed to the `Task.invalidated` block:
+  #
+  # + Caching results for len(partition) > 1: This is trivial iff we always run all targets in
+  #   the partition, but running just invalid targets in the partition is a nicer experience (you
+  #   can whittle away at failures in a loop of `::`-style runs). Running just invalid though
+  #   requires being able to merge prior results for the partition; ie: knowing the details of
+  #   junit xml, coverage data, or using tools that do, to merge data files. The alternative is
+  #   to always run all targets in a partition if even 1 target is invalid. In this way data files
+  #   corresponding to the full partition are always generated, and so on a green partition, the
+  #   cached data files will always represent the full green run.
+  #
+  # The compromise taken here is to only cache when `all_vts == invalid_vts`; ie when the partition
+  # goes green and the run was against the full partition. A common scenario would then be:
+  #
+  # 1. Mary makes changes / adds new code and iterates `./pants test tests/python/stuff::`
+  #    gradually getting greener until finally all test targets in the `tests/python/stuff::` set
+  #    pass. She commits the green change, but there is no cached result for it since green state
+  #    for the partition was approached incrementally.
+  # 2. Jake pulls in Mary's green change and runs `./pants test tests/python/stuff::`. There is a
+  #    cache miss and he does a full local run, but since `tests/python/stuff::` is green,
+  #    `all_vts == invalid_vts` and the result is now cached for others.
+  #
+  # In this scenario, Jake will likely be a CI process, in which case human others will see a
+  # cached result from Mary's commit. It's important to note, that the CI process must run the same
+  # partition as the end user for that end user to benefit and hit the cache. This is unlikely since
+  # the only natural partitions under CI are single target ones (`--no-fast` or all targets
+  # `--fast ::`. Its unlikely an end user in a large repo will want to run `--fast ::` since `::`
+  # is probably a much wider swath of code than they're working on. As such, although `--fast`
+  # caching is supported, its unlikely to be effective. Caching is best utilized when CI and users
+  # run `--no-fast`.
+  def _run_partition(self, fail_fast, test_targets, *args):
+    with self.invalidated(targets=test_targets,
+                          fingerprint_strategy=self.fingerprint_strategy(),
+                          # Re-run tests when the code they test (and depend on) changes.
+                          invalidate_dependents=True) as invalidation_check:
+
+      invalid_test_tgts = [invalid_test_tgt
+                           for vts in invalidation_check.invalid_vts
+                           for invalid_test_tgt in vts.targets]
+
+      # Processing proceeds through:
+      # 1.) output -> output_dir
+      # 2.) [iff all == invalid] output_dir -> cache: We do this manually for now.
+      # 3.) [iff invalid == 0 and all > 0] cache -> workdir: Done transparently by `invalidated`.
+
+      # 1.) Write all results that will be potentially cached to output_dir.
+      result = self.run_tests(fail_fast, invalid_test_tgts, *args).checked()
+
+      cache_vts = self._vts_for_partition(invalidation_check)
+      if invalidation_check.all_vts == invalidation_check.invalid_vts:
+        # 2.) All tests in the partition were invalid, cache successful test results.
+        if result.success and self.artifact_cache_writes_enabled():
+          self.update_artifact_cache([(cache_vts, self.collect_files(*args))])
+      elif not invalidation_check.invalid_vts:
+        # 3.) The full partition was valid, our results will have been staged for/by caching
+        # if not already local.
+        pass
+      else:
+        # The partition was partially invalid.
+
+        # We don't cache results; so others will need to re-run this partition.
+        # NB: We will presumably commit this change now though and so others will get this
+        # partition in a state that executes successfully; so when the 1st of the others
+        # executes against this partition; they will hit `all_vts == invalid_vts` and
+        # cache the results. That 1st of others is hopefully CI!
+        cache_vts.force_invalidate()
+
+      return result
+
+  def result_from_error(self, error):
+    """Convert an error into a test result.
+
+    :param error: The error to convert into a test result.
+    :type error: :class:`pants.base.exceptions.TaskError`
+    :returns: An unsuccessful test result.
+    :rtype: :class:`TestResult`
+    """
+    return TestResult.from_error(error)
+
+  def fingerprint_strategy(self):
+    """Return a fingerprint strategy for target fingerprinting.
+
+    :returns: A fingerprint strategy instance; by default, `None`; ie let the invalidation and
+              caching framework use the default target fingerprinter.
+    :rtype: :class:`pants.base.fingerprint_strategy.FingerprintStrategy`
+    """
+    return None
+
+  @abstractmethod
+  def partitions(self, per_target, all_targets, test_targets):
+    """Return a context manager that can be called to iterate of target partitions.
+
+    The iterator should return a 2-tuple with the partitions targets in the first slot and a tuple
+    of extra arguments needed to `run_tests` and `collect_files`.
+
+    :rtype: A context manager that is callable with no arguments; returning an iterator over
+            (partition, tuple(args))
+    """
+
+  @abstractmethod
+  def run_tests(self, fail_fast, test_targets, *args):
+    """Runs tests in the given invalid test targets.
+
+    :param bool fail_fast: `True` if the test run should fail as fast as possible.
+    :param test_targets: The test targets to run tests for.
+    :type test_targets: list of :class:`pants.build_graph.target.Target`s of the type iterated by
+                        `partitions`.
+    :param *args: Extra args associated with the partition of test targets being run as returned by
+                  the `partitions` iterator.
+    :returns: A test result summarizing the result of this test run.
+    :rtype: :class:`TestResult`
+    """
+
+  @abstractmethod
+  def collect_files(self, *args):
+    """Collects output files from a test run that should be cached.
+
+    :param *args: Extra args associated with the partition of test targets being run as returned by
+                  the `partitions` iterator.
+    :returns: A list of paths to files that should be cached.
+    :rtype: list of str
+    """
