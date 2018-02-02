@@ -90,7 +90,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
-    round_manager.require_data(GatherSources.PythonSources)
+    round_manager.require_data(GatherSources.PYTHON_SOURCES)
 
   def extra_requirements(self):
     """Override to provide extra requirements needed for execution.
@@ -121,9 +121,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
       if not os.path.isdir(path):
-        source_pexes = self.context.products.get_data(GatherSources.PythonSources).all()
-        requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
-        pexes = [requirements_pex] + source_pexes
+        pexes = [
+          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
+          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
+        ]
 
         if self.extra_requirements():
           extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]

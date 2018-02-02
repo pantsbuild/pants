@@ -23,15 +23,11 @@ from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
 
 
-def is_python_target(tgt):
+def has_python_sources(tgt):
   # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
   # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
   # we remove the old python pipeline entirely) we want to ignore those target types here.
-  return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary))
-
-
-def has_python_sources(tgt):
-  return is_python_target(tgt) and tgt.has_sources()
+  return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary)) and tgt.has_sources()
 
 
 def has_resources(tgt):
