@@ -11,7 +11,7 @@ python_library(
     ':python_requirements',
     'src/python/pants/backend/python/targets:python',
     'src/python/pants/backend/python/tasks',
-    'src/python/pants/backend/python:tasks2',
+    'src/python/pants/backend/python/tasks2',
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ]
@@ -130,15 +130,6 @@ python_library(
   sources = ['sdist_builder.py'],
   dependencies = [
     '3rdparty/python:pex',
-  ]
-)
-
-python_library(
-  name = 'tasks2',
-  sources = ['tasks2.py'],
-  dependencies = [
-    'src/python/pants/backend/python/tasks',
-    'src/python/pants/base:deprecated',
   ]
 )
 
