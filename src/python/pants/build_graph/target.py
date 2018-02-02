@@ -653,12 +653,13 @@ class Target(AbstractTarget):
     exports = self._cached_exports_addresses
     if exports is None:
 
-      exports = tuple()
+      exports = []
       for export_spec in getattr(self, 'export_specs', tuple()):
         if isinstance(export_spec, Target):
-          exports += (export_spec.address,)
+          exports.append(export_spec.address)
         else:
-          exports += (Address.parse(export_spec, relative_to=self.address.spec_path),)
+          exports.append(Address.parse(export_spec, relative_to=self.address.spec_path))
+      exports = tuple(exports)
 
       dep_addresses = {d.address for d in self.dependencies}
       invalid_export_specs = [a.spec for a in exports if a not in dep_addresses]
@@ -682,24 +683,16 @@ class Target(AbstractTarget):
     """
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
-      closure_kwargs = dep_context.target_closure_kwargs
-      respect_intransitive = closure_kwargs.get('respect_intransitive')
-      include_scopes = closure_kwargs.get('include_scopes')
-      exclude_scopes = closure_kwargs.get('exclude_scopes')
+      default_predicate = self._closure_dep_predicate({self},
+                                                      **dep_context.target_closure_kwargs)
+
       def dep_predicate(source, dependency):
+        if not default_predicate(source, dependency):
+          return False
+
         # Always expand aliases.
         if type(source) in dep_context.alias_types:
           return True
-
-        # If the dependency isn't in scope, don't use it.
-        if not dependency.scope.in_scope(
-            include_scopes=include_scopes,
-            exclude_scopes=exclude_scopes):
-          return False
-
-        # if the dependency is intransitive, ignore it.
-        if respect_intransitive and not dependency.transitive:
-          return False
 
         # Traverse other dependencies if they are exported.
         if source._dep_is_exported(dependency):
@@ -707,7 +700,7 @@ class Target(AbstractTarget):
         return False
 
       dep_addresses = [d.address for d in self.dependencies
-                        if d.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes)
+                        if default_predicate(self, d)
                       ]
       result = self._build_graph.transitive_subgraph_of_addresses_bfs(
         addresses=dep_addresses,

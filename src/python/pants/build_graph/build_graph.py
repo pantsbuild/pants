@@ -91,7 +91,7 @@ class BuildGraph(AbstractClass):
       return self._dep_predicate(target, dep)
 
 
-  class DepthAwareWalk(DepthAgnosticWalk):
+  class DepthAwareWalk(NoDepPredicateWalk):
     """This is a utility class to aid in graph traversals that care about the depth."""
 
     def __init__(self, leveled_predicate):
@@ -350,7 +350,36 @@ class BuildGraph(AbstractClass):
     """
     return sort_targets(self.targets())
 
-  def walk_transitive_dependency_graph(self, addresses, work, predicate=None, postorder=False,
+  def _walk_factory(self, dep_predicate, leveled_predicate):
+    """Construct the right context object for managing state during a transitive walk."""
+    deprecated_conditional(
+      lambda: leveled_predicate is not None,
+      '1.7.0.dev0',
+      'leveled_predicate',
+      '''
+      Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
+      ''',
+      stacklevel=5
+    )
+    if leveled_predicate and dep_predicate:
+      raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
+    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
+    # slow things down by few millis.
+
+    walk = None
+    if leveled_predicate:
+      walk = self.DepthAwareWalk(leveled_predicate)
+    elif dep_predicate:
+      walk = self.DepthAgnosticWalk(dep_predicate)
+    else:
+      walk = self.NoDepPredicateWalk()
+    return walk
+
+  def walk_transitive_dependency_graph(self,
+                                       addresses,
+                                       work,
+                                       predicate=None,
+                                       postorder=False,
                                        leveled_predicate=None,
                                        dep_predicate=None):
     """Given a work function, walks the transitive dependency closure of `addresses` using DFS.
@@ -374,27 +403,7 @@ class BuildGraph(AbstractClass):
       target in the search tree as a second parameter, and it is checked just before a dependency is
       expanded.
     """
-    deprecated_conditional(
-      lambda: leveled_predicate is not None,
-      '1.6.0.dev0',
-      'leveled_predicate',
-      '''
-      Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
-      '''
-    )
-
-    if leveled_predicate and dep_predicate:
-      raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
-    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
-    # slow things down by few millis.
-
-    walk = None
-    if leveled_predicate:
-      walk = self.DepthAwareWalk(leveled_predicate)
-    elif dep_predicate:
-      walk = self.DepthAgnosticWalk(dep_predicate)
-    else:
-      walk = self.NoDepPredicateWalk()
+    walk = self._walk_factory(dep_predicate, leveled_predicate)
 
     def _walk_rec(addr, level=0):
       # If we've followed an edge to this address, stop recursing.
@@ -495,7 +504,11 @@ class BuildGraph(AbstractClass):
                                           **kwargs)
     return ret
 
-  def transitive_subgraph_of_addresses_bfs(self, addresses, predicate=None, leveled_predicate=None, dep_predicate=None):
+  def transitive_subgraph_of_addresses_bfs(self,
+                                           addresses,
+                                           predicate=None,
+                                           leveled_predicate=None,
+                                           dep_predicate=None):
     """Returns the transitive dependency closure of `addresses` using BFS.
 
     :API: public
@@ -513,26 +526,9 @@ class BuildGraph(AbstractClass):
       target in the search tree as a second parameter, and it is checked just before a dependency is
       expanded.
     """
-    deprecated_conditional(
-      lambda: leveled_predicate is not None,
-      '1.6.0.dev0',
-      'leveled_predicate',
-      '''
-      Deprecated property leveled_predicate used. Please migrate to using dep_predicate.
-      '''
-    )
-    if leveled_predicate and dep_predicate:
-      raise ValueError('Cannot specify both leveled_predicate and dep_predicate')
+    walk = self._walk_factory(dep_predicate, leveled_predicate)
+
     ordered_closure = OrderedSet()
-    # Use the DepthAgnosticWalk if we can, because DepthAwareWalk does a bit of extra work that can
-    # slow things down by few millis.
-    walk = None
-    if leveled_predicate:
-      walk = self.DepthAwareWalk(leveled_predicate)
-    elif dep_predicate:
-      walk = self.DepthAgnosticWalk(dep_predicate)
-    else:
-      walk = self.NoDepPredicateWalk()
     to_walk = deque((0, addr) for addr in addresses)
     while len(to_walk) > 0:
       level, address = to_walk.popleft()
