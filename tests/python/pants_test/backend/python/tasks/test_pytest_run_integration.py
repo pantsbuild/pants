@@ -110,16 +110,19 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     if self.has_python_version(py27) and self.has_python_version(py3):
       print('Found both python {} and python {}. Running test.'.format(py27, py3))
       py27_path, py3_path = self.python_interpreter_path(py27), self.python_interpreter_path(py3)
-      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'), [py27_path, py3_path]):
+      with setup_pexrc_with_pex_python_path(os.path.join(os.path.dirname(sys.argv[0]), '.pexrc'),
+                                            [py27_path, py3_path]):
         with temporary_dir() as interpreters_cache:
           pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
           pants_run_27 = self.run_pants(
-            command=['test', '{}:test_py2'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            command=['test', '{}:test_py2'.format(os.path.join(self.testproject,
+                                                               'python_3_selection_testing'))],
             config=pants_ini_config
           )
           self.assert_success(pants_run_27)
           pants_run_3 = self.run_pants(
-            command=['test', '{}:test_py3'.format(os.path.join(self.testproject, 'python_3_selection_testing'))],
+            command=['test', '{}:test_py3'.format(os.path.join(self.testproject,
+                                                               'python_3_selection_testing'))],
             config=pants_ini_config
           )
           self.assert_success(pants_run_3)

@@ -20,6 +20,8 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
+from pants.util.contextutil import temporary_file
+from pants.util.objects import datatype
 
 
 class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
@@ -39,9 +41,42 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   def extra_requirements(self):
     """Override to provide extra requirements needed for execution.
 
-    Must return a list of pip-style requirement strings.
+    :returns: An iterable of pip-style requirement strings.
+    :rtype: :class:`collections.Iterable` of str
     """
-    return []
+    return ()
+
+  class ExtraFile(datatype('ExtraFile', ['path', 'content'])):
+    """Models an extra file to place in a PEX."""
+
+    @classmethod
+    def empty(cls, path):
+      """Creates an empty file with the given PEX path.
+
+      :param str path: The path this extra file should have when added to a PEX.
+      :rtype: :class:`ExtraFile`
+      """
+      return cls(path=path, content='')
+
+    def add_to(self, builder):
+      """Adds this extra file to a PEX builder.
+
+      :param builder: The PEX builder to add this extra file to.
+      :type builder: :class:`pex.pex_builder.PEXBuilder`
+      """
+      with temporary_file() as fp:
+        fp.write(self.content)
+        fp.close()
+        add = builder.add_source if self.path.endswith('.py') else builder.add_resource
+        add(fp.name, self.path)
+
+  def extra_files(self):
+    """Override to provide extra files needed for execution.
+
+    :returns: An iterable of extra files to add to the PEX.
+    :rtype: :class:`collections.Iterable` of :class:`PythonExecutionTaskBase.ExtraFile`
+    """
+    return ()
 
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
@@ -76,6 +111,10 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           pexes = [extra_requirements_pex] + pexes
         constraints = {constraint for rt in relevant_targets if is_python_target(rt)
                        for constraint in rt.compatibility}
-        self.merge_pexes(path, pex_info, interpreter, pexes, constraints)
+
+        with self.merged_pex(path, pex_info, interpreter, pexes, constraints) as builder:
+          for extra_file in self.extra_files():
+            extra_file.add_to(builder)
+          builder.freeze()
 
     return WrappedPEX(PEX(path, interpreter), interpreter)
