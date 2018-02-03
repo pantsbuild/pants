@@ -16,7 +16,7 @@ function run_local_pants() {
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
 readonly HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_STABLE_VERSION="$(run_local_pants --version 2>/dev/null)"
+readonly PANTS_STABLE_VERSION="$(cat "${ROOT}/src/python/pants/VERSION")"
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
