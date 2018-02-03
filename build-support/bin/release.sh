@@ -764,7 +764,7 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloep" opt; do
+while getopts "hdntcloepw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -774,6 +774,7 @@ while getopts "hdntcloep" opt; do
     o) list_owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex ; exit $? ;;
+    w) list_prebuilt_wheels ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
