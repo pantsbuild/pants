@@ -712,10 +712,9 @@ class Target(AbstractTarget):
         if type(declared) in dep_context.alias_types:
           continue
         if isinstance(declared, dep_context.compiler_plugin_types):
-          strict_deps.update(declared.closure(bfs=True,
-            respect_intransitive=respect_intransitive,
-            include_scopes=include_scopes,
-            exclude_scopes=exclude_scopes))
+          strict_deps.update(declared.closure(
+            bfs=True,
+            **dep_context.target_closure_kwargs))
         strict_deps.add(declared)
 
       strict_deps = list(strict_deps)
