@@ -5,8 +5,11 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
 from pants.base.exiter import Exiter
 from pants.bin.pants_runner import PantsRunner
+from pants.util.contextutil import maybe_profiled
 
 
 TEST_STR = 'T E S T'
@@ -28,7 +31,8 @@ def main():
   exiter = Exiter()
   exiter.set_except_hook()
 
-  try:
-    PantsRunner(exiter).run()
-  except KeyboardInterrupt:
-    exiter.exit_and_fail(b'Interrupted by user.')
+  with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
+    try:
+      PantsRunner(exiter).run()
+    except KeyboardInterrupt:
+      exiter.exit_and_fail(b'Interrupted by user.')
