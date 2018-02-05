@@ -10,18 +10,22 @@ not undergo the vetting associated with ``stable`` releases.
 
 New Features
 ~~~~~~~~~~~~
-
-
+* Allow intransitive unpacking of jars. (#5398)
+  `PR #5398 <https://github.com/pantsbuild/pants/pull/5398>`_
 
 API Changes
 ~~~~~~~~~~~
+* [strict-deps][build-graph] add new predicate to build graph traversal; Update Target.strict_deps to use it (#5150)
+  `PR #5150 <https://github.com/pantsbuild/pants/pull/5150>`_
 
 * Deprecate IDE project generation tasks. (#5432)
   `PR #5432 <https://github.com/pantsbuild/pants/pull/5432>`_
 
+* Enable workdir-max-build-entries by default. (#5423)
+  `PR #5423 <https://github.com/pantsbuild/pants/pull/5423>`_
+
 * Fix tasks2 deprecations to each have their own module. (#5421)
   `PR #5421 <https://github.com/pantsbuild/pants/pull/5421>`_
->`_ttps://github.com/pantsbuild/pants/pull/5363/files#r164906101)).
 
 * Console tasks can output nothing without erroring (#5412)
   `PR #5412 <https://github.com/pantsbuild/pants/pull/5412>`_
@@ -29,19 +33,11 @@ API Changes
 * Remove a remaining old-python-pipeline task from contrib/python. (#5411)
   `PR #5411 <https://github.com/pantsbuild/pants/pull/5411>`_
 
-* Allow intransitive unpacking of jars. (#5398)
-  `PR #5398 <https://github.com/pantsbuild/pants/pull/5398>`_
-
 * Make the thrift linter use the standard linter mixin. (#5394)
   `PR #5394 <https://github.com/pantsbuild/pants/pull/5394>`_
 
-
 Bugfixes
 ~~~~~~~~
-
-* Enable workdir-max-build-entries by default. (#5423)
-  `PR #5423 <https://github.com/pantsbuild/pants/pull/5423>`_
-
 * Fix `PytestRun` to handle multiple source roots. (#5400)
   `PR #5400 <https://github.com/pantsbuild/pants/pull/5400>`_
 
@@ -51,17 +47,15 @@ Bugfixes
 * [pantsd] Repair console interactivity in pantsd runs. (#5352)
   `PR #5352 <https://github.com/pantsbuild/pants/pull/5352>`_
 
-
 Documentation Updates
 ~~~~~~~~~~~~~~~~~~~~~
-
-
-
 * Document release reset of master. (#5397)
   `PR #5397 <https://github.com/pantsbuild/pants/pull/5397>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Make the Kythe Java indexer emit JVM nodes. (#5435)
+  `PR #5435 <https://github.com/pantsbuild/pants/pull/5435>`_
 
 * Release script allows wheel listing (#5431)
   `PR #5431 <https://github.com/pantsbuild/pants/pull/5431>`_
@@ -98,41 +92,6 @@ Refactoring, Improvements, and Tooling
 
 * Sort the indexable targets consistently. (#5403)
   `PR #5403 <https://github.com/pantsbuild/pants/pull/5403>`_
-
-
-
-
-
-
-
-
-* [strict-deps][build-graph] add new predicate to build graph traversal; Update Target.strict_deps to use it (#5150)
-  `PR #5150 <https://github.com/pantsbuild/pants/pull/5150>`_
-
-* Make the Kythe Java indexer emit JVM nodes. (#5435)
-  `PR #5435 <https://github.com/pantsbuild/pants/pull/5435>`_
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 1.5.0.dev1 (01/26/2018)
