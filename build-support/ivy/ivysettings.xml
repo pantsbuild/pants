@@ -12,7 +12,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
   <property name="m2.repo.artifact"
             value="${m2.repo.relpath}/[artifact](-[classifier])-[revision].[ext]"/>
   <property name="m2.repo.dir" value="${user.home}/.m2/repository" override="false"/>
-  <property name="kythe.artifact" value="[organization]-[revision]/[artifact].[ext]"/>
+  <property name="kythe.artifact" value="[organisation]/[artifact]/[revision]/[artifact]-[revision].[ext]"/>
   <!-- for retrieving jacoco snapshot, remove when a version containing cli is released -->
   <!-- see https://github.com/pantsbuild/pants/issues/5010 -->
   <property name="sonatype.nexus.snapshots.url" value="https://oss.sonatype.org/content/repositories/snapshots/" />
@@ -70,7 +70,7 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 
       <!-- Custom repo for Kythe jars, as Google don't currently publish them anywhere. -->
       <url name="benjyw/binhost">
-        <artifact pattern="https://github.com/benjyw/binhost/raw/99702052db865e0229998afbf19b5503d11225d3/[organisation]/${kythe.artifact}" />
+        <artifact pattern="https://github.com/benjyw/binhost/raw/master/${kythe.artifact}" />
       </url>
     </chain>
   </resolvers>
