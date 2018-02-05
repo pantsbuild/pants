@@ -324,6 +324,7 @@ class BuildGraphTest(BaseTest):
       self.inject_address_closure('//:a')
 
   def test_leveled_predicate(self):
+    # Keeping the test of this until it is removed to ensure it continues to function.
     a = self.make_target(spec='a')
     b = self.make_target(spec='b', dependencies=[a])
     c = self.make_target(spec='c', dependencies=[b])
@@ -368,6 +369,60 @@ class BuildGraphTest(BaseTest):
     check_funcs({b, d}, {b, d}, leveled_predicate=only_indirect_a)
     check_funcs({a, b, c, d}, {c, d}, leveled_predicate=only_indirect_a)
     check_funcs({a, b, c}, {c}, leveled_predicate=only_indirect_a)
+
+  def test_dep_predicate(self):
+    a = self.make_target(spec='a')
+    b = self.make_target(spec='b', dependencies=[a])
+    c = self.make_target(spec='c', dependencies=[b])
+    d = self.make_target(spec='d', dependencies=[a])
+
+    subgraph_funcs = (self.build_graph.transitive_subgraph_of_addresses,
+                      self.build_graph.transitive_subgraph_of_addresses_bfs)
+
+    def check_funcs(expected, roots, dep_predicate_factory=None, **kwargs):
+      if dep_predicate_factory:
+        kwargs['dep_predicate'] = dep_predicate_factory(roots)
+      for func in subgraph_funcs:
+        seen_targets = defaultdict(lambda: 0)
+        def predicate_sees(target):
+          seen_targets[target] += 1
+          return True
+
+        result = func([t.address for t in roots], predicate=predicate_sees, **kwargs)
+        self.assertEquals(set(expected), set(result))
+        if any(ct > 1 for ct in seen_targets.values()):
+          self.fail('func {} visited {} more than once.'.format(
+            func,
+            ', '.join(t.address for t, ct in seen_targets.items() if ct > 1))
+          )
+
+    def only_roots_factory(roots):
+      def only_roots(_, __):
+        # This is a silly constraint, because it effectively turns the transitive subgraph functions
+        # into the identity function.
+        return False
+      return only_roots
+
+    def only_direct_deps_factory(roots):
+      def only_direct_deps(source, dep):
+        return source in roots
+      return only_direct_deps
+
+    def only_indirect_a_factory(roots):
+      def only_indirect_a(source, dep):
+        # This is a really weird constraint just to demonstrate functionality.
+        return dep != a or source not in roots
+      return only_indirect_a
+
+    check_funcs({a, b, d}, {b, d}, dep_predicate_factory=None)
+    check_funcs({b, d}, {b, d}, dep_predicate_factory=only_roots_factory)
+    check_funcs({a, b, d}, {b, d}, dep_predicate_factory=only_direct_deps_factory)
+    check_funcs({d, a}, {d}, dep_predicate_factory=only_direct_deps_factory)
+    check_funcs({b, c}, {c}, dep_predicate_factory=only_direct_deps_factory)
+    check_funcs({b, c, d, a}, {c, d}, dep_predicate_factory=only_direct_deps_factory)
+    check_funcs({b, d}, {b, d}, dep_predicate_factory=only_indirect_a_factory)
+    check_funcs({a, b, c, d}, {c, d}, dep_predicate_factory=only_indirect_a_factory)
+    check_funcs({a, b, c}, {c}, dep_predicate_factory=only_indirect_a_factory)
 
   def test_derivation(self):
     a = self.make_target('a')

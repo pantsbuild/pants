@@ -33,49 +33,6 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-class SyntheticTargetNotFound(Exception):
-  pass
-
-
-def _get_synthetic_target(target, codegen_dep):
-  """Find a codegen_dep's corresponding synthetic target in the dependencies of the given target.
-
-  TODO: This lookup represents a workaround to avoid including logic about exports at codegen time.
-  We should likely make SimpleCodegenTask aware of exports, so that it can clone exports to
-  generated targets while updating the exports with relevant synthetic target specs.
-    see https://github.com/pantsbuild/pants/issues/4936
-  """
-  for dep in target.dependencies:
-    if dep != codegen_dep and dep.is_synthetic and dep.derived_from == codegen_dep:
-      return dep
-  raise SyntheticTargetNotFound('No synthetic target is found for thrift target: {}'.format(codegen_dep))
-
-
-def _resolve_strict_dependencies(target, dep_context):
-  for declared in target.dependencies:
-    if type(declared) in dep_context.alias_types:
-      # Is an alias. Recurse to expand.
-      for r in declared.strict_dependencies(dep_context):
-        yield r
-    else:
-      yield declared
-
-    for export in _resolve_exports(declared, dep_context):
-      yield export
-
-
-def _resolve_exports(target, dep_context):
-  for export in target.exports(dep_context):
-    if type(export) in dep_context.alias_types:
-      # If exported target is an alias, expand its dependencies.
-      for dep in export.strict_dependencies(dep_context):
-        yield dep
-    else:
-      yield export
-      for exp in _resolve_exports(export, dep_context):
-        yield exp
-
-
 class AbstractTarget(object):
 
   @classmethod
@@ -267,13 +224,16 @@ class Target(AbstractTarget):
     return ids[0] if len(ids) == 1 else cls.combine_ids(ids)
 
   @classmethod
-  def _closure_predicate(cls, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
+  def _closure_dep_predicate(cls, roots, include_scopes=None, exclude_scopes=None, respect_intransitive=False):
     if not respect_intransitive and include_scopes is None and exclude_scopes is None:
       return None
-    def predicate(target, level):
-      if not target.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes):
+
+    root_lookup = set(roots)
+    def predicate(target, dep_target):
+      if not dep_target.scope.in_scope(include_scopes=include_scopes, exclude_scopes=exclude_scopes):
         return False
-      if respect_intransitive and not target.transitive and level > 0:
+      # dep_target.transitive == False means that dep_target is only included if target is a root target.
+      if respect_intransitive and not dep_target.transitive and target not in root_lookup:
         return False
       return True
     return predicate
@@ -302,7 +262,8 @@ class Target(AbstractTarget):
 
     build_graph = target_roots[0]._build_graph
     addresses = [target.address for target in target_roots]
-    leveled_predicate = cls._closure_predicate(include_scopes=include_scopes,
+    dep_predicate = cls._closure_dep_predicate(target_roots,
+                                               include_scopes=include_scopes,
                                                exclude_scopes=exclude_scopes,
                                                respect_intransitive=respect_intransitive)
     closure = OrderedSet()
@@ -312,12 +273,12 @@ class Target(AbstractTarget):
         addresses=addresses,
         work=closure.add,
         postorder=postorder,
-        leveled_predicate=leveled_predicate,
+        dep_predicate=dep_predicate,
       )
     else:
       closure.update(build_graph.transitive_subgraph_of_addresses_bfs(
         addresses=addresses,
-        leveled_predicate=leveled_predicate,
+        dep_predicate=dep_predicate,
       ))
 
     # Make sure all the roots made it into the closure.
@@ -374,7 +335,7 @@ class Target(AbstractTarget):
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
-    self._cached_exports_map = {}
+    self._cached_exports_addresses = None
     self._no_cache = no_cache
     if kwargs:
       self.Arguments.check(self, kwargs)
@@ -458,7 +419,7 @@ class Target(AbstractTarget):
     self._cached_all_transitive_fingerprint_map = {}
     self._cached_direct_transitive_fingerprint_map = {}
     self._cached_strict_dependencies_map = {}
-    self._cached_exports_map = {}
+    self._cached_exports_addresses = None
     self.mark_extra_invalidation_hash_dirty()
     self.payload.mark_dirty()
 
@@ -687,31 +648,27 @@ class Target(AbstractTarget):
     return [self._build_graph.get_target(dep_address)
             for dep_address in self._build_graph.dependencies_of(self.address)]
 
-  def exports(self, dep_context):
-    """
-    :param dep_context: A DependencyContext with configuration for the request.
-
-    :return: targets that this target directly exports. Note that this list is not transitive,
-      but that exports are transitively expanded during the computation of strict_dependencies.
-    :rtype: list of Target
-    """
-    exports = self._cached_exports_map.get(dep_context, None)
+  @property
+  def export_addresses(self):
+    exports = self._cached_exports_addresses
     if exports is None:
+
       exports = []
-      for export in getattr(self, 'export_specs', []):
-        if not isinstance(export, Target):
-          export_spec = export
-          export_addr = Address.parse(export_spec, relative_to=self.address.spec_path)
-          export = self._build_graph.get_target(export_addr)
-          if export not in self.dependencies:
-            # A target can only export its dependencies.
-            raise TargetDefinitionException(
-                self,
-                'Invalid export: "{}" must also be a dependency.'.format(export_spec))
-        if isinstance(export, dep_context.codegen_types):
-          export = _get_synthetic_target(self, export)
-        exports.append(export)
-      self._cached_exports_map[dep_context] = exports
+      for export_spec in getattr(self, 'export_specs', tuple()):
+        if isinstance(export_spec, Target):
+          exports.append(export_spec.address)
+        else:
+          exports.append(Address.parse(export_spec, relative_to=self.address.spec_path))
+      exports = tuple(exports)
+
+      dep_addresses = {d.address for d in self.dependencies}
+      invalid_export_specs = [a.spec for a in exports if a not in dep_addresses]
+      if len(invalid_export_specs) > 0:
+        raise TargetDefinitionException(
+            self,
+            'Invalid exports: these exports must also be dependencies\n  {}'.format('\n  '.join(invalid_export_specs)))
+
+      self._cached_exports_addresses = exports
     return exports
 
   def strict_dependencies(self, dep_context):
@@ -726,15 +683,47 @@ class Target(AbstractTarget):
     """
     strict_deps = self._cached_strict_dependencies_map.get(dep_context, None)
     if strict_deps is None:
+      default_predicate = self._closure_dep_predicate({self},
+                                                      **dep_context.target_closure_kwargs)
+
+      def dep_predicate(source, dependency):
+        if not default_predicate(source, dependency):
+          return False
+
+        # Always expand aliases.
+        if type(source) in dep_context.alias_types:
+          return True
+
+        # Traverse other dependencies if they are exported.
+        if source._dep_is_exported(dependency):
+          return True
+        return False
+
+      dep_addresses = [d.address for d in self.dependencies
+                        if default_predicate(self, d)
+                      ]
+      result = self._build_graph.transitive_subgraph_of_addresses_bfs(
+        addresses=dep_addresses,
+        dep_predicate=dep_predicate
+      )
+
       strict_deps = OrderedSet()
-      for declared in _resolve_strict_dependencies(self, dep_context):
+      for declared in result:
+        if type(declared) in dep_context.alias_types:
+          continue
         if isinstance(declared, dep_context.compiler_plugin_types):
-          strict_deps.update(declared.closure(bfs=True, **dep_context.target_closure_kwargs))
-        else:
-          strict_deps.add(declared)
+          strict_deps.update(declared.closure(
+            bfs=True,
+            **dep_context.target_closure_kwargs))
+        strict_deps.add(declared)
+
       strict_deps = list(strict_deps)
       self._cached_strict_dependencies_map[dep_context] = strict_deps
     return strict_deps
+
+  def _dep_is_exported(self, dependency):
+    return dependency.address in self.export_addresses or \
+           dependency.is_synthetic and (dependency.concrete_derived_from.address in self.export_addresses)
 
   @property
   def dependents(self):
