@@ -693,74 +693,57 @@ impl SelectTransitive {
   }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectProjection {
-  subject: Key,
-  variants: Variants,
-  selector: selectors::SelectProjection,
-  input_product_entries: rule_graph::Entries,
-  projected_entries: rule_graph::Entries,
-}
+struct SelectProjection;
 
 impl SelectProjection {
-  fn new(
-    selector: selectors::SelectProjection,
-    subject: Key,
-    variants: Variants,
+  fn run(
+    context: &Context,
+    subject: &Key,
+    variants: &Variants,
+    selector: &selectors::SelectProjection,
     edges: &rule_graph::RuleEdges,
-  ) -> SelectProjection {
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
+  ) -> NodeFuture<Value> {
+    let input_product_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
       Selector::SelectProjection(selector.clone()),
       selectors::Select::without_variant(
-        selector.clone().input_product,
+        selector.input_product.clone(),
       ),
     ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedNestedSelect(
+    let projected_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedNestedSelect(
       Selector::SelectProjection(selector.clone()),
       selector.projected_subject.clone(),
       selectors::Select::without_variant(
-        selector.clone().product,
+        selector.product.clone(),
       ),
     ));
-    SelectProjection {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      input_product_entries: dep_p_entries,
-      projected_entries: p_entries,
-    }
-  }
-}
 
-impl SelectProjection {
-  fn run(self, context: Context) -> NodeFuture<Value> {
     // Request the product we need to compute the subject.
+    let context2 = context.clone();
+    let variants2 = variants.clone();
+    let selector2 = selector.clone();
     Select::run(
       &context,
-      &self.subject,
-      &self.variants,
+      subject,
+      variants,
       &selectors::Select {
-        product: self.selector.input_product,
+        product: selector.input_product,
         variant_key: None,
       },
-      &self.input_product_entries,
+      &input_product_entries,
     ).then(move |dep_product_res| {
       match dep_product_res {
         Ok(dep_product) => {
           // And then project the relevant field.
-          let projected_subject = externs::project(
-            &dep_product,
-            &self.selector.field,
-            &self.selector.projected_subject,
-          );
+          let projected_subject =
+            externs::project(&dep_product, &selector2.field, &selector2.projected_subject);
           Select::run(
-            &context,
+            &context2,
             &externs::key_for(&projected_subject),
-            &self.variants,
-            &selectors::Select::without_variant(self.selector.product),
+            &variants2,
+            &selectors::Select::without_variant(selector2.product),
             // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
             // subject here, because there is only one projected type.
-            &self.projected_entries,
+            &projected_entries,
           ).then(move |output_res| {
             // If the output product is available, return it.
             match output_res {
@@ -1128,12 +1111,7 @@ impl Task {
         ).run(context.clone())
       }
       &Selector::SelectProjection(ref s) => {
-        SelectProjection::new(
-          s.clone(),
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ).run(context.clone())
+        SelectProjection::run(&context, &self.subject, &self.variants, s, edges)
       }
     }
   }
