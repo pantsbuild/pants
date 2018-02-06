@@ -34,14 +34,16 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
 
-  def resolve_requirements(self, req_libs):
+  def resolve_requirements(self, req_libs, local_dist_targets=None):
     """Requirements resolution for PEX files.
 
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
+    :param local_dist_targets: A list of :class:`PythonDistribution` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
-    local_dist_targets = self.context.targets(is_local_python_dist)
-    tgts = req_libs + local_dist_targets
+    tgts = req_libs
+    if local_dist_targets:
+      tgts = req_libs + local_dist_targets
     with self.invalidated(tgts) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
