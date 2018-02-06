@@ -132,7 +132,6 @@ class PythonBinaryCreate(Task):
         dump_sources(builder, tgt, self.context.log)
 
       # Handle locally-built python distribution dependencies.
-      local_dist_req_libs = []
       built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
       if built_dists:
         req_tgts = inject_req_libs_provided_by_setup_file(self.context.build_graph,

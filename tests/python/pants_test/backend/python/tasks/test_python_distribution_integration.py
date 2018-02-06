@@ -70,7 +70,8 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     self.assertIn('fasthello', pants_run.stderr_data)
 
   def test_pants_binary_dep_isolation_with_multiple_targets(self):
-    command=['binary', '{}:main_with_no_conflict'.format(self.fasthello_install_requires)]
+    command=['binary', '{}:main_with_no_conflict'.format(self.fasthello_install_requires),
+             '{}:main_with_no_pycountry'.format(self.fasthello_install_requires)]
     pants_run = self.run_pants(command=command)
     self.assert_success(pants_run)
     # Check that the pex was built.
