@@ -14,8 +14,7 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants.backend.python.tasks.pex_build_util import (dump_requirements,
-                                                       inject_req_libs_provided_by_setup_file,
-                                                       is_local_python_dist)
+                                                       inject_req_libs_provided_by_setup_file)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
