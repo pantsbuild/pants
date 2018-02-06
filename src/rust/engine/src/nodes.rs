@@ -539,45 +539,9 @@ impl SelectDependencies {
 ///
 /// A node that recursively selects the dependencies of requested type and merge them.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectTransitive {
-  pub subject: Key,
-  pub variants: Variants,
-  pub selector: selectors::SelectTransitive,
-  dep_product_entries: rule_graph::Entries,
-  product_entries: rule_graph::Entries,
-}
+pub struct SelectTransitive;
 
 impl SelectTransitive {
-  fn new(
-    selector: selectors::SelectTransitive,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectTransitive {
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectTransitive(selector.clone()),
-      selectors::Select::without_variant(
-        selector.clone().dep_product,
-      ),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-      Selector::SelectTransitive(selector.clone()),
-      selector.field_types.clone(),
-      selectors::Select::without_variant(
-        selector.clone().product,
-      ),
-    ));
-
-    SelectTransitive {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      dep_product_entries: dep_p_entries,
-      product_entries: p_entries,
-    }
-  }
-
   ///
   /// Process single subject.
   ///
@@ -585,23 +549,24 @@ impl SelectTransitive {
   /// (processed subject_key, product output, dependencies to be processed in future iterations).
   ///
   fn expand_transitive(
-    &self,
     context: &Context,
+    variants: &Variants,
+    selector: &selectors::SelectTransitive,
+    product_entries: &rule_graph::Entries,
     subject_key: Key,
   ) -> NodeFuture<(Key, Value, Vec<Value>)> {
-    let field_name = self.selector.field.to_owned();
+    let field_name = selector.field.to_owned();
     Select::run(
       context,
       &subject_key,
-      &self.variants,
-      &selectors::Select::without_variant(self.selector.product),
+      variants,
+      &selectors::Select::without_variant(selector.product),
       // NB: We're filtering out all of the entries for field types other than
       //     subject_key's since none of them will match.
-      &self
-        .product_entries
-        .clone()
-        .into_iter()
+      &product_entries
+        .iter()
         .filter(|e| e.matches_subject_type(subject_key.type_id().clone()))
+        .cloned()
         .collect(),
     ).map(move |product| {
       let deps = externs::project_multi(&product, &field_name);
@@ -609,34 +574,42 @@ impl SelectTransitive {
     })
       .to_boxed()
   }
-}
 
-///
-/// Track states when processing `SelectTransitive` iteratively.
-///
-#[derive(Debug)]
-struct TransitiveExpansion {
-  // Subjects to be processed.
-  todo: HashSet<Key>,
+  fn run(
+    context: &Context,
+    subject: &Key,
+    variants: &Variants,
+    selector: &selectors::SelectTransitive,
+    edges: &rule_graph::RuleEdges,
+  ) -> NodeFuture<Value> {
+    let dep_product_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
+      Selector::SelectTransitive(selector.clone()),
+      selectors::Select::without_variant(
+        selector.dep_product.clone(),
+      ),
+    ));
+    let product_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
+      Selector::SelectTransitive(selector.clone()),
+      selector.field_types.clone(),
+      selectors::Select::without_variant(
+        selector.product.clone(),
+      ),
+    ));
 
-  // Mapping from processed subject `Key` to its product.
-  // Products will be collected at the end of iterations.
-  outputs: OrderMap<Key, Value>,
-}
-
-impl SelectTransitive {
-  fn run(self, context: Context) -> NodeFuture<Value> {
     // Select the product holding the dependency list.
+    let context2 = context.clone();
+    let variants2 = variants.clone();
+    let selector2 = selector.clone();
     Select::run(
-      &context,
-      &self.subject,
-      &self.variants,
-      &selectors::Select::without_variant(self.selector.dep_product),
-      &self.dep_product_entries,
+      context,
+      subject,
+      variants,
+      &selectors::Select::without_variant(selector.dep_product),
+      &dep_product_entries,
     ).then(move |dep_product_res| {
       match dep_product_res {
         Ok(dep_product) => {
-          let subject_keys = externs::project_multi(&dep_product, &self.selector.field)
+          let subject_keys = externs::project_multi(&dep_product, &selector2.field)
             .iter()
             .map(|subject| externs::key_for(&subject))
             .collect();
@@ -651,7 +624,15 @@ impl SelectTransitive {
               expansion
                 .todo
                 .drain()
-                .map(|subject_key| self.expand_transitive(&context, subject_key))
+                .map(|subject_key| {
+                  SelectTransitive::expand_transitive(
+                    &context2,
+                    &variants2,
+                    &selector2,
+                    &product_entries,
+                    subject_key,
+                  )
+                })
                 .collect::<Vec<_>>()
             });
 
@@ -690,6 +671,19 @@ impl SelectTransitive {
     })
       .to_boxed()
   }
+}
+
+///
+/// Track states when processing `SelectTransitive` iteratively.
+///
+#[derive(Debug)]
+struct TransitiveExpansion {
+  // Subjects to be processed.
+  todo: HashSet<Key>,
+
+  // Mapping from processed subject `Key` to its product.
+  // Products will be collected at the end of iterations.
+  outputs: OrderMap<Key, Value>,
 }
 
 struct SelectProjection;
@@ -1097,12 +1091,7 @@ impl Task {
         SelectDependencies::run(context, &self.subject, &self.variants, s, edges)
       }
       &Selector::SelectTransitive(ref s) => {
-        SelectTransitive::new(
-          s.clone(),
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ).run(context.clone())
+        SelectTransitive::run(context, &self.subject, &self.variants, s, edges)
       }
       &Selector::SelectProjection(ref s) => {
         SelectProjection::run(&context, &self.subject, &self.variants, s, edges)
