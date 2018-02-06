@@ -433,87 +433,86 @@ impl From<Select> for NodeKey {
 /// The value produced by this Node guarantees that the order of the provided values matches the
 /// order of declaration in the list `field` of the `dep_product`.
 ///
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct SelectDependencies {
-  pub subject: Key,
-  pub variants: Variants,
-  pub selector: selectors::SelectDependencies,
-  pub dep_product_entries: rule_graph::Entries,
-  pub product_entries: rule_graph::Entries,
-}
+struct SelectDependencies;
 
 impl SelectDependencies {
-  pub fn new(
-    selector: selectors::SelectDependencies,
-    subject: Key,
-    variants: Variants,
-    edges: &rule_graph::RuleEdges,
-  ) -> SelectDependencies {
-    // filters entries by whether the subject type is the right subject type
-    let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selectors::Select::without_variant(
-        selector.clone().dep_product,
-      ),
-    ));
-    let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
-      Selector::SelectDependencies(selector.clone()),
-      selector.field_types.clone(),
-      selectors::Select::without_variant(
-        selector.product.clone(),
-      ),
-    ));
-    SelectDependencies {
-      subject: subject,
-      variants: variants,
-      selector: selector.clone(),
-      dep_product_entries: dep_p_entries,
-      product_entries: p_entries,
-    }
-  }
-
-  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
+  fn get_dep(
+    context: &Context,
+    variants: &Variants,
+    selector: &selectors::SelectDependencies,
+    product_entries: &rule_graph::Entries,
+    dep_subject: &Value,
+  ) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
 
     let dep_subject_key = externs::key_for(dep_subject);
     Select::run(
-      &context,
+      context,
       &dep_subject_key,
-      &self.variants,
-      &selectors::Select::without_variant(self.selector.product),
+      variants,
+      &selectors::Select::without_variant(selector.product),
       // NB: We're filtering out all of the entries for field types other than
       //    dep_subject's since none of them will match.
-      &self
-        .product_entries
-        .clone()
-        .into_iter()
+      &product_entries
+        .iter()
         .filter(|e| {
           e.matches_subject_type(dep_subject_key.type_id().clone())
         })
+        .cloned()
         .collect(),
     )
   }
-}
 
-impl SelectDependencies {
-  fn run(self, context: Context) -> NodeFuture<Value> {
+  fn run(
+    context: &Context,
+    subject: &Key,
+    variants: &Variants,
+    selector: &selectors::SelectDependencies,
+    edges: &rule_graph::RuleEdges,
+  ) -> NodeFuture<Value> {
+    // filters entries by whether the subject type is the right subject type
+    let dep_product_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
+      Selector::SelectDependencies(selector.clone()),
+      selectors::Select::without_variant(
+        selector.dep_product.clone(),
+      ),
+    ));
+    let product_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
+      Selector::SelectDependencies(selector.clone()),
+      selector.field_types.clone(),
+      selectors::Select::without_variant(
+        selector.product.clone(),
+      ),
+    ));
+
     // Select the product holding the dependency list.
+    let context2 = context.clone();
+    let variants2 = variants.clone();
+    let selector2 = selector.clone();
     Select::run(
-      &context,
-      &self.subject,
-      &self.variants,
-      &selectors::Select::without_variant(self.selector.dep_product),
-      &self.dep_product_entries,
+      context,
+      subject,
+      variants,
+      &selectors::Select::without_variant(selector.dep_product),
+      &dep_product_entries,
     ).then(move |dep_product_res| {
       match dep_product_res {
         Ok(dep_product) => {
           // The product and its dependency list are available: project them.
           let deps = future::join_all(
-            externs::project_multi(&dep_product, &self.selector.field)
+            externs::project_multi(&dep_product, &selector2.field)
               .iter()
-              .map(|dep_subject| self.get_dep(&context, &dep_subject))
+              .map(|dep_subject| {
+                SelectDependencies::get_dep(
+                  &context2,
+                  &variants2,
+                  &selector2,
+                  &product_entries,
+                  &dep_subject,
+                )
+              })
               .collect::<Vec<_>>(),
           );
           deps
@@ -1095,12 +1094,7 @@ impl Task {
         Select::run_for_selector(context, &self.subject, &self.variants, s, edges)
       }
       &Selector::SelectDependencies(ref s) => {
-        SelectDependencies::new(
-          s.clone(),
-          self.subject.clone(),
-          self.variants.clone(),
-          edges,
-        ).run(context.clone())
+        SelectDependencies::run(context, &self.subject, &self.variants, s, edges)
       }
       &Selector::SelectTransitive(ref s) => {
         SelectTransitive::new(
