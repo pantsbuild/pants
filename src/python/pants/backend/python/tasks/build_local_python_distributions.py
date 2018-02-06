@@ -50,7 +50,7 @@ class BuildLocalPythonDistributions(Task):
           if vt.valid:
             built_dists.add(self._get_whl_from_dir(os.path.join(vt.results_dir, 'dist')))
           else:
-            if vt.target.dependencies :
+            if vt.target.dependencies:
               raise TargetDefinitionException(
                 vt.target, 'The `dependencies` field is disallowed on `python_dist` targets. List any 3rd '
                            'party requirements in the install_requirements argument of your setup function.'
@@ -84,5 +84,5 @@ class BuildLocalPythonDistributions(Task):
     if len(dists) == 0:
       raise TaskError('No distributions were produced by python_create_distribution task.')
     if len(dists) > 1:
-      raise TaskError('Ambiguous local python distributions found: %s' % (' '.join(dists)))
+      raise TaskError('Ambiguous local python distributions found: {}'.format(dists))
     return dists[0]
