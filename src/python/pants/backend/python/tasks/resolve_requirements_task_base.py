@@ -13,8 +13,9 @@ from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (build_req_libs_provided_by_setup_file,
-                                                        dump_requirements, is_local_python_dist)
+from pants.backend.python.tasks.pex_build_util import (dump_requirements,
+                                                       inject_req_libs_provided_by_setup_file,
+                                                       is_local_python_dist)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -61,23 +62,13 @@ class ResolveRequirementsTaskBase(Task):
           local_dist_req_libs = []
           built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
           if built_dists:
-            local_dist_req_libs = build_req_libs_provided_by_setup_file(self.context,
-                                                                        built_dists,
-                                                                        self.__class__.__name__)
-          req_libs = local_dist_req_libs + req_libs
+            req_libs = inject_req_libs_provided_by_setup_file(self.context.build_graph,
+                                                              built_dists,
+                                                              self.__class__.__name__) + req_libs
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)
 
   def _build_requirements_pex(self, interpreter, path, req_libs):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
-    # Dump built python distributions, if any, into the requirements pex.
-    # NB: If a python_dist depends on a requirement X and another target in play requires
-    # an incompatible version of X, this will cause the pex resolver to throw an incompatiblity
-    # error and Pants will abort the build.
-
-    built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-    if built_dists:
-      for dist in built_dists:
-        builder.add_dist_location(dist)
     builder.freeze()
