@@ -37,7 +37,7 @@ def build_file_aliases():
       PythonBinary.alias(): PythonBinary,
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,
-      'python_dist': PythonDistribution,
+      PythonDistribution.alias(): PythonDistribution,
       'python_requirement_library': PythonRequirementLibrary,
       Resources.alias(): Resources,
     },
