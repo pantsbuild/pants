@@ -166,24 +166,35 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   return distributions
 
 
-def inject_req_libs_provided_by_setup_file(build_graph, local_built_dists, synthetic_address):
+def inject_req_libs_provided_by_setup_file(build_graph, local_built_dists, synthetic_address, binary_tgt=None):
   """Build a requirements library from a local wheel.
 
   :param build_graph: The build graph needed for injecting synthetic targets.
   :param local_built_dists: A list of paths to locally built wheels to package into
   requirements libraries.
   :param synthetic_address: A generative address for addressing synthetic targets.
+  :param binary_tgt: An optional parameter to be passed only when called by the `python_binary_create`
+  task. This is needed to ensure that only python_dist targets in a binary target's closure are included
+  in the binary for the case where a user specifies mulitple binary targets in a single invocation of
+  `./pants binary`.
   :return: a :class: `PythonRequirementLibrary` containing a local wheel and its
   transitive dependencies.
   """
   req_libs = []
   local_whl_reqs = []
   for whl_location in local_built_dists:
-    base = os.path.basename(whl_location)
-    whl_dir = os.path.dirname(whl_location)
-    whl_metadata = base.split('-')
-    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
-    local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
+    should_create_req = False
+    if binary_tgt:
+      if any([tgt.id in whl_location for tgt in binary_tgt.closure()]):
+        should_create_req = True
+    else:
+      should_create_req = True
+    if should_create_req:
+      base = os.path.basename(whl_location)
+      whl_dir = os.path.dirname(whl_location)
+      whl_metadata = base.split('-')
+      req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
+      local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
   if local_whl_reqs:
     addr = Address.parse(synthetic_address)
     build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)

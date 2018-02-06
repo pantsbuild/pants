@@ -68,3 +68,24 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     self.assert_failure(pants_run)
     self.assertIn('pycountry', pants_run.stderr_data)
     self.assertIn('fasthello', pants_run.stderr_data)
+
+  def test_pants_binary_dep_isolation_with_multiple_targets(self):
+    command=['binary', '{}:main_with_no_conflict'.format(self.fasthello_install_requires)]
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)
+    # Check that the pex was built.
+    pex1 = os.path.join(get_buildroot(), 'dist', 'main_with_no_conflict.pex')
+    self.assertTrue(os.path.isfile(pex1))
+    pex2 = os.path.join(get_buildroot(), 'dist', 'main_with_no_pycountry.pex')
+    self.assertTrue(os.path.isfile(pex2))
+    # Check that the pex 1 runs.
+    output = subprocess.check_output(pex1)
+    self.assertIn('Super hello', output)
+    # Check that the pex 2 fails due to no python_dists leaked into it.
+    try:
+      output = subprocess.check_output(pex2)
+    except subprocess.CalledProcessError as e:
+      self.assertNotEquals(0, e.returncode)
+    # Cleanup
+    os.remove(pex1)
+    os.remove(pex2)
