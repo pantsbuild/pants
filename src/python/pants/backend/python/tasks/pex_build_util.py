@@ -166,13 +166,13 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   return distributions
 
 
-def inject_req_libs_provided_by_setup_file(build_graph, local_built_dists, class_name):
+def inject_req_libs_provided_by_setup_file(build_graph, local_built_dists, synthetic_address):
   """Build a requirements library from a local wheel.
 
   :param build_graph: The build graph needed for injecting synthetic targets.
   :param local_built_dists: A list of paths to locally built wheels to package into
   requirements libraries.
-  :param class_name: The name of the calling task class for naming synthetic targets.
+  :param synthetic_address: A generative address for addressing synthetic targets.
   :return: a :class: `PythonRequirementLibrary` containing a local wheel and its
   transitive dependencies.
   """
@@ -185,7 +185,7 @@ def inject_req_libs_provided_by_setup_file(build_graph, local_built_dists, class
     req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
     local_whl_reqs.append(PythonRequirement(req_name, repository=whl_dir))
   if local_whl_reqs:
-    addr = Address.parse(class_name)
+    addr = Address.parse(synthetic_address)
     build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)
     req_libs = [build_graph.get_target(addr)]
   return req_libs

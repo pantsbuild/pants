@@ -136,8 +136,8 @@ class PythonBinaryCreate(Task):
       built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
       if built_dists:
         req_tgts = inject_req_libs_provided_by_setup_file(self.context.build_graph,
-                                                              built_dists,
-                                                              self.__class__.__name__) + req_tgts
+                                                          built_dists,
+                                                          binary_tgt.invalidation_hash()) + req_tgts
 
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 

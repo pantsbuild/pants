@@ -64,7 +64,7 @@ class ResolveRequirementsTaskBase(Task):
           if built_dists:
             req_libs = inject_req_libs_provided_by_setup_file(self.context.build_graph,
                                                               built_dists,
-                                                              self.__class__.__name__) + req_libs
+                                                              target_set_id) + req_libs
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)
 
