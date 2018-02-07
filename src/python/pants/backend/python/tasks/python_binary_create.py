@@ -17,7 +17,7 @@ from pants.backend.python.tasks.build_local_python_distributions import \
 from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_sources,
                                                        has_python_requirements, has_python_sources,
                                                        has_resources,
-                                                       inject_req_libs_provided_by_setup_file)
+                                                       inject_synthetic_dist_requirements)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -134,9 +134,9 @@ class PythonBinaryCreate(Task):
       # Handle locally-built python distribution dependencies.
       built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
       if built_dists:
-        req_tgts = inject_req_libs_provided_by_setup_file(self.context.build_graph,
-                                                          built_dists,
-                                                          binary_tgt.invalidation_hash(), binary_tgt) + req_tgts
+        req_tgts = inject_synthetic_dist_requirements(self.context.build_graph,
+                                                      built_dists,
+                                                      binary_tgt.invalidation_hash(), binary_tgt) + req_tgts
 
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 

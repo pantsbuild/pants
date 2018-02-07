@@ -14,7 +14,7 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
 from pants.backend.python.tasks.pex_build_util import (dump_requirements,
-                                                       inject_req_libs_provided_by_setup_file)
+                                                       inject_synthetic_dist_requirements)
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -62,9 +62,9 @@ class ResolveRequirementsTaskBase(Task):
           # Handle locally-built python distribution dependencies.
           built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
           if built_dists:
-            req_libs = inject_req_libs_provided_by_setup_file(self.context.build_graph,
-                                                              built_dists,
-                                                              target_set_id) + req_libs
+            req_libs = inject_synthetic_dist_requirements(self.context.build_graph,
+                                                          built_dists,
+                                                          target_set_id) + req_libs
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)
 
