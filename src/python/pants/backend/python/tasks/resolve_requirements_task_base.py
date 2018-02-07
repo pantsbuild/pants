@@ -64,7 +64,7 @@ class ResolveRequirementsTaskBase(Task):
           if built_dists:
             req_libs = inject_synthetic_dist_requirements(self.context.build_graph,
                                                           built_dists,
-                                                          target_set_id) + req_libs
+                                                          ':'.join(2 * [target_set_id])) + req_libs
           self._build_requirements_pex(interpreter, safe_path, req_libs)
     return PEX(path, interpreter=interpreter)
 

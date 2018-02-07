@@ -136,7 +136,8 @@ class PythonBinaryCreate(Task):
       if built_dists:
         req_tgts = inject_synthetic_dist_requirements(self.context.build_graph,
                                                       built_dists,
-                                                      binary_tgt.invalidation_hash(), binary_tgt) + req_tgts
+                                                      ':'.join(2 * [binary_tgt.invalidation_hash()]),
+                                                      binary_tgt) + req_tgts
 
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
