@@ -10,7 +10,7 @@ use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Failure, Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, FNV, Function, Id, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 
 
@@ -312,8 +312,8 @@ impl hash::Hash for InternKey {
 
 #[derive(Default)]
 struct Interns {
-  forward: HashMap<InternKey, Key>,
-  reverse: HashMap<Id, Value>,
+  forward: HashMap<InternKey, Key, FNV>,
+  reverse: HashMap<Id, Value, FNV>,
   id_generator: u64,
 }
 
