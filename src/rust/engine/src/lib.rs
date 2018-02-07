@@ -37,9 +37,9 @@ use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
               ExternContext, Externs, IdToStrExtern, CallExtern, EvalExtern, LogExtern,
-              KeyForExtern, ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern,
+              IdentifyExtern, ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern,
               PyResult, SatisfiedByExtern, StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern,
-              StoreBytesExtern, TypeIdBuffer, ValForExtern, ValToStrExtern};
+              StoreBytesExtern, TypeIdBuffer, EqualsExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
@@ -121,8 +121,8 @@ pub extern "C" fn externs_set(
   log: LogExtern,
   call: CallExtern,
   eval: EvalExtern,
-  key_for: KeyForExtern,
-  val_for: ValForExtern,
+  identify: IdentifyExtern,
+  equals: EqualsExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   id_to_str: IdToStrExtern,
@@ -143,8 +143,8 @@ pub extern "C" fn externs_set(
     log,
     call,
     eval,
-    key_for,
-    val_for,
+    identify,
+    equals,
     clone_val,
     drop_handles,
     id_to_str,
@@ -160,6 +160,16 @@ pub extern "C" fn externs_set(
     create_exception,
     py_str_type,
   ));
+}
+
+#[no_mangle]
+pub extern "C" fn externs_key_for(value: Value) -> Key {
+  externs::key_for(&value)
+}
+
+#[no_mangle]
+pub extern "C" fn externs_val_for(key: Key) -> Value {
+  externs::val_for(&key)
 }
 
 ///

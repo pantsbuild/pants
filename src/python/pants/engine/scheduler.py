@@ -149,7 +149,7 @@ class WrappedNativeScheduler(object):
     return self._native.context.from_key(cdata)
 
   def _to_constraint(self, type_or_constraint):
-    return TypeConstraint(self._to_id(constraint_for(type_or_constraint)))
+    return TypeConstraint(self._to_key(constraint_for(type_or_constraint)))
 
   def _to_ids_buf(self, types):
     return self._native.to_ids_buf(types)
@@ -191,7 +191,7 @@ class WrappedNativeScheduler(object):
     """Register the given TaskRule with the native scheduler."""
     input_selects = rule.input_selectors
     func = rule.func
-    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_id(func)), output_constraint)
+    self._native.lib.tasks_task_begin(self._tasks, Function(self._to_key(func)), output_constraint)
     for selector in input_selects:
       selector_type = type(selector)
       product_constraint = self._to_constraint(selector.product)
@@ -243,7 +243,7 @@ class WrappedNativeScheduler(object):
   def rule_subgraph_visualization(self, root_subject_type, product_type):
     root_type_id = TypeId(self._to_id(root_subject_type))
 
-    product_type_id = TypeConstraint(self._to_id(constraint_for(product_type)))
+    product_type_id = TypeConstraint(self._to_key(constraint_for(product_type)))
     with temporary_file_path() as path:
       self._native.lib.rule_subgraph_visualize(
         self._scheduler,

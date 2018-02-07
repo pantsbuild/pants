@@ -184,9 +184,10 @@ impl Tasks {
     );
     assert!(
       !tasks.contains(&task),
-      "{:?} was double-registered for {:?}",
+      "{:?} was double-registered for {:?}: {:?}",
       task,
       task.product,
+      tasks,
     );
     task.clause.shrink_to_fit();
     tasks.push(task);

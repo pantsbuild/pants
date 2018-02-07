@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::hash;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
@@ -25,20 +26,27 @@ pub fn eval(python: &str) -> Result<Value, Failure> {
   }).into()
 }
 
+fn identify(val: &Value) -> Ident {
+  with_externs(|e| (e.identify)(e.context, val))
+}
+
+pub fn equals(val1: &Value, val2: &Value) -> bool {
+  with_externs(|e| (e.equals)(e.context, val1, val2))
+}
+
 pub fn key_for(val: &Value) -> Key {
-  with_externs(|e| (e.key_for)(e.context, val))
+  let mut interns = INTERNS.write().unwrap();
+  interns.insert(val)
 }
 
 pub fn val_for(key: &Key) -> Value {
-  with_externs(|e| (e.val_for)(e.context, key))
+  let interns = INTERNS.read().unwrap();
+  // TODO: Remove clone.
+  interns.get(key).clone()
 }
 
 pub fn clone_val(val: &Value) -> Value {
   with_externs(|e| (e.clone_val)(e.context, val))
-}
-
-pub fn val_for_id(id: Id) -> Value {
-  val_for(&Key::new_with_anon_type_id(id))
 }
 
 pub fn drop_handles(handles: Vec<Handle>) {
@@ -183,8 +191,8 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
 /// those configured in types::Types.
 ///
 pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
-  call(&val_for_id(func.0), args).unwrap_or_else(|e| {
-    panic!("Core function `{}` failed: {:?}", id_to_str(func.0), e);
+  call(&val_for(&func.0), args).unwrap_or_else(|e| {
+    panic!("Core function `{}` failed: {:?}", key_to_str(&func.0), e);
   })
 }
 
@@ -194,6 +202,7 @@ pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
 
 lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
+  static ref INTERNS: RwLock<Interns> = RwLock::new(Default::default());
 }
 
 ///
@@ -224,8 +233,8 @@ pub struct Externs {
   log: LogExtern,
   call: CallExtern,
   eval: EvalExtern,
-  key_for: KeyForExtern,
-  val_for: ValForExtern,
+  identify: IdentifyExtern,
+  equals: EqualsExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
@@ -254,8 +263,8 @@ impl Externs {
     log: LogExtern,
     call: CallExtern,
     eval: EvalExtern,
-    key_for: KeyForExtern,
-    val_for: ValForExtern,
+    identify: IdentifyExtern,
+    equals: EqualsExtern,
     clone_val: CloneValExtern,
     drop_handles: DropHandlesExtern,
     id_to_str: IdToStrExtern,
@@ -276,8 +285,8 @@ impl Externs {
       log: log,
       call: call,
       eval: eval,
-      key_for: key_for,
-      val_for: val_for,
+      identify: identify,
+      equals: equals,
       clone_val: clone_val,
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
@@ -297,6 +306,56 @@ impl Externs {
   }
 }
 
+struct InternKey(i64, Value);
+
+impl Eq for InternKey {}
+
+impl PartialEq for InternKey {
+  fn eq(&self, other: &InternKey) -> bool {
+    equals(&self.1, &other.1)
+  }
+}
+
+impl hash::Hash for InternKey {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+    self.0.hash(state);
+  }
+}
+
+#[derive(Default)]
+struct Interns {
+  forward: HashMap<InternKey, Key>,
+  reverse: HashMap<Id, Value>,
+  id_generator: u64,
+}
+
+impl Interns {
+  fn insert(&mut self, v: &Value) -> Key {
+    let ident = identify(v);
+    let type_id = ident.type_id;
+    let mut maybe_id = self.id_generator;
+    let key = self
+      .forward
+      .entry(InternKey(ident.hash, ident.value))
+      .or_insert_with(|| {
+        maybe_id += 1;
+        Key::new(maybe_id, type_id)
+      })
+      .clone();
+    if maybe_id != self.id_generator {
+      self.id_generator = maybe_id;
+      self.reverse.insert(maybe_id, v.clone());
+    }
+    key
+  }
+
+  fn get(&self, k: &Key) -> &Value {
+    self.reverse.get(&k.id()).unwrap_or_else(|| {
+      panic!("Previously memoized object disappeared for {:?}", k)
+    })
+  }
+}
+
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 pub type SatisfiedByExtern = extern "C" fn(*const ExternContext,
@@ -309,9 +368,9 @@ pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext,
                                                *const TypeId)
                                                -> bool;
 
-pub type KeyForExtern = extern "C" fn(*const ExternContext, *const Value) -> Key;
+pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Value) -> Ident;
 
-pub type ValForExtern = extern "C" fn(*const ExternContext, *const Key) -> Value;
+pub type EqualsExtern = extern "C" fn(*const ExternContext, *const Value, *const Value) -> bool;
 
 pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Value) -> Value;
 
@@ -369,6 +428,14 @@ impl From<Result<(), String>> for PyResult {
       },
     }
   }
+}
+
+// The result of an `identify` call, including the __hash__ of a Value and its TypeId.
+#[repr(C)]
+pub struct Ident {
+  hash: i64,
+  value: Value,
+  type_id: TypeId,
 }
 
 // Points to an array containing a series of values allocated by Python.

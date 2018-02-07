@@ -292,7 +292,7 @@ impl Select {
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
-      let value = externs::val_for_id(self.subject.id());
+      let value = externs::val_for(&self.subject);
       let mut env: BTreeMap<String, String> = BTreeMap::new();
       let env_var_parts = externs::project_multi_strs(&value, "env");
       // TODO: Error if env_var_parts.len() % 2 != 0
@@ -1117,7 +1117,7 @@ impl Node for Task {
     let task = self.task.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for_id(task.func.0), &deps),
+        Ok(deps) => externs::call(&externs::val_for(&task.func.0), &deps),
         Err(err) => Err(err),
       })
       .to_boxed()
@@ -1145,10 +1145,10 @@ pub enum NodeKey {
 impl NodeKey {
   pub fn format(&self) -> String {
     fn keystr(key: &Key) -> String {
-      externs::id_to_str(key.id())
+      externs::key_to_str(&key)
     }
     fn typstr(tc: &TypeConstraint) -> String {
-      externs::id_to_str(tc.0)
+      externs::key_to_str(&tc.0)
     }
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
@@ -1166,7 +1166,7 @@ impl NodeKey {
       &NodeKey::Task(ref s) => {
         format!(
           "Task({}, {}, {})",
-          externs::id_to_str(s.task.func.0),
+          externs::key_to_str(&s.task.func.0),
           keystr(&s.subject),
           typstr(&s.product)
         )
@@ -1177,7 +1177,7 @@ impl NodeKey {
 
   pub fn product_str(&self) -> String {
     fn typstr(tc: &TypeConstraint) -> String {
-      externs::id_to_str(tc.0)
+      externs::key_to_str(&tc.0)
     }
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),

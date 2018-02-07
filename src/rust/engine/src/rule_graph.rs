@@ -7,7 +7,7 @@ use std::hash::Hash;
 use std::fmt;
 use std::io;
 
-use core::{ANY_TYPE, Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{ANY_TYPE, Function, Key, TypeConstraint, TypeId, Value};
 use externs;
 use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
 use tasks::{Task, Tasks};
@@ -654,15 +654,11 @@ fn type_constraint_str(type_constraint: TypeConstraint) -> String {
 }
 
 fn to_val(type_constraint: TypeConstraint) -> Value {
-  to_val_from_id(type_constraint.0)
+  externs::val_for(&type_constraint.0)
 }
 
 fn to_val_from_func(func: &Function) -> Value {
-  to_val_from_id(func.0)
-}
-
-fn to_val_from_id(id: Id) -> Value {
-  externs::val_for_id(id)
+  externs::val_for(&func.0)
 }
 
 fn function_str(func: &Function) -> String {
@@ -675,8 +671,11 @@ pub fn type_str(type_id: TypeId) -> String {
   if type_id == ANY_TYPE {
     "Any".to_string()
   } else {
-    let as_val = to_val_from_id(type_id.0);
-    val_name(&as_val)
+    externs::id_to_str(type_id.0)
+    // TODO: We should be calling `__name__` here, but we're not. Would need to get
+    // a Value for the TypeId.
+    // let as_val =
+    // val_name(&as_val)
   }
 }
 
