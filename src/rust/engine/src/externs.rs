@@ -41,7 +41,6 @@ pub fn key_for(val: &Value) -> Key {
 
 pub fn val_for(key: &Key) -> Value {
   let interns = INTERNS.read().unwrap();
-  // TODO: Remove clone.
   interns.get(key).clone()
 }
 
@@ -56,27 +55,16 @@ pub fn drop_handles(handles: Vec<Handle>) {
 }
 
 pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
-  with_externs(|e| (e.satisfied_by)(e.context, constraint, obj))
+  let interns = INTERNS.read().unwrap();
+  with_externs(|e| {
+    (e.satisfied_by)(e.context, interns.get(&constraint.0), obj)
+  })
 }
 
 pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
+  let interns = INTERNS.read().unwrap();
   with_externs(|e| {
-    let key = (*constraint, *cls);
-
-    // See if a value already exists.
-    {
-      let read = e.satisfied_by_type_cache.read().unwrap();
-      if let Some(v) = read.get(&key) {
-        return *v;
-      }
-    }
-
-    // If not, compute and insert.
-    let mut write = e.satisfied_by_type_cache.write().unwrap();
-    write
-      .entry(key)
-      .or_insert_with(|| (e.satisfied_by_type)(e.context, constraint, cls))
-      .clone()
+    (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls)
   })
 }
 
@@ -191,8 +179,10 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
 /// those configured in types::Types.
 ///
 pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
-  call(&val_for(&func.0), args).unwrap_or_else(|e| {
-    panic!("Core function `{}` failed: {:?}", key_to_str(&func.0), e);
+  let interns = INTERNS.read().unwrap();
+  let func_val = interns.get(&func.0);
+  call(func_val, args).unwrap_or_else(|e| {
+    panic!("Core function `{}` failed: {:?}", val_to_str(func_val), e);
   })
 }
 
@@ -239,7 +229,6 @@ pub struct Externs {
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
-  satisfied_by_type_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   store_i32: StoreI32Extern,
@@ -291,7 +280,6 @@ impl Externs {
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
       satisfied_by_type: satisfied_by_type,
-      satisfied_by_type_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
       store_i32: store_i32,
@@ -358,14 +346,12 @@ impl Interns {
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
-pub type SatisfiedByExtern = extern "C" fn(*const ExternContext,
-                                           *const TypeConstraint,
-                                           *const Value)
-                                           -> bool;
+// TODO: Type alias used to avoid rustfmt breaking itself by rendering a 101 character line.
+pub type SatisifedBool = bool;
+pub type SatisfiedByExtern = extern "C" fn(*const ExternContext, *const Value, *const Value)
+                                           -> SatisifedBool;
 
-pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext,
-                                               *const TypeConstraint,
-                                               *const TypeId)
+pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext, *const Value, *const TypeId)
                                                -> bool;
 
 pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Value) -> Ident;

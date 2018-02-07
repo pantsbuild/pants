@@ -99,8 +99,8 @@ typedef Value            (*extern_ptr_clone_val)(ExternContext*, Value*);
 typedef void             (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
 typedef Buffer           (*extern_ptr_id_to_str)(ExternContext*, Id);
 typedef Buffer           (*extern_ptr_val_to_str)(ExternContext*, Value*);
-typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, TypeConstraint*, Value*);
-typedef _Bool            (*extern_ptr_satisfied_by_type)(ExternContext*, TypeConstraint*, TypeId*);
+typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
+typedef _Bool            (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
 typedef Value            (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, _Bool);
 typedef Value            (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_store_i32)(ExternContext*, int32_t);
@@ -234,8 +234,8 @@ extern "Python" {
   void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
   Buffer           extern_id_to_str(ExternContext*, Id);
   Buffer           extern_val_to_str(ExternContext*, Value*);
-  _Bool            extern_satisfied_by(ExternContext*, TypeConstraint*, Value*);
-  _Bool            extern_satisfied_by_type(ExternContext*, TypeConstraint*, TypeId*);
+  _Bool            extern_satisfied_by(ExternContext*, Value*, Value*);
+  _Bool            extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
   Value            extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
   Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
   Value            extern_store_i32(ExternContext*, int32_t);
@@ -321,7 +321,7 @@ def _initialize_externs(ffi):
   def extern_identify(context_handle, val):
     """Return an Ident containing a clone of the Value with its __hash__ and TypeId."""
     c = ffi.from_handle(context_handle)
-    obj = c.from_value(val)
+    obj = ffi.from_handle(val.handle)
     hash_ = hash(obj)
     cloned = c.to_value(obj)
     type_id = c.to_id(type(obj))
@@ -330,14 +330,13 @@ def _initialize_externs(ffi):
   @ffi.def_extern()
   def extern_equals(context_handle, val1, val2):
     """Return true if the given Values are __eq__."""
-    c = ffi.from_handle(context_handle)
-    return c.from_value(val1) == c.from_value(val2)
+    return ffi.from_handle(val1.handle) == ffi.from_handle(val2.handle)
 
   @ffi.def_extern()
   def extern_clone_val(context_handle, val):
     """Clone the given Value."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(c.from_value(val))
+    return c.to_value(ffi.from_handle(val.handle))
 
   @ffi.def_extern()
   def extern_drop_handles(context_handle, handles_ptr, handles_len):
@@ -359,17 +358,17 @@ def _initialize_externs(ffi):
     return c.utf8_buf(six.text_type(c.from_value(val)))
 
   @ffi.def_extern()
-  def extern_satisfied_by(context_handle, constraint_id, val):
+  def extern_satisfied_by(context_handle, constraint_val, val):
     """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
     c = ffi.from_handle(context_handle)
-    constraint = c.from_value(c.from_key(constraint_id.key))
-    return constraint.satisfied_by(c.from_value(val))
+    constraint = ffi.from_handle(constraint_val.handle)
+    return constraint.satisfied_by(ffi.from_handle(val.handle))
 
   @ffi.def_extern()
-  def extern_satisfied_by_type(context_handle, constraint_id, cls_id):
+  def extern_satisfied_by_type(context_handle, constraint_val, cls_id):
     """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
     c = ffi.from_handle(context_handle)
-    constraint = c.from_value(c.from_key(constraint_id.key))
+    constraint = ffi.from_handle(constraint_val.handle)
     return constraint.satisfied_by_type(c.from_id(cls_id.id_))
 
   @ffi.def_extern()
