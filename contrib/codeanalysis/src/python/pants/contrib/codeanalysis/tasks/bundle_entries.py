@@ -11,8 +11,6 @@ import shutil
 from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.util.dirutil import safe_mkdir
 
-from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJavaTargets
-
 
 class BundleEntries(NailgunTask):
   @classmethod
@@ -33,9 +31,7 @@ class BundleEntries(NailgunTask):
     if archive == 'none':
       return
 
-    indexable_targets = IndexableJavaTargets.global_instance().get(self.context)
-    for tgt in indexable_targets:
-      entries = self.context.products.get_data('kythe_entries_files', dict)[tgt]
+    for tgt, entries in self.context.products.get_data('kythe_entries_files', dict).items():
       kythe_distdir = os.path.join(self.get_options().pants_distdir, 'kythe')
       safe_mkdir(kythe_distdir)
       uncompressed_kythe_distpath = os.path.join(
