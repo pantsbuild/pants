@@ -10,9 +10,12 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.targets.python_binary import PythonBinary
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.tasks.build_local_python_distributions import \
+  BuildLocalPythonDistributions
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
@@ -34,6 +37,7 @@ def build_file_aliases():
       PythonBinary.alias(): PythonBinary,
       PythonLibrary.alias(): PythonLibrary,
       PythonTests.alias(): PythonTests,
+      PythonDistribution.alias(): PythonDistribution,
       'python_requirement_library': PythonRequirementLibrary,
       Resources.alias(): Resources,
     },
@@ -51,6 +55,7 @@ def build_file_aliases():
 
 def register_goals():
   task(name='interpreter', action=SelectInterpreter).install('pyprep')
+  task(name='build-local-dists', action=BuildLocalPythonDistributions).install('pyprep')
   task(name='requirements', action=ResolveRequirements).install('pyprep')
   task(name='sources', action=GatherSources).install('pyprep')
   task(name='py', action=PythonRun).install('run')

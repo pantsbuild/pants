@@ -73,9 +73,6 @@ class PailgunHandler(PailgunHandlerBase):
     self.logger.info('handling pailgun request: `{}`'.format(' '.join(arguments)))
     self.logger.debug('pailgun request environment: %s', environment)
 
-    # Instruct the client to send stdin (if applicable).
-    NailgunProtocol.send_start_reading_input(self.request)
-
     # Execute the requested command with optional daemon-side profiling.
     with maybe_profiled(environment.get('PANTSD_PROFILE')):
       self._run_pants(self.request, arguments, environment)

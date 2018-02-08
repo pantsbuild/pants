@@ -42,14 +42,15 @@ class GraphTestBase(unittest.TestCase):
     return options
 
   @contextmanager
-  def graph_helper(self, build_file_aliases=None, build_file_imports_behavior='allow'):
+  def graph_helper(self, build_file_aliases=None, build_file_imports_behavior='allow', include_trace_on_error=True):
     with temporary_dir() as work_dir:
       path_ignore_patterns = ['.*']
       graph_helper = EngineInitializer.setup_legacy_graph(path_ignore_patterns,
                                                           work_dir,
                                                           build_file_imports_behavior,
                                                           build_file_aliases=build_file_aliases,
-                                                          native=self._native)
+                                                          native=self._native,
+                                                          include_trace_on_error=include_trace_on_error)
       yield graph_helper
 
   @contextmanager
@@ -72,15 +73,21 @@ class GraphTestBase(unittest.TestCase):
 class GraphTargetScanFailureTests(GraphTestBase):
 
   def test_with_missing_target_in_existing_build_file(self):
+    # When a target is missing,
+    #  the suggestions should be in order
+    #  and there should only be one copy of the error if tracing is off.
     with self.assertRaises(AddressLookupError) as cm:
-      with self.graph_helper() as graph_helper:
+      with self.graph_helper(include_trace_on_error=False) as graph_helper:
         self.create_graph_from_specs(graph_helper, ['3rdparty/python:rutabaga'])
         self.fail('Expected an exception.')
 
-    self.assertIn('"rutabaga" was not found in namespace "3rdparty/python". Did you mean one of:\n'
-                  '  :psutil\n'
-                  '  :isort',
-                  str(cm.exception))
+    error_message = str(cm.exception)
+    expected_message = '"rutabaga" was not found in namespace "3rdparty/python".' \
+                       ' Did you mean one of:\n' \
+                       '  :Markdown\n' \
+                       '  :Pygments\n'
+    self.assertIn(expected_message, error_message)
+    self.assertTrue(error_message.count(expected_message) == 1)
 
   def test_with_missing_directory_fails(self):
     with self.assertRaises(AddressLookupError) as cm:

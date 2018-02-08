@@ -142,3 +142,23 @@ To enable the daemon, see the example in `pants.daemon.ini` in the root of the p
 
 The daemon will be in beta until the caveat mentioned above is addressed, but we hope to
 enable the daemon by default for the [`1.5.0` release of pants](https://github.com/pantsbuild/pants/milestone/12).
+
+Profiling Pants
+---------------
+
+There are three environment variables that profile various parts of a pants run.
+
+* `PANTS_PROFILE` - Covers the entire run when pantsd is disabled, or the post-fork portion
+  of a pantsd run.
+* `PANTSC_PROFILE` - Covers the client in a pantsd run, which connects to pantsd and then
+  communicates on the socket until the run completes.
+* `PANTSD_PROFILE` - Covers the graph warming operations pre-fork in a pantsd run.
+
+To enable profiling, set the relevant environment variable to a path to write a profile to, and
+then run pants:
+
+    :::bash
+    PANTS_PROFILE=myprofile.prof ./pants ..
+
+Once you have a profile file, you can use any visualizer that supports python profiles, such as
+`snakeviz` or `gprof2dot`.

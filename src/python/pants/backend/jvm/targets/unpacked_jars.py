@@ -27,20 +27,21 @@ class UnpackedJars(ImportJarsMixin, Target):
     pass
 
   def __init__(self, payload=None, libraries=None, include_patterns=None, exclude_patterns=None,
-               **kwargs):
+               intransitive=False, **kwargs):
     """
-    :param libraries: List of addresses of `jar_library <#jar_library>`_
-      targets which contain .proto definitions.
     :param list libraries: addresses of jar_library targets that specify the jars you want to unpack
     :param list include_patterns: fileset patterns to include from the archive
     :param list exclude_patterns: fileset patterns to exclude from the archive. Exclude patterns
       are processed before include_patterns.
+    :param bool intransitive: Whether to unpack all resolved dependencies of the jars, or just
+      the jars themselves.
     """
     payload = payload or Payload()
     payload.add_fields({
       'library_specs': PrimitiveField(libraries or ()),
       'include_patterns' : PrimitiveField(include_patterns or ()),
       'exclude_patterns' : PrimitiveField(exclude_patterns or ()),
+      'intransitive': PrimitiveField(intransitive)
     })
     super(UnpackedJars, self).__init__(payload=payload, **kwargs)
 

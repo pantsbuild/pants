@@ -483,9 +483,16 @@ class BaseTest(unittest.TestCase):
       return self._messages_for_level('WARNING')
 
   @contextmanager
-  def captured_logging(self):
+  def captured_logging(self, level=None):
+    root_logger = logging.getLogger()
+
+    old_level = root_logger.level
+    root_logger.setLevel(level or logging.NOTSET)
+
     handler = self.LoggingRecorder()
-    logger = logging.getLogger('')
-    logger.addHandler(handler)
-    yield handler
-    logger.removeHandler(handler)
+    root_logger.addHandler(handler)
+    try:
+      yield handler
+    finally:
+      root_logger.setLevel(old_level)
+      root_logger.removeHandler(handler)

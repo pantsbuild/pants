@@ -17,7 +17,6 @@ from pants.backend.jvm.tasks.unpack_jars import UnpackJars, UnpackJarsFingerprin
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.util.contextutil import open_zip, temporary_dir
-from pants.util.dirutil import safe_walk
 from pants_test.tasks.task_test_base import TaskTestBase
 
 
@@ -28,24 +27,24 @@ class UnpackJarsTest(TaskTestBase):
     return UnpackJars
 
   @contextmanager
-  def sample_jarfile(self):
-    """Create a jar file with a/b/c/data.txt and a/b/c/foo.proto"""
+  def sample_jarfile(self, name):
     with temporary_dir() as temp_dir:
-      jar_name = os.path.join(temp_dir, 'foo.jar')
+      jar_name = os.path.join(temp_dir, '{}.jar'.format(name))
       with open_zip(jar_name, 'w') as proto_jarfile:
-        proto_jarfile.writestr('a/b/c/data.txt', 'Foo text')
-        proto_jarfile.writestr('a/b/c/foo.proto', 'message Foo {}')
+        proto_jarfile.writestr('a/b/c/{}.txt'.format(name), 'Some text')
+        proto_jarfile.writestr('a/b/c/{}.proto'.format(name), 'message Msg {}')
       yield jar_name
 
   def test_invalid_pattern(self):
     with self.assertRaises(UnpackJars.InvalidPatternError):
-      UnpackJars._compile_patterns([45])
+      UnpackJars.compile_patterns([45])
 
-  def _run_filter(self, filename, include_patterns=None, exclude_patterns=None):
+  @staticmethod
+  def _run_filter(filename, include_patterns=None, exclude_patterns=None):
     return UnpackJars._file_filter(
       filename,
-      UnpackJars._compile_patterns(include_patterns or []),
-      UnpackJars._compile_patterns(exclude_patterns or []))
+      UnpackJars.compile_patterns(include_patterns or []),
+      UnpackJars.compile_patterns(exclude_patterns or []))
 
   def test_file_filter(self):
     # If no patterns are specified, everything goes through
@@ -81,90 +80,72 @@ class UnpackJarsTest(TaskTestBase):
                             jars=[JarDependency(org=coord.org, name=coord.name, rev=coord.rev,
                                                 url='file:///foo.jar')])
 
-  def _make_unpacked_jar(self, coord, include_patterns):
-    bar = self._make_jar_library(coord)
+  def _make_unpacked_jar(self, coord, include_patterns, intransitive=False):
+    jarlib = self._make_jar_library(coord)
     return self.make_target(spec='unpack:foo',
                             target_type=UnpackedJars,
-                            libraries=[bar.address.spec],
-                            include_patterns=include_patterns)
-
-  def _make_coord(self, rev):
-    return M2Coordinate(org='com.example', name='bar', rev=rev)
+                            libraries=[jarlib.address.spec],
+                            include_patterns=include_patterns,
+                            intransitive=intransitive)
 
   def test_unpack_jar_fingerprint_strategy(self):
     fingerprint_strategy = UnpackJarsFingerprintStrategy()
 
     make_unpacked_jar = functools.partial(self._make_unpacked_jar, include_patterns=['bar'])
-    rev1 = self._make_coord(rev='0.0.1')
+    rev1 = M2Coordinate(org='com.example', name='bar', rev='0.0.1')
     target = make_unpacked_jar(rev1)
     fingerprint1 = fingerprint_strategy.compute_fingerprint(target)
 
-    # Now, replace the build file with a different version
+    # Now, replace the build file with a different version.
     self.reset_build_graph()
-    target = make_unpacked_jar(self._make_coord(rev='0.0.2'))
+    target = make_unpacked_jar(M2Coordinate(org='com.example', name='bar', rev='0.0.2'))
     fingerprint2 = fingerprint_strategy.compute_fingerprint(target)
     self.assertNotEqual(fingerprint1, fingerprint2)
 
-    # Go back to the original library
+    # Go back to the original library.
     self.reset_build_graph()
     target = make_unpacked_jar(rev1)
     fingerprint3 = fingerprint_strategy.compute_fingerprint(target)
 
     self.assertEqual(fingerprint1, fingerprint3)
 
-  def _add_dummy_product(self, unpack_task, foo_target, jar_filename, coord):
-    jar_import_products = unpack_task.context.products.get_data(JarImportProducts,
-                                                                init_func=JarImportProducts)
+  @staticmethod
+  def _add_dummy_product(context, foo_target, jar_filename, coord):
+    jar_import_products = context.products.get_data(JarImportProducts, init_func=JarImportProducts)
     jar_import_products.imported(foo_target, coord, jar_filename)
 
-  def test_incremental(self):
-    make_unpacked_jar = functools.partial(self._make_unpacked_jar,
-                                          include_patterns=['a/b/c/*.proto'])
+  def _do_test_products(self, intransitive):
+    self.maxDiff = None
+    with self.sample_jarfile('foo') as foo_jar:
+      with self.sample_jarfile('bar') as bar_jar:
+        foo_coords = M2Coordinate(org='com.example', name='foo', rev='0.0.1')
+        bar_coords = M2Coordinate(org='com.example', name='bar', rev='0.0.7')
+        unpacked_jar_tgt = self._make_unpacked_jar(
+          foo_coords, include_patterns=['a/b/c/*.proto'], intransitive=intransitive)
 
-    with self.sample_jarfile() as jar_filename:
-      rev1 = self._make_coord(rev='0.0.1')
-      foo_target = make_unpacked_jar(rev1)
+        context = self.context(target_roots=[unpacked_jar_tgt])
+        unpack_task = self.create_task(context)
+        self._add_dummy_product(context, unpacked_jar_tgt, foo_jar, foo_coords)
+        # We add jar_bar as a product against foo_tgt, to simulate it being an
+        # externally-resolved dependency of jar_foo.
+        self._add_dummy_product(context, unpacked_jar_tgt, bar_jar, bar_coords)
+        unpack_task.execute()
 
-      # The first time through, the target should be unpacked.
-      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
-      self._add_dummy_product(unpack_task, foo_target, jar_filename, rev1)
-      unpacked_targets = unpack_task.execute()
+        expected_files = {'a/b/c/foo.proto'}
+        if not intransitive:
+          expected_files.add('a/b/c/bar.proto')
 
-      self.assertEquals([foo_target], unpacked_targets)
-      unpack_dir = unpack_task._unpack_dir(foo_target)
-      files = []
-      for _, dirname, filenames in safe_walk(unpack_dir):
-        files += filenames
-      self.assertEquals(['foo.proto'], files)
+        actual = {k: [set(v[0]), v[1]]
+                  for k, v in context.products.get_data('unpacked_archives', dict).items()}
 
-      # Calling the task a second time should not need to unpack any targets
-      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
-      self._add_dummy_product(unpack_task, foo_target, jar_filename, rev1)
-      unpacked_targets = unpack_task.execute()
+        self.assertEquals(
+          {unpacked_jar_tgt:
+             [expected_files,
+              '.pants.d/pants_backend_jvm_tasks_unpack_jars_UnpackJars/unpack.foo']},
+          actual)
 
-      self.assertEquals([], unpacked_targets)
+  def test_transitive(self):
+    self._do_test_products(intransitive=False)
 
-      # Change the library version and the target should be unpacked again.
-      self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
-      rev2 = self._make_coord(rev='0.0.2')
-      foo_target = make_unpacked_jar(rev2)
-
-      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
-      self._add_dummy_product(unpack_task, foo_target, jar_filename, rev2)
-      unpacked_targets = unpack_task.execute()
-
-      self.assertEquals([foo_target], unpacked_targets)
-
-      # Change the include pattern and the target should be unpacked again
-      self.reset_build_graph()  # Forget about the old definition of the unpack/jars:foo-jar target
-
-      make_unpacked_jar = functools.partial(self._make_unpacked_jar,
-                                            include_patterns=['a/b/c/foo.proto'])
-      foo_target = make_unpacked_jar(rev2)
-      unpack_task = self.create_task(self.context(target_roots=[foo_target]))
-      self._add_dummy_product(unpack_task, foo_target, jar_filename, rev2)
-      unpacked_targets = unpack_task.execute()
-
-      self.assertEquals([foo_target], unpacked_targets)
-
-      # TODO(Eric Ayers) Check the 'unpacked_archives' product
+  def test_intransitive(self):
+    self._do_test_products(intransitive=True)
