@@ -1,5 +1,5 @@
 # coding=utf-8
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
@@ -11,6 +11,18 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.util.memo import memoized_method
 
 
+class BinaryToolMeta(type):
+  """A metaclass to provide a per-class map of name to BinaryTool instance.
+
+  This allows us to avoid name collisions between tasks, and also avoid having
+  mutable state on the BinaryToolMixin class: We know that the _binary_tools_by_name
+  property will not change once a task's register_options() has returned.
+  """
+  def __init__(cls, name, bases, dct):
+    super(BinaryToolMeta, cls).__init__(name, bases, dct)
+    cls._binary_tools_by_name = {}
+
+
 class BinaryToolMixin(object):
   """Mixin for classes that use binary executables.
 
@@ -19,12 +31,14 @@ class BinaryToolMixin(object):
 
   :API: public
   """
+  __metaclass__ = BinaryToolMeta
+
   class BinaryTool(namedtuple('BinaryTool', ['scope', 'supportdir', 'name', 'platform_dependent',
                                              'replaces_scope', 'replaces_name'])):
 
     # TODO(benjy): Remove replaces_scope/replaces_name after migration to this mixin is complete.
     def select(self, options):
-      version = getattr(options.for_scope(self.scope), '{}_version'.format(self.name))
+      version = options.for_scope(self.scope).get('{}_version'.format(self.name))
       if self.replaces_scope and self.replaces_name:
         # If the old option is provided explicitly, let it take precedence.
         old_opts = options.for_scope(self.replaces_scope)
@@ -32,18 +46,6 @@ class BinaryToolMixin(object):
           version = old_opts.get(self.replaces_name)
       return BinaryUtil.Factory.create().select(
         self.supportdir, version, self.name, self.platform_dependent)
-
-  @staticmethod
-  def get_registered_tools():
-    """Returns a map of name to BinaryTool."""
-    return BinaryToolMixin._binary_tools
-
-  @staticmethod
-  def reset_registered_tools():
-    """Needed only for test isolation."""
-    BinaryToolMixin._binary_tools = {}
-
-  _binary_tools = {}  # name -> BinaryTool objects.
 
   @classmethod
   def register_binary_tool(cls,
@@ -91,8 +93,8 @@ class BinaryToolMixin(object):
 
     binary_tool = cls.BinaryTool(register.scope, supportdir, name, platform_dependent,
                                  replaces_scope, replaces_name)
-    BinaryToolMixin._binary_tools[name] = binary_tool
+    cls._binary_tools_by_name[name] = binary_tool
 
   @memoized_method
   def select_binary(self, name):
-    return self._binary_tools[name].select(self.context.options)
+    return self._binary_tools_by_name[name].select(self.context.options)
