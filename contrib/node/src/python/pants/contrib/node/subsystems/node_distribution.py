@@ -98,12 +98,12 @@ class NodeDistribution(object):
   def version(self):
     return self._node_instance.version
 
-  def install_packages(self, install_optional=False, node_paths=None, package_manager=None):
+  def install_packages(self, node_paths=None, package_manager=None, **kwargs):
     return self.get_package_manager(
       package_manager=package_manager
     ).install_packages(
-      install_optional=install_optional,
-      node_paths=node_paths
+      node_paths=node_paths,
+      **kwargs
     )
 
   def run_script(self, script_name, script_args=None, node_paths=None, package_manager=None):

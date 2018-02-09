@@ -15,10 +15,13 @@ PACKAGE_MANAGER_YARNPKG = 'yarnpkg'
 class PackageManagerMixin(object):
   """Defines node package manager functionalities."""
 
-  def _get_installation_args(self, install_optional):
+  def _get_installation_args(self, install_optional, production_only, force):
     """Returns command line args for installing package.
 
     :param install_optional: True to request install optional dependencies.
+    :param production_only: True to only install production dependencies, i.e.
+      ignore devDependencies.
+    :param force: True to force re-download dependencies.
     :rtype: list of strings
     """
     raise NotImplementedError
@@ -30,16 +33,27 @@ class PackageManagerMixin(object):
     """
     raise NotImplementedError
 
-  def install_packages(self, install_optional=False, node_paths=None):
+  def install_packages(
+    self,
+    install_optional=False,
+    production_only=False,
+    force=False,
+    node_paths=None):
     """Returns a command that when executed will install node package.
 
     :param install_optional: True to install optional dependencies.
+    :param production_only: True to only install production dependencies, i.e.
+      ignore devDependencies.
+    :param force: True to force re-download dependencies.
     :param node_paths: A list of path that should be included in $PATH when
       running installation.
     """
     return command_gen(
       self,
-      args=self._get_installation_args(install_optional=install_optional),
+      args=self._get_installation_args(
+        install_optional=install_optional,
+        production_only=production_only,
+        force=force),
       node_paths=node_paths
     )
 

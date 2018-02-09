@@ -119,8 +119,15 @@ class YarnBinary(PackageManagerMixin, InstallableTool):
   def _get_run_script_args(self):
     return ['run']
 
-  def _get_installation_args(self, install_optional):
-    return [] if install_optional else ['--ignore-optional']
+  def _get_installation_args(self, install_optional, production_only, force):
+    return_args = ['--non-interactive']
+    if not install_optional:
+      return_args.append('--ignore-optional')
+    if production_only:
+      return_args.append('--production=true')
+    if force:
+      return_args.append('--force')
+    return return_args
 
 
 # Note that npm is installed with node.  Since node is a prerequisite for npm, there is no need
@@ -137,5 +144,12 @@ class NpmBinary(PackageManagerMixin, Tool):
   def _get_run_script_args(self):
     return ['run-script']
 
-  def _get_installation_args(self, install_optional):
-    return ['install'] if install_optional else ['install', '--no-optional']
+  def _get_installation_args(self, install_optional, production_only, force):
+    return_args = ['install']
+    if not install_optional:
+      return_args.append('--no-optional')
+    if production_only:
+      return_args.append('--production')
+    if force:
+      return_args.append('--force')
+    return return_args

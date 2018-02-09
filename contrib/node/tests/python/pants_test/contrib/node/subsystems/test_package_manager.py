@@ -49,9 +49,10 @@ class TestYarn(unittest.TestCase):
   def test_install_package(self):
     command = self.yarn.install_packages()
     self.assertEqual(
-      command.cmd, ['fake_tool_bin_dir/yarnpkg', '--ignore-optional'])
+      command.cmd,
+      ['fake_tool_bin_dir/yarnpkg', '--non-interactive', '--ignore-optional'])
 
   def test_install_package_all(self):
     command = self.yarn.install_packages(install_optional=True)
     self.assertEqual(
-      command.cmd, ['fake_tool_bin_dir/yarnpkg'])
+      command.cmd, ['fake_tool_bin_dir/yarnpkg', '--non-interactive'])
