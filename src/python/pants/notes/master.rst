@@ -5,6 +5,20 @@ This document describes ``dev`` releases which occur weekly from master, and whi
 not undergo the vetting associated with ``stable`` releases.
 
 
+1.5.0.dev3 (02/10/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+* Python distribution task for user-defined setup.py + integration with ./pants {run/binary/test} (#5141)
+  `PR #5141 <https://github.com/pantsbuild/pants/pull/5141>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Bundle all kythe entries, regardless of origin. (#5450)
+  `PR #5450 <https://github.com/pantsbuild/pants/pull/5450>`_
+
+
 1.5.0.dev2 (02/05/2018)
 -----------------------
 
