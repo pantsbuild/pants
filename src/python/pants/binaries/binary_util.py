@@ -13,7 +13,6 @@ from contextlib import contextmanager
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
@@ -136,11 +135,9 @@ class BinaryUtil(object):
     else:
       return self._select_script(supportdir, version, name)
 
-  @deprecated('1.7.0.dev0', 'Use BinaryToolMixin instead of interacting directly with BinaryUtil.')
   def select_binary(self, supportdir, version, name):
     return self._select_binary(supportdir, version, name)
 
-  @deprecated('1.7.0.dev0', 'Use BinaryToolMixin instead of interacting directly with BinaryUtil.')
   def select_script(self, supportdir, version, name):
     return self._select_script(supportdir, version, name)
 
