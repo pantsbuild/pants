@@ -3,7 +3,7 @@
 
 python_library(
   name='binary_util',
-  sources=['binary_tool_mixin.py', 'binary_util.py'],
+  sources=['binary_tool.py', 'binary_tool_mixin.py', 'binary_util.py'],
   dependencies=[
     '3rdparty/python/twitter/commons:twitter.common.collections',
     'src/python/pants/base:build_environment',

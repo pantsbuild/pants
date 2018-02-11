@@ -10,17 +10,43 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class BinaryToolBase(Subsystem):
-  # Subclasses must set this to the register() kwargs for the --version option.
-  version_registration_kwargs = None
+  """Base class for subsytems that configure binary tools.
+
+  Typically, a specific subclass is created via create_binary_tool_subsystem_cls() below.
+  That subclass can be further subclassed, manually, e.g., to add any extra options.
+  """
   # Subclasses must set these to appropriate values for the tool they define.
+  # They must also, of course, set options_scope appropriately (typically the name of the
+  # tool, but this is not a requirement).
   support_dir = None
   platform_dependent = None
+  default_version = None
+
+  # Subclasses may set these to effect migration from an old --version option to this one.
+  # TODO(benjy): Remove these after migration to the mixin is complete.
   replaces_scope = None
   replaces_name = None
 
+  # Subclasses may set this to provide extra register() kwargs for the --version option.
+  extra_version_option_kwargs = None
+
   @classmethod
   def register_options(cls, register):
-    register('--version', **cls.version_registration_kwargs)
+    version_registration_kwargs = {
+      'type': str,
+      'default': cls.default_version,
+    }
+    if cls.extra_version_option_kwargs:
+      version_registration_kwargs.update(cls.extra_version_option_kwargs)
+    version_registration_kwargs['help'] = (
+      version_registration_kwargs['help'] or
+      'Version of the {} {} to use'.format(cls.name,
+                                           'binary' if cls.platform_dependent else 'script')
+    )
+    # The default for fingerprint in register() is False, but we want to default to True.
+    if 'fingerprint' not in version_registration_kwargs:
+      version_registration_kwargs['fingerprint'] = True
+    register('--version', **version_registration_kwargs)
 
   def select(self):
     version = self.get_options().version
@@ -33,31 +59,36 @@ class BinaryToolBase(Subsystem):
       self.supportdir, version, self.name, self.platform_dependent)
 
 
-def create_binary_tool_cls(supportdir,
-                           name,
-                           default_version,
-                           platform_dependent,
-                           fngerprint=True,
-                           help=None,
-                           removal_version=None,
-                            removal_hint=None,
-                            # Temporary params, while migrating existing version options.
-                            replaces_scope=None,
-                            replaces_name=None):
+def create_binary_tool_subsystem_cls(
+    tool_name,
+    supportdir,
+    platform_dependent,
+    default_version,
+    fingerprint=True,
+    help=None,
+    removal_version=None,
+    removal_hint=None,
+    # Temporary params, while migrating existing version options.
+    replaces_scope=None,
+    replaces_name=None):
   """A factory for creating BinaryToolBase subclasses."""
-  help = help or 'Version of the {} {} to use'.format(
-    name, 'binary' if platform_dependent else 'script')
-  return type(b'{}BinaryTool'.format(name), (BinaryToolBase,), {
-    b'version_registration_kwargs': {
-      'default_version': default_version,
-      'fingerprint': fingerprint,
-      'help': help,
-      'removal_version': removal_version,
-      'removal_hint': removal_hint,
-    },
-    b'support_dir': supportdir,
-    b'name': name,
-    b'platform_dependent': platform_dependent,
-    b'replaces_scope': replaces_scope,
-    b'replaces_name': replaces_name,
-  })
+  return type(
+    b'{}BinaryTool'.format(tool_name.title()),
+    (BinaryToolBase,),
+    {
+      b'extra_version_option_kwargs': {
+        'fingerprint': fingerprint,
+        'help': help,
+        'removal_version': removal_version,
+        'removal_hint': removal_hint,
+      },
+      b'options_scope': tool_name,
+      b'name': tool_name,
+      b'support_dir': supportdir,
+      b'platform_dependent': platform_dependent,
+      b'default_version': default_version,
+
+      b'replaces_scope': replaces_scope,
+      b'replaces_name': replaces_name,
+    }
+  )

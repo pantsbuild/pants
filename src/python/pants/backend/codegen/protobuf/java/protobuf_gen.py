@@ -12,25 +12,24 @@ from hashlib import sha1
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.protobuf.subsystem.protoc import Protoc
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.binary_tool_mixin import BinaryToolMixin
-from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.process_handler import subprocess
 
 
-class ProtobufGen(BinaryToolMixin, SimpleCodegenTask):
+class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtobufGen, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc,)
 
   @classmethod
   def register_options(cls, register):
@@ -70,10 +69,6 @@ class ProtobufGen(BinaryToolMixin, SimpleCodegenTask):
                   'This enables using import paths relative to the build root in .proto files, '
                   'as recommended by the protoc documentation.')
 
-    cls.register_binary_tool(register, 'bin/protobuf', 'protoc',
-                             default_version='2.4.1', platform_dependent=True,
-                             replaces_scope=register.scope, replaces_name='version')
-
   # TODO https://github.com/pantsbuild/pants/issues/604 prep start
   @classmethod
   def prepare(cls, options, round_manager):
@@ -90,7 +85,7 @@ class ProtobufGen(BinaryToolMixin, SimpleCodegenTask):
 
   @property
   def protobuf_binary(self):
-    return self.select_binary('protoc')
+    return Protoc.global_instance().select()
 
   @property
   def javadeps(self):
