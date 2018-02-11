@@ -5,10 +5,13 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.binaries.binary_tool import create_binary_tool_subsystem_cls
+from pants.binaries.binary_tool import NativeTool
 
 
-Protoc = create_binary_tool_subsystem_cls(
-  'protoc', supportdir='bin/protobuf', platform_dependent=True, default_version='2.4.1',
-  replaces_scope='gen.protoc', replaces_name='version'
-)
+class Protoc(NativeTool):
+  name = 'protoc'
+  support_dir = 'bin/protobuf'
+  default_version = '2.4.1'
+
+  replaces_scope='gen.protoc'
+  replaces_name='version'

@@ -18,6 +18,7 @@ class BinaryToolBase(Subsystem):
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also, of course, set options_scope appropriately (typically the name of the
   # tool, but this is not a requirement).
+  name = None
   support_dir = None
   platform_dependent = None
   default_version = None
@@ -59,36 +60,11 @@ class BinaryToolBase(Subsystem):
       self.supportdir, version, self.name, self.platform_dependent)
 
 
-def create_binary_tool_subsystem_cls(
-    tool_name,
-    supportdir,
-    platform_dependent,
-    default_version,
-    fingerprint=True,
-    help=None,
-    removal_version=None,
-    removal_hint=None,
-    # Temporary params, while migrating existing version options.
-    replaces_scope=None,
-    replaces_name=None):
-  """A factory for creating BinaryToolBase subclasses."""
-  return type(
-    b'{}BinaryTool'.format(tool_name.title()),
-    (BinaryToolBase,),
-    {
-      b'extra_version_option_kwargs': {
-        'fingerprint': fingerprint,
-        'help': help,
-        'removal_version': removal_version,
-        'removal_hint': removal_hint,
-      },
-      b'options_scope': tool_name,
-      b'name': tool_name,
-      b'support_dir': supportdir,
-      b'platform_dependent': platform_dependent,
-      b'default_version': default_version,
+class NativeTool(BinaryToolBase):
+  """A base class for native-code tools."""
+  platform_dependent = True
 
-      b'replaces_scope': replaces_scope,
-      b'replaces_name': replaces_name,
-    }
-  )
+
+class Script(BinaryToolBase):
+  """A base class for platform-independent scripts."""
+  platform_dependent = False
