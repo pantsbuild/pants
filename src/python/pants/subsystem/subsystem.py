@@ -104,8 +104,8 @@ class Subsystem(SubsystemClientMixin, Optionable):
       path.add(subsystem)
       if subsystem not in known_subsystem_types:
         known_subsystem_types.add(subsystem)
-        for dependency in subsystem.subsystem_dependencies():
-          collect_subsystems(dependency)
+        for dependency in subsystem.subsystem_dependencies_iter():
+          collect_subsystems(dependency.subsystem_cls)
       path.remove(subsystem)
 
     for subsystem_type in subsystem_types:
