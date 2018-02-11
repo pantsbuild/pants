@@ -34,7 +34,7 @@ pub fn equals(val1: &Value, val2: &Value) -> bool {
   with_externs(|e| (e.equals)(e.context, val1, val2))
 }
 
-pub fn key_for(val: &Value) -> Key {
+pub fn key_for(val: Value) -> Key {
   let mut interns = INTERNS.write().unwrap();
   interns.insert(val)
 }
@@ -318,8 +318,8 @@ struct Interns {
 }
 
 impl Interns {
-  fn insert(&mut self, v: &Value) -> Key {
-    let ident = identify(v);
+  fn insert(&mut self, v: Value) -> Key {
+    let ident = identify(&v);
     let type_id = ident.type_id;
     let mut maybe_id = self.id_generator;
     let key = self
@@ -332,7 +332,7 @@ impl Interns {
       .clone();
     if maybe_id != self.id_generator {
       self.id_generator = maybe_id;
-      self.reverse.insert(maybe_id, v.clone());
+      self.reverse.insert(maybe_id, v);
     }
     key
   }

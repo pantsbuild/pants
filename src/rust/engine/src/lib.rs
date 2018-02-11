@@ -164,7 +164,7 @@ pub extern "C" fn externs_set(
 
 #[no_mangle]
 pub extern "C" fn externs_key_for(value: Value) -> Key {
-  externs::key_for(&value)
+  externs::key_for(value)
 }
 
 #[no_mangle]

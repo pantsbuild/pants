@@ -446,7 +446,7 @@ impl SelectDependencies {
     }
   }
 
-  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
+  fn get_dep(&self, context: &Context, dep_subject: Value) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
@@ -485,8 +485,8 @@ impl SelectDependencies {
             // The product and its dependency list are available: project them.
             let deps = future::join_all(
               externs::project_multi(&dep_product, &self.selector.field)
-                .iter()
-                .map(|dep_subject| self.get_dep(&context, &dep_subject))
+                .into_iter()
+                .map(|dep_subject| self.get_dep(&context, dep_subject))
                 .collect::<Vec<_>>(),
             );
             deps
@@ -611,8 +611,8 @@ impl SelectTransitive {
         match dep_product_res {
           Ok(dep_product) => {
             let subject_keys = externs::project_multi(&dep_product, &self.selector.field)
-              .iter()
-              .map(|subject| externs::key_for(&subject))
+              .into_iter()
+              .map(|subject| externs::key_for(subject))
               .collect();
 
             let init = TransitiveExpansion {
@@ -642,7 +642,7 @@ impl SelectTransitive {
                   expansion.todo.extend(
                     todo_candidates
                       .into_iter()
-                      .map(|dep| externs::key_for(&dep))
+                      .map(|dep| externs::key_for(dep))
                       .filter(|dep_key| !outputs.contains_key(dep_key))
                       .collect::<Vec<_>>(),
                   );
@@ -728,7 +728,7 @@ impl SelectProjection {
             );
             Select {
               selector: selectors::Select::without_variant(self.selector.product),
-              subject: externs::key_for(&projected_subject),
+              subject: externs::key_for(projected_subject),
               variants: self.variants.clone(),
               // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
               // subject here, because there is only one projected type.
