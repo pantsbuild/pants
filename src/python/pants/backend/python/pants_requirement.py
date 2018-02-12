@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
 
 
