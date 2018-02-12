@@ -10,7 +10,6 @@ import logging
 import os
 import sys
 import sysconfig
-import threading
 import traceback
 from contextlib import closing
 
@@ -360,7 +359,6 @@ def _initialize_externs(ffi):
   @ffi.def_extern()
   def extern_satisfied_by(context_handle, constraint_val, val):
     """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
-    c = ffi.from_handle(context_handle)
     constraint = ffi.from_handle(constraint_val.handle)
     return constraint.satisfied_by(ffi.from_handle(val.handle))
 
