@@ -34,5 +34,5 @@ class PantsRequirement(object):
     """
     name = name or os.path.basename(self._parse_context.rel_path)
     requirement = PythonRequirement(requirement='pantsbuild.pants=={}'.format(pants_version()))
-    self._parse_context.create_object(PythonRequirementLibrary, name=name,
+    self._parse_context.create_object('python_requirement_library', name=name,
                                       requirements=[requirement])
