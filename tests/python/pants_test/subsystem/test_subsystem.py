@@ -28,6 +28,16 @@ class UninitializedSubsystem(Subsystem):
   options_scope = 'uninitialized-scope'
 
 
+class ScopedDependentSubsystem(Subsystem):
+  options_scope = 'scoped-dependent-subsystem'
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(ScopedDependentSubsystem, cls).subsystem_dependencies() + (
+      DummySubsystem.scoped(cls),
+    )
+
+
 class SubsystemTest(unittest.TestCase):
   def setUp(self):
     DummySubsystem._options = DummyOptions()
@@ -52,6 +62,8 @@ class SubsystemTest(unittest.TestCase):
 
   def test_closure_simple(self):
     self.assertEqual({DummySubsystem}, Subsystem.closure((DummySubsystem,)))
+    self.assertEqual({DummySubsystem, ScopedDependentSubsystem},
+                     Subsystem.closure((ScopedDependentSubsystem,)))
 
   def test_closure_tree(self):
     class SubsystemB(Subsystem):
