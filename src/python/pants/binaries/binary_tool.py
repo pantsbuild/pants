@@ -16,9 +16,7 @@ class BinaryToolBase(Subsystem):
   That subclass can be further subclassed, manually, e.g., to add any extra options.
   """
   # Subclasses must set these to appropriate values for the tool they define.
-  # They must also, of course, set options_scope appropriately (typically the name of the
-  # tool, but this is not a requirement).
-  name = None
+  # They must also, of course, set options_scope appropriately.
   support_dir = None
   platform_dependent = None
   default_version = None
@@ -40,8 +38,8 @@ class BinaryToolBase(Subsystem):
     if cls.extra_version_option_kwargs:
       version_registration_kwargs.update(cls.extra_version_option_kwargs)
     version_registration_kwargs['help'] = (
-      version_registration_kwargs['help'] or
-      'Version of the {} {} to use'.format(cls.name,
+      version_registration_kwargs.get('help') or
+      'Version of the {} {} to use'.format(cls.options_scope,
                                            'binary' if cls.platform_dependent else 'script')
     )
     # The default for fingerprint in register() is False, but we want to default to True.
