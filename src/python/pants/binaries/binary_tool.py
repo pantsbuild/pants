@@ -62,7 +62,7 @@ class BinaryToolBase(Subsystem):
       if not old_opts.is_default(self.replaces_name):
         version = old_opts.get(self.replaces_name)
     return BinaryUtil.Factory.create().select(
-      self.supportdir, version, self.name, self.platform_dependent)
+      self.support_dir, version, self.name, self.platform_dependent)
 
 
 class NativeTool(BinaryToolBase):
