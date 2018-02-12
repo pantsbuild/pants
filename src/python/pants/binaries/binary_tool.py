@@ -14,9 +14,11 @@ class BinaryToolBase(Subsystem):
 
   Typically, a specific subclass is created via create_binary_tool_subsystem_cls() below.
   That subclass can be further subclassed, manually, e.g., to add any extra options.
+
+  :API: public
   """
   # Subclasses must set these to appropriate values for the tool they define.
-  # They must also, of course, set options_scope appropriately.
+  # They must also set options_scope to the tool name as understood by BinaryUtil.
   support_dir = None
   platform_dependent = None
   default_version = None
@@ -54,6 +56,8 @@ class BinaryToolBase(Subsystem):
     a context, otherwise no context should be passed.
 
     # TODO: Once we're migrated, get rid of the context arg.
+
+    :API: public
     """
     version = self.get_options().version
     if self.replaces_scope and self.replaces_name:
@@ -62,14 +66,20 @@ class BinaryToolBase(Subsystem):
       if not old_opts.is_default(self.replaces_name):
         version = old_opts.get(self.replaces_name)
     return BinaryUtil.Factory.create().select(
-      self.support_dir, version, self.name, self.platform_dependent)
+      self.support_dir, version, self.options_scope, self.platform_dependent)
 
 
 class NativeTool(BinaryToolBase):
-  """A base class for native-code tools."""
+  """A base class for native-code tools.
+
+  :API: public
+  """
   platform_dependent = True
 
 
 class Script(BinaryToolBase):
-  """A base class for platform-independent scripts."""
+  """A base class for platform-independent scripts.
+
+  :API: public
+  """
   platform_dependent = False
