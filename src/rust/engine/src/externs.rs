@@ -178,7 +178,7 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
 ///
-pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
+pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
   let interns = INTERNS.read().unwrap();
   let func_val = interns.get(&func.0);
   call(func_val, args).unwrap_or_else(|e| {

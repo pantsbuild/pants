@@ -312,7 +312,7 @@ impl Select {
       vec![
         future::ok(externs::unsafe_call(
           &context.core.types.construct_process_result,
-          &vec![
+          &[
             externs::store_bytes(&result.stdout),
             externs::store_bytes(&result.stderr),
             externs::store_i32(result.exit_code),
@@ -974,7 +974,7 @@ impl Snapshot {
       .collect();
     externs::unsafe_call(
       &context.core.types.construct_snapshot,
-      &vec![
+      &[
         externs::store_bytes(&item.fingerprint.0),
         externs::store_list(path_stats.iter().collect(), false),
       ],
@@ -986,12 +986,12 @@ impl Snapshot {
   }
 
   fn store_dir(context: &Context, item: &Dir) -> Value {
-    let args = vec![Self::store_path(item.0.as_path())];
+    let args = [Self::store_path(item.0.as_path())];
     externs::unsafe_call(&context.core.types.construct_dir, &args)
   }
 
   fn store_file(context: &Context, item: &File) -> Value {
-    let args = vec![Self::store_path(item.path.as_path())];
+    let args = [Self::store_path(item.path.as_path())];
     externs::unsafe_call(&context.core.types.construct_file, &args)
   }
 
@@ -1010,7 +1010,7 @@ impl Snapshot {
   fn store_file_content(context: &Context, item: &FileContent) -> Value {
     externs::unsafe_call(
       &context.core.types.construct_file_content,
-      &vec![
+      &[
         Self::store_path(&item.path),
         externs::store_bytes(&item.content),
       ],
@@ -1024,7 +1024,7 @@ impl Snapshot {
       .collect();
     externs::unsafe_call(
       &context.core.types.construct_files_content,
-      &vec![externs::store_list(entries.iter().collect(), false)],
+      &[externs::store_list(entries.iter().collect(), false)],
     )
   }
 }

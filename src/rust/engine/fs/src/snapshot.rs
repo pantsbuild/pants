@@ -299,7 +299,7 @@ mod tests {
 
   fn expand_all_sorted(posix_fs: Arc<PosixFS>) -> Vec<PathStat> {
     let mut v = posix_fs
-      .expand(PathGlobs::create(&["**".to_owned()], &vec![]).unwrap())
+      .expand(PathGlobs::create(&["**".to_owned()], &[]).unwrap())
       .wait()
       .unwrap();
     v.sort_by(|a, b| a.path().cmp(b.path()));

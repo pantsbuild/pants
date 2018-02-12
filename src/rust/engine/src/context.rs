@@ -67,7 +67,7 @@ impl Core {
     tasks.singleton_replace(
       externs::unsafe_call(
         &types.construct_snapshots,
-        &vec![
+        &[
           externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes()),
         ],
       ),
