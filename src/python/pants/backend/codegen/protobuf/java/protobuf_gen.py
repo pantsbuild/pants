@@ -85,7 +85,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @property
   def protobuf_binary(self):
-    return Protoc.global_instance().select()
+    return Protoc.global_instance().select(context=self.context)
 
   @property
   def javadeps(self):

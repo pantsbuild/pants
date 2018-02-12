@@ -47,11 +47,18 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
     register('--version', **version_registration_kwargs)
 
-  def select(self):
+  def select(self, context=None):
+    """Returns the path to the specified binary tool.
+
+    If replaces_scope and replaces_name are defined, then the caller must pass in
+    a context, otherwise no context should be passed.
+
+    # TODO: Once we're migrated, get rid of the context arg.
+    """
     version = self.get_options().version
     if self.replaces_scope and self.replaces_name:
       # If the old option is provided explicitly, let it take precedence.
-      old_opts = self.context.options.for_scope(self.replaces_scope)
+      old_opts = context.options.for_scope(self.replaces_scope)
       if not old_opts.is_default(self.replaces_name):
         version = old_opts.get(self.replaces_name)
     return BinaryUtil.Factory.create().select(
