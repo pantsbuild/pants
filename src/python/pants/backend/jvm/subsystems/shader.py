@@ -17,6 +17,7 @@ from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem, SubsystemError
 from pants.util.contextutil import temporary_file
+from pants.util.memo import memoized_method
 
 
 class UnaryRule(namedtuple('UnaryRule', ['name', 'pattern'])):
@@ -324,7 +325,12 @@ class Shader(object):
     paths = set()
     for pathname in ClasspathUtil.classpath_entries_contents([path]):
       if cls._potential_package_path(pathname):
-        paths.add(os.path.dirname(pathname))
+        package = os.path.dirname(pathname)
+        if package:
+          # This check avoids a false positive on things like module-info.class.
+          # We must never add an empty package, as this will cause every single string
+          # literal to be rewritten.
+          paths.add(package)
     return cls._iter_packages(paths)
 
   def __init__(self, jarjar_classpath, executor):
@@ -336,24 +342,19 @@ class Shader(object):
     """
     self._jarjar_classpath = jarjar_classpath
     self._executor = executor
-    self._system_packages = None
 
-  def _calculate_system_packages(self):
+  @classmethod
+  @memoized_method
+  def _system_packages(cls, distribution):
     system_packages = set()
-    boot_classpath = self._executor.distribution.system_properties['sun.boot.class.path']
+    boot_classpath = distribution.system_properties['sun.boot.class.path']
     for path in boot_classpath.split(os.pathsep):
       if os.path.exists(path):
         if os.path.isdir(path):
-          system_packages.update(self._iter_dir_packages(path))
+          system_packages.update(cls._iter_dir_packages(path))
         else:
-          system_packages.update(self._iter_jar_packages(path))
-    return system_packages
-
-  @property
-  def system_packages(self):
-    if self._system_packages is None:
-      self._system_packages = self._calculate_system_packages()
-    return self._system_packages
+          system_packages.update(cls._iter_jar_packages(path))
+    return sorted(system_packages)
 
   def assemble_binary_rules(self, main, jar, custom_rules=None):
     """Creates an ordered list of rules suitable for fully shading the given binary.
@@ -390,7 +391,8 @@ class Shader(object):
       main_package = None
     rules.append(self.exclude_package(main_package))
 
-    rules.extend(self.exclude_package(system_pkg) for system_pkg in sorted(self.system_packages))
+    rules.extend(self.exclude_package(system_pkg)
+                 for system_pkg in self._system_packages(self._executor.distribution))
 
     # Shade everything else.
     #
