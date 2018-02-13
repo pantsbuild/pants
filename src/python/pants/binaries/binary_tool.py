@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
+from pants.util.memo import memoized_method
 
 
 class BinaryToolBase(Subsystem):
@@ -33,6 +34,8 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def register_options(cls, register):
+    super(BinaryToolBase, cls).register_options(register)
+
     version_registration_kwargs = {
       'type': str,
       'default': cls.default_version,
@@ -65,6 +68,10 @@ class BinaryToolBase(Subsystem):
       old_opts = context.options.for_scope(self.replaces_scope)
       if not old_opts.is_default(self.replaces_name):
         version = old_opts.get(self.replaces_name)
+        return self._select_for_version(version)
+
+  @memoized_method
+  def _select_for_version(self, version):
     return BinaryUtil.Factory.create().select(
       self.support_dir, version, self.options_scope, self.platform_dependent)
 

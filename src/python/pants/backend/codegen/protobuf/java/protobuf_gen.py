@@ -29,7 +29,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc,)
+    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
@@ -85,7 +85,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @property
   def protobuf_binary(self):
-    return Protoc.global_instance().select(context=self.context)
+    return Protoc.scoped_instance(self).select(context=self.context)
 
   @property
   def javadeps(self):
