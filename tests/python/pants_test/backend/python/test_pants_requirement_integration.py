@@ -36,9 +36,13 @@ class PantsRequirementIntegrationTest(PantsRunIntegrationTest):
   def test_pants_requirement(self):
     self.maxDiff = None
 
+    tests_dir = 'testprojects/pants-plugins/tests/python/test_pants_plugin'
     command = [
       'test',
-      'testprojects/pants-plugins/tests/python/test_pants_plugin',
+      tests_dir,
     ]
-    pants_run = self.run_with_testproject_backend_pkgs(command)
+
+    tests_dir_absolute = os.path.join(get_buildroot(), tests_dir)
+    with self.file_renamed(tests_dir_absolute, 'TEST_BUILD', 'BUILD'):
+      pants_run = self.run_with_testproject_backend_pkgs(command)
     self.assert_success(pants_run)
