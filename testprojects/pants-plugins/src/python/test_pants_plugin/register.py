@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.build_graph.build_file_aliases import BuildFileAliases
 
 from test_pants_plugin.pants_infra_tests import PantsInfraTests
-from test_pants_plugin.subsystems.python_test_infra import PythonTestInfra
+from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
 
 
 def build_file_aliases():
@@ -19,4 +19,4 @@ def build_file_aliases():
   )
 
 def global_subsystems():
-  return (PythonTestInfra,)
+  return (PantsTestInfra,)

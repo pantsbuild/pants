@@ -5,25 +5,17 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
-
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.build_graph.target import Target
 from pants.subsystem.subsystem import Subsystem
 
 
-logger = logging.getLogger(__name__)
-
-
-class TestInfraError(Exception): pass
-
-
-class PythonTestInfra(Subsystem):
-  options_scope = 'python-test-infra'
+class PantsTestInfra(Subsystem):
+  options_scope = 'pants-test-infra'
 
   @classmethod
   def register_options(cls, register):
-    super(PythonTestInfra, cls).register_options(register)
+    super(PantsTestInfra, cls).register_options(register)
     register('--pants-requirement-target', advanced=True, fingerprint=True,
              help='Address for a python target providing the pants sdist.',
              type=str, default=None)

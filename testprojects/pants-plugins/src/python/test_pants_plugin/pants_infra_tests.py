@@ -7,16 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.python.targets.python_tests import PythonTests
 
-from test_pants_plugin.subsystems.python_test_infra import PythonTestInfra
+from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
 
 
 class PantsInfraTests(object):
 
   def __init__(self, parse_context):
     self._parse_context = parse_context
-    self._python_test_infra = PythonTestInfra.global_instance()
+    self._pants_test_infra = PantsTestInfra.global_instance()
 
   def __call__(self, dependencies=[], **kwargs):
-    dependencies.extend(self._python_test_infra.dependent_target_addrs())
+    dependencies.extend(self._pants_test_infra.dependent_target_addrs())
     self._parse_context.create_object(
       PythonTests.alias(), dependencies=dependencies, **kwargs)

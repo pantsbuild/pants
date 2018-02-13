@@ -134,6 +134,12 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
                        'org/pantsbuild/example/precipitation/ttypes.py'])
 
   def test_setup_py_unregistered_pants_plugin(self):
+    """setup-py should succeed on a pants plugin target that:
+
+    1. uses a pants_requirement() instead of linking directly to targets in the
+       pants codebase
+    2. is not on the pythonpath nor registered as a backend package."""
+
     self.maxDiff = None
 
     command = [
@@ -150,5 +156,5 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
       'test_pants_plugin/register.py',
       'test_pants_plugin/subsystems/',
       'test_pants_plugin/subsystems/__init__.py',
-      'test_pants_plugin/subsystems/python_test_infra.py',
+      'test_pants_plugin/subsystems/pants_test_infra.py',
     ])
