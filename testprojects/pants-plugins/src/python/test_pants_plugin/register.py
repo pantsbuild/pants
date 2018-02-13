@@ -5,10 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.build_graph.build_file_aliases import BuildFileAliases
-
 from test_pants_plugin.pants_infra_tests import PantsInfraTests
 from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
+
+from pants.build_graph.build_file_aliases import BuildFileAliases
 
 
 def build_file_aliases():

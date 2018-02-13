@@ -5,9 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.backend.python.targets.python_tests import PythonTests
-
 from test_pants_plugin.subsystems.pants_test_infra import PantsTestInfra
+
+from pants.backend.python.targets.python_tests import PythonTests
 
 
 class PantsInfraTests(object):
