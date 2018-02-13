@@ -138,7 +138,6 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
 
     command = [
       'setup-py',
-      '--recursive',
       'testprojects/pants-plugins/src/python/test_pants_plugin',
     ]
     pants_run = self.run_pants(command=command)
