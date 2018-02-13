@@ -132,3 +132,24 @@ class SetupPyIntegrationTest(PantsRunIntegrationTest):
                        'org/pantsbuild/example/precipitation/__init__.py',
                        'org/pantsbuild/example/precipitation/constants.py',
                        'org/pantsbuild/example/precipitation/ttypes.py'])
+
+  def test_setup_py_unregistered_pants_plugin(self):
+    self.maxDiff = None
+
+    command = [
+      'setup-py',
+      '--recursive',
+      'testprojects/pants-plugins/src/python/test_pants_plugin',
+    ]
+    pants_run = self.run_pants(command=command)
+    self.assert_success(pants_run)
+
+    self.assert_sdist(pants_run, 'test_pants_plugin', [
+      'test_pants_plugin/',
+      'test_pants_plugin/__init__.py',
+      'test_pants_plugin/pants_infra_tests.py',
+      'test_pants_plugin/register.py',
+      'test_pants_plugin/subsystems/',
+      'test_pants_plugin/subsystems/__init__.py',
+      'test_pants_plugin/subsystems/python_test_infra.py',
+    ])
