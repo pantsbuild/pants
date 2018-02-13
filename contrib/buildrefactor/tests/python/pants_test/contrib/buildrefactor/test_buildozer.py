@@ -12,7 +12,6 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TaskError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.contrib.buildrefactor.buildozer import Buildozer
-from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
 from pants_test.tasks.task_test_base import TaskTestBase
 
@@ -119,8 +118,7 @@ class BuildozerTest(TaskTestBase):
     for root in roots:
       target_roots.append(targets[root])
 
-    self.create_task(self.context(
-      target_roots=target_roots, for_subsystems=[BuildozerBinary])).execute()
+    self.create_task(self.context(target_roots=target_roots)).execute()
 
   @staticmethod
   def _build_file_dependencies(build_file):
