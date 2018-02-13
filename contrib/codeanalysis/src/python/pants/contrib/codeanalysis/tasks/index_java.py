@@ -17,7 +17,7 @@ from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJav
 class IndexJava(NailgunTask):
   cache_target_dirs = True
 
-  _KYTHE_INDEXER_MAIN = 'com.google.devtools.kythe.analyzers.java.JavaIndexer'
+  _KYTHE_JAVA_INDEXER_MAIN = 'com.google.devtools.kythe.analyzers.java.JavaIndexer'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -41,8 +41,8 @@ class IndexJava(NailgunTask):
   def register_options(cls, register):
     super(IndexJava, cls).register_options(register)
     cls.register_jvm_tool(register,
-                          'kythe-indexer',
-                          main=cls._KYTHE_INDEXER_MAIN)
+                          'kythe-java-indexer',
+                          main=cls._KYTHE_JAVA_INDEXER_MAIN)
 
   @staticmethod
   def _entries_file(vt):
@@ -53,7 +53,7 @@ class IndexJava(NailgunTask):
 
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
       if invalidation_check.invalid_vts:
-        indexer_cp = self.tool_classpath('kythe-indexer')
+        indexer_cp = self.tool_classpath('kythe-java-indexer')
         # Kythe jars embed a copy of Java 9's com.sun.tools.javac and javax.tools, for use on JDK8.
         # We must put these jars on the bootclasspath, ahead of any others, to ensure that we load
         # the Java 9 versions, and not the runtime's versions.
@@ -73,7 +73,7 @@ class IndexJava(NailgunTask):
     if not kindex_file:
       raise TaskError('No .kindex file found for {}'.format(vt.target.address.spec))
     args = [kindex_file, '--emit_jvm', 'semantic', '--out', self._entries_file(vt)]
-    result = self.runjava(classpath=indexer_cp, main=self._KYTHE_INDEXER_MAIN,
+    result = self.runjava(classpath=indexer_cp, main=self._KYTHE_JAVA_INDEXER_MAIN,
                           jvm_options=jvm_options,
                           args=args, workunit_name='kythe-index',
                           workunit_labels=[WorkUnitLabel.COMPILER])
