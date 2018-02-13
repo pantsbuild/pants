@@ -13,5 +13,5 @@ class Protoc(NativeTool):
   support_dir = 'bin/protobuf'
   default_version = '2.4.1'
 
-  deprecated_option_scope = 'gen.protoc'
-  deprecated_option_name = 'version'
+  replaces_scope = 'gen.protoc'
+  replaces_name = 'version'

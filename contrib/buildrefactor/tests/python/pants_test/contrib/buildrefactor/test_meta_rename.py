@@ -33,8 +33,10 @@ class MetaRenameTest(TaskTestBase):
 
     self.new_name = 'goo'
     self.spec_path = 'a'
-    self.set_options(**{ 'from': '{}:a'.format(self.spec_path), 'to': '{}:{}'.format(self.spec_path, self.new_name) })
-    self.meta_rename = self.create_task(self.context(target_roots=prepare_dependencies(self).values()))
+    self.set_options(**{ 'from': '{}:a'.format(self.spec_path),
+                         'to': '{}:{}'.format(self.spec_path, self.new_name) })
+    self.meta_rename = self.create_task(
+      self.context(target_roots=prepare_dependencies(self).values()))
 
   def test_update_original_build_name(self):
     init_subsystem(BinaryUtil.Factory)
