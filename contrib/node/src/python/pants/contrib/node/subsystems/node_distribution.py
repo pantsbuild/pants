@@ -65,7 +65,7 @@ class NodeDistribution(object):
       options = self.get_options()
       return NodeDistribution(
         binary_util, options.supportdir, options.version, options.eslint_setupdir,
-        options.eslint_config, options.eslint_ignore, options.pants_workdir, options.eslint_version,
+        options.eslint_config, options.eslint_ignore, options.eslint_version,
         package_manager=options.package_manager,
         yarnpkg_version=options.yarnpkg_version,)
 
@@ -90,7 +90,7 @@ class NodeDistribution(object):
     return version if version.startswith('v') else 'v' + version
 
   def __init__(self, binary_util, supportdir, version, eslint_setupdir,
-               eslint_config, eslint_ignore, pants_workdir, eslint_version,
+               eslint_config, eslint_ignore, eslint_version,
                package_manager, yarnpkg_version):
     self._binary_util = binary_util
     self._supportdir = supportdir
@@ -98,7 +98,6 @@ class NodeDistribution(object):
     self._eslint_setupdir = eslint_setupdir
     self._eslint_config = eslint_config or None
     self._eslint_ignore = eslint_ignore or None
-    self._pants_workdir = pants_workdir
     self._eslint_version = eslint_version
     self.package_manager = self.validate_package_manager(package_manager=package_manager)
     self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
@@ -129,10 +128,6 @@ class NodeDistribution(object):
   @property
   def eslint_ignore(self):
     return self._eslint_ignore
-
-  @property
-  def pants_workdir(self):
-    return self._pants_workdir
 
   def unpack_package(self, supportdir, version, filename):
     tarball_filepath = self._binary_util.select_binary(
@@ -280,13 +275,14 @@ class NodeDistribution(object):
     shutil.copytree(self.eslint_setupdir, bootstrapped_support_path)
     return True
 
-  def fetch_eslint_supportdir(self):
+  def eslint_supportdir(self, task_workdir):
     """ Returns the path where the ESLint is bootstrapped.
-
+    
+    :param string task_workdir: The task's working directory
     :returns: The path where ESLint is bootstrapped and whether or not it is configured
     :rtype: (string, bool)
     """
-    bootstrapped_support_path = os.path.join(self.pants_workdir, 'lint', 'javascriptstyle')
+    bootstrapped_support_path = os.path.join(task_workdir, 'eslint')
 
     # If the eslint_setupdir is not provided or missing required files, then
     # clean up the directory so that Pants can install a pre-defined eslint version later on.

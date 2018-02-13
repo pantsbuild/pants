@@ -147,7 +147,7 @@ class JavascriptStyleBase(NodeTask):
     if not targets:
       return
     failed_targets = []
-    bootstrap_dir, is_preconfigured = self.node_distribution.fetch_eslint_supportdir()
+    bootstrap_dir, is_preconfigured = self.node_distribution.eslint_supportdir(self.workdir)
     if not is_preconfigured:
       self.context.log.debug('ESLint is not pre-configured, bootstrapping with defaults.')
       self._bootstrap_eslinter(bootstrap_dir)
