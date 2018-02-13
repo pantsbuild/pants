@@ -14,6 +14,7 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
+from pants.option.custom_types import dir_option, file_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method
@@ -48,13 +49,13 @@ class NodeDistribution(object):
                  NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()))
       register('--yarnpkg-version', advanced=True, default='v0.19.1', fingerprint=True,
                help='Yarnpkg version. Used for binary utils')
-      register('--eslint-setupdir', advanced=True, fingerprint=True,
-               help='Find the package.json under this dir for installing eslint and plugins.')
-      register('--eslint-config', advanced=True, fingerprint=True,
+      register('--eslint-setupdir', advanced=True, type=dir_option, fingerprint=True,
+               help='Find the package.json and yarn.lock under this dir for installing eslint and plugins.')
+      register('--eslint-config', advanced=True, type=file_option, fingerprint=True,
                help='The path to the global eslint configuration file specifying all the rules')
-      register('--eslint-ignore', advanced=True, fingerprint=True,
+      register('--eslint-ignore', advanced=True, type=file_option, fingerprint=True,
                help='The path to the global eslint ignore path')
-      register('--eslint-version', default='4.15.0', help='Use this ESLint version if not configured.')
+      register('--eslint-version', default='4.15.0', help='Use this ESLint version.')
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
