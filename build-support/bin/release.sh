@@ -682,7 +682,7 @@ function build_pex() {
 
   local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
 
-  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.2.13" || die "Failed to install pex."
+  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.2.16" || die "Failed to install pex."
 
   local requirements_string=""
   for pkg_name in $PANTS_PEX_PACKAGES; do
