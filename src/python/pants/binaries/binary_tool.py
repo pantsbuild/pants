@@ -68,7 +68,7 @@ class BinaryToolBase(Subsystem):
       old_opts = context.options.for_scope(self.replaces_scope)
       if not old_opts.is_default(self.replaces_name):
         version = old_opts.get(self.replaces_name)
-        return self._select_for_version(version)
+    return self._select_for_version(version)
 
   @memoized_method
   def _select_for_version(self, version):
