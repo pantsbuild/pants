@@ -25,6 +25,7 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope to the tool name as understood by BinaryUtil.
+  support_subdir = None
   platform_dependent = None
   archive_type = None
   default_version = None
@@ -87,9 +88,11 @@ class BinaryToolBase(Subsystem):
 
   @memoized_method
   def _select_for_version(self, version):
+    subdir = self.support_subdir or self.options_scope
+    binaryutil_supportdir = os.path.join(self.SUPPORTDIR_PARENT_DIRNAME, subdir)
+
     return self._binary_util.select(
-      supportdir=os.path.join(self.SUPPORTDIR_PARENT_DIRNAME,
-                              self.options_scope),
+      supportdir=binaryutil_supportdir,
       version=version,
       name=self.options_scope,
       platform_dependent=self.platform_dependent,
