@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
@@ -17,18 +18,19 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
+from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.python.python_repos import PythonRepos
-from pants.task.task import Task
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 from pex.pex_info import PexInfo
 
 
-class MypyTask(Task):
+class MypyTask(ResolveRequirementsTaskBase):
   """Invoke the mypy static type analyzer for Python."""
 
   _PYTHON_SOURCE_EXTENSION = '.py'
@@ -55,7 +57,8 @@ class MypyTask(Task):
 
   @staticmethod
   def is_non_synthetic_python_target(target):
-    return not target.is_synthetic and isinstance(target, (PythonLibrary, PythonBinary, PythonTests))
+    return (not target.is_synthetic and
+            isinstance(target, (PythonLibrary, PythonBinary, PythonTests)))
 
   @staticmethod
   def is_python_target(target):
@@ -91,9 +94,15 @@ class MypyTask(Task):
   def _run_mypy(self, py3_interpreter, mypy_args, **kwargs):
     pex_info = PexInfo.default()
     pex_info.entry_point = 'mypy'
-    chroot = self.cached_chroot(interpreter=py3_interpreter, pex_info=pex_info, targets=[],
-      extra_requirements=[PythonRequirement('mypy=={}'.format(self.get_options().mypy_version))])
-    pex = chroot.pex()
+    mypy_version = self.get_options().mypy_version
+
+    PythonRequirement('mypy=={}'.format(self.get_options().mypy_version))
+    mypy_requirement_pex = self.resolve_requirement_strings(['mypy=={}'.format(mypy_version)])
+
+    path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
+    if not os.path.isdir(path):
+      self.merge_pexes(path, pex_info, py3_interpreter, [mypy_requirement_pex])
+    pex = WrappedPEX(PEX(path, py3_interpreter), py3_interpreter)
     return pex.run(mypy_args, **kwargs)
 
   def execute(self):
