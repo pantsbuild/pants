@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 class BuildozerBinary(NativeTool):
   options_scope = 'buildozer-binary'
   name = 'buildozer'
-  support_dir = 'scripts/buildozer'
-  default_version = '0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c'
+  support_dir = 'bin/buildozer'
+  default_version = '0.6.0-1a9c38e0df9397d033a1ca535596de5a7c1cf18f'
 
   replaces_scope = 'buildozer'
   replaces_name = 'version'
