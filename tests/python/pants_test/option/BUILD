@@ -27,3 +27,18 @@ python_tests(
   tags = {'integration'},
   timeout=90,
 )
+
+python_tests(
+  name='t2',
+  sources=[
+  'test_options_fingerprinter.py'
+  ],
+  dependencies=[
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
+    'src/python/pants/option',
+    'src/python/pants/util:contextutil',
+    'tests/python/pants_test:base_test',
+  ],
+  timeout=10000,
+)

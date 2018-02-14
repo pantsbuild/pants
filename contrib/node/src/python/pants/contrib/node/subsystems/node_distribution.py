@@ -55,7 +55,7 @@ class NodeDistribution(object):
                help='The path to the global eslint configuration file specifying all the rules')
       register('--eslint-ignore', advanced=True, type=file_option, fingerprint=True,
                help='The path to the global eslint ignore path')
-      register('--eslint-version', default='4.15.0', help='Use this ESLint version.')
+      register('--eslint-version', default='4.15.0', fingerprint=True, help='Use this ESLint version.')
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
@@ -283,6 +283,9 @@ class NodeDistribution(object):
     :rtype: (string, bool)
     """
     bootstrapped_support_path = os.path.join(task_workdir, 'eslint')
+
+    # TODO(nsaechao): Should only have to check if the "eslint" dir exists in the task_workdir
+    # assuming fingerprinting works as intended.
 
     # If the eslint_setupdir is not provided or missing required files, then
     # clean up the directory so that Pants can install a pre-defined eslint version later on.
