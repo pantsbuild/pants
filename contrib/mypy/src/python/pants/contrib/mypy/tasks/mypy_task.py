@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -95,8 +94,8 @@ class MypyTask(ResolveRequirementsTaskBase):
     pex_info.entry_point = 'mypy'
     mypy_version = self.get_options().mypy_version
 
-    PythonRequirement('mypy=={}'.format(self.get_options().mypy_version))
-    mypy_requirement_pex = self.resolve_requirement_strings(['mypy=={}'.format(mypy_version)])
+    mypy_requirement_pex = self.resolve_requirement_strings(
+      py3_interpreter, ['mypy=={}'.format(mypy_version)])
 
     path = os.path.realpath(os.path.join(self.workdir, str(py3_interpreter.identity), mypy_version))
     if not os.path.isdir(path):

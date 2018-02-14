@@ -69,7 +69,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
         pexes = [requirements_pex] + source_pexes
         if self.extra_requirements():
-          extra_requirements_pex = self.resolve_requirement_strings(self.extra_requirements())
+          extra_requirements_pex = self.resolve_requirement_strings(
+            interpreter, self.extra_requirements())
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes

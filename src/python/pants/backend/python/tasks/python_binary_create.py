@@ -14,7 +14,7 @@ from pex.pex_info import PexInfo
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_sources,
+from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources,
                                                        has_resources,
                                                        inject_synthetic_dist_requirements)
@@ -139,7 +139,7 @@ class PythonBinaryCreate(Task):
                                                       ':'.join(2 * [binary_tgt.invalidation_hash()]),
                                                       binary_tgt) + req_tgts
 
-      dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
+      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))
