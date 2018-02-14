@@ -20,9 +20,11 @@ class BinaryToolBase(Subsystem):
 
   :API: public
   """
+  # all subsystems inheriting from BinaryToolBase will go under bin/
+  SUPPORTDIR_PARENT_DIRNAME = 'bin'
+
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope to the tool name as understood by BinaryUtil.
-  support_subdir = None
   platform_dependent = None
   archive_type = None
   default_version = None
@@ -34,11 +36,6 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
-
-  class InvalidSupportDir(TaskError):
-    """Indicates that the subclass of BinaryToolBase did not set up a valid
-    supportdir to pass to BinaryUtil."""
-    pass
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -88,31 +85,15 @@ class BinaryToolBase(Subsystem):
   def _binary_util(self):
     return BinaryUtil.Factory.create()
 
-  # can override this and call super() to compose
-  @classmethod
-  def support_dir_paths(cls):
-    return []
-
-  @classmethod
-  def _support_dir(cls):
-    paths = cls.support_dir_paths()
-    if len(paths) == 0:
-      raise self.InvalidSupportDir(
-        'support_dir_paths() must be a non-empty list of directory paths '
-        'to join!'
-      )
-    subdir = cls.support_subdir or cls.options_scope
-    paths.append(subdir)
-    return os.path.join(*paths)
-
   @memoized_method
   def _select_for_version(self, version):
     return self._binary_util.select(
-      self._support_dir(),
-      version,
-      self.options_scope,
-      self.platform_dependent,
-      self.archive_type)
+      supportdir=os.path.join(self.SUPPORTDIR_PARENT_DIRNAME,
+                              self.options_scope),
+      version=version,
+      name=self.options_scope,
+      platform_dependent=self.platform_dependent,
+      archive_type=self.archive_type)
 
 
 class NativeTool(BinaryToolBase):
@@ -122,10 +103,6 @@ class NativeTool(BinaryToolBase):
   """
   platform_dependent = True
 
-  @classmethod
-  def support_dir_paths(cls):
-    return super(NativeTool, cls).support_dir_paths() + ['bin']
-
 
 class Script(BinaryToolBase):
   """A base class for platform-independent scripts.
@@ -133,7 +110,3 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
-
-  @classmethod
-  def support_dir_paths(cls):
-    return super(Script, cls).support_dir_paths() + ['scripts']
