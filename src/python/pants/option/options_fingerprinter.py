@@ -143,7 +143,6 @@ class OptionsFingerprinter(object):
               s = fd.read(8192)
     return hasher.hexdigest()
 
-
   def _fingerprint_files(self, filepaths):
     """Returns a fingerprint of the given filepaths and their contents.
 
