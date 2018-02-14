@@ -41,7 +41,8 @@ class ProtobufGen(SimpleCodegenTask):
     # proper invalidation of protobuf products in the face of plugin modification that affects
     # plugin outputs.
     register('--version', advanced=True, fingerprint=True,
-             removal_version='1.7.0.dev0', removal_hint='Use --protoc-version instead.',
+             removal_version='1.7.0.dev0',
+             removal_hint='Use --version in scope protoc instead.',
              help='Version of protoc.  Used to create the default --javadeps and as part of '
                   'the path to lookup the tool with --pants-support-baseurls and '
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
