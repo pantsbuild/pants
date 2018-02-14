@@ -5,23 +5,26 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import os
+
+from pants.base.exceptions import TaskError
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 class BinaryToolBase(Subsystem):
   """Base class for subsytems that configure binary tools.
 
-  Typically, a specific subclass is created via create_binary_tool_subsystem_cls() below.
-  That subclass can be further subclassed, manually, e.g., to add any extra options.
+  Subclasses can be further subclassed, manually, e.g., to add any extra options.
 
   :API: public
   """
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope to the tool name as understood by BinaryUtil.
-  support_dir = None
+  support_subdir = None
   platform_dependent = None
+  archive_type = None
   default_version = None
 
   # Subclasses may set these to effect migration from an old --version option to this one.
@@ -31,6 +34,17 @@ class BinaryToolBase(Subsystem):
 
   # Subclasses may set this to provide extra register() kwargs for the --version option.
   extra_version_option_kwargs = None
+
+  class InvalidSupportDir(TaskError):
+    """Indicates that the subclass of BinaryToolBase did not set up a valid
+    supportdir to pass to BinaryUtil."""
+    pass
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(BinaryToolBase, cls).subsystem_dependencies() + (
+      BinaryUtil.Factory,
+    )
 
   @classmethod
   def register_options(cls, register):
@@ -70,10 +84,35 @@ class BinaryToolBase(Subsystem):
         version = old_opts.get(self.replaces_name)
     return self._select_for_version(version)
 
+  @memoized_property
+  def _binary_util(self):
+    return BinaryUtil.Factory.create()
+
+  # can override this and call super() to compose
+  @classmethod
+  def support_dir_paths(cls):
+    return []
+
+  @classmethod
+  def _support_dir(cls):
+    paths = cls.support_dir_paths()
+    if len(paths) == 0:
+      raise self.InvalidSupportDir(
+        'support_dir_paths() must be a non-empty list of directory paths '
+        'to join!'
+      )
+    subdir = cls.support_subdir or cls.options_scope
+    paths.append(subdir)
+    return os.path.join(*paths)
+
   @memoized_method
   def _select_for_version(self, version):
-    return BinaryUtil.Factory.create().select(
-      self.support_dir, version, self.options_scope, self.platform_dependent)
+    return self._binary_util.select(
+      self._support_dir(),
+      version,
+      self.options_scope,
+      self.platform_dependent,
+      self.archive_type)
 
 
 class NativeTool(BinaryToolBase):
@@ -83,6 +122,10 @@ class NativeTool(BinaryToolBase):
   """
   platform_dependent = True
 
+  @classmethod
+  def support_dir_paths(cls):
+    return super(NativeTool, cls).support_dir_paths() + ['bin']
+
 
 class Script(BinaryToolBase):
   """A base class for platform-independent scripts.
@@ -90,3 +133,7 @@ class Script(BinaryToolBase):
   :API: public
   """
   platform_dependent = False
+
+  @classmethod
+  def support_dir_paths(cls):
+    return super(Script, cls).support_dir_paths() + ['scripts']

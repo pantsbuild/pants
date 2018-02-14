@@ -14,6 +14,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.fs.archive import archive_extensions, archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
@@ -129,11 +130,27 @@ class BinaryUtil(object):
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
-  def select(self, supportdir, version, name, platform_dependent):
-    if platform_dependent:
-      return self._select_binary(supportdir, version, name)
+  def select(self, supportdir, version, name, platform_dependent, archive_type):
+    if archive_type is None:
+      full_name = name
     else:
-      return self._select_script(supportdir, version, name)
+      # TODO: throw a subclassed exception here if archive type doesn't exist!
+      arch_ext = archive_extensions[archive_type]
+      full_name = '{}.{}'.format(name, arch_ext)
+
+    if platform_dependent:
+      downloaded_file = self._select_binary(supportdir, version, full_name)
+    else:
+      downloaded_file = self._select_script(supportdir, version, full_name)
+
+    if archive_type is None:
+      return downloaded_file
+
+    selected_archiver = archiver(archive_type)
+    # use filename without extension as the directory name
+    unpacked_dirname, _ = os.path.splitext(downloaded_file)
+    selected_archiver.extract(downloaded_file, unpacked_dirname)
+    return unpacked_dirname
 
   def select_binary(self, supportdir, version, name):
     return self._select_binary(supportdir, version, name)

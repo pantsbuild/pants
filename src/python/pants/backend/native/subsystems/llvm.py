@@ -8,10 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.binaries.binary_tool import NativeTool
 
 
-class Protoc(NativeTool):
-  options_scope = 'protoc'
-  support_subdir = 'protobuf'
-  default_version = '2.4.1'
-
-  deprecated_option_scope = 'gen.protoc'
-  deprecated_option_name = 'version'
+class LLVM(NativeTool):
+  options_scope = 'llvm'
+  default_version = '5.0.1'
+  archive_type = 'tgz'
