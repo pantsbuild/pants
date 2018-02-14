@@ -6,11 +6,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-import subprocess
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
+from pants.util.process_handler import subprocess
 
 logger = logging.getLogger(__name__)
 
