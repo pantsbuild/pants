@@ -3,6 +3,97 @@
 
 This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
+1.4.0rc1 (01/28/2018)
+---------------------
+
+The second release candidate for the ``1.4.x`` stable branch.
+
+New Features
+~~~~~~~~~~~~
+
+* [pantsd] Add pantsd graph warmth stats. (#5374)
+  `PR #5374 <https://github.com/pantsbuild/pants/pull/5374>`_
+
+* [contrib/scrooge] Add exports support to scrooge (#5357)
+  `PR #5357 <https://github.com/pantsbuild/pants/pull/5357>`_
+
+* add avro/java contrib plugin to the release process (#5346)
+  `PR #5346 <https://github.com/pantsbuild/pants/pull/5346>`_
+
+* An --eager option for BootstrapJvmTools. (#5336)
+  `PR #5336 <https://github.com/pantsbuild/pants/pull/5336>`_
+
+* Publish the codeanalysis contrib plugin. (#5322)
+  `PR #5322 <https://github.com/pantsbuild/pants/pull/5322>`_
+
+* Add the mypy contrib module to pants release process (#5335)
+  `PR #5335 <https://github.com/pantsbuild/pants/pull/5335>`_
+
+API Changes
+~~~~~~~~~~~
+
+* [pantsd] Bump to watchman 4.9.0-pants1. (#5386)
+  `PR #5386 <https://github.com/pantsbuild/pants/pull/5386>`_
+
+* Bump to pex==1.2.16. (#5355)
+  `PR #5355 <https://github.com/pantsbuild/pants/pull/5355>`_
+
+* Deprecate the v1 engine option. (#5338)
+  `PR #5338 <https://github.com/pantsbuild/pants/pull/5338>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Repair console interactivity in pantsd runs. (#5352)
+  `PR #5352 <https://github.com/pantsbuild/pants/pull/5352>`_
+
+* Repoint the 'current' symlink even for valid VTs. (#5375)
+  `PR #5375 <https://github.com/pantsbuild/pants/pull/5375>`_
+
+* Do not download node package multiple times (#5372)
+  `PR #5372 <https://github.com/pantsbuild/pants/pull/5372>`_
+
+* Ensure test report results are always exposed. (#5368)
+  `PR #5368 <https://github.com/pantsbuild/pants/pull/5368>`_
+
+* Fix a silly bug when computing indexable targets. (#5359)
+  `PR #5359 <https://github.com/pantsbuild/pants/pull/5359>`_
+
+* python2: do not resolve requirements if no python targets in targets closure (#5361)
+  `PR #5361 <https://github.com/pantsbuild/pants/pull/5361>`_
+
+* [pantsd] Repair daemon wedge on log rotation. (#5358)
+  `PR #5358 <https://github.com/pantsbuild/pants/pull/5358>`_
+
+* Reenable lighter contrib sanity checks (#5340)
+  `PR #5340 <https://github.com/pantsbuild/pants/pull/5340>`_
+
+* Remove wiki-related targets from contrib and back to docgen (#5319)
+  `PR #5319 <https://github.com/pantsbuild/pants/pull/5319>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Single resolve with coursier (#5362)
+  `Issue #743 <https://github.com/coursier/coursier/issues/743>`_
+  `PR #5362 <https://github.com/pantsbuild/pants/pull/5362>`_
+  `PR #735 <https://github.com/coursier/coursier/pull/735>`_
+
+* Port IsolatedProcess implementation from Python to Rust - Split 1  (#5239)
+  `PR #5239 <https://github.com/pantsbuild/pants/pull/5239>`_
+
+* Remove superfluous --dist flag from kythe indexer task. (#5344)
+  `PR #5344 <https://github.com/pantsbuild/pants/pull/5344>`_
+
+* add mypy to list of released plugins in docs (#5341)
+  `PR #5341 <https://github.com/pantsbuild/pants/pull/5341>`_
+
+* Add support for alternate packages in the pex that is built. (#5283)
+  `PR #5283 <https://github.com/pantsbuild/pants/pull/5283>`_
+
+* Update lockfile for fs_util (#5326)
+  `PR #5326 <https://github.com/pantsbuild/pants/pull/5326>`_
+
 1.4.0rc0 (01/12/2018)
 ---------------------
 

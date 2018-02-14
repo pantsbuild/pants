@@ -265,10 +265,12 @@ class WrappedNativeScheduler(object):
     self._native.lib.execution_reset(self._scheduler)
 
   def add_root_selection(self, execution_request, subject, product):
-    self._native.lib.execution_add_root_select(self._scheduler,
-                                               execution_request,
-                                               self._to_key(subject),
-                                               self._to_constraint(product))
+    res = self._native.lib.execution_add_root_select(self._scheduler,
+                                                     execution_request,
+                                                     self._to_key(subject),
+                                                     self._to_constraint(product))
+    if res.is_throw:
+      raise self._from_value(res.value)
 
   def visualize_to_dir(self):
     return self._native.visualize_to_dir
@@ -487,12 +489,13 @@ class LocalScheduler(object):
         cumulative_trace = '\n'.join(self.trace(request))
         raise ExecutionError('Received unexpected Throw state(s):\n{}'.format(cumulative_trace))
 
-      if len(throw_root_states) == 1:
+      unique_exceptions = set(t.exc for t in throw_root_states)
+      if len(unique_exceptions) == 1:
         raise throw_root_states[0].exc
       else:
         raise ExecutionError('Multiple exceptions encountered:\n  {}'
-                             .format('\n  '.join('{}: {}'.format(type(t.exc).__name__, str(t.exc))
-                                                 for t in throw_root_states)))
+                             .format('\n  '.join('{}: {}'.format(type(t).__name__, str(t))
+                                                                 for t in unique_exceptions)))
 
     # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
     # order in output lists.

@@ -52,10 +52,6 @@ fn main() {
 
   let mut config = cc::Build::new();
 
-  // Don't implicitly set -Wall -Wextra because cffi generates code with warnings.
-  // TODO: Consider removing this if/when https://github.com/alexcrichton/cc-rs/pull/248 lands.
-  config.warnings(false);
-
   // N.B. The filename of this source code - at generation time - must line up 1:1 with the
   // python import name, as python keys the initialization function name off of the import name.
   let cffi_dir = Path::new("src/cffi");
@@ -66,6 +62,9 @@ fn main() {
   for flag in make_flags(&env_script_path).unwrap() {
     config.flag(flag.as_str());
   }
+
+  // cffi generates missing field initializers :(
+  config.flag("-Wno-missing-field-initializers");
 
   config.compile("libnative_engine_ffi.a");
 }

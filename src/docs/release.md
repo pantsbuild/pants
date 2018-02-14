@@ -160,8 +160,10 @@ is not required.
 3. Publish to PyPi
 ------------------
 
-Once the first two travis shards (the "binary builder" shards) have completed for your
-release commit, you can publish to PyPi:
+Once the first two travis shards (the "binary builder" shards) have completed for your release
+commit, you can publish to PyPi. First, ensure you are on the master branch at the release commit.
+If new commits have landed after your release commit, you can reset to your commit
+(`git reset --hard <sha>`). Then, publish the release:
 
     :::bash
     $ ./build-support/bin/release.sh

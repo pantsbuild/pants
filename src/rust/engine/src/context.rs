@@ -65,7 +65,7 @@ impl Core {
       panic!("Could not initialize Snapshot directory: {:?}", e);
     });
     tasks.singleton_replace(
-      externs::invoke_unsafe(
+      externs::unsafe_call(
         &types.construct_snapshots,
         &vec![
           externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes()),

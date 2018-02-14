@@ -63,43 +63,38 @@ impl Scheduler {
     request: &mut ExecutionRequest,
     subject: Key,
     product: TypeConstraint,
-  ) {
+  ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::Select(selectors::Select::without_variant(product)),
-    );
+      selectors::Selector::Select(
+        selectors::Select::without_variant(product),
+      ),
+    )?;
     request.roots.push(Select::new(
       product,
       subject,
       Default::default(),
       &edges,
     ));
+    Ok(())
   }
 
   fn find_root_edges_or_update_rule_graph(
     &self,
     subject_type: TypeId,
     selector: selectors::Selector,
-  ) -> rule_graph::RuleEdges {
-    // TODO what to do if there isn't a match, ie if there is a root type that hasn't been specified
-    // TODO up front.
-    // TODO Handle the case where the requested root is not in the list of roots that the graph was
-    //      created with.
-    //
-    //      Options
-    //        1. Toss the graph and make a subgraph specific graph, blowing up if that fails.
-    //           I can do this with minimal changes.
-    //        2. Update the graph & check result,
-
+  ) -> Result<rule_graph::RuleEdges, String> {
     self
       .core
       .rule_graph
       .find_root_edges(subject_type.clone(), selector.clone())
-      .expect(&format!(
-        "Edges to have been found TODO handle this selector: {:?}, subject {:?}",
-        rule_graph::selector_str(&selector),
-        subject_type
-      ))
+      .ok_or_else(|| {
+        format!(
+          "No installed rules can satisfy {} for a root subject of type {}.",
+          rule_graph::selector_str(&selector),
+          rule_graph::type_str(subject_type)
+        )
+      })
   }
 
   ///

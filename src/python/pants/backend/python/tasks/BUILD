@@ -6,6 +6,8 @@ python_library(
     '3rdparty/python:pex',
     '3rdparty/python/twitter/commons:twitter.common.collections',
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
+    'src/python/pants/backend/python:python_requirement',
+    'src/python/pants/backend/python:python_requirements',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python:python_chroot',
     'src/python/pants/backend/python/subsystems',

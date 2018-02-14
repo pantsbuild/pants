@@ -12,17 +12,16 @@ from hashlib import sha1
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
+from pants.backend.codegen.protobuf.subsystem.protoc import Protoc
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.address import Address
 from pants.fs.archive import ZIP
 from pants.task.simple_codegen_task import SimpleCodegenTask
-from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
 
@@ -30,7 +29,7 @@ class ProtobufGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ProtobufGen, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    return super(ProtobufGen, cls).subsystem_dependencies() + (Protoc.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
@@ -42,6 +41,7 @@ class ProtobufGen(SimpleCodegenTask):
     # proper invalidation of protobuf products in the face of plugin modification that affects
     # plugin outputs.
     register('--version', advanced=True, fingerprint=True,
+             removal_version='1.7.0.dev0', removal_hint='Use --protoc-version instead.',
              help='Version of protoc.  Used to create the default --javadeps and as part of '
                   'the path to lookup the tool with --pants-support-baseurls and '
                   '--pants-bootstrapdir.  When changing this parameter you may also need to '
@@ -56,6 +56,7 @@ class ProtobufGen(SimpleCodegenTask):
                   'Intended to help protoc find its plugins.',
              default=None)
     register('--supportdir', advanced=True,
+             removal_version='1.7.0.dev0', removal_hint='Will no longer be configurable.',
              help='Path to use for the protoc binary.  Used as part of the path to lookup the'
                   'tool under --pants-bootstrapdir.',
              default='bin/protobuf')
@@ -82,12 +83,9 @@ class ProtobufGen(SimpleCodegenTask):
     self.plugins = self.get_options().protoc_plugins or []
     self._extra_paths = self.get_options().extra_path or []
 
-  @memoized_property
+  @property
   def protobuf_binary(self):
-    binary_util = BinaryUtil.Factory.create()
-    return binary_util.select_binary(self.get_options().supportdir,
-                                     self.get_options().version,
-                                     'protoc')
+    return Protoc.scoped_instance(self).select(context=self.context)
 
   @property
   def javadeps(self):

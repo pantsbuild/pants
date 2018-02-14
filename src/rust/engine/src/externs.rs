@@ -19,6 +19,12 @@ pub fn log(level: LogLevel, msg: &str) {
   })
 }
 
+pub fn eval(python: &str) -> Result<Value, Failure> {
+  with_externs(|e| {
+    (e.eval)(e.context, python.as_ptr(), python.len() as u64)
+  }).into()
+}
+
 pub fn key_for(val: &Value) -> Key {
   with_externs(|e| (e.key_for)(e.context, val))
 }
@@ -162,30 +168,22 @@ pub fn create_exception(msg: &str) -> Value {
   })
 }
 
-pub fn invoke_runnable(func: &Value, args: &[Value], cacheable: bool) -> Result<Value, Failure> {
-  let result = with_externs(|e| {
-    (e.invoke_runnable)(e.context, func, args.as_ptr(), args.len() as u64, cacheable)
-  });
-  if result.is_throw {
-    let traceback = result.traceback.to_string().unwrap_or_else(|e| {
-      format!(
-        "<failed to decode unicode for {:?}: {}>",
-        result.traceback,
-        e
-      )
-    });
-    Err(Failure::Throw(result.value, traceback))
-  } else {
-    Ok(result.value)
-  }
+pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
+  call(&project_ignoring_type(&value, method), args)
+}
+
+pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
+  with_externs(|e| {
+    (e.call)(e.context, func, args.as_ptr(), args.len() as u64)
+  }).into()
 }
 
 ///
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
 ///
-pub fn invoke_unsafe(func: &Function, args: &Vec<Value>) -> Value {
-  invoke_runnable(&val_for_id(func.0), args, false).unwrap_or_else(|e| {
+pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
+  call(&val_for_id(func.0), args).unwrap_or_else(|e| {
     panic!("Core function `{}` failed: {:?}", id_to_str(func.0), e);
   })
 }
@@ -224,6 +222,8 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   context: *const ExternContext,
   log: LogExtern,
+  call: CallExtern,
+  eval: EvalExtern,
   key_for: KeyForExtern,
   val_for: ValForExtern,
   clone_val: CloneValExtern,
@@ -240,7 +240,6 @@ pub struct Externs {
   id_to_str: IdToStrExtern,
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
-  invoke_runnable: InvokeRunnable,
   // TODO: This type is also declared on `types::Types`.
   py_str_type: TypeId,
 }
@@ -253,6 +252,8 @@ impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
     log: LogExtern,
+    call: CallExtern,
+    eval: EvalExtern,
     key_for: KeyForExtern,
     val_for: ValForExtern,
     clone_val: CloneValExtern,
@@ -268,12 +269,13 @@ impl Externs {
     project_ignoring_type: ProjectIgnoringTypeExtern,
     project_multi: ProjectMultiExtern,
     create_exception: CreateExceptionExtern,
-    invoke_runnable: InvokeRunnable,
     py_str_type: TypeId,
   ) -> Externs {
     Externs {
       context: ext_context,
       log: log,
+      call: call,
+      eval: eval,
       key_for: key_for,
       val_for: val_for,
       clone_val: clone_val,
@@ -290,7 +292,6 @@ impl Externs {
       id_to_str: id_to_str,
       val_to_str: val_to_str,
       create_exception: create_exception,
-      invoke_runnable: invoke_runnable,
       py_str_type: py_str_type,
     }
   }
@@ -342,10 +343,32 @@ pub enum LogLevel {
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct RunnableComplete {
-  value: Value,
+pub struct PyResult {
   is_throw: bool,
-  traceback: Buffer,
+  value: Value,
+}
+
+impl From<PyResult> for Result<Value, Failure> {
+  fn from(result: PyResult) -> Self {
+    if result.is_throw {
+      let traceback = project_str(&result.value, "_formatted_exc");
+      Err(Failure::Throw(result.value, traceback))
+    } else {
+      Ok(result.value)
+    }
+  }
+}
+
+impl From<Result<(), String>> for PyResult {
+  fn from(res: Result<(), String>) -> Self {
+    match res {
+      Ok(()) => PyResult { is_throw: false, value: eval("None").unwrap() },
+      Err(msg) => PyResult {
+        is_throw: true,
+        value: create_exception(&msg),
+      },
+    }
+  }
 }
 
 // Points to an array containing a series of values allocated by Python.
@@ -460,12 +483,11 @@ pub type CreateExceptionExtern = extern "C" fn(*const ExternContext,
                                                str_len: u64)
                                                -> Value;
 
-pub type InvokeRunnable = extern "C" fn(*const ExternContext,
-                                        *const Value,
-                                        *const Value,
-                                        u64,
-                                        bool)
-                                        -> RunnableComplete;
+pub type CallExtern = extern "C" fn(*const ExternContext, *const Value, *const Value, u64)
+                                    -> PyResult;
+
+pub type EvalExtern = extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64)
+                                    -> PyResult;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
 where

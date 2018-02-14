@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
 
 
@@ -34,5 +33,6 @@ class PantsRequirement(object):
     """
     name = name or os.path.basename(self._parse_context.rel_path)
     requirement = PythonRequirement(requirement='pantsbuild.pants=={}'.format(pants_version()))
-    self._parse_context.create_object(PythonRequirementLibrary, name=name,
+    self._parse_context.create_object('python_requirement_library',
+                                      name=name,
                                       requirements=[requirement])

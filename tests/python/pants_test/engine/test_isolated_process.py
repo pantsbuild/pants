@@ -11,8 +11,8 @@ import unittest
 
 from pants.engine.fs import PathGlobs, Snapshot, create_fs_rules
 from pants.engine.isolated_process import (Binary, ExecuteProcess, ExecuteProcessRequest,
-  ExecuteProcessResult, SnapshottedProcess,
-  SnapshottedProcessRequest, create_process_rules)
+                                           ExecuteProcessResult, SnapshottedProcess,
+                                           SnapshottedProcessRequest, create_process_rules)
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import SingletonRule
 from pants.engine.selectors import Select

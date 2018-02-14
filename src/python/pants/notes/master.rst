@@ -4,6 +4,110 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+
+1.5.0.dev3 (02/10/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+* Python distribution task for user-defined setup.py + integration with ./pants {run/binary/test} (#5141)
+  `PR #5141 <https://github.com/pantsbuild/pants/pull/5141>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Bundle all kythe entries, regardless of origin. (#5450)
+  `PR #5450 <https://github.com/pantsbuild/pants/pull/5450>`_
+
+
+1.5.0.dev2 (02/05/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+* Allow intransitive unpacking of jars. (#5398)
+  `PR #5398 <https://github.com/pantsbuild/pants/pull/5398>`_
+
+API Changes
+~~~~~~~~~~~
+* [strict-deps][build-graph] add new predicate to build graph traversal; Update Target.strict_deps to use it (#5150)
+  `PR #5150 <https://github.com/pantsbuild/pants/pull/5150>`_
+
+* Deprecate IDE project generation tasks. (#5432)
+  `PR #5432 <https://github.com/pantsbuild/pants/pull/5432>`_
+
+* Enable workdir-max-build-entries by default. (#5423)
+  `PR #5423 <https://github.com/pantsbuild/pants/pull/5423>`_
+
+* Fix tasks2 deprecations to each have their own module. (#5421)
+  `PR #5421 <https://github.com/pantsbuild/pants/pull/5421>`_
+
+* Console tasks can output nothing without erroring (#5412)
+  `PR #5412 <https://github.com/pantsbuild/pants/pull/5412>`_
+
+* Remove a remaining old-python-pipeline task from contrib/python. (#5411)
+  `PR #5411 <https://github.com/pantsbuild/pants/pull/5411>`_
+
+* Make the thrift linter use the standard linter mixin. (#5394)
+  `PR #5394 <https://github.com/pantsbuild/pants/pull/5394>`_
+
+Bugfixes
+~~~~~~~~
+* Fix `PytestRun` to handle multiple source roots. (#5400)
+  `PR #5400 <https://github.com/pantsbuild/pants/pull/5400>`_
+
+* Fix a bug in task logging in tests. (#5404)
+  `PR #5404 <https://github.com/pantsbuild/pants/pull/5404>`_
+
+* [pantsd] Repair console interactivity in pantsd runs. (#5352)
+  `PR #5352 <https://github.com/pantsbuild/pants/pull/5352>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+* Document release reset of master. (#5397)
+  `PR #5397 <https://github.com/pantsbuild/pants/pull/5397>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Make the Kythe Java indexer emit JVM nodes. (#5435)
+  `PR #5435 <https://github.com/pantsbuild/pants/pull/5435>`_
+
+* Release script allows wheel listing (#5431)
+  `PR #5431 <https://github.com/pantsbuild/pants/pull/5431>`_
+
+* Get version from version file not by running pants (#5428)
+  `PR #5428 <https://github.com/pantsbuild/pants/pull/5428>`_
+
+* Improve python/rust boundary error handling (#5414)
+  `PR #5414 <https://github.com/pantsbuild/pants/pull/5414>`_
+
+* Factor up shared test partitioning code. (#5416)
+  `PR #5416 <https://github.com/pantsbuild/pants/pull/5416>`_
+
+* Set the log level when capturing logs in tests. (#5418)
+  `PR #5418 <https://github.com/pantsbuild/pants/pull/5418>`_
+
+* Simplify `JUnitRun` internals. (#5410)
+  `PR #5410 <https://github.com/pantsbuild/pants/pull/5410>`_
+
+* [v2-engine errors] Sort suggestions for typo'd targets, unique them when trace is disabled (#5413)
+  `PR #5413 <https://github.com/pantsbuild/pants/pull/5413>`_
+
+* No-op ivy resolve is ~100ms cheaper (#5389)
+  `PR #5389 <https://github.com/pantsbuild/pants/pull/5389>`_
+
+* Process executor does not require env flag to be set (#5409)
+  `PR #5409 <https://github.com/pantsbuild/pants/pull/5409>`_
+
+* [pantsd] Don't invalidate on surface name changes to config/rc files. (#5408)
+  `PR #5408 <https://github.com/pantsbuild/pants/pull/5408>`_
+
+* [pantsd] Break out DPR._nailgunned_stdio() into multiple methods. (#5405)
+  `PR #5405 <https://github.com/pantsbuild/pants/pull/5405>`_
+
+* Sort the indexable targets consistently. (#5403)
+  `PR #5403 <https://github.com/pantsbuild/pants/pull/5403>`_
+
+
 1.5.0.dev1 (01/26/2018)
 -----------------------
 

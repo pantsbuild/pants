@@ -27,12 +27,18 @@ from pants.backend.jvm.tasks.nailgun_task import NailgunTask
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated_module
 from pants.base.exceptions import TaskError
 from pants.base.project_tree_factory import get_project_tree
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.resources import Resources
 from pants.util import desktop
 from pants.util.dirutil import safe_mkdir, safe_walk
+
+
+deprecated_module('1.7.0.dev0',
+                  'IDE project generation functionality will be removed entirely.  Use the'
+                  'Pants IntelliJ plugin, or discuss alternative solutions with the Pants team.')
 
 
 logger = logging.getLogger(__name__)

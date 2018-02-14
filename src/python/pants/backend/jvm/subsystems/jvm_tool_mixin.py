@@ -16,6 +16,8 @@ class JvmToolMixin(object):
   """A mixin for registering and accessing JVM-based tools.
 
   Must be mixed in to something that can register and use options, e.g., a Task or a Subsystem.
+
+  :API: public
   """
   class InvalidToolClasspath(TaskError):
     """Indicates an invalid jvm tool classpath."""
@@ -81,7 +83,7 @@ class JvmToolMixin(object):
                         removal_hint=None):
     """Registers a jvm tool under `key` for lazy classpath resolution.
 
-    Classpaths can be retrieved in `execute` scope via `tool_classpath`.
+    Classpaths can be retrieved in `execute` scope via `tool_classpath_from_products`.
 
     NB: If the tool's `main` class name is supplied the tool classpath will be shaded.
 
@@ -175,7 +177,8 @@ class JvmToolMixin(object):
                                       'jar, instead found {count}:\n\t{classpath}'.format(**params))
     return classpath[0]
 
-  def tool_classpath_from_products(self, products, key, scope):
+  @staticmethod
+  def tool_classpath_from_products(products, key, scope):
     """Get a classpath for the tool previously registered under key in the given scope.
 
     :param products: The products of the current pants run.

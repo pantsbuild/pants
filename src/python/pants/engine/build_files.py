@@ -107,7 +107,8 @@ class UnhydratedStruct(datatype('UnhydratedStruct', ['address', 'struct', 'depen
 
 
 def _raise_did_you_mean(address_family, name):
-  possibilities = '\n  '.join(':{}'.format(a.target_name) for a in address_family.addressables)
+  names = [a.target_name for a in address_family.addressables]
+  possibilities = '\n  '.join(':{}'.format(target_name) for target_name in sorted(names))
   raise ResolveError('"{}" was not found in namespace "{}". '
                      'Did you mean one of:\n  {}'
                      .format(name, address_family.namespace, possibilities))

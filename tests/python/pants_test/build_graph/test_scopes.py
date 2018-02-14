@@ -120,7 +120,7 @@ class ScopedClosureTest(BaseTest):
     self.assert_closure({b_intransitive, a}, {b_intransitive})
     self.assert_closure({e, d, a, c}, {e, d})
     self.assert_closure_dfs([d, c, b_intransitive, a], [d, c], ordered=True)
-    self.assert_closure_dfs([c, d, a, b_intransitive], [d, c], ordered=True, postorder=True)
+    self.assert_closure_dfs([a, b_intransitive, c, d], [d, c], ordered=True, postorder=True)
     self.assert_closure_bfs([d, c, b_intransitive, a], [d, c], ordered=True)
     self.assert_closure({a, b_intransitive, d, c}, {d}, respect_intransitive=False)
 

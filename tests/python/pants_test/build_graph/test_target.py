@@ -16,6 +16,7 @@ from pants.base.payload import Payload
 from pants.base.payload_field import SetOfPrimitivesField
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
+from pants.build_graph.target_scopes import Scopes
 from pants.source.wrapped_globs import Globs
 from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
@@ -283,11 +284,18 @@ class TargetTest(BaseTest):
       exports=[':C_alias'],
     )
 
+    self.lib_f = self.make_target(
+      'com/foo:F',
+      target_type=SourcesTarget,
+      sources=['com/foo/E.scala'],
+      scope=Scopes.RUNTIME
+    )
+
     self.lib_e = self.make_target(
       'com/foo:E',
       target_type=SourcesTarget,
       sources=['com/foo/E.scala'],
-      dependencies=[self.lib_d],
+      dependencies=[self.lib_d, self.lib_f],
     )
 
   def test_strict_dependencies(self):
@@ -296,6 +304,7 @@ class TargetTest(BaseTest):
     dep_context.compiler_plugin_types = ()
     dep_context.codegen_types = ()
     dep_context.alias_types = (Target,)
+    dep_context.target_closure_kwargs = {'include_scopes': Scopes.JVM_COMPILE_SCOPES}
     self.assertEqual(set(self.lib_b.strict_dependencies(dep_context)), {self.lib_a, self.lib_aa})
     self.assertEqual(set(self.lib_c.strict_dependencies(dep_context)), {self.lib_b, self.lib_a})
     self.assertEqual(set(self.lib_c_alias.strict_dependencies(dep_context)), {self.lib_c, self.lib_b, self.lib_a})

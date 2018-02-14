@@ -22,7 +22,7 @@ from twitter.common.dirutil.chroot import Chroot
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
-from pants.backend.python.tasks.gather_sources import GatherSources
+from pants.backend.python.tasks.pex_build_util import is_local_python_dist
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TargetDefinitionException, TaskError
 from pants.base.specs import SiblingAddresses
@@ -343,7 +343,6 @@ class SetupPy(Task):
 
   @classmethod
   def prepare(cls, options, round_manager):
-    round_manager.require_data(GatherSources.PYTHON_SOURCES)
     round_manager.require_data(PythonInterpreter)
 
   @classmethod
@@ -590,9 +589,9 @@ class SetupPy(Task):
 
   def execute(self):
     # We drive creation of setup.py distributions from the original target graph, grabbing codegen'd
-    # sources when needed.
+    # sources when needed. We ignore PythonDistribution targets.
     def is_exported_python_target(t):
-      return t.is_original and self.has_provides(t)
+      return t.is_original and self.has_provides(t) and not is_local_python_dist(t)
 
     exported_python_targets = OrderedSet(t for t in self.context.target_roots
                                          if is_exported_python_target(t))

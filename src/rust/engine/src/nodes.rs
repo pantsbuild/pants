@@ -310,7 +310,7 @@ impl Select {
       // TODO: request the Node that invokes the process, rather than invoke directly
       let result = process_executor::local::run_command_locally(request).unwrap();
       vec![
-        future::ok(externs::invoke_unsafe(
+        future::ok(externs::unsafe_call(
           &context.core.types.construct_process_result,
           &vec![
             externs::store_bytes(&result.stdout),
@@ -972,7 +972,7 @@ impl Snapshot {
       .iter()
       .map(|ps| Self::store_path_stat(context, ps))
       .collect();
-    externs::invoke_unsafe(
+    externs::unsafe_call(
       &context.core.types.construct_snapshot,
       &vec![
         externs::store_bytes(&item.fingerprint.0),
@@ -987,12 +987,12 @@ impl Snapshot {
 
   fn store_dir(context: &Context, item: &Dir) -> Value {
     let args = vec![Self::store_path(item.0.as_path())];
-    externs::invoke_unsafe(&context.core.types.construct_dir, &args)
+    externs::unsafe_call(&context.core.types.construct_dir, &args)
   }
 
   fn store_file(context: &Context, item: &File) -> Value {
     let args = vec![Self::store_path(item.path.as_path())];
-    externs::invoke_unsafe(&context.core.types.construct_file, &args)
+    externs::unsafe_call(&context.core.types.construct_file, &args)
   }
 
   fn store_path_stat(context: &Context, item: &PathStat) -> Value {
@@ -1004,11 +1004,11 @@ impl Snapshot {
         vec![Self::store_path(path), Self::store_file(context, stat)]
       }
     };
-    externs::invoke_unsafe(&context.core.types.construct_path_stat, &args)
+    externs::unsafe_call(&context.core.types.construct_path_stat, &args)
   }
 
   fn store_file_content(context: &Context, item: &FileContent) -> Value {
-    externs::invoke_unsafe(
+    externs::unsafe_call(
       &context.core.types.construct_file_content,
       &vec![
         Self::store_path(&item.path),
@@ -1022,7 +1022,7 @@ impl Snapshot {
       .iter()
       .map(|e| Self::store_file_content(context, e))
       .collect();
-    externs::invoke_unsafe(
+    externs::unsafe_call(
       &context.core.types.construct_files_content,
       &vec![externs::store_list(entries.iter().collect(), false)],
     )
@@ -1117,9 +1117,7 @@ impl Node for Task {
     let task = self.task.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => {
-          externs::invoke_runnable(&externs::val_for_id(task.func.0), &deps, task.cacheable)
-        }
+        Ok(deps) => externs::call(&externs::val_for_id(task.func.0), &deps),
         Err(err) => Err(err),
       })
       .to_boxed()

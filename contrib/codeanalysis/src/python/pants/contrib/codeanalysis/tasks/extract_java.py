@@ -18,7 +18,7 @@ from pants.contrib.codeanalysis.tasks.indexable_java_targets import IndexableJav
 class ExtractJava(JvmToolTaskMixin):
   cache_target_dirs = True
 
-  _KYTHE_EXTRACTOR_MAIN = 'com.google.devtools.kythe.extractors.java.standalone.Javac8Wrapper'
+  _KYTHE_JAVA_EXTRACTOR_MAIN = 'com.google.devtools.kythe.extractors.java.standalone.Javac8Wrapper'
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -43,20 +43,20 @@ class ExtractJava(JvmToolTaskMixin):
   def register_options(cls, register):
     super(ExtractJava, cls).register_options(register)
     cls.register_jvm_tool(register,
-                          'kythe-extractor',
+                          'kythe-java-extractor',
                           custom_rules=[
                             # These need to remain unshaded so that Kythe can interact with the
                             # javac embedded in its jar.
                             Shader.exclude_package('com.sun', recursive=True),
                           ],
-                          main=cls._KYTHE_EXTRACTOR_MAIN)
+                          main=cls._KYTHE_JAVA_EXTRACTOR_MAIN)
 
   def execute(self):
     indexable_targets = IndexableJavaTargets.global_instance().get(self.context)
     targets_to_zinc_args = self.context.products.get_data('zinc_args')
 
     with self.invalidated(indexable_targets, invalidate_dependents=True) as invalidation_check:
-      extractor_cp = self.tool_classpath('kythe-extractor')
+      extractor_cp = self.tool_classpath('kythe-java-extractor')
       for vt in invalidation_check.invalid_vts:
         self.context.log.info('Kythe extracting from {}\n'.format(vt.target.address.spec))
         javac_args = self._get_javac_args_from_zinc_args(targets_to_zinc_args[vt.target])
@@ -72,11 +72,11 @@ class ExtractJava(JvmToolTaskMixin):
         ])
 
         result = self.dist.execute_java(
-          classpath=extractor_cp, main=self._KYTHE_EXTRACTOR_MAIN,
+          classpath=extractor_cp, main=self._KYTHE_JAVA_EXTRACTOR_MAIN,
           jvm_options=jvm_options, args=javac_args, workunit_name='kythe-extract')
         if result != 0:
           raise TaskError('java {main} ... exited non-zero ({result})'.format(
-            main=self._KYTHE_EXTRACTOR_MAIN, result=result))
+            main=self._KYTHE_JAVA_EXTRACTOR_MAIN, result=result))
 
     for vt in invalidation_check.all_vts:
       created_files = os.listdir(vt.results_dir)

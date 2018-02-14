@@ -40,4 +40,6 @@ class IndexableJavaTargets(Subsystem):
     for t in requested_targets:
       expanded_targets.extend(context.build_graph.get_all_derivatives(t.address))
 
-    return [t for t in expanded_targets if isinstance(t, JvmTarget) and t.has_sources('.java')]
+    return tuple(sorted(
+      [t for t in expanded_targets if isinstance(t, JvmTarget) and t.has_sources('.java')],
+      key=lambda t: t.address.spec))

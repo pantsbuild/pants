@@ -13,6 +13,7 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -90,7 +91,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
     super(PythonExecutionTaskBase, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data(ResolveRequirements.REQUIREMENTS_PEX)
-    round_manager.require_data(GatherSources.PYTHON_SOURCES)
+    round_manager.require_data(GatherSources.PythonSources)
 
   def extra_requirements(self):
     """Override to provide extra requirements needed for execution.
@@ -102,7 +103,8 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
   def create_pex(self, pex_info=None):
     """Returns a wrapped pex that "merges" the other pexes via PEX_PATH."""
     relevant_targets = self.context.targets(
-      lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Files)))
+      lambda tgt: isinstance(tgt, (
+        PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)))
     with self.invalidated(relevant_targets) as invalidation_check:
 
       # If there are no relevant targets, we still go through the motions of resolving
@@ -121,10 +123,9 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
       if not os.path.isdir(path):
-        pexes = [
-          self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX),
-          self.context.products.get_data(GatherSources.PYTHON_SOURCES)
-        ]
+        source_pexes = self.context.products.get_data(GatherSources.PythonSources).all()
+        requirements_pex = self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
+        pexes = [requirements_pex] + source_pexes
 
         if self.extra_requirements():
           extra_reqs = [PythonRequirement(req_str) for req_str in self.extra_requirements()]

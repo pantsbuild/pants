@@ -40,13 +40,13 @@ jar_library(name = 'scrooge-linter',
 # (https://github.com/benjyw/binhost) for now.  See build-support/ivy/ivysettings.xml
 # for more info.
 jar_library(
-  name='kythe-extractor',
-  jars = [jar(org='kythe', name='extractors/javac_extractor', rev='v0.0.26-snowchain3')]
+  name='kythe-java-extractor',
+  jars = [jar(org='kythe', name='javac_extractor', rev='v0.0.26.5-snowchain037-82964297aef')]
 )
 
 jar_library(
-  name='kythe-indexer',
-  jars = [jar(org='kythe', name='indexers/java_indexer', rev='v0.0.26-snowchain3')]
+  name='kythe-java-indexer',
+  jars = [jar(org='kythe', name='java_indexer', rev='v0.0.26.5-snowchain037-82964297aef')]
 )
 
 # Runtime dependencies for the Avro Java generated code.

@@ -136,6 +136,45 @@ class BinaryUtil(object):
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
+  def select(self, supportdir, version, name, platform_dependent):
+    if platform_dependent:
+      return self._select_binary(supportdir, version, name)
+    else:
+      return self._select_script(supportdir, version, name)
+
+  def select_binary(self, supportdir, version, name):
+    return self._select_binary(supportdir, version, name)
+
+  def select_script(self, supportdir, version, name):
+    return self._select_script(supportdir, version, name)
+
+  # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
+  # organize our binary hosting so that it's not needed.
+  def _select_binary(self, supportdir, version, name):
+    """Selects a binary matching the current os and architecture.
+
+    :param string supportdir: The path the `name` binaries are stored under.
+    :param string version: The version number of the binary to select.
+    :param string name: The name of the binary to fetch.
+    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
+      and name could be found for the current platform.
+    """
+    # TODO(John Sirois): finish doc of the path structure expected under base_path.
+    binary_path = self._select_binary_base_path(supportdir, version, name)
+    return self._fetch_binary(name=name, binary_path=binary_path)
+
+  def _select_script(self, supportdir, version, name):
+    """Selects a platform-independent script.
+
+    :param string supportdir: The path the `name` scripts are stored under.
+    :param string version: The version number of the script to select.
+    :param string name: The name of the script to fetch.
+    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no script of the given version
+      and name could be found.
+    """
+    binary_path = os.path.join(supportdir, version, name)
+    return self._fetch_binary(name=name, binary_path=binary_path)
+
   @contextmanager
   def _select_binary_stream(self, name, binary_path, fetcher=None):
     """Select a binary matching the current os and architecture.
@@ -173,31 +212,6 @@ class BinaryUtil(object):
                                   .format(url=url, error=e))
     if not downloaded_successfully:
       raise self.BinaryNotFound(binary_path, accumulated_errors)
-
-  def select_binary(self, supportdir, version, name):
-    """Selects a binary matching the current os and architecture.
-
-    :param string supportdir: The path the `name` binaries are stored under.
-    :param string version: The version number of the binary to select.
-    :param string name: The name of the binary to fetch.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
-      and name could be found for the current platform.
-    """
-    # TODO(John Sirois): finish doc of the path structure expected under base_path.
-    binary_path = self._select_binary_base_path(supportdir, version, name)
-    return self._fetch_binary(name=name, binary_path=binary_path)
-
-  def select_script(self, supportdir, version, name):
-    """Selects a platform-independent script.
-
-    :param string supportdir: The path the `name` scripts are stored under.
-    :param string version: The version number of the script to select.
-    :param string name: The name of the script to fetch.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no script of the given version
-      and name could be found.
-    """
-    binary_path = os.path.join(supportdir, version, name)
-    return self._fetch_binary(name=name, binary_path=binary_path)
 
   def _fetch_binary(self, name, binary_path):
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))

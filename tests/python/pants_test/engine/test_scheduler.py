@@ -269,8 +269,8 @@ class SchedulerTraceTest(unittest.TestCase):
                        Computing Task(<function nested_raise at 0xEEEEEEEEE>, <pants_test.engine.test_scheduler.B object at 0xEEEEEEEEE>, =A)
                          Throw(An exception for B)
                            Traceback (most recent call last):
-                             File LOCATION-INFO, in extern_invoke_runnable
-                               val = runnable(*args)
+                             File LOCATION-INFO, in call
+                               val = func(*args)
                              File LOCATION-INFO, in nested_raise
                                fn_raises(x)
                              File LOCATION-INFO, in fn_raises

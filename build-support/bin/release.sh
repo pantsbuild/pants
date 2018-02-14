@@ -16,7 +16,7 @@ function run_local_pants() {
 # NB: Pants core does not have the ability to change its own version, so we compute the
 # suffix here and mutate the VERSION_FILE to affect the current version.
 readonly HEAD_SHA=$(git rev-parse --verify HEAD)
-readonly PANTS_STABLE_VERSION="$(run_local_pants --version 2>/dev/null)"
+readonly PANTS_STABLE_VERSION="$(cat "${ROOT}/src/python/pants/VERSION")"
 readonly PANTS_UNSTABLE_VERSION="${PANTS_STABLE_VERSION}+${HEAD_SHA:0:8}"
 
 readonly DEPLOY_DIR="${ROOT}/dist/deploy"
@@ -682,7 +682,7 @@ function build_pex() {
 
   local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
 
-  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.2.13" || die "Failed to install pex."
+  activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.2.16" || die "Failed to install pex."
 
   local requirements_string=""
   for pkg_name in $PANTS_PEX_PACKAGES; do
@@ -764,7 +764,7 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloep" opt; do
+while getopts "hdntcloepw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -774,6 +774,7 @@ while getopts "hdntcloep" opt; do
     o) list_owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
     p) build_pex ; exit $? ;;
+    w) list_prebuilt_wheels ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
 done
