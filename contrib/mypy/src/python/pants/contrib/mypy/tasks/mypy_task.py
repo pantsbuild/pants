@@ -7,9 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
-from pex.interpreter import PythonInterpreter
-from pex.pex import PEX
-
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
@@ -27,6 +24,8 @@ from pants.python.python_repos import PythonRepos
 from pants.util.contextutil import temporary_file_path
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
+from pex.interpreter import PythonInterpreter
+from pex.pex import PEX
 from pex.pex_info import PexInfo
 
 

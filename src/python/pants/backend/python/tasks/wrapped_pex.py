@@ -61,4 +61,3 @@ class WrappedPEX(object):
       return ':'.join(self._extra_pex_paths)
     else:
       return None
-
