@@ -12,6 +12,7 @@ from pants.base.exceptions import TaskError
 from pants.binaries.binary_tool import NativeTool
 from pants.util.process_handler import subprocess
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -32,4 +33,3 @@ class BuildozerBinary(NativeTool):
         logger.warn('{} ... no changes were made'.format(buildozer_command))
       else:
         raise TaskError('{} ... exited non-zero ({}).'.format(buildozer_command, err.returncode))
-

@@ -9,9 +9,11 @@ import logging
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
+
+from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
+
 
 logger = logging.getLogger(__name__)
 
