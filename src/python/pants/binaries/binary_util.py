@@ -182,11 +182,11 @@ class BinaryUtil(object):
 
   def select_binary(self, supportdir, version, name):
     return self._select_file(
-      supportdir, version, name=name, filename=name, platform_dependent=True)
+      supportdir, version, name, platform_dependent=True)
 
   def select_script(self, supportdir, version, name):
     return self._select_file(
-      supportdir, version, name=name, filename=name, platform_dependent=False)
+      supportdir, version, name, platform_dependent=False)
 
   @contextmanager
   def _select_binary_stream(self, name, binary_path, fetcher=None):
