@@ -100,10 +100,6 @@ class PythonReplTest(PythonTaskTestBase):
     # Add a competing REPL impl.
     JvmRepl.prepare(self.options, round_manager=None)
 
-    # repltest_tgt = self.create_python_library(
-    #   'src/python/repltest', 'repltest', {'repltest.py': '\n'.join(code)},
-    #   dependencies=[t.address.spec for t in targets])
-
     # The easiest way to create products required by the PythonRepl task is to
     # execute the relevant tasks.
     si_task_type = self.synthesize_task_subtype(SelectInterpreter, 'si_scope')
