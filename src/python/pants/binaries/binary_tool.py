@@ -5,8 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import os
-
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
