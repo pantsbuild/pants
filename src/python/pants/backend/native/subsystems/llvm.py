@@ -10,6 +10,5 @@ from pants.binaries.binary_tool import NativeTool
 
 class LLVM(NativeTool):
   options_scope = 'llvm'
-  name = 'llvm'
   default_version = '5.0.1'
   archive_type = 'tgz'
