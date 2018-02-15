@@ -20,9 +20,6 @@ class BinaryToolBase(Subsystem):
 
   :API: public
   """
-  # all subsystems inheriting from BinaryToolBase will go under bin/
-  SUPPORTDIR_PARENT_DIRNAME = 'bin'
-
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
   support_dir = None
