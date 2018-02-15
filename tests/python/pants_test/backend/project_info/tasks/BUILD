@@ -52,6 +52,7 @@ python_tests(
     'src/python/pants/backend/jvm:plugin',
     'src/python/pants/backend/project_info/tasks:export',
     'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/java/distribution',

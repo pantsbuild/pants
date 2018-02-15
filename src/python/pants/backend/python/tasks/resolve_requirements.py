@@ -20,6 +20,5 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
   def execute(self):
     req_libs = self.context.targets(has_python_requirements)
     dist_tgts = self.context.targets(is_local_python_dist)
-    if req_libs or dist_tgts:
-      pex = self.resolve_requirements(req_libs, dist_tgts)
-      self.context.products.register_data(self.REQUIREMENTS_PEX, pex)
+    pex = self.resolve_requirements(req_libs, dist_tgts)
+    self.context.products.register_data(self.REQUIREMENTS_PEX, pex)
