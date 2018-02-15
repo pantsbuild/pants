@@ -21,7 +21,6 @@ class BinaryToolBase(Subsystem):
   """
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
-  support_dir = None
   platform_dependent = None
   archive_type = None
   default_version = None
