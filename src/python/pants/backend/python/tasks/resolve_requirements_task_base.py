@@ -14,7 +14,7 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_requirement_libs,
+from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_requirements,
                                                        inject_synthetic_dist_requirements)
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -74,7 +74,7 @@ class ResolveRequirementsTaskBase(Task):
 
   def resolve_requirement_strings(self, interpreter, requirement_strings):
     """Resolve a list of pip-style requirement strings."""
-    reqs = [PythonRequirement(req_str) for req_str in requirement_strings]
+    requirement_strings = sorted(requirement_strings)
     if len(requirement_strings) == 0:
       req_strings_id = 'no_requirements'
     elif len(requirement_strings) == 1:
@@ -84,6 +84,7 @@ class ResolveRequirementsTaskBase(Task):
 
     path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), req_strings_id))
     if not os.path.isdir(path):
+      reqs = [PythonRequirement(req_str) for req_str in requirement_strings]
       with safe_concurrent_creation(path) as safe_path:
         builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
         dump_requirements(builder, interpreter, reqs, self.context.log)
