@@ -2,20 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 java_library(
-    name = "X",
+    name = "Y",
 )
 
 java_library(
     name = "A",
-    dependencies = [":X"],
+    dependencies = [":Y"],
 )
 
 java_library(
     name = "B",
-    dependencies = [":X"],
+    dependencies = [":Y"],
 )
 
 java_library(
     name = "C",
-    dependencies = [":X"],
+    dependencies = [":Y"],
 )
