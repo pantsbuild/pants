@@ -9,9 +9,10 @@ import logging
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.binaries.binary_util import BinaryUtil
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
+
+from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 
 
 logger = logging.getLogger(__name__)
@@ -38,44 +39,36 @@ class Buildozer(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(Buildozer, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    return super(Buildozer, cls).subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
-    register('--version', default='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c', help='Version of buildozer.')
+    register('--version', type=str, advanced=True,
+             removal_version='1.7.0.dev0',
+             removal_hint='Use --version in scope buildozer-binary instead.',
+             help='Version of buildozer.')
     register('--add-dependencies', type=str, help='The dependency or dependencies to add')
     register('--remove-dependencies', type=str, help='The dependency or dependencies to remove')
     register('--command', type=str, help='A custom buildozer command to execute')
 
-  def __init__(self, *args, **kwargs):
-    super(Buildozer, self).__init__(*args, **kwargs)
-
-    self.options = self.get_options()
-    self._executable = BinaryUtil.Factory.create().select_binary('scripts/buildozer', self.options.version, 'buildozer')
-
   def execute(self):
-    if self.options.command:
-      if self.options.add_dependencies or self.options.remove_dependencies:
+    options = self.get_options()
+    if options.command:
+      if options.add_dependencies or options.remove_dependencies:
         raise TaskError('Buildozer custom command cannot be used together with ' +
                         '--add-dependencies or --remove-dependencies.')
-      self._execute_buildozer_script(self.options.command)
+      self._execute_buildozer_script(options.command)
 
-    if self.options.add_dependencies:
-      self._execute_buildozer_script('add dependencies {}'.format(self.options.add_dependencies))
+    if options.add_dependencies:
+      self._execute_buildozer_script('add dependencies {}'.format(options.add_dependencies))
 
-    if self.options.remove_dependencies:
-      self._execute_buildozer_script('remove dependencies {}'.format(self.options.remove_dependencies))
+    if options.remove_dependencies:
+      self._execute_buildozer_script('remove dependencies {}'.format(options.remove_dependencies))
 
   def _execute_buildozer_script(self, command):
+    binary = BuildozerBinary.scoped_instance(self)
     for root in self.context.target_roots:
-      address = root.address
-      Buildozer.execute_binary(command, address.spec, binary=self._executable)
-
-  @classmethod
-  def execute_binary(cls, command, spec, binary=None, version='0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c'):
-    binary = binary if binary else BinaryUtil.Factory.create().select_binary('scripts/buildozer', version, 'buildozer')
-
-    Buildozer._execute_buildozer_command([binary, command, spec])
+      binary.execute(command, root.address.spec, context=self.context)
 
   @classmethod
   def _execute_buildozer_command(cls, buildozer_command):

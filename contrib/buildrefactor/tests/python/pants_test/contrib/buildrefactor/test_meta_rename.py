@@ -8,10 +8,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.binaries.binary_util import BinaryUtil
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants_test.contrib.buildrefactor.buildozer_util import prepare_dependencies
-from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase
 
 from pants.contrib.buildrefactor.meta_rename import MetaRename
@@ -33,18 +31,16 @@ class MetaRenameTest(TaskTestBase):
 
     self.new_name = 'goo'
     self.spec_path = 'a'
-    self.set_options(**{ 'from': '{}:a'.format(self.spec_path), 'to': '{}:{}'.format(self.spec_path, self.new_name) })
-    self.meta_rename = self.create_task(self.context(target_roots=prepare_dependencies(self).values()))
+    self.set_options(**{ 'from': '{}:a'.format(self.spec_path),
+                         'to': '{}:{}'.format(self.spec_path, self.new_name) })
+    self.meta_rename = self.create_task(
+      self.context(target_roots=prepare_dependencies(self).values()))
 
   def test_update_original_build_name(self):
-    init_subsystem(BinaryUtil.Factory)
-
     self.meta_rename.execute()
     self.assertInFile(self.new_name, os.path.join(self.build_root, self.spec_path, 'BUILD'))
 
   def test_update_dependee_references(self):
-    init_subsystem(BinaryUtil.Factory)
-
     self.meta_rename.execute()
 
     for target in ['a', 'b', 'c']:
