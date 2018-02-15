@@ -10,7 +10,7 @@ from pants.binaries.binary_tool import NativeTool
 
 class Protoc(NativeTool):
   options_scope = 'protoc'
-  support_subdir = 'protobuf'
+  name = 'protobuf'
   default_version = '2.4.1'
 
   replaces_scope = 'gen.protoc'
