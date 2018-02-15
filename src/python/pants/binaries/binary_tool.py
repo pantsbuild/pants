@@ -20,9 +20,14 @@ class BinaryToolBase(Subsystem):
 
   :API: public
   """
+  # All subsystems inheriting from BinaryToolBase will go under
+  # bin/`support_subdir` unless they specify an explicit `support_dir`.
+  SUPPORTDIR_PARENT_DIRNAME = 'bin'
+
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
   support_dir = None
+  support_subdir = None
   platform_dependent = None
   archive_type = None
   default_version = None
@@ -85,10 +90,14 @@ class BinaryToolBase(Subsystem):
   def _binary_util(self):
     return BinaryUtil.Factory.create()
 
+  @classmethod
+  def _resolve_binaryutil_supportdir(cls):
+    return cls.support_dir or '{}/{}'.format(self.SUPPORTDIR_PARENT_DIRNAME, cls._get_name())
+
   @memoized_method
   def _select_for_version(self, version):
     return self._binary_util.select(
-      support_dir=self.support_dir,
+      support_dir=self._resolve_binaryutil_supportdir(),
       version=version,
       name=self._get_name(),
       platform_dependent=self.platform_dependent,
