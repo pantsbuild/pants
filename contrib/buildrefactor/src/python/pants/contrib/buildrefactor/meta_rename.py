@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
-
 from collections import defaultdict
 
 from pants.base.specs import DescendantAddresses
@@ -14,7 +13,7 @@ from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.task.task import Task
 
-from pants.contrib.buildrefactor.buildozer import Buildozer
+from pants.contrib.buildrefactor.buildozer_binary import BuildozerBinary
 
 
 logger = logging.getLogger(__name__)
@@ -26,6 +25,10 @@ class MetaRename(Task):
   Provides a mechanism for renaming the target's name within its local BUILD file.
   Also renames the target wherever it's specified as a dependency.
   """
+
+  @classmethod
+  def subsystem_dependencies(cls):
+    return super(MetaRename, cls).subsystem_dependencies() + (BuildozerBinary.scoped(cls),)
 
   @classmethod
   def register_options(cls, register):
@@ -46,25 +49,33 @@ class MetaRename(Task):
 
   def update_dependee_references(self):
     dependee_targets = self.dependency_graph()[
+      # TODO: Target() expects build_graph to be an instance of BuildGraph, not a list.
+      # TODO: The **{} seems unnecessary.
       Target(name=self._from_address.target_name, address=self._from_address, build_graph=[], **{})
     ]
 
     logging.disable(logging.WARNING)
 
+    buildozer_binary = BuildozerBinary.scoped_instance(self)
     for concrete_target in dependee_targets:
       for formats in [
         { 'from': self._from_address.spec, 'to': self._to_address.spec },
-        { 'from': ':{}'.format(self._from_address.target_name), 'to': ':{}'.format(self._to_address.target_name) }
+        { 'from': ':{}'.format(self._from_address.target_name), 'to': ':{}'.format(
+          self._to_address.target_name) }
       ]:
-        Buildozer.execute_binary(
+        buildozer_binary.execute(
           'replace dependencies {} {}'.format(formats['from'], formats['to']),
-          spec=concrete_target.address.spec
+          spec=concrete_target.address.spec,
+          context=self.context
         )
 
     logging.disable(logging.NOTSET)
 
   def update_original_build_name(self):
-    Buildozer.execute_binary('set name {}'.format(self._to_address.target_name), spec=self._from_address.spec)
+    BuildozerBinary.scoped_instance(self).execute(
+      'set name {}'.format(self._to_address.target_name),
+      spec=self._from_address.spec,
+      context=self.context)
 
   def dependency_graph(self, scope=''):
     dependency_graph = defaultdict(set)
