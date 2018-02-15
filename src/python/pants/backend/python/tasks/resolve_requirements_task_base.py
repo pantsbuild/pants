@@ -14,7 +14,7 @@ from pex.pex_builder import PEXBuilder
 from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.tasks.build_local_python_distributions import \
   BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (dump_requirements,
+from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_requirement_libs,
                                                        inject_synthetic_dist_requirements)
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
@@ -68,7 +68,7 @@ class ResolveRequirementsTaskBase(Task):
               self.context.build_graph, built_dists, ':'.join(2 * [target_set_id])
             ) + req_libs
           builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
-          dump_requirements(builder, interpreter, req_libs, self.context.log)
+          dump_requirement_libs(builder, interpreter, req_libs, self.context.log)
           builder.freeze()
     return PEX(path, interpreter=interpreter)
 
