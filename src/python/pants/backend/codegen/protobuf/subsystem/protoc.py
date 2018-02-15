@@ -10,8 +10,12 @@ from pants.binaries.binary_tool import NativeTool
 
 class Protoc(NativeTool):
   options_scope = 'protoc'
-  name = 'protobuf'
   default_version = '2.4.1'
 
   replaces_scope = 'gen.protoc'
   replaces_name = 'version'
+
+  # 'protoc' is also the binary's filename.
+  @classmethod
+  def get_support_dir(cls):
+    return 'bin/protobuf'
