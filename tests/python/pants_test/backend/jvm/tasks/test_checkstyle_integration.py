@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-import shutil
-from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
