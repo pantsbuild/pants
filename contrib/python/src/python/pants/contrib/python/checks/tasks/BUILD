@@ -4,11 +4,14 @@
 python_library(
   dependencies=[
     ':resources',
+    'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/targets:python',
+    'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
+    'src/python/pants/python',
   ]
 )
 
