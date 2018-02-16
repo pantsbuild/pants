@@ -12,10 +12,8 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.python_requirement import PythonRequirement
-from pants.backend.python.tasks.build_local_python_distributions import \
-  BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_requirements,
-                                                       inject_synthetic_dist_requirements)
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_requirements)
 from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
@@ -33,7 +31,7 @@ class ResolveRequirementsTaskBase(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
+    round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
 
   def resolve_requirements(self, req_libs, local_dist_targets=None):
     """Requirements resolution for PEX files.
@@ -61,12 +59,6 @@ class ResolveRequirementsTaskBase(Task):
       # to cover the empty case.
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
-          # Handle locally-built python distribution dependencies.
-          built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-          if built_dists:
-            req_libs = inject_synthetic_dist_requirements(
-              self.context.build_graph, built_dists, ':'.join(2 * [target_set_id])
-            ) + req_libs
           builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
           dump_requirement_libs(builder, interpreter, req_libs, self.context.log)
           builder.freeze()
