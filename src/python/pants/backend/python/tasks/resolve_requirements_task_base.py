@@ -65,10 +65,15 @@ class ResolveRequirementsTaskBase(Task):
             req_libs = inject_synthetic_dist_requirements(self.context.build_graph,
                                                           built_dists,
                                                           ':'.join(2 * [target_set_id])) + req_libs
-          self._build_requirements_pex(interpreter, safe_path, req_libs)
+          self._build_requirements_pex(interpreter, safe_path, req_libs, built_dists)
     return PEX(path, interpreter=interpreter)
 
-  def _build_requirements_pex(self, interpreter, path, req_libs):
+  def _build_requirements_pex(self, interpreter, path, req_libs, built_dists):
     builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
     dump_requirements(builder, interpreter, req_libs, self.context.log)
+
+    if built_dists:
+      for dist in built_dists:
+        builder.add_dist_location(dist)
+
     builder.freeze()
