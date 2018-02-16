@@ -4,24 +4,17 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    ':buildozer'
+    ':buildrefactor'
   ],
   distribution_name='pantsbuild.pants.contrib.buildrefactor',
   description='Plugin to manipulate and refactor BUILD files and targets',
   register_goals=True,
 )
 
-
 python_library(
-  name='buildozer',
-  sources=['buildozer.py'],
   dependencies = [
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
     'src/python/pants/binaries:binary_util'
   ]
-)
-
-
-python_library(
-  name='meta_rename',
-  sources=['meta_rename.py']
 )
