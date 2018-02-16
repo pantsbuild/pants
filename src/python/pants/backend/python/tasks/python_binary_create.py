@@ -134,10 +134,10 @@ class PythonBinaryCreate(Task):
       # Handle locally-built python distribution dependencies.
       built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
       if built_dists:
-        req_tgts = inject_synthetic_dist_requirements(self.context.build_graph,
-                                                      built_dists,
-                                                      ':'.join(2 * [binary_tgt.invalidation_hash()]),
-                                                      binary_tgt) + req_tgts
+        synthetic_address = ':'.join(2 * [binary_tgt.invalidation_hash()])
+        locally_built_dist_libs = inject_synthetic_dist_requirements(
+          self.context.build_graph, built_dists, synthetic_address, binary_tgt.closure())
+        req_tgts = locally_built_dist_libs + req_tgts
 
       dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 

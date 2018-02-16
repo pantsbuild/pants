@@ -62,10 +62,13 @@ class ResolveRequirementsTaskBase(Task):
           # Handle locally-built python distribution dependencies.
           built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
           if built_dists:
-            req_libs = inject_synthetic_dist_requirements(self.context.build_graph,
-                                                          built_dists,
-                                                          ':'.join(2 * [target_set_id])) + req_libs
+            synthetic_address = ':'.join(2 * [target_set_id])
+            locally_built_dist_libs = inject_synthetic_dist_requirements(
+              self.context.build_graph, built_dists, synthetic_address)
+            req_libs = locally_built_dist_libs + req_libs
+
           self._build_requirements_pex(interpreter, safe_path, req_libs, built_dists)
+
     return PEX(path, interpreter=interpreter)
 
   def _build_requirements_pex(self, interpreter, path, req_libs, built_dists):
