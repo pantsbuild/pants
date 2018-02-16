@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import re
 
 from pants.base.build_environment import get_buildroot
 from pants.util.process_handler import subprocess
@@ -56,6 +57,22 @@ class PythonDistributionIntegrationTest(PantsRunIntegrationTest):
     output = subprocess.check_output(pex)
     self.assertIn('United States', output)
     os.remove(pex)
+
+  @staticmethod
+  def rewrite_hello_c_source(orig_content):
+    return re.sub('"Super hello"', '"Super hello!"', orig_content)
+
+  def test_invalidation(self):
+    run_command=['run', '{}:main_with_no_conflict'.format(self.fasthello_install_requires)]
+    unmodified_pants_run = self.run_pants(command=run_command)
+    self.assert_success(unmodified_pants_run)
+    self.assertIn('Super hello\n', unmodified_pants_run.stdout_data)
+
+    c_source_file = '{}/super_greet.c'.format(self.fasthello_install_requires)
+    with self.rewrite_file_content(c_source_file, self.rewrite_hello_c_source):
+      modified_pants_run = self.run_pants(command=run_command)
+      self.assert_success(modified_pants_run)
+      self.assertIn('Super hello!\n', modified_pants_run.stdout_data)
 
   def test_with_conflicting_transitive_deps(self):
     command=['run', '{}:main_with_conflicting_dep'.format(self.fasthello_install_requires)]
