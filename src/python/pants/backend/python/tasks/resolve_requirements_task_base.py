@@ -96,6 +96,7 @@ class ResolveRequirementsTaskBase(Task):
     """Generates a merged pex at path."""
     pex_paths = [pex.path() for pex in pexes if pex]
     if pex_paths:
+      pex_info = pex_info.copy()
       pex_info.merge_pex_path(':'.join(pex_paths))
 
     with safe_concurrent_creation(path) as safe_path:

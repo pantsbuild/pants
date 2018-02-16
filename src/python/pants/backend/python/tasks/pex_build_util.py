@@ -107,12 +107,7 @@ def dump_requirements(builder, interpreter, reqs, log, platforms=None):
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
   """
-
-  # Gather and de-dup all requirements.
-  deduped_reqs = OrderedSet()
-  for req in reqs:
-    deduped_reqs.add(req)
-
+  deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
   for req in deduped_reqs:
     log.debug('  Dumping requirement: {}'.format(req))
