@@ -45,6 +45,8 @@ esac
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
 
+readonly rust_toolchain="1.24.0"
+
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
   # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
@@ -52,6 +54,7 @@ function calculate_current_hash() {
   (
    cd ${REPO_ROOT}
    (echo "${MODE_FLAG}"
+    echo "${rust_toolchain}"
     git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
@@ -73,8 +76,6 @@ function ensure_native_build_prerequisites() {
   local rust_toolchain_root="${CACHE_ROOT}/rust"
   export CARGO_HOME="${rust_toolchain_root}/cargo"
   export RUSTUP_HOME="${rust_toolchain_root}/rustup"
-
-  local rust_toolchain="1.23.0"
 
   # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
   if [[ ! -x "${CARGO_HOME}/bin/rustup" ]]
