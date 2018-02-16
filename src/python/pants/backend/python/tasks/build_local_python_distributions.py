@@ -87,7 +87,6 @@ class BuildLocalPythonDistributions(Task):
     setup_runner = SetupPyRunner(dist_target_dir, 'bdist_wheel', interpreter=interpreter)
     setup_runner.run()
 
-
   def _inject_synthetic_dist_requirements(self, dist, req_lib_addr):
     """Inject a synthetic requirements library that references a local wheel.
 
