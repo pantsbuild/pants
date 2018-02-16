@@ -166,24 +166,29 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
   return distributions
 
 
-def inject_synthetic_dist_requirements(build_graph, local_built_dists, synthetic_address, binary_tgt=None):
-  """Inject a synthetic requirements library from a local wheel.
+def inject_synthetic_dist_requirements(build_graph, local_built_dists, synthetic_address, in_tgts=None):
+  """Inject a synthetic requirements library from a locally-built wheel.
 
   :param build_graph: The build graph needed for injecting synthetic targets.
   :param local_built_dists: A list of paths to locally built wheels to package into
   requirements libraries.
   :param synthetic_address: A generative address for addressing synthetic targets.
-  :param binary_tgt: An optional parameter to be passed only when called by the `python_binary_create`
-  task. This is needed to ensure that only python_dist targets in a binary target's closure are included
-  in the binary for the case where a user specifies mulitple binary targets in a single invocation of
-  `./pants binary`.
-  :return: a :class: `PythonRequirementLibrary` containing a requirements that maps to a locally-built wheels.
+  :param in_tgts: If not None, an iterable of :class:`PythonDistribution`
+  targets. This is needed by the :class:`PythonBinaryCreate` task to ensure that
+  only :class:`PythonDistribution` targets in a binary target's closure are
+  included in the binary for the case where a user specifies multiple binary
+  targets in a single invocation of `./pants binary`.
+  :return: a :class:`PythonRequirementLibrary` containing a requirements that maps to locally-built wheels.
   """
-  def should_create_req(bin_tgt, loc):
-    if not bin_tgt:
+  tgt_ids = None
+  if in_tgts is not None:
+    tgt_ids = [tgt.id for tgt in in_tgts]
+
+  def within_allowed_targets(whl_loc):
+    if not tgt_ids:
       return True
-    # Ensure that a target is in a binary target's closure. See docstring for more detail.
-    return any([tgt.id in loc for tgt in bin_tgt.closure()])
+    # Ensure that a target is in a specified set. See docstring for more detail.
+    return any([tid in whl_loc for tid in tgt_ids])
 
   def python_requirement_from_wheel(path):
     base = os.path.basename(path)
@@ -195,7 +200,7 @@ def inject_synthetic_dist_requirements(build_graph, local_built_dists, synthetic
   local_whl_reqs = [
     python_requirement_from_wheel(whl_location)
     for whl_location in local_built_dists
-    if should_create_req(binary_tgt, whl_location)
+    if within_allowed_targets(whl_location)
   ]
 
   if not local_whl_reqs:
