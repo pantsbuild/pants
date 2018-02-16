@@ -412,8 +412,8 @@ class CoursierMixin(NailgunTask):
     # Construct a map from org:name to reconciled org:name:version
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
-      (org, name, _) = coord.split(':')
-      org_name_to_org_name_rev['{}:{}'.format(org, name)] = coord
+      m2coord = M2Coordinate.from_string(coord)
+      org_name_to_org_name_rev['{}:{}'.format(m2coord.org, m2coord.name)] = coord
 
     for vt in invalidation_check.all_vts:
       t = vt.target
@@ -535,62 +535,69 @@ class CoursierMixin(NailgunTask):
         {
           "coord": "a",
           "dependencies": ["b", "c"],
-          "files": [ ["", "a.jar"], ["sources", "a-sources.jar"] ]
+          "file": "a.jar"
         },
         {
           "coord": "b",
           "dependencies": [],
-          "files": [ ["", "b.jar"] ]
+          "file": "b.jar"
         },
         {
           "coord": "c",
           "dependencies": [],
-          "files": [ ["", "c.jar"] ]
-        }
+          "file": "c.jar"
+        },
+        {
+          "coord": "a:sources",
+          "dependencies": ["b", "c"],
+          "file": "a-sources.jar"
+        },
       ]
     }
 
     Should return:
     {
-      "a": { ResolvedJar(classifier='', path/cache_path="a.jar"),
-             ResolvedJar(classifier='sources', path/cache_path="a-sources.jar") },
-      "b": { ResolvedJar(classifier='', path/cache_path="b.jar") },
-      "c": { ResolvedJar(classifier='', path/cache_path="c.jar") },
+      "a":               ResolvedJar(classifier='', path/cache_path="a.jar"),
+      "a:sources":       ResolvedJar(classifier='sources', path/cache_path="a-sources.jar"),
+      "b": ResolvedJar(classifier='', path/cache_path="b.jar"),
+      "c": ResolvedJar(classifier='', path/cache_path="c.jar"),
     }
 
     :param result: coursier json output
     :param coursier_cache_path: coursier cache location
     :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
-    :return: a map from org:name:version to a set of resolved jars.
+    :return: a map from maven coordinate to a resolved jar.
     """
 
-    coord_to_resolved_jars = defaultdict(set)
+    coord_to_resolved_jars = dict()
 
     for dep in result['dependencies']:
+      simple_coord = dep['coord']
+      jar_path = dep.get('file', None)
+      if not jar_path:
+        # NB: Not all coordinates will have associated files.
+        #     This is fine. Some coordinates will just have dependencies.
+        continue
+      pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
-      for classifier, jar_path in dep['files']:
-        simple_coord = dep['coord']
-        coord = cls.to_m2_coord(simple_coord, classifier)
-        pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
-        if not os.path.exists(jar_path):
-          raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
+      if not os.path.exists(jar_path):
+        raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
 
-        if not os.path.exists(pants_path):
-          safe_mkdir(os.path.dirname(pants_path))
-          os.symlink(jar_path, pants_path)
-
-        resolved_jar = ResolvedJar(coord,
-                                   cache_path=jar_path,
-                                   pants_path=pants_path)
-        coord_to_resolved_jars[simple_coord].add(resolved_jar)
+      if not os.path.exists(pants_path):
+        safe_mkdir(os.path.dirname(pants_path))
+        os.symlink(jar_path, pants_path)
+      coord = M2Coordinate.from_string(simple_coord)
+      resolved_jar = ResolvedJar(coord,
+                                 cache_path=jar_path,
+                                 pants_path=pants_path)
+      coord_to_resolved_jars[simple_coord] = resolved_jar
 
     return coord_to_resolved_jars
 
   @classmethod
-  def to_m2_coord(cls, coord_str, classifier):
-    # TODO: currently assuming all packaging is a jar
-    return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
+  def to_m2_coord(cls, coord_str):
+    return M2Coordinate.from_string(coord_str)
 
 
 class CoursierResolve(CoursierMixin):

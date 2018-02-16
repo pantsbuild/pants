@@ -109,8 +109,17 @@ class M2Coordinate(object):
 
   @classmethod
   def from_string(cls, string_coord):
-    org, name, rev, classifier, ext = string_coord.split(':')
-    return M2Coordinate(org, name, rev or None, classifier or None, ext or None)
+    packaging = None
+    classifier = None
+    ct = string_coord.count(':')
+    if ct == 2:
+      org, name, rev = string_coord.split(':')
+    elif ct == 3:
+      org, name, packaging, rev = string_coord.split(':')
+    elif ct == 4:
+      org, name, packaging, classifier, rev = string_coord.split(':')
+    rev = rev or None
+    return M2Coordinate(org=org, name=name, rev=rev, ext=packaging, classifier=classifier)
 
   @property
   def simple_coord(self):
@@ -131,12 +140,18 @@ class M2Coordinate(object):
     return hash(self._id)
 
   def __str__(self):
-    # Doesn't follow https://maven.apache.org/pom.html#Maven_Coordinates
-    # Instead produces an unambiguous string representation of the coordinate
-    # org:name:rev:classifier:type_
-    # if any of the fields are None, it uses ''
-    # for example org=a, name=b, type_=jar -> a:b:::jar
-    return ':'.join((x or '') for x in self._id)
+    # Follows https://maven.apache.org/pom.html#Maven_Coordinates,
+    # with the exception that if rev is missing, it adds an extra ':' at the end.
+    # for example org=a, name=b, type_=jar -> a:b:jar:
+    if self.classifier:
+      components = (self.org, self.name, self.ext or 'jar', self.classifier, self.rev or '')
+    elif self.ext:
+      components = (self.org, self.name, self.ext or 'jar', self.rev or '')
+    else:
+      components = (self.org, self.name, self.rev or '')
+
+
+    return ':'.join((x or '') for x in components)
 
   def __repr__(self):
     return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
