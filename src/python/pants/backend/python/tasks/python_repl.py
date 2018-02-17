@@ -38,7 +38,7 @@ class PythonRepl(ReplTaskMixin, PythonExecutionTaskBase):
 
   def extra_requirements(self):
     if self.get_options().ipython:
-      return [self.get_options().ipython_requirements]
+      return self.get_options().ipython_requirements
     else:
       return []
 

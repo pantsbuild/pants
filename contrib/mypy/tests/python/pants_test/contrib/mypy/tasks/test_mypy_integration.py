@@ -24,4 +24,5 @@ class MypyIntegrationTest(PantsRunIntegrationTest):
       # Python 3.x was not found. Test whether mypy task fails for that reason.
       with self.pants_results(cmd) as pants_run:
         self.assert_failure(pants_run)
-        self.assertTrue('Unable to find a Python 3.x interpreter (required for mypy)' in pants_run.stdout_data)
+        self.assertIn('Unable to find a Python 3.x interpreter (required for mypy)',
+                      pants_run.stdout_data)
