@@ -55,6 +55,9 @@ class Archiver(AbstractClass):
     If prefix is specified, it should be prepended to all archive paths.
     """
 
+  def __init__(self, extension):
+    self.extension = extension
+
 
 class TarArchiver(Archiver):
   """An archiver that stores files in a tar file with optional compression.
@@ -71,7 +74,7 @@ class TarArchiver(Archiver):
     """
     :API: public
     """
-    super(TarArchiver, self).__init__()
+    super(TarArchiver, self).__init__(extension)
     self.mode = mode
     self.extension = extension
 
@@ -108,7 +111,7 @@ class ZipArchiver(Archiver):
     """
     :API: public
     """
-    super(ZipArchiver, self).__init__()
+    super(ZipArchiver, self).__init__(extension)
     self.compression = compression
     self.extension = extension
 
