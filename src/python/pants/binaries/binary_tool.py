@@ -51,7 +51,7 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs.update(cls.extra_version_option_kwargs)
     version_registration_kwargs['help'] = (
       version_registration_kwargs.get('help') or
-      'Version of the {} {} to use'.format(cls.get_name(),
+      'Version of the {} {} to use'.format(cls._get_name(),
                                            'binary' if cls.platform_dependent else 'script')
     )
     # The default for fingerprint in register() is False, but we want to default to True.
@@ -83,19 +83,19 @@ class BinaryToolBase(Subsystem):
 
   @classmethod
   def get_support_dir(cls):
-    return 'bin/{}'.format(cls.get_name())
+    return 'bin/{}'.format(cls._get_name())
 
   @memoized_method
   def _select_for_version(self, version):
     return self._binary_util.select(
       supportdir=self.get_support_dir(),
       version=version,
-      name=self.get_name(),
+      name=self._get_name(),
       platform_dependent=self.platform_dependent,
       archive_type=self.archive_type)
 
   @classmethod
-  def get_name(cls):
+  def _get_name(cls):
     return cls.name or cls.options_scope
 
 
