@@ -243,11 +243,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ini.write(fp)
       args.append('--pants-config-files=' + ini_file_name)
 
-    # NB: This is an absolute path, and allows integration tests to escape the chroot, and make use
-    # of files they don't explicitly declare in their dependencies. There is a dependency on
-    # 'src/python/pants/bin:pants_local_binary' added to the target owning this file so that all
-    # tests subclassing this class are invalidated upon changes to the pants source.
-    # There may be a better way to do this.
     pants_script = os.path.join(build_root or get_buildroot(), self.PANTS_SCRIPT_NAME)
 
     # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.

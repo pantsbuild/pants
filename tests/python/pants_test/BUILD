@@ -58,13 +58,11 @@ python_library(
     'src/python/pants/util:process_handler',
     'tests/python/pants_test/testutils:file_test_util',
     'tests/python/pants_test/testutils:pexrc_util',
-    # NB: Integration tests in the pants codebase find the pants script by absolute path, which
-    # escapes the chroot which tests are executed in, allowing them to use files they don't
-    # explicitly depend on. This dependency forces every test depending on this target to depend on
-    # ~all the pants source, so the result is invalidated when changing any relevant source files. If
-    # this is removed, the result of integration tests will be cached regardless of changes to
-    # source files that affect their behavior. This does not occur in CI due to the use of
-    # clean-all.
+    # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess, so test results will depend
+    # on the pants binary and all of its transitive dependencies. Adding this dependency is our best
+    # proxy for ensuring that any test target depending on this target will be invalidated on
+    # changes to those undeclared dependencies. Note that this concern is not applicable in CI due
+    # to the use of clean-all.
     # There may be a better way to do this.
     'src/python/pants/bin:pants_local_binary',
   ]
