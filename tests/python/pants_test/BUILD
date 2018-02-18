@@ -5,7 +5,7 @@ python_library(
   name='test_infra',
   dependencies=[
     'tests/python/pants_test:base_test',
-    'tests/python/pants_test:int-test',
+    'tests/python/pants_test:int-test-for-export',
     'tests/python/pants_test/jvm:jar_task_test_base',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
@@ -43,7 +43,7 @@ python_library(
 )
 
 python_library(
-  name = 'int-test',
+  name = 'int-test-for-export',
   sources = [
     'pants_run_integration_test.py'
   ],
@@ -59,6 +59,20 @@ python_library(
     'tests/python/pants_test/testutils:file_test_util',
     'tests/python/pants_test/testutils:pexrc_util',
   ]
+)
+
+target(
+  name = 'int-test',
+  dependencies=[
+    ':int-test-for-export',
+    # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess, so test results will depend
+    # on the pants binary and all of its transitive dependencies. Adding this dependency is our best
+    # proxy for ensuring that any test target depending on this target will be invalidated on
+    # changes to those undeclared dependencies. Note that this concern is not applicable in CI due
+    # to the use of clean-all.
+    # There may be a better way to do this.
+    'src/python/pants/bin:pants_local_binary',
+  ],
 )
 
 python_tests(
