@@ -7,6 +7,30 @@ use std::hash;
 use core::{FNV, Id, Key, Value};
 use externs;
 
+///
+/// A struct that encapsulates interning of python `Value`s as comparable `Key`s.
+///
+/// To minimize the total amount of time spent in python code comparing objects (represented on
+/// the rust side of the FFI boundary as `Value` instances) to one another, this API supports
+/// memoizing `Value`s as `Key`s.
+///
+/// Creating a `Key` involves interning a `Value` under a (private) `InternKey` struct which
+/// implements `Hash` and `Eq` using the precomputed python `__hash__` for the `Value` and
+/// delegating to python's `__eq__`, respectively
+///
+/// Currently `Value`s are interned indefinitely as `Key`s, meaning that they can never
+/// be collected: it's possible that this can eventually be improved by either:
+///
+///   1) switching to directly linking-against or embedding python, such that the `Value`
+///      type goes away in favor of direct usage of a python object wrapper struct.
+///   2) This structure might begin storing weak-references to `Key`s and/or `Value`s, which
+///      would allow the associated `Value` handles to be dropped when they were no longer used.
+///      The challenge to this approach is that it would make it more difficult to pass
+///      `Key`/`Value` instances across the FFI boundary.
+///   3) `Value` could implement `Eq`/`Hash` directly via extern calls to python (although we've
+///      avoided doing this so far because it would hide a relatively expensive operation behind
+///      those usually-inexpensive traits).
+///
 #[derive(Default)]
 pub struct Interns {
   forward: HashMap<InternKey, Key, FNV>,

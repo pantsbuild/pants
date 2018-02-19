@@ -479,7 +479,11 @@ class PyResult(datatype('PyResult', ['is_throw', 'value'])):
 
 
 class ExternContext(object):
-  """A wrapper around python objects used in static extern functions in this module."""
+  """A wrapper around python objects used in static extern functions in this module.
+
+  See comments in `src/rust/engine/src/interning.rs` for more information on the relationship
+  between `Key`s and `Value`s.
+  """
 
   def __init__(self, ffi, lib):
     """
