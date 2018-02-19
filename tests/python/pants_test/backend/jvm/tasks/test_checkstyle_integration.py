@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import json
 import os
-import shutil
-from contextlib import contextmanager
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
@@ -63,92 +61,52 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
 
   @ensure_cached(expected_num_artifacts=2)
   def test_config_name_invalidates_targets(self, cache_args):
-    with self.temporary_workdir() as workdir:
-      with temporary_dir(root_dir=get_buildroot()) as tmp:
-        config_names = ['one.xml', 'two.xml']
-        config = dedent("""
-          <module name="TreeWalker">
-            <property name="tabWidth" value="2"/>
-          </module>""")
+    with temporary_dir(root_dir=get_buildroot()) as tmp:
+      config_names = ['one.xml', 'two.xml']
+      config = dedent("""
+        <module name="TreeWalker">
+          <property name="tabWidth" value="2"/>
+        </module>""")
 
-        for config_name in config_names:
-          # Ensure that even though the config files have the same name, their contents will
-          # invalidate the targets.
-          config_file = os.path.join(tmp, config_name)
-          self._create_config_file(config_file, config)
-          args = [
-            'lint.checkstyle',
-            cache_args,
-            'examples/src/java/org/pantsbuild/example/hello/simple',
-            '--lint-checkstyle-configuration={}'.format(config_file)
-          ]
-          pants_run = self.run_pants_with_workdir(args, workdir)
-          self.assert_success(pants_run)
-
-  @contextmanager
-  def _temporary_buildroot(self, files_to_copy, current_root=None):
-    if current_root is None:
-      current_root = get_buildroot()
-    files_to_copy = set(files_to_copy)
-    files_to_copy.update(f for f in os.listdir(current_root)
-                         if f.endswith('.ini') or f.startswith('BUILD'))
-    files_to_copy.update((
-      'pants',
-      '3rdparty',
-      'build-support',
-      'contrib',
-      'pants-plugins',
-      'src',
-    ))
-    with temporary_dir() as temp_root:
-      temp_root = os.path.normpath(temp_root)
-      for path in files_to_copy:
-        src = os.path.join(current_root, path)
-        dst = os.path.join(temp_root, path)
-        if os.path.isdir(path):
-          shutil.copytree(src, dst)
-        else:
-          shutil.copyfile(src, dst)
-      current = os.getcwd()
-      try:
-        os.chdir(temp_root)
-        temp_root = os.getcwd()
-        yield temp_root
-      finally:
-        os.chdir(current)
-
-  def _temporary_buildroots(self, files_to_copy=None, current_root=None, iterations=2):
-    while iterations:
-      with self._temporary_buildroot(files_to_copy, current_root) as root:
-        yield root
-      iterations -= 1
-
-  @ensure_cached(expected_num_artifacts=1)
-  def test_config_buildroot_does_not_invalidate_targets(self, cache_args):
-    previous_names = set()
-    for buildroot in self._temporary_buildroots(['examples']):
-      with self.temporary_workdir() as workdir:
-        tmp = os.path.join(buildroot, 'tmp')
-        os.mkdir(tmp)
-        config = dedent("""
-          <module name="TreeWalker">
-            <property name="tabWidth" value="2"/>
-          </module>""")
-
-        # Ensure that even though the config files have the same name, their
-        # contents will invalidate the targets.
-        config_file = os.path.join(tmp, 'one.xml')
-        self.assertNotIn(config_file, previous_names)
-        previous_names.add(config_file)
+      for config_name in config_names:
+        # Ensure that even though the config files have the same name, their contents will
+        # invalidate the targets.
+        config_file = os.path.join(tmp, config_name)
         self._create_config_file(config_file, config)
         args = [
           'lint.checkstyle',
           cache_args,
           'examples/src/java/org/pantsbuild/example/hello/simple',
-          '--lint-checkstyle-configuration={}'.format(config_file),
+          '--lint-checkstyle-configuration={}'.format(config_file)
         ]
-        pants_run = self.run_pants_with_workdir(args, workdir)
+        pants_run = self.run_pants(args)
         self.assert_success(pants_run)
+
+  @ensure_cached(expected_num_artifacts=1)
+  def test_config_buildroot_does_not_invalidate_targets(self, cache_args):
+    previous_names = set()
+    with self.mock_buildroot(dirs_to_copy=['examples']) as buildroot:
+      tmp = os.path.join(buildroot.dir, 'tmp')
+      os.mkdir(tmp)
+      config = dedent("""
+        <module name="TreeWalker">
+          <property name="tabWidth" value="2"/>
+        </module>""")
+
+      # Ensure that even though the config files have the same name, their
+      # contents will invalidate the targets.
+      config_file = os.path.join(tmp, 'one.xml')
+      self.assertNotIn(config_file, previous_names)
+      previous_names.add(config_file)
+      self._create_config_file(config_file, config)
+      args = [
+        'lint.checkstyle',
+        cache_args,
+        'examples/src/java/org/pantsbuild/example/hello/simple',
+        '--lint-checkstyle-configuration={}'.format(config_file),
+      ]
+      pants_run = self.run_pants(args)
+      self.assert_success(pants_run)
 
   @ensure_cached(expected_num_artifacts=1)
   def test_properties_file_names_does_not_invalidates_targets(self, cache_args):
