@@ -1,17 +1,16 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
 use std::ffi::OsString;
-use std::hash;
 use std::mem;
 use std::os::raw;
 use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Failure, FNV, Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Function, Id, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
+use interning::Interns;
 
 
 pub fn log(level: LogLevel, msg: &str) {
@@ -26,7 +25,7 @@ pub fn eval(python: &str) -> Result<Value, Failure> {
   }).into()
 }
 
-fn identify(val: &Value) -> Ident {
+pub fn identify(val: &Value) -> Ident {
   with_externs(|e| (e.identify)(e.context, val))
 }
 
@@ -192,7 +191,7 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 
 lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
-  static ref INTERNS: RwLock<Interns> = RwLock::new(Default::default());
+  static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
 
 ///
@@ -294,56 +293,6 @@ impl Externs {
   }
 }
 
-struct InternKey(i64, Value);
-
-impl Eq for InternKey {}
-
-impl PartialEq for InternKey {
-  fn eq(&self, other: &InternKey) -> bool {
-    equals(&self.1, &other.1)
-  }
-}
-
-impl hash::Hash for InternKey {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-    self.0.hash(state);
-  }
-}
-
-#[derive(Default)]
-struct Interns {
-  forward: HashMap<InternKey, Key, FNV>,
-  reverse: HashMap<Id, Value, FNV>,
-  id_generator: u64,
-}
-
-impl Interns {
-  fn insert(&mut self, v: Value) -> Key {
-    let ident = identify(&v);
-    let type_id = ident.type_id;
-    let mut maybe_id = self.id_generator;
-    let key = self
-      .forward
-      .entry(InternKey(ident.hash, ident.value))
-      .or_insert_with(|| {
-        maybe_id += 1;
-        Key::new(maybe_id, type_id)
-      })
-      .clone();
-    if maybe_id != self.id_generator {
-      self.id_generator = maybe_id;
-      self.reverse.insert(maybe_id, v);
-    }
-    key
-  }
-
-  fn get(&self, k: &Key) -> &Value {
-    self.reverse.get(&k.id()).unwrap_or_else(|| {
-      panic!("Previously memoized object disappeared for {:?}", k)
-    })
-  }
-}
-
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 // TODO: Type alias used to avoid rustfmt breaking itself by rendering a 101 character line.
@@ -419,9 +368,9 @@ impl From<Result<(), String>> for PyResult {
 // The result of an `identify` call, including the __hash__ of a Value and its TypeId.
 #[repr(C)]
 pub struct Ident {
-  hash: i64,
-  value: Value,
-  type_id: TypeId,
+  pub hash: i64,
+  pub value: Value,
+  pub type_id: TypeId,
 }
 
 // Points to an array containing a series of values allocated by Python.

@@ -6,6 +6,7 @@ mod core;
 mod externs;
 mod graph;
 mod handles;
+mod interning;
 mod nodes;
 mod rule_graph;
 mod scheduler;
