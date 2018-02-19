@@ -77,7 +77,7 @@ class PythonBinary(PythonTarget):
     payload = Payload()
     payload.add_fields({
       'entry_point': PrimitiveField(entry_point),
-      'inherit_path': PrimitiveField(bool(inherit_path)),
+      'inherit_path': PrimitiveField(inherit_path),
       'zip_safe': PrimitiveField(bool(zip_safe)),
       'always_write_cache': PrimitiveField(bool(always_write_cache)),
       'repositories': PrimitiveField(maybe_list(repositories or [])),
