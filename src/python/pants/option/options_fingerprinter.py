@@ -130,7 +130,6 @@ class OptionsFingerprinter(object):
     This assumes that the file directories are of reasonable size
     to cause memory or performance issues.
     """
-    hasher = sha1()
     # Note that we don't sort the dirpaths, as their order may have meaning.
     filepaths = []
     for dirpath in dirpaths:
