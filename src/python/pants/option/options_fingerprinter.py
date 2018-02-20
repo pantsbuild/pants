@@ -132,21 +132,15 @@ class OptionsFingerprinter(object):
     """
     hasher = sha1()
     # Note that we don't sort the dirpaths, as their order may have meaning.
+    filepaths = []
     for dirpath in dirpaths:
-
       dirs = os.walk(dirpath, topdown=topdown, onerror=onerror,
                      followlinks=followlinks)
       sorted_dirs = sorted(dirs, key=lambda d: d[0])
-      for dirpath, dirnames, filenames in sorted_dirs:
-        filenames.sort()
-        for filename in filenames:
-          full_path = self._assert_in_buildroot(os.path.join(dirpath, filename))
-          with open(full_path, 'rb') as fd:
-            s = fd.read(8192)
-            while s:
-              hasher.update(s)
-              s = fd.read(8192)
-    return hasher.hexdigest()
+      filepaths.extend([os.path.join(dirpath, filename)
+                   for dirpath, dirnames, filenames in sorted_dirs
+                   for filename in sorted(filenames)])
+    return self._fingerprint_files(filepaths)
 
   def _fingerprint_files(self, filepaths):
     """Returns a fingerprint of the given filepaths and their contents.

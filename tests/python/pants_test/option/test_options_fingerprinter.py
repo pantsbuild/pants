@@ -114,8 +114,12 @@ class OptionsFingerprinterTest(BaseTest):
       ('b/bar/bar.config', 'blah blah blah'),
       ('c/bar/bar.config', 'blah meow blah')))
     dp1 = self.options_fingerprinter.fingerprint(dir_option, [d1])
-    dp2 = self.options_fingerprinter.fingerprint(dir_option, [d2])
-    dp3 = self.options_fingerprinter.fingerprint(dir_option, [d3])
+    dp2 = self.options_fingerprinter.fingerprint(dir_option, [d1, d2])
+    dp3 = self.options_fingerprinter.fingerprint(dir_option, [d2, d1])
+    dp4 = self.options_fingerprinter.fingerprint(dir_option, [d3])
 
-    self.assertEquals(dp1, dp2)
+    self.assertEquals(dp1, dp1)
+    self.assertEquals(dp2, dp2)
     self.assertNotEquals(dp1, dp3)
+    self.assertNotEquals(dp1, dp4)
+    self.assertNotEquals(dp2, dp3)
