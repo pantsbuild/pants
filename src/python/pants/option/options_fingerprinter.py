@@ -133,8 +133,11 @@ class OptionsFingerprinter(object):
     hasher = sha1()
     # Note that we don't sort the dirpaths, as their order may have meaning.
     for dirpath in dirpaths:
-      for dirpath, dirnames, filenames in os.walk(dirpath, topdown=topdown, onerror=onerror,
-                                                  followlinks=followlinks):
+
+      dirs = os.walk(dirpath, topdown=topdown, onerror=onerror,
+                     followlinks=followlinks)
+      sorted_dirs = sorted(dirs, key=lambda d: d[0])
+      for dirpath, dirnames, filenames in sorted_dirs:
         filenames.sort()
         for filename in filenames:
           full_path = self._assert_in_buildroot(os.path.join(dirpath, filename))
