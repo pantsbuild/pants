@@ -131,9 +131,8 @@ class OptionsFingerprinter(object):
     to cause memory or performance issues.
     """
     hasher = sha1()
-    copy_dirpaths = list(dirpaths)
-    copy_dirpaths.sort()
-    for dirpath in copy_dirpaths:
+    # Note that we don't sort the dirpaths, as their order may have meaning.
+    for dirpath in dirpaths:
       for dirpath, dirnames, filenames in os.walk(dirpath, topdown=topdown, onerror=onerror,
                                                   followlinks=followlinks):
         filenames.sort()
