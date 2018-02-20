@@ -60,9 +60,17 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     }
     init_subsystems([JUnit, ScalaPlatform], scala_options)
 
-    self.make_target(':scala-library',
-                     JarLibrary,
-                     jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
+    self.make_target(
+      ':scala-library',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')]
+    )
+
+    self.make_target(
+      ':nailgun-server',
+      JarLibrary,
+      jars=[JarDependency(org='com.martiansoftware', name='nailgun-server', rev='0.9.1'),]
+    )
 
     self.make_target(
       'project_info:first',
@@ -188,6 +196,7 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       },
     }
     options.update(options_overrides)
+
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
                            for_subsystems=[JvmPlatform])
     context.products.safe_create_data('compile_classpath',
