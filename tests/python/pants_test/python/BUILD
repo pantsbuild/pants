@@ -2,16 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-# XXX this tests the code running the test, not the code under test!
-python_tests(
-  name = 'test_antlr_builder',
-  sources = ['test_antlr_builder.py'],
-  dependencies = [
-    '3rdparty/python:antlr-3.1.3',
-    'testprojects/src/antlr/python/test:eval',
-  ],
-)
-
 python_tests(
   name = 'interpreter_selection_integration',
   sources = ['test_interpreter_selection_integration.py'],
