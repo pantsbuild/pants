@@ -39,8 +39,7 @@ class ResolveRequirementsTaskBase(Task):
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
-    tgts = req_libs
-    with self.invalidated(tgts) as invalidation_check:
+    with self.invalidated(req_libs) as invalidation_check:
       # If there are no relevant targets, we still go through the motions of resolving
       # an empty set of requirements, to prevent downstream tasks from having to check
       # for this special case.
