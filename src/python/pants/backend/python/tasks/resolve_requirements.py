@@ -22,6 +22,7 @@ class ResolveRequirements(ResolveRequirementsTaskBase):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
+
   def execute(self):
     interpreter = self.context.products.get_data(PythonInterpreter)
     pex = self.resolve_requirements(interpreter, self.context.targets(has_python_requirements))
