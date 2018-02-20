@@ -7,21 +7,20 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 class BinaryToolBase(Subsystem):
   """Base class for subsytems that configure binary tools.
 
-  Typically, a specific subclass is created via create_binary_tool_subsystem_cls() below.
-  That subclass can be further subclassed, manually, e.g., to add any extra options.
+  Subclasses can be further subclassed, manually, e.g., to add any extra options.
 
   :API: public
   """
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
-  support_dir = None
   platform_dependent = None
+  archive_type = None
   default_version = None
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
@@ -78,10 +77,22 @@ class BinaryToolBase(Subsystem):
         version = old_opts.get(self.replaces_name)
     return self._select_for_version(version)
 
+  @memoized_property
+  def _binary_util(self):
+    return BinaryUtil.Factory.create()
+
+  @classmethod
+  def get_support_dir(cls):
+    return 'bin/{}'.format(cls._get_name())
+
   @memoized_method
   def _select_for_version(self, version):
-    return BinaryUtil.Factory.create().select(
-      self.support_dir, version, self._get_name(), self.platform_dependent)
+    return self._binary_util.select(
+      supportdir=self.get_support_dir(),
+      version=version,
+      name=self._get_name(),
+      platform_dependent=self.platform_dependent,
+      archive_type=self.archive_type)
 
   @classmethod
   def _get_name(cls):

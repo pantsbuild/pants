@@ -19,12 +19,15 @@ logger = logging.getLogger(__name__)
 class BuildozerBinary(NativeTool):
   options_scope = 'buildozer-binary'
   name = 'buildozer'
-  # TODO: Move this to bin/buildozer - buildozer is a native binary.
-  support_dir = 'scripts/buildozer'
   default_version = '0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c'
 
   replaces_scope = 'buildozer'
   replaces_name = 'version'
+
+  # TODO: Move this to bin/buildozer - buildozer is a native binary.
+  @classmethod
+  def get_support_dir(cls):
+    return 'scripts/buildozer'
 
   def execute(self, buildozer_command, spec, context=None):
     try:
