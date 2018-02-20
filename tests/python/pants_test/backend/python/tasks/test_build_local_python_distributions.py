@@ -44,9 +44,13 @@ class TestBuildLocalPythonDistributions(PythonTaskTestBase):
                                             sources=sources)
 
   def test_python_create_distributions(self):
-    context = self.context(target_roots=[self.python_dist_tgt], for_task_types=[BuildLocalPythonDistributions])
+    context = self.context(target_roots=[self.python_dist_tgt],
+                           for_task_types=[BuildLocalPythonDistributions])
+    self.assertEquals([self.python_dist_tgt], context.build_graph.targets())
     python_create_distributions_task = self.create_task(context)
     python_create_distributions_task.execute()
-    built_dists = context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-    self.assertGreater(len(built_dists), 0)
-    self.assertTrue(any(['my_dist-0.0.0-py2-none-any.whl' in dist for dist in list(built_dists)]))
+    synthetic_tgts = set(context.build_graph.targets()) - {self.python_dist_tgt}
+    self.assertEquals(1, len(synthetic_tgts))
+    synthetic_target = next(iter(synthetic_tgts))
+    self.assertEquals(['my_dist==0.0.0'],
+                      [str(x.requirement) for x in synthetic_target.requirements.value])

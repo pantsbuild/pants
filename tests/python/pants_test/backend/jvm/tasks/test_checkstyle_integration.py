@@ -106,8 +106,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
         src = os.path.join(current_root, path)
         dst = os.path.join(temp_root, path)
         if os.path.isdir(path):
-          # Follow symlinks since the directories are created under pants_dev_deps.venv
-          shutil.copytree(src, dst, symlinks=True)
+          shutil.copytree(src, dst)
         else:
           shutil.copyfile(src, dst)
       current = os.getcwd()

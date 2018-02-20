@@ -45,6 +45,8 @@ esac
 readonly CACHE_ROOT=${XDG_CACHE_HOME:-$HOME/.cache}/pants
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
 
+readonly RUST_TOOLCHAIN="1.24.0"
+
 function calculate_current_hash() {
   # Cached and unstaged files, with ignored files excluded.
   # NB: We fork a subshell because one or both of `ls-files`/`hash-object` are
@@ -52,6 +54,7 @@ function calculate_current_hash() {
   (
    cd ${REPO_ROOT}
    (echo "${MODE_FLAG}"
+    echo "${RUST_TOOLCHAIN}"
     git ls-files -c -o --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
@@ -70,11 +73,9 @@ function _ensure_cffi_sources() {
 function ensure_native_build_prerequisites() {
   # Control a pants-specific rust toolchain.
 
-  local rust_toolchain_root="${CACHE_ROOT}/rust"
-  export CARGO_HOME="${rust_toolchain_root}/cargo"
-  export RUSTUP_HOME="${rust_toolchain_root}/rustup"
-
-  local rust_toolchain="1.23.0"
+  local RUST_TOOLCHAIN_root="${CACHE_ROOT}/rust"
+  export CARGO_HOME="${RUST_TOOLCHAIN_root}/cargo"
+  export RUSTUP_HOME="${RUST_TOOLCHAIN_root}/rustup"
 
   # NB: rustup installs itself into CARGO_HOME, but fetches toolchains into RUSTUP_HOME.
   if [[ ! -x "${CARGO_HOME}/bin/rustup" ]]
@@ -83,13 +84,13 @@ function ensure_native_build_prerequisites() {
         "https://www.rustup.rs ..."
     local readonly rustup=$(mktemp -t pants.rustup.XXXXXX)
     curl https://sh.rustup.rs -sSf > ${rustup}
-    sh ${rustup} -y --no-modify-path --default-toolchain "${rust_toolchain}" 1>&2
+    sh ${rustup} -y --no-modify-path --default-toolchain "${RUST_TOOLCHAIN}" 1>&2
     rm -f ${rustup}
   fi
 
   # Make sure rust is pinned at the correct version.
   # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
-  "${CARGO_HOME}/bin/rustup" override set "${rust_toolchain}" >&2
+  "${CARGO_HOME}/bin/rustup" override set "${RUST_TOOLCHAIN}" >&2
 
   # Sometimes fetching a large git repo dependency can take more than 10 minutes.
   # This times out on travis, because nothing is printed to stdout/stderr in that time.

@@ -424,7 +424,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       os.unlink(path)
 
   @contextmanager
-  def mock_buildroot(self):
+  def mock_buildroot(self, dirs_to_copy=None):
     """Construct a mock buildroot and return a helper object for interacting with it."""
     Manager = namedtuple('Manager', 'write_file pushd dir')
     # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
@@ -432,7 +432,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
     files_to_copy = ('BUILD.tools',)
     files_to_link = ('pants', 'pants.ini', 'pants.travis-ci.ini', '.pants.d',
                      'build-support', 'pants-plugins', 'src')
-    dirs_to_copy = ('contrib', '3rdparty')
+    dirs_to_copy = ('contrib', '3rdparty') + tuple(dirs_to_copy or [])
 
     with self.temporary_workdir() as tmp_dir:
       for filename in files_to_copy:

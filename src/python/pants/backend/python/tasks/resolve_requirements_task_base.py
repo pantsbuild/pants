@@ -11,10 +11,10 @@ from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 
-from pants.backend.python.tasks.build_local_python_distributions import \
-  BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (dump_requirements,
-                                                       inject_synthetic_dist_requirements)
+from pants.backend.python.python_requirement import PythonRequirement
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.tasks.pex_build_util import dump_requirement_libs, dump_requirements
+from pants.base.hash_utils import hash_all
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
 from pants.util.dirutil import safe_concurrent_creation
@@ -31,7 +31,7 @@ class ResolveRequirementsTaskBase(Task):
   @classmethod
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
-    round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
+    round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
 
   def resolve_requirements(self, req_libs, local_dist_targets=None):
     """Requirements resolution for PEX files.
@@ -59,16 +59,41 @@ class ResolveRequirementsTaskBase(Task):
       # to cover the empty case.
       if not os.path.isdir(path):
         with safe_concurrent_creation(path) as safe_path:
-          # Handle locally-built python distribution dependencies.
-          built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-          if built_dists:
-            req_libs = inject_synthetic_dist_requirements(self.context.build_graph,
-                                                          built_dists,
-                                                          ':'.join(2 * [target_set_id])) + req_libs
-          self._build_requirements_pex(interpreter, safe_path, req_libs)
+          builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
+          dump_requirement_libs(builder, interpreter, req_libs, self.context.log)
+          builder.freeze()
     return PEX(path, interpreter=interpreter)
 
-  def _build_requirements_pex(self, interpreter, path, req_libs):
-    builder = PEXBuilder(path=path, interpreter=interpreter, copy=True)
-    dump_requirements(builder, interpreter, req_libs, self.context.log)
-    builder.freeze()
+  def resolve_requirement_strings(self, interpreter, requirement_strings):
+    """Resolve a list of pip-style requirement strings."""
+    requirement_strings = sorted(requirement_strings)
+    if len(requirement_strings) == 0:
+      req_strings_id = 'no_requirements'
+    elif len(requirement_strings) == 1:
+      req_strings_id = requirement_strings[0]
+    else:
+      req_strings_id = hash_all(requirement_strings)
+
+    path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), req_strings_id))
+    if not os.path.isdir(path):
+      reqs = [PythonRequirement(req_str) for req_str in requirement_strings]
+      with safe_concurrent_creation(path) as safe_path:
+        builder = PEXBuilder(path=safe_path, interpreter=interpreter, copy=True)
+        dump_requirements(builder, interpreter, reqs, self.context.log)
+        builder.freeze()
+    return PEX(path, interpreter=interpreter)
+
+  @classmethod
+  def merge_pexes(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
+    """Generates a merged pex at path."""
+    pex_paths = [pex.path() for pex in pexes if pex]
+    if pex_paths:
+      pex_info = pex_info.copy()
+      pex_info.merge_pex_path(':'.join(pex_paths))
+
+    with safe_concurrent_creation(path) as safe_path:
+      builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
+      if interpeter_constraints:
+        for constraint in interpeter_constraints:
+          builder.add_interpreter_constraint(constraint)
+      builder.freeze()

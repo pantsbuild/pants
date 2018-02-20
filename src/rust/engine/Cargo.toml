@@ -8,6 +8,8 @@ build = "src/cffi_build.rs"
 # Enable debug symbols in the `release` profile: doesn't add a noticeable overhead in size/speed,
 # but enables profiling of optimized builds.
 debug = true
+# Optimise for the speed of our binary, rather than the speed of compilation.
+codegen-units = 1
 
 [lib]
 crate-type = ["dylib"]

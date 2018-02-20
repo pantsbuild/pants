@@ -15,6 +15,7 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:fingerprint_strategy',
+    'src/python/pants/base:hash_utils',
     'src/python/pants/base:specs',
     'src/python/pants/binaries:thrift_util',
     'src/python/pants/build_graph',
