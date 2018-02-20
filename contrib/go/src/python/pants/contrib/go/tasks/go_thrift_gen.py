@@ -8,11 +8,11 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 import re
 
+from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.revision import Revision
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.dirutil import safe_mkdir
@@ -44,11 +44,11 @@ class GoThriftGen(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoThriftGen, cls).subsystem_dependencies() + (ThriftBinary.Factory.scoped(cls),)
+    return super(GoThriftGen, cls).subsystem_dependencies() + (Thrift.scoped(cls),)
 
   @memoized_property
   def _thrift_binary(self):
-    return ThriftBinary.Factory.scoped_instance(self).create()
+    return Thrift.scoped_instance(self).create()
 
   @memoized_property
   def _deps(self):

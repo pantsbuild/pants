@@ -5,9 +5,15 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+from pants.base.deprecated import deprecated_module
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
+
+
+
+deprecated_module('1.7.0.dev0',
+                  hint_message='Use pants.backend.codegen.thrift.lib.thrift instead.')
 
 
 class ThriftBinary(object):

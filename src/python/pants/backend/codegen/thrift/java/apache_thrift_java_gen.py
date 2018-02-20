@@ -10,7 +10,6 @@ from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.backend.codegen.thrift.lib.apache_thrift_gen_base import ApacheThriftGenBase
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants.binaries.thrift_binary import ThriftBinary
 
 
 # TODO: Currently the injected runtime deps are specified by the --deps option defined in the
@@ -29,8 +28,7 @@ class ApacheThriftJavaGen(ApacheThriftGenBase):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(ApacheThriftJavaGen, cls).subsystem_dependencies() +
-            (ThriftDefaults, ThriftBinary.Factory.scoped(cls)))
+    return super(ApacheThriftJavaGen, cls).subsystem_dependencies() + (ThriftDefaults,)
 
   @classmethod
   def implementation_version(cls):

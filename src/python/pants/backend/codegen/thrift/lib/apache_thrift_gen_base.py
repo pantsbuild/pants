@@ -11,10 +11,10 @@ import shutil
 
 from twitter.common.collections import OrderedSet
 
+from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.thrift_binary import ThriftBinary
 from pants.option.custom_types import target_option
 from pants.task.simple_codegen_task import SimpleCodegenTask
 from pants.util.memo import memoized_property
@@ -52,8 +52,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return (super(ApacheThriftGenBase, cls).subsystem_dependencies() +
-            (ThriftBinary.Factory.scoped(cls),))
+    return super(ApacheThriftGenBase, cls).subsystem_dependencies() + (Thrift.scoped(cls),)
 
   def synthetic_target_extra_dependencies(self, target, target_workdir):
     for source in target.sources_relative_to_buildroot():
@@ -95,8 +94,7 @@ class ApacheThriftGenBase(SimpleCodegenTask):
 
   @memoized_property
   def _thrift_binary(self):
-    thrift_binary = ThriftBinary.Factory.scoped_instance(self).create()
-    return thrift_binary.path
+    return Thrift.scoped_instance(self).select(context=self.context)
 
   @memoized_property
   def _deps(self):

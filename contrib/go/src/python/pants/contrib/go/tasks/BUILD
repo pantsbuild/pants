@@ -12,7 +12,6 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/base:workunit',
-    'src/python/pants/binaries:thrift_util',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/process',
