@@ -27,6 +27,8 @@ from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
+from pants.backend.python.tasks.pex_build_util import has_python_requirements
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
@@ -40,7 +42,7 @@ from pants.util.memo import memoized_property
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
 # Please add @yic to reviews for this file.
-class ExportTask(IvyTaskMixin, CoursierMixin):
+class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   """Base class for generating a json-formattable blob of data about the target graph.
 
   Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
@@ -332,9 +334,11 @@ class ExportTask(IvyTaskMixin, CoursierMixin):
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
+        req_libs = filter(has_python_requirements, targets)
+        chroot = self.resolve_requirements(interpreter, req_libs)
         interpreters_info[str(interpreter.identity)] = {
           'binary': interpreter.binary,
-          'chroot': self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX).path()
+          'chroot': chroot.path()
         }
 
       graph_info['python_setup'] = {

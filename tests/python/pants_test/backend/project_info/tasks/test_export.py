@@ -26,7 +26,6 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.python.register import build_file_aliases as register_python
-from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.base.exceptions import TaskError
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.build_graph.resources import Resources
@@ -61,9 +60,17 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     }
     init_subsystems([JUnit, ScalaPlatform], scala_options)
 
-    self.make_target(':scala-library',
-                     JarLibrary,
-                     jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')])
+    self.make_target(
+      ':scala-library',
+      JarLibrary,
+      jars=[JarDependency('org.scala-lang', 'scala-library', '2.10.5')]
+    )
+
+    self.make_target(
+      ':nailgun-server',
+      JarLibrary,
+      jars=[JarDependency(org='com.martiansoftware', name='nailgun-server', rev='0.9.1'),]
+    )
 
     self.make_target(
       'project_info:first',
@@ -190,15 +197,11 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
     }
     options.update(options_overrides)
 
-    # The easiest way to create products required by the Export task is to
-    # execute the tasks that create them.
-    rr_task_type = self.synthesize_task_subtype(ResolveRequirements, 'rr_scope')
     context = self.context(options=options, target_roots=[self.target(spec) for spec in specs],
-                           for_task_types=[rr_task_type], for_subsystems=[JvmPlatform])
+                           for_subsystems=[JvmPlatform])
     context.products.safe_create_data('compile_classpath',
                                       init_func=ClasspathProducts.init_func(self.pants_workdir))
     task = self.create_task(context)
-    rr_task_type(context, os.path.join(self.pants_workdir, 'rr')).execute()
     return list(task.console_output(list(task.context.targets()),
                                     context.products.get_data('compile_classpath')))
 

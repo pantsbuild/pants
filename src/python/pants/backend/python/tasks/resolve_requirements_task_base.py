@@ -33,9 +33,10 @@ class ResolveRequirementsTaskBase(Task):
     round_manager.require_data(PythonInterpreter)
     round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
 
-  def resolve_requirements(self, req_libs):
+  def resolve_requirements(self, interpreter, req_libs):
     """Requirements resolution for PEX files.
 
+    :param interpreter: Resolve against this :class:`PythonInterpreter`.
     :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
     :returns: a PEX containing target requirements and any specified python dist targets.
     """
@@ -50,7 +51,6 @@ class ResolveRequirementsTaskBase(Task):
       else:
         target_set_id = 'no_targets'
 
-      interpreter = self.context.products.get_data(PythonInterpreter)
       path = os.path.realpath(os.path.join(self.workdir, str(interpreter.identity), target_set_id))
       # Note that we check for the existence of the directory, instead of for invalid_vts,
       # to cover the empty case.
