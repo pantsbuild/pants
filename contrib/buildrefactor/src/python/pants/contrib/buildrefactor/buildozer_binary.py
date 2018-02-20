@@ -24,11 +24,6 @@ class BuildozerBinary(NativeTool):
   replaces_scope = 'buildozer'
   replaces_name = 'version'
 
-  # TODO: Move this to bin/buildozer - buildozer is a native binary.
-  @classmethod
-  def get_support_dir(cls):
-    return 'scripts/buildozer'
-
   def execute(self, buildozer_command, spec, context=None):
     try:
       subprocess.check_call([self.select(context), buildozer_command, spec], cwd=get_buildroot())
