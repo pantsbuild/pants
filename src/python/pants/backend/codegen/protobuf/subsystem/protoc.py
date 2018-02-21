@@ -14,8 +14,3 @@ class Protoc(NativeTool):
 
   replaces_scope = 'gen.protoc'
   replaces_name = 'version'
-
-  # 'protoc' is also the binary's filename.
-  @classmethod
-  def get_support_dir(cls):
-    return 'bin/protobuf'
