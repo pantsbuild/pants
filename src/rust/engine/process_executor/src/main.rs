@@ -2,8 +2,8 @@ extern crate clap;
 extern crate process_execution;
 
 use clap::{App, AppSettings, Arg};
-use std::process::exit;
 use std::collections::BTreeMap;
+use std::process::exit;
 
 use std::iter::Iterator;
 
@@ -67,7 +67,10 @@ If unspecified, local execution will be performed.",
         .run_command_remote(request)
         .unwrap()
     }
-    None => process_execution::local::run_command_locally(request).unwrap(),
+    None => {
+      process_execution::local::run_command_locally(request, &std::env::current_dir().unwrap())
+        .unwrap()
+    }
   };
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
