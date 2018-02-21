@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 use futures::future::{self, Future};
 use ordermap::OrderMap;
+use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
 use context::Context;
@@ -306,9 +307,13 @@ impl Select {
         argv: externs::project_multi_strs(&value, "argv"),
         env: env,
       };
+
+      let tmpdir = TempDir::new("process-execution").unwrap();
+      // TODO: Materialize the snapshot into the tmpdir when ExecuteProcessRequest has a Snapshot.
+
       // TODO: this should run off-thread, and asynchronously
       // TODO: request the Node that invokes the process, rather than invoke directly
-      let result = process_executor::local::run_command_locally(request).unwrap();
+      let result = process_executor::local::run_command_locally(request, tmpdir.path()).unwrap();
       vec![
         future::ok(externs::unsafe_call(
           &context.core.types.construct_process_result,
@@ -764,10 +769,16 @@ impl Node for ExecuteProcess {
 
   fn run(self, _: Context) -> NodeFuture<ProcessResult> {
     let request = self.0.clone();
+
+    let tmpdir = TempDir::new("process-execution").unwrap();
+    // TODO: Materialize the snapshot into the tmpdir when ExecuteProcessRequest has a Snapshot.
+
     // TODO: this should run off-thread, and asynchronously
     future::ok(ProcessResult(
-      process_executor::local::run_command_locally(request)
-        .unwrap(),
+      process_executor::local::run_command_locally(
+        request,
+        tmpdir.path(),
+      ).unwrap(),
     )).to_boxed()
   }
 }
