@@ -1,3 +1,5 @@
+extern crate tempdir;
+
 use std::io::Error;
 use std::path::Path;
 use std::process::Command;
@@ -11,7 +13,6 @@ pub fn run_command_locally(
   req: ExecuteProcessRequest,
   workdir: &Path,
 ) -> Result<ExecuteProcessResult, Error> {
-  println!("executing in workdir: {:?}", &workdir);
   Command::new(&req.argv[0])
     .args(&req.argv[1..])
     .current_dir(workdir)
@@ -34,6 +35,7 @@ mod tests {
   extern crate testutil;
 
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_locally};
+  use fs;
   use std::collections::BTreeMap;
   use std::path::PathBuf;
   use self::testutil::{owned_string_vec, as_byte_owned_vec};
@@ -45,6 +47,7 @@ mod tests {
       ExecuteProcessRequest {
         argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
         env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
       },
       &PathBuf::from("/"),
     );
@@ -68,6 +71,7 @@ mod tests {
           &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
         ),
         env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
       },
       &PathBuf::from("/"),
     );
@@ -93,6 +97,7 @@ mod tests {
       ExecuteProcessRequest {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env.clone(),
+        input_files: fs::EMPTY_DIGEST,
       },
       &PathBuf::from("/"),
     );
@@ -125,6 +130,7 @@ mod tests {
       ExecuteProcessRequest {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env,
+        input_files: fs::EMPTY_DIGEST,
       }
     }
 
@@ -140,6 +146,7 @@ mod tests {
       ExecuteProcessRequest {
         argv: owned_string_vec(&["echo", "-n", "foo"]),
         env: BTreeMap::new(),
+        input_files: fs::EMPTY_DIGEST,
       },
       &PathBuf::from("/"),
     ).expect_err("Want Err");

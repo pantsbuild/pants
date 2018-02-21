@@ -1,6 +1,8 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+extern crate tempdir;
+
 use bazel_protos;
 use boxfuture::{Boxable, BoxFuture};
 use bytes::Bytes;
@@ -16,13 +18,47 @@ use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone, PartialEq)]
+const EMPTY_FINGERPRINT: Fingerprint = Fingerprint(
+  [
+    0xe3,
+    0xb0,
+    0xc4,
+    0x42,
+    0x98,
+    0xfc,
+    0x1c,
+    0x14,
+    0x9a,
+    0xfb,
+    0xf4,
+    0xc8,
+    0x99,
+    0x6f,
+    0xb9,
+    0x24,
+    0x27,
+    0xae,
+    0x41,
+    0xe4,
+    0x64,
+    0x9b,
+    0x93,
+    0x4c,
+    0xa4,
+    0x95,
+    0x99,
+    0x1b,
+    0x78,
+    0x52,
+    0xb8,
+    0x55,
+  ],
+);
+pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
+
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Snapshot {
-  // TODO: In a follow-up commit, fingerprint will be removed, and digest will be made non-optional.
-  // They both exist right now as a compatibility shim so that the tar-based code and
-  // Directory-based code can peacefully co-exist.
-  pub fingerprint: Fingerprint,
-  pub digest: Option<Digest>,
+  pub digest: Digest,
   pub path_stats: Vec<PathStat>,
 }
 
@@ -35,24 +71,25 @@ pub trait StoreFileByDigest<Error> {
 }
 
 impl Snapshot {
+  pub fn empty() -> Snapshot {
+    Snapshot {
+      digest: EMPTY_DIGEST,
+      path_stats: vec![],
+    }
+  }
+
   pub fn from_path_stats<
     S: StoreFileByDigest<Error> + Sized + Clone,
     Error: fmt::Debug + 'static + Send,
   >(
-    store: Arc<Store>,
+    store: Store,
     file_digester: S,
     path_stats: Vec<PathStat>,
   ) -> BoxFuture<Snapshot, String> {
     let mut sorted_path_stats = path_stats.clone();
     sorted_path_stats.sort_by(|a, b| a.path().cmp(b.path()));
     Snapshot::ingest_directory_from_sorted_path_stats(store, file_digester, sorted_path_stats)
-      .map(|digest| {
-        Snapshot {
-          fingerprint: digest.0,
-          digest: Some(digest),
-          path_stats: path_stats,
-        }
-      })
+      .map(|digest| Snapshot { digest, path_stats })
       .to_boxed()
   }
 
@@ -60,7 +97,7 @@ impl Snapshot {
     S: StoreFileByDigest<Error> + Sized + Clone,
     Error: fmt::Debug + 'static + Send,
   >(
-    store: Arc<Store>,
+    store: Store,
     file_digester: S,
     path_stats: Vec<PathStat>,
   ) -> BoxFuture<Digest, String> {
@@ -144,41 +181,37 @@ impl Snapshot {
   }
 
   // Preserves the order of Snapshot's path_stats in its returned Vec.
-  pub fn contents(self, store: Arc<Store>) -> BoxFuture<Vec<FileContent>, String> {
+  pub fn contents(self, store: Store) -> BoxFuture<Vec<FileContent>, String> {
     let contents = Arc::new(Mutex::new(HashMap::new()));
     let path_stats = self.path_stats;
-    Snapshot::contents_for_directory_helper(
-      self.digest.unwrap(),
-      store,
-      PathBuf::from(""),
-      contents.clone(),
-    ).map(move |_| {
-      let mut contents = contents.lock().unwrap();
-      let mut vec = Vec::new();
-      for path in path_stats.iter().filter_map(|path_stat| match path_stat {
-        &PathStat::File { ref path, .. } => Some(path.to_path_buf()),
-        &PathStat::Dir { .. } => None,
-      })
-      {
-        match contents.remove(&path) {
-          Some(content) => vec.push(FileContent { path, content }),
-          None => {
-            panic!(format!(
-              "PathStat for {:?} was present in path_stats but missing from Snapshot contents",
-              path
-            ));
+    Snapshot::contents_for_directory_helper(self.digest, store, PathBuf::from(""), contents.clone())
+      .map(move |_| {
+        let mut contents = contents.lock().unwrap();
+        let mut vec = Vec::new();
+        for path in path_stats.iter().filter_map(|path_stat| match path_stat {
+          &PathStat::File { ref path, .. } => Some(path.to_path_buf()),
+          &PathStat::Dir { .. } => None,
+        })
+        {
+          match contents.remove(&path) {
+            Some(content) => vec.push(FileContent { path, content }),
+            None => {
+              panic!(format!(
+                "PathStat for {:?} was present in path_stats but missing from Snapshot contents",
+                path
+              ));
+            }
           }
         }
-      }
-      vec
-    })
+        vec
+      })
       .to_boxed()
   }
 
   // Assumes that all fingerprints it encounters are valid.
   fn contents_for_directory_helper(
     digest: Digest,
-    store: Arc<Store>,
+    store: Store,
     path_so_far: PathBuf,
     contents_wrapped: Arc<Mutex<HashMap<PathBuf, Bytes>>>,
   ) -> BoxFuture<(), String> {
@@ -240,8 +273,7 @@ impl fmt::Debug for Snapshot {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     write!(
       f,
-      "Snapshot({}, digest={:?}, entries={})",
-      self.fingerprint.to_hex(),
+      "Snapshot(digest={:?}, entries={})",
       self.digest,
       self.path_stats.len()
     )
@@ -303,12 +335,10 @@ mod tests {
   const LATIN: &str = "Chaetophractus villosus";
   const STR: &str = "European Burmese";
 
-  fn setup() -> (Arc<Store>, TempDir, Arc<PosixFS>, FileSaver) {
+  fn setup() -> (Store, TempDir, Arc<PosixFS>, FileSaver) {
     let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
-    let store = Arc::new(
-      Store::local_only(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap(),
-    );
+    let store = Store::local_only(TempDir::new("lmdb_store").unwrap(), pool.clone()).unwrap();
     let dir = TempDir::new("root").unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
     let file_saver = FileSaver(store.clone(), posix_fs.clone());
@@ -323,17 +353,17 @@ mod tests {
     make_file(&dir.path().join(&file_name), STR.as_bytes(), 0o600);
 
     let path_stats = expand_all_sorted(posix_fs);
-    // TODO: Inline when only used once
-    let fingerprint = Fingerprint::from_hex_string(
-      "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
-    ).unwrap();
     assert_eq!(
       Snapshot::from_path_stats(store, digester, path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
-        fingerprint: fingerprint,
-        digest: Some(Digest(fingerprint, 80)),
+        digest: Digest(
+          Fingerprint::from_hex_string(
+            "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16",
+          ).unwrap(),
+          80,
+        ),
         path_stats: path_stats,
       }
     );
@@ -349,17 +379,17 @@ mod tests {
     make_file(&dir.path().join(&roland), STR.as_bytes(), 0o600);
 
     let path_stats = expand_all_sorted(posix_fs);
-    // TODO: Inline when only used once
-    let fingerprint = Fingerprint::from_hex_string(
-      "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
-    ).unwrap();
     assert_eq!(
       Snapshot::from_path_stats(store, digester, path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
-        fingerprint: fingerprint,
-        digest: Some(Digest(fingerprint, 78)),
+        digest: Digest(
+          Fingerprint::from_hex_string(
+            "8b1a7ea04eaa2527b35683edac088bc826117b53b7ec6601740b55e20bce3deb",
+          ).unwrap(),
+          78,
+        ),
         path_stats: path_stats,
       }
     );
@@ -381,17 +411,17 @@ mod tests {
     let sorted_path_stats = expand_all_sorted(posix_fs);
     let mut unsorted_path_stats = sorted_path_stats.clone();
     unsorted_path_stats.reverse();
-    // TODO: Inline when only used once
-    let fingerprint = Fingerprint::from_hex_string(
-      "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
-    ).unwrap();
     assert_eq!(
       Snapshot::from_path_stats(store, digester, unsorted_path_stats.clone())
         .wait()
         .unwrap(),
       Snapshot {
-        fingerprint: fingerprint,
-        digest: Some(Digest(fingerprint, 232)),
+        digest: Digest(
+          Fingerprint::from_hex_string(
+            "fbff703bdaac62accf2ea5083bcfed89292073bf710ef9ad14d9298c637e777b",
+          ).unwrap(),
+          232,
+        ),
         path_stats: unsorted_path_stats,
       }
     );
@@ -464,7 +494,7 @@ mod tests {
   }
 
   #[derive(Clone)]
-  struct FileSaver(Arc<Store>, Arc<PosixFS>);
+  struct FileSaver(Store, Arc<PosixFS>);
 
   impl StoreFileByDigest<String> for FileSaver {
     fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, String> {
