@@ -183,6 +183,17 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       target(name="alias")
     """.strip())
 
+    self.add_to_build_file('src/python/has_reqs/BUILD', textwrap.dedent("""
+       python_library(name="has_reqs", sources=globs("*.py"), dependencies=[':six'])
+       
+       python_requirement_library(
+         name='six',
+         requirements=[
+           python_requirement('six==1.9.0')
+         ]
+       ) 
+    """))
+
   def execute_export(self, *specs, **options_overrides):
     options = {
       JvmResolveSubsystem.options_scope: {
@@ -414,6 +425,17 @@ class ExportTest(InterpreterCacheTestMixin, ConsoleTaskTestBase):
       {'globs': ['src/python/z/**/*.py']},
       result['targets']['src/python/z:z']['globs']
     )
+
+  def test_has_python_requirements(self):
+    result = self.execute_export_json('src/python/has_reqs')
+    interpreters = result['python_setup']['interpreters']
+    self.assertEquals(1, len(interpreters))
+    chroot = interpreters.values()[0]['chroot']
+    deps = os.listdir(os.path.join(chroot, '.deps'))
+    self.assertEquals(1, len(deps))
+    six_whl = deps[0]
+    self.assertTrue(six_whl.startswith('six-1.9.0'))
+    self.assertTrue(six_whl.endswith('.whl'))
 
   @contextmanager
   def fake_distribution(self, version):
