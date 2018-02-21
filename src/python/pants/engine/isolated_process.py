@@ -201,18 +201,23 @@ class ExecuteProcess(object):
     return TaskRule(product_type, inputs, func)
 
 
-class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env'])):
+class ExecuteProcessRequest(datatype('ExecuteProcessRequest', ['argv', 'env', 'input_files_digest', 'digest_length'])):
   """Request for execution with args and snapshots to extract."""
 
-  def __new__(cls, argv, env):
+  def __new__(cls, argv, env, input_files_digest, digest_length):
     """
 
     :param args: Arguments to the process being run.
     :param env: A tuple of environment variables and values.
     """
+    print('*'*10)
+    print(argv)
+    print(env)
+    print(input_files_digest)
+    print(digest_length)
     if not isinstance(argv, tuple):
       raise ValueError('argv must be a tuple.')
-    return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env))
+    return super(ExecuteProcessRequest, cls).__new__(cls, argv, tuple(env), input_files_digest, digest_length)
 
 
 class ExecuteProcessResult(datatype('ExecuteProcessResult', ['stdout', 'stderr', 'exit_code'])):

@@ -1,7 +1,9 @@
 extern crate clap;
+extern crate fs;
 extern crate process_execution;
 
 use clap::{App, AppSettings, Arg};
+use std::path::PathBuf;
 use std::process::exit;
 use std::collections::BTreeMap;
 
@@ -60,14 +62,19 @@ If unspecified, local execution will be performed.",
   };
   let server = args.value_of("server");
 
-  let request = process_execution::ExecuteProcessRequest { argv, env };
+  let input_files = fs::Snapshot::empty().digest;
+  let request = process_execution::ExecuteProcessRequest {
+    argv,
+    env,
+    input_files,
+  };
   let result = match server {
     Some(addr) => {
       process_execution::remote::CommandRunner::new(addr, 1)
         .run_command_remote(request)
         .unwrap()
     }
-    None => process_execution::local::run_command_locally(request).unwrap(),
+    None => process_execution::local::run_command_locally(request, &PathBuf::from(".")).unwrap(),
   };
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
