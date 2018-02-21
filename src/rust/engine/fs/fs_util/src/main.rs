@@ -10,12 +10,11 @@ extern crate protobuf;
 use boxfuture::{Boxable, BoxFuture};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
-use fs::{GetFileDigest, ResettablePool, Snapshot, Store, VFS};
-use futures::future::{self, Future, join_all};
+use fs::{ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
+use futures::future::Future;
 use hashing::{Digest, Fingerprint};
 use protobuf::Message;
 use std::error::Error;
-use std::fs::File;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
@@ -229,7 +228,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               let digest = FileSaver {
                 store: store.clone(),
                 posix_fs: Arc::new(posix_fs),
-              }.digest(&f)
+              }.store_by_digest(&f)
                 .wait()
                 .unwrap();
               if store_has_remote {
@@ -261,7 +260,14 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .parse::<usize>()
             .expect("size_bytes must be a non-negative number");
           let digest = Digest(fingerprint, size_bytes);
-          materialize_directory(store, destination, digest).wait()
+          store
+            .materialize_directory(destination, digest)
+            .wait()
+            .map_err(|err| if err.contains("not found") {
+              ExitError(err, ExitCode::NotFound)
+            } else {
+              err.into()
+            })
         }
         ("save", Some(args)) => {
           let posix_fs = Arc::new(make_posix_fs(args.value_of("root").unwrap(), pool));
@@ -279,10 +285,10 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
             .and_then(move |paths| {
               Snapshot::from_path_stats(
                 store_copy.clone(),
-                Arc::new(FileSaver {
+                FileSaver {
                   store: store_copy,
                   posix_fs: posix_fs,
-                }),
+                },
                 paths,
               )
             })
@@ -374,13 +380,14 @@ fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::Posi
   fs::PosixFS::new(&root, pool, vec![]).unwrap()
 }
 
+#[derive(Clone)]
 struct FileSaver {
   store: Arc<Store>,
   posix_fs: Arc<fs::PosixFS>,
 }
 
-impl GetFileDigest<String> for FileSaver {
-  fn digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
+impl StoreFileByDigest<String> for FileSaver {
+  fn store_by_digest(&self, file: &fs::File) -> BoxFuture<Digest, String> {
     let file_copy = file.clone();
     let store = self.store.clone();
     self
@@ -392,94 +399,4 @@ impl GetFileDigest<String> for FileSaver {
       .and_then(move |content| store.store_file_bytes(content.content, true))
       .to_boxed()
   }
-}
-
-fn materialize_directory(
-  store: Arc<Store>,
-  destination: PathBuf,
-  digest: Digest,
-) -> BoxFuture<(), ExitError> {
-  let mkdir = make_clean_dir(&destination).map_err(|e| {
-    format!(
-      "Error making directory {:?}: {:?}",
-      destination,
-      e,
-    ).into()
-  });
-  match mkdir {
-    Ok(()) => {}
-    Err(e) => return future::err(e).to_boxed(),
-  };
-  store
-    .load_directory(digest)
-    .map_err(|e| e.into())
-    .and_then(move |directory_opt| {
-      directory_opt.ok_or_else(|| {
-        ExitError(
-          format!("Directory with digest {:?} not found", digest),
-          ExitCode::NotFound,
-        )
-      })
-    })
-    .and_then(move |directory| {
-      let file_futures = directory
-        .get_files()
-        .iter()
-        .map(|file_node| {
-          let store = store.clone();
-          let path = destination.join(file_node.get_name());
-          let digest: Digest = file_node.get_digest().into();
-          materialize_file(store, path, digest)
-        })
-        .collect::<Vec<_>>();
-      let directory_futures = directory
-        .get_directories()
-        .iter()
-        .map(|directory_node| {
-          let store = store.clone();
-          let path = destination.join(directory_node.get_name());
-          let digest: Digest = directory_node.get_digest().into();
-          materialize_directory(store, path, digest)
-        })
-        .collect::<Vec<_>>();
-      join_all(file_futures)
-        .join(join_all(directory_futures))
-        .map(|_| ())
-    })
-    .to_boxed()
-}
-
-fn materialize_file(
-  store: Arc<Store>,
-  destination: PathBuf,
-  digest: Digest,
-) -> BoxFuture<(), ExitError> {
-  store
-    .load_file_bytes_with(digest, move |bytes| {
-      File::create(&destination)
-        .and_then(|mut f| f.write_all(&bytes))
-        .map_err(|e| {
-          format!("Error writing file {:?}: {}", destination, e.description())
-        })
-    })
-    .map_err(|e| e.into())
-    .and_then(move |write_result| match write_result {
-      Some(Ok(())) => Ok(()),
-      Some(Err(e)) => Err(e.into()),
-      None => {
-        Err(ExitError(
-          format!("File with digest {:?} not found", digest),
-          ExitCode::NotFound,
-        ))
-      }
-    })
-    .to_boxed()
-}
-
-fn make_clean_dir(path: &Path) -> Result<(), io::Error> {
-  let parent = path.parent().ok_or_else(|| {
-    io::Error::new(io::ErrorKind::NotFound, format!("{:?} had no parent", path))
-  })?;
-  std::fs::create_dir_all(parent)?;
-  std::fs::create_dir(path)
 }
