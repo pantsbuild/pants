@@ -14,7 +14,7 @@ from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.pex_build_util import has_python_sources
+from pants.backend.python.tasks.pex_build_util import is_python_target
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.backend.python.tasks.wrapped_pex import WrappedPEX
@@ -74,7 +74,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
           # Add the extra requirements first, so they take precedence over any colliding version
           # in the target set's dependency closure.
           pexes = [extra_requirements_pex] + pexes
-        constraints = {constraint for rt in relevant_targets if has_python_sources(rt)
+        constraints = {constraint for rt in relevant_targets if is_python_target(rt)
                        for constraint in rt.compatibility}
         self.merge_pexes(path, pex_info, interpreter, pexes, constraints)
 

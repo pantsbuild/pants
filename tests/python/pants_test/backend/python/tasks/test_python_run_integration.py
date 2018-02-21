@@ -126,6 +126,34 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     os.remove(py2_pex)
     os.remove(py3_pex)
 
+  def test_target_constraints_with_no_sources(self):
+    with temporary_dir() as interpreters_cache:
+      # Run task.
+      py3 = '3'
+      if not self.skip_if_no_python(py3):
+        pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+        pants_run_3 = self.run_pants(
+          command=['run', '{}:test_bin'.format(os.path.join(self.testproject, 'test_target_with_no_sources'))],
+          config=pants_ini_config
+        )
+        self.assert_success(pants_run_3)
+        self.assertIn('python3.6', pants_run_3.stdout_data)
+
+      # Binary task.
+      pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
+      pants_run_27 = self.run_pants(
+        command=['binary', '{}:test_bin'.format(os.path.join(self.testproject, 'test_target_with_no_sources'))],
+        config=pants_ini_config
+      )
+      self.assert_success(pants_run_27)
+
+    # Ensure proper interpreter constraints were passed to built pexes.
+    py2_pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')
+    py2_info = get_pex_info(py2_pex)
+    self.assertIn('CPython>=3.6', py2_info.interpreter_constraints)
+    # Cleanup.
+    os.remove(py2_pex)
+
   def skip_if_no_python(self, version):
     if not self.has_python_version(version):
       msg = 'No python {} found. Skipping.'.format(version)
