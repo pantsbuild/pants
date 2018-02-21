@@ -32,6 +32,7 @@ from pants.backend.python.tasks.resolve_requirements_task_base import ResolveReq
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
@@ -334,7 +335,7 @@ class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
-        req_libs = filter(has_python_requirements, targets)
+        req_libs = filter(has_python_requirements, Target.closure_for_targets(targets))
         chroot = self.resolve_requirements(interpreter, req_libs)
         interpreters_info[str(interpreter.identity)] = {
           'binary': interpreter.binary,
