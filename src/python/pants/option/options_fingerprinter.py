@@ -14,7 +14,8 @@ import six
 
 from pants.base.build_environment import get_buildroot
 from pants.base.hash_utils import stable_json_hash
-from pants.option.custom_types import UnsetBool, dict_with_files_option, file_option, target_option
+from pants.option.custom_types import (UnsetBool, dict_with_files_option, dir_option,
+                                       file_option, target_option)
 
 
 class Encoder(json.JSONEncoder):
@@ -80,6 +81,8 @@ class OptionsFingerprinter(object):
 
     if option_type == target_option:
       return self._fingerprint_target_specs(option_val)
+    elif option_type == dir_option:
+      return self._fingerprint_dirs(option_val)
     elif option_type == file_option:
       return self._fingerprint_files(option_val)
     elif option_type == dict_with_files_option:
@@ -120,6 +123,23 @@ class OptionsFingerprinter(object):
                          '  build_root:  {buildroot}\n'
                          .format(filepath=filepath, buildroot=root))
       return filepath
+
+  def _fingerprint_dirs(self, dirpaths, topdown=True, onerror=None, followlinks=False):
+    """Returns a fingerprint of the given file directories and all their sub contents.
+
+    This assumes that the file directories are of reasonable size
+    to cause memory or performance issues.
+    """
+    # Note that we don't sort the dirpaths, as their order may have meaning.
+    filepaths = []
+    for dirpath in dirpaths:
+      dirs = os.walk(dirpath, topdown=topdown, onerror=onerror,
+                     followlinks=followlinks)
+      sorted_dirs = sorted(dirs, key=lambda d: d[0])
+      filepaths.extend([os.path.join(dirpath, filename)
+                   for dirpath, dirnames, filenames in sorted_dirs
+                   for filename in sorted(filenames)])
+    return self._fingerprint_files(filepaths)
 
   def _fingerprint_files(self, filepaths):
     """Returns a fingerprint of the given filepaths and their contents.
