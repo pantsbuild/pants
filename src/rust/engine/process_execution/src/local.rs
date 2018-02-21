@@ -1,14 +1,23 @@
+extern crate tempdir;
+
 use std::io::Error;
+use std::path::Path;
 use std::process::Command;
+use self::tempdir::TempDir;
 
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 
 ///
 /// Runs a command on this machine in the pwd.
 ///
-pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessResult, Error> {
+pub fn run_command_locally(
+  req: ExecuteProcessRequest,
+  workdir: &Path,
+) -> Result<ExecuteProcessResult, Error> {
+  println!("executing in workdir: {:?}", &workdir);
   Command::new(&req.argv[0])
     .args(&req.argv[1..])
+    .current_dir(workdir)
     .env_clear()
     // It would be really nice not to have to manually set PATH but this is sadly the only way
     // to stop automatic PATH searching.
@@ -22,21 +31,28 @@ pub fn run_command_locally(req: ExecuteProcessRequest) -> Result<ExecuteProcessR
     })
 }
 
+
 #[cfg(test)]
 mod tests {
   extern crate testutil;
 
   use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_locally};
+  use fs;
   use std::collections::BTreeMap;
+  use std::path::PathBuf;
   use self::testutil::{owned_string_vec, as_byte_owned_vec};
 
   #[test]
   #[cfg(unix)]
   fn stdout() {
-    let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-      env: BTreeMap::new(),
-    });
+    let result = run_command_locally(
+      ExecuteProcessRequest {
+        argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
+        env: BTreeMap::new(),
+        input_files: fs::Snapshot::empty().digest,
+      },
+      &PathBuf::from("."),
+    );
 
     assert_eq!(
       result.unwrap(),
@@ -51,12 +67,16 @@ mod tests {
   #[test]
   #[cfg(unix)]
   fn stdout_and_stderr_and_exit_code() {
-    let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(
-        &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
-      ),
-      env: BTreeMap::new(),
-    });
+    let result = run_command_locally(
+      ExecuteProcessRequest {
+        argv: owned_string_vec(
+          &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
+        ),
+        env: BTreeMap::new(),
+        input_files: fs::Snapshot::empty().digest,
+      },
+      &PathBuf::from("."),
+    );
 
     assert_eq!(
       result.unwrap(),
@@ -75,10 +95,14 @@ mod tests {
     env.insert("FOO".to_string(), "foo".to_string());
     env.insert("BAR".to_string(), "not foo".to_string());
 
-    let result = run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&["/usr/bin/env"]),
-      env: env.clone(),
-    });
+    let result = run_command_locally(
+      ExecuteProcessRequest {
+        argv: owned_string_vec(&["/usr/bin/env"]),
+        env: env.clone(),
+        input_files: fs::Snapshot::empty().digest,
+      },
+      &PathBuf::from("."),
+    );
 
     let stdout = String::from_utf8(result.unwrap().stdout).unwrap();
     let got_env: BTreeMap<String, String> = stdout
@@ -108,20 +132,25 @@ mod tests {
       ExecuteProcessRequest {
         argv: owned_string_vec(&["/usr/bin/env"]),
         env: env,
+        input_files: fs::Snapshot::empty().digest,
       }
     }
 
-    let result1 = run_command_locally(make_request());
-    let result2 = run_command_locally(make_request());
+    let result1 = run_command_locally(make_request(), &PathBuf::from("."));
+    let result2 = run_command_locally(make_request(), &PathBuf::from("."));
 
     assert_eq!(result1.unwrap(), result2.unwrap());
   }
 
   #[test]
   fn binary_not_found() {
-    run_command_locally(ExecuteProcessRequest {
-      argv: owned_string_vec(&["echo", "-n", "foo"]),
-      env: BTreeMap::new(),
-    }).expect_err("Want Err");
+    run_command_locally(
+      ExecuteProcessRequest {
+        argv: owned_string_vec(&["echo", "-n", "foo"]),
+        env: BTreeMap::new(),
+        input_files: fs::Snapshot::empty().digest,
+      },
+      &PathBuf::from("."),
+    ).expect_err("Want Err");
   }
 }

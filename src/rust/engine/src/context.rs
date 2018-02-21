@@ -2,16 +2,17 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
-use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use core::TypeId;
+use boxfuture::BoxFuture;
+use core::{Failure, TypeId};
 use externs;
-use fs::{PosixFS, Snapshots, Store, safe_create_dir_all_ioerror, ResettablePool};
+use fs::{File, PosixFS, Store, safe_create_dir_all_ioerror, ResettablePool, StoreFileByDigest};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
-use nodes::{Node, NodeFuture};
+use hashing::Digest;
+use nodes::{DigestFile, Node, NodeFuture};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
@@ -26,15 +27,14 @@ pub struct Core {
   pub rule_graph: RuleGraph,
   pub types: Types,
   pub pool: Arc<ResettablePool>,
-  pub snapshots: Snapshots,
-  pub store: Store,
+  pub store: Arc<Store>,
   pub vfs: PosixFS,
 }
 
 impl Core {
   pub fn new(
     root_subject_types: Vec<TypeId>,
-    mut tasks: Tasks,
+    tasks: Tasks,
     types: Types,
     build_root: &Path,
     ignore_patterns: Vec<String>,
@@ -59,20 +59,6 @@ impl Core {
       },
     );
 
-    // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
-    //   see: https://github.com/pantsbuild/pants/issues/4397
-    let snapshots = Snapshots::new(snapshots_dir).unwrap_or_else(|e| {
-      panic!("Could not initialize Snapshot directory: {:?}", e);
-    });
-    tasks.singleton_replace(
-      externs::unsafe_call(
-        &types.construct_snapshots,
-        &vec![
-          externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes()),
-        ],
-      ),
-      types.snapshots.clone(),
-    );
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
     Core {
@@ -81,8 +67,7 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       pool: pool.clone(),
-      snapshots: snapshots,
-      store: store,
+      store: Arc::new(store),
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
       vfs: PosixFS::new(build_root, pool, ignore_patterns).unwrap_or_else(|e| {
@@ -117,6 +102,12 @@ impl Context {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
     self.core.graph.get(self.entry_id, self, node)
+  }
+}
+
+impl StoreFileByDigest<Failure> for Context {
+  fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, Failure> {
+    self.get(DigestFile(file.clone()))
   }
 }
 

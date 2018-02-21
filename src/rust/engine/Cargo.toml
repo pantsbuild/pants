@@ -21,6 +21,7 @@ cc = "1.0"
 # [workspace]
 
 [dependencies]
+bazel_protos = { path = "process_execution/bazel_protos" }
 boxfuture = { path = "boxfuture" }
 fnv = "1.0.5"
 fs = { path = "fs" }
@@ -29,4 +30,5 @@ hashing = { path = "hashing" }
 lazy_static = "0.2.2"
 ordermap = "0.2.8"
 petgraph = "0.4.5"
+tempdir = "0.3.5"
 process_execution = { path = "process_execution" }
