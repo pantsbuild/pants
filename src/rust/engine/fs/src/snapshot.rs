@@ -23,14 +23,21 @@ pub struct Snapshot {
   pub path_stats: Vec<PathStat>,
 }
 
-pub trait GetFileDigest<Error> {
-  fn digest(&self, file: &File) -> BoxFuture<Digest, Error>;
+// StoreFileByDigest allows a File to be saved to an underlying Store, in such a way that it can be
+// looked up by the Digest produced by the store_by_digest method.
+// It is a separate trait so that caching implementations can be written which wrap the Store (used
+// to store the bytes) and VFS (used to read the files off disk if needed).
+pub trait StoreFileByDigest<Error> {
+  fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, Error>;
 }
 
 impl Snapshot {
-  pub fn from_path_stats<GFD: GetFileDigest<Error> + Sized, Error: fmt::Debug + 'static + Send>(
+  pub fn from_path_stats<
+    S: StoreFileByDigest<Error> + Sized + Clone,
+    Error: fmt::Debug + 'static + Send,
+  >(
     store: Arc<Store>,
-    file_digester: Arc<GFD>,
+    file_digester: S,
     mut path_stats: Vec<PathStat>,
   ) -> BoxFuture<Snapshot, String> {
     let mut file_futures: Vec<BoxFuture<bazel_protos::remote_execution::FileNode, String>> =
@@ -59,7 +66,7 @@ impl Snapshot {
             file_futures.push(
               file_digester
                 .clone()
-                .digest(&stat)
+                .store_by_digest(&stat)
                 .map_err(|e| format!("{:?}", e))
                 .and_then(move |digest| {
                   let mut file_node = bazel_protos::remote_execution::FileNode::new();
@@ -175,8 +182,8 @@ mod tests {
   use tempdir::TempDir;
   use self::testutil::make_file;
 
-  use super::super::{File, GetFileDigest, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot,
-                     Store, VFS};
+  use super::super::{File, PathGlobs, PathStat, PosixFS, ResettablePool, Snapshot, Store,
+                     StoreFileByDigest, VFS};
 
   use std;
   use std::error::Error;
@@ -185,7 +192,7 @@ mod tests {
 
   const STR: &str = "European Burmese";
 
-  fn setup() -> (Arc<Store>, TempDir, Arc<PosixFS>, Arc<FileSaver>) {
+  fn setup() -> (Arc<Store>, TempDir, Arc<PosixFS>, FileSaver) {
     let pool = Arc::new(ResettablePool::new("test-pool-".to_string()));
     // TODO: Pass a remote CAS address through.
     let store = Arc::new(
@@ -193,8 +200,8 @@ mod tests {
     );
     let dir = TempDir::new("root").unwrap();
     let posix_fs = Arc::new(PosixFS::new(dir.path(), pool, vec![]).unwrap());
-    let digester = Arc::new(FileSaver(store.clone(), posix_fs.clone()));
-    (store, dir, posix_fs, digester)
+    let file_saver = FileSaver(store.clone(), posix_fs.clone());
+    (store, dir, posix_fs, file_saver)
   }
 
   #[test]
@@ -279,10 +286,11 @@ mod tests {
     );
   }
 
+  #[derive(Clone)]
   struct FileSaver(Arc<Store>, Arc<PosixFS>);
 
-  impl GetFileDigest<String> for FileSaver {
-    fn digest(&self, file: &File) -> BoxFuture<Digest, String> {
+  impl StoreFileByDigest<String> for FileSaver {
+    fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, String> {
       let file_copy = file.clone();
       let store = self.0.clone();
       self
