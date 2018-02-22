@@ -122,9 +122,8 @@ class PythonBinaryCreate(Task):
           req_tgts.append(tgt)
         # Add target's interpreter compatibility constraints to pex info.
         if is_python_target(tgt):
-          if has_python_sources(tgt) or tgt.entry_point:
-            for constraint in tgt.compatibility:
-              builder.add_interpreter_constraint(constraint)
+          for constraint in tgt.compatibility:
+            builder.add_interpreter_constraint(constraint)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
