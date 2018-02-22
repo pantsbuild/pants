@@ -1,10 +1,11 @@
 extern crate clap;
 extern crate fs;
+extern crate futures;
 extern crate process_execution;
 
 use clap::{App, AppSettings, Arg};
+use futures::future::Future;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::process::exit;
 
 use std::iter::Iterator;
@@ -73,6 +74,7 @@ If unspecified, local execution will be performed.",
     Some(addr) => {
       process_execution::remote::CommandRunner::new(addr, 1)
         .run_command_remote(request)
+        .wait()
         .unwrap()
     }
     None => {
