@@ -16,9 +16,10 @@ pub struct CommandRunner {
   operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
 }
 
-#[derive(Debug, Eq, PartialEq)]
 enum ExecutionError {
+  // String is the error message.
   Fatal(String),
+  // String is the operation name which can be used to poll the GetOperation gRPC API.
   NotFinished(String),
 }
 
@@ -56,11 +57,16 @@ impl CommandRunner {
         .and_then(move |execute_request| {
           map_grpc_result(execution_client.execute(&execute_request))
         })
-        // TODO: Use some better looping-frequency strategy than a tight-loop.
+
+        // TODO: Use some better looping-frequency strategy than a tight-loop:
+        // https://github.com/pantsbuild/pants/issues/5503
+
         // TODO: Add a timeout of some kind.
+        // https://github.com/pantsbuild/pants/issues/5504
+
         .and_then(move |operation| future::loop_fn(operation, move |operation| {
           match extract_execute_response(operation) {
-            Ok(value) => return Ok(future::Loop::Break(value)),
+            Ok(value) => Ok(future::Loop::Break(value)),
             Err(ExecutionError::Fatal(err)) => Err(err),
             Err(ExecutionError::NotFinished(operation_name)) => {
               let mut operation_request = bazel_protos::operations::GetOperationRequest::new();
