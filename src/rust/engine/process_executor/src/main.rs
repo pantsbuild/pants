@@ -72,7 +72,7 @@ If unspecified, local execution will be performed.",
   };
   let result = match server {
     Some(addr) => {
-      process_execution::remote::CommandRunner::new(addr, 1)
+      process_execution::remote::CommandRunner::new(addr, 1, None)
         .run_command_remote(request)
         .wait()
         .unwrap()
