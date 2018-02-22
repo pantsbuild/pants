@@ -78,35 +78,13 @@ impl CommandRunner {
 
     match execute_request_result {
       Ok((command, execute_request)) => {
-        let execute_request_copy = execute_request.clone();
-        let store_copy = store.clone();
-        let store_copy2 = store.clone();
-        future::done(
-          command.write_to_bytes()
-              .map_err(|e| format!("Error serializing command {:?}", e))
-        )
-          .and_then(move |command_bytes| {
-            store_copy.store_file_bytes(
-              Bytes::from(command_bytes),
-              true,
-            )
-          })
-          .map_err(|e| format!("Error saving digest to local store: {:?}", e))
+        self.upload_command(&command, execute_request.get_action().get_command_digest().into())
           .and_then(move |_| {
-            // TODO: Tune when we upload the command.
-            store_copy2
-                .ensure_remote_has_recursive(vec![
-                  execute_request_copy.get_action().get_command_digest().into(),
-                ])
-                .map_err(|e| format!("Error uploading command {:?}", e))
-                .map(|_| execute_request_copy)
-          })
-          .and_then(move |execute_request| {
             // TODO: Log less verbosely
             println!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
 
-            let execute_request = Arc::new(execute_request);
             map_grpc_result(execution_client.execute(&execute_request))
+                .map(|result| (Arc::new(execute_request), result))
           })
 
           // TODO: Use some better looping-frequency strategy than a tight-loop:
@@ -115,7 +93,7 @@ impl CommandRunner {
           // TODO: Add a timeout of some kind.
           // https://github.com/pantsbuild/pants/issues/5504
 
-          .and_then(move |operation| {
+          .and_then(move |(execute_request, operation)| {
             future::loop_fn(operation, move |operation| {
               match extract_execute_response(operation) {
                 Ok(value) => {
@@ -160,6 +138,29 @@ impl CommandRunner {
       }
       Err(err) => future::err(err).to_boxed(),
     }
+  }
+
+  fn upload_command(
+    &self,
+    command: &bazel_protos::remote_execution::Command,
+    command_digest: Digest,
+  ) -> BoxFuture<(), String> {
+    let store = self.store.clone();
+    let store2 = store.clone();
+    future::done(command.write_to_bytes().map_err(|e| {
+      format!("Error serializing command {:?}", e)
+    })).and_then(move |command_bytes| {
+      store.store_file_bytes(Bytes::from(command_bytes), true)
+    })
+      .map_err(|e| format!("Error saving digest to local store: {:?}", e))
+      .and_then(move |_| {
+        // TODO: Tune when we upload the command.
+        store2
+          .ensure_remote_has_recursive(vec![command_digest])
+          .map_err(|e| format!("Error uploading command {:?}", e))
+          .map(|_| ())
+      })
+      .to_boxed()
   }
 }
 

@@ -6,10 +6,9 @@ extern crate futures;
 extern crate process_execution;
 extern crate tempdir;
 
-use boxfuture::{BoxFuture, Boxable};
 use clap::{App, AppSettings, Arg};
-use fs::{StoreFileByDigest, VFS};
 use futures::future::Future;
+use hashing::{Digest, Fingerprint};
 use tempdir::TempDir;
 use std::collections::BTreeMap;
 use std::iter::Iterator;
@@ -18,7 +17,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 /// A binary which takes args of format:
-///  process_executor --env=FOO=bar --env=SOME=value -- /path/to/binary --flag --otherflag
+///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
+///    -- /path/to/binary --flag --otherflag
 /// and runs /path/to/binary --flag --otherflag with FOO and SOME set.
 /// It outputs its output/err to stdout/err, and exits with its exit code.
 ///
@@ -30,14 +30,25 @@ fn main() {
         .long("local-store-path")
         .takes_value(true)
         .required(true)
-        .help("TODO"),
+        .help("Path to lmdb directory used for local file storage"),
     )
     .arg(
-      Arg::with_name("globs")
-        .long("globs")
+      Arg::with_name("input-digest")
+        .long("input-digest")
         .takes_value(true)
-        .multiple(true)
-        .help("TODO"),
+        .required(true)
+        .help(
+          "Fingerprint (hex string) of the digest to use as the input file tree.",
+        ),
+    )
+    .arg(
+      Arg::with_name("input-digest-length")
+        .long("input-digest-length")
+        .takes_value(true)
+        .required(true)
+        .help(
+          "Length of the proto-bytes whose digest to use as the input file tree.",
+        ),
     )
     .arg(
       Arg::with_name("server")
@@ -106,33 +117,16 @@ If unspecified, local execution will be performed.",
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }.expect("Error making store");
 
-  let posix_fs = Arc::new(fs::PosixFS::new(".", pool, vec![]).unwrap());
-  let store_copy = store.clone();
-  let input_files = posix_fs
-    .expand(
-      fs::PathGlobs::create(
-        &args
-          .values_of("globs")
-          .expect("Bad globs")
-          .map(|s| s.to_string())
-          .collect::<Vec<String>>(),
-        &[],
-      ).expect("Error creating globs"),
-    )
-    .map_err(|err| format!("Error expanding globs: {}", err))
-    .and_then(move |paths| {
-      fs::Snapshot::from_path_stats(
-        store_copy.clone(),
-        FileSaver {
-          store: store_copy,
-          posix_fs: posix_fs,
-        },
-        paths,
-      )
-    })
-    .map(|snapshot| snapshot.digest)
-    .wait()
-    .expect("Error reading input files");
+  let input_files = {
+    let fingerprint = Fingerprint::from_hex_string(args.value_of("input-digest").unwrap())
+      .expect("Bad input-digest");
+    let length = args
+      .value_of("input-digest-length")
+      .unwrap()
+      .parse::<usize>()
+      .expect("input-digest-length must be a non-negative number");
+    Digest(fingerprint, length)
+  };
 
   let request = process_execution::ExecuteProcessRequest {
     argv,
@@ -160,25 +154,4 @@ If unspecified, local execution will be performed.",
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());
   exit(result.exit_code);
-}
-
-#[derive(Clone)]
-struct FileSaver {
-  store: fs::Store,
-  posix_fs: Arc<fs::PosixFS>,
-}
-
-impl StoreFileByDigest<String> for FileSaver {
-  fn store_by_digest(&self, file: &fs::File) -> BoxFuture<hashing::Digest, String> {
-    let file_copy = file.clone();
-    let store = self.store.clone();
-    self
-      .posix_fs
-      .read_file(&file)
-      .map_err(move |err| {
-        format!("Error reading file {:?}: {:?}", file_copy, err)
-      })
-      .and_then(move |content| store.store_file_bytes(content.content, true))
-      .to_boxed()
-  }
 }
