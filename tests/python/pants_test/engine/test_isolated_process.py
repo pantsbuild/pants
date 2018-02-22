@@ -216,7 +216,6 @@ class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
     state = self.assertFirstEntryIsReturn(root_entries, scheduler, request)
     execution_result = state.value
     self.assertEqual(0, execution_result.exit_code)
-
     # TODO: Test that the output snapshot is good
 
   def test_javac_compilation_example_rust_failure(self):
