@@ -150,7 +150,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     # Ensure proper interpreter constraints were passed to built pexes.
     py2_pex = os.path.join(os.getcwd(), 'dist', 'test_bin.pex')
     py2_info = get_pex_info(py2_pex)
-    self.assertIn('CPython>=3.6', py2_info.interpreter_constraints)
+    self.assertIn('CPython>3', py2_info.interpreter_constraints)
     # Cleanup.
     os.remove(py2_pex)
 
