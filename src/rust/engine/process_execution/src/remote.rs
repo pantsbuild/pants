@@ -157,6 +157,7 @@ fn digest(message: &protobuf::Message) -> Result<bazel_protos::remote_execution:
 mod tests {
   use bazel_protos;
   use bytes::Bytes;
+  use fs;
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use testutil::{owned_string_vec, as_byte_owned_vec};
@@ -176,6 +177,7 @@ mod tests {
           super::make_execute_request(&ExecuteProcessRequest {
             argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
             env: BTreeMap::new(),
+            input_files: fs::EMPTY_DIGEST,
           }).unwrap(),
           vec![],
         ).unwrap(),
@@ -469,6 +471,7 @@ mod tests {
     ExecuteProcessRequest {
       argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
       env: BTreeMap::new(),
+      input_files: fs::EMPTY_DIGEST,
     }
   }
 
