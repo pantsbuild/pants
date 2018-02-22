@@ -5,14 +5,12 @@ use std;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use boxfuture::BoxFuture;
-use core::{Failure, TypeId};
+use core::TypeId;
 use externs;
-use fs::{File, PosixFS, Store, safe_create_dir_all_ioerror, ResettablePool, StoreFileByDigest};
+use fs::{PosixFS, Store, safe_create_dir_all_ioerror, ResettablePool};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
-use hashing::Digest;
-use nodes::{DigestFile, Node, NodeFuture};
+use nodes::{Node, NodeFuture};
 use rule_graph::RuleGraph;
 use tasks::Tasks;
 use types::Types;
@@ -102,12 +100,6 @@ impl Context {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
     self.core.graph.get(self.entry_id, self, node)
-  }
-}
-
-impl StoreFileByDigest<Failure> for Context {
-  fn store_by_digest(&self, file: &File) -> BoxFuture<Digest, Failure> {
-    self.get(DigestFile(file.clone()))
   }
 }
 

@@ -18,7 +18,7 @@ use boxfuture::{Boxable, BoxFuture};
 use context::Context;
 use core::{Failure, Key, Noop, TypeConstraint, Value, Variants, throw};
 use externs;
-use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, VFS};
+use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
 use process_execution as process_executor;
 use hashing;
 use rule_graph;
@@ -69,6 +69,12 @@ impl VFS<Failure> for Context {
       externs::create_exception(msg),
       "<pants native internals>".to_string(),
     )
+  }
+}
+
+impl StoreFileByDigest<Failure> for Context {
+  fn store_by_digest(&self, file: &File) -> BoxFuture<hashing::Digest, Failure> {
+    self.get(DigestFile(file.clone()))
   }
 }
 
@@ -307,8 +313,7 @@ impl Select {
         );
       }
 
-      // TODO: Make this much less unwrap-happy as part of moving this to run off-thread and
-      // asynchronously.
+      // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
 
       let fingerprint = externs::project_str(&value, "input_files_digest");
       let digest_length = externs::project_str(&value, "digest_length");
@@ -790,8 +795,7 @@ impl Node for ExecuteProcess {
   fn run(self, context: Context) -> NodeFuture<ProcessResult> {
     let request = self.0.clone();
 
-    // TODO: Make this much less unwrap-happy as part of moving this to run off-thread and
-    // asynchronously.
+    // TODO: Make this much less unwrap-happy with https://github.com/pantsbuild/pants/issues/5502
 
     let tmpdir = TempDir::new("process-execution").unwrap();
     context

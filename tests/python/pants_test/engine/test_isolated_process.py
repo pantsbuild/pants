@@ -92,6 +92,7 @@ def process_request_from_java_sources(binary):
     input_files_digest="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     digest_length=0)
 
+
 def process_request_java_args_from_java_sources(binary, sources_snapshot, out_dir):
   env = []
   return ExecuteProcessRequest(
@@ -99,6 +100,7 @@ def process_request_java_args_from_java_sources(binary, sources_snapshot, out_di
     input_files_digest=str(sources_snapshot.fingerprint),
     digest_length=sources_snapshot.digest_length,
     env=env)
+
 
 class ClasspathEntry(datatype('ClasspathEntry', ['path'])):
   """A classpath entry for a subject."""
@@ -128,6 +130,7 @@ class SnapshottedProcessRequestTest(SchedulerTestBase, unittest.TestCase):
 
 
 class IsolatedProcessTest(SchedulerTestBase, unittest.TestCase):
+
   # TODO: Re-write this test to work with non-tar-file snapshots
   @unittest.skip
   def test_integration_concat_with_snapshot_subjects_test(self):

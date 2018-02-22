@@ -471,7 +471,7 @@ mod local {
         // Without this flag, each time a read transaction is started, it eats into our transaction
         // limit (default: 126) until that thread dies.
         //
-        // This flag makes transactions are removed from that limit when they are dropped, rather
+        // This flag makes transactions be removed from that limit when they are dropped, rather
         // than when their thread dies. This is important, because we perform reads from a thread
         // pool, so our threads never die. Without this flag, all read requests will fail after the
         // first 126.
