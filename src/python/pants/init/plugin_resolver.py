@@ -39,7 +39,7 @@ class PluginResolver(object):
     if not os.path.isdir(install_dir):
       with temporary_dir(root_dir=os.path.dirname(install_dir)) as tmp:
         cls._install_wheel(wheel_path, tmp)
-      os.rename(tmp, install_dir)
+        os.rename(tmp, install_dir)
     # Activate any .pth files installed above.
     site.addsitedir(install_dir)
     return install_dir
