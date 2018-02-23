@@ -137,7 +137,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
           config=pants_ini_config
         )
         self.assert_success(pants_run_3)
-        self.assertIn('python3.6', pants_run_3.stdout_data)
+        self.assertIn('python3', pants_run_3.stdout_data)
 
       # Binary task.
       pants_ini_config = {'python-setup': {'interpreter_cache_dir': interpreters_cache}}
