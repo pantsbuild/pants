@@ -74,6 +74,9 @@ class PythonBinary(PythonTarget):
       e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements agnostic to interpreter class.
     """
 
+    if inherit_path is False:
+      inherit_path = "false"
+
     payload = Payload()
     payload.add_fields({
       'entry_point': PrimitiveField(entry_point),
