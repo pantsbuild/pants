@@ -353,8 +353,8 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       # Then, set an env var on the secondary call.
       with environment_as(TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST=EXPECTED_VALUE):
         result = pantsd_run(
-          ['run',
-           '-q',
+          ['-q',
+           'run',
            'testprojects/src/python/print_env',
            '--',
            'TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST']
