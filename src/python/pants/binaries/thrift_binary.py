@@ -5,15 +5,10 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants.base.deprecated import deprecated_module
+from pants.base.deprecated import deprecated
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_property
-
-
-
-deprecated_module('1.7.0.dev0',
-                  hint_message='Use pants.backend.codegen.thrift.lib.thrift instead.')
 
 
 class ThriftBinary(object):
@@ -35,12 +30,18 @@ class ThriftBinary(object):
     @classmethod
     def register_options(cls, register):
       register('--supportdir', advanced=True, default='bin/thrift',
+               removal_version='1.7.0.dev0',
+               removal_hint='Use pants.backend.codegen.thrift.lib.thrift instead.',
                help='Find thrift binaries under this dir.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
       register('--version', advanced=True, default='0.9.2', fingerprint=True,
+               removal_version='1.7.0.dev0',
+               removal_hint='Use pants.backend.codegen.thrift.lib.thrift instead.',
                help='Thrift compiler version.   Used as part of the path to lookup the'
                     'tool with --binary-util-baseurls and --pants-bootstrapdir')
 
+    @deprecated(removal_version='1.7.0.dev0',
+                hint_message='Use pants.backend.codegen.thrift.lib.thrift instead.')
     def create(self):
       """
       :API: public
