@@ -56,6 +56,17 @@ def environment_as(**kwargs):
 
 
 @contextmanager
+def hermetic_environment_as(**kwargs):
+  """Set the environment to the supplied values from an empty state."""
+  old_environment, os.environ = os.environ, {}
+  try:
+    with environment_as(**kwargs):
+      yield
+  finally:
+    os.environ = old_environment
+
+
+@contextmanager
 def _stdio_stream_as(src_fd, dst_fd, dst_sys_attribute, mode):
   """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
   if src_fd == -1:

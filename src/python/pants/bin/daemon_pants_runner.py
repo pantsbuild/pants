@@ -21,7 +21,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.contextutil import HardSystemExit, environment_as, stdio_as
+from pants.util.contextutil import HardSystemExit, hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
@@ -222,7 +222,7 @@ class DaemonPantsRunner(ProcessManager):
     self._setup_sigint_handler()
 
     # Invoke a Pants run with stdio redirected and a proxied environment.
-    with self._nailgunned_stdio(self._socket) as finalizer, environment_as(**self._env):
+    with self._nailgunned_stdio(self._socket) as finalizer, hermetic_environment_as(**self._env):
       try:
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
