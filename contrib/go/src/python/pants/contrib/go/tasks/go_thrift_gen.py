@@ -46,13 +46,24 @@ class GoThriftGen(SimpleCodegenTask):
   def subsystem_dependencies(cls):
     return super(GoThriftGen, cls).subsystem_dependencies() + (Thrift.scoped(cls),)
 
-  @memoized_property
+  @property
   def _thrift_binary(self):
-    return Thrift.scoped_instance(self).create()
+    return self._thrift.select(context=self.context)
+
+  @property
+  def _thrift_version(self):
+    return self._thrift.version(context=self.context)
+
+  @memoized_property
+  def _thrift(self):
+    return Thrift.scoped_instance(self)
 
   @memoized_property
   def _deps(self):
     thrift_import_target = self.get_options().thrift_import_target
+    if thrift_import_target is None:
+      raise TaskError('Option thrift_import_target in scope {} must be set.'.format(
+        self.options_scope))
     thrift_imports = self.context.resolve(thrift_import_target)
     return thrift_imports
 
@@ -93,18 +104,18 @@ class GoThriftGen(SimpleCodegenTask):
     # https://issues.apache.org/jira/browse/THRIFT-3776; first available in 0.10.0
     if self.get_options().multiple_files_per_target_override:
       return
-    actual_revision = Revision.semver(self._thrift_binary.version)
     required_version = '0.10.0'
-    if Revision.semver(required_version) <= actual_revision:
-      return
-    raise TaskError('A single .thrift source file is supported per go_thrift_library with thrift '
-                    'version `{}`: upgrade to at least `{}` to support multiple files.'.format(
-                      self._thrift_binary.version, required_version))
+    if  Revision.semver(self._thrift_version) < Revision.semver(required_version):
+      raise TaskError('A single .thrift source file is supported per go_thrift_library with thrift '
+                      'version `{}`: upgrade to at least `{}` to support multiple files.'.format(
+                      self._thrift_version, required_version))
 
   @memoized_property
   def _thrift_cmd(self):
-    cmd = [self._thrift_binary.path]
+    cmd = [self._thrift_binary]
     thrift_import = 'thrift_import={}'.format(self.get_options().thrift_import)
+    if thrift_import is None:
+      raise TaskError('Option thrift_import in scope {} must be set.'.format(self.options_scope))
     gen_options = self.get_options().gen_options
     if gen_options:
       gen_options += ',' + thrift_import
@@ -140,7 +151,7 @@ class GoThriftGen(SimpleCodegenTask):
                                  stdout=workunit.output('stdout'),
                                  stderr=workunit.output('stderr'))
         if result != 0:
-          raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary.path, result))
+          raise TaskError('{} ... exited non-zero ({})'.format(self._thrift_binary, result))
 
     gen_dir = os.path.join(target_workdir, 'gen-go')
     src_dir = os.path.join(target_workdir, 'src')

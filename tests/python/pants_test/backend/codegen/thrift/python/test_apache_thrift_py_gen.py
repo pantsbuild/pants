@@ -32,8 +32,8 @@ class ApacheThriftPyGenTest(TaskTestBase):
 
   @staticmethod
   def get_thrift_version(apache_thrift_gen):
-    thrift_binary = global_subsystem_instance(Thrift).scoped_instance(apache_thrift_gen).create()
-    return thrift_binary.version
+    thrift = global_subsystem_instance(Thrift).scoped_instance(apache_thrift_gen)
+    return thrift.get_options().version
 
   def generate_single_thrift_target(self, python_thrift_library):
     context = self.context(target_roots=[python_thrift_library])
