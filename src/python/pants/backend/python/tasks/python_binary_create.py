@@ -15,7 +15,7 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources,
-                                                       has_resources)
+                                                       has_resources, is_python_target)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -118,12 +118,12 @@ class PythonBinaryCreate(Task):
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
-          # Add target's interpreter compatibility constraints to pex info.
-          if has_python_sources(tgt):
-            for constraint in tgt.compatibility:
-              builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
+        # Add target's interpreter compatibility constraints to pex info.
+        if is_python_target(tgt):
+          for constraint in tgt.compatibility:
+            builder.add_interpreter_constraint(constraint)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
