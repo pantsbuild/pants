@@ -52,6 +52,9 @@ Bugfixes
 * fix/tests: subsystems can't declare dependencies on non-globally-scoped subsystems (#5456)
   `PR #5456 <https://github.com/pantsbuild/pants/pull/5456>`_
 
+* Fix missing interpreter constraints bug when a Python target does not have sources (#5501)
+  `PR #5501 <https://github.com/pantsbuild/pants/pull/5501>`_
+
 Documentation Updates
 ~~~~~~~~~~~~~~~~~~~~~
 
