@@ -38,26 +38,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'eclipse_integration',
-  sources = ['test_eclipse_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
-  name = 'ensime_integration',
-  sources = ['test_ensime_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-)
-
-python_tests(
   name = 'export',
   sources = ['test_export.py'],
   dependencies = [
@@ -124,19 +104,6 @@ python_tests(
     'src/python/pants/source',
     'tests/python/pants_test:base_test',
   ]
-)
-
-python_tests(
-  name = 'idea_integration',
-  sources = ['test_idea_integration.py'],
-  dependencies = [
-    ':resolve_jars_test_mixin',
-    '3rdparty/python/twitter/commons:twitter.common.collections',
-    'src/python/pants/util:contextutil',
-    'tests/python/pants_test:int-test',
-  ],
-  tags = {'integration'},
-  timeout = 300,
 )
 
 python_tests(

@@ -126,6 +126,7 @@ python_library(
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:build_file',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/util:desktop',
