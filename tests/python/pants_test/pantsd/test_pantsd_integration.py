@@ -343,7 +343,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
       join()
 
-  def test_pantsd_env_var_is_inherited_by_pantsd_runner_children(self):
+  def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
     EXPECTED_VALUE = '333'
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
       # First, launch the daemon without any local env vars set.
@@ -362,3 +362,23 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         checker.assert_running()
 
       self.assertEquals(EXPECTED_VALUE, ''.join(result.stdout_data).strip())
+
+  def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
+    with self.pantsd_test_context() as (workdir, pantsd_config, checker):
+      with environment_as(NO_LEAKS='33'):
+        self.assert_success(
+          self.run_pants_with_workdir(
+            ['help'],
+            workdir,
+            pantsd_config)
+        )
+        checker.await_pantsd()
+
+      self.assert_failure(
+        self.run_pants_with_workdir(
+          ['-q', 'run', 'testprojects/src/python/print_env', '--', 'NO_LEAKS'],
+          workdir,
+          pantsd_config
+        )
+      )
+      checker.assert_running()
