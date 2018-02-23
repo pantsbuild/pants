@@ -10,8 +10,6 @@ from textwrap import dedent
 
 import coverage
 
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
@@ -50,6 +48,7 @@ class PytestTestBase(PythonTaskTestBase):
       return e.failed_targets
 
   def _prepare_test_run(self, targets, *passthru_args, **options):
+    self.reset_build_graph()
     test_options = {
       'colors': False,
       'level': 'info'  # When debugging a test failure it may be helpful to set this to 'debug'.
@@ -152,7 +151,6 @@ class PytestTest(PytestTestBase):
                                read_from=None,
                                write_to=None)
 
-    # Targets under test.
     self.create_file(
         'lib/core.py',
         dedent("""
@@ -163,45 +161,21 @@ class PytestTest(PytestTestBase):
           def two():  # line 5
             return 2  # line 6
         """).strip())
-    core_lib = self.make_target(spec='lib:core',
-                                target_type=PythonLibrary,
-                                sources=['core.py'])
-
-    self.create_file(
-        'app/app.py',
+    self.add_to_build_file(
+        'lib',
         dedent("""
-          import core          # line 1
-                               # line 2
-                               # line 3
-          def use_two():       # line 4
-            return core.two()  # line 5
-        """).strip())
-    app_lib = self.make_target(spec='app',
-                               target_type=PythonLibrary,
-                               sources=['app.py'],
-                               dependencies=[core_lib])
-
-    # Test targets.
-    self.create_file(
-        'tests/test_app.py',
-        dedent("""
-          import unittest
-
-          import app
-
-          class AppTest(unittest.TestCase):
-            def test_use_two(self):
-              self.assertEqual(2, app.use_two())
+          python_library(
+            name='core',
+            sources=[
+              'core.py'
+            ]
+          )
         """))
-    self.app = self.make_target(spec='tests:app',
-                                target_type=PythonTests,
-                                sources=['test_app.py'],
-                                dependencies=[app_lib])
 
     self.create_file(
         'tests/test_core_green.py',
         dedent("""
-          import unittest
+          import unittest2 as unittest
 
           import core
 
@@ -209,16 +183,10 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
-    self.green = self.make_target(spec='tests:green',
-                                  target_type=PythonTests,
-                                  sources=['test_core_green.py'],
-                                  dependencies=[core_lib],
-                                  coverage=['core'])
-
     self.create_file(
-        'tests/test_core_green2.py',
-        dedent("""
-          import unittest
+      'tests/test_core_green2.py',
+      dedent("""
+          import unittest2 as unittest
 
           import core
 
@@ -226,16 +194,10 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
-    self.green2 = self.make_target(spec='tests:green2',
-                                   target_type=PythonTests,
-                                   sources=['test_core_green2.py'],
-                                   dependencies=[core_lib],
-                                   coverage=['core'])
-
     self.create_file(
-        'tests/test_core_green3.py',
-        dedent("""
-          import unittest
+      'tests/test_core_green3.py',
+      dedent("""
+          import unittest2 as unittest
 
           import core
 
@@ -243,12 +205,6 @@ class PytestTest(PytestTestBase):
             def test_one(self):
               self.assertEqual(1, core.one())
         """))
-    self.green3 = self.make_target(spec='tests:green3',
-                                   target_type=PythonTests,
-                                   sources=['test_core_green3.py'],
-                                   dependencies=[core_lib],
-                                   coverage=['core'])
-
     self.create_file(
         'tests/test_core_red.py',
         dedent("""
@@ -257,16 +213,10 @@ class PytestTest(PytestTestBase):
           def test_two():
             assert 1 == core.two()
         """))
-    self.red = self.make_target(spec='tests:red',
-                                target_type=PythonTests,
-                                sources=['test_core_red.py'],
-                                dependencies=[core_lib],
-                                coverage=['core'])
-
     self.create_file(
         'tests/test_core_red_in_class.py',
         dedent("""
-          import unittest
+          import unittest2 as unittest
 
           import core
 
@@ -274,72 +224,195 @@ class PytestTest(PytestTestBase):
             def test_one_in_class(self):
               self.assertEqual(1, core.two())
         """))
-    self.red_in_class = self.make_target(spec='tests:red_in_class',
-                                         target_type=PythonTests,
-                                         sources=['test_core_red_in_class.py'],
-                                         dependencies=[core_lib],
-                                         coverage=['core'])
-
     self.create_file(
-        'tests/test_core_sleep.py',
-        dedent("""
+      'tests/test_core_sleep.py',
+      dedent("""
           import core
 
           def test_three():
             assert 1 == core.one()
         """))
-    self.sleep_no_timeout = self.make_target(spec='tests:sleep_no_timeout',
-                                             target_type=PythonTests,
-                                             sources=['test_core_sleep.py'],
-                                             dependencies=[core_lib],
-                                             coverage=['core'],
-                                             timeout=0)
-    self.sleep_timeout = self.make_target(spec='tests:sleep_timeout',
-                                          target_type=PythonTests,
-                                          sources=['test_core_sleep.py'],
-                                          dependencies=[core_lib],
-                                          coverage=['core'],
-                                          timeout=1)
-
     self.create_file(
-        'tests/test_error.py',
-        dedent("""
-          def test_error(bad_fixture):
-            pass
-        """))
-    self.error = self.make_target(spec='tests:error',
-                                  target_type=PythonTests,
-                                  sources=['test_error.py'])
-
-    self.create_file(
-        'tests/test_failure_outside_function.py',
-        dedent("""
-        def null():
+      'tests/test_error.py',
+      dedent("""
+        def test_error(bad_fixture):
           pass
+      """)
+    )
+    self.create_file(
+      'tests/test_failure_outside_function.py',
+      dedent("""
+      def null():
+        pass
 
-        assert(False)
+      assert(False)
+      """
+        )
+    )
+    self.create_file(
+      'tests/conftest.py', self._CONFTEST_CONTENT
+    )
+
+    self.add_to_build_file(
+        'tests',
+        dedent("""
+          python_tests(
+            name='error',
+            sources=[
+              'test_error.py'
+            ],
+          )
+
+          python_tests(
+            name='failure_outside_function',
+            sources=[
+              'test_failure_outside_function.py',
+            ],
+          )
+
+          python_tests(
+            name='green',
+            sources=[
+              'test_core_green.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='green2',
+            sources=[
+              'test_core_green2.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='green3',
+            sources=[
+              'test_core_green3.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='red',
+            sources=[
+              'test_core_red.py',
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='red_in_class',
+            sources=[
+              'test_core_red_in_class.py',
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='sleep_no_timeout',
+            sources=[
+              'test_core_sleep.py',
+            ],
+            timeout = 0,
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='sleep_timeout',
+            sources=[
+              'test_core_sleep.py',
+            ],
+            timeout = 1,
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='all',
+            sources=[
+              'test_core_green.py',
+              'test_core_red.py',
+            ],
+            dependencies=[
+              'lib:core'
+            ]
+          )
+
+          python_tests(
+            name='all-with-coverage',
+            sources=[
+              'test_core_green.py',
+              'test_core_red.py'
+            ],
+            dependencies=[
+              'lib:core'
+            ],
+            coverage=[
+              'core'
+            ]
+          )
+
+          python_tests(
+            name='green-with-conftest',
+            sources=[
+              'conftest.py',
+              'test_core_green.py',
+            ],
+            dependencies=[
+              'lib:core',
+            ]
+          )
         """))
-    self.failure_outside_function = self.make_target(spec='tests:failure_outside_function',
-                                                     target_type=PythonTests,
-                                                     sources=['test_failure_outside_function.py'])
+    self.green = self.target('tests:green')
+    self.green2 = self.target('tests:green2')
+    self.green3 = self.target('tests:green3')
 
-    self.create_file('tests/conftest.py', self._CONFTEST_CONTENT)
-    self.green_with_conftest = self.make_target(spec='tests:green-with-conftest',
-                                                target_type=PythonTests,
-                                                sources=['conftest.py', 'test_core_green.py'],
-                                                dependencies=[core_lib])
+    self.red = self.target('tests:red')
+    self.red_in_class = self.target('tests:red_in_class')
+    self.sleep_no_timeout = self.target('tests:sleep_no_timeout')
+    self.sleep_timeout = self.target('tests:sleep_timeout')
+    self.error = self.target('tests:error')
+    self.failure_outside_function = self.target('tests:failure_outside_function')
 
-    self.all = self.make_target(spec='tests:all',
-                                target_type=PythonTests,
-                                sources=['test_core_green.py',
-                                         'test_core_red.py'],
-                                dependencies=[core_lib])
-
-    self.all_with_cov = self.make_target(spec='tests:all-with-coverage',
-                                         target_type=PythonTests,
-                                         sources=['test_core_green.py', 'test_core_red.py'],
-                                         dependencies=[core_lib],
-                                         coverage=['core'])
+    self.all = self.target('tests:all')
+    self.all_with_coverage = self.target('tests:all-with-coverage')
+    self.green_with_conftest = self.target('tests:green-with-conftest')
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_error(self):
@@ -432,62 +505,48 @@ class PytestTest(PytestTestBase):
 
   def load_coverage_data(self):
     path = os.path.join(self.build_root, 'lib', 'core.py')
-    return self.load_coverage_data_for(path)
-
-  def load_coverage_data_for(self, covered_path):
     data_file = self.coverage_data_file()
     self.assertTrue(os.path.isfile(data_file))
     coverage_data = coverage.coverage(data_file=data_file)
     coverage_data.load()
-    _, all_statements, not_run_statements, _ = coverage_data.analysis(covered_path)
+    _, all_statements, not_run_statements, _ = coverage_data.analysis(path)
     return all_statements, not_run_statements
 
-  def run_coverage_auto(self, targets, failed_targets=None):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-    simple_coverage_kwargs = {'coverage': 'auto'}
-    if failed_targets:
-      self.run_failing_tests(targets=targets,
-                             failed_targets=failed_targets,
-                             **simple_coverage_kwargs)
-    else:
-      self.run_tests(targets=targets, **simple_coverage_kwargs)
-    return self.load_coverage_data()
-
   @ensure_cached(PytestRun, expected_num_artifacts=1)
-  def test_coverage_auto_option_green(self):
-    all_statements, not_run_statements = self.run_coverage_auto(targets=[self.green])
+  def test_coverage_auto_option(self):
+    simple_coverage_kwargs = {'coverage': 'auto'}
+
+    self.assertFalse(os.path.isfile(self.coverage_data_file()))
+
+    self.run_tests(targets=[self.green], **simple_coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([6], not_run_statements)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_coverage_auto_option_red(self):
-    all_statements, not_run_statements = self.run_coverage_auto(targets=[self.red],
-                                                                failed_targets=[self.red])
+    self.run_failing_tests(targets=[self.red], failed_targets=[self.red], **simple_coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([2], not_run_statements)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_coverage_auto_option_mixed_multiple_targets(self):
-    all_statements, not_run_statements = self.run_coverage_auto(targets=[self.green, self.red],
-                                                                failed_targets=[self.red])
+    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
+                           **simple_coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
+    # The green target run should be cached and thus not covered in this second run.
+    self.assertEqual([2], not_run_statements)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_coverage_auto_option_mixed_single_target(self):
-    all_statements, not_run_statements = self.run_coverage_auto(targets=[self.all_with_cov],
-                                                                failed_targets=[self.all_with_cov])
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([], not_run_statements)
-
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
-  def test_coverage_auto_option_no_explicit_coverage_idiosyncratic_layout(self):
     # The all target has no coverage attribute and the code under test does not follow the
     # auto-discover pattern so we should get no coverage.
-    all_statements, not_run_statements = self.run_coverage_auto(targets=[self.all],
-                                                                failed_targets=[self.all])
+    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], **simple_coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
+
+    self.run_failing_tests(targets=[self.all_with_coverage],
+                           failed_targets=[self.all_with_coverage], **simple_coverage_kwargs)
+    all_statements, not_run_statements = self.load_coverage_data()
+    self.assertEqual([1, 2, 5, 6], all_statements)
+    self.assertEqual([], not_run_statements)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_coverage_modules_dne_option(self):
@@ -517,44 +576,6 @@ class PytestTest(PytestTestBase):
     all_statements, not_run_statements = self.load_coverage_data()
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
-
-  @ensure_cached(PytestRun, expected_num_artifacts=1)
-  def test_coverage_issue_5314_primary_source_root(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-
-    self.run_tests(targets=[self.app], coverage='app')
-
-    app_path = os.path.join(self.build_root, 'app', 'app.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(app_path)
-    self.assertEqual([1, 4, 5], all_statements)
-    self.assertEqual([], not_run_statements)
-
-  @ensure_cached(PytestRun, expected_num_artifacts=1)
-  def test_coverage_issue_5314_secondary_source_root(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-
-    self.run_tests(targets=[self.app], coverage='core')
-
-    core_path = os.path.join(self.build_root, 'lib', 'core.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(core_path)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([2], not_run_statements)
-
-  @ensure_cached(PytestRun, expected_num_artifacts=1)
-  def test_coverage_issue_5314_all_source_roots(self):
-    self.assertFalse(os.path.isfile(self.coverage_data_file()))
-
-    self.run_tests(targets=[self.app], coverage='app,core')
-
-    app_path = os.path.join(self.build_root, 'app', 'app.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(app_path)
-    self.assertEqual([1, 4, 5], all_statements)
-    self.assertEqual([], not_run_statements)
-
-    core_path = os.path.join(self.build_root, 'lib', 'core.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(core_path)
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([2], not_run_statements)
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_sharding(self):
