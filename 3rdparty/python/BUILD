@@ -12,7 +12,6 @@ python_requirement_library(
     # TODO: this library is not currently linked from pypi, so we override the repository
     # to fetch it from antlr.org instead. If at any point it reappears on pypi, the
     # repository arg can be removed.
-    #   see also: tests/python/pants_test/backend/python/test_python_chroot.py
     python_requirement('antlr_python_runtime==3.1.3',
                        repository='http://www.antlr3.org/download/Python/')
   ]

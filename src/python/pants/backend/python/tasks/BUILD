@@ -9,7 +9,6 @@ python_library(
     'src/python/pants/backend/python:python_requirement',
     'src/python/pants/backend/python:python_requirements',
     'src/python/pants/backend/python:interpreter_cache',
-    'src/python/pants/backend/python:python_chroot',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
