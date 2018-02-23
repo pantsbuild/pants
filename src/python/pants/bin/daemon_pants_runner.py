@@ -21,7 +21,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.contextutil import HardSystemExit, stdio_as, environment_as
+from pants.util.contextutil import HardSystemExit, environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
