@@ -11,13 +11,13 @@ from textwrap import dedent
 import six
 from pex.resolver import resolve
 
+from pants.backend.codegen.thrift.lib.thrift import Thrift
 from pants.backend.codegen.thrift.python.apache_thrift_py_gen import ApacheThriftPyGen
 from pants.backend.codegen.thrift.python.python_thrift_library import PythonThriftLibrary
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.base.build_environment import get_buildroot
-from pants.binaries.thrift_binary import ThriftBinary
 from pants.python.python_repos import PythonRepos
 from pants.util.process_handler import subprocess
 from pants_test.subsystem.subsystem_util import global_subsystem_instance
@@ -30,10 +30,10 @@ class ApacheThriftPyGenTest(TaskTestBase):
   def task_type(cls):
     return ApacheThriftPyGen
 
-  def get_thrift_version(self, apache_thrift_gen):
-    thrift_binary_factory = global_subsystem_instance(ThriftBinary.Factory)
-    thrift_binary = thrift_binary_factory.scoped_instance(apache_thrift_gen).create()
-    return thrift_binary.version
+  @staticmethod
+  def get_thrift_version(apache_thrift_gen):
+    thrift = global_subsystem_instance(Thrift).scoped_instance(apache_thrift_gen)
+    return thrift.get_options().version
 
   def generate_single_thrift_target(self, python_thrift_library):
     context = self.context(target_roots=[python_thrift_library])

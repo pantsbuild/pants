@@ -25,6 +25,7 @@ python_library(
   sources=['thrift_binary.py'],
   dependencies=[
     ':binary_util',
+    'src/python/pants/base:deprecated',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
   ],

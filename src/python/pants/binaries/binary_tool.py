@@ -59,6 +59,7 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
     register('--version', **version_registration_kwargs)
 
+  @memoized_method
   def select(self, context=None):
     """Returns the path to the specified binary tool.
 
@@ -69,13 +70,25 @@ class BinaryToolBase(Subsystem):
 
     :API: public
     """
-    version = self.get_options().version
+    return self._select_for_version(self.version(context))
+
+  @memoized_method
+  def version(self, context=None):
+    """Returns the version of the specified binary tool.
+
+    If replaces_scope and replaces_name are defined, then the caller must pass in
+    a context, otherwise no context should be passed.
+
+    # TODO: Once we're migrated, get rid of the context arg.
+
+    :API: public
+    """
     if self.replaces_scope and self.replaces_name:
       # If the old option is provided explicitly, let it take precedence.
       old_opts = context.options.for_scope(self.replaces_scope)
       if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
-        version = old_opts.get(self.replaces_name)
-    return self._select_for_version(version)
+        return old_opts.get(self.replaces_name)
+    return self.get_options().version
 
   @memoized_property
   def _binary_util(self):
