@@ -14,6 +14,9 @@ New Features
 * Add pantsd client profiling (#5434)
   `PR #5434 <https://github.com/pantsbuild/pants/pull/5434>`_
 
+* Release script allows wheel listing (#5431)
+  `PR #5431 <https://github.com/pantsbuild/pants/pull/5431>`_
+
 Bugfixes
 ~~~~~~~~
 
@@ -28,6 +31,9 @@ Bugfixes
 
 * [pantsd] Don't invalidate on surface name changes to config/rc files. (#5408)
   `PR #5408 <https://github.com/pantsbuild/pants/pull/5408>`_
+
+* Set the log level when capturing logs in tests. (#5418)
+  `PR #5418 <https://github.com/pantsbuild/pants/pull/5418>`_
 
 1.4.0rc1 (01/28/2018)
 ---------------------
