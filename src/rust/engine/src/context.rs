@@ -2,13 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std;
-use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use core::TypeId;
 use externs;
-use fs::{PosixFS, Snapshots, Store, safe_create_dir_all_ioerror, ResettablePool};
+use fs::{PosixFS, Store, safe_create_dir_all_ioerror, ResettablePool};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use nodes::{Node, NodeFuture};
@@ -26,7 +25,6 @@ pub struct Core {
   pub rule_graph: RuleGraph,
   pub types: Types,
   pub pool: Arc<ResettablePool>,
-  pub snapshots: Snapshots,
   pub store: Store,
   pub vfs: PosixFS,
 }
@@ -34,7 +32,7 @@ pub struct Core {
 impl Core {
   pub fn new(
     root_subject_types: Vec<TypeId>,
-    mut tasks: Tasks,
+    tasks: Tasks,
     types: Types,
     build_root: &Path,
     ignore_patterns: Vec<String>,
@@ -59,20 +57,6 @@ impl Core {
       },
     );
 
-    // TODO: Create the Snapshots directory, and then expose it as a singleton to python.
-    //   see: https://github.com/pantsbuild/pants/issues/4397
-    let snapshots = Snapshots::new(snapshots_dir).unwrap_or_else(|e| {
-      panic!("Could not initialize Snapshot directory: {:?}", e);
-    });
-    tasks.singleton_replace(
-      externs::unsafe_call(
-        &types.construct_snapshots,
-        &[
-          externs::store_bytes(snapshots.snapshot_path().as_os_str().as_bytes()),
-        ],
-      ),
-      types.snapshots.clone(),
-    );
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 
     Core {
@@ -81,7 +65,6 @@ impl Core {
       rule_graph: rule_graph,
       types: types,
       pool: pool.clone(),
-      snapshots: snapshots,
       store: store,
       // FIXME: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.

@@ -10,7 +10,6 @@ import os
 from collections import defaultdict
 
 import six
-from pex.pex_info import PexInfo
 from twitter.common.collections import OrderedSet
 
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -23,23 +22,28 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import CoursierMixin
 from pants.backend.jvm.tasks.ivy_task_mixin import IvyTaskMixin
+from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.python_task import PythonTask
+from pants.backend.python.tasks.pex_build_util import has_python_requirements
+from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.resources import Resources
+from pants.build_graph.target import Target
 from pants.java.distribution.distribution import DistributionLocator
 from pants.java.executor import SubprocessExecutor
 from pants.java.jar.jar_dependency_utils import M2Coordinate
+from pants.python.python_repos import PythonRepos
 from pants.task.console_task import ConsoleTask
 from pants.util.memo import memoized_property
 
 
 # Changing the behavior of this task may affect the IntelliJ Pants plugin.
-# Please add tdesai to reviews for this file.
-class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
+# Please add @yic to reviews for this file.
+class ExportTask(ResolveRequirementsTaskBase, IvyTaskMixin, CoursierMixin):
   """Base class for generating a json-formattable blob of data about the target graph.
 
   Subclasses can invoke the generate_targets_map method to get a dictionary of plain datastructures
@@ -61,7 +65,9 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(ExportTask, cls).subsystem_dependencies() + (DistributionLocator, JvmPlatform)
+    return super(ExportTask, cls).subsystem_dependencies() + (
+      DistributionLocator, JvmPlatform, PythonSetup, PythonRepos
+    )
 
   class SourceRootTypes(object):
     """Defines SourceRoot Types Constants"""
@@ -116,7 +122,15 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
       round_manager.require_data('java')
       round_manager.require_data('scala')
 
+  @memoized_property
+  def _interpreter_cache(self):
+    return PythonInterpreterCache(PythonSetup.global_instance(),
+                                  PythonRepos.global_instance(),
+                                  logger=self.context.log.debug)
+
   def resolve_jars(self, targets):
+    # TODO: Why is this computed directly here instead of taking from the actual product
+    # computed by the {Ivy,Coursier}Resolve task?
     executor = SubprocessExecutor(DistributionLocator.cached())
     confs = []
     if self.get_options().libraries:
@@ -137,7 +151,8 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
                                           confs=confs)
       else:
         CoursierMixin.resolve(self, targets, compile_classpath,
-                              sources=self.get_options().libraries_sources, javadoc=self.get_options().libraries_javadocs)
+                              sources=self.get_options().libraries_sources,
+                              javadoc=self.get_options().libraries_javadocs)
 
     return compile_classpath
 
@@ -166,17 +181,17 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
       """
       :type current_target:pants.build_graph.target.Target
       """
-      def get_target_type(target):
+      def get_target_type(tgt):
         def is_test(t):
           return isinstance(t, JUnitTests) or isinstance(t, PythonTests)
-        if is_test(target):
+        if is_test(tgt):
           return ExportTask.SourceRootTypes.TEST
         else:
-          if (isinstance(target, Resources) and
-              target in resource_target_map and
-                is_test(resource_target_map[target])):
+          if (isinstance(tgt, Resources) and
+              tgt in resource_target_map and
+                is_test(resource_target_map[tgt])):
             return ExportTask.SourceRootTypes.TEST_RESOURCE
-          elif isinstance(target, Resources):
+          elif isinstance(tgt, Resources):
             return ExportTask.SourceRootTypes.RESOURCE
           else:
             return ExportTask.SourceRootTypes.SOURCE
@@ -208,7 +223,8 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
         info['requirements'] = [req.key for req in reqs]
 
       if isinstance(current_target, PythonTarget):
-        interpreter_for_target = self.select_interpreter_for_targets([current_target])
+        interpreter_for_target = self._interpreter_cache.select_interpreter_for_targets(
+          [current_target])
         if interpreter_for_target is None:
           raise TaskError('Unable to find suitable interpreter for {}'
                           .format(current_target.address))
@@ -279,25 +295,20 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
       'version': self.DEFAULT_EXPORT_VERSION,
       'targets': targets_map,
       'jvm_platforms': jvm_platforms_map,
+      # `jvm_distributions` are static distribution settings from config,
+      # `preferred_jvm_distributions` are distributions that pants actually uses for the
+      # given platform setting.
+      'preferred_jvm_distributions': {}
     }
-
-    # `jvm_distributions` are static distribution settings from config,
-    # `preferred_jvm_distributions` are distributions that pants actually uses for the
-    # given platform setting.
-    graph_info['preferred_jvm_distributions'] = {}
-
-    def get_preferred_distribution(platform, strict):
-      try:
-        return JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
-      except DistributionLocator.Error:
-        return None
 
     for platform_name, platform in JvmPlatform.global_instance().platforms_by_name.items():
       preferred_distributions = {}
       for strict, strict_key in [(True, 'strict'), (False, 'non_strict')]:
-        dist = get_preferred_distribution(platform, strict=strict)
-        if dist:
+        try:
+          dist = JvmPlatform.preferred_jvm_distribution([platform], strict=strict)
           preferred_distributions[strict_key] = dist.home
+        except DistributionLocator.Error:
+          pass
 
       if preferred_distributions:
         graph_info['preferred_jvm_distributions'][platform_name] = preferred_distributions
@@ -324,11 +335,8 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
 
       interpreters_info = {}
       for interpreter, targets in six.iteritems(python_interpreter_targets_mapping):
-        chroot = self.cached_chroot(
-          interpreter=interpreter,
-          pex_info=PexInfo.default(),
-          targets=targets
-        )
+        req_libs = filter(has_python_requirements, Target.closure_for_targets(targets))
+        chroot = self.resolve_requirements(interpreter, req_libs)
         interpreters_info[str(interpreter.identity)] = {
           'binary': interpreter.binary,
           'chroot': chroot.path()
@@ -361,12 +369,12 @@ class ExportTask(PythonTask, IvyTaskMixin, CoursierMixin):
   @memoized_property
   def target_aliases_map(self):
     registered_aliases = self.context.build_file_parser.registered_aliases()
-    map = {}
+    mapping = {}
     for alias, target_types in registered_aliases.target_types_by_alias.items():
       # If a target class is registered under multiple aliases returns the last one.
       for target_type in target_types:
-        map[target_type] = alias
-    return map
+        mapping[target_type] = alias
+    return mapping
 
   def _get_pants_target_alias(self, pants_target_type):
     """Returns the pants target alias for the given target"""

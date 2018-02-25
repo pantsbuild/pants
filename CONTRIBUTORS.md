@@ -128,6 +128,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Nitay Joffe
 + Ny Saechao
 + Oliver Gould
++ Oliver Seemann
 + Pankaj Gupta
 + Patrick Lawson
 + Paul Groudas

@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
@@ -342,3 +342,43 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         checker.assert_running()
 
       join()
+
+  def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
+    EXPECTED_VALUE = '333'
+    with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
+      # First, launch the daemon without any local env vars set.
+      pantsd_run(['help'])
+      checker.await_pantsd()
+
+      # Then, set an env var on the secondary call.
+      with environment_as(TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST=EXPECTED_VALUE):
+        result = pantsd_run(
+          ['-q',
+           'run',
+           'testprojects/src/python/print_env',
+           '--',
+           'TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST']
+        )
+        checker.assert_running()
+
+      self.assertEquals(EXPECTED_VALUE, ''.join(result.stdout_data).strip())
+
+  def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
+    with self.pantsd_test_context() as (workdir, pantsd_config, checker):
+      with environment_as(NO_LEAKS='33'):
+        self.assert_success(
+          self.run_pants_with_workdir(
+            ['help'],
+            workdir,
+            pantsd_config)
+        )
+        checker.await_pantsd()
+
+      self.assert_failure(
+        self.run_pants_with_workdir(
+          ['-q', 'run', 'testprojects/src/python/print_env', '--', 'NO_LEAKS'],
+          workdir,
+          pantsd_config
+        )
+      )
+      checker.assert_running()

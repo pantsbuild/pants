@@ -5,15 +5,18 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import logging
 import os
 import posixpath
+from collections import namedtuple
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.hash_utils import hash_file
 from pants.fs.archive import archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
@@ -85,6 +88,10 @@ class BinaryUtil(object):
   class NoBaseUrlsError(TaskError):
     """Indicates that no urls were specified in pants.ini."""
     pass
+
+  class BinaryFileSpec(namedtuple('BinaryFileSpec', ['filename', 'checksum', 'digest'])):
+    def __new__(cls, filename, checksum=None, digest=hashlib.sha1()):
+      return super(BinaryUtil.BinaryFileSpec, cls).__new__(cls, filename, checksum, digest)
 
   def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
     """Calculate the base path.
@@ -243,3 +250,27 @@ class BinaryUtil(object):
     logger.debug('Selected {binary} binary bootstrapped to: {path}'
                  .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
+
+  def _compare_file_checksums(self, filepath, checksum=None, digest=None):
+    digest = digest or hashlib.sha1()
+
+    if os.path.isfile(filepath) and checksum:
+      return hash_file(filepath, digest=digest) == checksum
+
+    return os.path.isfile(filepath)
+
+  def is_bin_valid(self, basepath, binary_file_specs=[]):
+    """Check if this bin path is valid.
+
+    :param string basepath: The absolute path where the binaries are stored under.
+    :param BinaryFileSpec[] binary_file_specs: List of filenames and checksum for validation.
+    """
+    if not os.path.isdir(basepath):
+      return False
+
+    for f in binary_file_specs:
+      filepath = os.path.join(basepath, f.filename)
+      if not self._compare_file_checksums(filepath, f.checksum, f.digest):
+        return False
+
+    return True

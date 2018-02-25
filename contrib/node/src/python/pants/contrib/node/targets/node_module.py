@@ -21,7 +21,7 @@ class NodeModule(NodePackage):
 
   def __init__(
     self, package_manager=None, sources=None, build_script=None, output_dir='dist',
-    dev_dependency=False, address=None, payload=None, **kwargs):
+    dev_dependency=False, style_ignore_path='.eslintignore', address=None, payload=None, **kwargs):
     """
     :param sources: Javascript and other source code files that make up this module; paths are
                     relative to the BUILD file's directory.
@@ -38,6 +38,8 @@ class NodeModule(NodePackage):
     :param dev_dependency: boolean value.  Default is False. If a node_module is used as parts
       of devDependencies and thus should not be included in the final bundle or JVM binaries, set
       this value to True.
+    :param style_ignore_path: relative path to file specifying patterns of files to ignore. The syntax
+      supported is the same as the .eslintignore/.gitignore syntax.
     """
     # TODO(John Sirois): Support devDependencies, etc.  The devDependencies case is not
     # clear-cut since pants controlled builds would provide devDependencies as needed to perform
@@ -52,5 +54,14 @@ class NodeModule(NodePackage):
       'package_manager': PrimitiveField(package_manager),
       'output_dir': PrimitiveField(output_dir),
       'dev_dependency': PrimitiveField(dev_dependency),
+      'style_ignore_path': PrimitiveField(style_ignore_path)
     })
     super(NodeModule, self).__init__(address=address, payload=payload, **kwargs)
+
+  @property
+  def style_ignore_path(self):
+    """The name of the ignore path file.
+
+    :rtype: string
+    """
+    return self.payload.style_ignore_path

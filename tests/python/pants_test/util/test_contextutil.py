@@ -18,9 +18,9 @@ from contextlib import contextmanager
 import mock
 
 from pants.util.contextutil import (HardSystemExit, InvalidZipPath, Timer, environment_as,
-                                    exception_logging, hard_exit_handler, maybe_profiled, open_zip,
-                                    pushd, signal_handler_as, stdio_as, temporary_dir,
-                                    temporary_file)
+                                    exception_logging, hard_exit_handler, hermetic_environment_as,
+                                    maybe_profiled, open_zip, pushd, signal_handler_as, stdio_as,
+                                    temporary_dir, temporary_file)
 from pants.util.process_handler import subprocess
 
 
@@ -58,6 +58,11 @@ class ContextutilTest(unittest.TestCase):
                            stdout=output).wait()
           output.seek(0)
           self.assertEquals('False\n', output.read())
+
+  def test_hermetic_environment(self):
+    self.assertIn('USER', os.environ)
+    with hermetic_environment_as(**{}):
+      self.assertNotIn('USER', os.environ)
 
   def test_simple_pushd(self):
     pre_cwd = os.getcwd()

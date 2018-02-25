@@ -183,7 +183,7 @@ class BuildGraph(AbstractClass):
     return self._target_dependencies_by_address[address]
 
   def dependents_of(self, address):
-    """Returns the Targets which depend on the target at `address`.
+    """Returns the addresses of the targets that depend on the target at `address`.
 
     This method asserts that the address given is actually in the BuildGraph.
 

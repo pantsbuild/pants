@@ -1,12 +1,17 @@
 extern crate bazel_protos;
-#[cfg(test)]
+extern crate boxfuture;
 extern crate bytes;
 extern crate digest;
+extern crate fs;
+extern crate futures;
 extern crate grpcio;
+extern crate hashing;
 #[cfg(test)]
 extern crate mock;
 extern crate protobuf;
 extern crate sha2;
+#[cfg(test)]
+extern crate tempdir;
 #[cfg(test)]
 extern crate testutil;
 
@@ -36,6 +41,8 @@ pub struct ExecuteProcessRequest {
   /// No other environment variables will be set (except possibly for an empty PATH variable).
   ///
   pub env: BTreeMap<String, String>,
+
+  pub input_files: hashing::Digest,
 }
 
 ///

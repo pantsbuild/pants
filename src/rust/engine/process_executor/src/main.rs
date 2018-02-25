@@ -1,20 +1,55 @@
+extern crate boxfuture;
 extern crate clap;
+extern crate fs;
+extern crate hashing;
+extern crate futures;
 extern crate process_execution;
+extern crate tempdir;
 
 use clap::{App, AppSettings, Arg};
-use std::process::exit;
+use futures::future::Future;
+use hashing::{Digest, Fingerprint};
+use tempdir::TempDir;
 use std::collections::BTreeMap;
-
 use std::iter::Iterator;
+use std::process::exit;
+use std::sync::Arc;
+use std::time::Duration;
 
 /// A binary which takes args of format:
-///  process_executor --env=FOO=bar --env=SOME=value -- /path/to/binary --flag --otherflag
+///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
+///    -- /path/to/binary --flag --otherflag
 /// and runs /path/to/binary --flag --otherflag with FOO and SOME set.
 /// It outputs its output/err to stdout/err, and exits with its exit code.
 ///
 /// It does not perform $PATH lookup or shell expansion.
 fn main() {
   let args = App::new("process_executor")
+    .arg(
+      Arg::with_name("local-store-path")
+        .long("local-store-path")
+        .takes_value(true)
+        .required(true)
+        .help("Path to lmdb directory used for local file storage"),
+    )
+    .arg(
+      Arg::with_name("input-digest")
+        .long("input-digest")
+        .takes_value(true)
+        .required(true)
+        .help(
+          "Fingerprint (hex string) of the digest to use as the input file tree.",
+        ),
+    )
+    .arg(
+      Arg::with_name("input-digest-length")
+        .long("input-digest-length")
+        .takes_value(true)
+        .required(true)
+        .help(
+          "Length of the proto-bytes whose digest to use as the input file tree.",
+        ),
+    )
     .arg(
       Arg::with_name("server")
         .long("server")
@@ -23,6 +58,12 @@ fn main() {
           "The host:port of the gRPC server to connect to. Forces remote execution. \
 If unspecified, local execution will be performed.",
         ),
+    )
+    .arg(
+      Arg::with_name("cas-server")
+        .long("cas-server")
+        .takes_value(true)
+        .help("The host:port of the gRPC CAS server to connect to."),
     )
     .arg(
       Arg::with_name("env")
@@ -58,16 +99,57 @@ If unspecified, local execution will be performed.",
     }
     None => BTreeMap::new(),
   };
-  let server = args.value_of("server");
-
-  let request = process_execution::ExecuteProcessRequest { argv, env };
-  let result = match server {
-    Some(addr) => {
-      process_execution::remote::CommandRunner::new(addr, 1)
-        .run_command_remote(request)
-        .unwrap()
+  let local_store_path = args.value_of("local-store-path").unwrap();
+  let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
+  let server_arg = args.value_of("server");
+  let store = match (server_arg, args.value_of("cas-server")) {
+    (Some(_server), Some(cas_server)) => {
+      fs::Store::with_remote(
+        local_store_path,
+        pool.clone(),
+        cas_server,
+        1,
+        10 * 1024 * 1024,
+        Duration::from_secs(30),
+      )
     }
-    None => process_execution::local::run_command_locally(request).unwrap(),
+    (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
+    _ => panic!("Must specify either both --server and --cas-server or neither."),
+  }.expect("Error making store");
+
+  let input_files = {
+    let fingerprint = Fingerprint::from_hex_string(args.value_of("input-digest").unwrap())
+      .expect("Bad input-digest");
+    let length = args
+      .value_of("input-digest-length")
+      .unwrap()
+      .parse::<usize>()
+      .expect("input-digest-length must be a non-negative number");
+    Digest(fingerprint, length)
+  };
+
+  let request = process_execution::ExecuteProcessRequest {
+    argv,
+    env,
+    input_files,
+  };
+
+  let result = match server_arg {
+    Some(address) => {
+      process_execution::remote::CommandRunner::new(address, 1, store)
+        .run_command_remote(request)
+        .wait()
+        .expect("Error executing remotely")
+    }
+    None => {
+      let dir = TempDir::new("process-execution").expect("Error making temporary directory");
+      store
+        .materialize_directory(dir.path().to_owned(), request.input_files)
+        .wait()
+        .expect("Error materializing directory");
+      process_execution::local::run_command_locally(request, dir.path())
+        .expect("Error executing locally")
+    }
   };
   print!("{}", String::from_utf8(result.stdout).unwrap());
   eprint!("{}", String::from_utf8(result.stderr).unwrap());

@@ -4,6 +4,110 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.5.0.dev4 (02/23/2018)
+-----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Fix up remote process execution (#5500)
+  `PR #5500 <https://github.com/pantsbuild/pants/pull/5500>`_
+
+* Remote execution uploads files from a Store (#5499)
+  `PR #5499 <https://github.com/pantsbuild/pants/pull/5499>`_
+
+Public API Changes
+~~~~~~~~~~~~~~~~~~
+
+* Redesign JavaScript Style Checker to use ESLint directly (#5265)
+  `PR #5265 <https://github.com/pantsbuild/pants/pull/5265>`_
+
+* A convenient mechanism for fetching binary tools via subsystems (#5443)
+  `PR #5443 <https://github.com/pantsbuild/pants/pull/5443>`_
+
+* Qualify kythe target names with 'java-'. (#5459)
+  `PR #5459 <https://github.com/pantsbuild/pants/pull/5459>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Set the remote environment for pantsd-runner and child processes. (#5508)
+  `PR #5508 <https://github.com/pantsbuild/pants/pull/5508>`_
+
+* Don't special-case python dists in resolve_requirements(). (#5483)
+  `PR #5483 <https://github.com/pantsbuild/pants/pull/5483>`_
+
+* Add a dependency on the pants source to the integration test base target (#5481)
+  `PR #5481 <https://github.com/pantsbuild/pants/pull/5481>`_
+
+* fix/integration test for pants_requirement() (#5457)
+  `PR #5457 <https://github.com/pantsbuild/pants/pull/5457>`_
+
+* Never allow the shader to rewrite the empty-string package. (#5461)
+  `PR #5461 <https://github.com/pantsbuild/pants/pull/5461>`_
+
+* Bump release.sh to pex 1.2.16. (#5460)
+  `PR #5460 <https://github.com/pantsbuild/pants/pull/5460>`_
+
+* fix/tests: subsystems can't declare dependencies on non-globally-scoped subsystems (#5456)
+  `PR #5456 <https://github.com/pantsbuild/pants/pull/5456>`_
+
+* Fix missing interpreter constraints bug when a Python target does not have sources (#5501)
+  `PR #5501 <https://github.com/pantsbuild/pants/pull/5501>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Fix reference html/js: expand/collapse toggle in Firefox (#5507)
+  `PR #5507 <https://github.com/pantsbuild/pants/pull/5507>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Delete unused old python pipeline classes. (#5509)
+  `PR #5509 <https://github.com/pantsbuild/pants/pull/5509>`_
+
+* Make the export task use new python pipeline constructs. (#5486)
+  `PR #5486 <https://github.com/pantsbuild/pants/pull/5486>`_
+
+* Remote command execution returns a Future (#5497)
+  `PR #5497 <https://github.com/pantsbuild/pants/pull/5497>`_
+
+* Snapshot is backed by LMDB not tar files (#5496)
+  `PR #5496 <https://github.com/pantsbuild/pants/pull/5496>`_
+
+* Local process execution happens in a directory (#5495)
+  `PR #5495 <https://github.com/pantsbuild/pants/pull/5495>`_
+
+* Snapshot can get FileContent (#5494)
+  `PR #5494 <https://github.com/pantsbuild/pants/pull/5494>`_
+
+* Move materialize_{file,directory} from fs_util to Store (#5493)
+  `PR #5493 <https://github.com/pantsbuild/pants/pull/5493>`_
+
+* Remove support dir overrides (#5489)
+  `PR #5489 <https://github.com/pantsbuild/pants/pull/5489>`_
+
+* Upgrade to rust 1.24 (#5477)
+  `PR #5477 <https://github.com/pantsbuild/pants/pull/5477>`_
+
+* Simplify python local dist handling code. (#5480)
+  `PR #5480 <https://github.com/pantsbuild/pants/pull/5480>`_
+
+* Remove some outdated test harness code that exists in the base class (#5472)
+  `PR #5472 <https://github.com/pantsbuild/pants/pull/5472>`_
+
+* Tweaks to the BinaryTool subsystem and use it to create an LLVM subsystem (#5471)
+  `PR #5471 <https://github.com/pantsbuild/pants/pull/5471>`_
+
+* Refactor python pipeline utilities (#5474)
+  `PR #5474 <https://github.com/pantsbuild/pants/pull/5474>`_
+
+* Fetch the buildozer binary using a subsystem. (#5462)
+  `PR #5462 <https://github.com/pantsbuild/pants/pull/5462>`_
+
+* Narrow the warnings we ignore when compiling our cffi (#5458)
+  `PR #5458 <https://github.com/pantsbuild/pants/pull/5458>`_
 
 1.5.0.dev3 (02/10/2018)
 -----------------------
