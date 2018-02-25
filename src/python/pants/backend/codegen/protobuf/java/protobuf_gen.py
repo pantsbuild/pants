@@ -12,7 +12,7 @@ from hashlib import sha1
 from twitter.common.collections import OrderedSet
 
 from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtobufLibrary
-from pants.backend.codegen.protobuf.subsystem.protoc import Protoc
+from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts

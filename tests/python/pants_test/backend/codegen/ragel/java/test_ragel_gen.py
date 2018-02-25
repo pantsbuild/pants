@@ -68,7 +68,6 @@ class RagelGenTest(TaskTestBase):
                               target_type=JavaRagelLibrary,
                               sources=['atoi.rl'])
     task = self.create_task(self.context(target_roots=[target]))
-
     target_workdir = safe_mkdtemp(dir=self.test_workdir)
     task.execute_codegen(target, target_workdir)
 
