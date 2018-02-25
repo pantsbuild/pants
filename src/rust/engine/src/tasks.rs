@@ -80,10 +80,10 @@ impl Tasks {
         value,
       );
     }
-    self.singletons.insert(
-      product,
-      (externs::key_for(&value), value),
-    );
+    self.singletons.insert(product, (
+      externs::key_for(value.clone()),
+      value,
+    ));
   }
 
   ///
@@ -174,9 +174,10 @@ impl Tasks {
     );
     assert!(
       !tasks.contains(&task),
-      "{:?} was double-registered for {:?}",
+      "{:?} was double-registered for {:?}: {:?}",
       task,
       task.product,
+      tasks,
     );
     task.clause.shrink_to_fit();
     tasks.push(task);

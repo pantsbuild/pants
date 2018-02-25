@@ -301,7 +301,7 @@ impl Select {
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
-      let value = externs::val_for_id(self.subject.id());
+      let value = externs::val_for(&self.subject);
 
       let mut env: BTreeMap<String, String> = BTreeMap::new();
       let env_var_parts = externs::project_multi_strs(&value, "env");
@@ -342,7 +342,7 @@ impl Select {
       vec![
         future::ok(externs::unsafe_call(
           &context.core.types.construct_process_result,
-          &vec![
+          &[
             externs::store_bytes(&result.stdout),
             externs::store_bytes(&result.stderr),
             externs::store_i32(result.exit_code),
@@ -476,7 +476,7 @@ impl SelectDependencies {
     }
   }
 
-  fn get_dep(&self, context: &Context, dep_subject: &Value) -> NodeFuture<Value> {
+  fn get_dep(&self, context: &Context, dep_subject: Value) -> NodeFuture<Value> {
     // TODO: This method needs to consider whether the `dep_subject` is an Address,
     // and if so, attempt to parse Variants there. See:
     //   https://github.com/pantsbuild/pants/issues/4020
@@ -515,8 +515,8 @@ impl SelectDependencies {
             // The product and its dependency list are available: project them.
             let deps = future::join_all(
               externs::project_multi(&dep_product, &self.selector.field)
-                .iter()
-                .map(|dep_subject| self.get_dep(&context, &dep_subject))
+                .into_iter()
+                .map(|dep_subject| self.get_dep(&context, dep_subject))
                 .collect::<Vec<_>>(),
             );
             deps
@@ -641,8 +641,8 @@ impl SelectTransitive {
         match dep_product_res {
           Ok(dep_product) => {
             let subject_keys = externs::project_multi(&dep_product, &self.selector.field)
-              .iter()
-              .map(|subject| externs::key_for(&subject))
+              .into_iter()
+              .map(|subject| externs::key_for(subject))
               .collect();
 
             let init = TransitiveExpansion {
@@ -672,7 +672,7 @@ impl SelectTransitive {
                   expansion.todo.extend(
                     todo_candidates
                       .into_iter()
-                      .map(|dep| externs::key_for(&dep))
+                      .map(|dep| externs::key_for(dep))
                       .filter(|dep_key| !outputs.contains_key(dep_key))
                       .collect::<Vec<_>>(),
                   );
@@ -758,7 +758,7 @@ impl SelectProjection {
             );
             Select {
               selector: selectors::Select::without_variant(self.selector.product),
-              subject: externs::key_for(&projected_subject),
+              subject: externs::key_for(projected_subject),
               variants: self.variants.clone(),
               // NB: Unlike SelectDependencies and SelectTransitive, we don't need to filter by
               // subject here, because there is only one projected type.
@@ -975,7 +975,7 @@ impl Snapshot {
       .collect();
     externs::unsafe_call(
       &context.core.types.construct_snapshot,
-      &vec![
+      &[
         externs::store_bytes(&(item.digest.0).to_hex().as_bytes()),
         externs::store_i32((item.digest.1 as i32)),
         externs::store_list(path_stats.iter().collect(), false),
@@ -988,12 +988,12 @@ impl Snapshot {
   }
 
   fn store_dir(context: &Context, item: &Dir) -> Value {
-    let args = vec![Self::store_path(item.0.as_path())];
+    let args = [Self::store_path(item.0.as_path())];
     externs::unsafe_call(&context.core.types.construct_dir, &args)
   }
 
   fn store_file(context: &Context, item: &File) -> Value {
-    let args = vec![Self::store_path(item.path.as_path())];
+    let args = [Self::store_path(item.path.as_path())];
     externs::unsafe_call(&context.core.types.construct_file, &args)
   }
 
@@ -1012,7 +1012,7 @@ impl Snapshot {
   fn store_file_content(context: &Context, item: &FileContent) -> Value {
     externs::unsafe_call(
       &context.core.types.construct_file_content,
-      &vec![
+      &[
         Self::store_path(&item.path),
         externs::store_bytes(&item.content),
       ],
@@ -1026,7 +1026,7 @@ impl Snapshot {
       .collect();
     externs::unsafe_call(
       &context.core.types.construct_files_content,
-      &vec![externs::store_list(entries.iter().collect(), false)],
+      &[externs::store_list(entries.iter().collect(), false)],
     )
   }
 }
@@ -1119,7 +1119,7 @@ impl Node for Task {
     let task = self.task.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for_id(task.func.0), &deps),
+        Ok(deps) => externs::call(&externs::val_for(&task.func.0), &deps),
         Err(err) => Err(err),
       })
       .to_boxed()
@@ -1146,10 +1146,10 @@ pub enum NodeKey {
 impl NodeKey {
   pub fn format(&self) -> String {
     fn keystr(key: &Key) -> String {
-      externs::id_to_str(key.id())
+      externs::key_to_str(&key)
     }
     fn typstr(tc: &TypeConstraint) -> String {
-      externs::id_to_str(tc.0)
+      externs::key_to_str(&tc.0)
     }
     match self {
       &NodeKey::DigestFile(ref s) => format!("DigestFile({:?})", s.0),
@@ -1166,7 +1166,7 @@ impl NodeKey {
       &NodeKey::Task(ref s) => {
         format!(
           "Task({}, {}, {})",
-          externs::id_to_str(s.task.func.0),
+          externs::key_to_str(&s.task.func.0),
           keystr(&s.subject),
           typstr(&s.product)
         )
@@ -1177,7 +1177,7 @@ impl NodeKey {
 
   pub fn product_str(&self) -> String {
     fn typstr(tc: &TypeConstraint) -> String {
-      externs::id_to_str(tc.0)
+      externs::key_to_str(&tc.0)
     }
     match self {
       &NodeKey::ExecuteProcess(..) => "ProcessResult".to_string(),
