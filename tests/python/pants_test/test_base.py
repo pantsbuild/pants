@@ -342,7 +342,7 @@ class TestBase(unittest.TestCase):
       self._scheduler.invalidate_all_files()
       # Eagerly free file handles, threads, connections, etc, held by the scheduler. In theory,
       # dropping the scheduler is equivalent, but it's easy for references to the scheduler to leak.
-      self._scheduler.pre_fork()
+      self._scheduler.with_fork_context(lambda: None)
 
   @property
   def build_root(self):

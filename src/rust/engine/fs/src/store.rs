@@ -89,11 +89,17 @@ impl Store {
   /// processes run using the same daemon, one takes out some kind of lock which the other cannot
   /// ever acquire, so lmdb returns EAGAIN whenever a transaction is created in the second process.
   ///
-  pub fn reset_prefork(&self) {
-    self.local.reset_prefork();
-    if let Some(ref remote) = self.remote {
-      remote.reset_threadpool();
-    }
+  pub fn with_reset<F>(&self, f: F)
+  where
+    F: FnOnce() -> (),
+  {
+    self.local.with_reset(|| {
+      if let Some(ref remote) = self.remote {
+        remote.with_reset(|| f())
+      } else {
+        f()
+      }
+    })
   }
 
   ///
@@ -658,9 +664,14 @@ mod local {
       })
     }
 
-    pub fn reset_prefork(&self) {
-      self.inner.file_dbs.reset();
-      self.inner.directory_dbs.reset();
+    pub fn with_reset<F>(&self, f: F)
+    where
+      F: FnOnce() -> (),
+    {
+      self
+        .inner
+        .file_dbs
+        .with_reset(|| self.inner.directory_dbs.with_reset(|| f()))
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
@@ -1622,11 +1633,17 @@ mod remote {
       }
     }
 
-    pub fn reset_threadpool(&self) {
-      self.channel.reset();
-      self.env.reset();
-      self.cas_client.reset();
-      self.byte_stream_client.reset();
+    pub fn with_reset<F>(&self, f: F)
+    where
+      F: FnOnce() -> (),
+    {
+      self.channel.with_reset(|| {
+        self.env.with_reset(|| {
+          self
+            .cas_client
+            .with_reset(|| self.byte_stream_client.with_reset(|| f()))
+        })
+      })
     }
 
     pub fn store_bytes(&self, bytes: Bytes) -> BoxFuture<Digest, String> {
@@ -2973,7 +2990,7 @@ mod tests {
   }
 
   #[test]
-  fn works_after_reset_prefork() {
+  fn works_after_reset() {
     let dir = TempDir::new().unwrap();
     let cas = new_cas(1024);
 
@@ -2988,7 +3005,7 @@ mod tests {
       Ok(Some(testdata.bytes()))
     );
 
-    store.reset_prefork();
+    store.with_reset(|| {});
 
     // Already exists in local store:
     assert_eq!(

@@ -107,7 +107,12 @@ pub struct FallibleExecuteProcessResult {
 pub trait CommandRunner: Send + Sync {
   fn run(&self, req: ExecuteProcessRequest) -> BoxFuture<FallibleExecuteProcessResult, String>;
 
-  fn reset_prefork(&self);
+  ///
+  /// NB: Unlike other `with_shutdown` methods in the codebase, this method takes a Fn reference,
+  /// because in order to be "object safe", `CommandRunner` must not have functions with generic
+  /// parameters.
+  ///
+  fn with_shutdown(&self, f: &mut FnMut() -> ());
 }
 
 ///
@@ -133,7 +138,7 @@ impl CommandRunner for BoundedCommandRunner {
     self.sema.with_acquired(move || inner.run(req))
   }
 
-  fn reset_prefork(&self) {
-    self.inner.reset_prefork();
+  fn with_shutdown(&self, f: &mut FnMut() -> ()) {
+    self.inner.with_shutdown(f);
   }
 }
