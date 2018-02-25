@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::hash;
 
-use core::{FNV, Id, Key, Value};
+use core::{FNV, Key, Value};
 use externs;
 
 ///
@@ -16,7 +16,7 @@ use externs;
 ///
 /// Creating a `Key` involves interning a `Value` under a (private) `InternKey` struct which
 /// implements `Hash` and `Eq` using the precomputed python `__hash__` for the `Value` and
-/// delegating to python's `__eq__`, respectively
+/// delegating to python's `__eq__`, respectively.
 ///
 /// Currently `Value`s are interned indefinitely as `Key`s, meaning that they can never
 /// be collected: it's possible that this can eventually be improved by either:
@@ -34,7 +34,7 @@ use externs;
 #[derive(Default)]
 pub struct Interns {
   forward: HashMap<InternKey, Key, FNV>,
-  reverse: HashMap<Id, Value, FNV>,
+  reverse: HashMap<Key, Value, FNV>,
   id_generator: u64,
 }
 
@@ -46,24 +46,25 @@ impl Interns {
   pub fn insert(&mut self, v: Value) -> Key {
     let ident = externs::identify(&v);
     let type_id = ident.type_id;
-    let mut maybe_id = self.id_generator;
+    let mut inserted = false;
+    let id_generator = self.id_generator;
     let key = self
       .forward
       .entry(InternKey(ident.hash, ident.value))
       .or_insert_with(|| {
-        maybe_id += 1;
-        Key::new(maybe_id, type_id)
+        inserted = true;
+        Key::new(id_generator, type_id)
       })
       .clone();
-    if maybe_id != self.id_generator {
-      self.id_generator = maybe_id;
-      self.reverse.insert(maybe_id, v);
+    if inserted {
+      self.reverse.insert(key.clone(), v);
+      self.id_generator += 1;
     }
     key
   }
 
   pub fn get(&self, k: &Key) -> &Value {
-    self.reverse.get(&k.id()).unwrap_or_else(|| {
+    self.reverse.get(&k).unwrap_or_else(|| {
       panic!("Previously memoized object disappeared for {:?}", k)
     })
   }

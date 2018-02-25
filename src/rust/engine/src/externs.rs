@@ -8,7 +8,7 @@ use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Failure, Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 use interning::Interns;
 
@@ -137,12 +137,12 @@ pub fn key_to_str(key: &Key) -> String {
   val_to_str(&val_for(key))
 }
 
-pub fn id_to_str(digest: Id) -> String {
+pub fn type_to_str(type_id: TypeId) -> String {
   with_externs(|e| {
-    (e.id_to_str)(e.context, digest)
+    (e.type_to_str)(e.context, type_id)
       .to_string()
       .unwrap_or_else(|e| {
-        format!("<failed to decode unicode for {:?}: {}>", digest, e)
+        format!("<failed to decode unicode for {:?}: {}>", type_id, e)
       })
   })
 }
@@ -234,7 +234,7 @@ pub struct Externs {
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
-  id_to_str: IdToStrExtern,
+  type_to_str: TypeToStrExtern,
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   // TODO: This type is also declared on `types::Types`.
@@ -255,7 +255,7 @@ impl Externs {
     equals: EqualsExtern,
     clone_val: CloneValExtern,
     drop_handles: DropHandlesExtern,
-    id_to_str: IdToStrExtern,
+    type_to_str: TypeToStrExtern,
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
     satisfied_by_type: SatisfiedByTypeExtern,
@@ -285,7 +285,7 @@ impl Externs {
       project: project,
       project_ignoring_type: project_ignoring_type,
       project_multi: project_multi,
-      id_to_str: id_to_str,
+      type_to_str: type_to_str,
       val_to_str: val_to_str,
       create_exception: create_exception,
       py_str_type: py_str_type,
@@ -296,9 +296,9 @@ impl Externs {
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
 // TODO: Type alias used to avoid rustfmt breaking itself by rendering a 101 character line.
-pub type SatisifedBool = bool;
+pub type SatisfedBool = bool;
 pub type SatisfiedByExtern = extern "C" fn(*const ExternContext, *const Value, *const Value)
-                                           -> SatisifedBool;
+                                           -> SatisfedBool;
 
 pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext, *const Value, *const TypeId)
                                                -> bool;
@@ -476,7 +476,7 @@ impl BufferBuffer {
   }
 }
 
-pub type IdToStrExtern = extern "C" fn(*const ExternContext, Id) -> Buffer;
+pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer;
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 

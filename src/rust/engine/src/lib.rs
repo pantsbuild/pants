@@ -38,7 +38,7 @@ use std::path::{Path, PathBuf};
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
-              ExternContext, Externs, IdToStrExtern, CallExtern, EvalExtern, LogExtern,
+              ExternContext, Externs, TypeToStrExtern, CallExtern, EvalExtern, LogExtern,
               IdentifyExtern, ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern,
               PyResult, SatisfiedByExtern, StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern,
               StoreBytesExtern, TypeIdBuffer, EqualsExtern, ValToStrExtern};
@@ -127,7 +127,7 @@ pub extern "C" fn externs_set(
   equals: EqualsExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
-  id_to_str: IdToStrExtern,
+  type_to_str: TypeToStrExtern,
   val_to_str: ValToStrExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
@@ -149,7 +149,7 @@ pub extern "C" fn externs_set(
     equals,
     clone_val,
     drop_handles,
-    id_to_str,
+    type_to_str,
     val_to_str,
     satisfied_by,
     satisfied_by_type,

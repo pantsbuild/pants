@@ -96,7 +96,7 @@ typedef Ident            (*extern_ptr_identify)(ExternContext*, Value*);
 typedef _Bool            (*extern_ptr_equals)(ExternContext*, Value*, Value*);
 typedef Value            (*extern_ptr_clone_val)(ExternContext*, Value*);
 typedef void             (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
-typedef Buffer           (*extern_ptr_id_to_str)(ExternContext*, Id);
+typedef Buffer           (*extern_ptr_type_to_str)(ExternContext*, TypeId);
 typedef Buffer           (*extern_ptr_val_to_str)(ExternContext*, Value*);
 typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
 typedef _Bool            (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
@@ -138,7 +138,7 @@ void externs_set(ExternContext*,
                  extern_ptr_equals,
                  extern_ptr_clone_val,
                  extern_ptr_drop_handles,
-                 extern_ptr_id_to_str,
+                 extern_ptr_type_to_str,
                  extern_ptr_val_to_str,
                  extern_ptr_satisfied_by,
                  extern_ptr_satisfied_by_type,
@@ -231,7 +231,7 @@ extern "Python" {
   _Bool            extern_equals(ExternContext*, Value*, Value*);
   Value            extern_clone_val(ExternContext*, Value*);
   void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
-  Buffer           extern_id_to_str(ExternContext*, Id);
+  Buffer           extern_type_to_str(ExternContext*, TypeId);
   Buffer           extern_val_to_str(ExternContext*, Value*);
   _Bool            extern_satisfied_by(ExternContext*, Value*, Value*);
   _Bool            extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
@@ -345,10 +345,10 @@ def _initialize_externs(ffi):
     c.drop_handles(handles)
 
   @ffi.def_extern()
-  def extern_id_to_str(context_handle, id_):
-    """Given an Id for `obj`, write str(obj) and return it."""
+  def extern_type_to_str(context_handle, type_id):
+    """Given a TypeId, write type.__name__ and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_id(id_)))
+    return c.utf8_buf(six.text_type(c.from_id(type_id.id_).__name__))
 
   @ffi.def_extern()
   def extern_val_to_str(context_handle, val):
@@ -616,7 +616,7 @@ class Native(object):
                            self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,
                            self.ffi_lib.extern_drop_handles,
-                           self.ffi_lib.extern_id_to_str,
+                           self.ffi_lib.extern_type_to_str,
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_satisfied_by,
                            self.ffi_lib.extern_satisfied_by_type,
@@ -729,5 +729,4 @@ class Native(object):
     return self.gc(scheduler, self.lib.scheduler_destroy)
 
   def set_panic_handler(self):
-    # self.lib.set_panic_handler()
-    pass
+    self.lib.set_panic_handler()

@@ -671,11 +671,7 @@ pub fn type_str(type_id: TypeId) -> String {
   if type_id == ANY_TYPE {
     "Any".to_string()
   } else {
-    externs::id_to_str(type_id.0)
-    // TODO: We should be calling `__name__` here, but we're not. Would need to get
-    // a Value for the TypeId.
-    // let as_val =
-    // val_name(&as_val)
+    externs::type_to_str(type_id)
   }
 }
 
