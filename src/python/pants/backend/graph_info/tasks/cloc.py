@@ -11,7 +11,6 @@ from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
@@ -74,11 +73,14 @@ class CountLinesOfCode(ConsoleTask):
         name='cloc',
         labels=[WorkUnitLabel.TOOL],
         cmd=' '.join(cmd)) as workunit:
-        result = subprocess.call(
+        exit_code = subprocess.call(
           cmd,
           stdout=workunit.output('stdout'),
           stderr=workunit.output('stderr')
         )
+
+        if exit_code != 0:
+          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
 
       with open(report_file, 'r') as report_file_in:
         for line in report_file_in.read().split('\n'):
