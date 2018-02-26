@@ -27,7 +27,7 @@ class GoTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.Factory,)
+    return super(GoTask, cls).subsystem_dependencies() + (GoDistribution.scoped(cls),)
 
   @staticmethod
   def is_binary(target):
@@ -51,7 +51,7 @@ class GoTask(Task):
 
   @memoized_property
   def go_dist(self):
-    return GoDistribution.Factory.global_instance().create()
+    return GoDistribution.scoped_instance(self)
 
   @memoized_property
   def import_oracle(self):

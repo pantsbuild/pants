@@ -20,7 +20,7 @@ class BinaryToolBase(Subsystem):
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
   platform_dependent = None
-  archive_type = None
+  archive_type = None  # See pants.fs.archive.archive for valid string values.
   default_version = None
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
