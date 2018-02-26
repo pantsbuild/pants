@@ -320,13 +320,13 @@ class BaseTest(unittest.TestCase):
       scoped_opts = options.setdefault(s, {})
       scoped_opts.update(opts)
 
-    options = create_options_for_optionables(
+    fake_options = create_options_for_optionables(
       optionables, extra_scopes=extra_scopes, options=options, **kwargs)
 
     Subsystem.reset(reset_options=True)
-    Subsystem.set_options(options)
+    Subsystem.set_options(fake_options)
 
-    context = create_context_from_options(options,
+    context = create_context_from_options(fake_options,
                                           target_roots=target_roots,
                                           build_graph=self.build_graph,
                                           build_file_parser=self.build_file_parser,
