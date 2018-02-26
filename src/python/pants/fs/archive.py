@@ -148,6 +148,8 @@ TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset(['zip'])
 TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
 
 
+# TODO: Rename to `create_archiver`. Pretty much every caller of this method is going
+# to want to put the return value into a variable named `archiver`.
 def archiver(typename):
   """Returns Archivers in common configurations.
 

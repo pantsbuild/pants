@@ -17,11 +17,11 @@ from twitter.common.collections import OrderedSet
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
-from pants.fs.archive import archiver
+from pants.fs.archive import archiver as create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_file
-from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
+from pants.util.contextutil import temporary_file, temporary_dir
+from pants.util.dirutil import chmod_plus_x, safe_open, safe_mkdir_for
 from pants.util.osutil import get_os_id
 
 
@@ -143,8 +143,8 @@ class BinaryUtil(object):
     """Fetches a file, unpacking it if necessary."""
     if archive_type is None:
       return self._select_file(supportdir, version, name, platform_dependent)
-    selected_archiver = archiver(archive_type)
-    return self._select_archive(supportdir, version, name, platform_dependent, selected_archiver)
+    archiver = create_archiver(archive_type)
+    return self._select_archive(supportdir, version, name, platform_dependent, archiver)
 
   def _select_file(self, supportdir, version, name, platform_dependent):
     """Generates a path to request a file and fetches the file located at that path.
@@ -176,9 +176,10 @@ class BinaryUtil(object):
     """
     full_name = '{}.{}'.format(name, archiver.extension)
     downloaded_file = self._select_file(supportdir, version, full_name, platform_dependent)
-    # use filename without extension as the directory name
+    # use filename without rightmost extension as the directory name.
     unpacked_dirname, _ = os.path.splitext(downloaded_file)
-    archiver.extract(downloaded_file, unpacked_dirname)
+    if not os.path.exists(unpacked_dirname):
+      archiver.extract(downloaded_file, unpacked_dirname)
     return unpacked_dirname
 
   def _binary_path_to_fetch(self, supportdir, version, name, platform_dependent):
@@ -237,21 +238,21 @@ class BinaryUtil(object):
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
     if not os.path.exists(bootstrapped_binary_path):
-      downloadpath = bootstrapped_binary_path + '~'
-      try:
+      safe_mkdir_for(bootstrapped_binary_path)
+      with temporary_dir(root_dir=os.path.dirname(bootstrapped_binary_path)) as tmpdir:
+        downloadpath = os.path.join(tmpdir, 'download')
         with self._select_binary_stream(name, binary_path) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
           os.rename(downloadpath, bootstrapped_binary_path)
           chmod_plus_x(bootstrapped_binary_path)
-      finally:
-        safe_delete(downloadpath)
 
     logger.debug('Selected {binary} binary bootstrapped to: {path}'
                  .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
 
-  def _compare_file_checksums(self, filepath, checksum=None, digest=None):
+  @staticmethod
+  def _compare_file_checksums(filepath, checksum=None, digest=None):
     digest = digest or hashlib.sha1()
 
     if os.path.isfile(filepath) and checksum:
@@ -259,7 +260,7 @@ class BinaryUtil(object):
 
     return os.path.isfile(filepath)
 
-  def is_bin_valid(self, basepath, binary_file_specs=[]):
+  def is_bin_valid(self, basepath, binary_file_specs=tuple()):
     """Check if this bin path is valid.
 
     :param string basepath: The absolute path where the binaries are stored under.

@@ -10,8 +10,6 @@ from collections import OrderedDict, namedtuple
 
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.binaries.binary_tool import NativeTool
-from pants.fs.archive import TGZ
-from pants.util.contextutil import temporary_dir
 from pants.util.memo import memoized_property
 from pants.util.process_handler import subprocess
 
@@ -39,14 +37,14 @@ class GoDistribution(NativeTool):
     :returns: The Go distribution $GOROOT.
     :rtype: string
     """
-    go_distribution = self.select()
-    distribution_workdir = os.path.dirname(go_distribution)
-    outdir = os.path.join(distribution_workdir, 'unpacked')
-    if not os.path.exists(outdir):
-      with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
-        TGZ.extract(go_distribution, tmp_dist)
-        os.rename(tmp_dist, outdir)
-    return os.path.join(outdir, 'go')
+    #go_distribution = self.select()
+    # distribution_workdir = os.path.dirname(go_distribution)
+    # outdir = os.path.join(distribution_workdir, 'unpacked')
+    # if not os.path.exists(outdir):
+    #   with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
+    #     TGZ.extract(go_distribution, tmp_dist)
+    #     os.rename(tmp_dist, outdir)
+    return os.path.join(self.select(), 'go')
 
   def go_env(self, gopath=None):
     """Return an env dict that represents a proper Go environment mapping for this distribution."""
