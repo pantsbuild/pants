@@ -70,25 +70,15 @@ class CountLinesOfCode(ConsoleTask):
         '--list-file={}'.format(list_file),
         '--report-file={}'.format(report_file)
       )
-      if self.context._scheduler is None:
-        with self.context.new_workunit(
-          name='cloc',
-          labels=[WorkUnitLabel.TOOL],
-          cmd=' '.join(cmd)) as workunit:
-          result = subprocess.call(
-            cmd,
-            stdout=workunit.output('stdout'),
-            stderr=workunit.output('stderr')
-          )
-      else:
-        # TODO: Longer term we need to figure out what to put on $PATH in a remote execution env.
-        # Currently, we are adding everything within $PATH to the request.
-        env_path = ['PATH', os.environ.get('PATH')]
-        req = ExecuteProcessRequest(cmd, env_path)
-        execute_process_result, = self.context._scheduler.product_request(ExecuteProcessResult, [req])
-        exit_code = execute_process_result.exit_code
-        if exit_code != 0:
-          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
+      with self.context.new_workunit(
+        name='cloc',
+        labels=[WorkUnitLabel.TOOL],
+        cmd=' '.join(cmd)) as workunit:
+        result = subprocess.call(
+          cmd,
+          stdout=workunit.output('stdout'),
+          stderr=workunit.output('stderr')
+        )
 
       with open(report_file, 'r') as report_file_in:
         for line in report_file_in.read().split('\n'):
