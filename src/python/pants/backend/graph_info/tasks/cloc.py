@@ -80,7 +80,7 @@ class CountLinesOfCode(ConsoleTask):
         )
 
         if exit_code != 0:
-          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
+          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), exit_code))
 
       with open(report_file, 'r') as report_file_in:
         for line in report_file_in.read().split('\n'):
