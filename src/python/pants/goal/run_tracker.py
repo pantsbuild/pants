@@ -228,6 +228,32 @@ class RunTracker(Subsystem):
     self._main_root_workunit.set_outcome(outcome)
 
   @contextmanager
+  def new_pre_timed_workunit(self, name, timing, labels=None, cmd='', log_config=None):
+    """Creates a synthetic workunit with a pre-computed timing.
+
+    - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
+    - timing: The pre-compted timing for this workunit.
+    - labels: An optional iterable of labels. The reporters can use this to decide how to
+              display information about this work.
+    - cmd: An optional longer string representing this work.
+           E.g., the cmd line of a compiler invocation.
+    - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
+    """
+    parent = self._threadlocal.current_workunit
+    workunit = WorkUnit(
+      run_info_dir=self.run_info_dir,
+      parent=parent,
+      name=name,
+      labels=labels,
+      cmd=cmd,
+      log_config=log_config
+    )
+    self.report.start_workunit(workunit)
+    workunit.set_duration(timing)
+    workunit.set_outcome(WorkUnit.SUCCESS)
+    self.end_workunit(workunit)
+
+  @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):
     """Creates a (hierarchical) subunit of work for the purpose of timing and reporting.
 
