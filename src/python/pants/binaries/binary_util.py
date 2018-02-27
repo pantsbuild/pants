@@ -20,8 +20,8 @@ from pants.base.hash_utils import hash_file
 from pants.fs.archive import archiver as create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_file, temporary_dir
-from pants.util.dirutil import chmod_plus_x, safe_open, safe_mkdir_for
+from pants.util.contextutil import temporary_dir, temporary_file
+from pants.util.dirutil import chmod_plus_x, safe_mkdir_for, safe_open
 from pants.util.osutil import get_os_id
 
 
