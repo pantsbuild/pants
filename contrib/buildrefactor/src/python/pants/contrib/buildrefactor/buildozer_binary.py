@@ -21,7 +21,7 @@ class BuildozerBinary(NativeTool):
   # that runs buildozer.
   options_scope = 'buildozer-binary'
   name = 'buildozer'
-  default_version = '0.6.0.dce8b3c287652cbcaf43c8dd076b3f48c92ab44c'
+  default_version = '0.6.0-80c7f0d45d7e40fa1f7362852697d4a03df557b3'
 
   replaces_scope = 'buildozer'
   replaces_name = 'version'
