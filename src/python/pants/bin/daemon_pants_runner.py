@@ -74,7 +74,7 @@ class DaemonPantsRunner(ProcessManager):
   """
 
   def __init__(self, socket, exiter, args, env, graph_helper, fork_lock, preceding_graph_size,
-               warmth_timing, deferred_exception=None):
+               graph_warmth_timing, deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
@@ -85,7 +85,7 @@ class DaemonPantsRunner(ProcessManager):
                                            None.
     :param threading.RLock fork_lock: A lock to use during forking for thread safety.
     :param int preceding_graph_size: The size of the graph pre-warming, for stats.
-    :param float warmth_timing: The elapsed time of daemon-size graph warming.
+    :param float graph_warmth_timing: The elapsed time of daemon-size graph warming.
     :param Exception deferred_exception: A deferred exception from the daemon's graph construction.
                                          If present, this will be re-raised in the client context.
     """
@@ -97,7 +97,7 @@ class DaemonPantsRunner(ProcessManager):
     self._graph_helper = graph_helper
     self._fork_lock = fork_lock
     self._preceding_graph_size = preceding_graph_size
-    self._warmth_timing = warmth_timing
+    self._graph_warmth_timing = graph_warmth_timing
     self._deferred_exception = deferred_exception
 
   def _make_identity(self):
@@ -238,7 +238,7 @@ class DaemonPantsRunner(ProcessManager):
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper)
         runner.set_preceding_graph_size(self._preceding_graph_size)
-        runner.set_graph_warmth_timing(self._warmth_timing)
+        runner.set_graph_warmth_timing(self._graph_warmth_timing)
         runner.run()
       except KeyboardInterrupt:
         self._exiter.exit(1, msg='Interrupted by user.\n')
