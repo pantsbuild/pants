@@ -488,9 +488,6 @@ where
   output
 }
 
-
-
-
 #[repr(u8)]
 enum PythonLogLevel {
   Debug = 0,
