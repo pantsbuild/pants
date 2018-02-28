@@ -194,7 +194,7 @@ class RunTracker(Subsystem):
 
     return run_id
 
-  def start(self, report):
+  def start(self, report, run_start_time=None):
     """Start tracking this pants run using the given Report.
 
     `RunTracker.initialize` must have been called first to create the run_info_dir and
@@ -213,7 +213,8 @@ class RunTracker(Subsystem):
     self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
-    self._main_root_workunit.start()
+    # Set the true start time in the case of e.g. the daemon.
+    self._main_root_workunit.start(run_start_time)
     self.report.start_workunit(self._main_root_workunit)
 
     # Log reporting details.
@@ -226,32 +227,6 @@ class RunTracker(Subsystem):
   def set_root_outcome(self, outcome):
     """Useful for setup code that doesn't have a reference to a workunit."""
     self._main_root_workunit.set_outcome(outcome)
-
-  @contextmanager
-  def new_pre_timed_workunit(self, name, timing, labels=None, cmd='', log_config=None):
-    """Creates a synthetic workunit with a pre-computed timing.
-
-    - name: A short name for this work. E.g., 'resolve', 'compile', 'scala', 'zinc'.
-    - timing: The pre-compted timing for this workunit.
-    - labels: An optional iterable of labels. The reporters can use this to decide how to
-              display information about this work.
-    - cmd: An optional longer string representing this work.
-           E.g., the cmd line of a compiler invocation.
-    - log_config: An optional tuple WorkUnit.LogConfig of task-level options affecting reporting.
-    """
-    parent = self._threadlocal.current_workunit
-    workunit = WorkUnit(
-      run_info_dir=self.run_info_dir,
-      parent=parent,
-      name=name,
-      labels=labels,
-      cmd=cmd,
-      log_config=log_config
-    )
-    self.report.start_workunit(workunit)
-    workunit.set_duration(timing)
-    workunit.set_outcome(WorkUnit.SUCCESS)
-    self.end_workunit(workunit)
 
   @contextmanager
   def new_workunit(self, name, labels=None, cmd='', log_config=None):

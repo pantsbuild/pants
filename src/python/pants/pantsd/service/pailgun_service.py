@@ -8,7 +8,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import select
 import sys
-import time
 import traceback
 from contextlib import contextmanager
 
@@ -54,7 +53,6 @@ class PailgunService(PantsService):
     """Sets up a PailgunServer instance."""
     # Constructs and returns a runnable PantsRunner.
     def runner_factory(sock, arguments, environment):
-      start_time = time.time()
       exiter = self._exiter_class(sock)
       graph_helper = None
       deferred_exc = None
@@ -82,8 +80,6 @@ class PailgunService(PantsService):
           ''.join(traceback.format_exception(*deferred_exc))
         )
 
-      graph_warmth_time = time.time() - start_time
-
       return self._runner_class(
         sock,
         exiter,
@@ -92,7 +88,6 @@ class PailgunService(PantsService):
         graph_helper,
         self.fork_lock,
         preceding_graph_size,
-        graph_warmth_time,
         deferred_exc
       )
 

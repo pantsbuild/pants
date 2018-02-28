@@ -46,7 +46,7 @@ class Reporting(Subsystem):
                   '{workunits}.  Possible formatting values are {formats}'.format(
                workunits=WorkUnitLabel.keys(), formats=ToolOutputFormat.keys()))
 
-  def initialize(self, run_tracker):
+  def initialize(self, run_tracker, start_time=None):
     """Initialize with the given RunTracker.
 
     TODO: See `RunTracker.start`.
@@ -88,7 +88,7 @@ class Reporting(Subsystem):
       run_tracker.run_info.add_info('report_url', 'http://localhost:{}/run/{}'.format(port, run_id))
 
     # And start tracking the run.
-    run_tracker.start(report)
+    run_tracker.start(report, start_time)
 
   def _get_invalidation_report(self):
     return InvalidationReport() if self.get_options().invalidation_report else None

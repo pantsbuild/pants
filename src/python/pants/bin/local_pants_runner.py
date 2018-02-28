@@ -32,18 +32,18 @@ class LocalPantsRunner(object):
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
     self._preceding_graph_size = -1
-    self._graph_warmth_timing = 0.0
 
   def set_preceding_graph_size(self, size):
     self._preceding_graph_size = size
-
-  def set_graph_warmth_timing(self, timing):
-    self._graph_warmth_timing = timing
 
   def run(self):
     profile_path = self._env.get('PANTS_PROFILE')
     with hard_exit_handler(), maybe_profiled(profile_path):
       self._run()
+
+  def _maybe_get_client_start_time_from_env(self):
+    client_start_time = self._env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
+    return None if client_start_time is None else float(client_start_time)
 
   def _run(self):
     # Bootstrap options and logging.
@@ -67,7 +67,7 @@ class LocalPantsRunner(object):
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker)
+    reporting.initialize(run_tracker, self._maybe_get_client_start_time_from_env())
 
     try:
       # Determine the build root dir.
@@ -79,7 +79,6 @@ class LocalPantsRunner(object):
         repro.capture(run_tracker.run_info.get_as_dict())
 
       # Record the preceding product graph size.
-      run_tracker.new_pre_timed_workunit('graph_warmth', self._graph_warmth_timing)
       run_tracker.pantsd_stats.set_preceding_graph_size(self._preceding_graph_size)
 
       # Setup and run GoalRunner.

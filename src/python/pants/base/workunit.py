@@ -119,7 +119,6 @@ class WorkUnit(object):
     # In seconds since the epoch. Doubles, to account for fractional seconds.
     self.start_time = 0
     self.end_time = 0
-    self._synthetic_duration = None
 
     # A workunit may have multiple outputs, which we identify by a name.
     # E.g., a tool invocation may have 'stdout', 'stderr', 'debug_log' etc.
@@ -141,9 +140,9 @@ class WorkUnit(object):
     """
     return label in self.labels
 
-  def start(self):
+  def start(self, start_time=None):
     """Mark the time at which this workunit started."""
-    self.start_time = time.time()
+    self.start_time = start_time or time.time()
 
   def end(self):
     """Mark the time at which this workunit ended."""
@@ -214,13 +213,7 @@ class WorkUnit(object):
 
     :API: public
     """
-    if self._synthetic_duration is not None:
-      return self._synthetic_duration
     return (self.end_time or time.time()) - self.start_time
-
-  def set_duration(self, seconds):
-    """Sets a synthetic/pre-computed duration."""
-    self._synthetic_duration = seconds
 
   @property
   def start_time_string(self):
