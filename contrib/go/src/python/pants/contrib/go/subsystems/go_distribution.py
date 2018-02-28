@@ -37,13 +37,6 @@ class GoDistribution(NativeTool):
     :returns: The Go distribution $GOROOT.
     :rtype: string
     """
-    #go_distribution = self.select()
-    # distribution_workdir = os.path.dirname(go_distribution)
-    # outdir = os.path.join(distribution_workdir, 'unpacked')
-    # if not os.path.exists(outdir):
-    #   with temporary_dir(root_dir=distribution_workdir) as tmp_dist:
-    #     TGZ.extract(go_distribution, tmp_dist)
-    #     os.rename(tmp_dist, outdir)
     return os.path.join(self.select(), 'go')
 
   def go_env(self, gopath=None):
@@ -61,7 +54,7 @@ class GoDistribution(NativeTool):
     """Encapsulates a go command that can be executed."""
 
     @classmethod
-    def create(cls, goroot, cmd, go_env, args=None):
+    def _create(cls, goroot, cmd, go_env, args=None):
       return cls([os.path.join(goroot, 'bin', 'go'), cmd] + (args or []), env=go_env)
 
     def spawn(self, env=None, **kwargs):
@@ -104,7 +97,7 @@ class GoDistribution(NativeTool):
     :returns: A go command that can be executed later.
     :rtype: :class:`GoDistribution.GoCommand`
     """
-    return self.GoCommand.create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
+    return self.GoCommand._create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
 
   def execute_go_cmd(self, cmd, gopath=None, args=None, env=None,
                      workunit_factory=None, workunit_name=None, workunit_labels=None, **kwargs):
@@ -125,7 +118,7 @@ class GoDistribution(NativeTool):
     :returns: A tuple of the exit code and the go command that was run.
     :rtype: (int, :class:`GoDistribution.GoCommand`)
     """
-    go_cmd = self.GoCommand.create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
+    go_cmd = self.GoCommand._create(self.goroot, cmd, go_env=self.go_env(gopath=gopath), args=args)
     if workunit_factory is None:
       return go_cmd.spawn(**kwargs).wait()
     else:
