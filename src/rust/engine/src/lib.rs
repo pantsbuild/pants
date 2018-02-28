@@ -21,6 +21,8 @@ extern crate futures;
 extern crate hashing;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate log;
 extern crate ordermap;
 extern crate petgraph;
 extern crate process_execution;
@@ -531,10 +533,10 @@ pub extern "C" fn set_panic_handler() {
       panic_str.push_str(&panic_location_str);
     }
 
-    externs::log(externs::LogLevel::Critical, &panic_str);
+    error!("{}", panic_str);
 
     let panic_file_bug_str = "Please file a bug at https://github.com/pantsbuild/pants/issues.";
-    externs::log(externs::LogLevel::Critical, &panic_file_bug_str);
+    error!("{}", panic_file_bug_str);
   }));
 }
 
@@ -545,7 +547,7 @@ pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
     .store
     .garbage_collect() {
     Ok(_) => {}
-    Err(err) => externs::log(externs::LogLevel::Critical, &err),
+    Err(err) => error!("{}", err),
   });
 }
 
@@ -555,7 +557,7 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler) {
     let digests = scheduler.core.graph.all_digests();
     match scheduler.core.store.lease_all(digests.iter()) {
       Ok(_) => {}
-      Err(err) => externs::log(externs::LogLevel::Critical, &err),
+      Err(err) => error!("{}", &err),
     }
   });
 }

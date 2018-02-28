@@ -2,6 +2,7 @@ extern crate bazel_protos;
 extern crate boxfuture;
 extern crate bytes;
 extern crate clap;
+extern crate env_logger;
 extern crate fs;
 extern crate futures;
 extern crate hashing;
@@ -37,6 +38,8 @@ impl From<String> for ExitError {
 }
 
 fn main() {
+  env_logger::init();
+
   match execute(
     App::new("fs_util")
       .subcommand(
