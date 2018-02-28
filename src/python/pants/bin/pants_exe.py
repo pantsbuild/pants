@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import time
 
 from pants.base.exiter import Exiter
 from pants.bin.pants_runner import PantsRunner
@@ -28,11 +29,13 @@ def test_env():
 
 
 def main():
+  start_time = time.time()
+
   exiter = Exiter()
   exiter.set_except_hook()
 
   with maybe_profiled(os.environ.get('PANTSC_PROFILE')):
     try:
-      PantsRunner(exiter).run()
+      PantsRunner(exiter, start_time=start_time).run()
     except KeyboardInterrupt:
       exiter.exit_and_fail(b'Interrupted by user.')

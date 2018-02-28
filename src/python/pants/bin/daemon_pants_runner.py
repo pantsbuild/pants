@@ -171,6 +171,10 @@ class DaemonPantsRunner(ProcessManager):
         # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.
         raise self._deferred_exception
 
+  def _maybe_get_client_start_time_from_env(self, env):
+    client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
+    return None if client_start_time is None else float(client_start_time)
+
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     with self._fork_lock:
@@ -223,6 +227,7 @@ class DaemonPantsRunner(ProcessManager):
 
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper)
+        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.set_preceding_graph_size(self._preceding_graph_size)
         runner.run()
       except KeyboardInterrupt:

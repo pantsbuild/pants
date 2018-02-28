@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import signal
 import sys
+import time
 from contextlib import contextmanager
 
 from pants.console.stty_utils import STTYSettings
@@ -43,6 +44,7 @@ class RemotePantsRunner(object):
     :param file stdout: The stream representing stdout.
     :param file stderr: The stream representing stderr.
     """
+    self._start_time = time.time()
     self._exiter = exiter
     self._args = args
     self._env = env
@@ -93,6 +95,7 @@ class RemotePantsRunner(object):
     # Merge the nailgun TTY capability environment variables with the passed environment dict.
     ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
     modified_env = combined_dict(self._env, ng_env)
+    modified_env['PANTSD_RUNTRACKER_CLIENT_START_TIME'] = str(self._start_time)
 
     assert isinstance(port, int), 'port {} is not an integer!'.format(port)
 
