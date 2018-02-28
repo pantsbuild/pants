@@ -9,6 +9,7 @@ import logging
 import os
 import time
 from collections import defaultdict
+from types import GeneratorType
 
 from pants.base.exceptions import TaskError
 from pants.base.project_tree import Dir, File, Link
@@ -111,6 +112,7 @@ class WrappedNativeScheduler(object):
       constraint_for(Link),
       constraint_for(ExecuteProcessRequest),
       constraint_for(ExecuteProcessResult),
+      constraint_for(GeneratorType),
     )
 
   def _root_type_ids(self):

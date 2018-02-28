@@ -32,11 +32,30 @@ def constraint_for(type_or_constraint):
     raise TypeError("Expected a type or constraint: got: {}".format(type_or_constraint))
 
 
+class Get(datatype('Get', ['product', 'subject'])):
+  """TODO: Experimental synchronous generator API.
+
+  May be called equivalently as either:
+    # verbose form: Get(product_type, subject_type, subject)
+    # shorthand form: Get(product_type, subject_type(subject))
+  """
+
+  def __new__(cls, *args):
+    if len(args) == 2:
+      product, subject = args
+    elif len(args) == 3:
+      product, _, subject = args
+    else:
+      raise Exception('Expected either two or three arguments to {}; got {}.'.format(
+          Get.__name__, args))
+    return super(Get, cls).__new__(cls, product, subject)
+
+
 class Selector(AbstractClass):
-  # The type constraint for the product type for this selector.
 
   @property
   def type_constraint(self):
+    """The type constraint for the product type for this selector."""
     return constraint_for(self.product)
 
   @abstractproperty

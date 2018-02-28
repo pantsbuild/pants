@@ -42,10 +42,11 @@ use std::path::{Path, PathBuf};
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern,
-              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs, IdentifyExtern,
-              LogExtern, ProjectExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
-              SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI32Extern,
-              StoreListExtern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern};
+              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs,
+              GeneratorSendExtern, IdentifyExtern, LogExtern, ProjectExtern,
+              ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult, SatisfiedByExtern,
+              SatisfiedByTypeExtern, StoreBytesExtern, StoreI32Extern, StoreListExtern,
+              TypeIdBuffer, TypeToStrExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;
@@ -119,10 +120,11 @@ impl RawNodes {
 
 #[no_mangle]
 pub extern "C" fn externs_set(
-  ext_context: *const ExternContext,
+  context: *const ExternContext,
   log: LogExtern,
   log_level: u8,
   call: CallExtern,
+  generator_send: GeneratorSendExtern,
   eval: EvalExtern,
   identify: IdentifyExtern,
   equals: EqualsExtern,
@@ -141,11 +143,12 @@ pub extern "C" fn externs_set(
   create_exception: CreateExceptionExtern,
   py_str_type: TypeId,
 ) {
-  externs::set_externs(Externs::new(
-    ext_context,
+  externs::set_externs(Externs {
+    context,
     log,
     log_level,
     call,
+    generator_send,
     eval,
     identify,
     equals,
@@ -163,7 +166,7 @@ pub extern "C" fn externs_set(
     project_multi,
     create_exception,
     py_str_type,
-  ));
+  });
 }
 
 #[no_mangle]
@@ -206,6 +209,7 @@ pub extern "C" fn scheduler_create(
   type_link: TypeConstraint,
   type_process_request: TypeConstraint,
   type_process_result: TypeConstraint,
+  type_generator: TypeConstraint,
   type_string: TypeId,
   type_bytes: TypeId,
   build_root_buf: Buffer,
@@ -244,6 +248,7 @@ pub extern "C" fn scheduler_create(
       link: type_link,
       process_request: type_process_request,
       process_result: type_process_result,
+      generator: type_generator,
       string: type_string,
       bytes: type_bytes,
     },

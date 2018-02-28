@@ -182,6 +182,7 @@ python_library(
   sources=['native.py'],
   dependencies=[
     ':native_engine_shared_library',
+    ':selectors',
     '3rdparty/python:cffi',
     '3rdparty/python:setuptools',
     'src/python/pants/binaries:binary_util',

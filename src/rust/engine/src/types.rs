@@ -22,6 +22,7 @@ pub struct Types {
   pub link: TypeConstraint,
   pub process_request: TypeConstraint,
   pub process_result: TypeConstraint,
+  pub generator: TypeConstraint,
   pub string: TypeId,
   pub bytes: TypeId,
 }

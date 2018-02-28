@@ -908,6 +908,58 @@ impl Task {
       }
     }
   }
+
+  ///
+  /// TODO: Merge with `get` once all edges are statically declared.
+  ///
+  fn gen_get(context: &Context, gets: Vec<externs::Get>) -> NodeFuture<Vec<Value>> {
+    let get_futures = gets
+      .into_iter()
+      .map(|get| {
+        let externs::Get(constraint, subject) = get;
+        let selector = selectors::Select::without_variant(constraint.clone());
+        let edges_res = context
+          .core
+          .rule_graph
+          .find_root_edges(*subject.type_id(), selectors::Selector::Select(selector))
+          .ok_or_else(|| {
+            throw(&format!(
+              "No rules were available to compute {} for {}",
+              externs::key_to_str(&constraint.0),
+              externs::key_to_str(&subject)
+            ))
+          });
+        let context = context.clone();
+        future::result(edges_res).and_then(move |edges| {
+          Select::new(constraint, subject, Default::default(), &edges).run(context.clone())
+        })
+      })
+      .collect::<Vec<_>>();
+    future::join_all(get_futures).to_boxed()
+  }
+
+  ///
+  /// Given a python generator Value, loop to request the generator's dependencies until
+  /// it completes with a result Value.
+  ///
+  fn generate(context: Context, generator: Value) -> NodeFuture<Value> {
+    future::loop_fn(externs::eval("None").unwrap(), move |input| {
+      let context = context.clone();
+      future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
+        match response {
+          externs::GeneratorResponse::Get(get) => Self::gen_get(&context, vec![get])
+            .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
+            .to_boxed() as BoxFuture<_, _>,
+          externs::GeneratorResponse::GetMulti(gets) => Self::gen_get(&context, gets)
+            .map(|vs| future::Loop::Continue(externs::store_list(vs.iter().collect(), false)))
+            .to_boxed() as BoxFuture<_, _>,
+          externs::GeneratorResponse::Break(val) => {
+            future::ok(future::Loop::Break(val)).to_boxed() as BoxFuture<_, _>
+          }
+        }
+      })
+    }).to_boxed()
+  }
 }
 
 impl Node for Task {
@@ -923,11 +975,21 @@ impl Node for Task {
         .collect::<Vec<_>>(),
     );
 
-    let task = self.task.clone();
+    let func = self.task.func.clone();
     deps
       .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for(&task.func.0), &deps),
-        Err(err) => Err(err),
+        Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
+        Err(failure) => Err(failure),
+      })
+      .then(move |task_result| match task_result {
+        Ok(val) => {
+          if externs::satisfied_by(&context.core.types.generator, &val) {
+            Self::generate(context, val)
+          } else {
+            ok(val)
+          }
+        }
+        Err(failure) => err(failure),
       })
       .to_boxed()
   }
