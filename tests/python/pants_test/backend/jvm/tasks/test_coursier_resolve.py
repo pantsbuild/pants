@@ -24,7 +24,7 @@ from pants.base.exceptions import TaskError
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.task.task import Task
-from pants.util.contextutil import temporary_dir
+from pants.util.contextutil import temporary_dir, temporary_file_path
 from pants_test.jvm.jvm_tool_task_test_base import JvmToolTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import TaskTestBase
@@ -72,18 +72,14 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertTrue(any('.pants.d/coursier/cache/relative/' in path for path in paths))
   
   def test_resolve_with_local_url(self):
-    file_d, tmp_path = tempfile.mkstemp(suffix='.jar')
-    try:
-      dep_with_url = JarDependency('commons-lang', 'commons-lang', '2.5', url='file://' + tmp_path)
+    with temporary_file_path(suffix='.jar') as url:
+      dep_with_url = JarDependency('commons-lang', 'commons-lang', '2.5', url='file://' + url)
       dep_with_url_lib = self.make_target('//:a', JarLibrary, jars=[dep_with_url])
       
       compile_classpath = self.resolve([dep_with_url_lib])
       # Get paths on compile classpath and assert that it starts with '.../coursier/cache/absolute'
       paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
       self.assertTrue(any('.pants.d/coursier/cache/absolute/' in path for path in paths))
-    finally:
-      os.remove(tmp_path)
-      self.assertFalse(os.path.exists(tmp_path))
 
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
