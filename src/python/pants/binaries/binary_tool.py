@@ -20,12 +20,16 @@ class BinaryToolBase(Subsystem):
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
   platform_dependent = None
-  archive_type = None
+  archive_type = None  # See pants.fs.archive.archive for valid string values.
   default_version = None
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
   # If unset, it defaults to the value of options_scope.
   name = None
+
+  # Subclasses may set this to a suffix (e.g., '.pex') to add to the computed remote path.
+  # Note that setting archive_type will add an appropriate archive suffix after this suffix.
+  suffix = ''
 
   # Subclasses may set these to effect migration from an old --version option to this one.
   # TODO(benjy): Remove these after migration to the mixin is complete.
@@ -103,7 +107,7 @@ class BinaryToolBase(Subsystem):
     return self._binary_util.select(
       supportdir=self.get_support_dir(),
       version=version,
-      name=self._get_name(),
+      name='{}{}'.format(self._get_name(), self.suffix),
       platform_dependent=self.platform_dependent,
       archive_type=self.archive_type)
 
