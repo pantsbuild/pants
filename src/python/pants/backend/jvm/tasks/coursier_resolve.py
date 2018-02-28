@@ -8,6 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import hashlib
 import json
 import os
+import urllib
 from collections import defaultdict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -354,6 +355,10 @@ class CoursierMixin(NailgunTask):
       if j.coordinate.classifier:
         module += ',classifier={}'.format(j.coordinate.classifier)
 
+      if j.get_url():
+        jar_url = j.get_url()
+        module += ',url={}'.format(urllib.quote_plus(jar_url))
+        
       if j.intransitive:
         cmd_args.append('--intransitive')
 
@@ -571,8 +576,8 @@ class CoursierMixin(NailgunTask):
       for classifier, jar_path in dep['files']:
         simple_coord = dep['coord']
         coord = cls.to_m2_coord(simple_coord, classifier)
-        pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
-
+        pants_path = cls._get_path_to_jar(coursier_cache_path, pants_jar_path_base, jar_path)
+      
         if not os.path.exists(jar_path):
           raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
 
@@ -586,6 +591,21 @@ class CoursierMixin(NailgunTask):
         coord_to_resolved_jars[simple_coord].add(resolved_jar)
 
     return coord_to_resolved_jars
+
+  @classmethod
+  def _get_path_to_jar(cls, coursier_cache_path, pants_jar_path_base, jar_path):
+    """
+    Create the path to the jar that will live in .pants.d
+    
+    :param coursier_cache_path: coursier cache location
+    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :param jar_path: path of the jar
+    :return:
+    """
+    if os.path.abspath(coursier_cache_path) not in os.path.abspath(jar_path):
+      return os.path.join(pants_jar_path_base, os.path.normpath('absolute/' + jar_path))
+    else:
+      return os.path.join(pants_jar_path_base, 'relative', os.path.relpath(jar_path, coursier_cache_path))
 
   @classmethod
   def to_m2_coord(cls, coord_str, classifier):
