@@ -636,6 +636,10 @@ class CoursierResolve(CoursierMixin):
   def register_options(cls, register):
     super(CoursierResolve, cls).register_options(register)
 
+  @classmethod
+  def implementation_version(cls):
+    return super(CoursierResolve, cls).implementation_version() + [('CoursierResolve', 1)]
+  
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).
