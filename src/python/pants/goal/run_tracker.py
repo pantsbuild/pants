@@ -194,7 +194,7 @@ class RunTracker(Subsystem):
 
     return run_id
 
-  def start(self, report):
+  def start(self, report, run_start_time=None):
     """Start tracking this pants run using the given Report.
 
     `RunTracker.initialize` must have been called first to create the run_info_dir and
@@ -213,7 +213,8 @@ class RunTracker(Subsystem):
     self._main_root_workunit = WorkUnit(run_info_dir=self.run_info_dir, parent=None,
                                         name=RunTracker.DEFAULT_ROOT_NAME, cmd=None)
     self.register_thread(self._main_root_workunit)
-    self._main_root_workunit.start()
+    # Set the true start time in the case of e.g. the daemon.
+    self._main_root_workunit.start(run_start_time)
     self.report.start_workunit(self._main_root_workunit)
 
     # Log reporting details.

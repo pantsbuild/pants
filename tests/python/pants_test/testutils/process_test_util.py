@@ -17,7 +17,7 @@ class ProcessStillRunning(AssertionError):
 def _safe_iter_matching_processes(name):
   for proc in psutil.process_iter():
     try:
-      if name in ''.join(proc.cmdline()):
+      if name in ''.join([part.decode('utf-8') for part in proc.cmdline()]):
         yield proc
     except (psutil.NoSuchProcess, psutil.AccessDenied):
       pass
