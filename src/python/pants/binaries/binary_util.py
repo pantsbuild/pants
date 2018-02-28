@@ -21,7 +21,7 @@ from pants.fs.archive import archiver as create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import chmod_plus_x, safe_open, safe_concurrent_creation
+from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.osutil import get_os_id
 
 
