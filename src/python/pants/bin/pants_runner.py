@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class PantsRunner(object):
   """A higher-level runner that delegates runs to either a LocalPantsRunner or RemotePantsRunner."""
 
-  def __init__(self, exiter, args=None, env=None):
+  def __init__(self, exiter, args=None, env=None, start_time=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (sys.argv) for this run. (Optional, default: sys.argv)
@@ -28,6 +28,7 @@ class PantsRunner(object):
     self._exiter = exiter
     self._args = args or sys.argv
     self._env = env or os.environ
+    self._start_time = start_time
 
   def run(self):
     options_bootstrapper = OptionsBootstrapper(env=self._env, args=self._args)
@@ -42,7 +43,11 @@ class PantsRunner(object):
     # N.B. Inlining this import speeds up the python thin client run by about 100ms.
     from pants.bin.local_pants_runner import LocalPantsRunner
 
-    return LocalPantsRunner(self._exiter,
-                            self._args,
-                            self._env,
-                            options_bootstrapper=options_bootstrapper).run()
+    runner = LocalPantsRunner(
+        self._exiter,
+        self._args,
+        self._env,
+        options_bootstrapper=options_bootstrapper
+    )
+    runner.set_start_time(self._start_time)
+    return runner.run()
