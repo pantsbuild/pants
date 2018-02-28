@@ -603,6 +603,9 @@ class CoursierMixin(NailgunTask):
     :return:
     """
     if os.path.abspath(coursier_cache_path) not in os.path.abspath(jar_path):
+      # Appending the string 'absolute' to the jar_path and joining that is a hack to work around
+      # python's os.path.join behavior of throwing away all components that come before an
+      # absolute path. See https://docs.python.org/3.3/library/os.path.html#os.path.join
       return os.path.join(pants_jar_path_base, os.path.normpath('absolute/' + jar_path))
     else:
       return os.path.join(pants_jar_path_base, 'relative', os.path.relpath(jar_path, coursier_cache_path))
