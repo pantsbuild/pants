@@ -93,6 +93,7 @@ typedef void ExternContext;
 
 // On the rust side the integration is defined in externs.rs
 typedef void             (*extern_ptr_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
+typedef uint8_t          extern_log_level;
 typedef Ident            (*extern_ptr_identify)(ExternContext*, Value*);
 typedef _Bool            (*extern_ptr_equals)(ExternContext*, Value*, Value*);
 typedef Value            (*extern_ptr_clone_val)(ExternContext*, Value*);
@@ -133,6 +134,7 @@ typedef struct {
 CFFI_HEADERS = '''
 void externs_set(ExternContext*,
                  extern_ptr_log,
+                 extern_log_level,
                  extern_ptr_call,
                  extern_ptr_eval,
                  extern_ptr_identify,
@@ -333,14 +335,7 @@ def _initialize_externs(ffi):
   def extern_log(context_handle, level, msg_ptr, msg_len):
     """Given a log level and utf8 message string, log it."""
     msg = bytes(ffi.buffer(msg_ptr, msg_len)).decode('utf-8')
-    if level == 0:
-      logger.debug(msg)
-    elif level == 1:
-      logger.info(msg)
-    elif level == 2:
-      logger.warn(msg)
-    else:
-      logger.critical(msg)
+    logger.log(level, msg)
 
   @ffi.def_extern()
   def extern_identify(context_handle, val):
@@ -636,6 +631,7 @@ class Native(object):
       context = ExternContext(self.ffi, self.lib)
       self.lib.externs_set(context._handle,
                            self.ffi_lib.extern_log,
+                           logger.getEffectiveLevel(),
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_eval,
                            self.ffi_lib.extern_identify,

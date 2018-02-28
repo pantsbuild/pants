@@ -35,6 +35,7 @@ members = [
 [dependencies]
 bazel_protos = { path = "process_execution/bazel_protos" }
 boxfuture = { path = "boxfuture" }
+enum_primitive = "0.1.1"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures = "0.1.16"
