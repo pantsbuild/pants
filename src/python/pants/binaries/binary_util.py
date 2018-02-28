@@ -20,8 +20,8 @@ from pants.base.hash_utils import hash_file
 from pants.fs.archive import archiver as create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import temporary_dir, temporary_file
-from pants.util.dirutil import chmod_plus_x, safe_mkdir_for, safe_open
+from pants.util.contextutil import temporary_file
+from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.osutil import get_os_id
 
 
@@ -176,7 +176,7 @@ class BinaryUtil(object):
     """
     full_name = '{}.{}'.format(name, archiver.extension)
     downloaded_file = self._select_file(supportdir, version, full_name, platform_dependent)
-    # use filename without rightmost extension as the directory name.
+    # Use filename without rightmost extension as the directory name.
     unpacked_dirname, _ = os.path.splitext(downloaded_file)
     if not os.path.exists(unpacked_dirname):
       archiver.extract(downloaded_file, unpacked_dirname)
@@ -238,9 +238,7 @@ class BinaryUtil(object):
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
     if not os.path.exists(bootstrapped_binary_path):
-      safe_mkdir_for(bootstrapped_binary_path)
-      with temporary_dir(root_dir=os.path.dirname(bootstrapped_binary_path)) as tmpdir:
-        downloadpath = os.path.join(tmpdir, 'download')
+      with safe_concurrent_creation(bootstrapped_binary_path) as downloadpath:
         with self._select_binary_stream(name, binary_path) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
@@ -260,7 +258,7 @@ class BinaryUtil(object):
 
     return os.path.isfile(filepath)
 
-  def is_bin_valid(self, basepath, binary_file_specs=tuple()):
+  def is_bin_valid(self, basepath, binary_file_specs=()):
     """Check if this bin path is valid.
 
     :param string basepath: The absolute path where the binaries are stored under.
