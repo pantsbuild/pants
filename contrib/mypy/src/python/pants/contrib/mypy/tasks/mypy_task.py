@@ -13,7 +13,6 @@ from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.targets.python_tests import PythonTests
-from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.resolve_requirements_task_base import ResolveRequirementsTaskBase
 from pants.backend.python.tasks.wrapped_pex import WrappedPEX
 from pants.base.build_environment import get_buildroot
@@ -37,7 +36,6 @@ class MypyTask(ResolveRequirementsTaskBase):
   def prepare(cls, options, round_manager):
     super(MypyTask, cls).prepare(options, round_manager)
     round_manager.require_data(PythonInterpreter)
-    round_manager.require_data(GatherSources.PythonSources)
 
   @classmethod
   def register_options(cls, register):
