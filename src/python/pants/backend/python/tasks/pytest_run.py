@@ -18,7 +18,6 @@ from textwrap import dedent
 
 from six import StringIO
 from six.moves import configparser
-from twitter.common.collections import OrderedSet
 
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.backend.python.tasks.gather_sources import GatherSources
