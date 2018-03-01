@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import logging
 import os
 
 from pants.backend.jvm.targets.java_library import JavaLibrary
@@ -18,9 +17,6 @@ from pants.task.simple_codegen_task import SimpleCodegenTask
 from twitter.common.collections import OrderedSet
 
 from pants.contrib.thrifty.java_thrifty_library import JavaThriftyLibrary
-
-
-logger = logging.getLogger(__name__)
 
 
 class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
@@ -40,9 +36,6 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
     cls.register_jvm_tool(register,
                           'thrifty-compiler',
                           classpath=[thrifty_jar(name='thrifty-compiler')])
-
-  def __init__(self, *args, **kwargs):
-    super(JavaThriftyGen, self).__init__(*args, **kwargs)
 
   def synthetic_target_type(self, target):
     return JavaLibrary
@@ -77,23 +70,19 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
   def _compute_include_paths(self, target):
     """Computes the set of paths that thrifty uses to lookup imports.
 
-    The IDL files under these paths are not compiled, but they are required to to compile
+    The IDL files under these paths are not compiled, but they are required to compile
     downstream IDL files.
 
     :param target: the JavaThriftyLibrary target to compile.
     :return: an ordered set of directories to pass along to thrifty.
     """
     paths = OrderedSet()
-    paths.add(os.path.join(get_buildroot(), self.context.source_roots.find(target).path))
+    paths.add(os.path.join(get_buildroot(), target.target_base))
 
     def collect_paths(dep):
-      if not dep.has_sources():
+      if not dep.has_sources('.thrift'):
         return
-      for source in dep.sources_relative_to_buildroot():
-        if source.endswith('.thrift'):
-          root = self.context.source_roots.find_by_path(source)
-          if root:
-            paths.add(os.path.join(get_buildroot(), root.path))
+      paths.add(os.path.join(get_buildroot(), dep.target_base))
 
     collect_paths(target)
     target.walk(collect_paths)
