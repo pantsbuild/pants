@@ -46,7 +46,7 @@ class JavaThriftyGen(NailgunTaskBase, SimpleCodegenTask):
     return deps
 
   def synthetic_target_extra_exports(self, target, target_workdir):
-    return self.synthetic_target_extra_dependencies(target, target_workdir)
+    return self.resolve_deps([self.get_options().thrifty_runtime])
 
   def format_args_for_target(self, target, target_workdir):
     sources = OrderedSet(target.sources_relative_to_buildroot())
