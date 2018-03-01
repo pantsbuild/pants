@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+from contextlib import contextmanager
 
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
@@ -80,8 +81,12 @@ class ResolveRequirementsTaskBase(Task):
     return PEX(path, interpreter=interpreter)
 
   @classmethod
-  def merge_pexes(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
-    """Generates a merged pex at path."""
+  @contextmanager
+  def merged_pex(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
+    """Yields a pex builder at path with the given pexes already merged.
+
+    :rtype: :class:`pex.pex_builder.PEXBuilder`
+    """
     pex_paths = [pex.path() for pex in pexes if pex]
     if pex_paths:
       pex_info = pex_info.copy()
@@ -92,4 +97,10 @@ class ResolveRequirementsTaskBase(Task):
       if interpeter_constraints:
         for constraint in interpeter_constraints:
           builder.add_interpreter_constraint(constraint)
+      yield builder
+
+  @classmethod
+  def merge_pexes(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
+    """Generates a merged pex at path."""
+    with cls.merged_pex(path, pex_info, interpreter, pexes, interpeter_constraints) as builder:
       builder.freeze()
