@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+import pkg_resources
 from pex.pex_info import PexInfo
 
 from pants.backend.python.subsystems.pytest import PyTest
@@ -39,6 +40,10 @@ class PytestPrep(PythonExecutionTaskBase):
       return os.path.join(self._pex.path(), 'pytest.ini')
 
   @classmethod
+  def implementation_version(cls):
+    return super(PytestPrep, cls).implementation_version() + [('PytestPrep', 1)]
+
+  @classmethod
   def product_types(cls):
     return [cls.PytestBinary]
 
@@ -51,6 +56,11 @@ class PytestPrep(PythonExecutionTaskBase):
 
   def extra_files(self):
     yield self.ExtraFile.empty('pytest.ini')
+
+    enclosing_dir = os.path.dirname(__name__.replace('.', os.sep))
+    plugin_path = os.path.join(enclosing_dir, 'coverage/plugin.py')
+    yield self.ExtraFile(path=plugin_path,
+                         content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'))
 
   def execute(self):
     pex_info = PexInfo.default()
