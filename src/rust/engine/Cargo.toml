@@ -12,13 +12,10 @@ debug = true
 codegen-units = 1
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
 [build-dependencies]
 cc = "1.0"
-
-# TODO: Enable workspace when https://github.com/rust-lang/rust/issues/44862 is resolved.
-# [workspace]
 
 [dependencies]
 boxfuture = { path = "boxfuture" }
