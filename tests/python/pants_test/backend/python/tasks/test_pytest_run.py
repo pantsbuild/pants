@@ -444,23 +444,26 @@ class PytestTest(PytestTestBase):
     data_file = self.coverage_data_file()
     self.assertEqual(expect_coverage, os.path.isfile(data_file))
     if expect_coverage:
-      python_sources = context.products.get_data(GatherSources.PythonSources)
+      python_sources = context.products.get_data(GatherSources.PYTHON_SOURCES)
       covered_relpath = os.path.relpath(covered_path, self.build_root)
       owning_targets = [t for t in context.targets()
                         if covered_relpath in t.sources_relative_to_buildroot()]
       self.assertEqual(1, len(owning_targets))
       owning_target = owning_targets[0]
 
-      chroot = python_sources.for_target(owning_target).path()
+      src_chroot_path = python_sources.path()
       src_root_abspath = os.path.join(self.build_root, owning_target.target_base)
       covered_src_root_relpath = os.path.relpath(covered_path, src_root_abspath)
-      chroot_path = os.path.join(chroot, covered_src_root_relpath)
+      chroot_path = os.path.join(src_chroot_path, covered_src_root_relpath)
 
       cp = configparser.SafeConfigParser()
-      src_to_chroot = {os.path.join(self.build_root, tgt.target_base):
-                         python_sources.for_target(tgt).path()
-                       for tgt in context.targets()}
-      PytestRun._add_plugin_config(cp, src_to_chroot=src_to_chroot)
+      src_to_target_base = {src: tgt.target_base
+                            for tgt in context.targets()
+                            for src in tgt.sources_relative_to_source_root()}
+
+      PytestRun._add_plugin_config(cp,
+                                   src_chroot_path=src_chroot_path,
+                                   src_to_target_base=src_to_target_base)
       with temporary_file() as fp:
         cp.write(fp)
         fp.close()

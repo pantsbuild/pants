@@ -61,11 +61,6 @@ class GatherSourcesTest(TaskTestBase):
                                      sources=['corge.py'],
                                      dependencies=[self.files, self.resources])
 
-  def _assert_content(self, python_sources, target):
-    pex = python_sources.for_target(target)
-    self._assert_content_in_pex(pex, target)
-    return pex
-
   def _extract_files(self, target):
     if type(target) == Files:
       to_filemap_key = lambda path: path
@@ -91,54 +86,24 @@ class GatherSourcesTest(TaskTestBase):
       self.assertFalse(os.path.exists(os.path.join(pex_path, path)))
 
   def test_gather_sources(self):
-    python_sources = self._gather_sources([self.sources1,
-                                           # These files should not be gathered since they are not
-                                           # a dependency of any python targets in play.
-                                           self.files])
-    pex = self._assert_content(python_sources, self.sources1)
+    pex = self._gather_sources([self.sources1,
+                                # These files should not be gathered since they are not
+                                # a dependency of any python targets in play.
+                                self.files])
+    self._assert_content_in_pex(pex, self.sources1)
     self._assert_content_in_pex(pex, self.resources)
     self._assert_content_not_in_pex(pex, self.sources2)
     self._assert_content_not_in_pex(pex, self.files)
 
   def test_gather_files(self):
-    python_sources = self._gather_sources([self.sources2,
-                                           # These resources should not be gathered since they are
-                                           # not a dependency of any python targets in play.
-                                           self.resources])
-    pex = self._assert_content(python_sources, self.sources2)
+    pex = self._gather_sources([self.sources2,
+                                # These resources should not be gathered since they are
+                                # not a dependency of any python targets in play.
+                                self.resources])
+    self._assert_content_in_pex(pex, self.sources2)
     self._assert_content_in_pex(pex, self.files)
     self._assert_content_not_in_pex(pex, self.sources1)
     self._assert_content_not_in_pex(pex, self.resources)
-
-  def test_gather_resources_into_multiple_pexes(self):
-    python_sources = self._gather_sources([self.sources1, self.sources2, self.sources3])
-
-    pex1 = self._assert_content(python_sources, self.sources1)
-    pex2 = self._assert_content(python_sources, self.sources2)
-    self.assertIs(pex1, pex2)  # sources1 and sources2 share the same source root.
-    self._assert_content_in_pex(pex1, self.files)
-    self._assert_content_in_pex(pex1, self.resources)
-    self._assert_content_not_in_pex(pex1, self.sources3)
-
-    pex3 = self._assert_content(python_sources, self.sources3)
-    self.assertIsNot(pex3, pex1)  # sources3 has a different source root from sources1 and sources2.
-    self._assert_content_in_pex(pex3, self.files)
-    self._assert_content_in_pex(pex3, self.resources)
-    self._assert_content_not_in_pex(pex3, self.sources1)
-    self._assert_content_not_in_pex(pex3, self.sources2)
-
-    self.assertEqual([pex1, pex3], python_sources.all())
-
-  def test_order_respected(self):
-    python_sources = self._gather_sources([self.sources1, self.sources3])
-    pex1 = python_sources.for_target(self.sources1)
-    pex3 = python_sources.for_target(self.sources3)
-    self.assertEqual([pex1, pex3], python_sources.all())
-
-    python_sources = self._gather_sources([self.sources3, self.sources1])
-    pex1 = python_sources.for_target(self.sources1)
-    pex3 = python_sources.for_target(self.sources3)
-    self.assertEqual([pex3, pex1], python_sources.all())
 
   def _gather_sources(self, target_roots):
     context = self.context(target_roots=target_roots, for_subsystems=[PythonSetup, PythonRepos])
@@ -156,4 +121,4 @@ class GatherSourcesTest(TaskTestBase):
     task = self.create_task(context)
     task.execute()
 
-    return context.products.get_data(GatherSources.PythonSources)
+    return context.products.get_data(GatherSources.PYTHON_SOURCES)

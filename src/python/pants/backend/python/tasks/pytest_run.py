@@ -183,7 +183,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
   # N.B.: Extracted for tests.
   @classmethod
-  def _add_plugin_config(cls, cp, src_to_chroot):
+  def _add_plugin_config(cls, cp, src_chroot_path, src_to_target_base):
     # We use a coverage plugin to map PEX chroot source paths back to their original repo paths for
     # report output.
     plugin_module = 'pants.backend.python.tasks.coverage.plugin'
@@ -192,16 +192,14 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     cp.add_section(plugin_module)
     cp.set(plugin_module, 'buildroot', get_buildroot())
-    cp.set(plugin_module,
-           'src_to_chroot',
-           json.dumps({os.path.join(get_buildroot(), f): os.path.join(get_buildroot(), t)
-                       for f, t in src_to_chroot.items()}))
+    cp.set(plugin_module, 'src_chroot_path', src_chroot_path)
+    cp.set(plugin_module, 'src_to_target_base', json.dumps(src_to_target_base))
 
-  def _generate_coverage_config(self, src_to_chroot):
+  def _generate_coverage_config(self, src_to_target_base):
     cp = configparser.SafeConfigParser()
     cp.readfp(StringIO(self.DEFAULT_COVERAGE_CONFIG))
 
-    self._add_plugin_config(cp, src_to_chroot)
+    self._add_plugin_config(cp, self._source_chroot_path, src_to_target_base)
 
     # See the debug options here: http://nedbatchelder.com/code/coverage/cmd.html#cmd-run-debug
     if self._debug:
@@ -216,8 +214,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     return cp
 
   @contextmanager
-  def _cov_setup(self, workdirs, coverage_morfs, src_to_chroot):
-    cp = self._generate_coverage_config(src_to_chroot=src_to_chroot)
+  def _cov_setup(self, workdirs, coverage_morfs, src_to_target_base):
+    cp = self._generate_coverage_config(src_to_target_base=src_to_target_base)
     # Note that it's important to put the tmpfile under the workdir, because pytest
     # uses all arguments that look like paths to compute its rootdir, and we want
     # it to pick the buildroot.
@@ -239,15 +237,15 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       yield []
       return
 
-    def pex_src_root(tgt):
-      return os.path.relpath(self._source_chroot_path((tgt,)), get_buildroot())
+    pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
 
-    src_to_chroot = {}
+    src_to_target_base = {}
     for target in test_targets:
       libs = (tgt for tgt in target.closure()
               if tgt.has_sources('.py') and not isinstance(tgt, PythonTests))
       for lib in libs:
-        src_to_chroot[lib.target_base] = pex_src_root(lib)
+        for src in lib.sources_relative_to_source_root():
+          src_to_target_base[src] = lib.target_base
 
     def ensure_trailing_sep(path):
       return path if path.endswith(os.path.sep) else path + os.path.sep
@@ -287,13 +285,13 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
           rel_source = ensure_trailing_sep(rel_source)
 
           found_target_base = False
-          for target_base, pex_root in src_to_chroot.items():
+          for target_base in set(src_to_target_base.values()):
             prefix = ensure_trailing_sep(target_base)
             if rel_source.startswith(prefix):
               # ... rel_source will match on prefix=src/python/ ...
               suffix = rel_source[len(prefix):]
               # ... suffix will equal foo/bar ...
-              coverage_morfs.append(os.path.join(get_buildroot(), pex_root, suffix))
+              coverage_morfs.append(os.path.join(get_buildroot(), pex_src_root, suffix))
               found_target_base = True
               # ... and we end up appending <pex_src_root>/foo/bar to the coverage_sources.
               break
@@ -305,7 +303,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     with self._cov_setup(workdirs,
                          coverage_morfs=coverage_morfs,
-                         src_to_chroot=src_to_chroot) as (args, coverage_rc):
+                         src_to_target_base=src_to_target_base) as (args, coverage_rc):
       try:
         yield args
       finally:
@@ -320,7 +318,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
         # The '.coverage' data file is output in the CWD of the test run above; so we make sure to
         # look for it there.
-        with self._maybe_run_in_chroot(test_targets):
+        with self._maybe_run_in_chroot():
           # On failures or timeouts, the .coverage file won't be written.
           if not os.path.exists('.coverage'):
             self.context.log.warn('No .coverage file was found! Skipping coverage reporting.')
@@ -506,7 +504,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       return PytestResult.exception()
 
   def _map_relsrc_to_targets(self, targets):
-    pex_src_root = os.path.relpath(self._source_chroot_path(targets), get_buildroot())
+    pex_src_root = os.path.relpath(self._source_chroot_path, get_buildroot())
     # First map chrooted sources back to their targets.
     relsrc_to_target = {os.path.join(pex_src_root, src): target for target in targets
       for src in target.sources_relative_to_source_root()}
@@ -557,17 +555,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
         for test_target in test_targets:
           yield (test_target,)
     else:
-      targets_by_target_base = OrderedDict()
-      for test_target in test_targets:
-        targets_for_base = targets_by_target_base.get(test_target.target_base)
-        if targets_for_base is None:
-          targets_for_base = []
-          targets_by_target_base[test_target.target_base] = targets_for_base
-        targets_for_base.append(test_target)
-
       def iter_partitions():
-        for test_targets in targets_by_target_base.values():
-          yield tuple(test_targets)
+        yield tuple(test_targets)
 
     workdir = self.workdir
 
@@ -633,13 +622,11 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
     if not test_targets:
       return PytestResult.rc(0)
 
-    test_chroot_path = self._source_chroot_path(test_targets)
-
     # Absolute path to chrooted test file -> Path to original test file relative to the buildroot.
     sources_map = OrderedDict()
     for t in test_targets:
       for p in t.sources_relative_to_source_root():
-        sources_map[os.path.join(test_chroot_path, p)] = os.path.join(t.target_base, p)
+        sources_map[os.path.join(self._source_chroot_path, p)] = os.path.join(t.target_base, p)
 
     if not sources_map:
       return PytestResult.rc(0)
@@ -678,7 +665,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       if os.path.exists(junitxml_path):
         os.unlink(junitxml_path)
 
-      with self._maybe_run_in_chroot(test_targets):
+      with self._maybe_run_in_chroot():
         result = self._do_run_tests_with_args(pytest_binary.pex, args)
 
       # There was a problem prior to test execution preventing junit xml file creation so just let
@@ -704,17 +691,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
       return result.with_failed_targets(failed_targets)
 
-  @memoized_method
-  def _source_chroot_path(self, targets):
-    if len(targets) > 1:
-      target_bases = {target.target_base for target in targets}
-      assert len(target_bases) == 1, ('Expected targets to live in the same source root, given '
-                                      'targets living under the following source roots: {}'
-                                      .format(', '.join(sorted(target_bases))))
-    representative_target = targets[0]
-
-    python_sources = self.context.products.get_data(GatherSources.PythonSources)
-    return python_sources.for_target(representative_target).path()
+  @memoized_property
+  def _source_chroot_path(self):
+    return self.context.products.get_data(GatherSources.PYTHON_SOURCES).path()
 
   def _pex_run(self, pex, workunit_name, args, env):
     with self.context.new_workunit(name=workunit_name,
@@ -724,9 +703,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       return process.wait()
 
   @contextmanager
-  def _maybe_run_in_chroot(self, targets):
+  def _maybe_run_in_chroot(self):
     if self.run_tests_in_chroot:
-      with pushd(self._source_chroot_path(targets)):
+      with pushd(self._source_chroot_path):
         yield
     else:
       yield

@@ -53,42 +53,43 @@ class MyFileReporter(PythonFileReporter):
 class MyPlugin(CoveragePlugin):
   """A plugin that knows how to map Pants PEX chroots back to repo source code when reporting."""
 
-  def __init__(self, buildroot, src_to_chroot):
+  def __init__(self, buildroot, src_chroot_path, src_to_target_base):
     super(MyPlugin, self).__init__()
     self._buildroot = buildroot
-    self._src_to_chroot = src_to_chroot
+    self._src_chroot_path = src_chroot_path
+    self._src_to_target_base = src_to_target_base
+    self._target_bases = set(self._src_to_target_base.values())
 
   def find_executable_files(self, top):
-    for chroot_path in self._src_to_chroot.values():
-      if top.startswith(chroot_path):
-        for root, _, files in os.walk(top):
-          for f in files:
-            if f.endswith('.py'):
-              yield os.path.join(root, f)
-        break
+    if top.startswith(self._src_chroot_path):
+      for root, dirs, files in os.walk(top):
+        for f in files:
+          if f.endswith('.py'):
+            yield os.path.join(root, f)
 
   def file_tracer(self, filename):
-    for chroot_path in self._src_to_chroot.values():
-      if filename.startswith(chroot_path):
+    if filename.startswith(self._src_chroot_path):
+      src = os.path.relpath(filename, self._src_chroot_path)
+      if src in self._src_to_target_base:
         return MyFileTracer(filename)
 
   def file_reporter(self, filename):
-    src_file = self._map_to_src(filename)
-    mapped_relpath = os.path.relpath(src_file, self._buildroot)
-    return MyFileReporter(filename, mapped_relpath)
+    mapped_relpath = self._map_relpath(filename)
+    return MyFileReporter(filename, mapped_relpath or filename)
 
-  def _map_to_src(self, chroot):
-    for src_dir, chroot_dir in self._src_to_chroot.items():
-      if chroot.startswith(chroot_dir):
-        return src_dir + chroot[len(chroot_dir):]
-    raise AssertionError('Failed to map traced file {} to any source root via '
-                         'source root -> chroot mappings:\n\t{}'
-                         .format(chroot, '\n\t'.join(sorted('{} -> {}'.format(src_dir, chroot_dir)
-                                                            for src_dir, chroot_dir
-                                                            in self._src_to_chroot.items()))))
+  def _map_relpath(self, filename):
+    src = os.path.relpath(filename, self._src_chroot_path)
+    target_base = self._src_to_target_base.get(src) or self._find_target_base(src)
+    return os.path.join(target_base, src) if target_base else filename
+
+  def _find_target_base(self, src):
+    for target_base in self._target_bases:
+      if os.path.isfile(os.path.join(self._buildroot, target_base, src)):
+        return target_base
 
 
 def coverage_init(reg, options):
   buildroot = options['buildroot']
-  src_to_chroot = json.loads(options['src_to_chroot'])
-  reg.add_file_tracer(MyPlugin(buildroot, src_to_chroot))
+  src_chroot_path = options['src_chroot_path']
+  src_to_target_base = json.loads(options['src_to_target_base'])
+  reg.add_file_tracer(MyPlugin(buildroot, src_chroot_path, src_to_target_base))
