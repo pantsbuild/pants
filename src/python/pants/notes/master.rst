@@ -4,6 +4,71 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
+1.5.0dev5 (03/02/2018)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add ability for pants to call coursier with the new url attribute (#5527)
+  `PR #5527 <https://github.com/pantsbuild/pants/pull/5527>`_
+
+* Don't force inherit_path to be a bool (#5482)
+  `PR #5482 <https://github.com/pantsbuild/pants/pull/5482>`_
+  `PR #444 <https://github.com/pantsbuild/pex/pull/444>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Repair end to end runtracker timing for pantsd runs. (#5526)
+  `PR #5526 <https://github.com/pantsbuild/pants/pull/5526>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Generate a single python source chroot. (#5535)
+  `PR #5535 <https://github.com/pantsbuild/pants/pull/5535>`_
+
+* Improve py.test covered paths reporting. (#5534)
+  `PR #5534 <https://github.com/pantsbuild/pants/pull/5534>`_
+
+* Improve test reporting in batched partitions. (#5420)
+  `PR #5420 <https://github.com/pantsbuild/pants/pull/5420>`_
+
+* Fix non-exportable library target subclasses (#5533)
+  `PR #5533 <https://github.com/pantsbuild/pants/pull/5533>`_
+
+* Cleanups for 3bdd5506dc3 that I forgot to push before merging. (#5529)
+  `PR #5529 <https://github.com/pantsbuild/pants/pull/5529>`_
+
+* New-style BinaryTool Subsystems for isort and go distribution. (#5523)
+  `PR #5523 <https://github.com/pantsbuild/pants/pull/5523>`_
+
+* Use rust logging API (#5525)
+  `PR #5525 <https://github.com/pantsbuild/pants/pull/5525>`_
+
+* Add comment about significance of unsorted-ness of sources (#5524)
+  `PR #5524 <https://github.com/pantsbuild/pants/pull/5524>`_
+
+* cloc never executes in the v2 engine (#5518)
+  `PR #5518 <https://github.com/pantsbuild/pants/pull/5518>`_
+
+* Robustify `PantsRequirementIntegrationTest`. (#5520)
+  `PR #5520 <https://github.com/pantsbuild/pants/pull/5520>`_
+
+* Subsystems for the ragel and cloc binaries (#5517)
+  `PR #5517 <https://github.com/pantsbuild/pants/pull/5517>`_
+
+* Move Key interning to rust (#5455)
+  `PR #5455 <https://github.com/pantsbuild/pants/pull/5455>`_
+
+* Don't reinstall plugin wheels on every invocation. (#5506)
+  `PR #5506 <https://github.com/pantsbuild/pants/pull/5506>`_
+
+* A new Thrift binary tool subsystem. (#5512)
+  `PR #5512 <https://github.com/pantsbuild/pants/pull/5512>`_
+
+
 1.5.0.dev4 (02/23/2018)
 -----------------------
 
