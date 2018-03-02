@@ -265,7 +265,7 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   temp_output_prefix = os.path.join(tempdir, module_name)
   real_output_prefix = os.path.join(output_dir, module_name)
   temp_c_file = '{}.c'.format(temp_output_prefix)
-  real_c_file = '{}.c'.format(real_output_prefix)
+  c_file = '{}.c'.format(real_output_prefix)
   env_script = '{}.cflags'.format(real_output_prefix)
 
   ffibuilder = cffi.FFI()
@@ -275,10 +275,23 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
   ffibuilder.emit_c_code(six.binary_type(temp_c_file))
 
+  # Work around https://github.com/rust-lang/rust/issues/36342 by renaming initnative_engine to
+  # wrapped_initnative_engine so that the rust code can define the symbol initnative_engine.
+  #
+  # If we dont do this, we end up at the mercy of the implementation details of rust's stripping
+  # and LTO. In the past we have found ways to trick it into not stripping symbols which was handy
+  # (it kept the binary working) but inconvenient (it was relying on unspecified behavior, it meant
+  # our binaries couldn't be stripped which inflated them by 2~3x, and it reduced the amount of LTO
+  # we could use, which led to unmeasured performance hits).
   with open(temp_c_file, 'rb') as f:
-    file_content = f.read()
+    lines = f.readlines()
+  for i, line in enumerate(lines):
+    # This is an optimistic heuristic for renaming the initnative_engine symbol and nothing else.
+    if line.startswith(b'init{}'.format(module_name)):
+      lines[i] = 'wrapped_' + line
+  file_content = ''.join(lines)
 
-  _replace_file(real_c_file, file_content)
+  _replace_file(c_file, file_content)
 
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
   _replace_file(env_script, get_build_cflags())
