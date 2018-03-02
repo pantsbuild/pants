@@ -24,6 +24,8 @@ extern crate itertools;
 #[macro_use]
 extern crate lazy_static;
 extern crate lmdb;
+#[macro_use]
+extern crate log;
 #[cfg(test)]
 extern crate mock;
 extern crate ordermap;
