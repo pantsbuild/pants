@@ -439,10 +439,11 @@ mod local {
   use hashing::{Digest, Fingerprint};
   use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, NO_TLS,
              RwTransaction, Transaction, WriteFlags};
-  use lmdb::Error::{KeyExist, MapFull, NotFound};
+  use lmdb::Error::{KeyExist, NotFound};
   use sha2::Sha256;
-  use std::collections::BinaryHeap;
-  use std::path::Path;
+  use std::collections::{BinaryHeap, HashMap};
+  use std::fmt;
+  use std::path::{Path, PathBuf};
   use std::sync::Arc;
   use std::time;
 
@@ -455,79 +456,50 @@ mod local {
   }
 
   struct InnerStore {
-    env: Environment,
     pool: Arc<ResettablePool>,
-    file_database: Database,
     // Store directories separately from files because:
     //  1. They may have different lifetimes.
     //  2. It's nice to know whether we should be able to parse something as a proto.
-    directory_database: Database,
-    lease_database: Database,
+    file_dbs: ShardedLmdb,
+    directory_dbs: ShardedLmdb,
   }
 
   impl ByteStore {
     pub fn new<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<ByteStore, String> {
-      let env = Environment::new()
-        // Without this flag, each time a read transaction is started, it eats into our transaction
-        // limit (default: 126) until that thread dies.
-        //
-        // This flag makes transactions be removed from that limit when they are dropped, rather
-        // than when their thread dies. This is important, because we perform reads from a thread
-        // pool, so our threads never die. Without this flag, all read requests will fail after the
-        // first 126.
-        //
-        // The only down-side is that you need to make sure that any individual OS thread must not
-        // try to perform multiple write transactions concurrently. Fortunately, this property
-        // holds for us.
-        .set_flags(NO_TLS)
-          // 3 DBs; one for file contents, one for directories, one for leases.
-        .set_max_dbs(3)
-        .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
-        .open(path.as_ref())
-        .map_err(|e| format!("Error making env: {:?}", e))?;
-      let file_database = env
-        .create_db(Some("files"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!("Error creating/opening files database: {:?}", e)
-        })?;
-      let directory_database = env
-        .create_db(Some("directories"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!("Error creating/opening directories database: {:?}", e)
-        })?;
-      let lease_database = env
-        .create_db(Some("leases"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!("Error creating/opening leases database: {:?}", e)
-        })?;
+      let root = path.as_ref();
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
-          env,
-          pool,
-          file_database,
-          directory_database,
-          lease_database,
+          pool: pool,
+          file_dbs: ShardedLmdb::new(root.join("files"))?,
+          directory_dbs: ShardedLmdb::new(root.join("directories"))?,
         }),
       })
     }
 
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
     pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
-      let txn = self.inner.env.begin_ro_txn().map_err(|err| {
+      {
+        let (env, directory_database, _) = self.inner.directory_dbs.get(fingerprint);
+        let txn = env.begin_ro_txn().map_err(|err| {
+          format!("Failed to begin read transaction: {:?}", err)
+        })?;
+        match txn.get(directory_database, &fingerprint.as_ref()) {
+          Ok(_) => return Ok(Some(EntryType::Directory)),
+          Err(NotFound) => {}
+          Err(err) => {
+            return Err(format!(
+              "Error reading from store when determining type of fingerprint {}: {:?}",
+              fingerprint,
+              err
+            ))
+          }
+        };
+      }
+      let (env, file_database, _) = self.inner.file_dbs.get(fingerprint);
+      let txn = env.begin_ro_txn().map_err(|err| {
         format!("Failed to begin read transaction: {:?}", err)
       })?;
-      match txn.get(self.inner.directory_database, &fingerprint.as_ref()) {
-        Ok(_) => return Ok(Some(EntryType::Directory)),
-        Err(NotFound) => {}
-        Err(err) => {
-          return Err(format!(
-            "Error reading from store when determining type of fingerprint {}: {:?}",
-            fingerprint,
-            err
-          ))
-        }
-      };
-      match txn.get(self.inner.file_database, &fingerprint.as_ref()) {
+      match txn.get(file_database, &fingerprint.as_ref()) {
         Ok(_) => return Ok(Some(EntryType::File)),
         Err(NotFound) => {}
         Err(err) => {
@@ -545,25 +517,19 @@ mod local {
       &self,
       digests: Ds,
     ) -> Result<(), String> {
-      self
-        .inner
-        .env
-        .begin_rw_txn()
-        .map_err(|err| format!("Error making lmdb transaction: {:?}", err))
-        .and_then(|mut txn| {
-          let until = Self::default_lease_until_secs_since_epoch();
-          for digest in digests {
-            self.lease(&digest.0, until, &mut txn).map_err(|e| {
-              format!("Error leasing digest {:?}: {:?}", digest, e)
-            })?;
-          }
-          Ok(txn)
-        })
-        .and_then(|txn| {
-          txn.commit().map_err(
-            |e| format!("Error writing lease: {:?}", e),
-          )
-        })
+      let until = Self::default_lease_until_secs_since_epoch();
+      for digest in digests {
+        let (env, _, lease_database) = self.inner.file_dbs.get(&digest.0);
+        env
+          .begin_rw_txn()
+          .and_then(|mut txn| {
+            self.lease(&lease_database, &digest.0, until, &mut txn)
+          })
+          .map_err(|err| {
+            format!("Error leasing digest {:?}: {:?}", digest, err)
+          })?;
+      }
+      Ok(())
     }
 
     fn default_lease_until_secs_since_epoch() -> u64 {
@@ -575,18 +541,14 @@ mod local {
 
     fn lease(
       &self,
+      database: &Database,
       fingerprint: &Fingerprint,
       until_secs_since_epoch: u64,
       txn: &mut RwTransaction,
     ) -> Result<(), lmdb::Error> {
       let mut buf = [0; 8];
       LittleEndian::write_u64(&mut buf, until_secs_since_epoch);
-      txn.put(
-        self.inner.lease_database,
-        &fingerprint.as_ref(),
-        &buf,
-        WriteFlags::empty(),
-      )
+      txn.put(*database, &fingerprint.as_ref(), &buf, WriteFlags::empty())
     }
 
     ///
@@ -595,119 +557,113 @@ mod local {
     ///
     /// Returns the size it was shrunk to, which may be larger than target_bytes.
     ///
+    /// Ignores directories. TODO: Shrink directories.
+    ///
     /// TODO: Use LMDB database statistics when lmdb-rs exposes them.
     ///
     pub fn shrink(&self, target_bytes: usize) -> Result<usize, String> {
       let mut used_bytes: usize = 0;
       let mut fingerprints_by_expired_ago = BinaryHeap::new();
 
-      self
-        .inner
-        .env
-        .begin_rw_txn()
-        .and_then(|mut txn| {
-          {
-            self.aged_fingerprints(
-              &txn,
-              EntryType::File,
-              &mut used_bytes,
-              &mut fingerprints_by_expired_ago,
-            );
-            self.aged_fingerprints(
-              &txn,
-              EntryType::Directory,
-              &mut used_bytes,
-              &mut fingerprints_by_expired_ago,
-            );
-          }
-          while used_bytes > target_bytes {
-            let aged_fingerprint = fingerprints_by_expired_ago.pop().expect(
-              "lmdb corruption detected, sum of size of blobs exceeded stored blobs",
-            );
-            if aged_fingerprint.expired_seconds_ago == 0 {
-              // Ran out of expired blobs - everything remaining is leased and cannot be collected.
-              return Err(MapFull);
-            }
-            txn
-              .del(
-                match aged_fingerprint.entry_type {
-                  EntryType::File => self.inner.file_database,
-                  EntryType::Directory => self.inner.directory_database,
-                },
+      self.aged_fingerprints(
+        EntryType::File,
+        &mut used_bytes,
+        &mut fingerprints_by_expired_ago,
+      )?;
+      self.aged_fingerprints(
+        EntryType::Directory,
+        &mut used_bytes,
+        &mut fingerprints_by_expired_ago,
+      )?;
+      while used_bytes > target_bytes {
+        let aged_fingerprint = fingerprints_by_expired_ago.pop().expect(
+          "lmdb corruption detected, sum of size of blobs exceeded stored blobs",
+        );
+        if aged_fingerprint.expired_seconds_ago == 0 {
+          // Ran out of expired blobs - everything remaining is leased and cannot be collected.
+          return Ok(used_bytes);
+        }
+        let lmdbs = match aged_fingerprint.entry_type {
+          EntryType::File => self.inner.file_dbs.clone(),
+          EntryType::Directory => self.inner.directory_dbs.clone(),
+        };
+        let (env, database, lease_database) = lmdbs.get(&aged_fingerprint.fingerprint);
+        {
+          env
+            .begin_rw_txn()
+            .and_then(|mut txn| {
+              txn.del(
+                database,
                 &aged_fingerprint.fingerprint.as_ref(),
                 None,
-              )
-              .expect("Failed to delete lmdb blob");
+              )?;
 
-            txn
-              .del(
-                self.inner.lease_database,
-                &aged_fingerprint.fingerprint.as_ref(),
-                None,
-              )
-              .or_else(|err| match err {
-                NotFound => Ok(()),
-                err => Err(err),
-              })
-              .expect("Failed to delete lmdb lease");
-            used_bytes -= aged_fingerprint.size_bytes;
-          }
-          txn.commit()
-        })
-        .or_else(|e| match e {
-          MapFull => Ok(()),
-          e => Err(format!("Error shrinking store: {:?}", e)),
-        })?;
+              txn
+                .del(lease_database, &aged_fingerprint.fingerprint.as_ref(), None)
+                .or_else(|err| match err {
+                  NotFound => Ok(()),
+                  err => Err(err),
+                })?;
+              used_bytes -= aged_fingerprint.size_bytes;
+              txn.commit()
+            })
+            .map_err(|err| format!("Error garbage collecting: {:?}", err))?;
+        }
+      }
       Ok(used_bytes)
     }
 
-    fn aged_fingerprints<T>(
+    fn aged_fingerprints(
       &self,
-      txn: &T,
       entry_type: EntryType,
       used_bytes: &mut usize,
       fingerprints_by_expired_ago: &mut BinaryHeap<AgedFingerprint>,
-    ) where
-      T: Transaction,
-    {
+    ) -> Result<(), String> {
       let database = match entry_type {
-        EntryType::File => self.inner.file_database,
-        EntryType::Directory => self.inner.directory_database,
+        EntryType::File => self.inner.file_dbs.clone(),
+        EntryType::Directory => self.inner.directory_dbs.clone(),
       };
 
-      let mut cursor = txn.open_ro_cursor(database).expect(
-        "Failed to open lmdb read cursor",
-      );
-      for (key, bytes) in cursor.iter() {
-        *used_bytes = *used_bytes + bytes.len();
+      for &(ref env, ref database, ref lease_database) in database.all_lmdbs().iter() {
+        let txn = env.begin_ro_txn().map_err(|err| {
+          format!("Error beginning transaction to garbage collect: {:?}", err)
+        })?;
+        let mut cursor = txn.open_ro_cursor(*database).map_err(|err| {
+          format!("Failed to open lmdb read cursor: {:?}", err)
+        })?;
+        for (key, bytes) in cursor.iter() {
+          *used_bytes = *used_bytes + bytes.len();
 
-        // Random access into the lease_database is slower than iterating, but hopefully garbage
-        // collection is rare enough that we can get away with this, rather than do two passes here
-        // (either to populate leases into pre-populated AgedFingerprints, or to read sizes when
-        // we delete from lmdb to track how much we've freed).
-        let lease_until_unix_timestamp = txn
-          .get(self.inner.lease_database, &key)
-          .map(|b| LittleEndian::read_u64(b))
-          .unwrap_or_else(|e| match e {
-            NotFound => 0,
-            e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
+          // Random access into the lease_database is slower than iterating, but hopefully garbage
+          // collection is rare enough that we can get away with this, rather than do two passes
+          // here (either to populate leases into pre-populated AgedFingerprints, or to read sizes
+          // when we delete from lmdb to track how much we've freed).
+          let lease_until_unix_timestamp = txn
+            .get(*lease_database, &key)
+            .map(|b| LittleEndian::read_u64(b))
+            .unwrap_or_else(|e| match e {
+              NotFound => 0,
+              e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
+            });
+
+          let leased_until = time::UNIX_EPOCH +
+            time::Duration::from_secs(lease_until_unix_timestamp);
+
+          let expired_seconds_ago = time::SystemTime::now()
+              .duration_since(leased_until)
+              .map(|t| t.as_secs())
+              // 0 indicates unleased.
+              .unwrap_or(0);
+
+          fingerprints_by_expired_ago.push(AgedFingerprint {
+            expired_seconds_ago: expired_seconds_ago,
+            fingerprint: Fingerprint::from_bytes_unsafe(key),
+            size_bytes: bytes.len(),
+            entry_type: entry_type,
           });
-
-        let leased_until = time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
-
-        let expired_seconds_ago = time::SystemTime::now()
-          .duration_since(leased_until)
-          .map(|t| t.as_secs())
-          // 0 indicates unleased.
-          .unwrap_or(0);
-
-        fingerprints_by_expired_ago.push(AgedFingerprint {
-          expired_seconds_ago: expired_seconds_ago,
-          fingerprint: Fingerprint::from_bytes_unsafe(key),
-          size_bytes: bytes.len(),
-          entry_type: entry_type,
-        });
+        }
       }
+      Ok(())
     }
 
     pub fn store_bytes(
@@ -716,12 +672,11 @@ mod local {
       bytes: Bytes,
       initial_lease: bool,
     ) -> BoxFuture<Fingerprint, String> {
-      let db = match entry_type {
-        EntryType::Directory => self.inner.directory_database,
-        EntryType::File => self.inner.file_database,
-      }.clone();
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_dbs.clone(),
+      };
 
-      let inner = self.inner.clone();
       let bytestore = self.clone();
       self
         .inner
@@ -733,10 +688,17 @@ mod local {
             Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
           };
 
-          let put_res = inner.env.begin_rw_txn().and_then(|mut txn| {
-            txn.put(db, &fingerprint, &bytes, NO_OVERWRITE)?;
+          let (env, content_database, lease_database) = dbs.get(&fingerprint);
+          let put_res = env.begin_rw_txn().and_then(|mut txn| {
+            txn.put(
+              content_database,
+              &fingerprint,
+              &bytes,
+              NO_OVERWRITE,
+            )?;
             if initial_lease {
               bytestore.lease(
+                &lease_database,
                 &fingerprint,
                 Self::default_lease_until_secs_since_epoch(),
                 &mut txn,
@@ -764,17 +726,17 @@ mod local {
       fingerprint: Fingerprint,
       f: F,
     ) -> BoxFuture<Option<T>, String> {
-      let db = match entry_type {
-        EntryType::Directory => self.inner.directory_database,
-        EntryType::File => self.inner.file_database,
-      }.clone();
+      let dbs = match entry_type {
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+        EntryType::File => self.inner.file_dbs.clone(),
+      };
 
-      let store = self.inner.clone();
       self
         .inner
         .pool
         .spawn_fn(move || {
-          let ro_txn = store.env.begin_ro_txn().map_err(|err| {
+          let (env, db, _) = dbs.get(&fingerprint);
+          let ro_txn = env.begin_ro_txn().map_err(|err| {
             format!("Failed to begin read transaction: {:?}", err)
           });
           ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
@@ -788,6 +750,95 @@ mod local {
           })
         })
         .to_boxed()
+    }
+  }
+
+  // Each LMDB directory can have at most one concurrent writer.
+  // We use this type to shard storage into 16 LMDB directories, based on the first 4 bits of the
+  // fingerprint being stored, so that we can write to them in parallel.
+  #[derive(Clone)]
+  struct ShardedLmdb {
+    root_path: PathBuf,
+    // First Database is content, second is leases.
+    lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
+  }
+
+  impl ShardedLmdb {
+    pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
+      debug!("Initializing ShardedLmdb at root {:?}", root_path);
+      let mut lmdbs = HashMap::new();
+
+      for b in 0x00..0x10 {
+        let key = b << 4;
+
+        let dirname = {
+          let mut s = String::new();
+          fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
+          s[0..1].to_owned()
+        };
+        let dir = root_path.join(dirname);
+        super::super::safe_create_dir_all(&dir).map_err(|err| {
+          format!("Error making directory for store at {:?}: {:?}", dir, err)
+        })?;
+        debug!("Making ShardedLmdb env for {:?}", dir);
+        let env =
+          Environment::new()
+            // Without this flag, each time a read transaction is started, it eats into our
+            // transaction limit (default: 126) until that thread dies.
+            //
+            // This flag makes transactions be removed from that limit when they are dropped, rather
+            // than when their thread dies. This is important, because we perform reads from a
+            // thread pool, so our threads never die. Without this flag, all read requests will fail
+            // after the first 126.
+            //
+            // The only down-side is that you need to make sure that any individual OS thread must
+            // not try to perform multiple write transactions concurrently. Fortunately, this
+            // property holds for us.
+            .set_flags(NO_TLS)
+            // 2 DBs; one for file contents, one for leases.
+            .set_max_dbs(2)
+            .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES / 16)
+            .open(&dir)
+            .map_err(|e| format!("Error making env for store at {:?}: {:?} for ", dir, e))?;
+
+        debug!("Making ShardedLmdb content database for {:?}", dir);
+        let content_database = env
+          .create_db(Some("content"), DatabaseFlags::empty())
+          .map_err(|e| {
+            format!(
+              "Error creating/opening content database at {:?}: {:?}",
+              dir,
+              e
+            )
+          })?;
+
+        debug!("Making ShardedLmdb lease database for {:?}", dir);
+        let lease_database = env
+          .create_db(Some("leases"), DatabaseFlags::empty())
+          .map_err(|e| {
+            format!(
+              "Error creating/opening content database at {:?}: {:?}",
+              dir,
+              e
+            )
+          })?;
+
+        lmdbs.insert(key, (Arc::new(env), content_database, lease_database));
+      }
+
+      Ok(ShardedLmdb {
+        root_path: root_path,
+        lmdbs: lmdbs,
+      })
+    }
+
+    // First Database is content, second is leases.
+    pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
+      self.lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()
+    }
+
+    pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
+      self.lmdbs.values().map(|v| v.clone()).collect()
     }
   }
 
@@ -806,6 +857,7 @@ mod local {
     use futures::Future;
     use hashing::{Digest, Fingerprint};
     use super::{ByteStore, EntryType, ResettablePool};
+    use super::super::super::safe_create_dir_all;
     use lmdb::{DatabaseFlags, Environment, Transaction, WriteFlags};
     use std::path::Path;
     use std::sync::Arc;
@@ -846,11 +898,16 @@ mod local {
     #[test]
     fn save_file_collision_preserves_first() {
       let dir = TempDir::new("store").unwrap();
+      let sharded_dir = dir.path().join("files").join(&fingerprint().to_hex()[0..1]);
+      safe_create_dir_all(&sharded_dir).expect("Making temp dir");
 
       let bogus_value = Bytes::new();
 
-      let env = Environment::new().set_max_dbs(1).open(dir.path()).unwrap();
-      let database = env.create_db(Some("files"), DatabaseFlags::empty());
+      let env = Environment::new()
+        .set_max_dbs(1)
+        .open(&sharded_dir)
+        .unwrap();
+      let database = env.create_db(Some("content"), DatabaseFlags::empty());
       env
         .begin_rw_txn()
         .and_then(|mut txn| {
