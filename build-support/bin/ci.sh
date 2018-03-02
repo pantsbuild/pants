@@ -220,7 +220,10 @@ fi
 if [[ "${skip_rust_tests:-false}" == "false" ]]; then
   start_travis_section "RustTests" "Running Pants rust tests"
   (
-    "${REPO_ROOT}/src/rust/engine/run-all-tests.sh"
+    source "${REPO_ROOT}/build-support/pants_venv"
+    source "${REPO_ROOT}/build-support/bin/native/bootstrap.sh"
+    activate_pants_venv
+    RUST_BACKTRACE=1 PANTS_SRCPATH="${REPO_ROOT}/src/python" ensure_cffi_sources=1 run_cargo test "${MODE_FLAG}" --all --manifest-path="${REPO_ROOT}/src/rust/engine/Cargo.toml"
   ) || die "Pants rust test failure"
   end_travis_section
 fi
