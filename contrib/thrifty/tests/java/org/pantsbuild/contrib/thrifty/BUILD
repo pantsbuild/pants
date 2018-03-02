@@ -4,5 +4,6 @@
 junit_tests(
     dependencies=[
         'contrib/thrifty/tests/thrift/org/pantsbuild/contrib/thrifty/client',
+        'contrib/thrifty/tests/thrift/org/pantsbuild/contrib/thrifty/common',
     ],
 )
