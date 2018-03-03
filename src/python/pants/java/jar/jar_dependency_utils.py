@@ -58,9 +58,13 @@ class M2Coordinate(object):
     self.name = name
     self.rev = rev
     self.classifier = classifier
-    self.ext = ext or 'jar'
+    self._ext = ext # or 'jar'
 
     self._id = (self.org, self.name, self.rev, self.classifier, self.ext)
+
+  @property
+  def ext(self):
+    return self._ext or 'jar'
 
   @classmethod
   def create(cls, jar):
@@ -145,8 +149,8 @@ class M2Coordinate(object):
     # for example org=a, name=b, type_=jar -> a:b:jar:
     if self.classifier:
       components = (self.org, self.name, self.ext or 'jar', self.classifier, self.rev or '')
-    elif self.ext:
-      components = (self.org, self.name, self.ext or 'jar', self.rev or '')
+    elif self.ext and self.ext != 'jar':
+      components = (self.org, self.name, self.ext, self.rev or '')
     else:
       components = (self.org, self.name, self.rev or '')
 
@@ -156,3 +160,11 @@ class M2Coordinate(object):
   def __repr__(self):
     return ('M2Coordinate(org={!r}, name={!r}, rev={!r}, classifier={!r}, ext={!r})'
             .format(*self._id))
+
+  def copy(self, **replacements):
+    """Returns a clone of this M2Coordinate with the given replacements kwargs overlaid."""
+    cls = type(self)
+    kwargs = {'org': self.org, 'name': self.name, 'ext': self.ext, 'classifier': self.classifier, 'rev': self.rev}
+    for key, val in replacements.items():
+      kwargs[key] = val
+    return cls(**kwargs)

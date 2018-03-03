@@ -28,6 +28,11 @@ from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
 
 
+def with_new_classifier(coord, classifier):
+  # TODO what about coords that already have classifiers
+  return coord.copy(classifier=classifier)
+
+
 class CoursierResultNotFound(Exception):
   pass
 
@@ -243,7 +248,6 @@ class CoursierMixin(NailgunTask):
       'src_doc': [<result from coursier call with --sources and/or --javadoc>],
     }
     """
-
     # Prepare coursier args
     coursier_subsystem_instance = CoursierSubsystem.global_instance()
     coursier_jar = coursier_subsystem_instance.bootstrap_coursier(self.context.new_workunit)
@@ -291,7 +295,6 @@ class CoursierMixin(NailgunTask):
   def _get_non_default_conf_results(self, common_args, coursier_jar, global_excludes, jars_to_resolve,
                                     coursier_work_temp_dir, pinned_coords,
                                     sources, javadoc):
-
     # To prevent improper api usage during development. User should not see this anyway.
     if not sources and not javadoc:
       raise TaskError("sources or javadoc has to be True.")
@@ -301,16 +304,29 @@ class CoursierMixin(NailgunTask):
 
     results = defaultdict(list)
 
+    new_pinned_coords = []
+    new_jars_to_resolve = []
     special_args = []
+
+    if not sources and not javadoc:
+      new_pinned_coords = pinned_coords
+      new_jars_to_resolve = jars_to_resolve
     if sources:
       special_args.append('--sources')
+      new_pinned_coords.extend(with_new_classifier(c, 'sources') for c in pinned_coords)
+      new_jars_to_resolve.extend(with_new_classifier(c, 'sources') for c in jars_to_resolve)
 
     if javadoc:
       special_args.append('--javadoc')
+      new_pinned_coords.extend(with_new_classifier(c, 'javadoc') for c in pinned_coords)
+      new_jars_to_resolve.extend(with_new_classifier(c, 'javadoc') for c in jars_to_resolve)
 
-    cmd_args = self._construct_cmd_args(jars_to_resolve, common_args,
+    cmd_args = self._construct_cmd_args(new_jars_to_resolve,
+                                        common_args,
                                         global_excludes if self.get_options().allow_global_excludes else [],
-                                        pinned_coords, coursier_work_temp_dir, output_fn)
+                                        new_pinned_coords,
+                                        coursier_work_temp_dir,
+                                        output_fn)
     cmd_args.extend(special_args)
 
     # sources and/or javadoc share the same conf
@@ -407,13 +423,14 @@ class CoursierMixin(NailgunTask):
     """
     # Parse the coursier result
     flattened_resolution = self._extract_dependencies_by_root(result)
-    coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
-    # Construct a map from org:name to reconciled org:name:version
-    org_name_to_org_name_rev = {}
+    coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
+    # Construct a map from org:name/classifier to the reconciled org:name:version coordinate
+    org_name_classifier_to_org_name_rev = {}
+
     for coord in coord_to_resolved_jars.keys():
       m2coord = M2Coordinate.from_string(coord)
-      org_name_to_org_name_rev['{}:{}'.format(m2coord.org, m2coord.name)] = coord
+      org_name_classifier_to_org_name_rev['{}:{}/{}'.format(m2coord.org, m2coord.name, m2coord.classifier)] = coord
 
     for vt in invalidation_check.all_vts:
       t = vt.target
@@ -421,32 +438,35 @@ class CoursierMixin(NailgunTask):
         def get_transitive_resolved_jars(my_simple_coord, classifier, resolved_jars):
           transitive_jar_path_for_coord = []
           if my_simple_coord in flattened_resolution:
-            # TODO(wisechengyi): this only grabs jar with matching classifier the current coordinate
-            # and it still takes the jars wholesale for its transitive dependencies.
-            # https://github.com/coursier/coursier/issues/743
-            resolved_jars_with_matching_classifier = filter(
-              lambda x: x.coordinate.classifier == classifier or x.coordinate.classifier in ['sources', 'javadoc'],
-              resolved_jars[my_simple_coord])
-
-            transitive_jar_path_for_coord.extend(resolved_jars_with_matching_classifier)
+            resolved_jar_with_matching_classifier = None
+            if resolved_jars[my_simple_coord].coordinate.classifier == classifier or resolved_jars[my_simple_coord].coordinate.classifier in ['sources', 'javadoc']:
+              resolved_jar_with_matching_classifier = resolved_jars[my_simple_coord]
+              transitive_jar_path_for_coord.append(resolved_jar_with_matching_classifier)
 
             for c in flattened_resolution[my_simple_coord]:
-              transitive_jar_path_for_coord.extend(resolved_jars[c])
+              c_with_classifier = with_new_classifier(M2Coordinate.from_string(c), classifier=classifier)
+              j = resolved_jars.get(str(c_with_classifier), )
+              if not j:
+                j = resolved_jars.get(c)
+              if j:
+                transitive_jar_path_for_coord.append(j)
 
           return transitive_jar_path_for_coord
 
         for jar in t.jar_dependencies:
           simple_coord_candidate = jar.coordinate.simple_coord
           final_simple_coord = None
-          if simple_coord_candidate in coord_to_resolved_jars:
+          if str(jar.coordinate) in coord_to_resolved_jars:
+            final_simple_coord = str(jar.coordinate)
+          elif simple_coord_candidate in coord_to_resolved_jars:
             final_simple_coord = simple_coord_candidate
           elif simple_coord_candidate in result['conflict_resolution']:
             final_simple_coord = result['conflict_resolution'][simple_coord_candidate]
-          # If still not found, look for org:name match.
+           # If still not found, look for org:name match.
           else:
-            org_name = '{}:{}'.format(jar.org, jar.name)
-            if org_name in org_name_to_org_name_rev:
-              final_simple_coord = org_name_to_org_name_rev[org_name]
+            org_name_classifier = '{}:{}/{}'.format(jar.org, jar.name, jar.classifier)
+            if org_name_classifier in org_name_classifier_to_org_name_rev:
+              final_simple_coord = org_name_classifier_to_org_name_rev[org_name_classifier]
 
           if final_simple_coord:
             transitive_resolved_jars = get_transitive_resolved_jars(final_simple_coord, jar.coordinate.classifier, coord_to_resolved_jars)
@@ -592,7 +612,6 @@ class CoursierMixin(NailgunTask):
                                  cache_path=jar_path,
                                  pants_path=pants_path)
       coord_to_resolved_jars[simple_coord] = resolved_jar
-
     return coord_to_resolved_jars
 
   @classmethod

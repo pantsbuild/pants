@@ -17,8 +17,10 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
+
 from pants.base.exceptions import TaskError
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
@@ -43,6 +45,9 @@ class CoursierResolveTest(JvmToolTaskTestBase):
                                read_from=None,
                                write_to=None)
     self.set_options_for_scope('resolver', resolver='coursier')
+    # TODO publish this
+    self.set_options_for_scope('coursier',
+                               bootstrap_jar_url='http://localhost:8000/dist/coursier-cli.jar')
 
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
@@ -59,6 +64,23 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     compile_classpath = self.resolve([jar_lib, scala_lib])
     self.assertEquals(1, len(compile_classpath.get_for_target(jar_lib)))
     self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+
+  def test_resolve_specific_with_sources_javadocs(self):
+    # Create a jar_library with a single dep, and another library with no deps.
+    dep = JarDependency('commons-lang', 'commons-lang', '2.5')
+    jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
+    scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
+    with self._temp_workdir() as workdir:
+      # Confirm that the deps were added to the appropriate targets.
+      context = self.context(target_roots=[jar_lib, scala_lib])
+      task = self.prepare_execute(context)
+      compile_classpath = context.products.get_data('compile_classpath',
+        init_func=ClasspathProducts.init_func(workdir)
+      )
+      task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True)
+
+      self.assertEquals(2, len(compile_classpath.get_for_target(jar_lib)))
+      self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
 
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
@@ -203,6 +225,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       # └─ junit:junit:4.12
       #    └─ org.hamcrest:hamcrest-core:1.3
       self.assertEquals(2, len(jar_cp))
+
 
       # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
       conf, path = jar_cp[0]
