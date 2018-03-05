@@ -9,11 +9,12 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.zinc_language_mixin import ZincLanguageMixin
 from pants.backend.jvm.targets.tools_jar import ToolsJar
 from pants.build_graph.address import Address
+from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.subsystem.subsystem import Subsystem
 
 
 # TODO: Sort out JVM compile config model: https://github.com/pantsbuild/pants/issues/4483.
-class Java(JvmToolMixin, ZincLanguageMixin, Subsystem):
+class Java(JvmToolMixin, ZincLanguageMixin, InjectablesMixin, Subsystem):
   """A subsystem to encapsulate compile-time settings and features for the Java language.
 
   Runtime options are captured by the JvmPlatform subsystem.
