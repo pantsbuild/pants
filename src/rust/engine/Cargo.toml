@@ -21,7 +21,6 @@ cc = "1.0"
 # [workspace]
 
 [dependencies]
-bazel_protos = { path = "process_execution/bazel_protos" }
 boxfuture = { path = "boxfuture" }
 fnv = "1.0.5"
 fs = { path = "fs" }

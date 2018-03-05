@@ -1,10 +1,8 @@
 extern crate clap;
-extern crate fs;
 extern crate process_execution;
 
 use clap::{App, AppSettings, Arg};
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 use std::process::exit;
 
 use std::iter::Iterator;
@@ -62,13 +60,7 @@ If unspecified, local execution will be performed.",
   };
   let server = args.value_of("server");
 
-  // TODO: Capture the working directory as a snapshot, and materialize it to a temporary directory.
-  let input_files = fs::EMPTY_DIGEST;
-  let request = process_execution::ExecuteProcessRequest {
-    argv,
-    env,
-    input_files,
-  };
+  let request = process_execution::ExecuteProcessRequest { argv, env };
   let result = match server {
     Some(addr) => {
       process_execution::remote::CommandRunner::new(addr, 1)

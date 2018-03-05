@@ -5,5 +5,4 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [dependencies]
 clap = "2"
-fs = { path = "../fs" }
-process_execution = { path = "../process_execution" }
+process_execution = {path = "../process_execution"}

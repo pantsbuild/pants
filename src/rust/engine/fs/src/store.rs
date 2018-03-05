@@ -437,8 +437,8 @@ mod local {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use hashing::{Digest, Fingerprint};
-  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, NO_TLS,
-             RwTransaction, Transaction, WriteFlags};
+  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, RwTransaction,
+             Transaction, WriteFlags};
   use lmdb::Error::{KeyExist, MapFull, NotFound};
   use sha2::Sha256;
   use std::collections::BinaryHeap;
@@ -467,20 +467,8 @@ mod local {
 
   impl ByteStore {
     pub fn new<P: AsRef<Path>>(path: P, pool: Arc<ResettablePool>) -> Result<ByteStore, String> {
+      // 3 DBs; one for file contents, one for directories, one for leases.
       let env = Environment::new()
-        // Without this flag, each time a read transaction is started, it eats into our transaction
-        // limit (default: 126) until that thread dies.
-        //
-        // This flag makes transactions be removed from that limit when they are dropped, rather
-        // than when their thread dies. This is important, because we perform reads from a thread
-        // pool, so our threads never die. Without this flag, all read requests will fail after the
-        // first 126.
-        //
-        // The only down-side is that you need to make sure that any individual OS thread must not
-        // try to perform multiple write transactions concurrently. Fortunately, this property
-        // holds for us.
-        .set_flags(NO_TLS)
-          // 3 DBs; one for file contents, one for directories, one for leases.
         .set_max_dbs(3)
         .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES)
         .open(path.as_ref())
