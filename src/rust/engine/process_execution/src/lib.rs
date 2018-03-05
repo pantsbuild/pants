@@ -12,8 +12,6 @@ extern crate mock;
 extern crate protobuf;
 extern crate sha2;
 #[cfg(test)]
-extern crate tempdir;
-#[cfg(test)]
 extern crate testutil;
 
 use std::collections::BTreeMap;

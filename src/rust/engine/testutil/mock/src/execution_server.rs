@@ -28,11 +28,25 @@ impl MockExecution {
     name: String,
     execute_request: bazel_protos::remote_execution::ExecuteRequest,
     operation_responses: Vec<bazel_protos::operations::Operation>,
-  ) -> MockExecution {
-    MockExecution {
-      name: name,
-      execute_request: execute_request,
-      operation_responses: Arc::new(Mutex::new(VecDeque::from(operation_responses))),
+  ) -> Result<MockExecution, String> {
+    let error = operation_responses
+      .iter()
+      .find(|o| o.get_name() != name)
+      .map(|bad| {
+        Err(format!(
+          "All operation responses must have a name matching the MockExecution's name ({}) but \
+at least one did not ({:?})",
+          name,
+          bad
+        ))
+      });
+    match error {
+      Some(x) => x,
+      None => Ok(MockExecution {
+        name: name,
+        execute_request: execute_request,
+        operation_responses: Arc::new(Mutex::new(VecDeque::from(operation_responses))),
+      }),
     }
   }
 }
