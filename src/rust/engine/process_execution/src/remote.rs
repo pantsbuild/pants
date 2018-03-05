@@ -2,9 +2,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use bazel_protos;
-use boxfuture::{BoxFuture, Boxable};
 use digest::{Digest, FixedOutput};
-use futures::{Future, future};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
@@ -12,27 +10,17 @@ use sha2::Sha256;
 use super::{ExecuteProcessRequest, ExecuteProcessResult};
 
 pub struct CommandRunner {
-  execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
-  operations_client: Arc<bazel_protos::operations_grpc::OperationsClient>,
-}
-
-enum ExecutionError {
-  // String is the error message.
-  Fatal(String),
-  // String is the operation name which can be used to poll the GetOperation gRPC API.
-  NotFinished(String),
+  execution_client: bazel_protos::remote_execution_grpc::ExecutionClient,
+  operations_client: bazel_protos::operations_grpc::OperationsClient,
 }
 
 impl CommandRunner {
   pub fn new(address: &str, thread_count: usize) -> CommandRunner {
     let env = Arc::new(grpcio::Environment::new(thread_count));
     let channel = grpcio::ChannelBuilder::new(env.clone()).connect(address);
-    let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
-      channel.clone(),
-    ));
-    let operations_client = Arc::new(bazel_protos::operations_grpc::OperationsClient::new(
-      channel.clone(),
-    ));
+    let execution_client =
+      bazel_protos::remote_execution_grpc::ExecutionClient::new(channel.clone());
+    let operations_client = bazel_protos::operations_grpc::OperationsClient::new(channel.clone());
 
     CommandRunner {
       execution_client,
@@ -50,35 +38,36 @@ impl CommandRunner {
   pub fn run_command_remote(
     &self,
     req: ExecuteProcessRequest,
-  ) -> BoxFuture<ExecuteProcessResult, String> {
-    let execution_client = self.execution_client.clone();
-    let operations_client = self.operations_client.clone();
-    future::done(make_execute_request(&req))
-        .and_then(move |execute_request| {
-          map_grpc_result(execution_client.execute(&execute_request))
-        })
+  ) -> Result<ExecuteProcessResult, String> {
+    let execute_request = make_execute_request(&req)?;
 
-        // TODO: Use some better looping-frequency strategy than a tight-loop:
-        // https://github.com/pantsbuild/pants/issues/5503
+    let initial_result = map_grpc_result(self.execution_client.execute(&execute_request))?;
 
-        // TODO: Add a timeout of some kind.
-        // https://github.com/pantsbuild/pants/issues/5504
+    match extract_execute_response(&initial_result)? {
+      Some(value) => {
+        return Ok(value);
+      }
+      None => {}
+    }
 
-        .and_then(move |operation| future::loop_fn(operation, move |operation| {
-          match extract_execute_response(operation) {
-            Ok(value) => Ok(future::Loop::Break(value)),
-            Err(ExecutionError::Fatal(err)) => Err(err),
-            Err(ExecutionError::NotFinished(operation_name)) => {
-              let mut operation_request = bazel_protos::operations::GetOperationRequest::new();
-              operation_request.set_name(operation_name);
-              Ok(
-                future::Loop::Continue(
-                  map_grpc_result(operations_client.get_operation(&operation_request))?
-                )
-              )
-            },
-          }
-        })).to_boxed()
+    let mut operation_request = bazel_protos::operations::GetOperationRequest::new();
+    operation_request.set_name(initial_result.get_name().to_string());
+    loop {
+      // TODO: Use some better looping-frequency strategy than a tight-loop.
+      let operation_result =
+        map_grpc_result(self.operations_client.get_operation(&operation_request))?;
+
+      let result = extract_execute_response(&operation_result)?;
+
+      match result {
+        Some(value) => {
+          break Ok(value);
+        }
+        None => {
+          continue;
+        }
+      }
+    }
   }
 }
 
@@ -104,31 +93,27 @@ fn make_execute_request(
 }
 
 fn extract_execute_response(
-  mut operation: bazel_protos::operations::Operation,
-) -> Result<ExecuteProcessResult, ExecutionError> {
+  operation: &bazel_protos::operations::Operation,
+) -> Result<Option<ExecuteProcessResult>, String> {
   if !operation.get_done() {
-    return Err(ExecutionError::NotFinished(operation.take_name()));
+    return Ok(None);
   }
   if operation.has_error() {
-    return Err(ExecutionError::Fatal(format_error(&operation.get_error())));
+    return Err(format_error(&operation.get_error()));
   }
   if !operation.has_response() {
-    return Err(ExecutionError::Fatal(
-      "Operation finished but no response supplied".to_owned(),
-    ));
+    return Err("Operation finished but no response supplied".to_string());
   }
   let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
   execute_response
     .merge_from_bytes(operation.get_response().get_value())
-    .map_err(|e| {
-      ExecutionError::Fatal(format!("Error deserializing operation response: {:?}", e))
-    })?;
+    .map_err(|e| e.description().to_string())?;
 
-  Ok(ExecuteProcessResult {
+  Ok(Some(ExecuteProcessResult {
     stdout: execute_response.get_result().get_stdout_raw().to_vec(),
     stderr: execute_response.get_result().get_stderr_raw().to_vec(),
     exit_code: execute_response.get_result().get_exit_code(),
-  })
+  }))
 }
 
 fn format_error(error: &bazel_protos::status::Status) -> String {
@@ -173,7 +158,6 @@ mod tests {
   use bazel_protos;
   use bytes::Bytes;
   use fs;
-  use futures::Future;
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use testutil::{owned_string_vec, as_byte_owned_vec};
@@ -533,8 +517,6 @@ mod tests {
     address: &str,
     request: ExecuteProcessRequest,
   ) -> Result<ExecuteProcessResult, String> {
-    CommandRunner::new(address, 1)
-      .run_command_remote(request)
-      .wait()
+    CommandRunner::new(address, 1).run_command_remote(request)
   }
 }

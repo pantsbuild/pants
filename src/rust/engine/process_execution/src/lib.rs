@@ -1,10 +1,8 @@
 extern crate bazel_protos;
-extern crate boxfuture;
 #[cfg(test)]
 extern crate bytes;
 extern crate digest;
 extern crate fs;
-extern crate futures;
 extern crate grpcio;
 extern crate hashing;
 #[cfg(test)]
