@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 mod snapshot;
-pub use snapshot::{EMPTY_DIGEST, Snapshot, StoreFileByDigest};
+pub use snapshot::{Snapshot, StoreFileByDigest};
 mod store;
 pub use store::Store;
 mod pool;
@@ -29,21 +29,25 @@ extern crate mock;
 extern crate ordermap;
 extern crate protobuf;
 extern crate sha2;
+extern crate tar;
 extern crate tempdir;
 
 use std::collections::HashSet;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{fmt, fs};
 use std::io::{self, Read};
 use std::cmp::min;
 
 use bytes::Bytes;
 use futures::future::{self, Future};
+use futures_cpupool::CpuFuture;
 use glob::Pattern;
+use hashing::{Fingerprint, WriterHasher};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ordermap::OrderMap;
+use tempdir::TempDir;
 
 use boxfuture::{Boxable, BoxFuture};
 
@@ -825,6 +829,242 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
   })
 }
 
+fn safe_create_tmpdir_in(base_dir: &Path, prefix: &str) -> Result<TempDir, String> {
+  safe_create_dir_all(&base_dir)?;
+  Ok(TempDir::new_in(&base_dir, prefix).map_err(|e| {
+    format!("Failed to create tempdir {:?} due to {:?}", base_dir, e)
+  })?)
+}
+
+///
+/// A facade for the snapshot directory, which lives under the pants workdir.
+///
+pub struct Snapshots {
+  snapshots_dir: PathBuf,
+  snapshots_generator: Mutex<(TempDir, usize)>,
+}
+
+impl Snapshots {
+  pub fn new(snapshots_dir: PathBuf) -> Result<Snapshots, String> {
+    let snapshots_tmpdir = safe_create_tmpdir_in(&snapshots_dir, ".tmp")?;
+
+    Ok(Snapshots {
+      snapshots_dir: snapshots_dir,
+      snapshots_generator: Mutex::new((snapshots_tmpdir, 0)),
+    })
+  }
+
+  pub fn snapshot_path(&self) -> &Path {
+    self.snapshots_dir.as_path()
+  }
+
+  fn next_temp_path(&self) -> Result<PathBuf, String> {
+    let mut gen = self.snapshots_generator.lock().unwrap();
+    gen.1 += 1;
+
+    // N.B. Sometimes, in e.g. a `./pants clean-all test ...` the snapshot tempdir created at the
+    // beginning of a run can be removed out from under us by e.g. the `clean-all` task. Here, we
+    // we double check existence of the `TempDir`'s path when the path is accessed and replace if
+    // necessary.
+    if !gen.0.path().exists() {
+      gen.0 = safe_create_tmpdir_in(&self.snapshots_dir, ".tmp")?;
+    }
+
+    Ok(gen.0.path().join(format!("{}.tmp", gen.1)))
+  }
+
+  ///
+  /// A non-canonical (does not expand symlinks) in-memory form of normalize. Used to collapse
+  /// parent and cur components, which are legal in symbolic paths in PathStats, but not in
+  /// Tar files.
+  ///
+  fn normalize(path: &Path) -> Result<PathBuf, String> {
+    let mut res = PathBuf::new();
+    for component in path.components() {
+      match component {
+        Component::Prefix(..) |
+        Component::RootDir => return Err(format!("Absolute paths not supported: {:?}", path)),
+        Component::CurDir => continue,
+        Component::ParentDir => {
+          // Pop the previous component.
+          if !res.pop() {
+            return Err(format!(
+              "Globs may not traverse outside the root: {:?}",
+              path
+            ));
+          } else {
+            continue;
+          }
+        }
+        Component::Normal(p) => res.push(p),
+      }
+    }
+    Ok(res)
+  }
+
+  ///
+  /// Create a tar file on the given Write instance containing the given paths, or
+  /// return an error string.
+  ///
+  fn tar_create<W: io::Write>(
+    dest: W,
+    paths: &Vec<PathStat>,
+    relative_to: &Dir,
+  ) -> Result<W, String> {
+    let mut tar_builder = tar::Builder::new(dest);
+    tar_builder.mode(tar::HeaderMode::Deterministic);
+    for path_stat in paths {
+      // Append the PathStat using the symbolic name and underlying stat.
+      let append_res = match path_stat {
+        &PathStat::File { ref path, ref stat } => {
+          let normalized = Snapshots::normalize(path)?;
+          let mut input = fs::File::open(relative_to.0.join(stat.path.as_path()))
+            .map_err(|e| format!("Failed to open {:?}: {:?}", path_stat, e))?;
+          tar_builder.append_file(normalized, &mut input)
+        }
+        &PathStat::Dir { ref path, ref stat } => {
+          let normalized = Snapshots::normalize(path)?;
+          tar_builder.append_dir(normalized, relative_to.0.join(stat.0.as_path()))
+        }
+      };
+      append_res.map_err(|e| {
+        format!("Failed to tar {:?}: {:?}", path_stat, e)
+      })?;
+    }
+
+    // Finish the tar file, returning ownership of the stream to the caller.
+    Ok(tar_builder.into_inner().map_err(|e| {
+      format!("Failed to finalize snapshot tar: {:?}", e)
+    })?)
+  }
+
+  ///
+  /// Create a tar file at the given dest Path containing the given paths, while
+  /// fingerprinting the written stream.
+  ///
+  fn tar_create_fingerprinted(
+    dest: &Path,
+    paths: &Vec<PathStat>,
+    relative_to: &Dir,
+  ) -> Result<Fingerprint, String> {
+    // Wrap buffering around a fingerprinted stream above a File.
+    let stream = io::BufWriter::new(WriterHasher::new(fs::File::create(dest).map_err(|e| {
+      format!("Failed to create destination file: {:?}", e)
+    })?));
+
+    // Then append the tar to the stream, and retrieve the Fingerprint to flush all writers.
+    Ok(
+      Snapshots::tar_create(stream, paths, relative_to)?
+        .into_inner()
+        .map_err(|e| {
+          format!("Failed to flush to {:?}: {:?}", dest, e.error())
+        })?
+        .finish(),
+    )
+  }
+
+  ///
+  /// Attempts to rename src to dst, and _succeeds_ if dst already exists. This is safe in
+  /// the case of Snapshots because the destination path is unique to its content.
+  ///
+  fn finalize(temp_path: &Path, dest_path: &Path) -> Result<(), String> {
+    if dest_path.is_file() {
+      // The Snapshot has already been created.
+      fs::remove_file(temp_path).unwrap_or(());
+      Ok(())
+    } else {
+      let dest_dir = dest_path.parent().expect(
+        "All snapshot paths must have parent directories.",
+      );
+      safe_create_dir_all(dest_dir)?;
+      match fs::rename(temp_path, dest_path) {
+        Ok(_) => Ok(()),
+        Err(_) if dest_path.is_file() => Ok(()),
+        Err(e) => Err(format!(
+          "Failed to finalize snapshot at {:?}: {:?}",
+          dest_path,
+          e
+        )),
+      }
+    }
+  }
+
+  fn path_for(&self, fingerprint: &Fingerprint) -> PathBuf {
+    Snapshots::path_under_for(self.snapshot_path(), fingerprint)
+  }
+
+  fn path_under_for(path: &Path, fingerprint: &Fingerprint) -> PathBuf {
+    let hex = fingerprint.to_hex();
+    path.join(&hex[0..2]).join(&hex[2..4]).join(
+      format!("{}.tar", hex),
+    )
+  }
+
+  ///
+  /// Creates a Snapshot for the given paths under the given VFS.
+  ///
+  pub fn create(&self, fs: &PosixFS, paths: Vec<PathStat>) -> CpuFuture<Snapshot, String> {
+    let dest_dir = self.snapshot_path().to_owned();
+    let root = fs.root.clone();
+    let temp_path = self.next_temp_path().expect(
+      "Couldn't get the next temp path.",
+    );
+
+    fs.pool.spawn_fn(move || {
+      // Write the tar deterministically to a temporary file while fingerprinting.
+      let fingerprint = Snapshots::tar_create_fingerprinted(temp_path.as_path(), &paths, &root)?;
+
+      // Rename to the final path if it does not already exist.
+      Snapshots::finalize(
+        temp_path.as_path(),
+        Snapshots::path_under_for(&dest_dir, &fingerprint).as_path(),
+      )?;
+
+      Ok(Snapshot {
+        fingerprint: fingerprint,
+        digest: None,
+        path_stats: paths,
+      })
+    })
+  }
+
+  fn contents_for_sync(snapshot: Snapshot, path: PathBuf) -> Result<Vec<FileContent>, io::Error> {
+    let mut archive = fs::File::open(path).map(|f| tar::Archive::new(f))?;
+
+    // Zip the in-memory Snapshot to the on disk representation, validating as we go.
+    let mut files_content = Vec::new();
+    for (entry_res, path_stat) in archive.entries()?.zip(snapshot.path_stats.into_iter()) {
+      let mut entry = entry_res?;
+      if entry.header().entry_type() == tar::EntryType::file() {
+        let path = match path_stat {
+          PathStat::File { path, .. } => path,
+          PathStat::Dir { .. } => panic!("Snapshot contents changed after storage."),
+        };
+        let mut content = Vec::new();
+        io::Read::read_to_end(&mut entry, &mut content)?;
+        files_content.push(FileContent {
+          path: path,
+          content: Bytes::from(content),
+        });
+      }
+    }
+    Ok(files_content)
+  }
+
+  pub fn contents_for(
+    &self,
+    fs: &PosixFS,
+    snapshot: Snapshot,
+  ) -> CpuFuture<Vec<FileContent>, String> {
+    let archive_path = self.path_for(&snapshot.fingerprint);
+    fs.pool.spawn_fn(move || {
+      let snapshot_str = format!("{:?}", snapshot);
+      Snapshots::contents_for_sync(snapshot, archive_path).map_err(|e| {
+        format!("Failed to open Snapshot {}: {:?}", snapshot_str, e)
+      })
+    })
+  }
+}
 
 #[cfg(test)]
 mod posixfs_test {

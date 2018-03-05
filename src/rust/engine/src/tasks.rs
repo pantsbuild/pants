@@ -86,6 +86,16 @@ impl Tasks {
     ));
   }
 
+  // TODO: Only exists in order to support the `Snapshots` singleton replacement in `context.rs`:
+  // Fix by porting isolated processes to rust:
+  //   see: https://github.com/pantsbuild/pants/issues/4397
+  pub fn singleton_replace(&mut self, value: Value, product: TypeConstraint) {
+    self.singletons.insert(product, (
+      externs::key_for(value.clone()),
+      value,
+    ));
+  }
+
   ///
   /// The following methods define the Task registration lifecycle.
   ///

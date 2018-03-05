@@ -52,7 +52,7 @@ class PathGlobs(datatype('PathGlobs', ['include', 'exclude'])):
                      tuple(join(relative_to, f) for f in exclude))
 
 
-class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats'])):
+class Snapshot(datatype('Snapshot', ['fingerprint', 'path_stats'])):
   """A Snapshot is a collection of Files and Dirs fingerprinted by their names/content.
 
   Snapshots are used to make it easier to isolate process execution by fixing the contents
@@ -77,7 +77,7 @@ class Snapshot(datatype('Snapshot', ['fingerprint', 'digest_length', 'path_stats
     return [p.stat for p in self.files]
 
   def __repr__(self):
-    return '''Snapshot(fingerprint='{}', digest_length='{}', entries={})'''.format(hexlify(self.fingerprint)[:8], self.digest_length, len(self.path_stats))
+    return '''Snapshot(fingerprint='{}', entries={})'''.format(hexlify(self.fingerprint)[:8], len(self.path_stats))
 
   def __str__(self):
     return repr(self)

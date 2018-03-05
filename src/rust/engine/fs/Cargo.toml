@@ -22,6 +22,7 @@ lmdb = "0.7.2"
 ordermap = "0.2.8"
 protobuf = { version = "1.4.1", features = ["with-bytes"] }
 sha2 = "0.6.0"
+tar = "0.4.13"
 tempdir = "0.3.5"
 
 [dev-dependencies]
