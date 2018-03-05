@@ -30,7 +30,7 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.target import Target
 from pants.task.task import Task
 from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
-from pants.util.contextutil import pushd, temporary_dir, temporary_file
+from pants.util.contextutil import environment_as, pushd, temporary_dir, temporary_file
 from pants.util.dirutil import mergetree, safe_mkdir, safe_mkdir_for
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.objects import datatype
@@ -213,6 +213,25 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
 
     return cp
 
+  @staticmethod
+  def _is_coverage_env_var(name):
+    return (
+      name.startswith('COV_CORE_')  # These are from `pytest-cov`.
+      or name.startswith('COVERAGE_')  # These are from `coverage`.
+    )
+
+  @contextmanager
+  def _scrub_cov_env_vars(self):
+    cov_env_vars = {k: v for k, v in os.environ.items() if self._is_coverage_env_var(k)}
+    if cov_env_vars:
+      self.context.log.warn('Scrubbing coverage environment variables\n\t{}'
+                            .format('\n\t'.join(sorted('{}={}'.format(k, v)
+                                                       for k, v in cov_env_vars.items()))))
+      with environment_as(**{k: None for k in cov_env_vars}):
+        yield
+    else:
+      yield
+
   @contextmanager
   def _cov_setup(self, workdirs, coverage_morfs, src_to_target_base):
     cp = self._generate_coverage_config(src_to_target_base=src_to_target_base)
@@ -228,7 +247,9 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
       args = ['--cov-report=', '--cov-config', coverage_rc]
       for morf in coverage_morfs:
         args.extend(['--cov', morf])
-      yield args, coverage_rc
+
+      with self._scrub_cov_env_vars():
+        yield args, coverage_rc
 
   @contextmanager
   def _maybe_emit_coverage_data(self, workdirs, test_targets, pex):
