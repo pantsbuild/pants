@@ -774,7 +774,7 @@ mod local {
         let dirname = {
           let mut s = String::new();
           fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
-          s
+          s[0..1].to_owned()
         };
         let dir = root_path.join(dirname);
         super::super::safe_create_dir_all(&dir).map_err(|err| {
