@@ -15,20 +15,18 @@ from coverage.parser import PythonParser
 from coverage.python import PythonFileReporter
 
 
-class MyFileTracer(FileTracer):
+class SimpleFileTracer(FileTracer):
   def __init__(self, filename):
-    super(MyFileTracer, self).__init__()
+    super(SimpleFileTracer, self).__init__()
     self._filename = filename
 
   def source_filename(self):
     return self._filename
 
 
-class MyFileReporter(PythonFileReporter):
-  """A python file reporter that knows how to map Pants PEX chroots back to repo source code."""
-
+class SimpleFileReporter(PythonFileReporter):
   def __init__(self, morf, relpath):
-    super(MyFileReporter, self).__init__(morf, coverage=None)
+    super(SimpleFileReporter, self).__init__(morf, coverage=None)
     self._relpath = relpath
 
   def relative_filename(self):
@@ -50,11 +48,11 @@ class MyFileReporter(PythonFileReporter):
                                       join_regex(DEFAULT_PARTIAL_ALWAYS[:]))
 
 
-class MyPlugin(CoveragePlugin):
+class ChrootRemappingPlugin(CoveragePlugin):
   """A plugin that knows how to map Pants PEX chroots back to repo source code when reporting."""
 
   def __init__(self, buildroot, src_chroot_path, src_to_target_base):
-    super(MyPlugin, self).__init__()
+    super(ChrootRemappingPlugin, self).__init__()
     self._buildroot = buildroot
     self._src_chroot_path = src_chroot_path
     self._src_to_target_base = src_to_target_base
@@ -68,14 +66,15 @@ class MyPlugin(CoveragePlugin):
             yield os.path.join(root, f)
 
   def file_tracer(self, filename):
+    # Don't trace third party libraries or the standard lib, just user code in the src chroot.
     if filename.startswith(self._src_chroot_path):
       src = os.path.relpath(filename, self._src_chroot_path)
       if src in self._src_to_target_base:
-        return MyFileTracer(filename)
+        return SimpleFileTracer(filename)
 
   def file_reporter(self, filename):
     mapped_relpath = self._map_relpath(filename)
-    return MyFileReporter(filename, mapped_relpath or filename)
+    return SimpleFileReporter(filename, mapped_relpath)
 
   def _map_relpath(self, filename):
     src = os.path.relpath(filename, self._src_chroot_path)
@@ -92,4 +91,4 @@ def coverage_init(reg, options):
   buildroot = options['buildroot']
   src_chroot_path = options['src_chroot_path']
   src_to_target_base = json.loads(options['src_to_target_base'])
-  reg.add_file_tracer(MyPlugin(buildroot, src_chroot_path, src_to_target_base))
+  reg.add_file_tracer(ChrootRemappingPlugin(buildroot, src_chroot_path, src_to_target_base))

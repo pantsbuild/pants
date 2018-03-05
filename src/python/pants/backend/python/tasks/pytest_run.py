@@ -186,7 +186,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
   def _add_plugin_config(cls, cp, src_chroot_path, src_to_target_base):
     # We use a coverage plugin to map PEX chroot source paths back to their original repo paths for
     # report output.
-    plugin_module = 'pants.backend.python.tasks.coverage.plugin'
+    plugin_module = PytestPrep.PytestBinary.coverage_plugin_module()
     cls._ensure_section(cp, 'run')
     cp.set('run', 'plugins', plugin_module)
 

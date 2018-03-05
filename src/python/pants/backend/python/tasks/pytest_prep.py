@@ -20,6 +20,8 @@ class PytestPrep(PythonExecutionTaskBase):
   class PytestBinary(object):
     """A `py.test` PEX binary with an embedded default (empty) `pytest.ini` config file."""
 
+    _COVERAGE_PLUGIN_MODULE_NAME = '__{}__'.format(__name__.replace('.', '_'))
+
     def __init__(self, pex):
       self._pex = pex
 
@@ -39,9 +41,17 @@ class PytestPrep(PythonExecutionTaskBase):
       """
       return os.path.join(self._pex.path(), 'pytest.ini')
 
+    @classmethod
+    def coverage_plugin_module(cls):
+      """Return the name of the coverage plugin module embedded in this py.test binary.
+
+      :rtype: str
+      """
+      return cls._COVERAGE_PLUGIN_MODULE_NAME
+
   @classmethod
   def implementation_version(cls):
-    return super(PytestPrep, cls).implementation_version() + [('PytestPrep', 1)]
+    return super(PytestPrep, cls).implementation_version() + [('PytestPrep', 2)]
 
   @classmethod
   def product_types(cls):
@@ -56,10 +66,7 @@ class PytestPrep(PythonExecutionTaskBase):
 
   def extra_files(self):
     yield self.ExtraFile.empty('pytest.ini')
-
-    enclosing_dir = os.path.dirname(__name__.replace('.', os.sep))
-    plugin_path = os.path.join(enclosing_dir, 'coverage/plugin.py')
-    yield self.ExtraFile(path=plugin_path,
+    yield self.ExtraFile(path='{}.py'.format(self.PytestBinary.coverage_plugin_module()),
                          content=pkg_resources.resource_string(__name__, 'coverage/plugin.py'))
 
   def execute(self):
