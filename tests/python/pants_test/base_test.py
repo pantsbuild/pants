@@ -285,7 +285,6 @@ class BaseTest(unittest.TestCase):
     # Many tests use source root functionality via the SourceRootConfig.global_instance().
     # (typically accessed via Target.target_base), so we always set it up, for convenience.
     optionables = {SourceRootConfig}
-    extra_scopes = set()
 
     for_subsystems = for_subsystems or ()
     for subsystem in for_subsystems:
@@ -308,7 +307,6 @@ class BaseTest(unittest.TestCase):
         optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
                              {b'options_scope': task_type.options_scope}))
 
-      extra_scopes.update([si.scope for si in task_type.known_scope_infos()])
       optionables.update(Subsystem.closure(
         set([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()]) |
             self._build_configuration.subsystems()))
@@ -321,7 +319,7 @@ class BaseTest(unittest.TestCase):
       scoped_opts.update(opts)
 
     fake_options = create_options_for_optionables(
-      optionables, extra_scopes=extra_scopes, options=options, **kwargs)
+      optionables, options=options, **kwargs)
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(fake_options)
