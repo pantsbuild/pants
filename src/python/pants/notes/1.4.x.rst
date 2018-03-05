@@ -3,6 +3,23 @@
 
 This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
+1.4.0rc3 (03/05/2018)
+---------------------
+
+The fourth release candidate for the ``1.4.x`` stable branch.
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Repair end to end runtracker timing for pantsd runs. (#5526)
+  `PR #5526 <https://github.com/pantsbuild/pants/pull/5526>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Repair pantsd integration tests for execution via pantsd. (#5387)
+  `PR #5387 <https://github.com/pantsbuild/pants/pull/5387>`_
+
 1.4.0rc2 (02/23/2018)
 ---------------------
 
