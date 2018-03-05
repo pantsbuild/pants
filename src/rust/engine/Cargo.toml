@@ -28,7 +28,6 @@ fs = { path = "fs" }
 futures = "0.1.16"
 hashing = { path = "hashing" }
 lazy_static = "0.2.2"
-log = "0.4"
 ordermap = "0.2.8"
 petgraph = "0.4.5"
 process_execution = { path = "process_execution" }

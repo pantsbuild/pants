@@ -80,7 +80,8 @@ impl CommandRunner {
       Ok((command, execute_request)) => {
         self.upload_command(&command, execute_request.get_action().get_command_digest().into())
           .and_then(move |_| {
-            debug!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
+            // TODO: Log less verbosely
+            println!("Executing remotely request: {:?} (command: {:?})", execute_request, command);
 
             map_grpc_result(execution_client.execute(&execute_request))
                 .map(|result| (Arc::new(execute_request), result))
@@ -193,7 +194,7 @@ fn extract_execute_response(
   mut operation: bazel_protos::operations::Operation,
 ) -> Result<ExecuteProcessResult, ExecutionError> {
   // TODO: Log less verbosely
-  debug!("Got operation response: {:?}", operation);
+  println!("Got operation response: {:?}", operation);
   if !operation.get_done() {
     return Err(ExecutionError::NotFinished(operation.take_name()));
   }
@@ -212,7 +213,7 @@ fn extract_execute_response(
       ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e))
     })?;
   // TODO: Log less verbosely
-  debug!("Got (nested) execute response: {:?}", execute_response);
+  println!("Got (nested) execute response: {:?}", execute_response);
 
   match grpcio::RpcStatusCode::from(execute_response.get_status().get_code()) {
     grpcio::RpcStatusCode::Ok => Ok(ExecuteProcessResult {

@@ -6,7 +6,6 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 [dependencies]
 boxfuture = { path = "../boxfuture" }
 clap = "2"
-env_logger = "0.5.4"
 fs = { path = "../fs" }
 hashing = { path = "../hashing" }
 futures = "0.1.16"

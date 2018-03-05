@@ -6,8 +6,6 @@ extern crate fs;
 extern crate futures;
 extern crate grpcio;
 extern crate hashing;
-#[macro_use]
-extern crate log;
 #[cfg(test)]
 extern crate mock;
 extern crate protobuf;

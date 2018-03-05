@@ -1,6 +1,5 @@
 extern crate boxfuture;
 extern crate clap;
-extern crate env_logger;
 extern crate fs;
 extern crate hashing;
 extern crate futures;
@@ -25,8 +24,6 @@ use std::time::Duration;
 ///
 /// It does not perform $PATH lookup or shell expansion.
 fn main() {
-  env_logger::init();
-
   let args = App::new("process_executor")
     .arg(
       Arg::with_name("local-store-path")
