@@ -32,7 +32,13 @@ class SubsystemDependency(namedtuple('_SubsystemDependency', ('subsystem_cls', '
 
 
 class SubsystemClientMixin(object):
-  """A mixin for declaring dependencies on subsystems."""
+  """A mixin for declaring dependencies on subsystems.
+
+  Must be mixed in to an Optionable.
+
+  TODO(benjy): Do we need this mixin? Can we put these methods directly on Optionable?
+               Are there Optionables that must not use subsystems?
+  """
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -58,3 +64,14 @@ class SubsystemClientMixin(object):
         yield dep
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE)
+
+  @classmethod
+  def known_scope_infos(cls):
+    """Yields ScopeInfo for all known scopes for this optionable, in no particular order."""
+    # The optionable's own scope.
+    yield cls.get_scope_info()
+    # The scopes of any scoped subsystems it uses.
+    for dep in cls.subsystem_dependencies_iter():
+      if not dep.is_global():
+        for si in dep.subsystem_cls.known_scope_infos():
+          yield si.scoped_to(dep.scope)

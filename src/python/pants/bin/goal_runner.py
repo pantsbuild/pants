@@ -214,7 +214,10 @@ class GoalRunner(object):
 
   @classmethod
   def subsystems(cls):
-    """Subsystems used outside of any task."""
+    """Subsystems used outside of any task.
+
+    TODO: Should these simply be dependencies of the GlobalOptions optionable?
+    """
     return {
       SourceRootConfig,
       Reporting,

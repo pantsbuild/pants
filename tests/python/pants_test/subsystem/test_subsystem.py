@@ -131,6 +131,27 @@ class SubsystemTest(unittest.TestCase):
       with self.assertRaises(Subsystem.CycleException):
         Subsystem.closure((root,))
 
+  def test_scoping(self):
+    class SubsystemC(Subsystem):
+      options_scope = 'c'
+
+    class SubsystemB(Subsystem):
+      options_scope = 'b'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemC.scoped(cls),)
+
+    class SubsystemA(Subsystem):
+       options_scope = 'a'
+
+       @classmethod
+       def subsystem_dependencies(cls):
+         return (SubsystemB.scoped(cls),)
+
+    expected_known_scope_infos_c = []
+    self.assertListEqual(expected_known_scope_infos_c, SubsystemC.known_scope_infos())
+
   def test_uninitialized_global(self):
     Subsystem.reset()
     with self.assertRaisesRegexp(Subsystem.UninitializedSubsystemError,

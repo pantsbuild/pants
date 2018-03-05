@@ -8,6 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 
 
+GLOBAL_SCOPE = ''
+GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
+
+
 class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls'])):
   """Information about a scope."""
 
@@ -17,6 +21,12 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls']
   TASK = 'TASK'
   SUBSYSTEM = 'SUBSYSTEM'
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
+
+  def scoped_to(self, client_scope):
+    """The Optionable described by this scope, when scoped to the Optionable with client_scope."""
+    if client_scope == GLOBAL_SCOPE:
+      return self
+    return ScopeInfo('{0}.{1}'.format(self.scope, client_scope), self.category, self.optionable_cls)
 
   @property
   def description(self):
