@@ -60,6 +60,7 @@ function calculate_current_hash() {
      "${REPO_ROOT}/src/python/pants/engine/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
      "${REPO_ROOT}/3rdparty/python/requirements.txt" \
+   | grep -v -e "/BUILD" -e "/*.md" \
    | git hash-object -t blob --stdin-paths) | fingerprint_data
   )
 }
