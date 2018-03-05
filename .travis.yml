@@ -33,6 +33,7 @@ before_cache:
   # individually resolved artifacts.
   - rm -rf ${HOME}/.cache/pants/bin
   - rm -rf ${HOME}/.cache/pants/rust/rustup
+  - rm -rf ${HOME}/.cache/pants/lmdb_store
   # Render a summary of what is left in the home directory, to assist with further pruning of
   # the cache.
   - du -d2 ${HOME} | sort -r -n
