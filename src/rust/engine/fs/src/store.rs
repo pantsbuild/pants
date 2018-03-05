@@ -442,8 +442,9 @@ mod local {
   use lmdb::Error::{KeyExist, NotFound};
   use sha2::Sha256;
   use std::collections::{BinaryHeap, HashMap};
+  use std::fmt;
   use std::path::{Path, PathBuf};
-  use std::sync::{Arc, RwLock};
+  use std::sync::Arc;
   use std::time;
 
   use pool::ResettablePool;
@@ -469,8 +470,8 @@ mod local {
       Ok(ByteStore {
         inner: Arc::new(InnerStore {
           pool: pool,
-          file_dbs: ShardedLmdb::new(root.join("files")),
-          directory_dbs: ShardedLmdb::new(root.join("directories")),
+          file_dbs: ShardedLmdb::new(root.join("files"))?,
+          directory_dbs: ShardedLmdb::new(root.join("directories"))?,
         }),
       })
     }
@@ -478,7 +479,7 @@ mod local {
     // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
     pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
       {
-        let (env, directory_database, _) = self.inner.directory_dbs.get(fingerprint)?;
+        let (env, directory_database, _) = self.inner.directory_dbs.get(fingerprint);
         let txn = env.begin_ro_txn().map_err(|err| {
           format!("Failed to begin read transaction: {:?}", err)
         })?;
@@ -494,7 +495,7 @@ mod local {
           }
         };
       }
-      let (env, file_database, _) = self.inner.file_dbs.get(fingerprint)?;
+      let (env, file_database, _) = self.inner.file_dbs.get(fingerprint);
       let txn = env.begin_ro_txn().map_err(|err| {
         format!("Failed to begin read transaction: {:?}", err)
       })?;
@@ -516,10 +517,9 @@ mod local {
       &self,
       digests: Ds,
     ) -> Result<(), String> {
-      // TODO
       let until = Self::default_lease_until_secs_since_epoch();
       for digest in digests {
-        let (env, _, lease_database) = self.inner.file_dbs.get(&digest.0)?;
+        let (env, _, lease_database) = self.inner.file_dbs.get(&digest.0);
         env
           .begin_rw_txn()
           .and_then(|mut txn| {
@@ -587,9 +587,7 @@ mod local {
           EntryType::File => self.inner.file_dbs.clone(),
           EntryType::Directory => self.inner.directory_dbs.clone(),
         };
-        let (env, database, lease_database) = lmdbs.get(&aged_fingerprint.fingerprint).expect(
-          "Inconsistent sharded LMDB during garbage collection",
-        );
+        let (env, database, lease_database) = lmdbs.get(&aged_fingerprint.fingerprint);
         {
           env
             .begin_rw_txn()
@@ -626,7 +624,7 @@ mod local {
         EntryType::Directory => self.inner.directory_dbs.clone(),
       };
 
-      for &(ref env, ref database, ref lease_database) in database.all_lmdbs()?.iter() {
+      for &(ref env, ref database, ref lease_database) in database.all_lmdbs().iter() {
         let txn = env.begin_ro_txn().map_err(|err| {
           format!("Error beginning transaction to garbage collect: {:?}", err)
         })?;
@@ -690,7 +688,7 @@ mod local {
             Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
           };
 
-          let (env, content_database, lease_database) = dbs.get(&fingerprint)?;
+          let (env, content_database, lease_database) = dbs.get(&fingerprint);
           let put_res = env.begin_rw_txn().and_then(|mut txn| {
             txn.put(
               content_database,
@@ -737,7 +735,7 @@ mod local {
         .inner
         .pool
         .spawn_fn(move || {
-          let (env, db, _) = dbs.get(&fingerprint)?;
+          let (env, db, _) = dbs.get(&fingerprint);
           let ro_txn = env.begin_ro_txn().map_err(|err| {
             format!("Failed to begin read transaction: {:?}", err)
           });
@@ -762,91 +760,81 @@ mod local {
   struct ShardedLmdb {
     root_path: PathBuf,
     // First Database is content, second is leases.
-    lmdbs: Arc<RwLock<HashMap<u8, (Arc<Environment>, Database, Database)>>>,
+    lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
   }
 
   impl ShardedLmdb {
-    pub fn new(root_path: PathBuf) -> ShardedLmdb {
-      ShardedLmdb {
-        root_path: root_path,
-        lmdbs: Arc::new(RwLock::new(HashMap::new())),
+    pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
+      let mut lmdbs = HashMap::new();
+
+      for b in 0x00..0x10 {
+        let key = b << 4;
+
+        let dirname = {
+          let mut s = String::new();
+          fmt::Write::write_fmt(&mut s, format_args!("{:x}", key)).unwrap();
+          s
+        };
+        let dir = root_path.join(dirname);
+        super::super::safe_create_dir_all(&dir).map_err(|err| {
+          format!("Error making directory for store at {:?}: {:?}", dir, err)
+        })?;
+        let env =
+          Environment::new()
+            // Without this flag, each time a read transaction is started, it eats into our
+            // transaction limit (default: 126) until that thread dies.
+            //
+            // This flag makes transactions be removed from that limit when they are dropped, rather
+            // than when their thread dies. This is important, because we perform reads from a
+            // thread pool, so our threads never die. Without this flag, all read requests will fail
+            // after the first 126.
+            //
+            // The only down-side is that you need to make sure that any individual OS thread must
+            // not try to perform multiple write transactions concurrently. Fortunately, this
+            // property holds for us.
+            .set_flags(NO_TLS)
+            // 2 DBs; one for file contents, one for leases.
+            .set_max_dbs(2)
+            .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES / 16)
+            .open(&dir)
+            .map_err(|e| format!("Error making env for store at {:?}: {:?} for ", dir, e))?;
+
+        let content_database = env
+          .create_db(Some("content"), DatabaseFlags::empty())
+          .map_err(|e| {
+            format!(
+              "Error creating/opening content database at {:?}: {:?}",
+              dir,
+              e
+            )
+          })?;
+
+        let lease_database = env
+          .create_db(Some("leases"), DatabaseFlags::empty())
+          .map_err(|e| {
+            format!(
+              "Error creating/opening content database at {:?}: {:?}",
+              dir,
+              e
+            )
+          })?;
+
+        lmdbs.insert(key, (Arc::new(env), content_database, lease_database));
       }
+
+      Ok(ShardedLmdb {
+        root_path: root_path,
+        lmdbs: lmdbs,
+      })
     }
 
     // First Database is content, second is leases.
-    pub fn get(
-      &self,
-      fingerprint: &Fingerprint,
-    ) -> Result<(Arc<Environment>, Database, Database), String> {
-      let key = fingerprint.0[0] & 0xF0;
-      {
-        let lmdbs = self.lmdbs.read().unwrap();
-        match lmdbs.get(&key) {
-          Some(value) => return Ok(value.clone()),
-          None => {}
-        }
-      }
-      let mut lmdbs = self.lmdbs.write().unwrap();
-      match lmdbs.get(&key) {
-        Some(value) => return Ok(value.clone()),
-        None => {}
-      }
-      let dir = &self.root_path.join(&fingerprint.to_hex()[0..1]);
-      super::super::safe_create_dir_all(&dir).map_err(|err| {
-        format!("Error making directory for store at {:?}: {:?}", dir, err)
-      })?;
-      let env = Environment::new()
-          // Without this flag, each time a read transaction is started, it eats into our
-          // transaction limit (default: 126) until that thread dies.
-          //
-          // This flag makes transactions be removed from that limit when they are dropped, rather
-          // than when their thread dies. This is important, because we perform reads from a thread
-          // pool, so our threads never die. Without this flag, all read requests will fail after
-          // the first 126.
-          //
-          // The only down-side is that you need to make sure that any individual OS thread must not
-          // try to perform multiple write transactions concurrently. Fortunately, this property
-          // holds for us.
-          .set_flags(NO_TLS)
-          // 2 DBs; one for file contents, one for leases.
-          .set_max_dbs(2)
-          .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES / 16)
-          .open(&dir)
-          .map_err(|e| format!("Error making env for store at {:?}: {:?} for ", dir, e))?;
-
-      let content_database = env
-        .create_db(Some("content"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!(
-            "Error creating/opening content database at {:?}: {:?}",
-            dir,
-            e
-          )
-        })?;
-
-      let lease_database = env
-        .create_db(Some("leases"), DatabaseFlags::empty())
-        .map_err(|e| {
-          format!(
-            "Error creating/opening content database at {:?}: {:?}",
-            dir,
-            e
-          )
-        })?;
-
-      lmdbs.insert(key, (Arc::new(env), content_database, lease_database));
-      Ok(lmdbs.get(&key).unwrap().clone())
+    pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
+      self.lmdbs.get(&(fingerprint.0[0] & 0xF0)).unwrap().clone()
     }
 
-    pub fn all_lmdbs(&self) -> Result<Vec<(Arc<Environment>, Database, Database)>, String> {
-      let mut vec = Vec::new();
-      // Force all lmdbs to be created, so that if any already existed on disk but haven't been
-      // accessed yet we still iterate over them.
-      for b in 0x00..0x10 {
-        let bs: [u8; 32] = [b << 4; 32];
-        vec.push(self.get(&Fingerprint::from_bytes_unsafe(&bs))?);
-      }
-      Ok(vec)
+    pub fn all_lmdbs(&self) -> Vec<(Arc<Environment>, Database, Database)> {
+      self.lmdbs.values().map(|v| v.clone()).collect()
     }
   }
 
