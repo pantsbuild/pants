@@ -765,6 +765,7 @@ mod local {
 
   impl ShardedLmdb {
     pub fn new(root_path: PathBuf) -> Result<ShardedLmdb, String> {
+      debug!("Initializing ShardedLmdb at root {:?}", root_path);
       let mut lmdbs = HashMap::new();
 
       for b in 0x00..0x10 {
@@ -779,6 +780,7 @@ mod local {
         super::super::safe_create_dir_all(&dir).map_err(|err| {
           format!("Error making directory for store at {:?}: {:?}", dir, err)
         })?;
+        debug!("Making ShardedLmdb env for {:?}", dir);
         let env =
           Environment::new()
             // Without this flag, each time a read transaction is started, it eats into our
@@ -799,6 +801,7 @@ mod local {
             .open(&dir)
             .map_err(|e| format!("Error making env for store at {:?}: {:?} for ", dir, e))?;
 
+        debug!("Making ShardedLmdb content database for {:?}", dir);
         let content_database = env
           .create_db(Some("content"), DatabaseFlags::empty())
           .map_err(|e| {
@@ -809,6 +812,7 @@ mod local {
             )
           })?;
 
+        debug!("Making ShardedLmdb lease database for {:?}", dir);
         let lease_database = env
           .create_db(Some("leases"), DatabaseFlags::empty())
           .map_err(|e| {
