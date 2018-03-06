@@ -3,6 +3,61 @@
 
 This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
+1.4.0rc3 (03/05/2018)
+---------------------
+
+The fourth release candidate for the ``1.4.x`` stable branch.
+
+New Features
+~~~~~~~~~~~~
+
+* Thrifty support for pants (#5531)
+  `PR #5531 <https://github.com/pantsbuild/pants/pull/5531>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Repair end to end runtracker timing for pantsd runs. (#5526)
+  `PR #5526 <https://github.com/pantsbuild/pants/pull/5526>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* [pantsd] Repair pantsd integration tests for execution via pantsd. (#5387)
+  `PR #5387 <https://github.com/pantsbuild/pants/pull/5387>`_
+
+1.4.0rc2 (02/23/2018)
+---------------------
+
+The third release candidate for the ``1.4.x`` stable branch; likely the last!
+
+New Features
+~~~~~~~~~~~~
+
+* Add pantsd client profiling (#5434)
+  `PR #5434 <https://github.com/pantsbuild/pants/pull/5434>`_
+
+* Release script allows wheel listing (#5431)
+  `PR #5431 <https://github.com/pantsbuild/pants/pull/5431>`_
+
+Bugfixes
+~~~~~~~~
+
+* [pantsd] Set the remote environment for pantsd-runner and child processes. (#5508)
+  `PR #5508 <https://github.com/pantsbuild/pants/pull/5508>`_
+
+* Bump release.sh to pex 1.2.16. (#5460)
+  `PR #5460 <https://github.com/pantsbuild/pants/pull/5460>`_
+
+* Get version from version file not by running pants (#5428)
+  `PR #5428 <https://github.com/pantsbuild/pants/pull/5428>`_
+
+* [pantsd] Don't invalidate on surface name changes to config/rc files. (#5408)
+  `PR #5408 <https://github.com/pantsbuild/pants/pull/5408>`_
+
+* Set the log level when capturing logs in tests. (#5418)
+  `PR #5418 <https://github.com/pantsbuild/pants/pull/5418>`_
+
 1.4.0rc1 (01/28/2018)
 ---------------------
 

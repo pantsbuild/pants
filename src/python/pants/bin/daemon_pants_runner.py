@@ -21,7 +21,7 @@ from pants.init.util import clean_global_runtime_state
 from pants.java.nailgun_io import NailgunStreamStdinReader, NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 from pants.pantsd.process_manager import ProcessManager
-from pants.util.contextutil import HardSystemExit, stdio_as
+from pants.util.contextutil import HardSystemExit, hermetic_environment_as, stdio_as
 from pants.util.socket import teardown_socket
 
 
@@ -183,6 +183,10 @@ class DaemonPantsRunner(ProcessManager):
         # If `_deferred_exception` isn't a 3-item tuple, treat it like a bare exception.
         raise self._deferred_exception
 
+  def _maybe_get_client_start_time_from_env(self, env):
+    client_start_time = env.pop('PANTSD_RUNTRACKER_CLIENT_START_TIME', None)
+    return None if client_start_time is None else float(client_start_time)
+
   def run(self):
     """Fork, daemonize and invoke self.post_fork_child() (via ProcessManager)."""
     with self._fork_lock:
@@ -221,8 +225,8 @@ class DaemonPantsRunner(ProcessManager):
     # Setup a SIGINT signal handler.
     self._setup_sigint_handler()
 
-    # Invoke a Pants run with stdio redirected.
-    with self._nailgunned_stdio(self._socket) as finalizer:
+    # Invoke a Pants run with stdio redirected and a proxied environment.
+    with self._nailgunned_stdio(self._socket) as finalizer, hermetic_environment_as(**self._env):
       try:
         # Setup the Exiter's finalizer.
         self._exiter.set_finalizer(finalizer)
@@ -235,6 +239,7 @@ class DaemonPantsRunner(ProcessManager):
 
         # Otherwise, conduct a normal run.
         runner = LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper)
+        runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.set_preceding_graph_size(self._preceding_graph_size)
         runner.run()
       except KeyboardInterrupt:

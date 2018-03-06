@@ -32,9 +32,13 @@ class LocalPantsRunner(object):
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
     self._preceding_graph_size = -1
+    self._run_start_time = None
 
   def set_preceding_graph_size(self, size):
     self._preceding_graph_size = size
+
+  def set_start_time(self, start_time):
+    self._run_start_time = start_time
 
   def run(self):
     profile_path = self._env.get('PANTS_PROFILE')
@@ -63,7 +67,7 @@ class LocalPantsRunner(object):
     # Launch RunTracker as early as possible (just after Subsystem options are initialized).
     run_tracker = RunTracker.global_instance()
     reporting = Reporting.global_instance()
-    reporting.initialize(run_tracker)
+    reporting.initialize(run_tracker, self._run_start_time)
 
     try:
       # Determine the build root dir.

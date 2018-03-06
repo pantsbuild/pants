@@ -5,6 +5,7 @@ python_tests(
   dependencies=[
     '3rdparty/python:pex',
     '3rdparty/python:six',
+    'src/python/pants/backend/codegen/thrift/lib',
     'src/python/pants/backend/codegen/thrift/python',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',

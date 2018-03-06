@@ -19,6 +19,7 @@ from wheel.install import WheelFile
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_repos import PythonRepos
 from pants.subsystem.subsystem import Subsystem
+from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
 from pants.version import PANTS_SEMVER
@@ -32,9 +33,19 @@ class PluginResolver(object):
   def _is_wheel(path):
     return os.path.isfile(path) and path.endswith('.whl')
 
-  @staticmethod
-  def _activate_wheel(wheel_path):
+  @classmethod
+  def _activate_wheel(cls, wheel_path):
     install_dir = '{}-install'.format(wheel_path)
+    if not os.path.isdir(install_dir):
+      with temporary_dir(root_dir=os.path.dirname(install_dir)) as tmp:
+        cls._install_wheel(wheel_path, tmp)
+        os.rename(tmp, install_dir)
+    # Activate any .pth files installed above.
+    site.addsitedir(install_dir)
+    return install_dir
+
+  @classmethod
+  def _install_wheel(cls, wheel_path, install_dir):
     safe_mkdir(install_dir, clean=True)
     WheelFile(wheel_path).install(force=True,
                                   overrides={
@@ -44,9 +55,6 @@ class PluginResolver(object):
                                     'platlib': install_dir,
                                     'data': install_dir
                                   })
-    # Activate any .pth files installed above.
-    site.addsitedir(install_dir)
-    return install_dir
 
   def __init__(self, options_bootstrapper):
     self._options_bootstrapper = options_bootstrapper

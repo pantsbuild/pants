@@ -54,7 +54,7 @@ pub type Field = String;
 // The type of a python object (which itself has a type, but which is not represented
 // by a Key, because that would result in a infinitely recursive structure.)
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TypeId(pub Id);
 
 // On the python side, the 0th type id is used as an anonymous id
@@ -62,13 +62,13 @@ pub const ANY_TYPE: TypeId = TypeId(0);
 
 // A type constraint, which a TypeId may or may-not satisfy.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct TypeConstraint(pub Id);
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct TypeConstraint(pub Key);
 
 // An identifier for a python function.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Function(pub Id);
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct Function(pub Key);
 
 ///
 /// Wraps a type id for use as a key in HashMaps and sets.
@@ -95,11 +95,8 @@ impl hash::Hash for Key {
 }
 
 impl Key {
-  pub fn new_with_anon_type_id(id: Id) -> Key {
-    Key {
-      id: id,
-      type_id: ANY_TYPE,
-    }
+  pub fn new(id: Id, type_id: TypeId) -> Key {
+    Key { id, type_id }
   }
 
   pub fn id(&self) -> Id {

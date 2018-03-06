@@ -15,11 +15,18 @@ from pants.base.exceptions import ErrorWhileTesting, TaskError
 from pants.build_graph.files import Files
 from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.task.task import Task
+from pants.util.memo import memoized_method, memoized_property
 from pants.util.process_handler import subprocess
 
 
 class TestResult(object):
   @classmethod
+  @memoized_method
+  def successful(cls):
+    return cls.rc(0)
+
+  @classmethod
+  @memoized_method
   def exception(cls):
     return cls('EXCEPTION')
 
@@ -446,7 +453,7 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         try:
           rv = self._run_partition(fail_fast, partition, *args)
         except ErrorWhileTesting as e:
-          rv = self.result_from_error(e)
+          rv = self.result_class.from_error(e)
 
         results[partition] = rv
         if not rv.success:
@@ -456,21 +463,15 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
       for partition in sorted(results):
         rv = results[partition]
-        if len(partition) == 1 or rv.success:
-          log = self.context.log.info if rv.success else self.context.log.error
-          for target in partition:
-            log('{0:80}.....{1:>10}'.format(target.address.reference(), rv))
-        else:
-          # There is not much useful we can display in summary for a multi-target partition with
-          # failures without parsing those failures to link them to individual targets; ie: targets
-          # 2 and 8 failed in this partition of 10 targets.
-          # TODO(John Sirois): Punting here works for our 2 common partitionings:
-          # 1. All targets in singleton partitions
-          # 2. All targets in 1 partition
-          # PytestRun supports multiple partitions with multiple targets each when there sre
-          # multiple python source roots, and so some sort of summary for the multi-target
-          # partitions is needed: https://github.com/pantsbuild/pants/issues/5415
-          pass
+        failed_targets = set(rv.failed_targets)
+        for target in partition:
+          if target in failed_targets:
+            log = self.context.log.error
+            result = rv
+          else:
+            log = self.context.log.info
+            result = self.result_class.successful()
+          log('{0:80}.....{1:>10}'.format(target.address.reference(), result))
 
       msgs = [str(_rv) for _rv in results.values() if not _rv.success]
       failed_targets = [target
@@ -555,15 +556,14 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
       return result
 
-  def result_from_error(self, error):
-    """Convert an error into a test result.
+  @memoized_property
+  def result_class(self):
+    """Return the test result type returned by `run_tests`.
 
-    :param error: The error to convert into a test result.
-    :type error: :class:`pants.base.exceptions.TaskError`
-    :returns: An unsuccessful test result.
-    :rtype: :class:`TestResult`
+    :returns: The test result class to use.
+    :rtype: type that is a subclass of :class:`TestResult`
     """
-    return TestResult.from_error(error)
+    return TestResult
 
   def fingerprint_strategy(self):
     """Return a fingerprint strategy for target fingerprinting.

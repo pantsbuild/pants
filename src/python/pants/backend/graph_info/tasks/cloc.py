@@ -7,11 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
-from pants.binaries.binary_util import BinaryUtil
-from pants.engine.isolated_process import ExecuteProcessRequest, ExecuteProcessResult
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
@@ -22,12 +21,14 @@ class CountLinesOfCode(ConsoleTask):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(CountLinesOfCode, cls).subsystem_dependencies() + (BinaryUtil.Factory,)
+    return super(CountLinesOfCode, cls).subsystem_dependencies() + (ClocBinary,)
 
   @classmethod
   def register_options(cls, register):
     super(CountLinesOfCode, cls).register_options(register)
-    register('--version', advanced=True, fingerprint=True, default='1.66', help='Version of cloc.')
+    register('--version', advanced=True, fingerprint=True, default='1.66',
+             removal_version='1.7.0.dev0', removal_hint='Use --version in scope cloc-binary',
+             help='Version of cloc.')
     register('--transitive', type=bool, fingerprint=True, default=True,
              help='Operate on the transitive dependencies of the specified targets.  '
                   'Unset to operate only on the specified targets.')
@@ -35,8 +36,7 @@ class CountLinesOfCode(ConsoleTask):
              help='Show information about files ignored by cloc.')
 
   def _get_cloc_script(self):
-    binary_util = BinaryUtil.Factory.create()
-    return binary_util.select_script('scripts/cloc', self.get_options().version, 'cloc')
+    return ClocBinary.global_instance().select(self.context)
 
   def console_output(self, targets):
     if not self.get_options().transitive:
@@ -69,25 +69,18 @@ class CountLinesOfCode(ConsoleTask):
         '--list-file={}'.format(list_file),
         '--report-file={}'.format(report_file)
       )
-      if self.context._scheduler is None:
-        with self.context.new_workunit(
-          name='cloc',
-          labels=[WorkUnitLabel.TOOL],
-          cmd=' '.join(cmd)) as workunit:
-          result = subprocess.call(
-            cmd,
-            stdout=workunit.output('stdout'),
-            stderr=workunit.output('stderr')
-          )
-      else:
-        # TODO: Longer term we need to figure out what to put on $PATH in a remote execution env.
-        # Currently, we are adding everything within $PATH to the request.
-        env_path = ['PATH', os.environ.get('PATH')]
-        req = ExecuteProcessRequest(cmd, env_path)
-        execute_process_result, = self.context._scheduler.product_request(ExecuteProcessResult, [req])
-        exit_code = execute_process_result.exit_code
+      with self.context.new_workunit(
+        name='cloc',
+        labels=[WorkUnitLabel.TOOL],
+        cmd=' '.join(cmd)) as workunit:
+        exit_code = subprocess.call(
+          cmd,
+          stdout=workunit.output('stdout'),
+          stderr=workunit.output('stderr')
+        )
+
         if exit_code != 0:
-          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), result))
+          raise TaskError('{} ... exited non-zero ({}).'.format(' '.join(cmd), exit_code))
 
       with open(report_file, 'r') as report_file_in:
         for line in report_file_in.read().split('\n'):

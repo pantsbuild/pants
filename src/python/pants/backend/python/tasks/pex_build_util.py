@@ -8,11 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import os
 
 from pex.fetcher import Fetcher
-from pex.platforms import Platform
 from pex.resolver import resolve
 from twitter.common.collections import OrderedSet
 
-from pants.backend.python.python_requirement import PythonRequirement
 from pants.backend.python.subsystems.python_setup import PythonSetup
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_distribution import PythonDistribution
@@ -21,7 +19,6 @@ from pants.backend.python.targets.python_requirement_library import PythonRequir
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.build_graph.address import Address
 from pants.build_graph.files import Files
 from pants.python.python_repos import PythonRepos
 
@@ -84,11 +81,8 @@ def dump_sources(builder, tgt, log):
                     'Depend on resources() targets instead.'.format(tgt.address.spec))
 
 
-def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
+def dump_requirement_libs(builder, interpreter, req_libs, log, platforms=None):
   """Multi-platform dependency resolution for PEX files.
-
-  Returns a list of distributions that must be included in order to satisfy a set of requirements.
-  That may involve distributions for multiple platforms.
 
   :param builder: Dump the requirements into this builder.
   :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
@@ -97,29 +91,30 @@ def dump_requirements(builder, interpreter, req_libs, log, platforms=None):
   :param platforms: A list of :class:`Platform`s to resolve requirements for.
                     Defaults to the platforms specified by PythonSetup.
   """
+  reqs = [req for req_lib in req_libs for req in req_lib.requirements]
+  dump_requirements(builder, interpreter, reqs, log, platforms)
 
-  # Gather and de-dup all requirements.
-  reqs = OrderedSet()
-  for req_lib in req_libs:
-    for req in req_lib.requirements:
-      reqs.add(req)
 
-  # See which ones we need to build.
-  reqs_to_build = OrderedSet()
+def dump_requirements(builder, interpreter, reqs, log, platforms=None):
+  """Multi-platform dependency resolution for PEX files.
+
+  :param builder: Dump the requirements into this builder.
+  :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
+  :param reqs: A list of :class:`PythonRequirement` to resolve.
+  :param log: Use this logger.
+  :param platforms: A list of :class:`Platform`s to resolve requirements for.
+                    Defaults to the platforms specified by PythonSetup.
+  """
+  deduped_reqs = OrderedSet(reqs)
   find_links = OrderedSet()
-  for req in reqs:
-    # TODO: should_build appears to be hardwired to always be True. Get rid of it?
-    if req.should_build(interpreter.python, Platform.current()):
-      reqs_to_build.add(req)
-      log.debug('  Dumping requirement: {}'.format(req))
-      builder.add_requirement(req.requirement)
-      if req.repository:
-        find_links.add(req.repository)
-    else:
-      log.debug('  Skipping {} based on version filter'.format(req))
+  for req in deduped_reqs:
+    log.debug('  Dumping requirement: {}'.format(req))
+    builder.add_requirement(req.requirement)
+    if req.repository:
+      find_links.add(req.repository)
 
   # Resolve the requirements into distributions.
-  distributions = _resolve_multi(interpreter, reqs_to_build, platforms, find_links)
+  distributions = _resolve_multi(interpreter, deduped_reqs, platforms, find_links)
   locations = set()
   for platform, dists in distributions.items():
     for dist in dists:
@@ -164,43 +159,3 @@ def _resolve_multi(interpreter, requirements, platforms, find_links):
       allow_prereleases=python_setup.resolver_allow_prereleases)
 
   return distributions
-
-
-def inject_synthetic_dist_requirements(build_graph, local_built_dists, synthetic_address, binary_tgt=None):
-  """Inject a synthetic requirements library from a local wheel.
-
-  :param build_graph: The build graph needed for injecting synthetic targets.
-  :param local_built_dists: A list of paths to locally built wheels to package into
-  requirements libraries.
-  :param synthetic_address: A generative address for addressing synthetic targets.
-  :param binary_tgt: An optional parameter to be passed only when called by the `python_binary_create`
-  task. This is needed to ensure that only python_dist targets in a binary target's closure are included
-  in the binary for the case where a user specifies mulitple binary targets in a single invocation of
-  `./pants binary`.
-  :return: a :class: `PythonRequirementLibrary` containing a requirements that maps to a locally-built wheels.
-  """
-  def should_create_req(bin_tgt, loc):
-    if not bin_tgt:
-      return True
-    # Ensure that a target is in a binary target's closure. See docstring for more detail.
-    return any([tgt.id in loc for tgt in bin_tgt.closure()])
-
-  def python_requirement_from_wheel(path):
-    base = os.path.basename(path)
-    whl_dir = os.path.dirname(path)
-    whl_metadata = base.split('-')
-    req_name = '=='.join([whl_metadata[0], whl_metadata[1]])
-    return PythonRequirement(req_name, repository=whl_dir)
-
-  local_whl_reqs = [
-    python_requirement_from_wheel(whl_location)
-    for whl_location in local_built_dists
-    if should_create_req(binary_tgt, whl_location)
-  ]
-
-  if not local_whl_reqs:
-    return []
-
-  addr = Address.parse(synthetic_address)
-  build_graph.inject_synthetic_target(addr, PythonRequirementLibrary, requirements=local_whl_reqs)
-  return [build_graph.get_target(addr)]

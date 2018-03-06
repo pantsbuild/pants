@@ -18,8 +18,7 @@ from pants.contrib.go.subsystems.go_distribution import GoDistribution
 class GoDistributionTest(unittest.TestCase):
 
   def distribution(self):
-    factory = global_subsystem_instance(GoDistribution.Factory)
-    return factory.create()
+    return global_subsystem_instance(GoDistribution)
 
   def test_bootstrap(self):
     go_distribution = self.distribution()

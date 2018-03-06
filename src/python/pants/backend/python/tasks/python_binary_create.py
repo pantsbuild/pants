@@ -12,12 +12,10 @@ from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.tasks.build_local_python_distributions import \
-  BuildLocalPythonDistributions
-from pants.backend.python.tasks.pex_build_util import (dump_requirements, dump_sources,
+from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
+from pants.backend.python.tasks.pex_build_util import (dump_requirement_libs, dump_sources,
                                                        has_python_requirements, has_python_sources,
-                                                       has_resources,
-                                                       inject_synthetic_dist_requirements)
+                                                       has_resources, is_python_target)
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
 from pants.build_graph.target_scopes import Scopes
@@ -46,7 +44,7 @@ class PythonBinaryCreate(Task):
   def prepare(cls, options, round_manager):
     round_manager.require_data(PythonInterpreter)
     round_manager.require_data('python')  # For codegen.
-    round_manager.require_data(BuildLocalPythonDistributions.PYTHON_DISTS)
+    round_manager.optional_product(PythonRequirementLibrary)  # For local dists.
 
   @staticmethod
   def is_binary(target):
@@ -120,26 +118,17 @@ class PythonBinaryCreate(Task):
       for tgt in binary_tgt.closure(exclude_scopes=Scopes.COMPILE):
         if has_python_sources(tgt) or has_resources(tgt):
           source_tgts.append(tgt)
-          # Add target's interpreter compatibility constraints to pex info.
-          if has_python_sources(tgt):
-            for constraint in tgt.compatibility:
-              builder.add_interpreter_constraint(constraint)
         elif has_python_requirements(tgt):
           req_tgts.append(tgt)
+        # Add target's interpreter compatibility constraints to pex info.
+        if is_python_target(tgt):
+          for constraint in tgt.compatibility:
+            builder.add_interpreter_constraint(constraint)
 
       # Dump everything into the builder's chroot.
       for tgt in source_tgts:
         dump_sources(builder, tgt, self.context.log)
-
-      # Handle locally-built python distribution dependencies.
-      built_dists = self.context.products.get_data(BuildLocalPythonDistributions.PYTHON_DISTS)
-      if built_dists:
-        req_tgts = inject_synthetic_dist_requirements(self.context.build_graph,
-                                                      built_dists,
-                                                      ':'.join(2 * [binary_tgt.invalidation_hash()]),
-                                                      binary_tgt) + req_tgts
-
-      dump_requirements(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
+      dump_requirement_libs(builder, interpreter, req_tgts, self.context.log, binary_tgt.platforms)
 
       # Build the .pex file.
       pex_path = os.path.join(results_dir, '{}.pex'.format(binary_tgt.name))

@@ -15,6 +15,7 @@ from twitter.common.collections import OrderedSet
 from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
+from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
 from pants.util.meta import AbstractClass
 
@@ -133,8 +134,8 @@ class BuildGraph(AbstractClass):
     target_types = {type(t) for t in targets}
     target_subsystem_deps = {s for s in itertools.chain(*(t.subsystems() for t in target_types))}
     for subsystem in target_subsystem_deps:
-      # TODO: This check is primarily for tests and would be nice to do away with.
-      if subsystem.is_initialized():
+      # TODO: The is_initialized() check is primarily for tests and would be nice to do away with.
+      if issubclass(subsystem, InjectablesMixin) and subsystem.is_initialized():
         subsystem.global_instance().injectables(self)
 
   def reset(self):
@@ -183,7 +184,7 @@ class BuildGraph(AbstractClass):
     return self._target_dependencies_by_address[address]
 
   def dependents_of(self, address):
-    """Returns the Targets which depend on the target at `address`.
+    """Returns the addresses of the targets that depend on the target at `address`.
 
     This method asserts that the address given is actually in the BuildGraph.
 

@@ -7,12 +7,16 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import logging
 import os
+import shutil
 from collections import namedtuple
 
 from pants.base.exceptions import TaskError
+from pants.base.hash_utils import hash_file
 from pants.binaries.binary_util import BinaryUtil
 from pants.fs.archive import TGZ
+from pants.option.custom_types import dir_option, file_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method
 from pants.util.process_handler import subprocess
 
@@ -45,6 +49,13 @@ class NodeDistribution(object):
                  NodeDistribution.VALID_PACKAGE_MANAGER_LIST.keys()))
       register('--yarnpkg-version', advanced=True, default='v0.19.1', fingerprint=True,
                help='Yarnpkg version. Used for binary utils')
+      register('--eslint-setupdir', advanced=True, type=dir_option, fingerprint=True,
+               help='Find the package.json and yarn.lock under this dir for installing eslint and plugins.')
+      register('--eslint-config', advanced=True, type=file_option, fingerprint=True,
+               help='The path to the global eslint configuration file specifying all the rules')
+      register('--eslint-ignore', advanced=True, type=file_option, fingerprint=True,
+               help='The path to the global eslint ignore path')
+      register('--eslint-version', default='4.15.0', fingerprint=True, help='Use this ESLint version.')
 
     def create(self):
       # NB: create is an instance method to allow the user to choose global or scoped.
@@ -53,9 +64,10 @@ class NodeDistribution(object):
       binary_util = BinaryUtil.Factory.create()
       options = self.get_options()
       return NodeDistribution(
-        binary_util, options.supportdir, options.version,
+        binary_util, options.supportdir, options.version, options.eslint_setupdir,
+        options.eslint_config, options.eslint_ignore, options.eslint_version,
         package_manager=options.package_manager,
-        yarnpkg_version=options.yarnpkg_version)
+        yarnpkg_version=options.yarnpkg_version,)
 
   PACKAGE_MANAGER_NPM = 'npm'
   PACKAGE_MANAGER_YARNPKG = 'yarnpkg'
@@ -77,10 +89,16 @@ class NodeDistribution(object):
     # 'X.Y.Z'.
     return version if version.startswith('v') else 'v' + version
 
-  def __init__(self, binary_util, supportdir, version, package_manager, yarnpkg_version):
+  def __init__(self, binary_util, supportdir, version, eslint_setupdir,
+               eslint_config, eslint_ignore, eslint_version,
+               package_manager, yarnpkg_version):
     self._binary_util = binary_util
     self._supportdir = supportdir
     self._version = self._normalize_version(version)
+    self._eslint_setupdir = eslint_setupdir
+    self._eslint_config = eslint_config or None
+    self._eslint_ignore = eslint_ignore or None
+    self._eslint_version = eslint_version
     self.package_manager = self.validate_package_manager(package_manager=package_manager)
     self.yarnpkg_version = self._normalize_version(version=yarnpkg_version)
     logger.debug('Node.js version: %s package manager from config: %s',
@@ -94,6 +112,22 @@ class NodeDistribution(object):
     :rtype: string
     """
     return self._version
+
+  @property
+  def eslint_setupdir(self):
+    return self._eslint_setupdir
+
+  @property
+  def eslint_version(self):
+    return self._eslint_version
+
+  @property
+  def eslint_config(self):
+    return self._eslint_config
+
+  @property
+  def eslint_ignore(self):
+    return self._eslint_ignore
 
   def unpack_package(self, supportdir, version, filename):
     tarball_filepath = self._binary_util.select_binary(
@@ -233,3 +267,42 @@ class NodeDistribution(object):
     """
     return self._command_gen(
       [self.install_node, self.install_yarnpkg], 'yarnpkg', args=args, node_paths=node_paths)
+
+  def _configure_eslinter(self, bootstrapped_support_path):
+    logger.debug('Copying {setupdir} to bootstrapped dir: {support_path}'
+                           .format(setupdir=self.eslint_setupdir, support_path=bootstrapped_support_path))
+    safe_rmtree(bootstrapped_support_path)
+    shutil.copytree(self.eslint_setupdir, bootstrapped_support_path)
+    return True
+
+  def eslint_supportdir(self, task_workdir):
+    """ Returns the path where the ESLint is bootstrapped.
+    
+    :param string task_workdir: The task's working directory
+    :returns: The path where ESLint is bootstrapped and whether or not it is configured
+    :rtype: (string, bool)
+    """
+    bootstrapped_support_path = os.path.join(task_workdir, 'eslint')
+
+    # TODO(nsaechao): Should only have to check if the "eslint" dir exists in the task_workdir
+    # assuming fingerprinting works as intended.
+
+    # If the eslint_setupdir is not provided or missing required files, then
+    # clean up the directory so that Pants can install a pre-defined eslint version later on.
+    # Otherwise, if there is no configurations changes, rely on the cache.
+    # If there is a config change detected, use the new configuration.
+    configured = False
+    if self.eslint_setupdir:
+      configured = self._binary_util.is_bin_valid(self.eslint_setupdir,
+                                           [BinaryUtil.BinaryFileSpec('package.json'),
+                                            BinaryUtil.BinaryFileSpec('yarn.lock')])
+    if not configured:
+      safe_mkdir(bootstrapped_support_path, clean=True)
+    else:
+      binary_file_specs = [
+        BinaryUtil.BinaryFileSpec(f, hash_file(os.path.join(self.eslint_setupdir, f)))
+        for f in ['yarn.lock', 'package.json']]
+      installed = self._binary_util.is_bin_valid(bootstrapped_support_path, binary_file_specs)
+      if not installed:
+        self._configure_eslinter(bootstrapped_support_path)
+    return (bootstrapped_support_path, configured)

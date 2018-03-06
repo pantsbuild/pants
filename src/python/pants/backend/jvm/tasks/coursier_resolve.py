@@ -9,6 +9,7 @@ import hashlib
 import json
 import logging
 import os
+import urllib
 from collections import defaultdict
 
 from pants.backend.jvm.ivy_utils import IvyUtils
@@ -378,6 +379,10 @@ class CoursierMixin(NailgunTask):
       if j.coordinate.classifier:
         module += ',classifier={}'.format(j.coordinate.classifier)
 
+      if j.get_url():
+        jar_url = j.get_url()
+        module += ',url={}'.format(urllib.quote_plus(jar_url))
+        
       if j.intransitive:
         cmd_args.append('--intransitive')
 
@@ -440,7 +445,7 @@ class CoursierMixin(NailgunTask):
     # was resolved in pants.
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
-      m2coord = M2Coordinate.from_string(coord)
+      m2coord = self.to_m2_coord(coord)
       org_name_to_org_name_rev['{}:{}'.format(m2coord.org, m2coord.name)] = coord
 
     for vt in invalidation_check.all_vts:
@@ -469,11 +474,11 @@ class CoursierMixin(NailgunTask):
 
           # if conflict resolution entries, then update versions to the resolved ones.
           if jar.coordinate.simple_coord in result['conflict_resolution']:
-            parsed_conflict = M2Coordinate.from_string(
+            parsed_conflict = self.to_m2_coord(
               result['conflict_resolution'][jar.coordinate.simple_coord])
             coord_candidates = [with_new_rev(c, parsed_conflict.rev) for c in coord_candidates]
           elif '{}:{}'.format(jar.coordinate.org, jar.coordinate.name) in org_name_to_org_name_rev:
-            parsed_conflict = M2Coordinate.from_string(
+            parsed_conflict = self.to_m2_coord(
               org_name_to_org_name_rev['{}:{}'.format(jar.coordinate.org, jar.coordinate.name)])
             coord_candidates = [with_new_rev(c, parsed_conflict.rev) for c in coord_candidates]
 
@@ -609,8 +614,11 @@ class CoursierMixin(NailgunTask):
         # NB: Not all coordinates will have associated files.
         #     This is fine. Some coordinates will just have dependencies.
         continue
-      pants_path = os.path.join(pants_jar_path_base, os.path.relpath(jar_path, coursier_cache_path))
 
+      if not os.path.exists(jar_path):
+        raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
+
+      pants_path = cls._get_path_to_jar(coursier_cache_path, pants_jar_path_base, jar_path)
 
       if not os.path.exists(jar_path):
         raise CoursierResultNotFound("Jar path not found: {}".format(jar_path))
@@ -618,7 +626,8 @@ class CoursierMixin(NailgunTask):
       if not os.path.exists(pants_path):
         safe_mkdir(os.path.dirname(pants_path))
         os.symlink(jar_path, pants_path)
-      coord = M2Coordinate.from_string(simple_coord)
+
+      coord = cls.to_m2_coord(simple_coord)
       resolved_jar = ResolvedJar(coord,
                                  cache_path=jar_path,
                                  pants_path=pants_path)
@@ -628,6 +637,28 @@ class CoursierMixin(NailgunTask):
   @classmethod
   def to_m2_coord(cls, coord_str):
     return M2Coordinate.from_string(coord_str)
+
+  @classmethod
+  def _get_path_to_jar(cls, coursier_cache_path, pants_jar_path_base, jar_path):
+    """
+    Create the path to the jar that will live in .pants.d
+    
+    :param coursier_cache_path: coursier cache location
+    :param pants_jar_path_base: location under pants workdir to store the symlink to the coursier cache
+    :param jar_path: path of the jar
+    :return:
+    """
+    if os.path.abspath(coursier_cache_path) not in os.path.abspath(jar_path):
+      # Appending the string 'absolute' to the jar_path and joining that is a hack to work around
+      # python's os.path.join behavior of throwing away all components that come before an
+      # absolute path. See https://docs.python.org/3.3/library/os.path.html#os.path.join
+      return os.path.join(pants_jar_path_base, os.path.normpath('absolute/' + jar_path))
+    else:
+      return os.path.join(pants_jar_path_base, 'relative', os.path.relpath(jar_path, coursier_cache_path))
+  #@classmethod
+  #def to_m2_coord(cls, coord_str, classifier):
+  #  # TODO: currently assuming all packaging is a jar
+  #  return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
 
 
 class CoursierResolve(CoursierMixin):
@@ -650,6 +681,10 @@ class CoursierResolve(CoursierMixin):
   def register_options(cls, register):
     super(CoursierResolve, cls).register_options(register)
 
+  @classmethod
+  def implementation_version(cls):
+    return super(CoursierResolve, cls).implementation_version() + [('CoursierResolve', 1)]
+  
   def execute(self):
     """Resolves the specified confs for the configured targets and returns an iterator over
     tuples of (conf, jar path).

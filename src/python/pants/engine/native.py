@@ -10,7 +10,6 @@ import logging
 import os
 import sys
 import sysconfig
-import threading
 import traceback
 from contextlib import closing
 
@@ -38,21 +37,21 @@ typedef struct {
 } TypeId;
 
 typedef struct {
-  Id id_;
+  Id       id_;
+  TypeId   type_id;
+} Key;
+
+typedef struct {
+  Key key;
 } TypeConstraint;
 
 typedef struct {
-  Id id_;
+  Key key;
 } Function;
 
 typedef struct {
   Handle   handle;
 } Value;
-
-typedef struct {
-  Id       id_;
-  TypeId   type_id;
-} Key;
 
 typedef struct {
   uint8_t*  bytes_ptr;
@@ -83,18 +82,24 @@ typedef struct {
   Value  value;
 } PyResult;
 
+typedef struct {
+  int64_t   hash_;
+  Value     value;
+  TypeId    type_id;
+} Ident;
+
 typedef void ExternContext;
 
 // On the rust side the integration is defined in externs.rs
 typedef void             (*extern_ptr_log)(ExternContext*, uint8_t, uint8_t*, uint64_t);
-typedef Key              (*extern_ptr_key_for)(ExternContext*, Value*);
-typedef Value            (*extern_ptr_val_for)(ExternContext*, Key*);
+typedef Ident            (*extern_ptr_identify)(ExternContext*, Value*);
+typedef _Bool            (*extern_ptr_equals)(ExternContext*, Value*, Value*);
 typedef Value            (*extern_ptr_clone_val)(ExternContext*, Value*);
 typedef void             (*extern_ptr_drop_handles)(ExternContext*, Handle*, uint64_t);
-typedef Buffer           (*extern_ptr_id_to_str)(ExternContext*, Id);
+typedef Buffer           (*extern_ptr_type_to_str)(ExternContext*, TypeId);
 typedef Buffer           (*extern_ptr_val_to_str)(ExternContext*, Value*);
-typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, TypeConstraint*, Value*);
-typedef _Bool            (*extern_ptr_satisfied_by_type)(ExternContext*, TypeConstraint*, TypeId*);
+typedef _Bool            (*extern_ptr_satisfied_by)(ExternContext*, Value*, Value*);
+typedef _Bool            (*extern_ptr_satisfied_by_type)(ExternContext*, Value*, TypeId*);
 typedef Value            (*extern_ptr_store_list)(ExternContext*, Value**, uint64_t, _Bool);
 typedef Value            (*extern_ptr_store_bytes)(ExternContext*, uint8_t*, uint64_t);
 typedef Value            (*extern_ptr_store_i32)(ExternContext*, int32_t);
@@ -129,11 +134,11 @@ void externs_set(ExternContext*,
                  extern_ptr_log,
                  extern_ptr_call,
                  extern_ptr_eval,
-                 extern_ptr_key_for,
-                 extern_ptr_val_for,
+                 extern_ptr_identify,
+                 extern_ptr_equals,
                  extern_ptr_clone_val,
                  extern_ptr_drop_handles,
-                 extern_ptr_id_to_str,
+                 extern_ptr_type_to_str,
                  extern_ptr_val_to_str,
                  extern_ptr_satisfied_by,
                  extern_ptr_satisfied_by_type,
@@ -146,13 +151,16 @@ void externs_set(ExternContext*,
                  extern_ptr_create_exception,
                  TypeId);
 
+Key externs_key_for(Value);
+Value externs_val_for(Key);
+
 Tasks* tasks_create(void);
 void tasks_task_begin(Tasks*, Function, TypeConstraint);
 void tasks_add_select(Tasks*, TypeConstraint);
 void tasks_add_select_variant(Tasks*, TypeConstraint, Buffer);
 void tasks_add_select_dependencies(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
 void tasks_add_select_transitive(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeIdBuffer);
-void tasks_add_select_projection(Tasks*, TypeConstraint, TypeConstraint, Buffer, TypeConstraint);
+void tasks_add_select_projection(Tasks*, TypeConstraint, TypeId, Buffer, TypeConstraint);
 void tasks_task_end(Tasks*);
 void tasks_singleton_add(Tasks*, Value, TypeConstraint);
 void tasks_destroy(Tasks*);
@@ -219,14 +227,14 @@ extern "Python" {
   void             extern_log(ExternContext*, uint8_t, uint8_t*, uint64_t);
   PyResult         extern_call(ExternContext*, Value*, Value*, uint64_t);
   PyResult         extern_eval(ExternContext*, uint8_t*, uint64_t);
-  Key              extern_key_for(ExternContext*, Value*);
-  Value            extern_val_for(ExternContext*, Key*);
+  Ident            extern_identify(ExternContext*, Value*);
+  _Bool            extern_equals(ExternContext*, Value*, Value*);
   Value            extern_clone_val(ExternContext*, Value*);
   void             extern_drop_handles(ExternContext*, Handle*, uint64_t);
-  Buffer           extern_id_to_str(ExternContext*, Id);
+  Buffer           extern_type_to_str(ExternContext*, TypeId);
   Buffer           extern_val_to_str(ExternContext*, Value*);
-  _Bool            extern_satisfied_by(ExternContext*, TypeConstraint*, Value*);
-  _Bool            extern_satisfied_by_type(ExternContext*, TypeConstraint*, TypeId*);
+  _Bool            extern_satisfied_by(ExternContext*, Value*, Value*);
+  _Bool            extern_satisfied_by_type(ExternContext*, Value*, TypeId*);
   Value            extern_store_list(ExternContext*, Value**, uint64_t, _Bool);
   Value            extern_store_bytes(ExternContext*, uint8_t*, uint64_t);
   Value            extern_store_i32(ExternContext*, int32_t);
@@ -263,7 +271,6 @@ def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   ffibuilder.emit_c_code(six.binary_type(c_file))
 
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
-  print('generating {}'.format(env_script))
   with open(env_script, 'wb') as f:
     f.write(get_build_cflags())
 
@@ -310,22 +317,25 @@ def _initialize_externs(ffi):
       logger.critical(msg)
 
   @ffi.def_extern()
-  def extern_key_for(context_handle, val):
-    """Return a Key for a Value."""
+  def extern_identify(context_handle, val):
+    """Return an Ident containing a clone of the Value with its __hash__ and TypeId."""
     c = ffi.from_handle(context_handle)
-    return c.to_key(c.from_value(val))
+    obj = ffi.from_handle(val.handle)
+    hash_ = hash(obj)
+    cloned = c.to_value(obj)
+    type_id = c.to_id(type(obj))
+    return (hash_, cloned, TypeId(type_id))
 
   @ffi.def_extern()
-  def extern_val_for(context_handle, key):
-    """Return a Value for a Key."""
-    c = ffi.from_handle(context_handle)
-    return c.to_value(c.from_key(key))
+  def extern_equals(context_handle, val1, val2):
+    """Return true if the given Values are __eq__."""
+    return ffi.from_handle(val1.handle) == ffi.from_handle(val2.handle)
 
   @ffi.def_extern()
   def extern_clone_val(context_handle, val):
     """Clone the given Value."""
     c = ffi.from_handle(context_handle)
-    return c.to_value(c.from_value(val))
+    return c.to_value(ffi.from_handle(val.handle))
 
   @ffi.def_extern()
   def extern_drop_handles(context_handle, handles_ptr, handles_len):
@@ -335,10 +345,10 @@ def _initialize_externs(ffi):
     c.drop_handles(handles)
 
   @ffi.def_extern()
-  def extern_id_to_str(context_handle, id_):
-    """Given an Id for `obj`, write str(obj) and return it."""
+  def extern_type_to_str(context_handle, type_id):
+    """Given a TypeId, write type.__name__ and return it."""
     c = ffi.from_handle(context_handle)
-    return c.utf8_buf(six.text_type(c.from_id(id_)))
+    return c.utf8_buf(six.text_type(c.from_id(type_id.id_).__name__))
 
   @ffi.def_extern()
   def extern_val_to_str(context_handle, val):
@@ -347,16 +357,17 @@ def _initialize_externs(ffi):
     return c.utf8_buf(six.text_type(c.from_value(val)))
 
   @ffi.def_extern()
-  def extern_satisfied_by(context_handle, constraint_id, val):
+  def extern_satisfied_by(context_handle, constraint_val, val):
     """Given a TypeConstraint and a Value return constraint.satisfied_by(value)."""
-    c = ffi.from_handle(context_handle)
-    return c.from_id(constraint_id.id_).satisfied_by(c.from_value(val))
+    constraint = ffi.from_handle(constraint_val.handle)
+    return constraint.satisfied_by(ffi.from_handle(val.handle))
 
   @ffi.def_extern()
-  def extern_satisfied_by_type(context_handle, constraint_id, cls_id):
+  def extern_satisfied_by_type(context_handle, constraint_val, cls_id):
     """Given a TypeConstraint and a TypeId, return constraint.satisfied_by_type(type_id)."""
     c = ffi.from_handle(context_handle)
-    return c.from_id(constraint_id.id_).satisfied_by_type(c.from_id(cls_id.id_))
+    constraint = ffi.from_handle(constraint_val.handle)
+    return constraint.satisfied_by_type(c.from_id(cls_id.id_))
 
   @ffi.def_extern()
   def extern_store_list(context_handle, vals_ptr_ptr, vals_len, merge):
@@ -451,11 +462,11 @@ class Key(datatype('Key', ['id_', 'type_id'])):
   """Corresponds to the native object of the same name."""
 
 
-class Function(datatype('Function', ['id_'])):
+class Function(datatype('Function', ['key'])):
   """Corresponds to the native object of the same name."""
 
 
-class TypeConstraint(datatype('TypeConstraint', ['id_'])):
+class TypeConstraint(datatype('TypeConstraint', ['key'])):
   """Corresponds to the native object of the same name."""
 
 
@@ -467,62 +478,26 @@ class PyResult(datatype('PyResult', ['is_throw', 'value'])):
   """Corresponds to the native object of the same name."""
 
 
-class ObjectIdMap(object):
-  """In the native context, assign and memoize python objects an unique unsigned-integer Id.
+class ExternContext(object):
+  """A wrapper around python objects used in static extern functions in this module.
 
-  Underlying, the id is uniquely derived from object's digest instead of using its hash code
-  because the content may change and object's hash function could be overridden. In order not
-  to return the stale object we trade performance for correctness.
-
-  In the future, we could improve performance by only computing digests for mutable objects.
-  For this reason referring an implementation-independent id instead of the digest in the native
-  context is more flexible.
+  See comments in `src/rust/engine/src/interning.rs` for more information on the relationship
+  between `Key`s and `Value`s.
   """
 
-  def __init__(self):
-    # Memoized object Ids.
-    self._id_to_obj = dict()
-    self._obj_to_id = dict()
-    self._next_id = 0
-
-  def put(self, obj):
-    new_id = self._next_id
-    oid = self._obj_to_id.setdefault(obj, new_id)
-    if oid is not new_id:
-      # Object already existed.
-      return oid
-
-    # Object is new/unique.
-    self._id_to_obj[oid] = obj
-    self._next_id += 1
-    return oid
-
-  def get(self, oid):
-    return self._id_to_obj[oid]
-
-
-class ExternContext(object):
-  """A wrapper around python objects used in static extern functions in this module."""
-
-  def __init__(self, ffi):
+  def __init__(self, ffi, lib):
     """
     :param CompiledCFFI ffi: The CFFI handle to the compiled native engine lib.
     """
     self._ffi = ffi
+    self._lib = lib
 
     # A handle to this object to ensure that the native wrapper survives at least as
     # long as this object.
-    self.handle = self._ffi.new_handle(self)
+    self._handle = self._ffi.new_handle(self)
 
-    # The native code will invoke externs concurrently, so locking is needed around
-    # datastructures in this context.
-    self._lock = threading.RLock()
-
-    # Memoized object Ids.
-    self._id_generator = 0
-    self._id_to_obj = dict()
-    self._obj_to_id = dict()
-    self._object_id_map = ObjectIdMap()
+    # A lookup table for `id(type) -> types`.
+    self._types = {}
 
     # Outstanding FFI object handles.
     self._handles = set()
@@ -558,26 +533,20 @@ class ExternContext(object):
   def drop_handles(self, handles):
     self._handles -= set(handles)
 
-  def put(self, obj):
-    with self._lock:
-      # If we encounter an existing id, return it.
-      return self._object_id_map.put(obj)
-
-  def get(self, id_):
-    return self._object_id_map.get(id_)
-
   def to_id(self, typ):
-    return self.put(typ)
+    type_id = id(typ)
+    self._types[type_id] = typ
+    return type_id
+
+  def from_id(self, type_id):
+    return self._types[type_id]
 
   def to_key(self, obj):
-    type_id = TypeId(self.put(type(obj)))
-    return Key(self.put(obj), type_id)
+    cdata = self._lib.externs_key_for(self.to_value(obj))
+    return Key(cdata.id_, TypeId(cdata.type_id.id_))
 
-  def from_id(self, cdata):
-    return self.get(cdata)
-
-  def from_key(self, cdata):
-    return self.get(cdata.id_)
+  def from_key(self, key):
+    return Value(self._lib.externs_val_for(key).handle)
 
 
 class Native(object):
@@ -638,16 +607,16 @@ class Native(object):
     # We statically initialize a ExternContext to correspond to the queue of dropped
     # Handles that the native code maintains.
     def init_externs():
-      context = ExternContext(self.ffi)
-      self.lib.externs_set(context.handle,
+      context = ExternContext(self.ffi, self.lib)
+      self.lib.externs_set(context._handle,
                            self.ffi_lib.extern_log,
                            self.ffi_lib.extern_call,
                            self.ffi_lib.extern_eval,
-                           self.ffi_lib.extern_key_for,
-                           self.ffi_lib.extern_val_for,
+                           self.ffi_lib.extern_identify,
+                           self.ffi_lib.extern_equals,
                            self.ffi_lib.extern_clone_val,
                            self.ffi_lib.extern_drop_handles,
-                           self.ffi_lib.extern_id_to_str,
+                           self.ffi_lib.extern_type_to_str,
                            self.ffi_lib.extern_val_to_str,
                            self.ffi_lib.extern_satisfied_by,
                            self.ffi_lib.extern_satisfied_by_type,
@@ -718,21 +687,23 @@ class Native(object):
                     constraint_process_result):
     """Create and return an ExternContext and native Scheduler."""
 
+    def func(constraint):
+      return Function(self.context.to_key(constraint))
     def tc(constraint):
-      return TypeConstraint(self.context.to_id(constraint))
+      return TypeConstraint(self.context.to_key(constraint))
 
     scheduler = self.lib.scheduler_create(
         tasks,
         # Constructors/functions.
-        Function(self.context.to_id(construct_snapshot)),
-        Function(self.context.to_id(construct_snapshots)),
-        Function(self.context.to_id(construct_file_content)),
-        Function(self.context.to_id(construct_files_content)),
-        Function(self.context.to_id(construct_path_stat)),
-        Function(self.context.to_id(construct_dir)),
-        Function(self.context.to_id(construct_file)),
-        Function(self.context.to_id(construct_link)),
-        Function(self.context.to_id(construct_process_result)),
+        func(construct_snapshot),
+        func(construct_snapshots),
+        func(construct_file_content),
+        func(construct_files_content),
+        func(construct_path_stat),
+        func(construct_dir),
+        func(construct_file),
+        func(construct_link),
+        func(construct_process_result),
         # TypeConstraints.
         tc(constraint_address),
         tc(constraint_has_products),

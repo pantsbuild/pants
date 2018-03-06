@@ -8,17 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import os
 
+from pants.backend.python.subsystems.isort import Isort
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
-from pants.binaries.binary_util import BinaryUtil
 from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.task import Task
 from pants.util.process_handler import subprocess
 
 
+# TODO: Should be named IsortRun, for consistency.
 class IsortPythonTask(FmtTaskMixin, Task):
   """Autoformats Python source files with isort.
 
@@ -40,7 +41,7 @@ class IsortPythonTask(FmtTaskMixin, Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(IsortPythonTask, cls).subsystem_dependencies() + (BinaryUtil.Factory.scoped(cls), )
+    return super(IsortPythonTask, cls).subsystem_dependencies() + (Isort, )
 
   def __init__(self, *args, **kwargs):
     super(IsortPythonTask, self).__init__(*args, **kwargs)
@@ -50,6 +51,7 @@ class IsortPythonTask(FmtTaskMixin, Task):
   def register_options(cls, register):
     super(IsortPythonTask, cls).register_options(register)
     register('--version', advanced=True, fingerprint=True, default='4.2.5',
+             removal_version='1.7.0.dev0', removal_hint='Use --version in scope isort',
              help='Version of isort.')
 
   def execute(self, test_output_file=None):
@@ -60,8 +62,7 @@ class IsortPythonTask(FmtTaskMixin, Task):
       logging.debug(self.NOOP_MSG_HAS_TARGET_BUT_NO_SOURCE)
       return
 
-    isort_script = BinaryUtil.Factory.create().select_script('scripts/isort',
-                                                             self.options.version, 'isort.pex')
+    isort_script = Isort.global_instance().select(context=self.context)
     cmd = [isort_script] + self.get_passthru_args() + sources
     logging.debug(' '.join(cmd))
 

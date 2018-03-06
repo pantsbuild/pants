@@ -1,7 +1,6 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std::collections::HashMap;
 use std::ffi::OsString;
 use std::mem;
 use std::os::raw;
@@ -9,8 +8,9 @@ use std::os::unix::ffi::OsStringExt;
 use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
-use core::{Failure, Function, Id, Key, TypeConstraint, TypeId, Value};
+use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
+use interning::Interns;
 
 
 pub fn log(level: LogLevel, msg: &str) {
@@ -25,20 +25,26 @@ pub fn eval(python: &str) -> Result<Value, Failure> {
   }).into()
 }
 
-pub fn key_for(val: &Value) -> Key {
-  with_externs(|e| (e.key_for)(e.context, val))
+pub fn identify(val: &Value) -> Ident {
+  with_externs(|e| (e.identify)(e.context, val))
+}
+
+pub fn equals(val1: &Value, val2: &Value) -> bool {
+  with_externs(|e| (e.equals)(e.context, val1, val2))
+}
+
+pub fn key_for(val: Value) -> Key {
+  let mut interns = INTERNS.write().unwrap();
+  interns.insert(val)
 }
 
 pub fn val_for(key: &Key) -> Value {
-  with_externs(|e| (e.val_for)(e.context, key))
+  let interns = INTERNS.read().unwrap();
+  interns.get(key).clone()
 }
 
 pub fn clone_val(val: &Value) -> Value {
   with_externs(|e| (e.clone_val)(e.context, val))
-}
-
-pub fn val_for_id(id: Id) -> Value {
-  val_for(&Key::new_with_anon_type_id(id))
 }
 
 pub fn drop_handles(handles: Vec<Handle>) {
@@ -48,27 +54,16 @@ pub fn drop_handles(handles: Vec<Handle>) {
 }
 
 pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
-  with_externs(|e| (e.satisfied_by)(e.context, constraint, obj))
+  let interns = INTERNS.read().unwrap();
+  with_externs(|e| {
+    (e.satisfied_by)(e.context, interns.get(&constraint.0), obj)
+  })
 }
 
 pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
+  let interns = INTERNS.read().unwrap();
   with_externs(|e| {
-    let key = (*constraint, *cls);
-
-    // See if a value already exists.
-    {
-      let read = e.satisfied_by_type_cache.read().unwrap();
-      if let Some(v) = read.get(&key) {
-        return *v;
-      }
-    }
-
-    // If not, compute and insert.
-    let mut write = e.satisfied_by_type_cache.write().unwrap();
-    write
-      .entry(key)
-      .or_insert_with(|| (e.satisfied_by_type)(e.context, constraint, cls))
-      .clone()
+    (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls)
   })
 }
 
@@ -142,12 +137,12 @@ pub fn key_to_str(key: &Key) -> String {
   val_to_str(&val_for(key))
 }
 
-pub fn id_to_str(digest: Id) -> String {
+pub fn type_to_str(type_id: TypeId) -> String {
   with_externs(|e| {
-    (e.id_to_str)(e.context, digest)
+    (e.type_to_str)(e.context, type_id)
       .to_string()
       .unwrap_or_else(|e| {
-        format!("<failed to decode unicode for {:?}: {}>", digest, e)
+        format!("<failed to decode unicode for {:?}: {}>", type_id, e)
       })
   })
 }
@@ -182,9 +177,11 @@ pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
 /// NB: Panics on failure. Only recommended for use with built-in functions, such as
 /// those configured in types::Types.
 ///
-pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
-  call(&val_for_id(func.0), args).unwrap_or_else(|e| {
-    panic!("Core function `{}` failed: {:?}", id_to_str(func.0), e);
+pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
+  let interns = INTERNS.read().unwrap();
+  let func_val = interns.get(&func.0);
+  call(func_val, args).unwrap_or_else(|e| {
+    panic!("Core function `{}` failed: {:?}", val_to_str(func_val), e);
   })
 }
 
@@ -194,6 +191,7 @@ pub fn unsafe_call(func: &Function, args: &Vec<Value>) -> Value {
 
 lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
+  static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
 
 ///
@@ -224,20 +222,19 @@ pub struct Externs {
   log: LogExtern,
   call: CallExtern,
   eval: EvalExtern,
-  key_for: KeyForExtern,
-  val_for: ValForExtern,
+  identify: IdentifyExtern,
+  equals: EqualsExtern,
   clone_val: CloneValExtern,
   drop_handles: DropHandlesExtern,
   satisfied_by: SatisfiedByExtern,
   satisfied_by_type: SatisfiedByTypeExtern,
-  satisfied_by_type_cache: RwLock<HashMap<(TypeConstraint, TypeId), bool>>,
   store_list: StoreListExtern,
   store_bytes: StoreBytesExtern,
   store_i32: StoreI32Extern,
   project: ProjectExtern,
   project_ignoring_type: ProjectIgnoringTypeExtern,
   project_multi: ProjectMultiExtern,
-  id_to_str: IdToStrExtern,
+  type_to_str: TypeToStrExtern,
   val_to_str: ValToStrExtern,
   create_exception: CreateExceptionExtern,
   // TODO: This type is also declared on `types::Types`.
@@ -254,11 +251,11 @@ impl Externs {
     log: LogExtern,
     call: CallExtern,
     eval: EvalExtern,
-    key_for: KeyForExtern,
-    val_for: ValForExtern,
+    identify: IdentifyExtern,
+    equals: EqualsExtern,
     clone_val: CloneValExtern,
     drop_handles: DropHandlesExtern,
-    id_to_str: IdToStrExtern,
+    type_to_str: TypeToStrExtern,
     val_to_str: ValToStrExtern,
     satisfied_by: SatisfiedByExtern,
     satisfied_by_type: SatisfiedByTypeExtern,
@@ -276,20 +273,19 @@ impl Externs {
       log: log,
       call: call,
       eval: eval,
-      key_for: key_for,
-      val_for: val_for,
+      identify: identify,
+      equals: equals,
       clone_val: clone_val,
       drop_handles: drop_handles,
       satisfied_by: satisfied_by,
       satisfied_by_type: satisfied_by_type,
-      satisfied_by_type_cache: RwLock::new(HashMap::new()),
       store_list: store_list,
       store_bytes: store_bytes,
       store_i32: store_i32,
       project: project,
       project_ignoring_type: project_ignoring_type,
       project_multi: project_multi,
-      id_to_str: id_to_str,
+      type_to_str: type_to_str,
       val_to_str: val_to_str,
       create_exception: create_exception,
       py_str_type: py_str_type,
@@ -299,19 +295,17 @@ impl Externs {
 
 pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8, str_len: u64);
 
-pub type SatisfiedByExtern = extern "C" fn(*const ExternContext,
-                                           *const TypeConstraint,
-                                           *const Value)
-                                           -> bool;
+// TODO: Type alias used to avoid rustfmt breaking itself by rendering a 101 character line.
+pub type SatisfedBool = bool;
+pub type SatisfiedByExtern = extern "C" fn(*const ExternContext, *const Value, *const Value)
+                                           -> SatisfedBool;
 
-pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext,
-                                               *const TypeConstraint,
-                                               *const TypeId)
+pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext, *const Value, *const TypeId)
                                                -> bool;
 
-pub type KeyForExtern = extern "C" fn(*const ExternContext, *const Value) -> Key;
+pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Value) -> Ident;
 
-pub type ValForExtern = extern "C" fn(*const ExternContext, *const Key) -> Value;
+pub type EqualsExtern = extern "C" fn(*const ExternContext, *const Value, *const Value) -> bool;
 
 pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Value) -> Value;
 
@@ -369,6 +363,14 @@ impl From<Result<(), String>> for PyResult {
       },
     }
   }
+}
+
+// The result of an `identify` call, including the __hash__ of a Value and its TypeId.
+#[repr(C)]
+pub struct Ident {
+  pub hash: i64,
+  pub value: Value,
+  pub type_id: TypeId,
 }
 
 // Points to an array containing a series of values allocated by Python.
@@ -474,7 +476,7 @@ impl BufferBuffer {
   }
 }
 
-pub type IdToStrExtern = extern "C" fn(*const ExternContext, Id) -> Buffer;
+pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer;
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 

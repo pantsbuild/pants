@@ -5,19 +5,23 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import hashlib
 import logging
 import os
 import posixpath
+from collections import namedtuple
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.base.hash_utils import hash_file
+from pants.fs.archive import archiver as create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
-from pants.util.dirutil import chmod_plus_x, safe_delete, safe_open
+from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.osutil import get_os_id
 
 
@@ -85,6 +89,10 @@ class BinaryUtil(object):
     """Indicates that no urls were specified in pants.ini."""
     pass
 
+  class BinaryFileSpec(namedtuple('BinaryFileSpec', ['filename', 'checksum', 'digest'])):
+    def __new__(cls, filename, checksum=None, digest=hashlib.sha1()):
+      return super(BinaryUtil.BinaryFileSpec, cls).__new__(cls, filename, checksum, digest)
+
   def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
     """Calculate the base path.
 
@@ -129,48 +137,68 @@ class BinaryUtil(object):
     if path_by_id:
       self._path_by_id.update((tuple(k), tuple(v)) for k, v in path_by_id.items())
 
-  def select(self, supportdir, version, name, platform_dependent):
-    if platform_dependent:
-      return self._select_binary(supportdir, version, name)
-    else:
-      return self._select_script(supportdir, version, name)
-
-  def select_binary(self, supportdir, version, name):
-    return self._select_binary(supportdir, version, name)
-
-  def select_script(self, supportdir, version, name):
-    return self._select_script(supportdir, version, name)
-
   # TODO: Deprecate passing in an explicit supportdir? Seems like we should be able to
   # organize our binary hosting so that it's not needed.
-  def _select_binary(self, supportdir, version, name):
-    """Selects a binary matching the current os and architecture.
+  def select(self, supportdir, version, name, platform_dependent, archive_type):
+    """Fetches a file, unpacking it if necessary."""
+    if archive_type is None:
+      return self._select_file(supportdir, version, name, platform_dependent)
+    archiver = create_archiver(archive_type)
+    return self._select_archive(supportdir, version, name, platform_dependent, archiver)
+
+  def _select_file(self, supportdir, version, name, platform_dependent):
+    """Generates a path to request a file and fetches the file located at that path.
 
     :param string supportdir: The path the `name` binaries are stored under.
     :param string version: The version number of the binary to select.
-    :param string name: The name of the binary to fetch.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no binary of the given version
+    :param string name: The name of the file to fetch.
+    :param bool platform_dependent: Whether the file content differs depending
+      on the current platform.
+    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no file of the given version
       and name could be found for the current platform.
     """
-    # TODO(John Sirois): finish doc of the path structure expected under base_path.
-    binary_path = self._select_binary_base_path(supportdir, version, name)
+    binary_path = self._binary_path_to_fetch(supportdir, version, name, platform_dependent)
     return self._fetch_binary(name=name, binary_path=binary_path)
 
-  def _select_script(self, supportdir, version, name):
-    """Selects a platform-independent script.
+  def _select_archive(self, supportdir, version, name, platform_dependent, archiver):
+    """Generates a path to fetch, fetches the archive file, and unpacks the archive.
 
-    :param string supportdir: The path the `name` scripts are stored under.
-    :param string version: The version number of the script to select.
-    :param string name: The name of the script to fetch.
-    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no script of the given version
-      and name could be found.
+    :param string supportdir: The path the `name` binaries are stored under.
+    :param string version: The version number of the binary to select.
+    :param string name: The name of the file to fetch.
+    :param bool platform_dependent: Whether the file content differs depending
+      on the current platform.
+    :param archiver: The archiver object which provides the file extension and
+      unpacks the archive.
+    :type: :class:`pants.fs.archive.Archiver`
+    :raises: :class:`pants.binary_util.BinaryUtil.BinaryNotFound` if no file of the given version
+      and name could be found for the current platform.
     """
-    binary_path = os.path.join(supportdir, version, name)
-    return self._fetch_binary(name=name, binary_path=binary_path)
+    full_name = '{}.{}'.format(name, archiver.extension)
+    downloaded_file = self._select_file(supportdir, version, full_name, platform_dependent)
+    # Use filename without rightmost extension as the directory name.
+    unpacked_dirname, _ = os.path.splitext(downloaded_file)
+    if not os.path.exists(unpacked_dirname):
+      archiver.extract(downloaded_file, unpacked_dirname)
+    return unpacked_dirname
+
+  def _binary_path_to_fetch(self, supportdir, version, name, platform_dependent):
+    if platform_dependent:
+      # TODO(John Sirois): finish doc of the path structure expected under base_path.
+      return self._select_binary_base_path(supportdir, version, name)
+    return os.path.join(supportdir, version, name)
+
+  def select_binary(self, supportdir, version, name):
+    return self._select_file(
+      supportdir, version, name, platform_dependent=True)
+
+  def select_script(self, supportdir, version, name):
+    return self._select_file(
+      supportdir, version, name, platform_dependent=False)
 
   @contextmanager
   def _select_binary_stream(self, name, binary_path, fetcher=None):
-    """Select a binary matching the current os and architecture.
+    """Select a binary located at a given path.
 
     :param string binary_path: The path to the binary to fetch.
     :param fetcher: Optional argument used only for testing, to 'pretend' to open urls.
@@ -210,16 +238,38 @@ class BinaryUtil(object):
     bootstrap_dir = os.path.realpath(os.path.expanduser(self._pants_bootstrapdir))
     bootstrapped_binary_path = os.path.join(bootstrap_dir, binary_path)
     if not os.path.exists(bootstrapped_binary_path):
-      downloadpath = bootstrapped_binary_path + '~'
-      try:
+      with safe_concurrent_creation(bootstrapped_binary_path) as downloadpath:
         with self._select_binary_stream(name, binary_path) as stream:
           with safe_open(downloadpath, 'wb') as bootstrapped_binary:
             bootstrapped_binary.write(stream())
           os.rename(downloadpath, bootstrapped_binary_path)
           chmod_plus_x(bootstrapped_binary_path)
-      finally:
-        safe_delete(downloadpath)
 
     logger.debug('Selected {binary} binary bootstrapped to: {path}'
                  .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
+
+  @staticmethod
+  def _compare_file_checksums(filepath, checksum=None, digest=None):
+    digest = digest or hashlib.sha1()
+
+    if os.path.isfile(filepath) and checksum:
+      return hash_file(filepath, digest=digest) == checksum
+
+    return os.path.isfile(filepath)
+
+  def is_bin_valid(self, basepath, binary_file_specs=()):
+    """Check if this bin path is valid.
+
+    :param string basepath: The absolute path where the binaries are stored under.
+    :param BinaryFileSpec[] binary_file_specs: List of filenames and checksum for validation.
+    """
+    if not os.path.isdir(basepath):
+      return False
+
+    for f in binary_file_specs:
+      filepath = os.path.join(basepath, f.filename)
+      if not self._compare_file_checksums(filepath, f.checksum, f.digest):
+        return False
+
+    return True

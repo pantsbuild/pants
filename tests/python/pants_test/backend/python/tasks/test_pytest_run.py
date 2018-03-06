@@ -9,6 +9,7 @@ import os
 from textwrap import dedent
 
 import coverage
+from six.moves import configparser
 
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
@@ -18,9 +19,12 @@ from pants.backend.python.tasks.pytest_run import PytestResult, PytestRun
 from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.exceptions import ErrorWhileTesting, TaskError
-from pants.util.contextutil import pushd, temporary_dir
+from pants.build_graph.target import Target
+from pants.source.source_root import SourceRootConfig
+from pants.util.contextutil import pushd, temporary_dir, temporary_file
 from pants.util.dirutil import safe_mkdtemp, safe_rmtree
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
+from pants_test.subsystem.subsystem_util import init_subsystem
 from pants_test.tasks.task_test_base import ensure_cached
 
 
@@ -35,12 +39,14 @@ class PytestTestBase(PythonTaskTestBase):
     """Run the tests in the specified targets, with the specified PytestRun task options."""
     context = self._prepare_test_run(targets, *passthru_args, **options)
     self._do_run_tests(context)
+    return context
 
   def run_failing_tests(self, targets, failed_targets, *passthru_args, **options):
     context = self._prepare_test_run(targets, *passthru_args, **options)
     with self.assertRaises(ErrorWhileTesting) as cm:
       self._do_run_tests(context)
     self.assertEqual(set(failed_targets), set(cm.exception.failed_targets))
+    return context
 
   def try_run_tests(self, targets, *passthru_args, **options):
     try:
@@ -430,28 +436,62 @@ class PytestTest(PytestTestBase):
   def coverage_data_file(self):
     return os.path.join(self.build_root, '.coverage')
 
-  def load_coverage_data(self):
+  def load_coverage_data(self, context, expect_coverage=True):
     path = os.path.join(self.build_root, 'lib', 'core.py')
-    return self.load_coverage_data_for(path)
+    return self.load_coverage_data_for(context, path, expect_coverage=expect_coverage)
 
-  def load_coverage_data_for(self, covered_path):
+  def load_coverage_data_for(self, context, covered_path, expect_coverage=True):
     data_file = self.coverage_data_file()
-    self.assertTrue(os.path.isfile(data_file))
-    coverage_data = coverage.coverage(data_file=data_file)
-    coverage_data.load()
-    _, all_statements, not_run_statements, _ = coverage_data.analysis(covered_path)
-    return all_statements, not_run_statements
+    self.assertEqual(expect_coverage, os.path.isfile(data_file))
+    if expect_coverage:
+      python_sources = context.products.get_data(GatherSources.PYTHON_SOURCES)
+      covered_relpath = os.path.relpath(covered_path, self.build_root)
+      owning_targets = [t for t in context.targets()
+                        if covered_relpath in t.sources_relative_to_buildroot()]
+      self.assertEqual(1, len(owning_targets))
+      owning_target = owning_targets[0]
 
-  def run_coverage_auto(self, targets, failed_targets=None):
+      src_chroot_path = python_sources.path()
+      src_root_abspath = os.path.join(self.build_root, owning_target.target_base)
+      covered_src_root_relpath = os.path.relpath(covered_path, src_root_abspath)
+      chroot_path = os.path.join(src_chroot_path, covered_src_root_relpath)
+
+      cp = configparser.SafeConfigParser()
+      src_to_target_base = {src: tgt.target_base
+                            for tgt in context.targets()
+                            for src in tgt.sources_relative_to_source_root()}
+
+      PytestRun._add_plugin_config(cp,
+                                   src_chroot_path=src_chroot_path,
+                                   src_to_target_base=src_to_target_base)
+      with temporary_file() as fp:
+        cp.write(fp)
+        fp.close()
+
+        coverage_data = coverage.coverage(config_file=fp.name, data_file=data_file)
+        coverage_data.load()
+
+      _, all_statements, not_run_statements, _ = coverage_data.analysis(chroot_path)
+      return all_statements, not_run_statements
+
+  def run_coverage_auto(self,
+                        targets,
+                        failed_targets=None,
+                        expect_coverage=True,
+                        covered_path=None):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
     simple_coverage_kwargs = {'coverage': 'auto'}
     if failed_targets:
-      self.run_failing_tests(targets=targets,
-                             failed_targets=failed_targets,
-                             **simple_coverage_kwargs)
+      context = self.run_failing_tests(targets=targets,
+                                       failed_targets=failed_targets,
+                                       **simple_coverage_kwargs)
     else:
-      self.run_tests(targets=targets, **simple_coverage_kwargs)
-    return self.load_coverage_data()
+      context = self.run_tests(targets=targets, **simple_coverage_kwargs)
+
+    if covered_path:
+      return self.load_coverage_data_for(context, covered_path, expect_coverage=expect_coverage)
+    else:
+      return self.load_coverage_data(context, expect_coverage=expect_coverage)
 
   @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option_green(self):
@@ -480,23 +520,94 @@ class PytestTest(PytestTestBase):
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
-  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
+  def test_coverage_auto_option_no_explicit_coverage(self):
+    init_subsystem(Target.Arguments)
+    init_subsystem(SourceRootConfig)
+
+    self.create_file(
+      'src/python/util/math.py',
+      dedent("""
+          def one():  # line 1
+            return 1  # line 2
+        """).strip())
+    util = self.make_target(spec='src/python/util',
+                            target_type=PythonLibrary)
+
+    self.create_file(
+      'test/python/util/test_math.py',
+      dedent("""
+          import unittest
+
+          from util import math
+
+          class MathTest(unittest.TestCase):
+            def test_one(self):
+              self.assertEqual(1, math.one())
+        """))
+    test = self.make_target(spec='test/python/util',
+                            target_type=PythonTests,
+                            dependencies=[util])
+    covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
+
+    all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
+                                                                covered_path=covered_path)
+    self.assertEqual([1, 2], all_statements)
+    self.assertEqual([], not_run_statements)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=1)
   def test_coverage_auto_option_no_explicit_coverage_idiosyncratic_layout(self):
     # The all target has no coverage attribute and the code under test does not follow the
-    # auto-discover pattern so we should get no coverage.
-    all_statements, not_run_statements = self.run_coverage_auto(targets=[self.all],
-                                                                failed_targets=[self.all])
-    self.assertEqual([1, 2, 5, 6], all_statements)
-    self.assertEqual([1, 2, 5, 6], not_run_statements)
+    # auto-discover (parallel packages) pattern so we should get no coverage.
+    init_subsystem(Target.Arguments)
+    init_subsystem(SourceRootConfig)
+
+    self.create_file(
+      'src/python/util/math.py',
+      dedent("""
+          def one():  # line 1
+            return 1  # line 2
+        """).strip())
+    util = self.make_target(spec='src/python/util',
+                            target_type=PythonLibrary)
+
+    self.create_file(
+      'test/python/util_tests/test_math.py',
+      dedent("""
+          import unittest
+
+          from util import math
+
+          class MathTest(unittest.TestCase):
+            def test_one(self):
+              self.assertEqual(1, math.one())
+        """))
+    test = self.make_target(spec='test/python/util_tests',
+                            target_type=PythonTests,
+                            dependencies=[util])
+    covered_path = os.path.join(self.build_root, 'src/python/util/math.py')
+    all_statements, not_run_statements = self.run_coverage_auto(targets=[test],
+                                                                covered_path=covered_path)
+    self.assertEqual([1, 2], all_statements)
+    self.assertEqual([1, 2], not_run_statements)
+
+  @ensure_cached(PytestRun, expected_num_artifacts=0)
+  def test_coverage_auto_option_no_explicit_coverage_idiosyncratic_layout_no_packages(self):
+    # The all target has no coverage attribute and the code under test does not follow the
+    # auto-discover pattern so we should get no coverage. Additionally, the all target sources
+    # live in the root package (they are top-level files); so they don't even have a package to use
+    # to guess the code under test with; as such, we should not specify and coverage sources at all,
+    # short-circuiting coverage.
+    self.run_coverage_auto(targets=[self.all], failed_targets=[self.all], expect_coverage=False)
 
   @ensure_cached(PytestRun, expected_num_artifacts=0)
   def test_coverage_modules_dne_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
     # Explicit modules should trump .coverage.
-    self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
-                           coverage='does_not_exist,nor_does_this')
-    all_statements, not_run_statements = self.load_coverage_data()
+    context = self.run_failing_tests(targets=[self.green, self.red], failed_targets=[self.red],
+                                     coverage='does_not_exist,nor_does_this')
+    all_statements, not_run_statements = self.load_coverage_data(context)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([1, 2, 5, 6], not_run_statements)
 
@@ -504,8 +615,8 @@ class PytestTest(PytestTestBase):
   def test_coverage_modules_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='core')
-    all_statements, not_run_statements = self.load_coverage_data()
+    context = self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='core')
+    all_statements, not_run_statements = self.load_coverage_data(context)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
@@ -513,8 +624,8 @@ class PytestTest(PytestTestBase):
   def test_coverage_paths_option(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='lib/')
-    all_statements, not_run_statements = self.load_coverage_data()
+    context = self.run_failing_tests(targets=[self.all], failed_targets=[self.all], coverage='lib/')
+    all_statements, not_run_statements = self.load_coverage_data(context)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([], not_run_statements)
 
@@ -522,10 +633,10 @@ class PytestTest(PytestTestBase):
   def test_coverage_issue_5314_primary_source_root(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_tests(targets=[self.app], coverage='app')
+    context = self.run_tests(targets=[self.app], coverage='app')
 
     app_path = os.path.join(self.build_root, 'app', 'app.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(app_path)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, app_path)
     self.assertEqual([1, 4, 5], all_statements)
     self.assertEqual([], not_run_statements)
 
@@ -533,10 +644,10 @@ class PytestTest(PytestTestBase):
   def test_coverage_issue_5314_secondary_source_root(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_tests(targets=[self.app], coverage='core')
+    context = self.run_tests(targets=[self.app], coverage='core')
 
     core_path = os.path.join(self.build_root, 'lib', 'core.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(core_path)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, core_path)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([2], not_run_statements)
 
@@ -544,15 +655,15 @@ class PytestTest(PytestTestBase):
   def test_coverage_issue_5314_all_source_roots(self):
     self.assertFalse(os.path.isfile(self.coverage_data_file()))
 
-    self.run_tests(targets=[self.app], coverage='app,core')
+    context = self.run_tests(targets=[self.app], coverage='app,core')
 
     app_path = os.path.join(self.build_root, 'app', 'app.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(app_path)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, app_path)
     self.assertEqual([1, 4, 5], all_statements)
     self.assertEqual([], not_run_statements)
 
     core_path = os.path.join(self.build_root, 'lib', 'core.py')
-    all_statements, not_run_statements = self.load_coverage_data_for(core_path)
+    all_statements, not_run_statements = self.load_coverage_data_for(context, core_path)
     self.assertEqual([1, 2, 5, 6], all_statements)
     self.assertEqual([2], not_run_statements)
 

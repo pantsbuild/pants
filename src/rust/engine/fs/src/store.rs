@@ -5,7 +5,9 @@ use futures::{Future, future};
 use hashing::Digest;
 use protobuf::core::Message;
 use std::collections::HashMap;
-use std::path::Path;
+use std::fs::File;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -356,6 +358,65 @@ impl Store {
           return future::err(format!("Could not expand unknown directory: {:?}", digest))
             .to_boxed() as BoxFuture<_, _>
         }
+      })
+      .to_boxed()
+  }
+
+  pub fn materialize_directory(
+    &self,
+    destination: PathBuf,
+    digest: Digest,
+  ) -> BoxFuture<(), String> {
+    match super::safe_create_dir_all(&destination) {
+      Ok(()) => {}
+      Err(e) => return future::err(e).to_boxed(),
+    };
+    let store = self.clone();
+    self
+      .load_directory(digest)
+      .and_then(move |directory_opt| {
+        directory_opt.ok_or_else(|| format!("Directory with digest {:?} not found", digest))
+      })
+      .and_then(move |directory| {
+        let file_futures = directory
+          .get_files()
+          .iter()
+          .map(|file_node| {
+            let store = store.clone();
+            let path = destination.join(file_node.get_name());
+            let digest = file_node.get_digest().into();
+            store.materialize_file(path, digest)
+          })
+          .collect::<Vec<_>>();
+        let directory_futures = directory
+          .get_directories()
+          .iter()
+          .map(|directory_node| {
+            let store = store.clone();
+            let path = destination.join(directory_node.get_name());
+            let digest = directory_node.get_digest().into();
+            store.materialize_directory(path, digest)
+          })
+          .collect::<Vec<_>>();
+        future::join_all(file_futures)
+          .join(future::join_all(directory_futures))
+          .map(|_| ())
+      })
+      .to_boxed()
+  }
+
+  fn materialize_file(&self, destination: PathBuf, digest: Digest) -> BoxFuture<(), String> {
+    self
+      .load_file_bytes_with(digest, move |bytes| {
+        File::create(&destination)
+          .and_then(|mut f| f.write_all(&bytes))
+          .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
+      })
+      .map_err(|e| e.into())
+      .and_then(move |write_result| match write_result {
+        Some(Ok(())) => Ok(()),
+        Some(Err(e)) => Err(e.into()),
+        None => Err(format!("File with digest {:?} not found", digest)),
       })
       .to_boxed()
   }
@@ -1127,6 +1188,7 @@ mod local {
       // Whether the unleased file is present is undefined.
     }
 
+    #[test]
     fn entry_type_for_file() {
       let dir = TempDir::new("store").unwrap();
       let store = new_store(dir.path());
@@ -1621,7 +1683,9 @@ mod tests {
   use pool::ResettablePool;
   use protobuf::Message;
   use sha2::Sha256;
+  use std;
   use std::collections::HashMap;
+  use std::io::Read;
   use std::path::Path;
   use std::sync::Arc;
   use std::time::Duration;
@@ -1747,6 +1811,10 @@ f41e9443e961b5127998715a526051f9";
         .expect("Error serializing proto")
         .len(),
     )
+  }
+
+  pub fn catnip_bytes() -> Bytes {
+    Bytes::from("catnip".as_bytes())
   }
 
   pub fn catnip_fingerprint() -> Fingerprint {
@@ -2229,5 +2297,115 @@ f41e9443e961b5127998715a526051f9";
       format!("Failed to upload digest {:?}: Not found", digest()),
       "Bad error message"
     );
+  }
+
+  #[test]
+  fn materialize_missing_file() {
+    let materialize_dir = TempDir::new("materialize").unwrap();
+    let file = materialize_dir.path().join("file");
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+      .materialize_file(file.clone(), digest())
+      .wait()
+      .expect_err("Want unknown digest error");
+  }
+
+  #[test]
+  fn materialize_file() {
+    let materialize_dir = TempDir::new("materialize").unwrap();
+    let file = materialize_dir.path().join("file");
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store.store_file_bytes(str_bytes(), false).wait().expect(
+      "Error saving bytes",
+    );
+    store
+      .materialize_file(file.clone(), digest())
+      .wait()
+      .expect("Error materializing file");
+    assert_eq!(file_contents(&file), str_bytes());
+  }
+
+  #[test]
+  fn materialize_missing_directory() {
+    let materialize_dir = TempDir::new("materialize").unwrap();
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+      .materialize_directory(
+        materialize_dir.path().to_owned(),
+        recursive_directory_digest(),
+      )
+      .wait()
+      .expect_err("Want unknown digest error");
+  }
+
+  #[test]
+  fn materialize_directory() {
+    let materialize_dir = TempDir::new("materialize").unwrap();
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+      .record_directory(&recursive_directory(), false)
+      .wait()
+      .expect("Error saving recursive Directory");
+    store.record_directory(&directory(), false).wait().expect(
+      "Error saving Directory",
+    );
+    store.store_file_bytes(str_bytes(), false).wait().expect(
+      "Error saving file bytes",
+    );
+    store
+      .store_file_bytes(catnip_bytes(), false)
+      .wait()
+      .expect("Error saving catnip file bytes");
+
+    store
+      .materialize_directory(
+        materialize_dir.path().to_owned(),
+        recursive_directory_digest(),
+      )
+      .wait()
+      .expect("Error materializing");
+
+    assert_eq!(list_dir(materialize_dir.path()), vec!["cats", "treats"]);
+    assert_eq!(
+      file_contents(&materialize_dir.path().join("treats")),
+      catnip_bytes()
+    );
+    assert_eq!(
+      list_dir(&materialize_dir.path().join("cats")),
+      vec!["roland"]
+    );
+    assert_eq!(
+      file_contents(&materialize_dir.path().join("cats").join("roland")),
+      str_bytes()
+    );
+  }
+
+  fn list_dir(path: &Path) -> Vec<String> {
+    std::fs::read_dir(path)
+      .expect("Listing dir")
+      .map(|entry| {
+        entry
+          .expect("Error reading entry")
+          .file_name()
+          .to_string_lossy()
+          .to_string()
+      })
+      .collect()
+  }
+
+  fn file_contents(path: &Path) -> Bytes {
+    let mut contents = Vec::new();
+    std::fs::File::open(path)
+      .and_then(|mut f| f.read_to_end(&mut contents))
+      .expect("Error reading file");
+    Bytes::from(contents)
   }
 }

@@ -7,26 +7,29 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
-from pants.util.memo import memoized_method
+from pants.util.memo import memoized_method, memoized_property
 
 
 class BinaryToolBase(Subsystem):
   """Base class for subsytems that configure binary tools.
 
-  Typically, a specific subclass is created via create_binary_tool_subsystem_cls() below.
-  That subclass can be further subclassed, manually, e.g., to add any extra options.
+  Subclasses can be further subclassed, manually, e.g., to add any extra options.
 
   :API: public
   """
   # Subclasses must set these to appropriate values for the tool they define.
   # They must also set options_scope appropriately.
-  support_dir = None
   platform_dependent = None
+  archive_type = None  # See pants.fs.archive.archive for valid string values.
   default_version = None
 
   # Subclasses may set this to the tool name as understood by BinaryUtil.
   # If unset, it defaults to the value of options_scope.
   name = None
+
+  # Subclasses may set this to a suffix (e.g., '.pex') to add to the computed remote path.
+  # Note that setting archive_type will add an appropriate archive suffix after this suffix.
+  suffix = ''
 
   # Subclasses may set these to effect migration from an old --version option to this one.
   # TODO(benjy): Remove these after migration to the mixin is complete.
@@ -60,6 +63,7 @@ class BinaryToolBase(Subsystem):
       version_registration_kwargs['fingerprint'] = True
     register('--version', **version_registration_kwargs)
 
+  @memoized_method
   def select(self, context=None):
     """Returns the path to the specified binary tool.
 
@@ -70,18 +74,42 @@ class BinaryToolBase(Subsystem):
 
     :API: public
     """
-    version = self.get_options().version
+    return self._select_for_version(self.version(context))
+
+  @memoized_method
+  def version(self, context=None):
+    """Returns the version of the specified binary tool.
+
+    If replaces_scope and replaces_name are defined, then the caller must pass in
+    a context, otherwise no context should be passed.
+
+    # TODO: Once we're migrated, get rid of the context arg.
+
+    :API: public
+    """
     if self.replaces_scope and self.replaces_name:
       # If the old option is provided explicitly, let it take precedence.
       old_opts = context.options.for_scope(self.replaces_scope)
       if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
-        version = old_opts.get(self.replaces_name)
-    return self._select_for_version(version)
+        return old_opts.get(self.replaces_name)
+    return self.get_options().version
+
+  @memoized_property
+  def _binary_util(self):
+    return BinaryUtil.Factory.create()
+
+  @classmethod
+  def get_support_dir(cls):
+    return 'bin/{}'.format(cls._get_name())
 
   @memoized_method
   def _select_for_version(self, version):
-    return BinaryUtil.Factory.create().select(
-      self.support_dir, version, self._get_name(), self.platform_dependent)
+    return self._binary_util.select(
+      supportdir=self.get_support_dir(),
+      version=version,
+      name='{}{}'.format(self._get_name(), self.suffix),
+      platform_dependent=self.platform_dependent,
+      archive_type=self.archive_type)
 
   @classmethod
   def _get_name(cls):
