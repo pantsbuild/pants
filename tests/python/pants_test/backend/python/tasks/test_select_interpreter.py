@@ -103,3 +103,23 @@ class SelectInterpreterTest(TaskTestBase):
                              dependencies=[self.tgt3], sources=['foo/bar/baz.py'])
     self.assertEquals('FakePython-2.99.999',
                       self._select_interpreter([tgtb], should_invalidate=False))
+
+  def test_compatibility_AND(self):
+    tgt = self._fake_target('tgt5', compatibility=['FakePython>2.77.777,<2.99.999'])
+    self.assertEquals('FakePython-2.88.888', self._select_interpreter([tgt]))
+
+  def test_compatibility_AND_impossible(self):
+    tgt = self._fake_target('tgt5', compatibility=['FakePython>2.77.777,<2.88.888'])
+
+    with self.assertRaises(PythonInterpreterCache.UnsatisfiableInterpreterConstraintsError):
+      self._select_interpreter([tgt])
+
+  def test_compatibility_OR(self):
+    tgt = self._fake_target('tgt6', compatibility=['FakePython>2.88.888', 'FakePython<2.7'])
+    self.assertEquals('FakePython-2.99.999', self._select_interpreter([tgt]))
+
+  def test_compatibility_OR_impossible(self):
+    tgt = self._fake_target('tgt6', compatibility=['FakePython>2.99.999', 'FakePython<2.77.777'])
+
+    with self.assertRaises(PythonInterpreterCache.UnsatisfiableInterpreterConstraintsError):
+      self._select_interpreter([tgt])
