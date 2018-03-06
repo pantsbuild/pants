@@ -198,6 +198,18 @@ function pkg_avro_install_test() {
     --explain gen | grep "avro-java" &> /dev/null
 }
 
+PKG_THRIFTY=(
+  "pantsbuild.pants.contrib.thrifty"
+  "//contrib/thrifty/src/python/pants/contrib/thrifty:plugin"
+  "pkg_thrifty_install_test"
+)
+function pkg_thrifty_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.thrifty==${version}']" \
+    --explain gen | grep "thrifty" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -215,4 +227,5 @@ CONTRIB_PACKAGES=(
   PKG_JAXWS
   PKG_MYPY
   PKG_AVRO
+  PKG_THRIFTY
 )
