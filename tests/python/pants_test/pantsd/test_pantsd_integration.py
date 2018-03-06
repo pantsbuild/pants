@@ -33,7 +33,7 @@ class PantsDaemonMonitor(ProcessManager):
       'PantsDaemonMonitor: pid is {} is_alive={}'.format(self._pid, self.is_alive()))
     )
 
-  def await_pantsd(self, timeout=3):
+  def assert_started(self, timeout=.1):
     self._process = None
     self._pid = self.await_pid(timeout)
     self.assert_running()
@@ -64,6 +64,10 @@ def read_pantsd_log(workdir):
       yield line.strip()
 
 
+def full_pantsd_log(workdir):
+  return '\n'.join(read_pantsd_log(workdir))
+
+
 def launch_file_toucher(f):
   """Launch a loop to touch the given file, and return a function to call to stop and join it."""
   executor = ThreadPoolExecutor(max_workers=1)
@@ -85,21 +89,21 @@ def launch_file_toucher(f):
 
 class TestPantsDaemonIntegration(PantsRunIntegrationTest):
   @contextmanager
-  def pantsd_test_context(self, log_level='info'):
+  def pantsd_test_context(self, log_level='info', extra_config=None):
     with no_lingering_process_by_command('pantsd-runner'):
       with self.temporary_workdir() as workdir_base:
         pid_dir = os.path.join(workdir_base, '.pids')
         workdir = os.path.join(workdir_base, '.workdir.pants.d')
         print('\npantsd log is {}/pantsd/pantsd.log'.format(workdir))
         pantsd_config = {
-          'GLOBAL': {
+          'GLOBAL': combined_dict({
             'enable_pantsd': True,
             # The absolute paths in CI can exceed the UNIX socket path limitation
             # (>104-108 characters), so we override that here with a shorter path.
             'watchman_socket_path': '/tmp/watchman.{}.sock'.format(os.getpid()),
             'level': log_level,
             'pants_subprocessdir': pid_dir
-          }
+          }, extra_config or {})
         }
         checker = PantsDaemonMonitor(pid_dir)
         self.assert_success_runner(workdir, pantsd_config, ['kill-pantsd'])
@@ -114,8 +118,8 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
           checker.assert_stopped()
 
   @contextmanager
-  def pantsd_successful_run_context(self, log_level='info'):
-    with self.pantsd_test_context(log_level) as (workdir, pantsd_config, checker):
+  def pantsd_successful_run_context(self, log_level='info', extra_config=None):
+    with self.pantsd_test_context(log_level, extra_config) as (workdir, pantsd_config, checker):
       yield (
         functools.partial(
           self.assert_success_runner,
@@ -162,12 +166,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _):
       # This tests a deeper pantsd-based run by actually invoking a full compile.
       pantsd_run(['compile', 'examples/src/scala/org/pantsbuild/example/hello/welcome'])
-      checker.await_pantsd()
+      checker.assert_started()
 
   def test_pantsd_run(self):
     with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, workdir):
       pantsd_run(['list', '3rdparty:'])
-      checker.await_pantsd()
+      checker.assert_started()
 
       pantsd_run(['list', ':'])
       checker.assert_running()
@@ -191,12 +195,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     with self.pantsd_test_context() as (workdir, pantsd_config, checker):
       run = self.run_pants_with_workdir('help | head -1', workdir, pantsd_config, shell=True)
       self.assertNotIn('broken pipe', run.stderr_data.lower())
-      checker.await_pantsd()
+      checker.assert_started()
 
   def test_pantsd_stacktrace_dump(self):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
       pantsd_run(['help'])
-      checker.await_pantsd()
+      checker.assert_started()
 
       os.kill(checker.pid, signal.SIGUSR2)
 
@@ -216,7 +220,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
             workdir,
             pantsd_config)
         )
-        checker.await_pantsd()
+        checker.assert_started()
 
         # Assert pantsd is in a good functional state.
         self.assert_success(self.run_pants_with_workdir(['help'], workdir, pantsd_config))
@@ -235,7 +239,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       for cmd in itertools.chain(*itertools.repeat(variants, 3)):
         # Run with a CLI flag.
         pantsd_run(['-l{}'.format(cmd[0]), cmd[1]])
-        next_pid = checker.await_pantsd()
+        next_pid = checker.assert_started()
         if last_pid is not None:
           self.assertNotEqual(last_pid, next_pid)
         last_pid = next_pid
@@ -255,7 +259,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       for cmd in itertools.chain(*itertools.repeat(variants, 3)):
         # Run with a CLI flag.
         pantsd_run(cmd)
-        next_pid = checker.await_pantsd()
+        next_pid = checker.assert_started()
         if last_pid is not None:
           self.assertEqual(last_pid, next_pid)
         last_pid = next_pid
@@ -280,12 +284,12 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         for cmd in itertools.chain(*itertools.repeat(variants, 2)):
           pantsd_run(cmd)
           if not pantsd_pid:
-            pantsd_pid = checker.await_pantsd()
+            pantsd_pid = checker.assert_started()
           else:
             checker.assert_running()
 
         pantsd_run(['--pants-config-files={}'.format(invalidating_config), 'help'])
-        self.assertNotEqual(pantsd_pid, checker.await_pantsd())
+        self.assertNotEqual(pantsd_pid, checker.assert_started())
 
   def test_pantsd_stray_runners(self):
     # Allow env var overrides for local stress testing.
@@ -295,7 +299,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     with no_lingering_process_by_command('pantsd-runner'):
       with self.pantsd_successful_run_context('debug') as (pantsd_run, checker, _):
         pantsd_run(cmd)
-        checker.await_pantsd()
+        checker.assert_started()
         for _ in range(attempts):
           pantsd_run(cmd)
           checker.assert_running()
@@ -317,7 +321,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
 
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
       daemon_runs = [pantsd_run(cmd) for cmd in cmds]
-      checker.await_pantsd()
+      checker.assert_started()
 
     for cmd, run in zip(cmds, daemon_runs):
       self.assertEqual(run.stderr_data.strip(), '', 'Non-empty stderr for {}'.format(cmd))
@@ -331,7 +335,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
       cmd = ['list', '::']
       pantsd_run(cmd)
-      checker.await_pantsd()
+      checker.assert_started()
 
       # Launch a separate thread to poke files in 3rdparty.
       join = launch_file_toucher('3rdparty/BUILD')
@@ -348,7 +352,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
     with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
       # First, launch the daemon without any local env vars set.
       pantsd_run(['help'])
-      checker.await_pantsd()
+      checker.assert_started()
 
       # Then, set an env var on the secondary call.
       with environment_as(TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST=EXPECTED_VALUE):
@@ -372,7 +376,7 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
             workdir,
             pantsd_config)
         )
-        checker.await_pantsd()
+        checker.assert_started()
 
       self.assert_failure(
         self.run_pants_with_workdir(
@@ -382,3 +386,27 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
         )
       )
       checker.assert_running()
+
+  def test_pantsd_invalidation_file_tracking(self):
+    test_file = 'testprojects/src/python/print_env/main.py'
+    config = {'pantsd_invalidation_globs': '["testprojects/src/python/print_env/*"]'}
+    with self.pantsd_successful_run_context(extra_config=config) as (pantsd_run, checker, workdir):
+      pantsd_run(['help'])
+      checker.assert_started()
+
+      # Let any fs events quiesce.
+      time.sleep(5)
+
+      # Check the logs.
+      self.assertRegexpMatches(
+        full_pantsd_log(workdir),
+        r'watching invalidating files:.*{}'.format(test_file)
+      )
+
+      checker.assert_running()
+      touch(test_file)
+      # Permit ample time for the async file event propagate in CI.
+      time.sleep(10)
+      checker.assert_stopped()
+
+      self.assertIn('saw file events covered by invalidation globs', full_pantsd_log(workdir))
