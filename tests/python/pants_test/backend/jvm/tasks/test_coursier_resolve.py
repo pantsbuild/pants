@@ -79,7 +79,9 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       )
       task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True)
 
-      self.assertEquals(2, len(compile_classpath.get_for_target(jar_lib)))
+      # Both javadoc and sources jars are added to the classpath product
+      self.assertEquals(['default', 'src_doc', 'src_doc'],
+       sorted([c[0] for c in compile_classpath.get_for_target(jar_lib)]))
       self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
 
   def test_resolve_conflicted(self):
