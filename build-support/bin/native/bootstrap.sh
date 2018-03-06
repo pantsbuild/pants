@@ -92,6 +92,7 @@ function ensure_native_build_prerequisites() {
   # Make sure rust is pinned at the correct version.
   # We sincerely hope that no one ever runs `rustup override set` in a subdirectory of the working directory.
   "${CARGO_HOME}/bin/rustup" override set "${RUST_TOOLCHAIN}" >&2
+  "${CARGO_HOME}/bin/rustup" component add rustfmt-preview >&2
 
   # Sometimes fetching a large git repo dependency can take more than 10 minutes.
   # This times out on travis, because nothing is printed to stdout/stderr in that time.
@@ -108,7 +109,6 @@ function ensure_native_build_prerequisites() {
   "${CARGO_HOME}/bin/cargo" ensure-installed --package=cargo-ensure-installed --version=0.1.0 >&2
   "${CARGO_HOME}/bin/cargo" ensure-installed --package=protobuf --version=1.4.2 >&2
   "${CARGO_HOME}/bin/cargo" ensure-installed --package=grpcio-compiler --version=0.2.0 >&2
-  "${CARGO_HOME}/bin/cargo" ensure-installed --package=rustfmt --version=0.9.0 >&2
 
   local download_binary="${REPO_ROOT}/build-support/bin/download_binary.sh"
   local readonly cmakeroot="$("${download_binary}" "binaries.pantsbuild.org" "cmake" "3.9.5" "cmake.tar.gz")" || die "Failed to fetch cmake"
