@@ -36,7 +36,7 @@ class CoursierSubsystem(Subsystem):
     register('--fetch-options', type=list, fingerprint=True,
              help='Additional options to pass to coursier fetch. See `coursier fetch --help`')
     register('--bootstrap-jar-url', fingerprint=True,
-             default='https://www.dropbox.com/s/t8zz2nupqkv2sfv/coursier-cli-1.0.0.34602bb1b2f4188c8026b7f193735dbdf818cced.jar?dl=0',
+             default='https://dl.dropboxusercontent.com/s/t8zz2nupqkv2sfv/coursier-cli-1.0.0.34602bb1b2f4188c8026b7f193735dbdf818cced.jar?dl=0',
              help='Location to download a bootstrap version of Coursier.')
     # TODO(wisechengyi): currently using a custom url for fast iteration.
     # Once the coursier builds are stable, move the logic to binary_util. https://github.com/pantsbuild/pants/issues/5381
