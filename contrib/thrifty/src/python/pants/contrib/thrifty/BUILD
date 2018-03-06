@@ -15,4 +15,5 @@ contrib_plugin(
     'Topic :: Software Development :: Code Generators'
   ],
   register_goals=True,
+  build_file_aliases=True,
 )
