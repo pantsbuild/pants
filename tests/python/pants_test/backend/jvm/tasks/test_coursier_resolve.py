@@ -45,9 +45,6 @@ class CoursierResolveTest(JvmToolTaskTestBase):
                                read_from=None,
                                write_to=None)
     self.set_options_for_scope('resolver', resolver='coursier')
-    # TODO publish this
-    self.set_options_for_scope('coursier',
-                               bootstrap_jar_url='http://localhost:8000/dist/coursier-cli.jar')
 
   def resolve(self, targets):
     """Given some targets, execute a resolve, and return the resulting compile_classpath."""
