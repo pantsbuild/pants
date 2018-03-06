@@ -9,11 +9,12 @@ from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
 from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
+from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.java.jar.jar_dependency import JarDependency
 from pants.subsystem.subsystem import Subsystem
 
 
-class JUnit(JvmToolMixin, Subsystem):
+class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
   options_scope = 'junit'
 
   LIBRARY_REV = '4.12'

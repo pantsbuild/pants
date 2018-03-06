@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 
+from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.option.custom_types import target_option
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir
@@ -16,7 +17,7 @@ from pants.util.dirutil import safe_mkdir
 from pants.contrib.node.subsystems.resolvers.node_resolver_base import NodeResolverBase
 
 
-class ScalaJSPlatform(Subsystem, NodeResolverBase):
+class ScalaJSPlatform(InjectablesMixin, Subsystem, NodeResolverBase):
   """The scala.js platform."""
 
   options_scope = 'scala-js'
