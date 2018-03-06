@@ -19,7 +19,7 @@ from pants.pantsd.process_manager import (ProcessGroup, ProcessManager, ProcessM
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump
 from pants.util.process_handler import subprocess
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -31,7 +31,7 @@ def fake_process(**kwargs):
   return proc
 
 
-class TestProcessGroup(BaseTest):
+class TestProcessGroup(TestBase):
   def setUp(self):
     super(TestProcessGroup, self).setUp()
     self.pg = ProcessGroup('test', metadata_base_dir=self.subprocess_dir)
@@ -100,7 +100,7 @@ class TestProcessGroup(BaseTest):
         self.assertTrue('_test' in item.name)
 
 
-class TestProcessMetadataManager(BaseTest):
+class TestProcessMetadataManager(TestBase):
   NAME = '_test_'
   TEST_KEY = 'TEST'
   TEST_VALUE = '300'
@@ -181,7 +181,7 @@ class TestProcessMetadataManager(BaseTest):
     self.assertGreater(mock_rm.call_count, 0)
 
 
-class TestProcessManager(BaseTest):
+class TestProcessManager(TestBase):
   def setUp(self):
     super(TestProcessManager, self).setUp()
     # N.B. We pass in `metadata_base_dir` here because ProcessManager (itself a non-task/non-

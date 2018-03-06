@@ -103,7 +103,7 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/project_info/tasks:ide_gen',
     'src/python/pants/source',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 

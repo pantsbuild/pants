@@ -7,13 +7,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.scrooge.tasks.java_thrift_library_fingerprint_strategy import \
   JavaThriftLibraryFingerprintStrategy
 
 
-class JavaThriftLibraryFingerprintStrategyTest(BaseTest):
+class JavaThriftLibraryFingerprintStrategyTest(TestBase):
 
   options1 = {'compiler': 'scrooge',
               'language': 'java',

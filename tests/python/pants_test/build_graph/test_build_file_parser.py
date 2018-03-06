@@ -17,7 +17,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
 from pants.util.strutil import ensure_binary
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class ErrorTarget(Target):
@@ -25,7 +25,7 @@ class ErrorTarget(Target):
     assert False, "This fake target should never be initialized in this test!"
 
 
-class BaseTestWithParser(BaseTest):
+class BaseTestWithParser(TestBase):
   def setUp(self):
     super(BaseTestWithParser, self).setUp()
 

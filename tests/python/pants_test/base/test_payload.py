@@ -11,10 +11,10 @@ from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, Payload
 from pants.base.payload_field import PrimitiveField
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.wrapped_globs import Globs
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class PayloadTest(BaseTest):
+class PayloadTest(TestBase):
 
   @property
   def alias_groups(self):

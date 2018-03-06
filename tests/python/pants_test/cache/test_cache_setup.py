@@ -19,8 +19,8 @@ from pants.cache.restful_artifact_cache import RESTfulArtifactCache
 from pants.subsystem.subsystem import Subsystem
 from pants.task.task import Task
 from pants.util.contextutil import temporary_dir
-from pants_test.base_test import BaseTest
 from pants_test.option.util.fakes import create_options
+from pants_test.test_base import TestBase
 from pants_test.testutils.mock_logger import MockLogger
 
 
@@ -45,7 +45,7 @@ class MockPinger(object):
     return map(lambda host: (host, self._hosts_to_times.get(host, 9999)), hosts)
 
 
-class TestCacheSetup(BaseTest):
+class TestCacheSetup(TestBase):
 
   TEST_RESOLVED_FROM = 'http://test-resolver'
   LOCAL_URI = '/a/local/path'

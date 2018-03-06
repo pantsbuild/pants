@@ -14,7 +14,7 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec, RGlobs
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class DummyTarget(Target):
@@ -26,7 +26,7 @@ class DummyTarget(Target):
     super(DummyTarget, self).__init__(address=address, payload=payload, **kwargs)
 
 
-class FilesetRelPathWrapperTest(BaseTest):
+class FilesetRelPathWrapperTest(TestBase):
 
   @property
   def alias_groups(self):
@@ -222,7 +222,7 @@ class FilesetRelPathWrapperTest(BaseTest):
     self.assertEquals({'y/fleem.java', 'y/morx.java', 'foo.java'}, relative_sources)
 
 
-class FilesetWithSpecTest(BaseTest):
+class FilesetWithSpecTest(TestBase):
 
   def test_lazy_fileset_with_spec_fails_if_filespec_not_prefixed_by_relroot(self):
     with self.assertRaises(ValueError):

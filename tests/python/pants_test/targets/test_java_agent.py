@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from pants.backend.jvm.targets.java_agent import JavaAgent
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class JavaAgentTest(BaseTest):
+class JavaAgentTest(TestBase):
   @property
   def alias_groups(self):
     return BuildFileAliases(

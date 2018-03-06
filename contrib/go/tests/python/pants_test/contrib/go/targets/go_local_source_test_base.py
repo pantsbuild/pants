@@ -10,20 +10,20 @@ from textwrap import dedent
 
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.util.meta import AbstractClass
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.go.register import build_file_aliases
 
 
 class GoLocalSourceTestBase(AbstractClass):
-  # NB: We assume we're mixed into a BaseTest - we can't extend that directly or else unittest tries
+  # NB: We assume we're mixed into a TestBase - we can't extend that directly or else unittest tries
   # to run our test methods in the subclass (OK), and against us (not OK).
   # NB: We use aliases and BUILD files to test proper registration of anonymous targets and macros.
 
   @classmethod
   def setUpClass(cls):
-    if not issubclass(cls, BaseTest):
-      raise TypeError('Subclasses must mix in BaseTest')
+    if not issubclass(cls, TestBase):
+      raise TypeError('Subclasses must mix in TestBase')
     super(GoLocalSourceTestBase, cls).setUpClass()
 
   def setUp(self):

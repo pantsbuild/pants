@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.project_info.tasks.ide_gen import Project, SourceSet
 from pants.source.source_root import SourceRootConfig
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class IdeGenTest(BaseTest):
+class IdeGenTest(TestBase):
   def test_collapse_source_root(self):
     self.context(for_subsystems=[SourceRootConfig], options={
       SourceRootConfig.options_scope: {

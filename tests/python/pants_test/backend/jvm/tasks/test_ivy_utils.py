@@ -26,8 +26,8 @@ from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
-from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystem
+from pants_test.test_base import TestBase
 
 
 def coord(org, name, classifier=None, rev=None, ext=None):
@@ -43,7 +43,7 @@ def do_nothing(*args, **kwards):
   pass
 
 
-class IvyUtilsTestBase(BaseTest):
+class IvyUtilsTestBase(TestBase):
 
   @property
   def alias_groups(self):
@@ -586,7 +586,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
                                    ['default'], dir, 'another-hash-name')
 
 
-class IvyUtilsResolveStepsTest(BaseTest):
+class IvyUtilsResolveStepsTest(TestBase):
   def test_if_not_all_symlinked_files_exist_after_successful_resolve_fail(self):
     resolve = IvyResolveStep(
       ['default'],
@@ -634,7 +634,7 @@ class IvyUtilsResolveStepsTest(BaseTest):
     return os.path.join('tests/python/pants_test/backend/jvm/tasks', rel_path)
 
 
-class IvyFrozenResolutionTest(BaseTest):
+class IvyFrozenResolutionTest(TestBase):
 
   def test_spec_without_a_real_target(self):
     with temporary_file() as resolve_file:

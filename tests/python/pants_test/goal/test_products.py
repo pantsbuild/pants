@@ -12,10 +12,10 @@ from contextlib import contextmanager
 from pants.goal.products import MultipleRootedProducts, ProductError, Products
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class ProductsTest(BaseTest):
+class ProductsTest(TestBase):
   def setUp(self):
     super(ProductsTest, self).setUp()
     self.products = Products()

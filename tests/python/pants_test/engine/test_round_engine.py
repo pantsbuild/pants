@@ -9,11 +9,11 @@ import itertools
 
 from pants.engine.round_engine import RoundEngine
 from pants.task.task import Task
-from pants_test.base_test import BaseTest
 from pants_test.engine.base_engine_test import EngineTestBase
+from pants_test.test_base import TestBase
 
 
-class RoundEngineTest(EngineTestBase, BaseTest):
+class RoundEngineTest(EngineTestBase, TestBase):
   def setUp(self):
     super(RoundEngineTest, self).setUp()
 

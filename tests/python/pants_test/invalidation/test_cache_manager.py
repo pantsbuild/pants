@@ -12,10 +12,10 @@ import tempfile
 from pants.invalidation.build_invalidator import BuildInvalidator, CacheKeyGenerator
 from pants.invalidation.cache_manager import InvalidationCacheManager, VersionedTargetSet
 from pants.util.dirutil import safe_mkdir, safe_rmtree
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class InvalidationCacheManagerTest(BaseTest):
+class InvalidationCacheManagerTest(TestBase):
 
   @staticmethod
   def is_empty(dir_name):

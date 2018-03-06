@@ -7,7 +7,7 @@ python_tests(
   dependencies=[
     'contrib/go/src/python/pants/contrib/go/subsystems',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 

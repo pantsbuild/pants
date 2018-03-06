@@ -8,10 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from twitter.common.collections import OrderedSet
 
 from pants.goal.products import UnionProducts
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class UnionProductsTest(BaseTest):
+class UnionProductsTest(TestBase):
   def setUp(self):
     super(UnionProductsTest, self).setUp()
     self.products = UnionProducts()
