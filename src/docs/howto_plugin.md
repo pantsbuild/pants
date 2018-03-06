@@ -95,7 +95,7 @@ take a look at [`twitter/commons`](https://github.com/twitter/commons), especial
 The repo's [`pants.ini` file](https://github.com/twitter/commons/blob/32011ab5351fea23e8c70e24e752540b06d1389f/pants.ini) has a
 `backend_packages` entry listing the plugin packages (packages with `register.py` files):
 
-    :::python
+    :::ini
     [GLOBAL]
     pythonpath: [
         "%(buildroot)s/pants-plugins/src/python",
