@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
+import unittest
 from contextlib import contextmanager
 
 from mock import MagicMock
@@ -20,7 +21,6 @@ from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDepende
 from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
-
 from pants.base.exceptions import TaskError
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
@@ -101,6 +101,21 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     conf, path = winning_cp[0]
     self.assertEqual('default', conf)
     self.assertEqual('guava-16.0.1.jar', os.path.basename(path))
+
+  @unittest.expectedFailure
+  def test_resolve_ignores_jars_with_rev_left_off(self):
+    """If a resolve jar leaves off the rev, we're supposed to get the latest version,
+       but coursier doesn't currently support that.
+       https://github.com/coursier/coursier/issues/209
+    """
+    jar = JarDependency('com.google.guava', 'guava')
+    lib = self.make_target('//:b', JarLibrary, jars=[jar])
+
+    compile_classpath = self.resolve([lib])
+
+    lib_cp = compile_classpath.get_for_target(lib)
+
+    self.assertEqual(5, len(lib_cp))
 
   def test_resolve_multiple_artifacts(self):
     def coordinates_for(cp):

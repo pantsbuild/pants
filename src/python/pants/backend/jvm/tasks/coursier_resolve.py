@@ -7,6 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import hashlib
 import json
+import logging
 import os
 from collections import defaultdict
 
@@ -26,6 +27,9 @@ from pants.invalidation.cache_manager import VersionedTargetSet
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import safe_mkdir
+
+
+logger = logging.getLogger(__name__)
 
 
 def with_new_classifier(coord, classifier):
@@ -50,6 +54,10 @@ class CoursierMixin(NailgunTask):
   """
 
   RESULT_FILENAME = 'result'
+
+  @classmethod
+  def implementation_version(cls):
+    return super(CoursierMixin, cls).implementation_version() + [('CoursierMixin', 1)]
 
   @classmethod
   def subsystem_dependencies(cls):
@@ -362,7 +370,8 @@ class CoursierMixin(NailgunTask):
 
     # Dealing with intransitivity and forced versions.
     for j in jars:
-      if not j.rev:
+      if not j.rev: #TODO we should still resolve these right?
+        logger.warn('Coursier does not allow using latest as the revision: ignoring {}'.format(j.coordinate))
         continue
 
       module = j.coordinate.simple_coord
@@ -426,8 +435,9 @@ class CoursierMixin(NailgunTask):
 
     coord_to_resolved_jars = self._map_coord_to_resolved_jars(result, coursier_cache_path, pants_jar_path_base)
 
-    # Construct a map from org:name/classifier to the reconciled org:name:version coordinate
-    # This is used in cases where conflict_resolution doesn't have an entry, but should.
+    # Construct a map from org:name to the reconciled org:name:version coordinate
+    # This is used when there is won't be a conflict_resolution entry because the conflict
+    # was resolved in pants.
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
       m2coord = M2Coordinate.from_string(coord)
