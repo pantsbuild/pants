@@ -8,6 +8,12 @@ This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
 The fourth release candidate for the ``1.4.x`` stable branch.
 
+New Features
+~~~~~~~~~~~~
+
+* Thrifty support for pants (#5531)
+  `PR #5531 <https://github.com/pantsbuild/pants/pull/5531>`_
+
 Bugfixes
 ~~~~~~~~
 
