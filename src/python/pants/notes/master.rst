@@ -26,6 +26,37 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Cleanup v1 changed code. (#5572)
+  `PR #5572 <https://github.com/pantsbuild/pants/pull/5572>`_
+
+* Improve the performance of v2 changed. (#5571)
+  `PR #5571 <https://github.com/pantsbuild/pants/pull/5571>`_
+
+* Delete obsolete README. (#5573)
+  `PR #5573 <https://github.com/pantsbuild/pants/pull/5573>`_
+
+* Improve interpreter constraint tests and docs. (#5566)
+  `PR #5566 <https://github.com/pantsbuild/pants/pull/5566>`_
+
+* Engine is a workspace (#5555)
+  `PR #5555 <https://github.com/pantsbuild/pants/pull/5555>`_
+
+* Native engine is a stripped cdylib (#5557)
+  `PR #5557 <https://github.com/pantsbuild/pants/pull/5557>`_
+
+* Don't overwrite cffi files if they haven't changed (#5553)
+  `PR #5553 <https://github.com/pantsbuild/pants/pull/5553>`_
+
+* Don't install panic handler when RUST_BACKTRACE=1 (#5561)
+  `PR #5561 <https://github.com/pantsbuild/pants/pull/5561>`_
+
+* Only shift once, not twice (#5552)
+  `Issue #5551 <https://github.com/pantsbuild/pants/issues/5551>`_
+  `PR #5552 <https://github.com/pantsbuild/pants/pull/5552>`_
+
+* Prepare 1.4.0rc4 (#5569)
+  `PR #5569 <https://github.com/pantsbuild/pants/pull/5569>`_
+
 * Generate a single python source chroot. (#5535)
   `PR #5535 <https://github.com/pantsbuild/pants/pull/5535>`_
 
