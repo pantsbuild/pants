@@ -75,13 +75,16 @@ class EngineSourceMapper(SourceMapper):
     sources_set = set(sources)
     subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
 
+    # Uniqify all transitive hydrated targets.
+    hydrated_target_to_address = {}
     for hydrated_targets in self._scheduler.product_request(HydratedTargets, subjects):
       for hydrated_target in hydrated_targets.dependencies:
-        legacy_address = hydrated_target.adaptor.address
+        hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
 
-        # Handle BUILD files.
-        if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
+    for hydrated_target, legacy_address in hydrated_target_to_address.iteritems():
+      # Handle BUILD files.
+      if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
+        yield legacy_address
+      else:
+        if any(self._owns_source(source, hydrated_target) for source in sources_set):
           yield legacy_address
-        else:
-          if any(self._owns_source(source, hydrated_target) for source in sources_set):
-            yield legacy_address
