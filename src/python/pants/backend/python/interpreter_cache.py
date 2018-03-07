@@ -30,6 +30,10 @@ def _safe_link(src, dst):
 
 
 class PythonInterpreterCache(object):
+
+  class UnsatisfiableInterpreterConstraintsError(TaskError):
+    """Indicates a python interpreter matching given constraints could not be located."""
+
   @staticmethod
   def _matches(interpreter, filters):
     return any(interpreter.identity.matches(filt) for filt in filters)
@@ -88,9 +92,10 @@ class PythonInterpreterCache(object):
       unique_compatibilities = set(tuple(t.compatibility) for t in tgts_with_compatibilities)
       unique_compatibilities_strs = [','.join(x) for x in unique_compatibilities if x]
       tgts_with_compatibilities_strs = [t.address.spec for t in tgts_with_compatibilities]
-      raise TaskError('Unable to detect a suitable interpreter for compatibilities: {} '
-                      '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
-                                                         ', '.join(tgts_with_compatibilities_strs)))
+      raise self.UnsatisfiableInterpreterConstraintsError(
+        'Unable to detect a suitable interpreter for compatibilities: {} '
+        '(Conflicting targets: {})'.format(' && '.join(unique_compatibilities_strs),
+                                           ', '.join(tgts_with_compatibilities_strs)))
     # Return the lowest compatible interpreter.
     return min(allowed_interpreters)
 

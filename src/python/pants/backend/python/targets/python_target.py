@@ -43,10 +43,12 @@ class PythonTarget(Target):
     :param provides:
       The `setup_py <#setup_py>`_ to publish that represents this
       target outside the repo.
-    :param compatibility: either a string or list of strings that represents
-      interpreter compatibility for this target, using the Requirement-style
-      format, e.g. ``'CPython>=3', or just ['>=2.7','<3']`` for requirements
-      agnostic to interpreter class.
+    :param compatibility: either a string that represents interpreter compatibility for this target
+      using the Requirement-style format, e.g. ``'CPython>=2.7,<3'`` (Select a CPython interpreter
+      with version ``>=2.7`` AND version ``<3``) or a list of Requirement-style strings which will
+      be OR'ed together. If the compatibility requirement is agnostic to interpreter class, using
+      the example above, a Requirement-style compatibility constraint like '>=2.7,<3' (N.B.: not
+      prefixed with CPython) can be used.
     """
     self.address = address
     payload = payload or Payload()
