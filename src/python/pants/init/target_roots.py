@@ -44,7 +44,6 @@ class TargetRoots(object):
     :param string build_root: The build root.
     :param ChangeCalculator change_calculator: A `ChangeCalculator` for calculating changes.
     """
-
     # Determine the literal target roots.
     spec_roots = cls.parse_specs(options.target_specs, build_root)
 
@@ -52,7 +51,6 @@ class TargetRoots(object):
     # initialization paths.
     changed_options = options.for_scope('changed')
     changed_request = ChangedRequest.from_options(changed_options)
-
 
     logger.debug('spec_roots are: %s', spec_roots)
     logger.debug('changed_request is: %s', changed_request)

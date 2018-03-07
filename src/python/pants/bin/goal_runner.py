@@ -220,7 +220,7 @@ class GoalRunner(object):
       Reporting,
       Reproducer,
       RunTracker,
-      Changed.Factory,
+      Changed,
       BinaryUtil.Factory,
       Subprocess.Factory
     }

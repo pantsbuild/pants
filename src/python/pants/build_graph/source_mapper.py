@@ -18,6 +18,8 @@ class SourceMapper(object):
     raise NotImplementedError
 
 
+# TODO: Kill this in favor of `EngineSourceMapper` once pants/backend/graph_info/tasks/list_owners.py
+# (which consumes LazySourceMapper) is ported to the v2 engine.
 class SpecSourceMapper(SourceMapper):
   """
   Uses sources specs to identify an owner target of a source.

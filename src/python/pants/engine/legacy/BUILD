@@ -79,13 +79,3 @@ python_library(
     'src/python/pants/source',
   ]
 )
-
-python_library(
-  name='change_calculator',
-  sources=['change_calculator.py'],
-  dependencies=[
-    'src/python/pants/engine/legacy:source_mapper',
-    'src/python/pants/goal:workspace',
-    'src/python/pants/scm:change_calculator',
-  ]
-)
