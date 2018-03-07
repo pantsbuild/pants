@@ -7,6 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import os
 
+import six
+
 from pants.base.specs import AscendantAddresses, SingleAddress
 from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
@@ -105,13 +107,15 @@ class EngineSourceMapper(SourceMapper):
     sources_set = set(sources)
     subjects = [AscendantAddresses(directory=d) for d in self._unique_dirs_for_sources(sources_set)]
 
+    # Uniqify all transitive hydrated targets.
+    hydrated_target_to_address = {}
     for hydrated_targets in self._scheduler.product_request(HydratedTargets, subjects):
       for hydrated_target in hydrated_targets.dependencies:
-        legacy_address = hydrated_target.adaptor.address
+        if hydrated_target not in hydrated_target_to_address:
+          hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
 
-        # Handle BUILD files.
-        if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
-          yield legacy_address
-        else:
-          if any(self._owns_source(source, hydrated_target) for source in sources_set):
-            yield legacy_address
+    for hydrated_target, legacy_address in six.iteritems(hydrated_target_to_address):
+      # Handle BUILD files.
+      if (any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set) or
+          any(self._owns_source(source, hydrated_target) for source in sources_set)):
+        yield legacy_address

@@ -77,6 +77,7 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/source',
+    '3rdparty/python:six'
   ]
 )
 
