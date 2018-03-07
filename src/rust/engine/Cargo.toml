@@ -17,6 +17,21 @@ crate-type = ["cdylib"]
 [build-dependencies]
 cc = "1.0"
 
+[workspace]
+# We need to explicitly list these, because otherwise the standalone tools
+# (e.g. fs_util) won't be included.
+members = [
+  "boxfuture",
+  "fs",
+  "fs/fs_util",
+  "hashing",
+  "process_execution",
+  "process_execution/bazel_protos",
+  "process_executor",
+  "testutil",
+  "testutil/mock",
+]
+
 [dependencies]
 boxfuture = { path = "boxfuture" }
 fnv = "1.0.5"
