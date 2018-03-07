@@ -58,7 +58,7 @@ class M2Coordinate(object):
     self.name = name
     self.rev = rev
     self.classifier = classifier
-    self._ext = ext # or 'jar'
+    self._ext = ext
 
     self._id = (self.org, self.name, self.rev, self.classifier, self.ext)
 
