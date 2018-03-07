@@ -437,7 +437,7 @@ mod local {
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use hashing::{Digest, Fingerprint};
-  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, NO_TLS,
+  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, NO_SYNC, NO_TLS,
              RwTransaction, Transaction, WriteFlags};
   use lmdb::Error::{KeyExist, NotFound};
   use sha2::Sha256;
@@ -783,6 +783,25 @@ mod local {
         debug!("Making ShardedLmdb env for {:?}", dir);
         let env =
           Environment::new()
+            // NO_SYNC
+            // =======
+            //
+            // Don't force fsync on every lmdb write transaction
+            //
+            // This significantly improves performance on slow or contended disks.
+            //
+            // On filesystems which preserve order of writes, on system crash this may lead to some
+            // transactions being rolled back. This is fine because this is just a write-once
+            // content-addressed cache. There is no risk of corruption, just compromised durability.
+            //
+            // On filesystems which don't preserve the order of writes, this may lead to lmdb
+            // corruption on system crash (but in no other circumstances, such as process crash).
+            //
+            // ------------------------------------------------------------------------------------
+            //
+            // NO_TLS
+            // ======
+            //
             // Without this flag, each time a read transaction is started, it eats into our
             // transaction limit (default: 126) until that thread dies.
             //
@@ -794,7 +813,7 @@ mod local {
             // The only down-side is that you need to make sure that any individual OS thread must
             // not try to perform multiple write transactions concurrently. Fortunately, this
             // property holds for us.
-            .set_flags(NO_TLS)
+            .set_flags(NO_SYNC | NO_TLS)
             // 2 DBs; one for file contents, one for leases.
             .set_max_dbs(2)
             .set_map_size(MAX_LOCAL_STORE_SIZE_BYTES / 16)
