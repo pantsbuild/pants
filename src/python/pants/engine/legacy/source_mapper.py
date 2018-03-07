@@ -83,8 +83,6 @@ class EngineSourceMapper(SourceMapper):
 
     for hydrated_target, legacy_address in hydrated_target_to_address.iteritems():
       # Handle BUILD files.
-      if any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set):
+      if (any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set) or
+          any(self._owns_source(source, hydrated_target) for source in sources_set)):
         yield legacy_address
-      else:
-        if any(self._owns_source(source, hydrated_target) for source in sources_set):
-          yield legacy_address
