@@ -86,6 +86,14 @@ class Goal(object):
     return [goal for _, goal in sorted(Goal._goal_by_name.items()) if goal.active]
 
   @classmethod
+  def get_optionables(cls):
+    for goal in cls.all():
+      if goal._options_registrar_cls:
+        yield goal._options_registrar_cls
+      for task_type in goal.task_types():
+        yield task_type
+
+  @classmethod
   def subsystems(cls):
     """Returns all subsystem types used by all tasks, in no particular order.
 
@@ -128,8 +136,6 @@ class _Goal(object):
   def register_options(self, options):
     if self._options_registrar_cls:
       self._options_registrar_cls.register_options_on_scope(options)
-    for task_type in sorted(self.task_types(), key=lambda cls: cls.options_scope):
-      task_type.register_options_on_scope(options)
 
   def install(self, task_registrar, first=False, replace=False, before=None, after=None):
     """Installs the given task in this goal.
@@ -212,15 +218,6 @@ class _Goal(object):
       self._ordered_task_names = [x for x in self._ordered_task_names if x != name]
     else:
       raise GoalError('Cannot uninstall unknown task: {0}'.format(name))
-
-  def known_scope_infos(self):
-    """Yields ScopeInfos for all known scopes under this goal."""
-    # Note that we don't yield the goal's own scope. We don't need it (as we don't register
-    # options on it), and it's needlessly confusing when a task has the same name as its goal,
-    # in which case we shorten its scope to the goal's scope (e.g., idea.idea -> idea).
-    for task_type in self.task_types():
-      for scope_info in task_type.known_scope_infos():
-        yield scope_info
 
   def subsystems(self):
     """Returns all subsystem types used by tasks in this goal, in no particular order."""

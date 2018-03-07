@@ -81,20 +81,6 @@ class OptionsInitializer(object):
     # Load plugins and backends.
     return load_backends_and_plugins(plugins, working_set, backend_packages)
 
-  def _register_options(self, subsystems, options):
-    """Registers global options."""
-    # Standalone global options.
-    GlobalOptionsRegistrar.register_options_on_scope(options)
-
-    # Options for subsystems.
-    for subsystem in subsystems:
-      subsystem.register_options_on_scope(options)
-
-    # TODO(benjy): Should Goals or the entire goal-running mechanism be a Subsystem?
-    for goal in Goal.all():
-      # Register task options.
-      goal.register_options(options)
-
   def _install_options(self, options_bootstrapper, build_configuration):
     """Parse and register options.
 
@@ -105,22 +91,26 @@ class OptionsInitializer(object):
     from pants.bin.goal_runner import GoalRunner
 
     # Now that plugins and backends are loaded, we can gather the known scopes.
-    known_scope_infos = [GlobalOptionsRegistrar.get_scope_info()]
 
-    # Add scopes for all needed subsystems via a union of all known subsystem sets.
-    subsystems = Subsystem.closure(
-      GoalRunner.subsystems() | Goal.subsystems() | build_configuration.subsystems()
-    )
-    for subsystem in subsystems:
-      known_scope_infos.append(subsystem.get_scope_info())
+    # Gather the optionables that are not scoped to any other.  All known scopes are reachable
+    # via these optionables' known_scope_infos() methods.
+    # TODO: Rename methods to 'global_subsystems'.
+    top_level_optionables = ({GlobalOptionsRegistrar} |
+                             GoalRunner.subsystems() |
+                             build_configuration.subsystems() |
+                             set(Goal.get_optionables()))
 
-    # Add scopes for all tasks in all goals.
-    for goal in Goal.all():
-      known_scope_infos.extend(filter(None, goal.known_scope_infos()))
+    known_scope_infos = sorted({
+      si for optionable in top_level_optionables for si in optionable.known_scope_infos()
+    })
 
     # Now that we have the known scopes we can get the full options.
     options = options_bootstrapper.get_full_options(known_scope_infos)
-    self._register_options(subsystems, options)
+
+    distinct_optionable_classes = sorted({si.optionable_cls for si in known_scope_infos},
+                                         key=lambda o: o.options_scope)
+    for optionable_cls in distinct_optionable_classes:
+      optionable_cls.register_options_on_scope(options)
 
     # Make the options values available to all subsystems.
     Subsystem.set_options(options)

@@ -43,10 +43,12 @@ def init_subsystems(subsystem_types, options=None):
                   subsystem_type.options_scope) and/or the scopes of instances of the
                   subsystems they transitively depend on.
   """
+  optionables = set()
   for s in subsystem_types:
     if not Subsystem.is_subsystem_type(s):
       raise TypeError('{} is not a subclass of `Subsystem`'.format(s))
-  optionables = Subsystem.closure(subsystem_types)
+    for si in s.known_scope_infos():
+      optionables.update(si.optionable_cls)
   if options:
     allowed_scopes = {o.options_scope for o in optionables}
     for scope in options.keys():

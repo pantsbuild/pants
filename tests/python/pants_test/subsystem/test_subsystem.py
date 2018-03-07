@@ -8,7 +8,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import unittest
 
 from pants.option.optionable import Optionable
+from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem import Subsystem
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
 class DummySubsystem(Subsystem):
@@ -38,6 +40,11 @@ class ScopedDependentSubsystem(Subsystem):
     )
 
 
+def si(scope, subsystem_cls):
+  """Shorthand helper."""
+  return ScopeInfo(scope, ScopeInfo.SUBSYSTEM, subsystem_cls)
+
+
 class SubsystemTest(unittest.TestCase):
   def setUp(self):
     DummySubsystem._options = DummyOptions()
@@ -60,12 +67,13 @@ class SubsystemTest(unittest.TestCase):
     with self.assertRaises(NotImplementedError):
       NoScopeSubsystem.global_instance()
 
-  def test_closure_simple(self):
-    self.assertEqual({DummySubsystem}, Subsystem.closure((DummySubsystem,)))
-    self.assertEqual({DummySubsystem, ScopedDependentSubsystem},
-                     Subsystem.closure((ScopedDependentSubsystem,)))
+  def test_scoping_simple(self):
+    self.assertEqual({si('dummy', DummySubsystem)}, DummySubsystem.known_scope_infos())
+    self.assertEqual({si('scoped-dependent-subsystem', ScopedDependentSubsystem),
+                      si('dummy.scoped-dependent-subsystem', DummySubsystem)},
+                     ScopedDependentSubsystem.known_scope_infos())
 
-  def test_closure_tree(self):
+  def test_scoping_tree(self):
     class SubsystemB(Subsystem):
       options_scope = 'b'
 
@@ -76,13 +84,10 @@ class SubsystemTest(unittest.TestCase):
       def subsystem_dependencies(cls):
         return (DummySubsystem, SubsystemB)
 
-    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB}, Subsystem.closure((SubsystemA,)))
-    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
-                     Subsystem.closure((SubsystemA, SubsystemB)))
-    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
-                     Subsystem.closure((DummySubsystem, SubsystemA, SubsystemB)))
+    self.assertEqual({si('dummy', DummySubsystem), si('a', SubsystemA), si('b', SubsystemB)},
+                     SubsystemA.known_scope_infos())
 
-  def test_closure_graph(self):
+  def test_scoping_graph(self):
     class SubsystemB(Subsystem):
       options_scope = 'b'
 
@@ -97,15 +102,13 @@ class SubsystemTest(unittest.TestCase):
       def subsystem_dependencies(cls):
         return (DummySubsystem, SubsystemB)
 
-    self.assertEqual({DummySubsystem, SubsystemB}, Subsystem.closure((SubsystemB,)))
+    self.assertEqual({si('dummy', DummySubsystem), si('b', SubsystemB)},
+                     SubsystemB.known_scope_infos())
 
-    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB}, Subsystem.closure((SubsystemA,)))
-    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
-                     Subsystem.closure((SubsystemA, SubsystemB)))
-    self.assertEqual({DummySubsystem, SubsystemA, SubsystemB},
-                     Subsystem.closure((DummySubsystem, SubsystemA, SubsystemB)))
+    self.assertEqual({si('dummy', DummySubsystem), si('a', SubsystemA), si('b', SubsystemB)},
+                     SubsystemA.known_scope_infos())
 
-  def test_closure_cycle(self):
+  def test_option_class_cycle(self):
     class SubsystemC(Subsystem):
       options_scope = 'c'
 
@@ -118,7 +121,8 @@ class SubsystemTest(unittest.TestCase):
 
       @classmethod
       def subsystem_dependencies(cls):
-        return (SubsystemC,)
+        # Ensure that we detect cycles via scoped deps as well as global deps.
+        return (SubsystemC.scoped(cls),)
 
     class SubsystemA(Subsystem):
       options_scope = 'a'
@@ -128,10 +132,31 @@ class SubsystemTest(unittest.TestCase):
         return (SubsystemB,)
 
     for root in SubsystemA, SubsystemB, SubsystemC:
-      with self.assertRaises(Subsystem.CycleException):
-        Subsystem.closure((root,))
+      with self.assertRaises(SubsystemClientMixin.CycleException):
+        root.known_scope_infos()
 
-  def test_scoping(self):
+  def test_scoping_complex(self):
+    """
+    Subsystem dep structure is (-s-> = scoped dep, -g-> = global dep):
+
+    D -s-> E
+    |
+    + -s->
+          \
+    A -s-> B -s-> C
+           |
+           + -g-> E
+    """
+    class SubsystemE(Subsystem):
+      options_scope = 'e'
+
+    class SubsystemD(Subsystem):
+      options_scope = 'd'
+
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemE.scoped(cls), SubsystemB.scoped(cls))
+
     class SubsystemC(Subsystem):
       options_scope = 'c'
 
@@ -140,7 +165,7 @@ class SubsystemTest(unittest.TestCase):
 
       @classmethod
       def subsystem_dependencies(cls):
-        return (SubsystemC.scoped(cls),)
+        return (SubsystemE, SubsystemC.scoped(cls))
 
     class SubsystemA(Subsystem):
        options_scope = 'a'
@@ -149,8 +174,23 @@ class SubsystemTest(unittest.TestCase):
        def subsystem_dependencies(cls):
          return (SubsystemB.scoped(cls),)
 
-    expected_known_scope_infos_c = []
-    self.assertListEqual(expected_known_scope_infos_c, SubsystemC.known_scope_infos())
+    expected_known_scope_infos_c = {si('c', SubsystemC)}
+    self.assertSetEqual(expected_known_scope_infos_c, set(SubsystemC.known_scope_infos()))
+
+    expected_known_scope_infos_b = {si('b', SubsystemB), si('e', SubsystemE), si('c.b', SubsystemC)}
+    self.assertSetEqual(expected_known_scope_infos_b, set(SubsystemB.known_scope_infos()))
+
+    expected_known_scope_infos_a = {
+      si('a', SubsystemA), si('e', SubsystemE), si('b.a', SubsystemB), si('c.b.a', SubsystemC)
+    }
+    self.assertSetEqual(expected_known_scope_infos_a, set(SubsystemA.known_scope_infos()))
+
+    expected_known_scope_infos_d = {
+      si('d', SubsystemD), si('e.d', SubsystemE), si('b.d', SubsystemB), si('c.b.d', SubsystemC),
+      si('e', SubsystemE)
+    }
+    self.assertSetEqual(expected_known_scope_infos_d, set(SubsystemD.known_scope_infos()))
+
 
   def test_uninitialized_global(self):
     Subsystem.reset()

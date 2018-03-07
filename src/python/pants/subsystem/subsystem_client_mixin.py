@@ -7,7 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from collections import namedtuple
 
+from twitter.common.collections import OrderedSet
+
 from pants.option.arg_splitter import GLOBAL_SCOPE
+from pants.option.scope import ScopeInfo
 
 
 class SubsystemClientError(Exception): pass
@@ -35,9 +38,6 @@ class SubsystemClientMixin(object):
   """A mixin for declaring dependencies on subsystems.
 
   Must be mixed in to an Optionable.
-
-  TODO(benjy): Do we need this mixin? Can we put these methods directly on Optionable?
-               Are there Optionables that must not use subsystems?
   """
 
   @classmethod
@@ -65,13 +65,57 @@ class SubsystemClientMixin(object):
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE)
 
+  # @classmethod
+  # def known_scope_infos(cls):
+  #   """Yields ScopeInfo for all known scopes for this optionable, in no particular order."""
+  #   # The optionable's own scope.
+  #   yield cls.get_scope_info()
+  #   # The scopes of any scoped subsystems it uses.
+  #   for dep in cls.subsystem_dependencies_iter():
+  #     for si in dep.subsystem_cls.known_scope_infos():
+  #       if si.is_scoped() or not dep.is_global():
+  #         yield si.scoped_to(dep.scope)
+  #       else:
+  #         yield si
+
+  class CycleException(Exception):
+    """Thrown when a circular subsystem dependency is detected."""
+
+    def __init__(self, cycle):
+      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
+        '{} scope: {}'.format(optionable_cls, optionable_cls.options_scope)
+        for optionable_cls in cycle))
+      super(SubsystemClientMixin.CycleException, self).__init__(message)
+
   @classmethod
   def known_scope_infos(cls):
-    """Yields ScopeInfo for all known scopes for this optionable, in no particular order."""
-    # The optionable's own scope.
-    yield cls.get_scope_info()
-    # The scopes of any scoped subsystems it uses.
-    for dep in cls.subsystem_dependencies_iter():
-      if not dep.is_global():
-        for si in dep.subsystem_cls.known_scope_infos():
-          yield si.scoped_to(dep.scope)
+    """Yields ScopeInfo for all known scopes for this optionable, in no particular order.
+
+    :raises: :class:`pants.subsystem.subsystem_client_mixin.SubsystemClientMixin.CycleException`
+             if a dependency cycle is detected.
+    """
+    known_scope_infos = set()
+    optionables_path = OrderedSet()  #  To check for cycles at the Optionable level, ignoring scope.
+
+    def collect_scope_infos(optionable_cls, scoped_to):
+      if optionable_cls in optionables_path:
+        raise cls.CycleException(list(optionables_path) + [optionable_cls])
+      optionables_path.add(optionable_cls)
+
+      scope = (optionable_cls.options_scope if scoped_to == GLOBAL_SCOPE
+               else optionable_cls.subscope(scoped_to))
+      scope_info = ScopeInfo(scope, optionable_cls.options_scope_category, optionable_cls)
+
+      if scope_info not in known_scope_infos:
+        known_scope_infos.add(scope_info)
+        for dep in scope_info.optionable_cls.subsystem_dependencies_iter():
+          if dep.is_global():
+            scoped_to = GLOBAL_SCOPE
+          else:
+            scoped_to = scope
+          collect_scope_infos(dep.subsystem_cls, scoped_to)
+
+      optionables_path.remove(scope_info.optionable_cls)
+
+    collect_scope_infos(cls, GLOBAL_SCOPE)
+    return known_scope_infos

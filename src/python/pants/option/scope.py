@@ -28,6 +28,10 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls']
       return self
     return ScopeInfo('{0}.{1}'.format(self.scope, client_scope), self.category, self.optionable_cls)
 
+  def is_scoped(self):
+    """Whether this ScopeInfo represents a subsystem scoped to some other optionable."""
+    return self.category == self.SUBSYSTEM and '.' in self.scope
+
   @property
   def description(self):
     return self._optionable_cls_attr('get_description', lambda: '')()
