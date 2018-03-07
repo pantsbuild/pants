@@ -31,9 +31,9 @@ class PythonSetup(Subsystem):
              metavar='<requirement>',
              help="Constrain the selected Python interpreter.  Specify with requirement syntax, "
                   "e.g. 'CPython>=2.7,<3' (A CPython interpreter with version >=2.7 AND version <3)"
-                  "or 'PyPy' (A pypy interpreter of any version). Multiple constraints will be "
-                  "ORed together. These constraints are applied in addition to any compatibilities "
-                  "required by the relevant targets.")
+                  "or 'PyPy' (A pypy interpreter of any version). Multiple constraint strings will "
+                  "be ORed together. These constraints are applied in addition to any "
+                  "compatibilities required by the relevant targets.")
     register('--setuptools-version', advanced=True, default='30.0.0',
              help='The setuptools version for this python environment.')
     register('--wheel-version', advanced=True, default='0.29.0',
