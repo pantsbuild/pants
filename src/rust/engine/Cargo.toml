@@ -10,15 +10,28 @@ build = "src/cffi_build.rs"
 debug = true
 # Optimise for the speed of our binary, rather than the speed of compilation.
 codegen-units = 1
+lto = true
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["cdylib"]
 
 [build-dependencies]
 cc = "1.0"
 
-# TODO: Enable workspace when https://github.com/rust-lang/rust/issues/44862 is resolved.
-# [workspace]
+[workspace]
+# We need to explicitly list these, because otherwise the standalone tools
+# (e.g. fs_util) won't be included.
+members = [
+  "boxfuture",
+  "fs",
+  "fs/fs_util",
+  "hashing",
+  "process_execution",
+  "process_execution/bazel_protos",
+  "process_executor",
+  "testutil",
+  "testutil/mock",
+]
 
 [dependencies]
 boxfuture = { path = "boxfuture" }
