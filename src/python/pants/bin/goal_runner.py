@@ -174,7 +174,9 @@ class GoalRunnerFactory(object):
       goals = self._determine_goals(self._requested_goals)
       is_quiet = self._should_be_quiet(goals)
 
-      target_root_instances = self._roots_to_targets(target_roots)
+      # TODO: How will tag filtering work without Targets? May need to make tag filters
+      # a property of the `pants.base.spec.Spec` instances.
+      target_root_instances = self._roots_to_targets(target_roots) if self._build_graph is not None else None
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()

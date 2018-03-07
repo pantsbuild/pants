@@ -68,19 +68,21 @@ class Context(object):
     self.address_mapper = address_mapper
     self.run_tracker = run_tracker
     self._log = self.Log(run_tracker)
-    self._target_base = target_base or Target
     self._products = Products()
     self._buildroot = get_buildroot()
     self._source_roots = SourceRootConfig.global_instance().get_source_roots()
     self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
-    self._java_sysprops = None  # Computed lazily.
-    self.requested_goals = requested_goals or []
     self._console_outstream = console_outstream or sys.stdout
     self._scm = scm or get_scm()
     self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
     self._replace_targets(target_roots)
     self._invalidation_report = invalidation_report
     self._scheduler = scheduler
+
+    # TODO: Unused?
+    self.requested_goals = requested_goals or []
+    self._target_base = target_base or Target
+    self._java_sysprops = None  # Computed lazily.
 
   @property
   def options(self):
@@ -166,30 +168,29 @@ class Context(object):
 
   def _set_target_root_count_in_runtracker(self):
     """Sets the target root count in the run tracker's daemon stats object."""
-    # N.B. `self._target_roots` is always an expanded list of `Target` objects as
-    # provided by `GoalRunner`.
-    target_count = len(self._target_roots)
-    self.run_tracker.pantsd_stats.set_target_root_size(target_count)
-    return target_count
+    if self._target_roots is not None:
+      # N.B. `self._target_roots` is always an expanded list of `Target` objects as
+      # provided by `GoalRunner`.
+      target_count = len(self._target_roots)
+      self.run_tracker.pantsd_stats.set_target_root_size(target_count)
 
   def _set_affected_target_count_in_runtracker(self):
     """Sets the realized target count in the run tracker's daemon stats object."""
-    target_count = len(self.build_graph)
-    self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
-    return target_count
+    if self.build_graph is not None:
+      target_count = len(self.build_graph)
+      self.run_tracker.pantsd_stats.set_affected_targets_size(target_count)
 
   def _set_affected_target_files_count_in_runtracker(self):
     """Sets the realized target file count in the run tracker's daemon stats object."""
-    # TODO: Move this file counting into the `ProductGraph`.
-    target_file_count = self.build_graph.target_file_count()
-    self.run_tracker.pantsd_stats.set_affected_targets_file_count(target_file_count)
-    return target_file_count
+    if self.build_graph is not None:
+      # TODO: Move this file counting into the `Graph` before landing #5639.
+      target_file_count = self.build_graph.target_file_count()
+      self.run_tracker.pantsd_stats.set_affected_targets_file_count(target_file_count)
 
   def _set_resulting_graph_size_in_runtracker(self):
     """Sets the resulting graph size in the run tracker's daemon stats object."""
     node_count = self._scheduler.graph_len()
     self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
-    return node_count
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """
@@ -289,7 +290,7 @@ class Context(object):
     # TODO(John Sirois): This currently has only 1 use (outside ContextTest) in pantsbuild/pants and
     # only 1 remaining known use case in the Foursquare codebase that will be able to go away with
     # the post RoundEngine engine - kill the method at that time.
-    self._target_roots = list(target_roots)
+    self._target_roots = list(target_roots) if target_roots is not None else None
 
   def add_new_target(self, address, target_type, target_base=None, dependencies=None,
                      derived_from=None, **kwargs):
@@ -338,6 +339,11 @@ class Context(object):
                           `False` or preorder by default.
     :returns: A list of matching targets.
     """
+    if self.target_roots is None:
+      raise AssertionError(
+          'No tasks (for goal(s): {}) requested a '
+          'BuildGraph.'.format(', '.join(self.requested_goals)))
+
     target_set = self._collect_targets(self.target_roots, **kwargs)
 
     synthetics = OrderedSet()

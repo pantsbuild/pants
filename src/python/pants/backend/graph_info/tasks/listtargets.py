@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.base.exceptions import TaskError
+from pants.engine.addressable import BuildFileAddresses
 from pants.task.console_task import ConsoleTask
 
 
@@ -26,6 +27,10 @@ class ListTargets(ConsoleTask):
                   'address, artifact_id, repo_name, repo_url, push_db_basedir')
     register('--documented', type=bool,
              help='Print only targets that are documented with a description.')
+
+  @classmethod
+  def address_products(cls):
+    return (BuildFileAddresses,)
 
   def __init__(self, *args, **kwargs):
     super(ListTargets, self).__init__(*args, **kwargs)

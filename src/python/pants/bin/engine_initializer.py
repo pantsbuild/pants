@@ -76,30 +76,37 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
   def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
+    """Warm the scheduler's `Graph` with the products necessary to satisfy the given TargetRoots.
 
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    subjects = [Specs(tuple(target_roots.specs))]
-    request = self.scheduler.execution_request([TransitiveHydratedTargets], subjects)
-    result = self.scheduler.execute(request)
-    if result.error:
-      raise result.error
+
+    products = list(target_roots.products)
+    if target_roots.requires_legacy_graph:
+      # If a BuildGraph is required to satisfy the request, explicitly request
+      # the necessary product in addition to the rest.
+      products.append(HydratedTargets)
+    self.scheduler.products_request(products, [Specs(tuple(target_roots.specs))])
 
   def create_build_graph(self, target_roots, build_root=None):
-    """Construct and return a `BuildGraph` given a set of input specs.
+    """Given a set of input specs, construct and return a `BuildGraph` if necessary.
 
     :param TargetRoots target_roots: The targets root of the request.
     :param string build_root: The build root.
-    :returns: A tuple of (BuildGraph, AddressMapper).
+    :returns: A tuple of (BuildGraph, AddressMapper), or (None, None) if the TargetRoots
+      do not require a lgeacy graph.
     """
     logger.debug('target_roots are: %r', target_roots)
-    graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
+    if target_roots.requires_legacy_graph:
+      graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
+      # Ensure the entire generator is unrolled.
+      for _ in graph.inject_specs_closure(target_roots.specs):
+        pass
+    else:
+      graph = None
+
     logger.debug('build_graph is: %s', graph)
-    # Ensure the entire generator is unrolled.
-    for _ in graph.inject_roots_closure(target_roots):
-      pass
 
     address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
