@@ -11,13 +11,8 @@ use std::sync::RwLock;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
 use handles::Handle;
 use interning::Interns;
+use log;
 
-
-pub fn log(level: LogLevel, msg: &str) {
-  with_externs(|e| {
-    (e.log)(e.context, level as u8, msg.as_ptr(), msg.len() as u64)
-  })
-}
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| {
@@ -192,6 +187,7 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
+  static ref LOGGER: FfiLogger = FfiLogger{};
 }
 
 ///
@@ -201,6 +197,7 @@ lazy_static! {
 pub fn set_externs(externs: Externs) {
   let mut externs_ref = EXTERNS.write().unwrap();
   *externs_ref = Some(externs);
+  LOGGER.init();
 }
 
 fn with_externs<F, T>(f: F) -> T
@@ -324,16 +321,6 @@ pub type ProjectExtern = extern "C" fn(*const ExternContext,
                                        field_name_len: u64,
                                        *const TypeId)
                                        -> Value;
-
-// Not all log levels are always in use.
-#[allow(dead_code)]
-#[repr(u8)]
-pub enum LogLevel {
-  Debug = 0,
-  Info = 1,
-  Warn = 2,
-  Critical = 3,
-}
 
 #[repr(C)]
 #[derive(Debug)]
@@ -499,4 +486,63 @@ where
   let output = f(&cs);
   mem::forget(cs);
   output
+}
+
+#[repr(u8)]
+enum PythonLogLevel {
+  Debug = 0,
+  Info = 1,
+  Warn = 2,
+  Critical = 3,
+}
+
+///
+/// FfiLogger is an implementation of log::Log which asks the Python logging system to log via cffi.
+///
+struct FfiLogger {}
+
+impl FfiLogger {
+  // init must only be called once in the lifetime of the program. No other loggers may be init'd.
+  // If either of the above are violated, expect a panic.
+  pub fn init(&'static self) {
+    log::set_logger(self).expect(
+      "Failed to set logger (maybe you tried to call init multiple times?)",
+    );
+
+    // TODO: Set this to whatever the value Python is using is.
+    log::set_max_level(log::LevelFilter::Trace);
+  }
+}
+
+impl log::Log for FfiLogger {
+  fn enabled(&self, _metadata: &log::Metadata) -> bool {
+    // TODO: Inspect the current log setting from the python and actually filter.
+    // This is only used when people call log_enabled! to decide whether to do expensive
+    // computation before logging, which we don't currently do anywhere.
+    true
+  }
+
+  fn log(&self, record: &log::Record) {
+    if !self.enabled(record.metadata()) {
+      return;
+    }
+    let level = match record.level() {
+      log::Level::Error => PythonLogLevel::Critical,
+      log::Level::Warn => PythonLogLevel::Warn,
+      log::Level::Info => PythonLogLevel::Info,
+      log::Level::Debug => PythonLogLevel::Debug,
+      log::Level::Trace => PythonLogLevel::Debug,
+    };
+    let message = format!("{}", record.args());
+    with_externs(|e| {
+      (e.log)(
+        e.context,
+        level as u8,
+        message.as_ptr(),
+        message.len() as u64,
+      )
+    })
+  }
+
+  fn flush(&self) {}
 }

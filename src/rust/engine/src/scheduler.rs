@@ -10,7 +10,6 @@ use futures::future::{self, Future};
 use boxfuture::{Boxable, BoxFuture};
 use context::{Context, ContextFactory, Core};
 use core::{Failure, Key, TypeConstraint, TypeId, Value};
-use externs::{self, LogLevel};
 use graph::EntryId;
 use nodes::{NodeKey, Select};
 use rule_graph;
@@ -129,10 +128,7 @@ impl Scheduler {
                   // Otherwise (if it is a success, some other type of Failure, or if we've run
                   // out of retries) recover to complete the join, which will cause the results to
                   // propagate to the user.
-                  externs::log(
-                    LogLevel::Debug,
-                    &format!("Root {} completed.", NodeKey::Select(root).format()),
-                  );
+                  debug!("Root {} completed.", NodeKey::Select(root).format());
                   Ok(other)
                 }
               }
@@ -156,10 +152,7 @@ impl Scheduler {
     request: &'e ExecutionRequest,
   ) -> Vec<(&'e Key, &'e TypeConstraint, RootResult)> {
     // Bootstrap tasks for the roots, and then wait for all of them.
-    externs::log(
-      LogLevel::Debug,
-      &format!("Launching {} roots.", request.roots.len()),
-    );
+    debug!("Launching {} roots.", request.roots.len());
 
     // Wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
