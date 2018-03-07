@@ -278,6 +278,16 @@ class CoursierResolveTest(JvmToolTaskTestBase):
 
       task.runjava.assert_called()
 
+  def test_resolve_jarless_pom(self):
+    jar = JarDependency('org.apache.commons', 'commons-weaver-privilizer-parent', '1.3')
+    lib = self.make_target('//:b', JarLibrary, jars=[jar])
+
+    compile_classpath = self.resolve([lib])
+
+    lib_cp = compile_classpath.get_for_target(lib)
+
+    self.assertEqual(0, len(lib_cp))
+
   def _make_junit_target(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
     junit_jar_lib = self.make_target('//:a', JarLibrary, jars=[junit_dep])

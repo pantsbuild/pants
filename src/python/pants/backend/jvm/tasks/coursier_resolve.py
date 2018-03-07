@@ -182,7 +182,9 @@ class CoursierMixin(NailgunTask):
         resolve_vts.update()
 
   def _override_classifiers_for_conf(self, conf):
-    if conf == 'src_doc': #TODO encapsulate this in the result instead of here.
+     # TODO Encapsulate this in the result from coursier instead of here.
+     #      https://github.com/coursier/coursier/issues/803
+    if conf == 'src_doc':
       return ['sources', 'javadoc']
     else:
       return None
@@ -371,7 +373,7 @@ class CoursierMixin(NailgunTask):
 
     # Dealing with intransitivity and forced versions.
     for j in jars:
-      if not j.rev: #TODO we should still resolve these right?
+      if not j.rev:
         logger.warn('Coursier does not allow using latest as the revision: ignoring {}'.format(j.coordinate))
         continue
 
@@ -434,7 +436,6 @@ class CoursierMixin(NailgunTask):
     :param result: result dict converted from the json produced by one coursier run
     :return: n/a
     """
-    # if we are forcing source / javadoc, then we need to explicitly call for them
     # Parse the coursier result
     flattened_resolution = self._extract_dependencies_by_root(result)
 
@@ -445,8 +446,7 @@ class CoursierMixin(NailgunTask):
     # was resolved in pants.
     org_name_to_org_name_rev = {}
     for coord in coord_to_resolved_jars.keys():
-      m2coord = self.to_m2_coord(coord)
-      org_name_to_org_name_rev['{}:{}'.format(m2coord.org, m2coord.name)] = coord
+      org_name_to_org_name_rev['{}:{}'.format(coord.org, coord.name)] = coord
 
     for vt in invalidation_check.all_vts:
       t = vt.target
@@ -454,11 +454,11 @@ class CoursierMixin(NailgunTask):
         def get_transitive_resolved_jars(my_coord, resolved_jars):
           transitive_jar_path_for_coord = []
           coord_str = str(my_coord)
-          if coord_str in flattened_resolution and coord_str in resolved_jars:
-            transitive_jar_path_for_coord.append(resolved_jars[coord_str])
+          if coord_str in flattened_resolution and my_coord in resolved_jars:
+            transitive_jar_path_for_coord.append(resolved_jars[my_coord])
 
             for c in flattened_resolution[coord_str]:
-              j = resolved_jars.get(c)
+              j = resolved_jars.get(self.to_m2_coord(c))
               if j:
                 transitive_jar_path_for_coord.append(j)
 
@@ -478,8 +478,7 @@ class CoursierMixin(NailgunTask):
               result['conflict_resolution'][jar.coordinate.simple_coord])
             coord_candidates = [with_new_rev(c, parsed_conflict.rev) for c in coord_candidates]
           elif '{}:{}'.format(jar.coordinate.org, jar.coordinate.name) in org_name_to_org_name_rev:
-            parsed_conflict = self.to_m2_coord(
-              org_name_to_org_name_rev['{}:{}'.format(jar.coordinate.org, jar.coordinate.name)])
+            parsed_conflict = org_name_to_org_name_rev['{}:{}'.format(jar.coordinate.org, jar.coordinate.name)]
             coord_candidates = [with_new_rev(c, parsed_conflict.rev) for c in coord_candidates]
 
           for coord in coord_candidates:
@@ -608,7 +607,7 @@ class CoursierMixin(NailgunTask):
     coord_to_resolved_jars = dict()
 
     for dep in result['dependencies']:
-      simple_coord = dep['coord']
+      coord = dep['coord']
       jar_path = dep.get('file', None)
       if not jar_path:
         # NB: Not all coordinates will have associated files.
@@ -627,11 +626,11 @@ class CoursierMixin(NailgunTask):
         safe_mkdir(os.path.dirname(pants_path))
         os.symlink(jar_path, pants_path)
 
-      coord = cls.to_m2_coord(simple_coord)
+      coord = cls.to_m2_coord(coord)
       resolved_jar = ResolvedJar(coord,
                                  cache_path=jar_path,
                                  pants_path=pants_path)
-      coord_to_resolved_jars[simple_coord] = resolved_jar
+      coord_to_resolved_jars[coord] = resolved_jar
     return coord_to_resolved_jars
 
   @classmethod
@@ -655,10 +654,6 @@ class CoursierMixin(NailgunTask):
       return os.path.join(pants_jar_path_base, os.path.normpath('absolute/' + jar_path))
     else:
       return os.path.join(pants_jar_path_base, 'relative', os.path.relpath(jar_path, coursier_cache_path))
-  #@classmethod
-  #def to_m2_coord(cls, coord_str, classifier):
-  #  # TODO: currently assuming all packaging is a jar
-  #  return M2Coordinate.from_string(coord_str + ':{}:jar'.format(classifier))
 
 
 class CoursierResolve(CoursierMixin):
