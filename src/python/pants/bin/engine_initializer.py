@@ -14,7 +14,6 @@ from pants.engine.build_files import create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.change_calculator import EngineChangeCalculator
 from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
@@ -27,6 +26,7 @@ from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.scm.change_calculator import EngineChangeCalculator
 
 
 logger = logging.getLogger(__name__)

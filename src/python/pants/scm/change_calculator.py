@@ -5,17 +5,88 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import itertools
 import logging
-import re
 from abc import abstractmethod
+from collections import defaultdict
 
+from pants.base.build_environment import get_scm
 from pants.base.specs import DescendantAddresses
-from pants.build_graph.source_mapper import SpecSourceMapper
+from pants.build_graph.address import Address
+from pants.engine.legacy.graph import HydratedTargets, target_types_from_symbol_table
+from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace
 from pants.util.meta import AbstractClass
 
 
 logger = logging.getLogger(__name__)
+
+
+class _HydratedTargetDependentGraph(object):
+  """A graph for walking dependent addresses of HydratedTarget objects.
+
+  This avoids/imitates constructing a v1 BuildGraph object, because that codepath results
+  in many references held in mutable global state (ie, memory leaks).
+
+  The long term goal is to deprecate the `changed` goal in favor of sufficiently good cache
+  hit rates, such that rather than running:
+
+    ./pants --changed-parent=master test
+
+  ...you would always be able to run:
+
+    ./pants test ::
+
+  ...and have it complete in a similar amount of time by hitting relevant caches.
+  """
+
+  @classmethod
+  def from_iterable(cls, target_types, iterable):
+    """Create a new HydratedTargetDependentGraph from an iterable of HydratedTarget instances."""
+    inst = cls(target_types)
+    for hydrated_target in iterable:
+      inst.inject_target(hydrated_target)
+    return inst
+
+  def __init__(self, target_types):
+    self._dependent_address_map = defaultdict(set)
+    self._target_types = target_types
+
+  def inject_target(self, hydrated_target):
+    """Inject a target, respecting all sources of dependencies."""
+    target_cls = self._target_types[hydrated_target.adaptor.type_alias]
+
+    declared_deps = hydrated_target.dependencies
+    implicit_deps = (Address.parse(s) for s in target_cls.compute_dependency_specs(kwargs=hydrated_target.adaptor.kwargs()))
+
+    for dep in itertools.chain(declared_deps, implicit_deps):
+      self._dependent_address_map[dep].add(hydrated_target.adaptor.address)
+
+  def dependents_of_addresses(self, addresses):
+    """Given an iterable of addresses, yield all of those addresses dependents."""
+    seen = set(addresses)
+    for address in addresses:
+      for dependent_address in self._dependent_address_map[address]:
+        if dependent_address not in seen:
+          seen.add(dependent_address)
+          yield dependent_address
+
+  def transitive_dependents_of_addresses(self, addresses):
+    """Given an iterable of addresses, yield all of those addresses dependents, transitively."""
+    addresses_to_visit = set(addresses)
+    while 1:
+      dependents = set(self.dependents_of_addresses(addresses))
+      # If we've exhausted all dependencies or visited all remaining nodes, break.
+      if (not dependents) or dependents.issubset(addresses_to_visit):
+        break
+      addresses = dependents.difference(addresses_to_visit)
+      addresses_to_visit.update(dependents)
+
+    transitive_set = itertools.chain(
+      *(self._dependent_address_map[address] for address in addresses_to_visit)
+    )
+    for dep in transitive_set:
+      yield dep
 
 
 class ChangeCalculator(AbstractClass):
@@ -41,75 +112,49 @@ class ChangeCalculator(AbstractClass):
     """Find changed targets, according to SCM."""
 
 
-# TODO: Remove this in 1.5.0dev0 in favor of `EngineChangeCalculator`.
-class BuildGraphChangeCalculator(ChangeCalculator):
-  """A `BuildGraph`-based helper for calculating changed target addresses."""
+class EngineChangeCalculator(ChangeCalculator):
+  """A ChangeCalculator variant that uses the v2 engine for source mapping."""
 
-  def __init__(self,
-               scm,
-               workspace,
-               address_mapper,
-               build_graph,
-               include_dependees,
-               fast=False,
-               changes_since=None,
-               diffspec=None,
-               exclude_target_regexp=None):
-    super(BuildGraphChangeCalculator, self).__init__(scm, workspace, changes_since, diffspec)
-    self._build_graph = build_graph
-    self._include_dependees = include_dependees
-    self._fast = fast
-    self._exclude_target_regexp = exclude_target_regexp or []
-    self._mapper = SpecSourceMapper(address_mapper, build_graph, fast)
-
-  def _directly_changed_targets(self):
-    # Internal helper to find target addresses containing SCM changes.
-    targets_for_source = self._mapper.target_addresses_for_source
-    result = set()
-    for src in self.changed_files(self._changes_since, self._diffspec):
-      result.update(set(targets_for_source(src)))
-    return result
-
-  def _find_changed_targets(self):
-    # Internal helper to find changed targets, optionally including their dependees.
-    changed = self._directly_changed_targets()
-
-    # Skip loading the graph or doing any further work if no directly changed targets found.
-    if not changed:
-      return changed
-
-    if self._include_dependees == 'none':
-      return changed
-
-    # Load the whole build graph since we need it for dependee finding in either remaining case.
-    for _ in self._build_graph.inject_specs_closure([DescendantAddresses('')]):
-      pass
-
-    if self._include_dependees == 'direct':
-      return changed.union(*[self._build_graph.dependents_of(addr) for addr in changed])
-
-    if self._include_dependees == 'transitive':
-      return set(t.address for t in self._build_graph.transitive_dependees_of_addresses(changed))
-
-    # Should never get here.
-    raise ValueError('Unknown dependee inclusion: "{}"'.format(self._include_dependees))
-
-  def changed_target_addresses(self):
-    """Find changed targets, according to SCM.
-
-    This is the intended entry point for finding changed targets unless callers have a specific
-    reason to call one of the above internal helpers. It will find changed targets and:
-      - Optionally find changes in a given diffspec (commit, branch, tag, range, etc).
-      - Optionally include direct or transitive dependees.
-      - Optionally filter targets matching exclude_target_regexp.
-
-    :returns: A set of target addresses.
+  def __init__(self, scheduler, symbol_table, scm):
     """
-    # Find changed targets (and maybe their dependees).
-    changed = self._find_changed_targets()
+    :param scheduler: The `Scheduler` instance to use for computing file to target mappings.
+    :param symbol_table: The symbol table.
+    :param scm: The `Scm` instance to use for change determination.
+    """
+    super(EngineChangeCalculator, self).__init__(scm or get_scm())
+    self._scheduler = scheduler
+    self._symbol_table = symbol_table
+    self._mapper = EngineSourceMapper(self._scheduler)
 
-    # Remove any that match the exclude_target_regexp list.
-    excludes = [re.compile(pattern) for pattern in self._exclude_target_regexp]
-    return set([
-      t for t in changed if not any(exclude.search(t.spec) is not None for exclude in excludes)
-    ])
+  def iter_changed_target_addresses(self, changed_request):
+    """Given a `ChangedRequest`, compute and yield all affected target addresses."""
+    changed_files = self.changed_files(changed_request.changes_since, changed_request.diffspec)
+    logger.debug('changed files: %s', changed_files)
+    if not changed_files:
+      return
+
+    changed_addresses = set(address
+                            for address
+                            in self._mapper.iter_target_addresses_for_sources(changed_files))
+    for address in changed_addresses:
+      yield address
+
+    if changed_request.include_dependees not in ('direct', 'transitive'):
+      return
+
+    # For dependee finding, we need to parse all build files.
+    product_iter = (t
+                    for targets in self._scheduler.product_request(HydratedTargets, [DescendantAddresses('')])
+                    for t in targets.dependencies)
+    graph = _HydratedTargetDependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
+                                                        product_iter)
+
+    if changed_request.include_dependees == 'direct':
+      for address in graph.dependents_of_addresses(changed_addresses):
+        yield address
+    elif changed_request.include_dependees == 'transitive':
+      for address in graph.transitive_dependents_of_addresses(changed_addresses):
+        yield address
+
+  def changed_target_addresses(self, changed_request):
+    return list(self.iter_changed_target_addresses(changed_request))
