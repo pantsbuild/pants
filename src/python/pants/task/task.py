@@ -145,8 +145,38 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     Typically a task that requires products from other goals would register interest in those
     products here and then retrieve the requested product mappings when executed.
 
+    Only one of either `def prepare` or `def address_products` may be declared.
+
     :API: public
     """
+  prepare.__func__._canary = None
+
+  @classmethod
+  def address_products(cls):
+    """A tuple of product types for the root `pants.base.spec.Spec` subjects of a run.
+
+    Only one of either `def prepare` or `def address_products` may be declared.
+
+    :API: experimental
+    """
+    return tuple()
+  address_products.__func__._canary = None
+
+  @classmethod
+  def defines_prepare(cls):
+    return not hasattr(cls.prepare, '_canary')
+
+  @classmethod
+  def defines_address_products(cls):
+    return not hasattr(cls.address_products, '_canary')
+
+  @classmethod
+  def _validate_exclusive_product_methods(cls):
+    """Validates that at most one of `def prepare` and `def address_products` are implemented."""
+    if cls.defines_prepare() and cls.defines_address_products():
+      raise AssertionError(
+          'At most one of `def prepare` and `def address_products` may be defined '
+          'by a Task, but {} defines both (perhaps indirectly).'.format(cls.__name__))
 
   def __init__(self, context, workdir):
     """Subclass __init__ methods, if defined, *must* follow this idiom:
@@ -163,6 +193,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     :API: public
     """
     super(TaskBase, self).__init__()
+    self._validate_exclusive_product_methods()
     self.context = context
     self._workdir = workdir
 
