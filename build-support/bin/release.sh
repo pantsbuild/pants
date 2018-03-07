@@ -2,6 +2,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+set -e
+
 ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 source ${ROOT}/build-support/common.sh
 
@@ -275,7 +277,7 @@ EOM
 
 function install_and_test_packages() {
   local VERSION=$1
-  shift 2
+  shift
   local PIP_ARGS=(
     "${VERSION}"
     "$@"
