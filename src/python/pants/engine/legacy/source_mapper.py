@@ -79,7 +79,8 @@ class EngineSourceMapper(SourceMapper):
     hydrated_target_to_address = {}
     for hydrated_targets in self._scheduler.product_request(HydratedTargets, subjects):
       for hydrated_target in hydrated_targets.dependencies:
-        hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
+        if hydrated_target not in hydrated_target_to_address:
+          hydrated_target_to_address[hydrated_target] = hydrated_target.adaptor.address
 
     for hydrated_target, legacy_address in hydrated_target_to_address.iteritems():
       # Handle BUILD files.
