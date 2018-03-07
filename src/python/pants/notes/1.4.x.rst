@@ -3,6 +3,17 @@
 
 This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
+1.4.0rc4 (03/06/2018)
+---------------------
+
+The fifth release candidate for the ``1.4.x`` stable branch.
+
+Bugfixes
+~~~~~~~~
+
+* Set thrifty build_file_aliases (#5559) (#5562)
+  `PR #5559 <https://github.com/pantsbuild/pants/pull/5559>`_
+
 1.4.0rc3 (03/05/2018)
 ---------------------
 
