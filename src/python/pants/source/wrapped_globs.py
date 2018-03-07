@@ -104,8 +104,13 @@ class EagerFilesetWithSpec(FilesetWithSpec):
     return 'EagerFilesetWithSpec(rel_root={!r}, files={!r})'.format(self.rel_root, self.files)
 
   def matches(self, path_from_buildroot):
-    path_relative_to_rel_root = os.path.relpath(path_from_buildroot, self.rel_root)
-    return path_relative_to_rel_root in self._files
+    try:
+      path_relative_to_rel_root = fast_relpath(path_from_buildroot, self.rel_root)
+    except ValueError:
+      # N.B. `fast_relpath` raises a `ValueError` if prefixes aren't aligned.
+      return False
+    else:
+      return path_relative_to_rel_root in self._files
 
 
 class LazyFilesetWithSpec(FilesetWithSpec):
