@@ -109,8 +109,7 @@ class EagerFilesetWithSpec(FilesetWithSpec):
     except ValueError:
       # N.B. `fast_relpath` raises a `ValueError` if prefixes aren't aligned.
       return False
-    else:
-      return path_relative_to_rel_root in self._files
+    return path_relative_to_rel_root in self._files
 
 
 class LazyFilesetWithSpec(FilesetWithSpec):
