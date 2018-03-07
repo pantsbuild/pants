@@ -2,6 +2,7 @@ extern crate bazel_protos;
 extern crate boxfuture;
 extern crate bytes;
 extern crate clap;
+extern crate env_logger;
 extern crate fs;
 extern crate futures;
 extern crate hashing;
@@ -37,6 +38,8 @@ impl From<String> for ExitError {
 }
 
 fn main() {
+  env_logger::init();
+
   match execute(
     App::new("fs_util")
       .subcommand(
@@ -181,7 +184,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
         e
       )
     })?;
-    (Arc::new(store), store_has_remote)
+    (store, store_has_remote)
   };
 
   match top_match.subcommand() {
@@ -292,7 +295,7 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
                 paths,
               )
             })
-            .map(|snapshot| snapshot.digest.unwrap())
+            .map(|snapshot| snapshot.digest)
             .wait()?;
           if store_has_remote {
             store.ensure_remote_has_recursive(vec![digest]).wait()?;
@@ -382,7 +385,7 @@ fn make_posix_fs<P: AsRef<Path>>(root: P, pool: Arc<ResettablePool>) -> fs::Posi
 
 #[derive(Clone)]
 struct FileSaver {
-  store: Arc<Store>,
+  store: Store,
   posix_fs: Arc<fs::PosixFS>,
 }
 

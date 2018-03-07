@@ -1,5 +1,5 @@
 package simple;
 // Placeholder file.
-class Simple {
-
+class Broken {
+  NOT VALID JAVA!
 }
