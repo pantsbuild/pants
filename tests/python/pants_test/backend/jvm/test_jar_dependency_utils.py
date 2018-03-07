@@ -14,7 +14,7 @@ class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_string_representation(self):
     org_name_ref = M2Coordinate(org='org.example', name='lib', rev='the-ref')
 
-    self.assertEquals('org.example:lib:jar:the-ref', str(org_name_ref))
+    self.assertEquals('org.example:lib:the-ref', str(org_name_ref))
     self.assertEquals(org_name_ref, M2Coordinate.from_string(str(org_name_ref)))
 
     org_name_ref_classifier = M2Coordinate(org='org.example', name='lib',
