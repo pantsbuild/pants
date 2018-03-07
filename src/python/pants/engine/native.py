@@ -17,7 +17,8 @@ import cffi
 import pkg_resources
 import six
 
-from pants.util.dirutil import safe_mkdir, safe_mkdtemp, touch
+from pants.util.contextutil import temporary_dir
+from pants.util.dirutil import safe_mkdir, safe_mkdtemp
 from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
@@ -257,33 +258,45 @@ def get_build_cflags():
 
 def bootstrap_c_source(output_dir, module_name=NATIVE_ENGINE_MODULE):
   """Bootstrap an external CFFI C source file."""
+
   safe_mkdir(output_dir)
 
-  output_prefix = os.path.join(output_dir, module_name)
-  c_file = '{}.c'.format(output_prefix)
-  env_script = '{}.cflags'.format(output_prefix)
+  with temporary_dir() as tempdir:
 
-  ffibuilder = cffi.FFI()
-  ffibuilder.cdef(CFFI_TYPEDEFS)
-  ffibuilder.cdef(CFFI_HEADERS)
-  ffibuilder.cdef(CFFI_EXTERNS)
-  ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
-  ffibuilder.emit_c_code(six.binary_type(c_file))
+    temp_output_prefix = os.path.join(tempdir, module_name)
+    real_output_prefix = os.path.join(output_dir, module_name)
+    temp_c_file = '{}.c'.format(temp_output_prefix)
+    real_c_file = '{}.c'.format(real_output_prefix)
+    env_script = '{}.cflags'.format(real_output_prefix)
+
+    ffibuilder = cffi.FFI()
+    ffibuilder.cdef(CFFI_TYPEDEFS)
+    ffibuilder.cdef(CFFI_HEADERS)
+    ffibuilder.cdef(CFFI_EXTERNS)
+    ffibuilder.set_source(module_name, CFFI_TYPEDEFS + CFFI_HEADERS)
+    ffibuilder.emit_c_code(six.binary_type(temp_c_file))
+
+    with open(temp_c_file, 'rb') as f:
+      file_content = f.read()
+
+  _replace_file(real_c_file, file_content)
 
   # Write a shell script to be sourced at build time that contains inherited CFLAGS.
-  with open(env_script, 'wb') as f:
-    f.write(get_build_cflags())
+  _replace_file(env_script, get_build_cflags())
 
-  # These files are built by Cargo which looks at mtime to determine when to rebuild. Since
-  # this source file contains the generated contents this is a simple way to make sure we don't
-  # trigger Cargo rebuilds un-necessarily.
-  source_mtime = os.stat(__file__).st_mtime
 
-  def fixup_times(path):
-    touch(path, times=(source_mtime, source_mtime))
+def _replace_file(path, content):
+  """Writes a file if it doesn't already exist with the same content.
 
-  fixup_times(c_file)
-  fixup_times(env_script)
+  This is useful because cargo uses timestamps to decide whether to compile things."""
+  if os.path.exists(path):
+    with open(path, 'rb') as f:
+      if content == f.read():
+        print("Not overwriting {} because it is unchanged".format(path), file=sys.stderr)
+        return
+
+  with open(path, 'wb') as f:
+    f.write(content)
 
 
 def _initialize_externs(ffi):
