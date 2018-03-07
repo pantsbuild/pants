@@ -190,6 +190,8 @@ class GlobalOptionsRegistrar(Optionable):
              help='The directory to log pantsd output to.')
     register('--pantsd-fs-event-workers', advanced=True, type=int, default=4,
              help='The number of workers to use for the filesystem event service executor pool.')
+    register('--pantsd-invalidation-globs', advanced=True, type=list, fromfile=True, default=[],
+             help='Filesystem events matching any of these globs will trigger a daemon restart.')
 
     # Watchman options.
     register('--watchman-version', advanced=True, default='4.9.0-pants1', help='Watchman version.')

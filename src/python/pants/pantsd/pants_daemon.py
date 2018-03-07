@@ -129,8 +129,19 @@ class PantsDaemon(FingerprintedProcessManager):
 
       :returns: A tuple of (`tuple` service_instances, `dict` port_map).
       """
-      fs_event_service = FSEventService(watchman, build_root, bootstrap_options.pantsd_fs_event_workers)
-      scheduler_service = SchedulerService(fs_event_service, legacy_graph_helper)
+      fs_event_service = FSEventService(
+        watchman,
+        build_root,
+        bootstrap_options.pantsd_fs_event_workers
+      )
+
+      scheduler_service = SchedulerService(
+        fs_event_service,
+        legacy_graph_helper,
+        build_root,
+        bootstrap_options.pantsd_invalidation_globs
+      )
+
       pailgun_service = PailgunService(
         bind_addr=(bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
         exiter_class=DaemonExiter,
@@ -138,6 +149,7 @@ class PantsDaemon(FingerprintedProcessManager):
         target_roots_class=TargetRoots,
         scheduler_service=scheduler_service
       )
+
       store_gc_service = StoreGCService(legacy_graph_helper.scheduler)
 
       return (

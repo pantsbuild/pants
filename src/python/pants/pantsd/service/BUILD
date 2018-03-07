@@ -32,7 +32,7 @@ python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
   dependencies = [
-    '3rdparty/python:six',
+    '3rdparty/python/twitter/commons:twitter.common.dirutil',
     ':pants_service'
   ]
 )
