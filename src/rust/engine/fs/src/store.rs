@@ -1423,8 +1423,8 @@ mod remote {
           let chunk_size_bytes = self.chunk_size_bytes;
           let stream =
             futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
-              0 as usize,
-              move |offset| if offset >= bytes.len() {
+              (0 as usize, false),
+              move |(offset, has_sent_any)| if offset >= bytes.len() && has_sent_any {
                 None
               } else {
                 let mut req = bazel_protos::bytestream::WriteRequest::new();
@@ -1434,7 +1434,7 @@ mod remote {
                 req.set_finish_write(next_offset == bytes.len());
                 req.set_data(bytes.slice(offset, next_offset));
                 Some(future::ok(
-                  ((req, grpcio::WriteFlags::default()), next_offset),
+                  ((req, grpcio::WriteFlags::default()), (next_offset, true)),
                 ))
               },
             );
@@ -1529,6 +1529,7 @@ mod remote {
 
     use super::{ByteStore, Fingerprint};
     use super::super::EntryType;
+    use super::super::super::EMPTY_DIGEST;
     use bytes::Bytes;
     use futures::Future;
     use hashing::Digest;
@@ -1696,6 +1697,20 @@ mod remote {
           format!("Size {} should have been <= {}", size, 10 * 1024)
         );
       }
+    }
+
+    #[test]
+    fn write_empty_file() {
+      let cas = StubCAS::empty();
+
+      let store = new_byte_store(&cas);
+      assert_eq!(
+        store.store_bytes(Bytes::from(vec![])).wait(),
+        Ok(EMPTY_DIGEST)
+      );
+
+      let blobs = cas.blobs.lock().unwrap();
+      assert_eq!(blobs.get(&EMPTY_DIGEST.0), Some(&Bytes::from(vec![])));
     }
 
     #[test]
