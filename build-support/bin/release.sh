@@ -674,21 +674,62 @@ function activate_twine() {
 
 function build_pex() {
   # Builds a pex from the current UNSTABLE version.
+  # If $1 == "build", builds a pex just for this platform, from source.
+  # If $1 == "fetch", fetches the linux and OSX wheels which were built on travis.
+  local mode="$1"
 
   local linux_platform="linux_x86_64"
+  local osx_platform="macosx_10.10_x86_64"
+
+  case "${mode}" in
+    build)
+      case "$(uname)" in
+	Darwin)
+	  local platform="${osx_platform}"
+	  ;;
+	Linux)
+	  local platform="${linux_platform}"
+	  ;;
+	*)
+	  echo >&2 "Unknown uname"
+	  exit 1
+	  ;;
+      esac
+      local platforms=("${platform}")
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
+      ;;
+    fetch)
+      local platforms=("${linux_platform}" "macosx_10.10_x86_64")
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+      ;;
+    *)
+      echo >&2 "Bad build_pex mode ${mode}"
+      exit 1
+      ;;
+  esac
 
   rm -rf "${DEPLOY_DIR}"
   mkdir -p "${DEPLOY_DIR}"
-  fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
-  adjust_wheel_platform "manylinux1_x86_64" "${linux_platform}" "${DEPLOY_DIR}"
 
-  local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+  if [[ "${mode}" == "fetch" ]]; then
+    fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  else
+    build_pants_packages "${PANTS_UNSTABLE_VERSION}"
+    build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
+  fi
+
+  adjust_wheel_platform "manylinux1_x86_64" "${linux_platform}" "${DEPLOY_DIR}"
 
   activate_tmp_venv && trap deactivate RETURN && pip install "pex==1.3.1" || die "Failed to install pex."
 
-  local requirements_string=""
+  local requirements=()
   for pkg_name in $PANTS_PEX_PACKAGES; do
-    requirements_string="${requirements_string} ${pkg_name}==${PANTS_UNSTABLE_VERSION}"
+    requirements=("${requirements[@]}" "${pkg_name}==${PANTS_UNSTABLE_VERSION}")
+  done
+
+  local platform_flags=()
+  for platform in "${platforms[@]}"; do
+    platform_flags=("${platform_flags[@]}" "--platform=${platform}")
   done
 
   pex \
@@ -697,11 +738,10 @@ function build_pex() {
     --no-build \
     --no-pypi \
     --disable-cache \
-    --platform="macosx_10.10_x86_64" \
-    --platform="${linux_platform}" \
+    "${platform_flags[@]}" \
     -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-    ${requirements_string}
+    "${requirements[@]}"
 
   banner "Successfully built ${dest}"
 }
@@ -756,6 +796,7 @@ function usage() {
   echo " -o  Lists all pantsbuild package owners."
   echo " -e  Check that wheels are prebuilt for this release."
   echo " -p  Build a pex from prebuilt wheels for this release."
+  echo " -q  Build a pex which only works on the host platform, using the code as exists on disk."
   echo
   echo "All options (except for '-d') are mutually exclusive."
 
@@ -766,7 +807,7 @@ function usage() {
   fi
 }
 
-while getopts "hdntcloepw" opt; do
+while getopts "hdntcloepqw" opt; do
   case ${opt} in
     h) usage ;;
     d) debug="true" ;;
@@ -775,7 +816,8 @@ while getopts "hdntcloepw" opt; do
     l) list_packages ; exit $? ;;
     o) list_owners ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;
-    p) build_pex ; exit $? ;;
+    p) build_pex fetch ; exit $? ;;
+    q) build_pex build ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;
   esac
