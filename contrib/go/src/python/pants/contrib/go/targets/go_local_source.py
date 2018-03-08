@@ -39,7 +39,7 @@ class GoLocalSource(GoTarget):
     if 'name' in kwargs:
       raise TargetDefinitionException(Address(parse_context.rel_path, kwargs['name']).spec,
                                       'A {} does not accept a name; instead, the name is taken '
-                                      'from the the BUILD file location.'.format(cls.alias()))
+                                      'from the BUILD file location.'.format(cls.alias()))
     name = os.path.basename(parse_context.rel_path)
 
     if 'sources' in kwargs:

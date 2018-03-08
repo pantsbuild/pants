@@ -29,9 +29,12 @@ class TargetFilterTaskMixinTest(TaskTestBase):
   class GreenTarget(Target):
     pass
 
+  class PurpleTarget(Target):
+    pass
+
   @property
   def alias_groups(self):
-    purple_macro = TargetMacro.Factory.wrap(lambda ctx: None, self.RedTarget, self.BlueTarget)
+    purple_macro = TargetMacro.Factory.wrap(lambda ctx: None, self.PurpleTarget)
     return BuildFileAliases(targets={'green': self.GreenTarget, 'purple': purple_macro},
                             objects={'red': object()},
                             context_aware_object_factories={'blue': lambda ctx: None})
@@ -46,7 +49,7 @@ class TargetFilterTaskMixinTest(TaskTestBase):
 
   def test_macro_alias(self):
     purple_targets = self.task.target_types_for_alias('purple')
-    self.assertEqual({self.RedTarget, self.BlueTarget}, purple_targets)
+    self.assertEqual({self.PurpleTarget}, purple_targets)
 
   def test_alias_miss(self):
     with self.assertRaises(self.task.InvalidTargetType):
