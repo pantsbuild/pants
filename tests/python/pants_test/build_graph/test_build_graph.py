@@ -247,6 +247,7 @@ class BuildGraphTest(TestBase):
   def inject_address_closure(self, spec):
     self.build_graph.inject_address_closure(Address.parse(spec))
 
+  @unittest.skip(reason='TODO: #4515')
   def test_invalid_address(self):
     with self.assertRaisesRegexp(AddressLookupError, '.* does not contain any BUILD files.'):
       self.inject_address_closure('//:a')
@@ -256,7 +257,9 @@ class BuildGraphTest(TestBase):
                            '  dependencies=["non-existent-path:b"],'
                            ')')
     with self.assertRaisesRegexp(AddressLookupError,
-                                 '.*non-existent-path.*does not contain any BUILD files.'):
+                                 '^.*/non-existent-path does not contain any BUILD files.'
+                                 '\s+when translating spec non-existent-path:b'
+                                 '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   @unittest.skip(reason='TODO: #4515')
@@ -318,7 +321,10 @@ class BuildGraphTest(TestBase):
     self.add_to_build_file('other/BUILD',
                            'target(name="b")')
 
-    with self.assertRaisesRegexp(AddressLookupError, '^Addresses in dependencies must be unique.'):
+    with self.assertRaisesRegexp(
+        AddressLookupError,
+        '''^Addresses in dependencies must be unique. 'other:b' is '''
+        '''referenced more than once by target '//:a'.'''):
       self.inject_address_closure('//:a')
 
   def test_leveled_predicate(self):

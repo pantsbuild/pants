@@ -136,11 +136,11 @@ class TestBase(unittest.TestCase):
     contents: A string containing the contents of the file - '' by default..
     mode:     The mode to write to the file in - over-write by default.
     """
-    if self._graph_helper is not None:
-      self._graph_helper.scheduler.invalidate_files(list(self._collect_invalid_for(relpath)))
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
+    if self._graph_helper is not None:
+      self._graph_helper.scheduler.invalidate_files(list(self._collect_invalid_for(relpath)))
     return path
 
   def create_files(self, path, files):
