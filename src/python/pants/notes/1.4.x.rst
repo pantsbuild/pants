@@ -3,6 +3,17 @@
 
 This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
+1.4.0rc5 (03/07/2018)
+---------------------
+
+The sixth release candidate for the ``1.4.x`` stable branch.
+
+Bugfixes
+~~~~~~~~
+
+* Improve the performance of v2 changed. (#5571)
+  `PR #5571 <https://github.com/pantsbuild/pants/pull/5571>`_
+
 1.4.0rc4 (03/06/2018)
 ---------------------
 
