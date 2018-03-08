@@ -59,24 +59,12 @@ class SubsystemClientMixin(object):
 
   @classmethod
   def subsystem_dependencies_iter(cls):
+    """Iterate over the direct subsystem dependencies of this Optionable."""
     for dep in cls.subsystem_dependencies():
       if isinstance(dep, SubsystemDependency):
         yield dep
       else:
         yield SubsystemDependency(dep, GLOBAL_SCOPE)
-
-  # @classmethod
-  # def known_scope_infos(cls):
-  #   """Yields ScopeInfo for all known scopes for this optionable, in no particular order."""
-  #   # The optionable's own scope.
-  #   yield cls.get_scope_info()
-  #   # The scopes of any scoped subsystems it uses.
-  #   for dep in cls.subsystem_dependencies_iter():
-  #     for si in dep.subsystem_cls.known_scope_infos():
-  #       if si.is_scoped() or not dep.is_global():
-  #         yield si.scoped_to(dep.scope)
-  #       else:
-  #         yield si
 
   class CycleException(Exception):
     """Thrown when a circular subsystem dependency is detected."""

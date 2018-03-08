@@ -22,16 +22,6 @@ class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls']
   SUBSYSTEM = 'SUBSYSTEM'
   INTERMEDIATE = 'INTERMEDIATE'  # Scope added automatically to fill out the scope hierarchy.
 
-  def scoped_to(self, client_scope):
-    """The Optionable described by this scope, when scoped to the Optionable with client_scope."""
-    if client_scope == GLOBAL_SCOPE:
-      return self
-    return ScopeInfo('{0}.{1}'.format(self.scope, client_scope), self.category, self.optionable_cls)
-
-  def is_scoped(self):
-    """Whether this ScopeInfo represents a subsystem scoped to some other optionable."""
-    return self.category == self.SUBSYSTEM and '.' in self.scope
-
   @property
   def description(self):
     return self._optionable_cls_attr('get_description', lambda: '')()
