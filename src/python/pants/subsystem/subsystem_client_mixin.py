@@ -97,11 +97,12 @@ class SubsystemClientMixin(object):
       if scope_info not in known_scope_infos:
         known_scope_infos.add(scope_info)
         for dep in scope_info.optionable_cls.subsystem_dependencies_iter():
-          if dep.is_global():
-            scoped_to = GLOBAL_SCOPE
-          else:
-            scoped_to = scope
-          collect_scope_infos(dep.subsystem_cls, scoped_to)
+          # A subsystem always exists at its global scope (for the purpose of options
+          # registration and specification), even if in practice we only use it scoped to
+          # some other scope.
+          collect_scope_infos(dep.subsystem_cls, GLOBAL_SCOPE)
+          if not dep.is_global():
+            collect_scope_infos(dep.subsystem_cls, scope)
 
       optionables_path.remove(scope_info.optionable_cls)
 
