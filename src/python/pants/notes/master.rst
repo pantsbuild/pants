@@ -86,8 +86,8 @@ Documentation Updates
 * Fix documentation code blocks. (#5558)
   `PR #5558 <https://github.com/pantsbuild/pants/pull/5558>`_
 
-1.5.0dev5 (03/02/2018)
-----------------------
+1.5.0.dev5 (03/02/2018)
+-----------------------
 
 New Features
 ~~~~~~~~~~~~
