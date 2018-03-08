@@ -284,7 +284,7 @@ class BaseTest(unittest.TestCase):
     """
     # Many tests use source root functionality via the SourceRootConfig.global_instance().
     # (typically accessed via Target.target_base), so we always set it up, for convenience.
-    for_subsystems = for_subsystems or ()
+    for_subsystems = set(for_subsystems or ())
     for subsystem in for_subsystems:
       if subsystem.options_scope is None:
         raise TaskError('You must set a scope on your subsystem type before using it in tests.')
