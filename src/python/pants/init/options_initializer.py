@@ -94,7 +94,6 @@ class OptionsInitializer(object):
 
     # Gather the optionables that are not scoped to any other.  All known scopes are reachable
     # via these optionables' known_scope_infos() methods.
-    # TODO: Rename methods to 'global_subsystems'.
     top_level_optionables = ({GlobalOptionsRegistrar} |
                              GoalRunner.subsystems() |
                              build_configuration.subsystems() |
