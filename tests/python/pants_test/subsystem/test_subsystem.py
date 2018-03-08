@@ -70,6 +70,7 @@ class SubsystemTest(unittest.TestCase):
   def test_scoping_simple(self):
     self.assertEqual({si('dummy', DummySubsystem)}, DummySubsystem.known_scope_infos())
     self.assertEqual({si('scoped-dependent-subsystem', ScopedDependentSubsystem),
+                      si('dummy', DummySubsystem),
                       si('dummy.scoped-dependent-subsystem', DummySubsystem)},
                      ScopedDependentSubsystem.known_scope_infos())
 
@@ -177,17 +178,19 @@ class SubsystemTest(unittest.TestCase):
     expected_known_scope_infos_c = {si('c', SubsystemC)}
     self.assertSetEqual(expected_known_scope_infos_c, set(SubsystemC.known_scope_infos()))
 
-    expected_known_scope_infos_b = {si('b', SubsystemB), si('e', SubsystemE), si('c.b', SubsystemC)}
+    expected_known_scope_infos_b = {si('b', SubsystemB), si('e', SubsystemE),
+                                    si('c', SubsystemC), si('c.b', SubsystemC)}
     self.assertSetEqual(expected_known_scope_infos_b, set(SubsystemB.known_scope_infos()))
 
     expected_known_scope_infos_a = {
-      si('a', SubsystemA), si('e', SubsystemE), si('b.a', SubsystemB), si('c.b.a', SubsystemC)
+      si('a', SubsystemA), si('e', SubsystemE), si('b', SubsystemB), si('b.a', SubsystemB),
+      si('c', SubsystemC), si('c.b', SubsystemC), si('c.b.a', SubsystemC)
     }
     self.assertSetEqual(expected_known_scope_infos_a, set(SubsystemA.known_scope_infos()))
 
     expected_known_scope_infos_d = {
-      si('d', SubsystemD), si('e.d', SubsystemE), si('b.d', SubsystemB), si('c.b.d', SubsystemC),
-      si('e', SubsystemE)
+      si('d', SubsystemD), si('e.d', SubsystemE), si('b', SubsystemB), si('b.d', SubsystemB),
+      si('c', SubsystemC), si('c.b', SubsystemC), si('c.b.d', SubsystemC), si('e', SubsystemE)
     }
     self.assertSetEqual(expected_known_scope_infos_d, set(SubsystemD.known_scope_infos()))
 
