@@ -168,11 +168,11 @@ class SubsystemTest(unittest.TestCase):
         return (SubsystemE, SubsystemC.scoped(cls))
 
     class SubsystemA(Subsystem):
-       options_scope = 'a'
+      options_scope = 'a'
 
-       @classmethod
-       def subsystem_dependencies(cls):
-         return (SubsystemB.scoped(cls),)
+      @classmethod
+      def subsystem_dependencies(cls):
+        return (SubsystemB.scoped(cls),)
 
     expected_known_scope_infos_c = {si('c', SubsystemC)}
     self.assertSetEqual(expected_known_scope_infos_c, set(SubsystemC.known_scope_infos()))
@@ -190,7 +190,6 @@ class SubsystemTest(unittest.TestCase):
       si('e', SubsystemE)
     }
     self.assertSetEqual(expected_known_scope_infos_d, set(SubsystemD.known_scope_infos()))
-
 
   def test_uninitialized_global(self):
     Subsystem.reset()
