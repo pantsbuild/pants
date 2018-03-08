@@ -23,17 +23,17 @@ from pants.task.task import TaskBase
 class BashCompletion(ConsoleTask):
   """Generate a Bash shell script that teaches Bash how to autocomplete pants command lines."""
 
-  def get_all_cmd_line_scopes(self):
+  @staticmethod
+  def _get_all_cmd_line_scopes():
     """Return all scopes that may be explicitly specified on the cmd line, in no particular order.
 
     Note that this includes only task scope, and not, say, subsystem scopes,
     as those aren't specifiable on the cmd line.
     """
-    all_scopes = set([''])
+    all_scopes ={GLOBAL_SCOPE}
     for goal in Goal.all():
-      for scope_info in goal.known_scope_infos():
-        if scope_info.category == ScopeInfo.TASK:
-          all_scopes.add(scope_info.scope)
+      for task in goal.task_types():
+        all_scopes.add(task.get_scope_info().scope)
     return all_scopes
 
   def get_autocomplete_options_by_scope(self):
@@ -74,14 +74,14 @@ class BashCompletion(ConsoleTask):
   def console_output(self, targets):
     if targets:
       raise TaskError('This task does not accept any target addresses.')
-    cmd_line_scopes = sorted(self.get_all_cmd_line_scopes())
+    cmd_line_scopes = sorted(self._get_all_cmd_line_scopes())
     autocomplete_options_by_scope = self.get_autocomplete_options_by_scope()
 
-    def bash_scope_key(scope):
-      if scope == GLOBAL_SCOPE:
+    def bash_scope_key(sc):
+      if sc == GLOBAL_SCOPE:
         return '__pants_global_options'
       else:
-        return '__pants_options_for_{}'.format(scope.replace('-', '_').replace('.', '_'))
+        return '__pants_options_for_{}'.format(sc.replace('-', '_').replace('.', '_'))
 
     options_text_lines = []
     for scope in cmd_line_scopes:
