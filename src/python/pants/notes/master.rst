@@ -4,8 +4,90 @@ Master Pre-Releases
 This document describes ``dev`` releases which occur weekly from master, and which do
 not undergo the vetting associated with ``stable`` releases.
 
-1.5.0dev5 (03/02/2018)
-----------------------
+1.5.0rc0 (03/07/2018)
+---------------------
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Cleanup v1 changed code. (#5572)
+  `PR #5572 <https://github.com/pantsbuild/pants/pull/5572>`_
+
+* Improve the performance of v2 changed. (#5571)
+  `PR #5571 <https://github.com/pantsbuild/pants/pull/5571>`_
+
+* Delete obsolete README. (#5573)
+  `PR #5573 <https://github.com/pantsbuild/pants/pull/5573>`_
+
+* Improve interpreter constraint tests and docs. (#5566)
+  `PR #5566 <https://github.com/pantsbuild/pants/pull/5566>`_
+
+* Engine is a workspace (#5555)
+  `PR #5555 <https://github.com/pantsbuild/pants/pull/5555>`_
+
+* Native engine is a stripped cdylib (#5557)
+  `PR #5557 <https://github.com/pantsbuild/pants/pull/5557>`_
+
+* Don't overwrite cffi files if they haven't changed (#5553)
+  `PR #5553 <https://github.com/pantsbuild/pants/pull/5553>`_
+
+* Don't install panic handler when RUST_BACKTRACE=1 (#5561)
+  `PR #5561 <https://github.com/pantsbuild/pants/pull/5561>`_
+
+* Only shift once, not twice (#5552)
+  `Issue #5551 <https://github.com/pantsbuild/pants/issues/5551>`_
+  `PR #5552 <https://github.com/pantsbuild/pants/pull/5552>`_
+
+* Prepare 1.4.0rc4 (#5569)
+  `PR #5569 <https://github.com/pantsbuild/pants/pull/5569>`_
+
+* [pantsd] Daemon lifecycle invalidation on configurable glob watches. (#5550)
+  `PR #5550 <https://github.com/pantsbuild/pants/pull/5550>`_
+
+* Set thrifty build_file_aliases (#5559)
+  `PR #5559 <https://github.com/pantsbuild/pants/pull/5559>`_
+
+* Better `PantsRunIntegrationTest` invalidation. (#5547)
+  `PR #5547 <https://github.com/pantsbuild/pants/pull/5547>`_
+
+* Support coverage of pants coverage tests. (#5544)
+  `PR #5544 <https://github.com/pantsbuild/pants/pull/5544>`_
+
+* Tighten `PytestRun` coverage plugin. (#5542)
+  `PR #5542 <https://github.com/pantsbuild/pants/pull/5542>`_
+
+* One additional change for 1.4.0rc3. (#5549)
+  `PR #5549 <https://github.com/pantsbuild/pants/pull/5549>`_
+
+* Provide injectables functionality in a mixin. (#5548)
+  `PR #5548 <https://github.com/pantsbuild/pants/pull/5548>`_
+
+* Revert a bunch of remoting PRs (#5543)
+  `PR #5543 <https://github.com/pantsbuild/pants/pull/5543>`_
+
+* Prep 1.4.0rc3 (#5545)
+  `PR #5545 <https://github.com/pantsbuild/pants/pull/5545>`_
+
+* CLean up fake options creation in tests. (#5539)
+  `PR #5539 <https://github.com/pantsbuild/pants/pull/5539>`_
+
+* Don't cache lmdb_store directory (#5541)
+  `PR #5541 <https://github.com/pantsbuild/pants/pull/5541>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Thrifty support for pants (#5531)
+  `PR #5531 <https://github.com/pantsbuild/pants/pull/5531>`_
+
+Documentation Updates
+~~~~~~~~~~~~~~~~~~~~~
+
+* Fix documentation code blocks. (#5558)
+  `PR #5558 <https://github.com/pantsbuild/pants/pull/5558>`_
+
+1.5.0.dev5 (03/02/2018)
+-----------------------
 
 New Features
 ~~~~~~~~~~~~
