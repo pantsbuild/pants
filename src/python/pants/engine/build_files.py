@@ -368,6 +368,7 @@ def create_graph_rules(address_mapper, symbol_table):
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(BuildFileAddress),
+    RootRule(BuildFileAddresses),
     RootRule(AscendantAddresses),
     RootRule(DescendantAddresses),
     RootRule(SiblingAddresses),

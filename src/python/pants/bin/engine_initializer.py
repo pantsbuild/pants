@@ -10,7 +10,7 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.build_files import create_graph_rules
+from pants.engine.build_files import BuildFileAddresses, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
@@ -25,6 +25,7 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.init.options_initializer import OptionsInitializer
+from pants.init.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.change_calculator import EngineChangeCalculator
 
@@ -79,7 +80,13 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    request = self.scheduler.execution_request([HydratedTargets], target_roots.as_specs())
+    if type(target_roots) is ChangedTargetRoots:
+      subjects = [BuildFileAddresses(target_roots.addresses)]
+    elif type(target_roots) is LiteralTargetRoots:
+      subjects = target_roots.specs
+    else:
+      raise ValueError('Unexpected TargetRoots type: `{}`.'.format(target_roots))
+    request = self.scheduler.execution_request([HydratedTargets], subjects)
     result = self.scheduler.execute(request)
     if result.error:
       raise result.error
@@ -95,7 +102,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
-    for _ in graph.inject_specs_closure(target_roots.as_specs()):
+    for _ in graph.inject_roots_closure(target_roots):
       pass
 
     address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())

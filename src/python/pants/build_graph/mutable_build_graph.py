@@ -99,6 +99,19 @@ class MutableBuildGraph(BuildGraph):
       raise self.TransitiveLookupError("{message}\n  referenced from {spec}"
                                        .format(message=e, spec=target_address.spec))
 
+  def inject_roots_closure(self, target_roots, fail_fast=None):
+    if type(target_roots) is ChangedTargetRoots:
+      for address in target_roots.addresses:
+        self.inject_address_closure(address)
+        yield address
+    elif type(target_roots) is LiteralTargetRoots:
+      for address in self._address_mapper.scan_specs(target_roots.specs,
+                                                     fail_fast=fail_fast):
+        self.inject_address_closure(address)
+        yield address
+    else:
+      raise ValueError('Unrecognized TargetRoots type: `{}`.'.format(target_roots))
+
   def inject_specs_closure(self, specs, fail_fast=None):
     for address in self._address_mapper.scan_specs(specs,
                                                    fail_fast=fail_fast):

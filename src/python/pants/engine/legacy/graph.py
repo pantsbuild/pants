@@ -6,6 +6,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import logging
+from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
@@ -23,6 +24,7 @@ from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesFiel
 from pants.engine.mapper import ResolveError
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
+from pants.init.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype
@@ -206,16 +208,26 @@ class LegacyBuildGraph(BuildGraph):
     addresses = set(addresses) - set(self._target_by_address.keys())
     if not addresses:
       return
-    matched = set(self._inject([SingleAddress(a.spec_path, a.target_name) for a in addresses]))
+    matched = set(self._inject_specs([SingleAddress(a.spec_path, a.target_name) for a in addresses]))
     missing = addresses - matched
     if missing:
       # TODO: When SingleAddress resolution converted from projection of a directory
       # and name to a match for PathGlobs, we lost our useful AddressLookupError formatting.
       raise AddressLookupError('Addresses were not matched: {}'.format(missing))
 
+  def inject_roots_closure(self, target_roots, fail_fast=None):
+    if type(target_roots) is ChangedTargetRoots:
+      for address in self._inject_addresses(target_roots.addresses):
+        yield address
+    elif type(target_roots) is LiteralTargetRoots:
+      for address in self._inject_specs(target_roots.specs):
+        yield address
+    else:
+      raise ValueError('Unrecognized TargetRoots type: `{}`.'.format(target_roots))
+
   def inject_specs_closure(self, specs, fail_fast=None):
     # Request loading of these specs.
-    for address in self._inject(specs):
+    for address in self._inject_specs(specs):
       yield address
 
   def resolve_address(self, address):
@@ -223,12 +235,10 @@ class LegacyBuildGraph(BuildGraph):
       self.inject_address_closure(address)
     return self.get_target(address)
 
-  def _inject(self, subjects):
-    """Inject Targets into the graph for each of the subjects and yield the resulting addresses."""
-    logger.debug('Injecting to %s: %s', self, subjects)
+  @contextmanager
+  def _resolve_context(self):
     try:
-      product_results = self._scheduler.products_request([HydratedTargets, BuildFileAddresses],
-                                                         subjects)
+      yield
     except ResolveError as e:
       # NB: ResolveError means that a target was not found, which is a common user facing error.
       raise AddressLookupError(str(e))
@@ -237,7 +247,36 @@ class LegacyBuildGraph(BuildGraph):
         'Build graph construction failed: {} {}'.format(type(e).__name__, str(e))
       )
 
-    # Update the base class indexes for this request.
+  def _inject_addresses(self, subjects):
+    """Injects targets into the graph for each of the given `Address` objects, and then yields them.
+
+    TODO: See #4533 about unifying "collection of literal Addresses" with the `Spec` types, which
+    would avoid the need for the independent `_inject_addresses` and `_inject_specs` codepaths.
+    """
+    logger.debug('Injecting addresses to %s: %s', self, subjects)
+    with self._resolve_context():
+      addresses = tuple(subjects)
+      hydrated_targets = self._scheduler.product_request(HydratedTargets,
+                                                         [BuildFileAddresses(addresses)])
+
+    self._index(hydrated_targets)
+
+    yielded_addresses = set()
+    for address in subjects:
+      if address not in yielded_addresses:
+        yielded_addresses.add(address)
+        yield address
+
+  def _inject_specs(self, subjects):
+    """Injects targets into the graph for each of the given `Spec` objects.
+
+    Yields the resulting addresses.
+    """
+    logger.debug('Injecting specs to %s: %s', self, subjects)
+    with self._resolve_context():
+      product_results = self._scheduler.products_request([HydratedTargets, BuildFileAddresses],
+                                                         subjects)
+
     self._index(product_results[HydratedTargets])
 
     yielded_addresses = set()
