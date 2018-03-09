@@ -13,7 +13,8 @@ from collections import defaultdict
 from pants.base.build_environment import get_scm
 from pants.base.specs import DescendantAddresses
 from pants.build_graph.address import Address
-from pants.engine.legacy.graph import HydratedTargets, target_types_from_symbol_table
+from pants.engine.build_files import HydratedStructs
+from pants.engine.legacy.graph import target_types_from_symbol_table
 from pants.engine.legacy.source_mapper import EngineSourceMapper
 from pants.goal.workspace import ScmWorkspace
 from pants.util.meta import AbstractClass
@@ -22,8 +23,8 @@ from pants.util.meta import AbstractClass
 logger = logging.getLogger(__name__)
 
 
-class _HydratedTargetDependentGraph(object):
-  """A graph for walking dependent addresses of HydratedTarget objects.
+class _DependentGraph(object):
+  """A graph for walking dependent addresses of TargetAdaptor objects.
 
   This avoids/imitates constructing a v1 BuildGraph object, because that codepath results
   in many references held in mutable global state (ie, memory leaks).
@@ -41,26 +42,27 @@ class _HydratedTargetDependentGraph(object):
   """
 
   @classmethod
-  def from_iterable(cls, target_types, iterable):
-    """Create a new HydratedTargetDependentGraph from an iterable of HydratedTarget instances."""
+  def from_iterable(cls, target_types, adaptor_iter):
+    """Create a new DependentGraph from an iterable of TargetAdaptor subclasses."""
     inst = cls(target_types)
-    for hydrated_target in iterable:
-      inst.inject_target(hydrated_target)
+    for target_adaptor in adaptor_iter:
+      inst.inject_target(target_adaptor)
     return inst
 
   def __init__(self, target_types):
     self._dependent_address_map = defaultdict(set)
     self._target_types = target_types
 
-  def inject_target(self, hydrated_target):
+  def inject_target(self, target_adaptor):
     """Inject a target, respecting all sources of dependencies."""
-    target_cls = self._target_types[hydrated_target.adaptor.type_alias]
+    target_cls = self._target_types[target_adaptor.type_alias]
 
-    declared_deps = hydrated_target.dependencies
-    implicit_deps = (Address.parse(s) for s in target_cls.compute_dependency_specs(kwargs=hydrated_target.adaptor.kwargs()))
+    declared_deps = target_adaptor.dependencies
+    implicit_deps = (Address.parse(s)
+                     for s in target_cls.compute_dependency_specs(kwargs=target_adaptor.kwargs()))
 
     for dep in itertools.chain(declared_deps, implicit_deps):
-      self._dependent_address_map[dep].add(hydrated_target.adaptor.address)
+      self._dependent_address_map[dep].add(target_adaptor.address)
 
   def dependents_of_addresses(self, addresses):
     """Given an iterable of addresses, yield all of those addresses dependents."""
@@ -142,12 +144,14 @@ class EngineChangeCalculator(ChangeCalculator):
     if changed_request.include_dependees not in ('direct', 'transitive'):
       return
 
-    # For dependee finding, we need to parse all build files.
-    product_iter = (t
-                    for targets in self._scheduler.product_request(HydratedTargets, [DescendantAddresses('')])
+    # For dependee finding, we need to parse all build files to collect all structs. But we
+    # don't need to fully hydrate targets (ie, expand their source globs).
+    adaptor_iter = (t
+                    for targets in self._scheduler.product_request(HydratedStructs,
+                                                                   [DescendantAddresses('')])
                     for t in targets.dependencies)
-    graph = _HydratedTargetDependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
-                                                        product_iter)
+    graph = _DependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
+                                                        adaptor_iter)
 
     if changed_request.include_dependees == 'direct':
       for address in graph.dependents_of_addresses(changed_addresses):
