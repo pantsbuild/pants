@@ -6,7 +6,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import os
-import unittest
 from contextlib import contextmanager
 
 from mock import MagicMock
@@ -119,20 +118,19 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     self.assertEqual('default', conf)
     self.assertEqual('guava-16.0.1.jar', os.path.basename(path))
 
-  @unittest.expectedFailure
   def test_resolve_ignores_jars_with_rev_left_off(self):
     """If a resolve jar leaves off the rev, we're supposed to get the latest version,
        but coursier doesn't currently support that.
        https://github.com/coursier/coursier/issues/209
     """
-    jar = JarDependency('com.google.guava', 'guava')
-    lib = self.make_target('//:b', JarLibrary, jars=[jar])
+    with self.assertRaises(TaskError) as cm:
+      jar = JarDependency('com.google.guava', 'guava')
+      lib = self.make_target('//:b', JarLibrary, jars=[jar])
 
-    compile_classpath = self.resolve([lib])
-
-    lib_cp = compile_classpath.get_for_target(lib)
-
-    self.assertEqual(5, len(lib_cp))
+      self.resolve([lib])
+    self.assertEqual(
+      'Undefined revs for jars unsupported by Coursier. "jar(org=u\'com.google.guava\', name=u\'guava\', rev=None, classifier=None, ext=u\'jar\')"',
+      str(cm.exception))
 
   def test_resolve_multiple_artifacts(self):
     def coordinates_for(cp):

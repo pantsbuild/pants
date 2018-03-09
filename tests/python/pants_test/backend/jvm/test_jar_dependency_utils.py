@@ -12,15 +12,15 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
 
 class JarDependencyUtilsTest(unittest.TestCase):
   def test_m2_string_representation(self):
-    org_name_ref = M2Coordinate(org='org.example', name='lib', rev='the-ref')
+    org_name_ref = M2Coordinate(org='org.example', name='lib', rev='the-rev')
 
-    self.assertEquals('org.example:lib:the-ref', str(org_name_ref))
+    self.assertEquals('org.example:lib:the-rev', str(org_name_ref))
     self.assertEquals(org_name_ref, M2Coordinate.from_string(str(org_name_ref)))
 
     org_name_ref_classifier = M2Coordinate(org='org.example', name='lib',
-                                           rev='the-ref', classifier='classify')
+                                           rev='the-rev', classifier='classify')
 
-    self.assertEquals('org.example:lib:jar:classify:the-ref', str(org_name_ref_classifier))
+    self.assertEquals('org.example:lib:jar:classify:the-rev', str(org_name_ref_classifier))
     self.assertEquals(org_name_ref_classifier, M2Coordinate.from_string(str(org_name_ref_classifier)))
 
     org_name_classifier = M2Coordinate(org='org.example', name='lib', classifier='classify')
