@@ -190,8 +190,11 @@ lazy_static! {
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
 }
 
-// This is mut so that the max level can be set via set_externs, but so that a lock doesn't need to
-// be acquired every time we check whether we should log something.
+// This is mut so that the max level can be set via set_externs.
+// It should only be set exactly once, and nothing should ever read it (it is only defined to
+// prevent the FfiLogger from being dropped).
+// In order to avoid a performance hit, there is no lock guarding it (because if it had a lock, it
+// would need to be acquired for every single logging statement).
 // Please don't mutate it.
 // Please.
 static mut LOGGER: FfiLogger = FfiLogger { level_filter: log::LevelFilter::Off };
