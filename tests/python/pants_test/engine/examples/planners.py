@@ -22,7 +22,7 @@ from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.parser import SymbolTable
 from pants.engine.rules import SingletonRule, TaskRule, rule
 from pants.engine.scheduler import LocalScheduler
-from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectVariant
+from pants.engine.selectors import Get, Select, SelectDependencies, SelectVariant
 from pants.engine.struct import HasProducts, Struct, StructWithDeps, Variants
 from pants.util.meta import AbstractClass
 from pants.util.objects import datatype
@@ -92,11 +92,6 @@ class ScalaInferredDepsSources(Sources):
   extensions = ('.scala',)
 
 
-class ImportedJVMPackages(datatype('ImportedJVMPackages', ['dependencies'])):
-  """Holds a list of 'JVMPackageName' dependencies."""
-  pass
-
-
 class JVMPackageName(datatype('JVMPackageName', ['name'])):
   """A typedef to represent a fully qualified JVM package name."""
   pass
@@ -133,10 +128,10 @@ def calculate_package_search_path(jvm_package_name, source_roots):
 
 
 @printing_func
-@rule(ImportedJVMPackages,
-      [SelectProjection(FilesContent, PathGlobs, 'path_globs', ScalaInferredDepsSources)])
-def extract_scala_imports(source_files_content):
-  """A toy example of dependency inference. Would usually be a compiler plugin."""
+@rule(ScalaSources, [Select(ScalaInferredDepsSources)])
+def reify_scala_sources(sources):
+  """Given a ScalaInferredDepsSources object, create ScalaSources."""
+  source_files_content = yield Get(FilesContent, PathGlobs, sources.path_globs)
   packages = set()
   import_re = re.compile(r'^import ([^;]*);?$')
   for filecontent in source_files_content.dependencies:
@@ -144,18 +139,12 @@ def extract_scala_imports(source_files_content):
       match = import_re.search(line)
       if match:
         packages.add(match.group(1).rsplit('.', 1)[0])
-  return ImportedJVMPackages([JVMPackageName(p) for p in packages])
 
+  dependency_addresses = yield [Get(Address, JVMPackageName(p)) for p in packages]
 
-@printing_func
-@rule(ScalaSources,
-      [Select(ScalaInferredDepsSources),
-       SelectDependencies(Address, ImportedJVMPackages, field_types=(JVMPackageName,))])
-def reify_scala_sources(sources, dependency_addresses):
-  """Given a ScalaInferredDepsSources object and its inferred dependencies, create ScalaSources."""
   kwargs = sources._asdict()
   kwargs['dependencies'] = list(set(dependency_addresses))
-  return ScalaSources(**kwargs)
+  yield ScalaSources(**kwargs)
 
 
 class Requirement(Struct):
@@ -317,18 +306,18 @@ class ScroogeJavaConfiguration(ScroogeConfiguration):
 
 @rule(ScalaSources,
       [Select(ThriftSources),
-       SelectVariant(ScroogeScalaConfiguration, 'thrift'),
-       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
-def gen_scrooge_scala_thrift(sources, config, scrooge_classpath):
-  return gen_scrooge_thrift(sources, config, scrooge_classpath)
+       SelectVariant(ScroogeScalaConfiguration, 'thrift')])
+def gen_scrooge_scala_thrift(sources, config):
+  scrooge_classpath = yield Get(Classpath, Address, Scrooge.tool_address)
+  yield gen_scrooge_thrift(sources, config, scrooge_classpath)
 
 
 @rule(JavaSources,
       [Select(ThriftSources),
-       SelectVariant(ScroogeJavaConfiguration, 'thrift'),
-       SelectProjection(Classpath, Address, 'tool_address', Scrooge)])
-def gen_scrooge_java_thrift(sources, config, scrooge_classpath):
-  return gen_scrooge_thrift(sources, config, scrooge_classpath)
+       SelectVariant(ScroogeJavaConfiguration, 'thrift')])
+def gen_scrooge_java_thrift(sources, config):
+  scrooge_classpath = yield Get(Classpath, Address, Scrooge.tool_address)
+  yield gen_scrooge_thrift(sources, config, scrooge_classpath)
 
 
 @printing_func
@@ -469,7 +458,6 @@ def setup_json_scheduler(build_root, native):
     ] + [
       # scala dependency inference
       reify_scala_sources,
-      extract_scala_imports,
       select_package_address,
       calculate_package_search_path,
       SingletonRule(SourceRoots, SourceRoots(('src/java','src/scala'))),
