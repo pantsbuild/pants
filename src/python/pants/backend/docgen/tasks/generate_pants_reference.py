@@ -25,6 +25,13 @@ class GeneratePantsReference(Task):
   can appear in BUILD files, and a reference listing all available goals and options.
   """
 
+  PANTS_REFERENCE_PRODUCT = 'pants_reference_page'
+  BUILD_DICTIONARY_PRODUCT = 'build_dictionary_page'
+
+  @classmethod
+  def product_types(cls):
+    return [cls.PANTS_REFERENCE_PRODUCT, cls.BUILD_DICTIONARY_PRODUCT]
+
   @classmethod
   def register_options(cls, register):
     register('--pants-reference-template', default='reference/pants_reference.html',
@@ -71,18 +78,20 @@ class GeneratePantsReference(Task):
         'task_data': get_scope_data(scope)[1:]
       })
 
-    self._do_render(self.get_options().pants_reference_template, {
+    ref_page = self._do_render(self.get_options().pants_reference_template, {
       'global_scope_data': global_scope_data,
       'global_subsystem_data': global_subsystem_data,
       'goal_data': goal_data
     })
+    self.context.products.register_data(self.PANTS_REFERENCE_PRODUCT, ref_page)
 
   def _gen_build_dictionary(self):
     buildfile_aliases = self.context.build_file_parser.registered_aliases()
     extracter = BuildDictionaryInfoExtracter(buildfile_aliases)
     target_type_infos = extracter.get_target_type_info()
     other_infos = sorted(extracter.get_object_info() + extracter.get_object_factory_info())
-    self._do_render(self.get_options().build_dictionary_template, {
+
+    build_dict_page = self._do_render(self.get_options().build_dictionary_template, {
       'target_types': {
         'infos': target_type_infos
       },
@@ -90,6 +99,7 @@ class GeneratePantsReference(Task):
         'infos': other_infos
       }
     })
+    self.context.products.register_data(self.BUILD_DICTIONARY_PRODUCT, build_dict_page)
 
   def _do_render(self, filename, args):
     package_name, _, _ = __name__.rpartition('.')
@@ -99,3 +109,4 @@ class GeneratePantsReference(Task):
     html = renderer.render_name(filename, args)
     with safe_open(output_path, 'w') as outfile:
       outfile.write(html.encode('utf8'))
+    return output_path

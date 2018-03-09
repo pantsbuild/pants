@@ -41,7 +41,7 @@ Generating the site
 -------------------
 
 To see http://www.pantsbuild.org/ site's content as it would be generated based on your local
-copy of the pants repo, enter the command
+copy of the pants repo, enter the command:
 
     :::bash
     # This publishes the docs **locally** and opens (-o) them in your browser for review
@@ -51,7 +51,7 @@ Publishing the site
 -------------------
 
 We publish the site via [Github Pages](https://pages.github.com/). You need `pantsbuild` commit
-privilege to publish the site.
+privilege to publish to the site at https://www.pantsbuild.org, but you can also publish to any repo you own
 
 Use the same script as for generating the site, but request it also be published. Don't
 worry—you'll get a chance to abort the publish just before it's committed remotely:
@@ -62,14 +62,18 @@ worry—you'll get a chance to abort the publish just before it's committed remo
     # proceeding to publish to http://www.pantsbuild.org
     ./build-support/bin/publish_docs.sh -op
 
-If you'd like to publish remotely for others to preview your changes easily, the `-d` option creates
-a copy of the site in a subdir of <http://www.pantsbuild.org/>:
+If you have `pantsbuild` commit privilege and you'd like to test remote
+publishing or preview an alternate version of the site without modifying the
+main site, the `-d` option creates a copy of the site in a subdir of
+<http://www.pantsbuild.org/>:
 
     :::bash
     # This publishes the docs locally and opens (-o) them in your browser for review
     # and then prompts you to confirm you want to publish these docs remotely before
     # proceeding to publish to http://www.pantsbuild.org/sirois-test-site
     ./build-support/bin/publish_docs.sh -opd sirois-test-site
+
+
 
 Cross References
 ----------------

@@ -4,6 +4,9 @@
 
 set -eo pipefail
 
+PANTS_GH_PAGES='https://github.com/pantsbuild/pantsbuild.github.io.git'
+GIT_URL="${GIT_URL:-$PANTS_GH_PAGES}"
+
 REPO_ROOT=$(cd $(dirname "${BASH_SOURCE[0]}") && cd "$(git rev-parse --show-toplevel)" && pwd)
 
 source ${REPO_ROOT}/build-support/common.sh
@@ -11,14 +14,24 @@ source ${REPO_ROOT}/build-support/common.sh
 PANTS_EXE="${REPO_ROOT}/pants"
 
 function usage() {
-  echo "Publishes the http://pantsbuild.org/ docs locally or remotely."
-  echo
-  echo "Usage: $0 (-h|-opd)"
-  echo " -h           print out this help message"
-  echo " -o           open the doc site locally"
-  echo " -p           publish the doc site remotely"
-  echo " -y           continue publishing without prompting"
-  echo " -d  <dir>    publish the site to a subdir staging/<dir> (useful for public previews)"
+  cat <<EOF
+Generates the Pants html documentation and optionally publishes it locally
+and/or remotely.
+
+Usage: $0 (-h|-opyld)
+ -h           Print out this help message.
+ -p           Publish the site to \$GIT_URL with an automated commit.
+ -o           Open the published site in a web browser.
+ -y           Continue publishing without prompting (prompting for what??? dumb)
+ -l  <dir>    Also publish the documentation into the existing local directory <dir>.
+ -d  <dir>    publish the site to a subdir staging/<dir> (useful for public
+              previews)
+
+Environment Variables and Defaults:
+GIT_URL=$PANTS_GH_PAGES
+  URL of a git remote repository to publish to with an automated commit.
+VIEW_PUBLISH_URL=
+EOF
 
   if (( $# > 0 )); then
     die "$@"
@@ -44,6 +57,10 @@ done
 # products, like everything else.
 
 set -x
+
+${PANTS_EXE} sitegen --pants-config-files=pants.publish.ini \
+             src:: examples:: contrib::  \
+             testprojects/src/java/org/pantsbuild/testproject/page:readme
 
 ${PANTS_EXE} reference \
   --pants-reference-template=reference/pants_reference_body.html \
@@ -85,7 +102,7 @@ continue."
   fi
   (
     ${REPO_ROOT}/src/docs/publish_via_git.sh \
-      https://github.com/pantsbuild/pantsbuild.github.io.git \
+      $GIT_URL \
       ${publish_path}
     do_open ${url}/index.html
   ) || die "Publish to ${url} failed."

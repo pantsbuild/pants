@@ -67,6 +67,7 @@ page(
 page(
   name='index',
   source='index.md',
+  show_toc=True,
   links=[
     ':3rdparty',
     ':1.0',

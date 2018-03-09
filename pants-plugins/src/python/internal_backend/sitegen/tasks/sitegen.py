@@ -6,17 +6,23 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 import collections
-import datetime
 import json
 import os
 import re
 import shutil
+from datetime import datetime
 
-import pystache
+from pystache import Renderer
 from six.moves import range
 
+from pants.backend.docgen.tasks.generate_pants_reference import GeneratePantsReference
+from pants.base.build_environment import get_buildroot
 from pants.base.exceptions import TaskError
+from pants.engine.rules import rule
+from pants.engine.selectors import Select
 from pants.task.task import Task
+from pants.util.dirutil import read_file
+from pants.util.objects import datatype
 
 
 """Static Site Generator for the Pants Build documentation site.
@@ -58,6 +64,94 @@ class SiteGen(Task):
       copy_extras(config)
 
 
+class MarkdownPageExport(datatype('MarkdownPageExport', [
+    'rel_path',
+    'page_name',
+    'show_toc',
+])): pass
+
+
+class SoupedPage(datatype('SoupedPage', [
+    'title',
+    'soup',
+    'md_page_export',
+])): pass
+
+
+@rule(SoupedPage, [Select(MarkdownPageExport)])
+def soupify(md_page_export):
+  file_path = md_page_export.rel_path
+  with open(file_path, 'rb') as orig_file:
+    file_contents = orig_file.read().decode('utf-8')
+    soup = beautiful_soup(file_contents)
+    title = get_title(soup) or md_page_export.page_name
+    return SoupedPage(title=title, soup=soup, md_page_export=md_page_export)
+
+
+def normalize_hrefs(souped_page):
+  page_export_dir = os.path.dirname(souped_page.md_page_export.rel_path)
+  href_tags = [tag in souped_page.soup.find_all(True) if 'href' in tag.attrs]
+  for htag in href_tags:
+    relative_link = os.path.join(page_export_dir, htag['href'])
+    htag['href'] = os.path.normpath(relative_link)
+
+
+def clean_souped(souped_page):
+  normalize_hrefs(souped_page)
+  ensure_page_headings_linkable(souped_page.soup)
+
+
+class ProductiveSiteGen(Task):
+
+  @classmethod
+  def register_options(cls, register):
+    super(ProductiveSiteGen, cls).register_options(register)
+
+    register('--template-path', type=str, advanced=True,
+             help='Path to a mustache template file to use for '
+                  'generating the site.')
+
+  @memoized_property
+  def template(self):
+    return read_file(self.context.options.template_path)
+
+  @classmethod
+  def prepare(cls, options, round_manager):
+    round_manager.require('markdown_html')
+    round_manager.require_data(GeneratePantsReference.PANTS_REFERENCE_PRODUCT)
+    round_manager.require_data(GeneratePantsReference.BUILD_DICTIONARY_PRODUCT)
+
+  def _process_exported_pages(self):
+    markdown_site = self.context.products.get('markdown_html')
+    buildroot = get_buildroot()
+
+    markdown_exported_pages = []
+    for tgt, prod in markdown_site.itermappings():
+      for basedir, product_file_list in prod.items():
+        for html_file_product in product_file_list:
+          abs_html_path = os.path.join(basedir, html_file_product)
+          rel_html_path = os.path.relpath(abs_html_path, buildroot)
+          html_filename = os.path.basename(rel_html_path)
+          page_name = os.path.splitext(html_filename)[0]
+          markdown_exported_pages.append(
+            MarkdownPageExport(
+              rel_path=rel_html_path,
+              page_name=page_name,
+              show_toc=tgt.show_toc))
+
+    return markdown_exported_pages
+
+  def execute(self):
+    processed_exported_pages = self._process_exported_pages()
+
+    souped_pages = [soupify(export) for export in processed_exported_pages]
+
+
+
+    soup_dict = {sp.md_page_export.page_name: sp.soup for sp in souped_pages}
+    pantsrefs = precompute_pantsrefs(soup_dict)
+
+
 def load_config(json_path):
   """Load config info from a .json file and return it."""
   with open(json_path) as json_file:
@@ -86,7 +180,6 @@ class Precomputed(object):
     """
     self.page = page
     self.pantsref = pantsref
-
 
 class PrecomputedPageInfo(object):
   """Info we compute (and preserve) for each page before we mutate things."""
@@ -201,20 +294,23 @@ def ensure_headings_linkable(soups):
   Enables tables of contents.
   """
   for soup in soups.values():
-    # To avoid re-assigning an existing id, note 'em down.
-    # Case-insensitve because distinguishing links #Foo and #foo would be weird.
-    existing_anchors = find_existing_anchors(soup)
-    count = 100
-    for tag in soup.find_all(_heading_re):
-      if not (tag.has_attr('id') or tag.has_attr('name')):
-        snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
-        while True:
-          count += 1
-          candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
-          if not candidate_id in existing_anchors:
-            existing_anchors.add(candidate_id)
-            tag['id'] = candidate_id
-            break
+    ensure_page_headings_linkable(soup)
+
+def ensure_page_headings_linkable(soup):
+  # To avoid re-assigning an existing id, note 'em down.
+  # Case-insensitve because distinguishing links #Foo and #foo would be weird.
+  existing_anchors = find_existing_anchors(soup)
+  count = 100
+  for tag in soup.find_all(_heading_re):
+    if not (tag.has_attr('id') or tag.has_attr('name')):
+      snippet = ''.join([c for c in tag.text if c.isalpha()])[:20]
+      while True:
+        count += 1
+        candidate_id = 'heading_{0}_{1}'.format(snippet, count).lower()
+        if not candidate_id in existing_anchors:
+          existing_anchors.add(candidate_id)
+          tag['id'] = candidate_id
+          break
 
 
 def link_pantsrefs(soups, precomputed):
@@ -320,12 +416,29 @@ def generate_page_toc(soup):
 
 def generate_generated(config, here):
   return('{0} {1}'.format(config['sources'][here],
-                          datetime.datetime.now().isoformat()))
+                          datetime.now().isoformat()))
+
+
+def
+
+
+def render_souped(souped, template, renderer):
+  soup = souped.soup
+  export = souped.md_page_export
+  to_render = soup.body or soup
+  timestamp = datetime.now().isoformat()
+  return renderer.render(
+    template,
+    body_html=str(to_render),
+    generated='{} {}'.format(export.rel_path, timestamp),
+    site_toc=None,
+    has_page_toc=export.show_toc,
+    page_path=export.rel_path)
 
 
 def render_html(dst, config, soups, precomputed, template):
   soup = soups[dst]
-  renderer = pystache.Renderer()
+  renderer = Renderer()
   title = precomputed.page[dst].title
   topdots = ('../' * dst.count('/'))
   if soup.body:

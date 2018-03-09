@@ -84,6 +84,7 @@ class Page(Target):
                format=None,
                links=None,
                provides=None,
+               show_toc=False,
                **kwargs):
     """
     :param source: Path to page source file.
@@ -106,6 +107,7 @@ class Page(Target):
                                            sources_rel_path=address.spec_path,
                                            key_arg='sources'),
       'format': PrimitiveField(format),
+      'show_toc': PrimitiveField(bool(show_toc)),
       'links': PrimitiveField(links or []),
       'provides': self.ProvidesTupleField(provides or []),
     })
@@ -141,3 +143,7 @@ class Page(Target):
   def format(self):
     """Returns this page's format, 'md' (Markdown) or 'rst' (ReStructured Text)."""
     return self.payload.format
+
+  @property
+  def show_toc(self):
+    return self.payload.show_toc
