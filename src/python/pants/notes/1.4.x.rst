@@ -6,7 +6,8 @@ This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 1.4.0 (03/10/2017)
 ------------------
 
-The ``1.4.0`` stable release, with no addition changes since the rc5 release. Thanks for your patience!
+The ``1.4.0`` stable release, with no additional changes since the ``rc5`` release. Thanks for
+your patience!
 
 A quick summary of the changes since the ``1.3.x`` branch:
 
@@ -20,7 +21,7 @@ A quick summary of the changes since the ``1.3.x`` branch:
   a separate VM.
 * Beta support for ``coursier`` for artifact resolving: expected to be stable in the
   ``1.5.x`` release series.
-* PEX files support bringing interpretter constraints with them to their runtime
+* PEX files support bringing interpreter constraints with them to their runtime
   environment: see `PR #5160 <https://github.com/pantsbuild/pants/pull/5160>`_.
 * Improvements to the ``missing-dep-suggest`` task that runs when ``strict_deps`` is enabled
   for a Java or Scala target.
