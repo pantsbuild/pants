@@ -58,7 +58,7 @@ python_library(
   name='node_task',
   sources=['node_task.py'],
   dependencies=[
-    'contrib/node/src/python/pants/contrib/node/subsystems:node_distribution',
+    'contrib/node/src/python/pants/contrib/node/subsystems',
     'contrib/node/src/python/pants/contrib/node/targets:node_bundle',
     'contrib/node/src/python/pants/contrib/node/targets:node_module',
     'contrib/node/src/python/pants/contrib/node/targets:node_remote_module',

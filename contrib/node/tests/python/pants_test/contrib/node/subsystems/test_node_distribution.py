@@ -18,12 +18,12 @@ from pants.contrib.node.subsystems.node_distribution import NodeDistribution
 class NodeDistributionTest(unittest.TestCase):
 
   def setUp(self):
-    self.distribution = global_subsystem_instance(NodeDistribution.Factory).create()
+    self.distribution = global_subsystem_instance(NodeDistribution)
 
   def test_bootstrap(self):
     node_cmd = self.distribution.node_command(args=['--version'])
     output = node_cmd.check_output()
-    self.assertEqual(self.distribution.version, output.strip())
+    self.assertEqual(self.distribution.version(), output.strip())
 
   def test_node(self):
     node_command = self.distribution.node_command(args=['--interactive'])  # Force a REPL session.
