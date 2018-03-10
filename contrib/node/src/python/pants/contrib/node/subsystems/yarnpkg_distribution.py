@@ -11,6 +11,7 @@ from pants.base.deprecated import deprecated_conditional
 from pants.binaries.binary_tool import NativeTool
 from pants.util.memo import memoized_method
 
+
 logger = logging.getLogger(__name__)
 
 

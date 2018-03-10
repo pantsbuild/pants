@@ -15,11 +15,12 @@ from pants.base.exceptions import TaskError
 from pants.base.hash_utils import hash_file
 from pants.binaries.binary_tool import NativeTool
 from pants.binaries.binary_util import BinaryUtil
-from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistribution
 from pants.option.custom_types import dir_option, file_option
 from pants.util.dirutil import safe_mkdir, safe_rmtree
 from pants.util.memo import memoized_method, memoized_property
 from pants.util.process_handler import subprocess
+
+from pants.contrib.node.subsystems.yarnpkg_distribution import YarnpkgDistribution
 
 
 logger = logging.getLogger(__name__)
