@@ -17,6 +17,7 @@ from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.jvm_target import JvmTarget
 from pants.backend.jvm.targets.managed_jar_dependencies import ManagedJarDependencies
+from pants.backend.jvm.tasks.classpath_products import ClasspathProducts
 from pants.backend.jvm.tasks.coursier_resolve import (CoursierResolve,
                                                       CoursierResolveFingerprintStrategy)
 from pants.base.exceptions import TaskError
@@ -80,6 +81,25 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       paths = [tup[1] for tup in compile_classpath.get_for_target(dep_with_url_lib)]
       self.assertTrue(any('.pants.d/coursier/cache/absolute/' in path for path in paths))
 
+  def test_resolve_specific_with_sources_javadocs(self):
+    # Create a jar_library with a single dep, and another library with no deps.
+    dep = JarDependency('commons-lang', 'commons-lang', '2.5')
+    jar_lib = self.make_target('//:a', JarLibrary, jars=[dep])
+    scala_lib = self.make_target('//:b', JavaLibrary, sources=[])
+    with self._temp_workdir() as workdir:
+      # Confirm that the deps were added to the appropriate targets.
+      context = self.context(target_roots=[jar_lib, scala_lib])
+      task = self.prepare_execute(context)
+      compile_classpath = context.products.get_data('compile_classpath',
+        init_func=ClasspathProducts.init_func(workdir)
+      )
+      task.resolve([jar_lib, scala_lib], compile_classpath, sources=True, javadoc=True)
+
+      # Both javadoc and sources jars are added to the classpath product
+      self.assertEquals(['default', 'src_doc', 'src_doc'],
+       sorted([c[0] for c in compile_classpath.get_for_target(jar_lib)]))
+      self.assertEquals(0, len(compile_classpath.get_for_target(scala_lib)))
+
   def test_resolve_conflicted(self):
     losing_dep = JarDependency('com.google.guava', 'guava', '16.0')
     winning_dep = JarDependency('com.google.guava', 'guava', '16.0.1')
@@ -97,6 +117,20 @@ class CoursierResolveTest(JvmToolTaskTestBase):
     conf, path = winning_cp[0]
     self.assertEqual('default', conf)
     self.assertEqual('guava-16.0.1.jar', os.path.basename(path))
+
+  def test_resolve_ignores_jars_with_rev_left_off(self):
+    """If a resolve jar leaves off the rev, we're supposed to get the latest version,
+       but coursier doesn't currently support that.
+       https://github.com/coursier/coursier/issues/209
+    """
+    with self.assertRaises(TaskError) as cm:
+      jar = JarDependency('com.google.guava', 'guava')
+      lib = self.make_target('//:b', JarLibrary, jars=[jar])
+
+      self.resolve([lib])
+    self.assertEqual(
+      'Undefined revs for jars unsupported by Coursier. "jar(org=u\'com.google.guava\', name=u\'guava\', rev=None, classifier=None, ext=u\'jar\')"',
+      str(cm.exception))
 
   def test_resolve_multiple_artifacts(self):
     def coordinates_for(cp):
@@ -224,6 +258,7 @@ class CoursierResolveTest(JvmToolTaskTestBase):
       #    └─ org.hamcrest:hamcrest-core:1.3
       self.assertEquals(2, len(jar_cp))
 
+
       # Take a sample jar path, remove it, then call the task again, it should invoke coursier again
       conf, path = jar_cp[0]
 
@@ -240,6 +275,16 @@ class CoursierResolveTest(JvmToolTaskTestBase):
         pass
 
       task.runjava.assert_called()
+
+  def test_resolve_jarless_pom(self):
+    jar = JarDependency('org.apache.commons', 'commons-weaver-privilizer-parent', '1.3')
+    lib = self.make_target('//:b', JarLibrary, jars=[jar])
+
+    compile_classpath = self.resolve([lib])
+
+    lib_cp = compile_classpath.get_for_target(lib)
+
+    self.assertEqual(0, len(lib_cp))
 
   def _make_junit_target(self):
     junit_dep = JarDependency('junit', 'junit', rev='4.12')
