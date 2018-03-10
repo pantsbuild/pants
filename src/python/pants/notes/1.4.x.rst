@@ -3,6 +3,39 @@
 
 This document describes releases leading up to the ``1.4.x`` ``stable`` series.
 
+1.4.0 (03/10/2017)
+------------------
+
+The ``1.4.0`` stable release, with no addition changes since the rc5 release. Thanks for your patience!
+
+A quick summary of the changes since the ``1.3.x`` branch:
+
+* ``pantsd`` should be usable for almost all usecases, although it is not `quite`
+  ready to enable by default. Please try it out!
+* There are a few new contrib plugins: ``codeanalysis`` (aka: kythe), ``thrifty``, ``avro``,
+  ``mypy``, ``confluence``.
+* Both pytest and junit now have support for ``--chroot`` and a ``files(..)`` target was added,
+  to support loose-file isolation in unit tests, and improving the safety of test caching.
+* junit also gained support for ``--no-fast``, allowing running each ``junit_test`` target in
+  a separate VM.
+* Beta support for ``coursier`` for artifact resolving: expected to be stable in the
+  ``1.5.x`` release series.
+* PEX files support bringing interpretter constraints with them to their runtime
+  environment: see `PR #5160 <https://github.com/pantsbuild/pants/pull/5160>`_.
+* Improvements to the ``missing-dep-suggest`` task that runs when ``strict_deps`` is enabled
+  for a Java or Scala target.
+* The ``--cache-ignore`` option was added to support forcing a rebuild of any particular
+  task without requiring clean-all. Particularly helpful in these early days of test caching!
+* Pants reports per-target compile and test times to its stats URL via a general
+  "target-level metrics" API. Add per-target stats for your Tasks!
+* ``java_thrift_library`` now takes a ``compiler_args`` property, which deprecates ``rpc_style``
+  and ``language``.
+* "implicit sources" are now enabled by default! If you do not specify a ``sources`` argument
+  on your target, a default sources glob will be used.
+  See https://www.pantsbuild.org/build_files.html for more info.
+
+See the rest of this page for the complete list of changes.
+
 1.4.0rc5 (03/07/2018)
 ---------------------
 
