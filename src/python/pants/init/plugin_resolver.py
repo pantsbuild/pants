@@ -18,7 +18,6 @@ from wheel.install import WheelFile
 
 from pants.option.global_options import GlobalOptionsRegistrar
 from pants.python.python_repos import PythonRepos
-from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.memo import memoized_property
@@ -133,9 +132,8 @@ class PluginResolver(object):
     # NB: The PluginResolver runs very early in the pants startup sequence before the standard
     # Subsystem facility is wired up.  As a result PluginResolver is not itself a Subsystem with
     # PythonRepos as a dependency.  Instead it does the minimum possible work to hand-roll
-    # bootstrapping of the Subsystem it needs.
-    subsystems = Subsystem.closure([PythonRepos])
-    known_scope_infos = [subsystem.get_scope_info() for subsystem in subsystems]
+    # bootstrapping of the Subsystems it needs.
+    known_scope_infos = PythonRepos.known_scope_infos()
     options = self._options_bootstrapper.get_full_options(known_scope_infos)
 
     # Ignore command line flags since we'd blow up on any we don't understand (most of them).
@@ -144,6 +142,8 @@ class PluginResolver(object):
     defaulted_only_options = options.drop_flag_values()
 
     GlobalOptionsRegistrar.register_options_on_scope(defaulted_only_options)
-    for subsystem in subsystems:
-      subsystem.register_options_on_scope(defaulted_only_options)
+    distinct_optionable_classes = sorted({si.optionable_cls for si in known_scope_infos},
+                                         key=lambda o: o.options_scope)
+    for optionable_cls in distinct_optionable_classes:
+      optionable_cls.register_options_on_scope(defaulted_only_options)
     return defaulted_only_options

@@ -7,8 +7,6 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 import inspect
 
-from twitter.common.collections import OrderedSet
-
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin, SubsystemDependency
@@ -48,14 +46,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
         'Subsystem "{}" not initialized for scope "{}". '
         'Is subsystem missing from subsystem_dependencies() in a task? '.format(class_name, scope))
 
-  class CycleException(Exception):
-    """Thrown when a circular dependency is detected."""
-
-    def __init__(self, cycle):
-      message = 'Cycle detected:\n\t{}'.format(' ->\n\t'.join(
-          '{} scope: {}'.format(subsystem, subsystem.options_scope) for subsystem in cycle))
-      super(Subsystem.CycleException, self).__init__(message)
-
   @classmethod
   def is_subsystem_type(cls, obj):
     return inspect.isclass(obj) and issubclass(obj, cls)
@@ -75,36 +65,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
       return super(Subsystem, cls).get_scope_info()
     else:
       return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
-
-  @classmethod
-  def closure(cls, subsystem_types):
-    """Gathers the closure of the `subsystem_types` and their transitive `dependencies`.
-
-    :param subsystem_types: An iterable of subsystem types.
-    :returns: A set containing the closure of subsystem types reachable from the given
-              `subsystem_types` roots.
-    :raises: :class:`pants.subsystem.subsystem.Subsystem.CycleException` if a dependency cycle is
-             detected.
-    """
-    known_subsystem_types = set()
-    path = OrderedSet()
-
-    def collect_subsystems(subsystem):
-      if subsystem in path:
-        cycle = list(path) + [subsystem]
-        raise cls.CycleException(cycle)
-
-      path.add(subsystem)
-      if subsystem not in known_subsystem_types:
-        known_subsystem_types.add(subsystem)
-        for dependency in subsystem.subsystem_dependencies_iter():
-          collect_subsystems(dependency.subsystem_cls)
-      path.remove(subsystem)
-
-    for subsystem_type in subsystem_types:
-      collect_subsystems(subsystem_type)
-
-    return known_subsystem_types
 
   @classmethod
   def subscope(cls, scope):

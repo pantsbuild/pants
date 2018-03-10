@@ -11,12 +11,13 @@ from collections import namedtuple
 
 from twitter.common.collections import OrderedSet
 
-from pants.option.scope import ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import AbstractClass
 
 
-GLOBAL_SCOPE = ''
-GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
+# TODO: Switch all clients to reference pants.option.scope directly.
+GLOBAL_SCOPE = GLOBAL_SCOPE
+GLOBAL_SCOPE_CONFIG_SECTION = GLOBAL_SCOPE_CONFIG_SECTION
 
 
 class ArgSplitterError(Exception):

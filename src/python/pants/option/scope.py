@@ -8,6 +8,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from collections import namedtuple
 
 
+GLOBAL_SCOPE = ''
+GLOBAL_SCOPE_CONFIG_SECTION = 'GLOBAL'
+
+
 class ScopeInfo(namedtuple('_ScopeInfo', ['scope', 'category', 'optionable_cls'])):
   """Information about a scope."""
 

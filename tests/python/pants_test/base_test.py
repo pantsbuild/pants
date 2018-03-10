@@ -284,13 +284,12 @@ class BaseTest(unittest.TestCase):
     """
     # Many tests use source root functionality via the SourceRootConfig.global_instance().
     # (typically accessed via Target.target_base), so we always set it up, for convenience.
-    optionables = {SourceRootConfig}
-
-    for_subsystems = for_subsystems or ()
+    for_subsystems = set(for_subsystems or ())
     for subsystem in for_subsystems:
       if subsystem.options_scope is None:
         raise TaskError('You must set a scope on your subsystem type before using it in tests.')
-      optionables.add(subsystem)
+
+    optionables = {SourceRootConfig} | self._build_configuration.subsystems() | for_subsystems
 
     for_task_types = for_task_types or ()
     for task_type in for_task_types:
@@ -307,9 +306,10 @@ class BaseTest(unittest.TestCase):
         optionables.add(type(subclass_name, (task_type.goal_options_registrar_cls, ),
                              {b'options_scope': task_type.options_scope}))
 
-      optionables.update(Subsystem.closure(
-        set([dep.subsystem_cls for dep in task_type.subsystem_dependencies_iter()]) |
-            self._build_configuration.subsystems()))
+    # Now expand to all deps.
+    all_optionables = set()
+    for optionable in optionables:
+      all_optionables.update(si.optionable_cls for si in optionable.known_scope_infos())
 
     # Now default the option values and override with any caller-specified values.
     # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
@@ -319,7 +319,7 @@ class BaseTest(unittest.TestCase):
       scoped_opts.update(opts)
 
     fake_options = create_options_for_optionables(
-      optionables, options=options, **kwargs)
+      all_optionables, options=options, **kwargs)
 
     Subsystem.reset(reset_options=True)
     Subsystem.set_options(fake_options)

@@ -50,6 +50,14 @@ class Optionable(AbstractClass):
     return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
 
   @classmethod
+  def known_scope_infos(cls):
+    """Yields ScopeInfo for all known scopes for this optionable, in no particular order.
+
+    Specific Optionable subtypes may override to provide information about other optionables.
+    """
+    yield cls.get_scope_info()
+
+  @classmethod
   def get_description(cls):
     # First line of docstring.
     return '' if cls.__doc__ is None else cls.__doc__.partition('\n')[0].strip()

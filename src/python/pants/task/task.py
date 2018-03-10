@@ -102,16 +102,6 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
     return []
 
   @classmethod
-  def known_scope_infos(cls):
-    """Yields ScopeInfo for all known scopes for this task, in no particular order."""
-    # The task's own scope.
-    yield cls.get_scope_info()
-    # The scopes of any task-specific subsystems it uses.
-    for dep in cls.subsystem_dependencies_iter():
-      if not dep.is_global():
-        yield dep.subsystem_cls.get_scope_info(subscope=dep.scope)
-
-  @classmethod
   def supports_passthru_args(cls):
     """Subclasses may override to indicate that they can use passthru args.
 

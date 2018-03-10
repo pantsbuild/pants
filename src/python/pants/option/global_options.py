@@ -15,9 +15,10 @@ from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.custom_types import dir_option
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
+from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 
 
-class GlobalOptionsRegistrar(Optionable):
+class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
   options_scope = GLOBAL_SCOPE
   options_scope_category = ScopeInfo.GLOBAL
   options_subsumed_scopes = [

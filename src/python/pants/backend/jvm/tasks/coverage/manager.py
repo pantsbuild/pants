@@ -12,7 +12,6 @@ from pants.backend.jvm.tasks.coverage.cobertura import Cobertura
 from pants.backend.jvm.tasks.coverage.engine import NoCoverage
 from pants.backend.jvm.tasks.coverage.jacoco import Jacoco
 from pants.subsystem.subsystem import Subsystem
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.dirutil import safe_mkdir
 from pants.util.strutil import safe_shlex_split
 
@@ -55,7 +54,7 @@ class CodeCoverageSettings(object):
                log=task.context.log)
 
 
-class CodeCoverage(Subsystem, SubsystemClientMixin):
+class CodeCoverage(Subsystem):
   """Manages setup and construction of JVM code coverage engines.
   """
   options_scope = 'coverage'
