@@ -174,6 +174,9 @@ class PantsReferenceLinker(object):
     attribute have a unique id that can be linked to from other pages. Think of
     this like rust ownership. Use `get_result()` to get page objects to write to
     file, etc.
+
+    TODO: toc stuff (our markdown generation uses the 'toc' extension -- what
+    does this do and can we use it instead of doing our own stuff manually?)
     """
     soup = souped_page.soup
     for elem in soup.find_all(True):
@@ -183,13 +186,19 @@ class PantsReferenceLinker(object):
         self._accept_ref(souped_page, elem)
 
     self._pages.append(souped_page)
-    # TODO: toc stuff (our markdown generation uses the 'toc' extension -- what
-    # does this do and can we use it instead of doing our own stuff manually?)
 
   def get_result(self):
-    # TODO: return modified pages, signal e.g. multiple pantsmarks of the same
-    # name, ensure all pantsrefs match to a pantsmark, apply toc
-    
+    """TODO:
+
+    - return modified pages
+    - signal e.g. multiple pantsmarks of the same name
+    - ensure all pantsrefs match to a pantsmark
+    - apply tocs
+      - check if show_toc is true for whether to show page_toc
+        - see generate_page_toc()
+      - gotta have site_doc tho too for all
+        - see generate_site_toc()
+    """
 
 def _extract_refs_marks(souped_page):
   refs = []
