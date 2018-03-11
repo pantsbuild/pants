@@ -22,6 +22,7 @@ from pants.engine.rules import rule
 from pants.engine.selectors import Select
 from pants.task.task import Task
 from pants.util.dirutil import read_file
+from pants.util.memo import memoized_property
 from pants.util.objects import datatype
 
 
