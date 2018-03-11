@@ -85,7 +85,9 @@ class SoupedPage(datatype('SoupedPage', [
     'title',
     'soup',
     'md_page_export',
-])): pass
+])):
+  def rel_path(self):
+    return self.md_page_export.rel_path
 
 
 @rule(SoupedPage, [Select(MarkdownPageExport)])
@@ -102,11 +104,14 @@ class PantsMark(datatype('PantsMark', [
     'mark_name',
     'souped_page',
     'mark_element_id',
-])): pass
+])):
+  def as_href(self):
+    return '{}#{}'.format(self.souped_page.rel_path(), self.mark_element_id)
 
 
 class PantsRef(datatype('PantsRef', [
     'ref_mark_name',
+    'souped_page',
     'ref_element',
 ])): pass
 
@@ -133,20 +138,34 @@ def _ensure_element_id(soup, element, id_base):
 # render() function of pystache (which i think should be done in this class too)
 class PantsReferenceLinker(object):
   def __init__(self):
-    # mark_name ->
+    # mark_name -> PantsMark
     self._mark_dict = {}
-    self._processed_pages = []
+    self._refs = []
+    self._pages = []
+
+  class ReferenceLinkingError(Exception): pass
 
   def _accept_mark(self, souped_page, elem):
     mark_name = elem['pantsmark']
+
+    if self._mark_dict.has(mark_name):
+      prev_mark = self._mark_dict[mark_name]
+      raise self.ReferenceLinkingError(
+        'An element with pantsmark="{}" was declared twice: '
+        'in \'{}\' and \'{}\'. Each pantsmark may only be declared once.'
+        .format(
+          mark_name,
+          prev_mark.souped_page.rel_path(),
+          souped_page.rel_path()))
+
     mark_element_id = _ensure_element_id(soup, elem, mark_name)
     pants_mark = PantsMark(mark_name, souped_page, mark_element_id)
-    # TODO: ???
+    self._mark_dict[mark_name] = pants_mark
 
   def _accept_ref(self, souped_page, elem):
     ref_mark_name = elem['pantsref']
-    pants_ref = PantsRef(ref_mark_name, elem)
-    # TODO: ???
+    pants_ref = PantsRef(ref_mark_name, souped_page, elem)
+    self._refs.append(pants_ref)
 
   def accept_page(self, souped_page):
     """Extract 'pantsmark' and 'pantsref' locations from the page.
@@ -156,21 +175,21 @@ class PantsReferenceLinker(object):
     this like rust ownership. Use `get_result()` to get page objects to write to
     file, etc.
     """
-    refs = []
-    marks = []
     soup = souped_page.soup
     for elem in soup.find_all(True):
       if elem.has_attr('pantsmark'):
         self._accept_mark(souped_page, elem)
       if elem.has_attr('pantsref'):
         self._accept_ref(souped_page, elem)
+
+    self._pages.append(souped_page)
     # TODO: toc stuff (our markdown generation uses the 'toc' extension -- what
     # does this do and can we use it instead of doing our own stuff manually?)
 
   def get_result(self):
     # TODO: return modified pages, signal e.g. multiple pantsmarks of the same
     # name, ensure all pantsrefs match to a pantsmark, apply toc
-
+    
 
 def _extract_refs_marks(souped_page):
   refs = []
