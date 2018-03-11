@@ -71,6 +71,16 @@ class MarkdownPageExport(datatype('MarkdownPageExport', [
 ])): pass
 
 
+def _make_page_export(abs_html_path, show_toc, buildroot):
+    rel_html_path = os.path.relpath(abs_html_path, buildroot)
+    html_filename = os.path.basename(rel_html_path)
+    page_name = os.path.splitext(html_filename)[0]
+    return MarkdownPageExport(
+      rel_path=rel_html_path,
+      page_name=page_name,
+      show_toc=show_toc)
+
+
 class SoupedPage(datatype('SoupedPage', [
     'title',
     'soup',
@@ -88,28 +98,129 @@ def soupify(md_page_export):
     return SoupedPage(title=title, soup=soup, md_page_export=md_page_export)
 
 
-def normalize_hrefs(souped_page):
-  page_export_dir = os.path.dirname(souped_page.md_page_export.rel_path)
-  href_tags = [tag in souped_page.soup.find_all(True) if 'href' in tag.attrs]
-  for htag in href_tags:
-    relative_link = os.path.join(page_export_dir, htag['href'])
-    htag['href'] = os.path.normpath(relative_link)
+class PantsMark(datatype('PantsMark', [
+    'mark_name',
+    'souped_page',
+    'mark_element_id',
+])): pass
 
 
-def clean_souped(souped_page):
-  normalize_hrefs(souped_page)
-  ensure_page_headings_linkable(souped_page.soup)
+class PantsRef(datatype('PantsRef', [
+    'ref_mark_name',
+    'ref_element',
+])): pass
+
+
+def _ensure_element_id(soup, element, id_base):
+  """Mutates the element by setting an id attribute if necessary to ensure the
+  returned id is valid."""
+  cur_id = element.get('id')
+  if cur_id:
+    return cur_id
+
+  # TODO: there's probably a better way to generate unique ids...
+  cur_id = id_base
+  uniq_count = 1
+  while soup.find(id=cur_id):
+    cur_id = '{}_{}'.format(id_base, str(uniq_count))
+    uniq_count += 1
+
+  element['id'] = cur_id
+  return cur_id
+
+
+# TODO: see src/docs/docsite.html.mustache for what we need to pass to the
+# render() function of pystache (which i think should be done in this class too)
+class PantsReferenceLinker(object):
+  def __init__(self):
+    # mark_name ->
+    self._mark_dict = {}
+    self._processed_pages = []
+
+  def _accept_mark(self, souped_page, elem):
+    mark_name = elem['pantsmark']
+    mark_element_id = _ensure_element_id(soup, elem, mark_name)
+    pants_mark = PantsMark(mark_name, souped_page, mark_element_id)
+    # TODO: ???
+
+  def _accept_ref(self, souped_page, elem):
+    ref_mark_name = elem['pantsref']
+    pants_ref = PantsRef(ref_mark_name, elem)
+    # TODO: ???
+
+  def accept_page(self, souped_page):
+    """Extract 'pantsmark' and 'pantsref' locations from the page.
+
+    NB: May modify the page content to ensure elements with the 'pantsmark'
+    attribute have a unique id that can be linked to from other pages. Think of
+    this like rust ownership. Use `get_result()` to get page objects to write to
+    file, etc.
+    """
+    refs = []
+    marks = []
+    soup = souped_page.soup
+    for elem in soup.find_all(True):
+      if elem.has_attr('pantsmark'):
+        self._accept_mark(souped_page, elem)
+      if elem.has_attr('pantsref'):
+        self._accept_ref(souped_page, elem)
+    # TODO: toc stuff (our markdown generation uses the 'toc' extension -- what
+    # does this do and can we use it instead of doing our own stuff manually?)
+
+  def get_result(self):
+    # TODO: return modified pages, signal e.g. multiple pantsmarks of the same
+    # name, ensure all pantsrefs match to a pantsmark, apply toc
+
+
+def _extract_refs_marks(souped_page):
+  refs = []
+  marks = []
+  soup = souped_page.soup
+  for elem in soup.find_all(True):
+    if elem.has_attr('pantsmark'):
+      mark_name = elem['pantsmark']
+      mark_element_id = _generate_insert_element_id(soup, elem, mark_name)
+      pants_mark = PantsMark(mark_name, souped_page, mark_element_id)
+      marks.append(pants_mark)
+    if elem.has_attr('pantsref'):
+      ref_mark_name = elem['pantsref']
+      pants_ref = PantsRef(ref_mark_name, elem)
+      refs.append(pants_ref)
+
+  return (refs, marks)
+
+
+def render_souped(souped, template, renderer):
+  soup = souped.soup
+  export = souped.md_page_export
+  to_render = soup.body or soup
+  timestamp = datetime.now().isoformat()
+  return renderer.render(
+    template,
+    body_html=str(to_render),
+    generated='{} {}'.format(export.rel_path, timestamp),
+    site_toc=None,
+    has_page_toc=export.show_toc,
+    page_path=export.rel_path)
 
 
 class ProductiveSiteGen(Task):
+
+  PANTS_DOCSITE_HTML_TEMPLATE_PATH = 'src/docs/docsite.html.mustache'
+
+  PANTS_DOCSITE_OUTDIR = 'dist/docsite'
 
   @classmethod
   def register_options(cls, register):
     super(ProductiveSiteGen, cls).register_options(register)
 
     register('--template-path', type=str, advanced=True,
+             default=cls.PANTS_DOCSITE_HTML_TEMPLATE_PATH,
              help='Path to a mustache template file to use for '
                   'generating the site.')
+    register('--outdir', type=str, advanced=True,
+             default=cls.PANTS_DOCSITE_OUTDIR,
+             help='Path to a directory to render the generated site in.')
 
   @memoized_property
   def template(self):
@@ -121,6 +232,12 @@ class ProductiveSiteGen(Task):
     round_manager.require_data(GeneratePantsReference.PANTS_REFERENCE_PRODUCT)
     round_manager.require_data(GeneratePantsReference.BUILD_DICTIONARY_PRODUCT)
 
+  SITE_GEN_PRODUCT = 'generated_site'
+
+  @classmethod
+  def product_types(cls):
+    return [cls.SITE_GEN_PRODUCT]
+
   def _process_exported_pages(self):
     markdown_site = self.context.products.get('markdown_html')
     buildroot = get_buildroot()
@@ -130,14 +247,17 @@ class ProductiveSiteGen(Task):
       for basedir, product_file_list in prod.items():
         for html_file_product in product_file_list:
           abs_html_path = os.path.join(basedir, html_file_product)
-          rel_html_path = os.path.relpath(abs_html_path, buildroot)
-          html_filename = os.path.basename(rel_html_path)
-          page_name = os.path.splitext(html_filename)[0]
-          markdown_exported_pages.append(
-            MarkdownPageExport(
-              rel_path=rel_html_path,
-              page_name=page_name,
-              show_toc=tgt.show_toc))
+          pg_export = _make_page_export(abs_html_path, tgt.show_toc, buildroot)
+          markdown_exported_pages.append(pg_export)
+
+    pants_ref_prod = self.context.products.get_data(
+      GeneratePantsReference.PANTS_REFERENCE_PRODUCT)
+    markdown_exported_pages.append(
+      _make_page_export(pants_ref_prod, False, buildroot))
+    build_dict_prod = self.context.products.get_data(
+      GeneratePantsReference.BUILD_DICTIONARY_PRODUCT)
+    markdown_exported_pages.append(
+      _make_page_export(build_dict_prod, False, buildroot))
 
     return markdown_exported_pages
 
@@ -146,10 +266,10 @@ class ProductiveSiteGen(Task):
 
     souped_pages = [soupify(export) for export in processed_exported_pages]
 
+    # Mutates soup objects.
+    for pg in souped_pages:
+      normalize_hrefs(pg)
 
-
-    soup_dict = {sp.md_page_export.page_name: sp.soup for sp in souped_pages}
-    pantsrefs = precompute_pantsrefs(soup_dict)
 
 
 def load_config(json_path):
@@ -417,23 +537,6 @@ def generate_page_toc(soup):
 def generate_generated(config, here):
   return('{0} {1}'.format(config['sources'][here],
                           datetime.now().isoformat()))
-
-
-def
-
-
-def render_souped(souped, template, renderer):
-  soup = souped.soup
-  export = souped.md_page_export
-  to_render = soup.body or soup
-  timestamp = datetime.now().isoformat()
-  return renderer.render(
-    template,
-    body_html=str(to_render),
-    generated='{} {}'.format(export.rel_path, timestamp),
-    site_toc=None,
-    has_page_toc=export.show_toc,
-    page_path=export.rel_path)
 
 
 def render_html(dst, config, soups, precomputed, template):
