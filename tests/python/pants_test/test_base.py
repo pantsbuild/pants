@@ -92,6 +92,7 @@ class TestBase(unittest.TestCase):
 
     relpath: The relative path to the directory from the build root.
     """
+    self._invalidate_for(relpath)
     path = os.path.join(self.build_root, relpath)
     safe_mkdir(path)
     return path
@@ -107,25 +108,16 @@ class TestBase(unittest.TestCase):
     safe_mkdir(path)
     return path
 
-  def _collect_invalid_for(self, relpath):
-    """Before touching the given path (relative to the build root) computes all affected paths.
+  def _invalidate_for(self, *relpaths):
+    """Invalidates all files from the relpath, recursively up to the root.
 
     Many python operations implicitly create parent directories, so we assume that touching a
     file located below directories that do not currently exist will result in their creation.
-
-    This emulates (to some degree) the types of events we'd expect to see from watchman when a
-    user creates or updates a file. A created/removed file/directory results in two events: one
-    for the parent, and one for the child. An updated file on the other hand only sends a single
-    event (for the child and not its parent).
     """
-    # Invalidate for any path components which will be directly or indirectly created. The first
-    # component is always considered to have been invalidated.
-    transitively_invalidated = True
-    for p in recursive_dirname(relpath):
-      directly_invalidated = not os.path.exists(os.path.join(self.build_root, p))
-      if directly_invalidated or transitively_invalidated:
-        yield p
-      transitively_invalidated = directly_invalidated
+    if self._graph_helper is None:
+      return
+    files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
+    self._graph_helper.scheduler.invalidate_files(files)
 
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
@@ -136,8 +128,7 @@ class TestBase(unittest.TestCase):
     contents: A string containing the contents of the file - '' by default..
     mode:     The mode to write to the file in - over-write by default.
     """
-    if self._graph_helper is not None:
-      self._graph_helper.scheduler.invalidate_files(list(self._collect_invalid_for(relpath)))
+    self._invalidate_for(relpath)
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
@@ -333,15 +324,14 @@ class TestBase(unittest.TestCase):
       self._initialize_engine()
     return self._build_graph
 
-  def reset_build_graph(self, reset_build_files=False):
+  def reset_build_graph(self, reset_build_files=False, delete_build_files=False):
     """Start over with a fresh build graph with no targets in it."""
-    if reset_build_files:
-      files = [f for f in self.buildroot_files() if f.endswith('/BUILD')]
-      for f in files:
-        os.remove(os.path.join(self.build_root, f))
-      if self._graph_helper is not None:
-        invalidate = [invalid for root in files for invalid in self._collect_invalid_for(root)]
-        self._graph_helper.scheduler.invalidate_files(invalidate)
+    if delete_build_files or reset_build_files:
+      files = [f for f in self.buildroot_files() if os.path.basename(f) == 'BUILD']
+      if delete_build_files:
+        for f in files:
+          os.remove(os.path.join(self.build_root, f))
+      self._invalidate_for(*files)
     if self._build_graph is not None:
       self._build_graph = self._build_graph.clone_new()
 
