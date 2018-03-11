@@ -24,7 +24,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import relative_symlink, safe_mkdir
+from pants.util.dirutil import safe_mkdir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
