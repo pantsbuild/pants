@@ -239,6 +239,10 @@ class GoTargetAdaptor(TargetAdaptor):
     # N.B. Go targets glob on `*` due to the way resources and .c companion files are handled.
     return ('*',)
 
+  @property
+  def default_sources_exclude_globs(self):
+    return ('BUILD', 'BUILD.*')
+
 
 class BaseGlobs(Locatable, AbstractClass):
   """An adaptor class to allow BUILD file parsing from ContextAwareObjectFactories."""
