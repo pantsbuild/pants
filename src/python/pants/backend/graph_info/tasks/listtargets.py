@@ -12,8 +12,6 @@ from pants.task.console_task import ConsoleTask
 
 class ListTargets(ConsoleTask):
   """Lists all targets matching the target specs.
-
-  If no targets are specified, lists all targets in the workspace.
   """
 
   @classmethod
@@ -29,7 +27,7 @@ class ListTargets(ConsoleTask):
              help='Print only targets that are documented with a description.')
 
   @classmethod
-  def address_products(cls):
+  def address_products(cls, options):
     return (BuildFileAddresses,)
 
   def __init__(self, *args, **kwargs):

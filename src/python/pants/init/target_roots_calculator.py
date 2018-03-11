@@ -56,7 +56,7 @@ class TargetRootsCalculator(object):
     products = []
     for task in tasks:
       if task.defines_address_products():
-        products.extend(task.address_products())
+        products.extend(task.invoke_address_products(options))
       else:
         requires_legacy_graph = True
 

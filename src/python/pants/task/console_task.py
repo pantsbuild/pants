@@ -30,6 +30,12 @@ class ConsoleTask(QuietTaskMixin, Task):
 
   def __init__(self, *args, **kwargs):
     super(ConsoleTask, self).__init__(*args, **kwargs)
+    self._defines_console_output = not hasattr(self.console_output, '_canary')
+    self._defines_render = not hasattr(self.render, '_canary')
+    if self._defines_console_output == self._defines_render:
+      raise AssertionError(
+          'ConsoleTasks must define exactly one of either `console_output` or `render`.')
+
     self._console_separator = self.get_options().sep.decode('string-escape')
     if self.get_options().output_file:
       try:
@@ -53,8 +59,11 @@ class ConsoleTask(QuietTaskMixin, Task):
   def execute(self):
     with self._guard_sigpipe():
       try:
-        targets = self.context.targets()
-        for value in self.console_output(targets) or tuple():
+        if self._defines_console_output:
+          generator = self.console_output(self.context.targets())
+        else:
+          generator = self.render()
+        for value in generator or tuple():
           self._outstream.write(value.encode('utf-8'))
           self._outstream.write(self._console_separator)
       finally:
@@ -63,4 +72,19 @@ class ConsoleTask(QuietTaskMixin, Task):
           self._outstream.close()
 
   def console_output(self, targets):
-    raise NotImplementedError('console_output must be implemented by subclasses of ConsoleTask')
+    """Creates a generator or collection of lines of output for the given root targets.
+
+    Exactly one of `console_output` or `render` should be implemented.
+
+    :API: public
+    """
+  console_output._canary = None
+
+  def render(self):
+    """Creates a generator or collection of output lines (generally from the products for the task).
+
+    Exactly one of `console_output` or `render` should be implemented.
+
+    :API: experimental
+    """
+  render._canary = None

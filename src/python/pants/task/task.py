@@ -133,8 +133,13 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
 
   @classmethod
   def invoke_prepare(cls, options, round_manager):
-    # Subclasses should not generally need to override this method.
+    # Subclasses should not override this method.
     return cls.prepare(cls._scoped_options(options), round_manager)
+
+  @classmethod
+  def invoke_address_products(cls, options):
+    # Subclasses should not override this method.
+    return cls.address_products(cls._scoped_options(options))
 
   @classmethod
   def prepare(cls, options, round_manager):
@@ -152,7 +157,7 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
   prepare.__func__._canary = None
 
   @classmethod
-  def address_products(cls):
+  def address_products(cls, options):
     """A tuple of product types for the root `pants.base.spec.Spec` subjects of a run.
 
     Only one of either `def prepare` or `def address_products` may be declared.
@@ -223,6 +228,14 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       raise TaskError('{0} Does not support passthru args.'.format(self.stable_name()))
     else:
       return self.context.options.passthru_args_for_scope(self.options_scope)
+
+  def get_address_products(self):
+    """Returns the passthru args for this task, if it supports them.
+
+    :API: experimental
+    """
+    ...
+    return self.context.get_address_products(type(self))
 
   @property
   def skip_execution(self):
