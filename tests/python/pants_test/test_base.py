@@ -31,7 +31,8 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.task.goal_options_mixin import GoalOptionsMixin
-from pants.util.dirutil import recursive_dirname, safe_mkdir, safe_open, safe_rmtree
+from pants.util.dirutil import (recursive_dirname, relative_symlink, safe_mkdir, safe_open,
+                                safe_rmtree)
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.engine.util import init_native
 from pants_test.option.util.fakes import create_options_for_optionables
@@ -92,9 +93,9 @@ class TestBase(unittest.TestCase):
 
     relpath: The relative path to the directory from the build root.
     """
-    self._invalidate_for(relpath)
     path = os.path.join(self.build_root, relpath)
     safe_mkdir(path)
+    self._invalidate_for(relpath)
     return path
 
   def create_workdir_dir(self, relpath):
@@ -106,6 +107,7 @@ class TestBase(unittest.TestCase):
     """
     path = os.path.join(self.pants_workdir, relpath)
     safe_mkdir(path)
+    self._invalidate_for(relpath)
     return path
 
   def _invalidate_for(self, *relpaths):
@@ -119,6 +121,19 @@ class TestBase(unittest.TestCase):
     files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
     self._graph_helper.scheduler.invalidate_files(files)
 
+  def create_link(self, relsrc, reldst):
+    """Creates a symlink within the buildroot.
+
+    :API: public
+
+    relsrc: A relative path for the source of the link.
+    reldst: A relative path for the destination of the link.
+    """
+    src = os.path.join(self.build_root, relsrc)
+    dst = os.path.join(self.build_root, reldst)
+    relative_symlink(src, dst)
+    self._invalidate_for(reldst)
+
   def create_file(self, relpath, contents='', mode='wb'):
     """Writes to a file under the buildroot.
 
@@ -128,10 +143,10 @@ class TestBase(unittest.TestCase):
     contents: A string containing the contents of the file - '' by default..
     mode:     The mode to write to the file in - over-write by default.
     """
-    self._invalidate_for(relpath)
     path = os.path.join(self.build_root, relpath)
     with safe_open(path, mode=mode) as fp:
       fp.write(contents)
+    self._invalidate_for(relpath)
     return path
 
   def create_files(self, path, files):

@@ -24,7 +24,7 @@ from pants.build_graph.resources import Resources
 from pants.build_graph.target import Target
 from pants.fs.archive import TGZ
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
-from pants.util.dirutil import safe_mkdir
+from pants.util.dirutil import relative_symlink, safe_mkdir
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 from pants_test.subsystem.subsystem_util import init_subsystem
 
@@ -494,7 +494,7 @@ class TestSetupPy(SetupPyTestBase):
   def test_symlinks_issues_2815(self):
     res = self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
 
-    os.symlink(res, os.path.join(self.build_root, 'src/python/monster/group.res'))
+    self.create_link(res, 'src/python/monster/group.res')
     self.create_file(relpath='src/python/monster/__init__.py', contents='')
     self.create_file(relpath='src/python/monster/research_programme.py',
                      contents='# Look for more off-by-one "errors"!')
