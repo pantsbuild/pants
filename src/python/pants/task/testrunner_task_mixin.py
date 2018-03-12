@@ -270,7 +270,7 @@ class TestRunnerTaskMixin(object):
             import logging
             logger = logging.getLogger(__name__)
             logger.warn('Timed out test(s) did not terminate gracefully after {} seconds, killing...:\n  {}'
-                        .format(wait_time, '\n  '.join(t.address.spec for t in test_targets)))
+                        .format(wait_time, args))
             process_handler.kill()
 
         timer = Timer(wait_time, kill_if_not_terminated)
