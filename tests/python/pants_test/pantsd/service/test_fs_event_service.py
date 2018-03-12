@@ -12,7 +12,7 @@ import mock
 
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.watchman import Watchman
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 class TestExecutor(object):
@@ -26,7 +26,7 @@ class TestExecutor(object):
     pass
 
 
-class TestFSEventService(BaseTest):
+class TestFSEventService(TestBase):
   BUILD_ROOT = '/build_root'
   EMPTY_EVENT = (None, None)
   FAKE_EVENT = ('test', dict(subscription='test', files=['a/BUILD', 'b/BUILD']))
@@ -34,7 +34,7 @@ class TestFSEventService(BaseTest):
   WORKER_COUNT = 1
 
   def setUp(self):
-    BaseTest.setUp(self)
+    super(TestFSEventService, self).setUp()
     self.mock_watchman = mock.create_autospec(Watchman, spec_set=True)
     self.service = FSEventService(self.mock_watchman, self.BUILD_ROOT, self.WORKER_COUNT)
     self.service.setup(None, None, executor=TestExecutor())

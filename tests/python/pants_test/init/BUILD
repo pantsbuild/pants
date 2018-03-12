@@ -17,7 +17,7 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
     'tests/python/pants_test/subsystem:subsystem_utils'
   ],
   coverage = ['pants.init'],

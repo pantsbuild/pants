@@ -8,7 +8,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 import logging
 import textwrap
 
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExcluder
 
@@ -16,7 +16,7 @@ from pants.contrib.python.checks.tasks.checkstyle.file_excluder import FileExclu
 logger = logging.getLogger(__name__)
 
 
-class TestExcluder(BaseTest):
+class TestExcluder(TestBase):
 
   def setUp(self):
     super(TestExcluder, self).setUp()

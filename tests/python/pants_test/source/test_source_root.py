@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.source.source_root import (SourceRoot, SourceRootCategories, SourceRootConfig,
                                       SourceRootFactory, SourceRootTrie)
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 # Shorthand, to cut some verbosity down in the tests.
@@ -17,7 +17,7 @@ TEST = SourceRootCategories.TEST
 THIRDPARTY = SourceRootCategories.THIRDPARTY
 
 
-class SourceRootTest(BaseTest):
+class SourceRootTest(TestBase):
   def test_source_root_trie(self):
     trie = SourceRootTrie(SourceRootFactory({
       'jvm': ('java', 'scala'),

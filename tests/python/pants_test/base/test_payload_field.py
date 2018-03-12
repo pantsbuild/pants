@@ -12,10 +12,10 @@ from pants.base.payload_field import (ExcludesField, FingerprintedField, Fingerp
                                       JarsField, PrimitiveField, PythonRequirementsField)
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-class PayloadTest(BaseTest):
+class PayloadTest(TestBase):
 
   def test_excludes_field(self):
     empty = ExcludesField()

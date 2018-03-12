@@ -9,7 +9,7 @@ import mock
 import psutil
 
 from pants.java.nailgun_executor import NailgunExecutor
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -21,7 +21,7 @@ def fake_process(**kwargs):
   return proc
 
 
-class NailgunExecutorTest(BaseTest):
+class NailgunExecutorTest(TestBase):
   def setUp(self):
     super(NailgunExecutorTest, self).setUp()
     self.executor = NailgunExecutor(identity='test',

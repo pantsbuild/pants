@@ -13,14 +13,14 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
 jar1 = JarDependency(org='testOrg1', name='testName1', rev='123')
 jar2 = JarDependency(org='testOrg2', name='testName2', rev='456')
 
 
-class JarLibraryTest(BaseTest):
+class JarLibraryTest(TestBase):
 
   @property
   def alias_groups(self):

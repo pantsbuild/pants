@@ -4,7 +4,7 @@
 python_library(
   name = 'base',
   dependencies = [
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ],
 )
 
@@ -34,7 +34,7 @@ python_tests(
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ]
 )
 
@@ -89,6 +89,6 @@ python_tests(
     'src/python/pants/backend/python:python_artifact',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:base_test'
+    'tests/python/pants_test:test_base'
   ]
 )

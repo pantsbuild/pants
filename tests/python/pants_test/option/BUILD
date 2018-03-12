@@ -9,7 +9,7 @@ python_tests(
     'src/python/pants/base:deprecated',
     'src/python/pants/option',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:base_test',
+    'tests/python/pants_test:test_base',
   ],
   timeout=30,
 )

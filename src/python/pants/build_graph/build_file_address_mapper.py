@@ -253,7 +253,7 @@ class BuildFileAddressMapper(AddressMapper):
 
     if not addresses:
       raise self.EmptyBuildFileError(
-        '{was_not_found_message}, because that directory contains no BUILD files defining addressable entities.'
+        '{was_not_found_message}, because that directory does not contain any BUILD files defining addressable entities.'
           .format(was_not_found_message=was_not_found_message))
     # Print BUILD file extensions if there's more than one BUILD file with targets only.
     if (any(not hasattr(address, 'rel_path') for address in addresses) or

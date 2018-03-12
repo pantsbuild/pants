@@ -10,13 +10,13 @@ from contextlib import contextmanager
 
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import touch
-from pants_test.base_test import BaseTest
 from pants_test.contrib.android.test_android_base import distribution
+from pants_test.test_base import TestBase
 
 from pants.contrib.android.distribution.android_distribution import AndroidDistribution
 
 
-class TestAndroidDistribution(BaseTest):
+class TestAndroidDistribution(TestBase):
   """Test the AndroidDistribution class."""
 
   @contextmanager

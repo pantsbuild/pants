@@ -285,7 +285,8 @@ class GoBuildgenTest(TaskTestBase):
                      pkg='prod',
                      rev='v1.2.3')
     pre_execute_files = self.stitch_deps_remote(materialize=True)
-    self.build_graph.reset()  # Force targets to be loaded off disk
+    self.reset_build_graph(reset_build_files=True)  # Force targets to be loaded off disk
+    print('>>> {}'.format(self.buildroot_files()))
     self.assertEqual('v1.2.3', self.target('3rdparty/go/pantsbuild.org/fake:prod').rev)
     self.assertEqual({'src/go/src/jane/BUILD', '3rdparty/go/pantsbuild.org/fake/BUILD'},
                      self.buildroot_files() - pre_execute_files)

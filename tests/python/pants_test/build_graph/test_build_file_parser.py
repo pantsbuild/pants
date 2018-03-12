@@ -12,22 +12,29 @@ from textwrap import dedent
 from pants.base.build_file import BuildFile
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import BuildFileAddress
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.target import Target
 from pants.util.strutil import ensure_binary
-from pants_test.base_test import BaseTest
+from pants_test.test_base import TestBase
 
 
-# TODO(Eric Ayers) Explicit unit tests are missing for registered_alises, parse_spec,
-# parse_build_file_family
 class ErrorTarget(Target):
-
   def __init__(self, *args, **kwargs):
     assert False, "This fake target should never be initialized in this test!"
 
 
-class BuildFileParserBasicsTest(BaseTest):
+class BaseTestWithParser(TestBase):
+  def setUp(self):
+    super(BaseTestWithParser, self).setUp()
+
+    build_configuration = BuildConfiguration()
+    build_configuration.register_aliases(self.alias_groups)
+    self.build_file_parser = BuildFileParser(build_configuration, self.build_root)
+
+
+class BuildFileParserBasicsTest(BaseTestWithParser):
 
   @property
   def alias_groups(self):
@@ -113,7 +120,7 @@ class BuildFileParserBasicsTest(BaseTest):
     self.build_file_parser.parse_build_file(build_file)
 
 
-class BuildFileParserTargetTest(BaseTest):
+class BuildFileParserTargetTest(BaseTestWithParser):
   @property
   def alias_groups(self):
     return BuildFileAliases(targets={'fake': ErrorTarget})
@@ -203,7 +210,7 @@ class BuildFileParserTargetTest(BaseTest):
         BuildFile.get_build_files_family(FileSystemProjectTree(self.build_root), '.'))
 
 
-class BuildFileParserExposedObjectTest(BaseTest):
+class BuildFileParserExposedObjectTest(BaseTestWithParser):
 
   @property
   def alias_groups(self):
@@ -216,7 +223,7 @@ class BuildFileParserExposedObjectTest(BaseTest):
     self.assertEqual(len(address_map), 0)
 
 
-class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTest):
+class BuildFileParserExposedContextAwareObjectFactoryTest(BaseTestWithParser):
 
   Jar = namedtuple('Jar', ['org', 'name', 'rev'])
   Repository = namedtuple('Repository', ['name', 'url', 'push_db_basedir'])
