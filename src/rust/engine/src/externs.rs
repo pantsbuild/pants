@@ -9,6 +9,7 @@ use std::string::FromUtf8Error;
 use std::sync::RwLock;
 
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
+use enum_primitive::FromPrimitive;
 use handles::Handle;
 use interning::Interns;
 use log;
@@ -187,17 +188,28 @@ pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
 lazy_static! {
   static ref EXTERNS: RwLock<Option<Externs>> = RwLock::new(None);
   static ref INTERNS: RwLock<Interns> = RwLock::new(Interns::new());
-  static ref LOGGER: FfiLogger = FfiLogger{};
 }
+
+// This is mut so that the max level can be set via set_externs.
+// It should only be set exactly once, and nothing should ever read it (it is only defined to
+// prevent the FfiLogger from being dropped).
+// In order to avoid a performance hit, there is no lock guarding it (because if it had a lock, it
+// would need to be acquired for every single logging statement).
+// Please don't mutate it.
+// Please.
+static mut LOGGER: FfiLogger = FfiLogger { level_filter: log::LevelFilter::Off };
 
 ///
 /// Set the static Externs for this process. All other methods of this module will fail
 /// until this has been called.
 ///
 pub fn set_externs(externs: Externs) {
+  let log_level = externs.log_level;
   let mut externs_ref = EXTERNS.write().unwrap();
   *externs_ref = Some(externs);
-  LOGGER.init();
+  unsafe {
+    LOGGER.init(log_level);
+  }
 }
 
 fn with_externs<F, T>(f: F) -> T
@@ -217,6 +229,7 @@ pub type ExternContext = raw::c_void;
 pub struct Externs {
   context: *const ExternContext,
   log: LogExtern,
+  log_level: u8,
   call: CallExtern,
   eval: EvalExtern,
   identify: IdentifyExtern,
@@ -246,6 +259,7 @@ impl Externs {
   pub fn new(
     ext_context: *const ExternContext,
     log: LogExtern,
+    log_level: u8,
     call: CallExtern,
     eval: EvalExtern,
     identify: IdentifyExtern,
@@ -268,6 +282,7 @@ impl Externs {
     Externs {
       context: ext_context,
       log: log,
+      log_level: log_level,
       call: call,
       eval: eval,
       identify: identify,
@@ -488,51 +503,88 @@ where
   output
 }
 
+// This is a hard-coding of constants in the standard logging python package.
+enum_from_primitive! {
+#[derive(Debug, Eq, PartialEq)]
 #[repr(u8)]
 enum PythonLogLevel {
-  Debug = 0,
-  Info = 1,
-  Warn = 2,
-  Critical = 3,
+  NotSet = 0,
+  // Trace doesn't exist in a Python world, so set it to "a bit lower than Debug".
+  Trace = 5,
+  Debug = 10,
+  Info = 20,
+  Warn = 30,
+  Error = 40,
+  Critical = 50,
+}
+}
+
+impl From<log::Level> for PythonLogLevel {
+  fn from(level: log::Level) -> Self {
+    match level {
+      log::Level::Error => PythonLogLevel::Error,
+      log::Level::Warn => PythonLogLevel::Warn,
+      log::Level::Info => PythonLogLevel::Info,
+      log::Level::Debug => PythonLogLevel::Debug,
+      log::Level::Trace => PythonLogLevel::Trace,
+    }
+  }
+}
+
+impl From<PythonLogLevel> for log::LevelFilter {
+  fn from(level: PythonLogLevel) -> Self {
+    match level {
+      PythonLogLevel::NotSet => log::LevelFilter::Off,
+      PythonLogLevel::Trace => log::LevelFilter::Trace,
+      PythonLogLevel::Debug => log::LevelFilter::Debug,
+      PythonLogLevel::Info => log::LevelFilter::Info,
+      PythonLogLevel::Warn => log::LevelFilter::Warn,
+      PythonLogLevel::Error => log::LevelFilter::Error,
+      // Rust doesn't have a Critical, so treat them like Errors.
+      PythonLogLevel::Critical => log::LevelFilter::Error,
+    }
+  }
 }
 
 ///
 /// FfiLogger is an implementation of log::Log which asks the Python logging system to log via cffi.
 ///
-struct FfiLogger {}
+struct FfiLogger {
+  level_filter: log::LevelFilter,
+}
 
 impl FfiLogger {
   // init must only be called once in the lifetime of the program. No other loggers may be init'd.
   // If either of the above are violated, expect a panic.
-  pub fn init(&'static self) {
+  pub fn init(&'static mut self, max_level: u8) {
+    let max_python_level = PythonLogLevel::from_u8(max_level);
+    self.level_filter = {
+      match max_python_level {
+        Some(python_level) => {
+          let level: log::LevelFilter = python_level.into();
+          level
+        }
+        None => panic!("Unrecognised log level from python: {}", max_level),
+      }
+    };
+
+    log::set_max_level(self.level_filter);
     log::set_logger(self).expect(
       "Failed to set logger (maybe you tried to call init multiple times?)",
     );
-
-    // TODO: Set this to whatever the value Python is using is.
-    log::set_max_level(log::LevelFilter::Trace);
   }
 }
 
 impl log::Log for FfiLogger {
-  fn enabled(&self, _metadata: &log::Metadata) -> bool {
-    // TODO: Inspect the current log setting from the python and actually filter.
-    // This is only used when people call log_enabled! to decide whether to do expensive
-    // computation before logging, which we don't currently do anywhere.
-    true
+  fn enabled(&self, metadata: &log::Metadata) -> bool {
+    metadata.level() >= self.level_filter
   }
 
   fn log(&self, record: &log::Record) {
     if !self.enabled(record.metadata()) {
       return;
     }
-    let level = match record.level() {
-      log::Level::Error => PythonLogLevel::Critical,
-      log::Level::Warn => PythonLogLevel::Warn,
-      log::Level::Info => PythonLogLevel::Info,
-      log::Level::Debug => PythonLogLevel::Debug,
-      log::Level::Trace => PythonLogLevel::Debug,
-    };
+    let level: PythonLogLevel = record.level().into();
     let message = format!("{}", record.args());
     with_externs(|e| {
       (e.log)(
