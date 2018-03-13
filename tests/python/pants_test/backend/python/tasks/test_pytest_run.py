@@ -5,7 +5,9 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import functools
 import os
+from contextlib import contextmanager
 from textwrap import dedent
 
 import coverage
@@ -700,3 +702,105 @@ class PytestTest(PytestTestBase):
 
     with self.assertRaises(PytestRun.InvalidShardSpecification):
       self.run_tests(targets=[self.green], test_shard='1/a')
+
+  @contextmanager
+  def marking_tests(self):
+    init_subsystem(Target.Arguments)
+    init_subsystem(SourceRootConfig)
+
+    with temporary_dir() as marker_dir:
+      self.create_file(
+        'test/python/passthru/test_passthru.py',
+        dedent("""
+            import inspect
+            import os
+            import pytest
+            import unittest
+  
+  
+            class PassthruTest(unittest.TestCase):
+              def touch(self, path):
+                with open(path, 'wb') as fp:
+                  fp.close()
+                  
+              def mark_test_run(self):
+                caller_frame_record = inspect.stack()[1]
+                
+                # For the slot breakdown of a frame record tuple, see:
+                #   https://docs.python.org/2/library/inspect.html#the-interpreter-stack
+                _, _, _, caller_func_name, _, _ = caller_frame_record
+                
+                marker_file = os.path.join({marker_dir!r}, caller_func_name)
+                self.touch(marker_file)
+  
+              def test_one(self):
+                self.mark_test_run()
+  
+              @pytest.mark.purple
+              def test_two(self):
+                self.mark_test_run()
+  
+              def test_three(self):
+                self.mark_test_run()
+                
+              @pytest.mark.red
+              def test_four(self):
+                self.mark_test_run()
+              
+              @pytest.mark.green
+              def test_five(self):
+                self.mark_test_run()                
+          """.format(marker_dir=marker_dir)))
+
+      def assert_mark(exists, name):
+        message = '{} {!r} to be executed.'.format('Expected' if exists else 'Did not expect', name)
+        marker_file = os.path.join(marker_dir, name)
+        self.assertEqual(exists, os.path.exists(marker_file), message)
+
+      test = self.make_target(spec='test/python/passthru', target_type=PythonTests)
+      yield test, functools.partial(assert_mark, True), functools.partial(assert_mark, False)
+
+  def test_passthrough_args_facility_single_style(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], '-ktest_one or test_two')
+      assert_test_run('test_one')
+      assert_test_run('test_two')
+      assert_test_not_run('test_three')
+      assert_test_not_run('test_four')
+      assert_test_not_run('test_five')
+
+  def test_passthrough_args_facility_plus_arg_style(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], '-m', 'purple or red')
+      assert_test_not_run('test_one')
+      assert_test_run('test_two')
+      assert_test_not_run('test_three')
+      assert_test_run('test_four')
+      assert_test_not_run('test_five')
+
+  def test_passthrough_args_legacy_option_single_style(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], options=['-ktest_two or test_three'])
+      assert_test_not_run('test_one')
+      assert_test_run('test_two')
+      assert_test_run('test_three')
+      assert_test_not_run('test_four')
+      assert_test_not_run('test_five')
+
+  def test_passthrough_args_legacy_option_plus_arg_style(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], options=['-m', 'red or green'])
+      assert_test_not_run('test_one')
+      assert_test_not_run('test_two')
+      assert_test_not_run('test_three')
+      assert_test_run('test_four')
+      assert_test_run('test_five')
+
+  def test_passthrough_args_combined(self):
+    with self.marking_tests() as (target, assert_test_run, assert_test_not_run):
+      self.run_tests([target], '-mgreen or purple', options=['-ktest_two or test_three'])
+      assert_test_not_run('test_one')
+      assert_test_run('test_two')
+      assert_test_not_run('test_three')
+      assert_test_not_run('test_four')
+      assert_test_not_run('test_five')
