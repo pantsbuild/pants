@@ -29,16 +29,15 @@ pub fn run_command_locally(
     })
 }
 
-
 #[cfg(test)]
 mod tests {
   extern crate testutil;
 
-  use super::{ExecuteProcessRequest, ExecuteProcessResult, run_command_locally};
+  use super::{run_command_locally, ExecuteProcessRequest, ExecuteProcessResult};
   use fs;
   use std::collections::BTreeMap;
   use std::path::PathBuf;
-  use self::testutil::{owned_string_vec, as_byte_owned_vec};
+  use self::testutil::{as_byte_owned_vec, owned_string_vec};
 
   #[test]
   #[cfg(unix)]

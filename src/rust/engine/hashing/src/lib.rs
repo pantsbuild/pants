@@ -136,7 +136,7 @@ impl<W: Write> Write for WriterHasher<W> {
 
 #[cfg(test)]
 mod fingerprint_tests {
-  use super::{Digest, Fingerprint, bazel_protos};
+  use super::{bazel_protos, Digest, Fingerprint};
 
   #[test]
   fn from_bytes_unsafe() {

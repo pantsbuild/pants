@@ -14,7 +14,6 @@ use handles::Handle;
 use interning::Interns;
 use log;
 
-
 pub fn eval(python: &str) -> Result<Value, Failure> {
   with_externs(|e| {
     (e.eval)(e.context, python.as_ptr(), python.len() as u64)
@@ -358,7 +357,10 @@ impl From<PyResult> for Result<Value, Failure> {
 impl From<Result<(), String>> for PyResult {
   fn from(res: Result<(), String>) -> Self {
     match res {
-      Ok(()) => PyResult { is_throw: false, value: eval("None").unwrap() },
+      Ok(()) => PyResult {
+        is_throw: false,
+        value: eval("None").unwrap(),
+      },
       Err(msg) => PyResult {
         is_throw: true,
         value: create_exception(&msg),

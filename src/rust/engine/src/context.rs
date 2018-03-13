@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use core::TypeId;
 use externs;
-use fs::{PosixFS, Store, safe_create_dir_all_ioerror, ResettablePool};
+use fs::{safe_create_dir_all_ioerror, PosixFS, ResettablePool, Store};
 use graph::{EntryId, Graph};
 use handles::maybe_drain_handles;
 use nodes::{Node, NodeFuture};
@@ -49,13 +49,9 @@ impl Core {
     };
 
     let store = safe_create_dir_all_ioerror(&store_path)
-        .map_err(|e| format!("{:?}", e))
-        .and_then(|()| Store::local_only(store_path, pool.clone()))
-        .unwrap_or_else(
-      |e| {
-        panic!("Could not initialize Store directory {:?}", e)
-      },
-    );
+      .map_err(|e| format!("{:?}", e))
+      .and_then(|()| Store::local_only(store_path, pool.clone()))
+      .unwrap_or_else(|e| panic!("Could not initialize Store directory {:?}", e));
 
     let rule_graph = RuleGraph::new(&tasks, root_subject_types);
 

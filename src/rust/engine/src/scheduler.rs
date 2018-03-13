@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use futures::future::{self, Future};
 
-use boxfuture::{Boxable, BoxFuture};
+use boxfuture::{BoxFuture, Boxable};
 use context::{Context, ContextFactory, Core};
 use core::{Failure, Key, TypeConstraint, TypeId, Value};
 use graph::EntryId;

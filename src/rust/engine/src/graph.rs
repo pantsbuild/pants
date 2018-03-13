@@ -15,10 +15,9 @@ use futures::future::{self, Future};
 use externs;
 use boxfuture::{BoxFuture, Boxable};
 use context::ContextFactory;
-use core::{Failure, FNV, Noop};
+use core::{Failure, Noop, FNV};
 use hashing;
 use nodes::{DigestFile, Node, NodeFuture, NodeKey, NodeResult, TryInto};
-
 
 // 2^32 Nodes ought to be more than enough for anyone!
 pub type EntryId = NodeIndex<u32>;

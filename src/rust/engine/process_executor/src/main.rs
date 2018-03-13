@@ -2,8 +2,8 @@ extern crate boxfuture;
 extern crate clap;
 extern crate env_logger;
 extern crate fs;
-extern crate hashing;
 extern crate futures;
+extern crate hashing;
 extern crate process_execution;
 extern crate tempdir;
 
@@ -59,7 +59,7 @@ fn main() {
         .takes_value(true)
         .help(
           "The host:port of the gRPC server to connect to. Forces remote execution. \
-If unspecified, local execution will be performed.",
+           If unspecified, local execution will be performed.",
         ),
     )
     .arg(

@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::hash;
 
-use core::{FNV, Key, Value};
+use core::{Key, Value, FNV};
 use externs;
 
 ///

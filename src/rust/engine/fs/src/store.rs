@@ -1,7 +1,7 @@
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
-use futures::{Future, future};
+use futures::{future, Future};
 use hashing::Digest;
 use protobuf::core::Message;
 use std::collections::HashMap;
@@ -318,9 +318,15 @@ impl Store {
   fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {
     let accumulator = Arc::new(Mutex::new(HashMap::new()));
 
-    self.expand_directory_helper(digest, accumulator.clone()).map(|()| {
-      Arc::try_unwrap(accumulator).expect("Arc should have been unwrappable").into_inner().unwrap()
-    }).to_boxed()
+    self
+      .expand_directory_helper(digest, accumulator.clone())
+      .map(|()| {
+        Arc::try_unwrap(accumulator)
+          .expect("Arc should have been unwrappable")
+          .into_inner()
+          .unwrap()
+      })
+      .to_boxed()
   }
 
   fn expand_directory_helper(
@@ -432,13 +438,13 @@ pub enum EntryType {
 mod local {
   use super::EntryType;
 
-  use boxfuture::{Boxable, BoxFuture};
+  use boxfuture::{BoxFuture, Boxable};
   use byteorder::{ByteOrder, LittleEndian};
   use bytes::Bytes;
   use digest::{Digest as DigestTrait, FixedOutput};
   use hashing::{Digest, Fingerprint};
-  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, NO_OVERWRITE, NO_SYNC, NO_TLS,
-             RwTransaction, Transaction, WriteFlags};
+  use lmdb::{self, Cursor, Database, DatabaseFlags, Environment, RwTransaction, Transaction,
+             WriteFlags, NO_OVERWRITE, NO_SYNC, NO_TLS};
   use lmdb::Error::{KeyExist, NotFound};
   use sha2::Sha256;
   use std::collections::{BinaryHeap, HashMap};
@@ -744,8 +750,7 @@ mod local {
             Err(NotFound) => Ok(None),
             Err(err) => Err(format!(
               "Error loading fingerprint {}: {:?}",
-              fingerprint,
-              err,
+              fingerprint, err,
             )),
           })
         })
@@ -882,9 +887,9 @@ mod local {
     use std::sync::Arc;
     use tempdir::TempDir;
 
-    use super::super::tests::{DIRECTORY_HASH, directory_bytes, directory_fingerprint,
-                              empty_directory_fingerprint, fingerprint, other_directory_bytes,
-                              other_directory_fingerprint, str_bytes};
+    use super::super::tests::{directory_bytes, directory_fingerprint, empty_directory_fingerprint,
+                              fingerprint, other_directory_bytes, other_directory_fingerprint,
+                              str_bytes, DIRECTORY_HASH};
 
     #[test]
     fn save_file() {
@@ -930,8 +935,14 @@ mod local {
       env
         .begin_rw_txn()
         .and_then(|mut txn| {
-          txn.put(database.unwrap(), &fingerprint(), &bogus_value, WriteFlags::empty())
-                .and_then(|()| txn.commit())
+          txn
+            .put(
+              database.unwrap(),
+              &fingerprint(),
+              &bogus_value,
+              WriteFlags::empty(),
+            )
+            .and_then(|()| txn.commit())
         })
         .unwrap();
 
@@ -1178,7 +1189,7 @@ mod local {
 
       let file_bytes = Bytes::from(
         "0123456789012345678901234567890123456789\
-0123456789012345678901234567890123456789",
+         0123456789012345678901234567890123456789",
       );
       let file_fingerprint = Fingerprint::from_hex_string(
         "af1909413b96cbb29927b3a67f3a8879c801a37be383e5f9b31df5fa8d10fa2b",
@@ -1212,7 +1223,7 @@ mod local {
         .expect("Error storing");
       let file_bytes = Bytes::from(
         "0123456789012345678901234567890123456789\
-0123456789012345678901234567890123456789",
+         0123456789012345678901234567890123456789",
       );
       let file_fingerprint = Fingerprint::from_hex_string(
         "af1909413b96cbb29927b3a67f3a8879c801a37be383e5f9b31df5fa8d10fa2b",
@@ -1246,7 +1257,7 @@ mod local {
         .expect("Error storing");
       let file_bytes = Bytes::from(
         "01234567890123456789012345678901234567890\
-123456789012345678901234567890123456789",
+         123456789012345678901234567890123456789",
       );
       let file_fingerprint = Fingerprint::from_hex_string(
         "af1909413b96cbb29927b3a67f3a8879c801a37be383e5f9b31df5fa8d10fa2b",
@@ -1356,7 +1367,7 @@ mod remote {
   use super::EntryType;
 
   use bazel_protos;
-  use boxfuture::{Boxable, BoxFuture};
+  use boxfuture::{BoxFuture, Boxable};
   use bytes::{Bytes, BytesMut};
   use digest::{Digest as DigestTrait, FixedOutput};
   use futures::{self, future, Future, Sink, Stream};
@@ -1551,7 +1562,6 @@ mod remote {
         Some(str_bytes())
       );
     }
-
 
     #[test]
     fn missing_file() {
@@ -1775,7 +1785,7 @@ mod remote {
 
 #[cfg(test)]
 mod tests {
-  use super::{EntryType, Store, local};
+  use super::{local, EntryType, Store};
 
   use bazel_protos;
   use bytes::Bytes;
@@ -1798,13 +1808,13 @@ mod tests {
   pub const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
   pub const CATNIP_HASH: &str = "eb1b94cfd6971df4a73991580e1664cfbd8d830c5bd784e92ead3d7de9a9c874";
   pub const DIRECTORY_HASH: &str = "63949aa823baf765eff07b946050d76e\
-c0033144c785a94d3ebd82baa931cd16";
+                                    c0033144c785a94d3ebd82baa931cd16";
   pub const OTHER_DIRECTORY_HASH: &str = "1b9357331e7df1f6efb50fe0b15ecb2b\
-ca58002b3fa97478e7c2c97640e72ee1";
+                                          ca58002b3fa97478e7c2c97640e72ee1";
   const EMPTY_DIRECTORY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb924\
-27ae41e4649b934ca495991b7852b855";
+                                      27ae41e4649b934ca495991b7852b855";
   const RECURSIVE_DIRECTORY_HASH: &str = "636efb4d327248515bd8b2d1d8140a21\
-f41e9443e961b5127998715a526051f9";
+                                          f41e9443e961b5127998715a526051f9";
 
   pub fn fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(HASH).unwrap()
@@ -1865,7 +1875,6 @@ f41e9443e961b5127998715a526051f9";
       "Error serializing proto",
     ))
   }
-
 
   pub fn other_directory_fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(OTHER_DIRECTORY_HASH).unwrap()
@@ -2059,7 +2068,6 @@ f41e9443e961b5127998715a526051f9";
     );
     assert_eq!(1, cas.read_request_count());
   }
-
 
   #[test]
   fn load_file_remote_error_is_error() {
