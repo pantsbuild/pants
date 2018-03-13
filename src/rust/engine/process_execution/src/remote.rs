@@ -25,7 +25,7 @@ enum ExecutionError {
   // String is the error message.
   Fatal(String),
   // Digests are Files and Directories which have been reported to be missing. May be incomplete.
-  MissingFiles(Vec<Digest>),
+  MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
   NotFinished(String),
 }
@@ -102,10 +102,14 @@ impl CommandRunner {
                 Err(ExecutionError::Fatal(err)) => {
                   future::err(err).to_boxed() as BoxFuture<_, _>
                 },
-                Err(ExecutionError::MissingFiles(missing_files)) => {
+                Err(ExecutionError::MissingDigests(missing_digests)) => {
+                  debug!(
+                    "Server reported missing digests; trying to upload: {:?}",
+                    missing_digests
+                  );
                   let execute_request = execute_request.clone();
                   let execution_client2 = execution_client2.clone();
-                  store.ensure_remote_has_recursive(missing_files)
+                  store.ensure_remote_has_recursive(missing_digests)
                       .and_then(move |()| {
                         map_grpc_result(
                           execution_client2.execute(
@@ -292,7 +296,7 @@ protobuf type {}",
             .to_owned(),
         ));
       }
-      return Err(ExecutionError::MissingFiles(missing_digests));
+      return Err(ExecutionError::MissingDigests(missing_digests));
     }
     code => Err(ExecutionError::Fatal(format!(
       "Error from remote execution: {:?}: {:?}",
@@ -802,7 +806,7 @@ mod tests {
 
     assert_eq!(
       extract_execute_response(operation),
-      Err(ExecutionError::MissingFiles(missing_files))
+      Err(ExecutionError::MissingDigests(missing_files))
     );
   }
 
