@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pants.pantsd.process_manager import ProcessManager
 from pants.util.collections import combined_dict
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import touch
+from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, touch
 from pants_test.pants_run_integration_test import PantsRunIntegrationTest
 from pants_test.testutils.process_test_util import no_lingering_process_by_command
 
@@ -410,3 +410,34 @@ class TestPantsDaemonIntegration(PantsRunIntegrationTest):
       checker.assert_stopped()
 
       self.assertIn('saw file events covered by invalidation globs', full_pantsd_log(workdir))
+
+  def test_pantsd_invalidation_stale_sources(self):
+    test_path = 'tests/python/pants_test/daemon_correctness_test_0001'
+    test_build_file = os.path.join(test_path, 'BUILD')
+    test_src_file = os.path.join(test_path, 'some_file.py')
+    has_source_root_regex = r'"source_root": ".*/{}"'.format(test_path)
+    export_cmd = ['export', test_path]
+
+    try:
+      with self.pantsd_successful_run_context() as (pantsd_run, checker, workdir):
+        safe_mkdir(test_path, clean=True)
+
+        pantsd_run(['help'])
+        checker.assert_started()
+
+        safe_file_dump(test_build_file, "python_library(sources=globs('some_non_existent_file.py'))")
+        result = pantsd_run(export_cmd)
+        checker.assert_running()
+        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+
+        safe_file_dump(test_build_file, "python_library(sources=globs('*.py'))")
+        result = pantsd_run(export_cmd)
+        checker.assert_running()
+        self.assertNotRegexpMatches(result.stdout_data, has_source_root_regex)
+
+        safe_file_dump(test_src_file, 'import this\n')
+        result = pantsd_run(export_cmd)
+        checker.assert_running()
+        self.assertRegexpMatches(result.stdout_data, has_source_root_regex)
+    finally:
+      rm_rf(test_path)
