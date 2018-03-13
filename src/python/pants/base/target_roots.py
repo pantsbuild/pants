@@ -16,7 +16,7 @@ class TargetRoots(datatype('TargetRoots', ['specs', 'products', 'requires_legacy
   """Determines the target roots for a given pants run.
 
   :param specs: A list of `pants.base.spec.Spec` objects.
-  :param products: A list of `pants.engine.selector.Selector` objects to be applied for the specs.
+  :param products: A dict from Task to `pants.engine.selector.Selector` objects to be applied.
   :param requires_legacy_graph: True if a legacy `BuildGraph` instance is required to satisfy
     this TargetRoots request.
   """

@@ -82,11 +82,11 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     """
     logger.debug('warming target_roots for: %r', target_roots)
 
-    products = list(target_roots.products)
+    products = list({p for values in target_roots.products.values() for p in values})
     if target_roots.requires_legacy_graph:
       # If a BuildGraph is required to satisfy the request, explicitly request
       # the necessary product in addition to the rest.
-      products.append(HydratedTargets)
+      products.append(TransitiveHydratedTargets)
     self.scheduler.products_request(products, [Specs(tuple(target_roots.specs))])
 
   def create_build_graph(self, target_roots, build_root=None):
@@ -94,8 +94,9 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
 
     :param TargetRoots target_roots: The targets root of the request.
     :param string build_root: The build root.
-    :returns: A tuple of (BuildGraph, AddressMapper), or (None, None) if the TargetRoots
-      do not require a lgeacy graph.
+    :returns: A tuple of (BuildGraph, AddressMapper, products), or (None, AddressMapper, products)
+      if the TargetRoots do not require a legacy graph. The products dict maps from task class to
+        dicts of product type to product values.
     """
     logger.debug('target_roots are: %r', target_roots)
     if target_roots.requires_legacy_graph:
@@ -106,11 +107,16 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     else:
       graph = None
 
+    product_types = list({p for values in target_roots.products.values() for p in values})
+    products = self.scheduler.products_request(product_types, [Specs(tuple(target_roots.specs))])
+    product_values = {task: {pt: products[pt] for pt in product_types}
+                      for task, product_types in target_roots.products.items()}
+
     logger.debug('build_graph is: %s', graph)
 
     address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())
     logger.debug('address_mapper is: %s', address_mapper)
-    return graph, address_mapper
+    return graph, address_mapper, product_values
 
 
 class EngineInitializer(object):

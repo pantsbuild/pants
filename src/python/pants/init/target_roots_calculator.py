@@ -53,10 +53,10 @@ class TargetRootsCalculator(object):
              for goal in options.goals
              for task in Goal.by_name(goal).task_types()]
     requires_legacy_graph = False
-    products = []
+    products = {}
     for task in tasks:
       if task.defines_address_products():
-        products.extend(task.invoke_address_products(options))
+        products[task] = task.invoke_address_products(options)
       else:
         requires_legacy_graph = True
 

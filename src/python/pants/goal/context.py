@@ -56,12 +56,15 @@ class Context(object):
     def fatal(self, *msg_elements):
       self._run_tracker.log(Report.FATAL, *msg_elements)
 
-  # TODO: Figure out a more structured way to construct and use context than this big flat
-  # repository of attributes?
   def __init__(self, options, run_tracker, target_roots,
                requested_goals=None, target_base=None, build_graph=None,
-               build_file_parser=None, address_mapper=None, console_outstream=None, scm=None,
+               build_file_parser=None, address_mapper=None, products=None,
+               console_outstream=None, scm=None,
                workspace=None, invalidation_report=None, scheduler=None):
+    """
+    :param products: A dictionary from Task class to dictionaries of requested product types
+      to lists of product values.
+    """
     self._options = options
     self.build_graph = build_graph
     self.build_file_parser = build_file_parser
@@ -69,6 +72,7 @@ class Context(object):
     self.run_tracker = run_tracker
     self._log = self.Log(run_tracker)
     self._products = Products()
+    self._products_v2 = products or {}
     self._buildroot = get_buildroot()
     self._source_roots = SourceRootConfig.global_instance().get_source_roots()
     self._lock = OwnerPrintingInterProcessFileLock(os.path.join(self._buildroot, '.pants.workdir.file_lock'))
@@ -191,6 +195,15 @@ class Context(object):
     """Sets the resulting graph size in the run tracker's daemon stats object."""
     node_count = self._scheduler.graph_len()
     self.run_tracker.pantsd_stats.set_resulting_graph_size(node_count)
+
+  def get_address_products(self, task_cls):
+    """Returns the address products for the given Task class.
+
+    :API: experimental
+
+    :returns: a dict from product type to value list.
+    """
+    return self._products_v2.get(task_cls, {})
 
   def submit_background_work_chain(self, work_chain, parent_workunit_name=None):
     """

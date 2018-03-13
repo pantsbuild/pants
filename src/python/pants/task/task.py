@@ -230,11 +230,10 @@ class TaskBase(SubsystemClientMixin, Optionable, AbstractClass):
       return self.context.options.passthru_args_for_scope(self.options_scope)
 
   def get_address_products(self):
-    """Returns the passthru args for this task, if it supports them.
+    """Returns the address products for this task as a dict from product type to value list.
 
     :API: experimental
     """
-    ...
     return self.context.get_address_products(type(self))
 
   @property

@@ -37,7 +37,19 @@ class ListTargets(ConsoleTask):
     self._provides_columns = options.provides_columns
     self._documented = options.documented
 
-  def console_output(self, targets):
+  def render(self):
+    
+    visited = set()
+    for addresses in self.get_address_products()[BuildFileAddresses]:
+      for address in addresses.dependencies:
+        if address not in visited:
+          visited.add(address)
+          yield address.spec
+
+    # TODO
+    return
+    
+
     if self._provides:
       extractors = dict(
           address=lambda target: target.address.spec,
