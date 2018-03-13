@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class EngineTestBase(TestBase):
+class EngineTestBase(BaseTest):
   """
   :API: public
   """

@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.source.payload_fields import SourcesField
 from pants.source.wrapped_globs import EagerFilesetWithSpec, Globs, LazyFilesetWithSpec
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class PayloadTest(TestBase):
+class PayloadTest(BaseTest):
   def sources(self, rel_path, *args):
     return Globs.create_fileset_with_spec(rel_path, *args)
 

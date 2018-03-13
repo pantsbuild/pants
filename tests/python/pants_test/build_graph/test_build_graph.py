@@ -5,7 +5,6 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import unittest
 from collections import defaultdict
 
 import six
@@ -16,11 +15,11 @@ from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
 # TODO(Eric Ayers) There are many untested methods in BuildGraph left to be tested.
-class BuildGraphTest(TestBase):
+class BuildGraphTest(BaseTest):
 
   def inject_graph(self, root_spec, graph_dict):
     """Given a root spec, injects relevant targets from the graph represented by graph_dict.
@@ -247,22 +246,20 @@ class BuildGraphTest(TestBase):
   def inject_address_closure(self, spec):
     self.build_graph.inject_address_closure(Address.parse(spec))
 
-  @unittest.skip(reason='TODO: #4515')
   def test_invalid_address(self):
-    with self.assertRaisesRegexp(AddressLookupError, '.* does not contain any BUILD files.'):
+    with self.assertRaisesRegexp(AddressLookupError, '^.* does not contain any BUILD files.$'):
       self.inject_address_closure('//:a')
 
     self.add_to_build_file('BUILD',
                            'target(name="a", '
                            '  dependencies=["non-existent-path:b"],'
                            ')')
-    with self.assertRaisesRegexp(AddressLookupError,
+    with self.assertRaisesRegexp(BuildGraph.TransitiveLookupError,
                                  '^.*/non-existent-path does not contain any BUILD files.'
                                  '\s+when translating spec non-existent-path:b'
                                  '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
-  @unittest.skip(reason='TODO: #4515')
   def test_invalid_address_two_hops(self):
     self.add_to_build_file('BUILD',
                            'target(name="a", '
@@ -290,7 +287,6 @@ class BuildGraphTest(TestBase):
     )
     self.inject_address_closure('//:synth_library_address')
 
-  @unittest.skip(reason='TODO: #4515')
   def test_invalid_address_two_hops_same_file(self):
     self.add_to_build_file('BUILD',
                            'target(name="a", '
@@ -322,9 +318,9 @@ class BuildGraphTest(TestBase):
                            'target(name="b")')
 
     with self.assertRaisesRegexp(
-        AddressLookupError,
-        '''^Addresses in dependencies must be unique. 'other:b' is '''
-        '''referenced more than once by target '//:a'.'''):
+        BuildGraph.TransitiveLookupError,
+        '^Addresses in dependencies must be unique. \'other:b\' is referenced more than once.'
+        '\s+referenced from //:a$'):
       self.inject_address_closure('//:a')
 
   def test_leveled_predicate(self):

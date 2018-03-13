@@ -9,10 +9,10 @@ import mock
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_launcher import WatchmanLauncher
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class TestWatchmanLauncher(TestBase):
+class TestWatchmanLauncher(BaseTest):
   def watchman_launcher(self, cli_options=()):
     bootstrap_options = self.get_bootstrap_options(cli_options)
     return WatchmanLauncher.create(bootstrap_options)

@@ -14,10 +14,10 @@ from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.resources import Resources
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class PythonTargetTest(TestBase):
+class PythonTargetTest(BaseTest):
 
   def test_validation(self):
     internal_repo = Repository(url=None, push_db_basedir=None)

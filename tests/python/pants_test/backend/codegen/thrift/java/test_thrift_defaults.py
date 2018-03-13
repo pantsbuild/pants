@@ -11,10 +11,10 @@ from contextlib import contextmanager
 from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.codegen.thrift.java.thrift_defaults import ThriftDefaults
 from pants.build_graph.target import Target
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class TestThriftDefaults(TestBase):
+class TestThriftDefaults(BaseTest):
   def create_thrift_defaults(self, **options):
     self.context(for_subsystems=[ThriftDefaults], options={
       ThriftDefaults.options_scope: options

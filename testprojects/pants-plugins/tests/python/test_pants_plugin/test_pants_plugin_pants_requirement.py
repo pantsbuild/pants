@@ -7,9 +7,9 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.base.build_environment import pants_version
 from pants.version import VERSION as _VERSION
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class PantsPluginPantsRequirementTest(TestBase):
+class PantsPluginPantsRequirementTest(BaseTest):
   def test_version(self):
     self.assertEqual(pants_version(), _VERSION)

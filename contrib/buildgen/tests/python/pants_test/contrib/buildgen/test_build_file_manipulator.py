@@ -8,13 +8,13 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.build_graph.address import Address
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 from pants.contrib.buildgen.build_file_manipulator import (BuildFileManipulator,
                                                            BuildTargetParseError)
 
 
-class BuildFileManipulatorTest(TestBase):
+class BuildFileManipulatorTest(BaseTest):
 
   def setUp(self):
     super(BuildFileManipulatorTest, self).setUp()

@@ -15,10 +15,10 @@ import pywatchman
 
 from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class TestWatchman(TestBase):
+class TestWatchman(BaseTest):
   PATCH_OPTS = dict(autospec=True, spec_set=True)
   BUILD_ROOT = '/path/to/a/fake/build_root'
   WATCHMAN_PATH = '/path/to/a/fake/watchman'

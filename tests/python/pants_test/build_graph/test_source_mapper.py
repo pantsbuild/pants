@@ -11,7 +11,7 @@ from textwrap import dedent
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.source_mapper import LazySourceMapper, SpecSourceMapper
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
 class SourceMapperTest(object):
@@ -114,11 +114,11 @@ class SourceMapperTest(object):
     self.owner(['//:top'], 'foo.py')
 
 
-class LazySourceMapperTest(SourceMapperTest, TestBase):
+class LazySourceMapperTest(SourceMapperTest, BaseTest):
   def set_mapper(self, fast=False):
     self._mapper = LazySourceMapper(self.address_mapper, self.build_graph, fast)
 
 
-class SpecSourceMapperTest(SourceMapperTest, TestBase):
+class SpecSourceMapperTest(SourceMapperTest, BaseTest):
   def set_mapper(self, fast=False):
     self._mapper = SpecSourceMapper(self.address_mapper, self.build_graph, fast)

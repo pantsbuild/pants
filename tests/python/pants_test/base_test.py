@@ -17,7 +17,6 @@ from textwrap import dedent
 from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.deprecated import deprecated_module
 from pants.base.exceptions import TaskError
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import Address
@@ -35,9 +34,6 @@ from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.util.dirutil import safe_mkdir, safe_open, safe_rmtree
 from pants_test.base.context_utils import create_context_from_options
 from pants_test.option.util.fakes import create_options_for_optionables
-
-
-deprecated_module('1.7.0.dev0', 'Use pants_test.test_base instead')
 
 
 class TestGenerator(object):
@@ -72,6 +68,8 @@ class TestGenerator(object):
     setattr(cls, method_name, method)
 
 
+# TODO: Rename to 'TestBase', for uniformity, and also for logic: This is a baseclass
+# for tests, not a test of a thing called 'Base'.
 class BaseTest(unittest.TestCase):
   """A baseclass useful for tests requiring a temporary buildroot.
 

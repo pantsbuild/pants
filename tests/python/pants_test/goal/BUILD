@@ -8,7 +8,7 @@ python_tests(
     'src/python/pants/cache',
     'src/python/pants/goal:artifact_cache_stats',
     'src/python/pants/util:contextutil',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -27,7 +27,7 @@ python_tests(
     'src/python/pants/goal:run_tracker',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 

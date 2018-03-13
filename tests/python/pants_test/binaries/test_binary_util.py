@@ -14,10 +14,10 @@ from pants.binaries.binary_util import BinaryUtil
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_open
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class BinaryUtilTest(TestBase):
+class BinaryUtilTest(BaseTest):
   """Tests binary_util's pants_support_baseurls handling."""
 
   class MapFetcher(object):

@@ -10,13 +10,13 @@ from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.targets.junit_tests import JUnitTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.source.source_root import SourceRootConfig
+from pants_test.base_test import BaseTest
 from pants_test.subsystem.subsystem_util import init_subsystems
-from pants_test.test_base import TestBase
 
 
 # Note: There is no longer any special maven_layout directive.  Maven layouts should just
 # work out of the box.  This test exists just to prove that statement true.
-class MavenLayoutTest(TestBase):
+class MavenLayoutTest(BaseTest):
   @property
   def alias_groups(self):
     return BuildFileAliases(

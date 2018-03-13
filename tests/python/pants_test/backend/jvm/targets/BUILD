@@ -6,7 +6,7 @@ python_tests(
   sources=['test_credentials.py'],
   dependencies=[
     'src/python/pants/backend/jvm/targets:jvm',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -35,7 +35,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -46,7 +46,7 @@ python_tests(
     'src/python/pants/backend/jvm/subsystems:junit',
     'src/python/pants/backend/jvm/targets:jvm',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ],
 )
@@ -60,7 +60,7 @@ python_tests(
     'src/python/pants/base:parse_context',
     'src/python/pants/build_graph',
     'src/python/pants/source',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -73,7 +73,7 @@ python_tests(
     'src/python/pants/base:exceptions',
     'src/python/pants/base:payload_field',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -83,6 +83,6 @@ python_tests(
   dependencies=[
     'src/python/pants/java/jar',
     'src/python/pants/backend/jvm/targets:jvm',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )

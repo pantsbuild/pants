@@ -33,7 +33,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     sources = None if source_contents_map is None else ['__init__.py'] + source_contents_map.keys()
     sources_strs = ["'{0}'".format(s) for s in sources] if sources else None
-    self.add_to_build_file(relpath=relpath, target=dedent("""
+    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_library(
       name='{name}',
       {sources_clause}
@@ -57,7 +57,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     """
     :API: public
     """
-    self.add_to_build_file(relpath=relpath, target=dedent("""
+    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_binary(
       name='{name}',
       entry_point='{entry_point}',
@@ -79,7 +79,7 @@ class PythonTaskTestBase(InterpreterCacheTestMixin, TaskTestBase):
     def make_requirement(req):
       return 'python_requirement("{}")'.format(req)
 
-    self.add_to_build_file(relpath=relpath, target=dedent("""
+    self.create_file(relpath=self.build_path(relpath), contents=dedent("""
     python_requirement_library(
       name='{name}',
       requirements=[

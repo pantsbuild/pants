@@ -12,10 +12,10 @@ from pants.backend.jvm.tasks.reports.junit_html_report import (JUnitHtmlReport, 
                                                                ReportTestSuite)
 from pants.util.contextutil import temporary_dir
 from pants.util.strutil import ensure_text
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class TestJUnitHtmlReport(TestBase):
+class TestJUnitHtmlReport(BaseTest):
 
   _JUNIT_XML_DIR = 'tests/python/pants_test/backend/jvm/tasks/reports/junit_xml'
 

@@ -21,6 +21,18 @@ from pants.java.jar.jar_dependency import JarDependency
 from pants_test.tasks.task_test_base import ConsoleTaskTestBase
 
 
+class ReverseDepmapEmptyTest(ConsoleTaskTestBase):
+  @classmethod
+  def task_type(cls):
+    return ReverseDepmap
+
+  def test(self):
+    self.assert_console_output(targets=[])
+
+  def test_output_format_json(self):
+    self.assert_console_output('{}', targets=[], options={'output_format': 'json'})
+
+
 class BaseReverseDepmapTest(ConsoleTaskTestBase):
   @classmethod
   def task_type(cls):
@@ -147,13 +159,6 @@ class BaseReverseDepmapTest(ConsoleTaskTestBase):
 
 
 class ReverseDepmapTest(BaseReverseDepmapTest):
-
-  def test_empty(self):
-    self.assert_console_output(targets=[])
-
-  def test_empty_json(self):
-    self.assert_console_output('{}', targets=[], options={'output_format': 'json'})
-
   def test_roots(self):
     self.assert_console_output(
       'overlaps:two',

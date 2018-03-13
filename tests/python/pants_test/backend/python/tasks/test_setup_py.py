@@ -494,7 +494,7 @@ class TestSetupPy(SetupPyTestBase):
   def test_symlinks_issues_2815(self):
     res = self.create_file(relpath='src/python/monster/j-function.res', contents='196884')
 
-    self.create_link(res, 'src/python/monster/group.res')
+    os.symlink(res, os.path.join(self.build_root, 'src/python/monster/group.res'))
     self.create_file(relpath='src/python/monster/__init__.py', contents='')
     self.create_file(relpath='src/python/monster/research_programme.py',
                      contents='# Look for more off-by-one "errors"!')

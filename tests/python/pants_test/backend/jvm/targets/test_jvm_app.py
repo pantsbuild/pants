@@ -14,7 +14,7 @@ from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
 from pants.source.wrapped_globs import Globs
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
 def _bundle(rel_path):
@@ -27,7 +27,7 @@ def _globs(rel_path):
   return Globs(pc)
 
 
-class JvmAppTest(TestBase):
+class JvmAppTest(BaseTest):
   def test_simple(self):
     binary_target = self.make_target(':foo-binary', JvmBinary, main='com.example.Foo')
     app_target = self.make_target(':foo', JvmApp, basename='foo-app', binary=':foo-binary')
@@ -109,7 +109,7 @@ class JvmAppTest(TestBase):
       app.binary
 
 
-class BundleTest(TestBase):
+class BundleTest(BaseTest):
 
   def test_bundle_filemap_dest_bypath(self):
     spec_path = 'src/java/org/archimedes/buoyancy'

@@ -12,7 +12,6 @@ from collections import defaultdict
 import six
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
-from pants.base.deprecated import deprecated_conditional
 from pants.build_graph.target import Target
 from pants.util.memo import memoized_property
 
@@ -41,13 +40,6 @@ class TargetMacro(object):
       if not target_types:
         raise ValueError('The given `context_aware_object_factory` {} must expand at least 1 '
                          'produced type; none were registered'.format(context_aware_object_factory))
-      deprecated_conditional(
-        lambda: len(target_types) > 1,
-        '1.7.0.dev0',
-        'TargetMacro.Factory instances that construct more than one type are no longer supported. '
-        'Consider using a `context_aware_object_factory, which can construct any number of '
-        'different objects.'
-      )
 
       class Factory(cls):
         @property
