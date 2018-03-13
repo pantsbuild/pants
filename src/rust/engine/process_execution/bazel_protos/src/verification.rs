@@ -82,7 +82,7 @@ mod canonical_directory_tests {
   const DIRECTORY_HASH: &str = "63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16";
   const DIRECTORY_SIZE: i64 = 80;
   const OTHER_DIRECTORY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb924\
-27ae41e4649b934ca495991b7852b855";
+                                      27ae41e4649b934ca495991b7852b855";
   const OTHER_DIRECTORY_SIZE: i64 = 0;
 
   #[test]

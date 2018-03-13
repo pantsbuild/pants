@@ -3,10 +3,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use core::{Field, Function, FNV, Key, TypeConstraint, TypeId, Value};
+use core::{Field, Function, Key, TypeConstraint, TypeId, Value, FNV};
 use externs;
-use selectors::{Selector, Select, SelectDependencies, SelectProjection, SelectTransitive};
-
+use selectors::{Select, SelectDependencies, SelectProjection, SelectTransitive, Selector};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Task {
@@ -75,9 +74,7 @@ impl Tasks {
     if let Some(&(_, ref existing_value)) = self.singletons.get(&product) {
       panic!(
         "More than one singleton rule was installed for the product {:?}: {:?} vs {:?}",
-        product,
-        existing_value,
-        value,
+        product, existing_value, value,
       );
     }
     self.singletons.insert(product, (

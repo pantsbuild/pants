@@ -6,7 +6,7 @@ use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use fs::Store;
-use futures::{Future, future};
+use futures::{future, Future};
 use hashing::{Digest, Fingerprint};
 use grpcio;
 use protobuf::{self, Message, ProtobufEnum};
@@ -237,7 +237,7 @@ fn extract_execute_response(
       {
         return Err(ExecutionError::Fatal(format!(
           "Received FailedPrecondition, but didn't know how to resolve it: {}, \
-protobuf type {}",
+           protobuf type {}",
           execute_response.get_status().get_message(),
           details.get_type_url()
         )));
@@ -350,10 +350,10 @@ mod tests {
   use protobuf::{self, Message, ProtobufEnum};
   use mock;
   use tempdir::TempDir;
-  use testutil::{owned_string_vec, as_byte_owned_vec};
+  use testutil::{as_byte_owned_vec, owned_string_vec};
 
-  use super::{CommandRunner, ExecuteProcessRequest, ExecuteProcessResult, ExecutionError,
-              extract_execute_response};
+  use super::{extract_execute_response, CommandRunner, ExecuteProcessRequest,
+              ExecuteProcessResult, ExecutionError};
   use std::collections::BTreeMap;
   use std::iter::{self, FromIterator};
   use std::sync::Arc;
@@ -1020,7 +1020,7 @@ mod tests {
   pub const STR: &str = "European Burmese";
   pub const HASH: &str = "693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d";
   pub const DIRECTORY_HASH: &str = "63949aa823baf765eff07b946050d76e\
-c0033144c785a94d3ebd82baa931cd16";
+                                    c0033144c785a94d3ebd82baa931cd16";
 
   pub fn str_bytes() -> Bytes {
     Bytes::from(STR)

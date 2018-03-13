@@ -14,9 +14,9 @@ use futures::future::{self, Future};
 use ordermap::OrderMap;
 use tempdir::TempDir;
 
-use boxfuture::{Boxable, BoxFuture};
+use boxfuture::{BoxFuture, Boxable};
 use context::Context;
-use core::{Failure, Key, Noop, TypeConstraint, Value, Variants, throw};
+use core::{throw, Failure, Key, Noop, TypeConstraint, Value, Variants};
 use externs;
 use fs::{self, Dir, File, FileContent, Link, PathGlobs, PathStat, StoreFileByDigest, VFS};
 use process_execution as process_executor;
@@ -24,7 +24,6 @@ use hashing;
 use rule_graph;
 use selectors::{self, Selector};
 use tasks;
-
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 

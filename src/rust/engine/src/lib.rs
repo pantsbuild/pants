@@ -39,14 +39,13 @@ use std::os::raw;
 use std::panic;
 use std::path::{Path, PathBuf};
 
-
 use context::Core;
 use core::{Failure, Function, Key, TypeConstraint, TypeId, Value};
-use externs::{Buffer, BufferBuffer, CloneValExtern, DropHandlesExtern, CreateExceptionExtern,
-              ExternContext, Externs, TypeToStrExtern, CallExtern, EvalExtern, LogExtern,
-              IdentifyExtern, ProjectExtern, ProjectMultiExtern, ProjectIgnoringTypeExtern,
-              PyResult, SatisfiedByExtern, StoreI32Extern, SatisfiedByTypeExtern, StoreListExtern,
-              StoreBytesExtern, TypeIdBuffer, EqualsExtern, ValToStrExtern};
+use externs::{Buffer, BufferBuffer, CallExtern, CloneValExtern, CreateExceptionExtern,
+              DropHandlesExtern, EqualsExtern, EvalExtern, ExternContext, Externs, IdentifyExtern,
+              LogExtern, ProjectExtern, ProjectIgnoringTypeExtern, ProjectMultiExtern, PyResult,
+              SatisfiedByExtern, SatisfiedByTypeExtern, StoreBytesExtern, StoreI32Extern,
+              StoreListExtern, TypeIdBuffer, TypeToStrExtern, ValToStrExtern};
 use rule_graph::{GraphMaker, RuleGraph};
 use scheduler::{ExecutionRequest, RootResult, Scheduler};
 use tasks::Tasks;

@@ -4,7 +4,7 @@
 extern crate tempdir;
 
 use bazel_protos;
-use boxfuture::{Boxable, BoxFuture};
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use futures::Future;
 use futures::future::join_all;
@@ -288,18 +288,14 @@ fn paths_of_child_dir(paths: Vec<PathStat>) -> Vec<PathStat> {
         return None;
       }
       Some(match s {
-        PathStat::File { path, stat } => {
-          PathStat::File {
-            path: path.iter().skip(1).collect(),
-            stat: stat,
-          }
-        }
-        PathStat::Dir { path, stat } => {
-          PathStat::Dir {
-            path: path.iter().skip(1).collect(),
-            stat: stat,
-          }
-        }
+        PathStat::File { path, stat } => PathStat::File {
+          path: path.iter().skip(1).collect(),
+          stat: stat,
+        },
+        PathStat::Dir { path, stat } => PathStat::Dir {
+          path: path.iter().skip(1).collect(),
+          stat: stat,
+        },
       })
     })
     .collect()
@@ -313,8 +309,8 @@ fn osstring_as_utf8(path: OsString) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-  extern crate testutil;
   extern crate tempdir;
+  extern crate testutil;
 
   use boxfuture::{BoxFuture, Boxable};
   use bytes::Bytes;

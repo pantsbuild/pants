@@ -8,7 +8,7 @@ use std::{fmt, hash};
 use std::ops::Drop;
 
 use externs;
-use handles::{Handle, enqueue_drop_handle};
+use handles::{enqueue_drop_handle, Handle};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 

@@ -8,7 +8,7 @@ extern crate futures;
 extern crate hashing;
 extern crate protobuf;
 
-use boxfuture::{Boxable, BoxFuture};
+use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{App, Arg, SubCommand};
 use fs::{ResettablePool, Snapshot, Store, StoreFileByDigest, VFS};
@@ -162,19 +162,17 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
   let pool = Arc::new(ResettablePool::new("fsutil-pool-".to_string()));
   let (store, store_has_remote) = {
     let (store_result, store_has_remote) = match top_match.value_of("server-address") {
-      Some(cas_address) => {
-        (
-          Store::with_remote(
-            store_dir,
-            pool.clone(),
-            cas_address,
-            1,
-            10 * 1024 * 1024,
-            Duration::from_secs(30),
-          ),
-          true,
-        )
-      }
+      Some(cas_address) => (
+        Store::with_remote(
+          store_dir,
+          pool.clone(),
+          cas_address,
+          1,
+          10 * 1024 * 1024,
+          Duration::from_secs(30),
+        ),
+        true,
+      ),
       None => (Store::local_only(store_dir, pool.clone()), false),
     };
     let store = store_result.map_err(|e| {
@@ -247,7 +245,6 @@ fn execute(top_match: clap::ArgMatches) -> Result<(), ExitError> {
               ).into(),
             ),
           }
-
         }
         (_, _) => unimplemented!(),
       }

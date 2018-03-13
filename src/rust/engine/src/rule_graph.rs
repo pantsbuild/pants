@@ -1,13 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::hash::Hash;
 use std::fmt;
 use std::io;
 
-use core::{ANY_TYPE, Function, Key, TypeConstraint, TypeId, Value};
+use core::{Function, Key, TypeConstraint, TypeId, Value, ANY_TYPE};
 use externs;
 use selectors::{Select, SelectDependencies, SelectTransitive, Selector};
 use tasks::{Task, Tasks};
@@ -121,7 +120,6 @@ impl Entry {
       &Entry::Root(ref root) => root.subject_type,
       &Entry::SubjectIsProduct { subject_type, .. } => subject_type,
       _ => panic!("has no subject type"),
-
     }
   }
 
@@ -133,7 +131,6 @@ impl Entry {
     }
   }
 }
-
 
 ///
 /// A key for the Selects used from a rule. Rules are only picked up by Select selectors. These keys
@@ -298,7 +295,6 @@ impl<'t> GraphMaker<'t> {
     mut rule_dependency_edges: RuleDependencyEdges,
     mut unfulfillable_rules: UnfulfillableRuleMap,
   ) -> RuleGraph {
-
     let mut rules_to_traverse: VecDeque<Entry> = VecDeque::new();
     rules_to_traverse.push_back(Entry::from(beginning_rule));
     while let Some(entry) = rules_to_traverse.pop_front() {
@@ -476,7 +472,6 @@ impl<'t> GraphMaker<'t> {
                   );
                   was_unfulfillable = true;
                   continue;
-
                 }
                 add_rules_to_graph(
                   &mut rules_to_traverse,
@@ -572,7 +567,7 @@ impl<'t> GraphMaker<'t> {
             if !rule_graph.rule_dependency_edges.contains_key(inner) {
               panic!(
                 "All referenced dependencies should have entries in the graph, but {:?} had {:?}, \
-                  which is missing!",
+                 which is missing!",
                 root_rule,
                 d
               )
@@ -623,7 +618,6 @@ impl<'t> GraphMaker<'t> {
   }
 }
 
-
 ///
 /// A graph containing rules mapping rules to their dependencies taking into account subject types.
 ///
@@ -665,7 +659,6 @@ fn function_str(func: &Function) -> String {
   let as_val = to_val_from_func(func);
   val_name(&as_val)
 }
-
 
 pub fn type_str(type_id: TypeId) -> String {
   if type_id == ANY_TYPE {
@@ -721,11 +714,12 @@ pub fn selector_str(selector: &Selector) -> String {
       )
     }
     &Selector::SelectProjection(ref s) => {
-      format!("SelectProjection({}, {}, '{}', {})",
-                                                  type_constraint_str(s.product),
-                                                  type_str(s.projected_subject),
-                                                  s.field,
-                                                  type_constraint_str(s.input_product),
+      format!(
+      "SelectProjection({}, {}, '{}', {})",
+      type_constraint_str(s.product),
+      type_str(s.projected_subject),
+      s.field,
+      type_constraint_str(s.input_product),
     )
     }
   }
@@ -899,7 +893,6 @@ impl RuleGraph {
       return write!(f, "}}");
     }
 
-
     let mut root_subject_type_strs = self
       .root_subject_types
       .iter()
@@ -934,7 +927,6 @@ impl RuleGraph {
     root_rule_strs.sort();
     write!(f, "{}\n", root_rule_strs.join("\n"))?;
 
-
     write!(f, "  // internal entries\n")?;
     let mut internal_rule_strs = self
       .rule_dependency_edges
@@ -963,7 +955,6 @@ pub struct RuleEdges {
   dependencies: Entries,
   dependencies_by_select_key: HashMap<SelectKey, Entries>,
 }
-
 
 impl RuleEdges {
   pub fn new() -> RuleEdges {

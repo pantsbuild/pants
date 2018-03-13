@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 mod snapshot;
-pub use snapshot::{EMPTY_DIGEST, Snapshot, StoreFileByDigest};
+pub use snapshot::{Snapshot, StoreFileByDigest, EMPTY_DIGEST};
 mod store;
 pub use store::Store;
 mod pool;
@@ -47,8 +47,7 @@ use glob::Pattern;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use ordermap::OrderMap;
 
-use boxfuture::{Boxable, BoxFuture};
-
+use boxfuture::{BoxFuture, Boxable};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
@@ -827,13 +826,12 @@ fn safe_create_dir_all(path: &Path) -> Result<(), String> {
   })
 }
 
-
 #[cfg(test)]
 mod posixfs_test {
   extern crate tempdir;
   extern crate testutil;
 
-  use super::{Dir, File, Link, PosixFS, Stat, ResettablePool};
+  use super::{Dir, File, Link, PosixFS, ResettablePool, Stat};
   use futures::Future;
   use self::testutil::make_file;
   use std;
