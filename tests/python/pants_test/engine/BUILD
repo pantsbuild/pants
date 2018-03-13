@@ -23,7 +23,7 @@ python_library(
   dependencies = [
     'src/python/pants/goal',
     'src/python/pants/goal:task_registrar',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -45,7 +45,7 @@ python_tests(
     ':engine_test_base',
     'src/python/pants/engine:legacy_engine',
     'src/python/pants/task',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ],
 )
 

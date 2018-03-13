@@ -22,7 +22,6 @@ from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.rules import RootRule, SingletonRule, TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection
 from pants.engine.struct import Struct
-from pants.util.dirutil import recursive_dirname
 from pants.util.objects import datatype
 
 
@@ -73,7 +72,7 @@ def parse_address_family(address_mapper, path, build_files):
   """
   files_content = build_files.files_content.dependencies
   if not files_content:
-    raise ResolveError('Directory "{}" does not contain any BUILD files.'.format(path))
+    raise ResolveError('Directory "{}" does not contain build files.'.format(path))
   address_maps = []
   paths = (f.path for f in files_content)
   ignored_paths = set(address_mapper.build_ignore_patterns.match_files(paths))
@@ -244,7 +243,7 @@ def addresses_from_address_families(address_mapper, address_families, spec):
 
   def raise_if_empty_address_families():
     if not address_families:
-      raise ResolveError('Path "{}" does not contain any BUILD files.'.format(spec.directory))
+      raise ResolveError('Path "{}" contains no BUILD files.'.format(spec.directory))
 
   def exclude_address(address):
     if address_mapper.exclude_patterns:
@@ -297,11 +296,26 @@ def spec_to_globs(address_mapper, spec):
     patterns = [
       join(f, pattern)
       for pattern in address_mapper.build_patterns
-      for f in recursive_dirname(spec.directory)
+      for f in _recursive_dirname(spec.directory)
     ]
   else:
     raise ValueError('Unrecognized Spec type: {}'.format(spec))
   return PathGlobs.create(directory, include=patterns, exclude=[])
+
+
+def _recursive_dirname(f):
+  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
+
+        'a/b/c/d'
+        'a/b/c'
+        'a/b'
+        'a'
+        ''
+  """
+  while f:
+    yield f
+    f = dirname(f)
+  yield ''
 
 
 BuildFilesCollection = Collection.of(BuildFiles)

@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.codegen.wire.java.java_wire_library import JavaWireLibrary
 from pants.base.exceptions import TargetDefinitionException
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class JavaWireLibraryTest(TestBase):
+class JavaWireLibraryTest(BaseTest):
 
   def setUp(self):
     super(JavaWireLibraryTest, self).setUp()

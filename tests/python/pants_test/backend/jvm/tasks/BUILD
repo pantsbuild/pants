@@ -168,7 +168,7 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
     'tests/python/pants_test/testutils:file_test_util',
   ]
@@ -183,7 +183,7 @@ python_tests(
     'src/python/pants/backend/jvm/tasks:classpath_products',
     'src/python/pants/backend/jvm/tasks:classpath_util',
     'src/python/pants/goal:products',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -267,7 +267,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -290,7 +290,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/jvm:jvm_tool_task_test_base',
     'tests/python/pants_test/subsystem:subsystem_utils',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/tasks:task_test_base',
   ]
 )
@@ -318,7 +318,7 @@ python_tests(
     'src/python/pants/java/jar',
     'src/python/pants/util:contextutil',
     'tests/python/pants_test/backend/jvm/tasks/ivy_utils_resources',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
     'tests/python/pants_test/subsystem:subsystem_utils',
   ]
 )

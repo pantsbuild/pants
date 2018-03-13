@@ -14,7 +14,7 @@ from pants.base.payload_field import FingerprintedField
 from pants.build_graph.target import Target
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency import JarDependency
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
 class JarRulesTest(unittest.TestCase):
@@ -55,7 +55,7 @@ class JarRulesTest(unittest.TestCase):
       JarRules.set_default(None)
 
 
-class JvmBinaryTest(TestBase):
+class JvmBinaryTest(BaseTest):
 
   def test_simple(self):
     target = self.make_target(':foo', JvmBinary, main='com.example.Foo', basename='foo-base')

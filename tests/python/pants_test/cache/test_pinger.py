@@ -11,11 +11,11 @@ import urlparse
 from requests import RequestException
 
 from pants.cache.pinger import BestUrlSelector, InvalidRESTfulCacheProtoError, Pinger
+from pants_test.base_test import BaseTest
 from pants_test.cache.delay_server import setup_delayed_server
-from pants_test.test_base import TestBase
 
 
-class TestPinger(TestBase):
+class TestPinger(BaseTest):
   # NB(gmalmquist): The tests in this file pass locally, but are decorated with expectedFailure
   # because CI is usually too slow to run them before they timeout.
 
@@ -77,7 +77,7 @@ class TestPinger(TestBase):
       server.shutdown()
 
 
-class TestBestUrlSelector(TestBase):
+class TestBestUrlSelector(BaseTest):
 
   def setUp(self):
     self.url1 = 'http://host1:123'

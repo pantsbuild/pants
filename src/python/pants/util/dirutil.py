@@ -442,23 +442,6 @@ def touch(path, times=None):
     os.utime(path, times)
 
 
-def recursive_dirname(f):
-  """Given a relative path like 'a/b/c/d', yield all ascending path components like:
-
-        'a/b/c/d'
-        'a/b/c'
-        'a/b'
-        'a'
-        ''
-  """
-  prev = None
-  while f != prev:
-    yield f
-    prev = f
-    f = os.path.dirname(f)
-  yield ''
-
-
 def get_basedir(path):
   """Returns the base directory of a path.
 

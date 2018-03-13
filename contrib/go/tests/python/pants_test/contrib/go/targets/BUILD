@@ -7,7 +7,7 @@ python_library(
     'contrib/go/src/python/pants/contrib/go:plugin',
     'src/python/pants/build_graph',
     'src/python/pants/util:meta',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 
@@ -17,6 +17,6 @@ python_tests(
     'contrib/go/src/python/pants/contrib/go:plugin',
     'contrib/go/src/python/pants/contrib/go/targets',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )

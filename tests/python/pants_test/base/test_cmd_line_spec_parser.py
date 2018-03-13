@@ -9,7 +9,7 @@ import os
 
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
 def single(directory, name=None):
@@ -25,7 +25,7 @@ def sib(directory):
   return SiblingAddresses(directory)
 
 
-class CmdLineSpecParserTest(TestBase):
+class CmdLineSpecParserTest(BaseTest):
 
   def setUp(self):
     super(CmdLineSpecParserTest, self).setUp()

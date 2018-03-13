@@ -7,7 +7,7 @@ python_tests(
     'contrib/findbugs/src/python/pants/contrib/findbugs/tasks',
     'tests/python/pants_test/jvm:nailgun_task_test_base',
     'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )
 

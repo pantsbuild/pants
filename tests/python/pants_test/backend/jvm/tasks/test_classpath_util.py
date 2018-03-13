@@ -14,10 +14,10 @@ from pants.backend.jvm.tasks.classpath_util import ClasspathUtil
 from pants.goal.products import UnionProducts
 from pants.java.jar.exclude import Exclude
 from pants.java.jar.jar_dependency_utils import M2Coordinate, ResolvedJar
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class ClasspathUtilTest(TestBase):
+class ClasspathUtilTest(BaseTest):
 
   def test_path_with_differing_conf_ignored(self):
     a = self.make_target('a', JvmTarget)

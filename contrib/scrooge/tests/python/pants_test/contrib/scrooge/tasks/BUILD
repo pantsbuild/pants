@@ -67,6 +67,6 @@ python_tests(
     'contrib/scrooge/src/python/pants/contrib/scrooge/tasks:thrift_util',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )

@@ -10,12 +10,12 @@ from contextlib import contextmanager
 import mock
 
 from pants.pantsd.watchman_client import StreamableWatchmanClient
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class TestWatchmanClient(TestBase):
+class TestWatchmanClient(BaseTest):
   def setUp(self):
-    super(TestWatchmanClient, self).setUp()
+    BaseTest.setUp(self)
     self.swc = StreamableWatchmanClient(sockpath='/tmp/testing', transport='local')
 
   @contextmanager

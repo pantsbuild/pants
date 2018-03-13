@@ -6,10 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.backend.jvm.targets.credentials import LiteralCredentials
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class CredentialsTest(TestBase):
+class CredentialsTest(BaseTest):
 
   def test_literal_declaration(self):
     username = 'please don`t ever do this.'

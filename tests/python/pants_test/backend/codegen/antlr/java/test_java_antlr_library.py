@@ -8,19 +8,18 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 from textwrap import dedent
 
 from pants.backend.codegen.antlr.java.java_antlr_library import JavaAntlrLibrary
-from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class JavaAntlrLibraryTest(TestBase):
+class JavaAntlrLibraryTest(BaseTest):
 
   @property
   def alias_groups(self):
     return BuildFileAliases(targets={'java_antlr_library': JavaAntlrLibrary})
 
   def test_empty(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, "Missing required 'sources' parameter"):
+    with self.assertRaisesRegexp(ValueError, "Missing required 'sources' parameter"):
       self.add_to_build_file('BUILD', dedent('''
         java_antlr_library(name='foo',
           sources=[],
@@ -36,7 +35,7 @@ class JavaAntlrLibraryTest(TestBase):
     self.assertIsInstance(self.foo, JavaAntlrLibrary)
 
   def test_invalid_compiler(self):
-    with self.assertRaisesRegexp(TargetDefinitionException, "Illegal value for 'compiler'"):
+    with self.assertRaisesRegexp(ValueError, "Illegal value for 'compiler'"):
       self.add_to_build_file('BUILD', dedent('''
         java_antlr_library(name='foo',
           sources=['foo'],

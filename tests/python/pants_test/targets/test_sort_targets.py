@@ -6,10 +6,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
                         unicode_literals, with_statement)
 
 from pants.build_graph.build_graph import CycleException, sort_targets
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class SortTargetsTest(TestBase):
+class SortTargetsTest(BaseTest):
 
   def test_validation(self):
     valid = self.make_target(':valid')

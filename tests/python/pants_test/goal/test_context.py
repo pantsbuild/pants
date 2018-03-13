@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class ContextTest(TestBase):
+class ContextTest(BaseTest):
   def test_dependents_empty(self):
     context = self.context()
     dependees = context.dependents()

@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.backend.jvm.artifact import Artifact, PublicationMetadata
 from pants.backend.jvm.repository import Repository
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class ArtifactTest(TestBase):
+class ArtifactTest(BaseTest):
 
   def test_validation(self):
     repo = Repository(name="myRepo",

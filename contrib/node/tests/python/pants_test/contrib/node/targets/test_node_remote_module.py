@@ -5,12 +5,12 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 from pants.contrib.node.targets.node_remote_module import NodeRemoteModule
 
 
-class NodeRemoteModuleTest(TestBase):
+class NodeRemoteModuleTest(BaseTest):
   def test_unconstrained(self):
     target1 = self.make_target(spec=':unconstrained1', target_type=NodeRemoteModule)
     target2 = self.make_target(spec=':unconstrained2', target_type=NodeRemoteModule, version=None)

@@ -9,10 +9,10 @@ from twitter.common.collections import OrderedSet
 
 from pants.build_graph.target import Target
 from pants.build_graph.target_scopes import Scope, Scopes
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class ScopesTest(TestBase):
+class ScopesTest(BaseTest):
 
   def test_mixed_case(self):
     self.assertEquals(Scope('RUNTIME'), Scope('runtime'))
@@ -62,7 +62,7 @@ class ScopesTest(TestBase):
         Scope('').in_scope(include_scopes=bad_value)
 
 
-class ScopedClosureTest(TestBase):
+class ScopedClosureTest(BaseTest):
 
   def assert_closure(self, expected_targets, roots, include_scopes=None, exclude_scopes=None,
                      respect_intransitive=True):

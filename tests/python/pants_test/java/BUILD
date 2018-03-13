@@ -31,7 +31,7 @@ python_tests(
     '3rdparty/python:mock',
     '3rdparty/python:psutil',
     'src/python/pants/java:nailgun_executor',
-    'tests/python/pants_test:test_base'
+    'tests/python/pants_test:base_test'
   ]
 )
 

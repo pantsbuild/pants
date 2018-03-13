@@ -7,10 +7,10 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.build_graph.files import Files
 from pants.source.wrapped_globs import Globs
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class FilesTest(TestBase):
+class FilesTest(BaseTest):
   @staticmethod
   def sources(rel_path, *globs):
     return Globs.create_fileset_with_spec(rel_path, *globs)

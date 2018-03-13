@@ -15,7 +15,7 @@ from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_dir
 from pants.util.process_handler import subprocess
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
 # TODO: Find a better home for this?
@@ -50,7 +50,7 @@ def ensure_cached(task_cls, expected_num_artifacts=None):
   return decorator
 
 
-class TaskTestBase(TestBase):
+class TaskTestBase(BaseTest):
   """A baseclass useful for testing a single Task type.
 
   :API: public

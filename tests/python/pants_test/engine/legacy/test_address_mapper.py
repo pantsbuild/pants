@@ -11,12 +11,12 @@ import unittest
 import mock
 
 from pants.base.specs import SiblingAddresses, SingleAddress
+from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.nodes import Throw
 from pants.engine.scheduler import ExecutionResult
-from pants.init.engine_initializer import EngineInitializer
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_file_dump, safe_mkdir
 from pants_test.engine.util import init_native

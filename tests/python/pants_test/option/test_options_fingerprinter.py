@@ -13,10 +13,10 @@ from pants.option.custom_types import (UnsetBool, dict_option, dir_option, file_
                                        target_option)
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.util.contextutil import temporary_dir
-from pants_test.test_base import TestBase
+from pants_test.base_test import BaseTest
 
 
-class OptionsFingerprinterTest(TestBase):
+class OptionsFingerprinterTest(BaseTest):
 
   def setUp(self):
     super(OptionsFingerprinterTest, self).setUp()

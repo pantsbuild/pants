@@ -12,6 +12,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'tests/python/pants_test/backend/python/tasks:python_task_test_base',
     'tests/python/pants_test/option/util',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ]
 )

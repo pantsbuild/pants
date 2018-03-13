@@ -7,6 +7,6 @@ python_tests(
   dependencies = [
     'contrib/buildgen/src/python/pants/contrib/buildgen:build_file_manipulator',
     'src/python/pants/build_graph',
-    'tests/python/pants_test:test_base',
+    'tests/python/pants_test:base_test',
   ],
 )
