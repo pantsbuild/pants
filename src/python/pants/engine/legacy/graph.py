@@ -53,7 +53,7 @@ class _DestWrapper(datatype('DestWrapper', ['target_types'])):
 class LegacyBuildGraph(BuildGraph):
   """A directed acyclic graph of Targets and dependencies. Not necessarily connected.
 
-  This implementation is backed by a Scheduler that is able to resolve HydratedTargets.
+  This implementation is backed by a Scheduler that is able to resolve TransitiveHydratedTargets.
   """
 
   class InvalidCommandLineSpecError(AddressLookupError):
@@ -67,7 +67,7 @@ class LegacyBuildGraph(BuildGraph):
   def __init__(self, scheduler, target_types):
     """Construct a graph given a Scheduler, Engine, and a SymbolTable class.
 
-    :param scheduler: A Scheduler that is configured to be able to resolve HydratedTargets.
+    :param scheduler: A Scheduler that is configured to be able to resolve TransitiveHydratedTargets.
     :param symbol_table: A SymbolTable instance used to instantiate Target objects. Must match
       the symbol table installed in the scheduler (TODO: see comment in `_instantiate_target`).
     """
@@ -89,7 +89,7 @@ class LegacyBuildGraph(BuildGraph):
 
     # Index the ProductGraph.
     for product in roots:
-      # We have a successful HydratedTargets value (for a particular input Spec).
+      # We have a successful TransitiveHydratedTargets value (for a particular input Spec).
       for hydrated_target in product.dependencies:
         target_adaptor = hydrated_target.adaptor
         address = target_adaptor.address
@@ -256,7 +256,7 @@ class LegacyBuildGraph(BuildGraph):
     logger.debug('Injecting addresses to %s: %s', self, subjects)
     with self._resolve_context():
       addresses = tuple(subjects)
-      hydrated_targets = self._scheduler.product_request(HydratedTargets,
+      hydrated_targets = self._scheduler.product_request(TransitiveHydratedTargets,
                                                          [BuildFileAddresses(addresses)])
 
     self._index(hydrated_targets)
@@ -274,10 +274,10 @@ class LegacyBuildGraph(BuildGraph):
     """
     logger.debug('Injecting specs to %s: %s', self, subjects)
     with self._resolve_context():
-      product_results = self._scheduler.products_request([HydratedTargets, BuildFileAddresses],
+      product_results = self._scheduler.products_request([TransitiveHydratedTargets, BuildFileAddresses],
                                                          subjects)
 
-    self._index(product_results[HydratedTargets])
+    self._index(product_results[TransitiveHydratedTargets])
 
     yielded_addresses = set()
     for subject, product in zip(subjects, product_results[BuildFileAddresses]):
@@ -293,7 +293,7 @@ class LegacyBuildGraph(BuildGraph):
 class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependencies'])):
   """A wrapper for a fully hydrated TargetAdaptor object.
 
-  Transitive graph walks collect ordered sets of HydratedTargets which involve a huge amount
+  Transitive graph walks collect ordered sets of TransitiveHydratedTargets which involve a huge amount
   of hashing: we implement eq/hash via direct usage of an Address field to speed that up.
   """
 
@@ -313,12 +313,29 @@ class HydratedTarget(datatype('HydratedTarget', ['address', 'adaptor', 'dependen
     return hash(self.address)
 
 
-HydratedTargets = Collection.of(HydratedTarget)
+class TransitiveHydratedTargets(Collection.of(HydratedTarget)):
+  """A transitive set of HydratedTarget objects."""
 
 
-@rule(HydratedTargets, [SelectTransitive(HydratedTarget, BuildFileAddresses, field_types=(Address,), field='addresses')])
+class HydratedTargets(Collection.of(HydratedTarget)):
+  """An intransitive set of HydratedTarget objects."""
+
+
+@rule(TransitiveHydratedTargets, [SelectTransitive(HydratedTarget,
+                                                   BuildFileAddresses,
+                                                   field_types=(Address,),
+                                                   field='addresses')])
 def transitive_hydrated_targets(targets):
-  """Recursively requests HydratedTargets, which will result in an eager, transitive graph walk."""
+  """Recursively requests HydratedTarget instances, which will result in an eager, transitive graph walk."""
+  return TransitiveHydratedTargets(targets)
+
+
+@rule(HydratedTargets, [SelectDependencies(HydratedTarget,
+                                           BuildFileAddresses,
+                                           field_types=(Address,),
+                                           field='addresses')])
+def hydrated_targets(targets):
+  """Requests HydratedTarget instances."""
   return HydratedTargets(targets)
 
 
@@ -391,6 +408,7 @@ def create_legacy_graph_tasks(symbol_table):
   symbol_table_constraint = symbol_table.constraint()
   return [
     transitive_hydrated_targets,
+    hydrated_targets,
     TaskRule(
       HydratedTarget,
       [Select(symbol_table_constraint),

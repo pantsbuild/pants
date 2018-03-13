@@ -15,7 +15,8 @@ from pants.engine.build_files import BuildFileAddresses, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
+                                       create_legacy_graph_tasks)
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
                                          JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
@@ -75,7 +76,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
   def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `HydratedTargets` products.
+    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
 
     :param TargetRoots target_roots: The targets root of the request.
     """
@@ -86,7 +87,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
       subjects = target_roots.specs
     else:
       raise ValueError('Unexpected TargetRoots type: `{}`.'.format(target_roots))
-    request = self.scheduler.execution_request([HydratedTargets], subjects)
+    request = self.scheduler.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler.execute(request)
     if result.error:
       raise result.error
