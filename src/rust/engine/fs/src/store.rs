@@ -5,8 +5,9 @@ use futures::{future, Future};
 use hashing::Digest;
 use protobuf::core::Message;
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -383,7 +384,7 @@ impl Store {
             let store = store.clone();
             let path = destination.join(file_node.get_name());
             let digest = file_node.get_digest().into();
-            store.materialize_file(path, digest)
+            store.materialize_file(path, digest, file_node.is_executable)
           })
           .collect::<Vec<_>>();
         let directory_futures = directory
@@ -403,10 +404,19 @@ impl Store {
       .to_boxed()
   }
 
-  fn materialize_file(&self, destination: PathBuf, digest: Digest) -> BoxFuture<(), String> {
+  fn materialize_file(
+    &self,
+    destination: PathBuf,
+    digest: Digest,
+    is_executable: bool,
+  ) -> BoxFuture<(), String> {
     self
       .load_file_bytes_with(digest, move |bytes| {
-        File::create(&destination)
+        OpenOptions::new()
+          .create(true)
+          .write(true)
+          .mode(if is_executable { 0o755 } else { 0o644 })
+          .open(&destination)
           .and_then(|mut f| f.write_all(&bytes))
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
       })
@@ -1764,6 +1774,7 @@ mod tests {
   use std;
   use std::collections::HashMap;
   use std::io::Read;
+  use std::os::unix::fs::PermissionsExt;
   use std::path::Path;
   use std::sync::Arc;
   use std::time::Duration;
@@ -1780,6 +1791,8 @@ mod tests {
                                       27ae41e4649b934ca495991b7852b855";
   const RECURSIVE_DIRECTORY_HASH: &str = "636efb4d327248515bd8b2d1d8140a21\
                                           f41e9443e961b5127998715a526051f9";
+  const MIXED_EXECUTABLE_DIRECTORY_HASH: &str = "ae9b1bbf58fe3a983bc5c3b3960c66ef\
+                                                 acccc177716e4946564aff23fb2ccab2";
 
   pub fn fingerprint() -> Fingerprint {
     Fingerprint::from_hex_string(HASH).unwrap()
@@ -1891,6 +1904,42 @@ mod tests {
         .write_to_bytes()
         .expect("Error serializing proto")
         .len(),
+    )
+  }
+
+  pub fn directory_with_mixed_executable_files() -> bazel_protos::remote_execution::Directory {
+    let mut directory = bazel_protos::remote_execution::Directory::new();
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("feed".to_string());
+      file.set_digest({
+        let mut digest = bazel_protos::remote_execution::Digest::new();
+        digest.set_hash(CATNIP_HASH.to_string());
+        digest.set_size_bytes(6);
+        digest
+      });
+      file.set_is_executable(true);
+      file
+    });
+    directory.mut_files().push({
+      let mut file = bazel_protos::remote_execution::FileNode::new();
+      file.set_name("food".to_string());
+      file.set_digest({
+        let mut digest = bazel_protos::remote_execution::Digest::new();
+        digest.set_hash(CATNIP_HASH.to_string());
+        digest.set_size_bytes(6);
+        digest
+      });
+      file.set_is_executable(false);
+      file
+    });
+    directory
+  }
+
+  pub fn directory_with_mixed_executable_files_digest() -> Digest {
+    Digest(
+      Fingerprint::from_hex_string(MIXED_EXECUTABLE_DIRECTORY_HASH).unwrap(),
+      158,
     )
   }
 
@@ -2388,7 +2437,7 @@ mod tests {
     let store_dir = TempDir::new("store").unwrap();
     let store = new_local_store(store_dir.path());
     store
-      .materialize_file(file.clone(), digest())
+      .materialize_file(file.clone(), digest(), false)
       .wait()
       .expect_err("Want unknown digest error");
   }
@@ -2405,10 +2454,30 @@ mod tests {
       .wait()
       .expect("Error saving bytes");
     store
-      .materialize_file(file.clone(), digest())
+      .materialize_file(file.clone(), digest(), false)
       .wait()
       .expect("Error materializing file");
     assert_eq!(file_contents(&file), str_bytes());
+    assert!(!is_executable(&file));
+  }
+
+  #[test]
+  fn materialize_file_executable() {
+    let materialize_dir = TempDir::new("materialize").unwrap();
+    let file = materialize_dir.path().join("file");
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error saving bytes");
+    store
+      .materialize_file(file.clone(), digest(), true)
+      .wait()
+      .expect("Error materializing file");
+    assert_eq!(file_contents(&file), str_bytes());
+    assert!(is_executable(&file));
   }
 
   #[test]
@@ -2472,6 +2541,42 @@ mod tests {
     );
   }
 
+  #[test]
+  fn materialize_directory_executable() {
+    let materialize_dir = TempDir::new("materialize").unwrap();
+
+    let store_dir = TempDir::new("store").unwrap();
+    let store = new_local_store(store_dir.path());
+    store
+      .record_directory(&directory_with_mixed_executable_files(), false)
+      .wait()
+      .expect("Error saving Directory");
+    store
+      .store_file_bytes(catnip_bytes(), false)
+      .wait()
+      .expect("Error saving catnip file bytes");
+
+    store
+      .materialize_directory(
+        materialize_dir.path().to_owned(),
+        directory_with_mixed_executable_files_digest(),
+      )
+      .wait()
+      .expect("Error materializing");
+
+    assert_eq!(list_dir(materialize_dir.path()), vec!["feed", "food"]);
+    assert_eq!(
+      file_contents(&materialize_dir.path().join("feed")),
+      catnip_bytes()
+    );
+    assert_eq!(
+      file_contents(&materialize_dir.path().join("food")),
+      catnip_bytes()
+    );
+    assert!(is_executable(&materialize_dir.path().join("feed")));
+    assert!(!is_executable(&materialize_dir.path().join("food")));
+  }
+
   fn list_dir(path: &Path) -> Vec<String> {
     std::fs::read_dir(path)
       .expect("Listing dir")
@@ -2491,5 +2596,12 @@ mod tests {
       .and_then(|mut f| f.read_to_end(&mut contents))
       .expect("Error reading file");
     Bytes::from(contents)
+  }
+
+  fn is_executable(path: &Path) -> bool {
+    std::fs::metadata(path)
+      .expect("Getting metadata")
+      .permissions()
+      .mode() & 0o100 == 0o100
   }
 }
