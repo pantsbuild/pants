@@ -656,6 +656,12 @@ class CoursierResolve(CoursierMixin):
 
     self.resolve(self.context.targets(), classpath_products, sources=False, javadoc=False)
 
+  def check_artifact_cache_for(self, invalidation_check):
+    # Coursier resolution is an output dependent on the entire target set, and is not divisible
+    # by target. So we can only cache it keyed by the entire target set.
+    global_vts = VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
+    return [global_vts]
+
 
 class CoursierResolveFingerprintStrategy(FingerprintStrategy):
 
