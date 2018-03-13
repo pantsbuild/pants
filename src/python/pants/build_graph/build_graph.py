@@ -17,7 +17,6 @@ from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.injectables_mixin import InjectablesMixin
 from pants.build_graph.target import Target
-from pants.init.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.util.meta import AbstractClass
 
 

@@ -12,13 +12,13 @@ from contextlib import contextmanager
 
 import mock
 
+from pants.base.target_roots import TargetRoots
 from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.options_initializer import OptionsInitializer
-from pants.init.target_roots import TargetRoots
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir

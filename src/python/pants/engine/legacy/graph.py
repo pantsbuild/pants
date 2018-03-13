@@ -14,6 +14,7 @@ from pants.backend.jvm.targets.jvm_app import Bundle, JvmApp
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import SingleAddress
+from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import BuildGraph
@@ -24,7 +25,6 @@ from pants.engine.legacy.structs import BundleAdaptor, BundlesField, SourcesFiel
 from pants.engine.mapper import ResolveError
 from pants.engine.rules import TaskRule, rule
 from pants.engine.selectors import Select, SelectDependencies, SelectProjection, SelectTransitive
-from pants.init.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper
 from pants.util.dirutil import fast_relpath
 from pants.util.objects import datatype

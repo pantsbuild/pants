@@ -10,6 +10,7 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.engine.build_files import BuildFileAddresses, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
@@ -25,7 +26,6 @@ from pants.engine.native import Native
 from pants.engine.parser import SymbolTable
 from pants.engine.scheduler import LocalScheduler
 from pants.init.options_initializer import OptionsInitializer
-from pants.init.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.change_calculator import EngineChangeCalculator
 
