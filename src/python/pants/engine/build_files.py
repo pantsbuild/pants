@@ -318,6 +318,12 @@ def _recursive_dirname(f):
   yield ''
 
 
+# TODO: This is a bit of a lie: `Struct` is effectively abstract, so this collection
+# will contain subclasses of `Struct` for the symbol table types. These APIs need more
+# polish before we make them public: see #4535 in particular.
+HydratedStructs = Collection.of(Struct)
+
+
 BuildFilesCollection = Collection.of(BuildFiles)
 
 
@@ -343,6 +349,14 @@ def create_graph_rules(address_mapper, symbol_table):
       hydrate_struct
     ),
     resolve_unhydrated_struct,
+    TaskRule(
+      HydratedStructs,
+      [SelectDependencies(symbol_table_constraint,
+                          BuildFileAddresses,
+                          field_types=(Address,),
+                          field='addresses')],
+      HydratedStructs
+    ),
     # BUILD file parsing.
     parse_address_family,
     build_files,
@@ -355,6 +369,7 @@ def create_graph_rules(address_mapper, symbol_table):
     # Root rules representing parameters that might be provided via root subjects.
     RootRule(Address),
     RootRule(BuildFileAddress),
+    RootRule(BuildFileAddresses),
     RootRule(AscendantAddresses),
     RootRule(DescendantAddresses),
     RootRule(SiblingAddresses),

@@ -21,7 +21,7 @@ from pants.goal.goal import Goal
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_printer import HelpPrinter
 from pants.init.subprocess import Subprocess
-from pants.init.target_roots import TargetRoots
+from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.java.nailgun_executor import NailgunProcessGroup
 from pants.option.ranked_value import RankedValue
 from pants.reporting.reporting import Reporting
@@ -113,7 +113,7 @@ class GoalRunnerFactory(object):
         include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
       )
 
-    target_roots = target_roots or TargetRoots.create(
+    target_roots = target_roots or TargetRootsCalculator.create(
       options=self._options,
       build_root=self._root_dir,
       change_calculator=graph_helper.change_calculator
@@ -133,21 +133,21 @@ class GoalRunnerFactory(object):
     goals = [Goal.by_name(goal) for goal in requested_goals]
     return goals
 
-  def _specs_to_targets(self, specs):
-    """Populate the BuildGraph and target list from a set of input specs."""
+  def _roots_to_targets(self, target_roots):
+    """Populate the BuildGraph and target list from a set of input TargetRoots."""
     with self._run_tracker.new_workunit(name='parse', labels=[WorkUnitLabel.SETUP]):
       def filter_for_tag(tag):
         return lambda target: tag in map(str, target.tags)
 
       tag_filter = wrap_filters(create_filters(self._tag, filter_for_tag))
 
-      def generate_targets(specs):
-        for address in self._build_graph.inject_specs_closure(specs, self._fail_fast):
+      def generate_targets():
+        for address in self._build_graph.inject_roots_closure(target_roots, self._fail_fast):
           target = self._build_graph.get_target(address)
           if tag_filter(target):
             yield target
 
-    return list(generate_targets(specs))
+      return list(generate_targets())
 
   def _should_be_quiet(self, goals):
     if self._explain:
@@ -174,7 +174,7 @@ class GoalRunnerFactory(object):
       goals = self._determine_goals(self._requested_goals)
       is_quiet = self._should_be_quiet(goals)
 
-      literal_target_roots = self._specs_to_targets(target_roots.as_specs())
+      target_root_instances = self._roots_to_targets(target_roots)
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
@@ -186,7 +186,7 @@ class GoalRunnerFactory(object):
 
       context = Context(options=self._options,
                         run_tracker=self._run_tracker,
-                        target_roots=literal_target_roots,
+                        target_roots=target_root_instances,
                         requested_goals=self._requested_goals,
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,

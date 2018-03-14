@@ -14,7 +14,7 @@ from pants.build_graph.address import parse_spec
 from pants.build_graph.source_mapper import SourceMapper
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import HydratedTargets
-from pants.source.filespec import matches_filespec
+from pants.source.filespec import any_matches_filespec
 
 
 def iter_resolve_and_parse_specs(rel_path, specs):
@@ -50,10 +50,14 @@ class EngineSourceMapper(SourceMapper):
   def target_addresses_for_source(self, source):
     return list(self.iter_target_addresses_for_sources([source]))
 
-  def _match_source(self, source, fileset):
-    return fileset.matches(source) or matches_filespec(source, fileset.filespec)
+  def _match_sources(self, sources_set, fileset):
+    # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
+    # so we don't actually call `fileset.matches` here.
+    # TODO: This call should be pushed down into the engine to match directly against
+    # `PathGlobs` as we erode the `AddressMapper`/`SourceMapper` split.
+    return any_matches_filespec(sources_set, fileset.filespec)
 
-  def _owns_source(self, source, legacy_target):
+  def _owns_any_source(self, sources_set, legacy_target):
     """Given a `HydratedTarget` instance, check if it owns the given source file."""
     target_kwargs = legacy_target.adaptor.kwargs()
 
@@ -61,12 +65,12 @@ class EngineSourceMapper(SourceMapper):
     target_source = target_kwargs.get('source')
     if target_source:
       path_from_build_root = os.path.join(legacy_target.adaptor.address.spec_path, target_source)
-      if path_from_build_root == source:
+      if path_from_build_root in sources_set:
         return True
 
     # Handle `sources`-declaring targets.
     target_sources = target_kwargs.get('sources', [])
-    if target_sources and self._match_source(source, target_sources):
+    if target_sources and self._match_sources(sources_set, target_sources):
       return True
 
     return False
@@ -86,6 +90,6 @@ class EngineSourceMapper(SourceMapper):
 
     for hydrated_target, legacy_address in six.iteritems(hydrated_target_to_address):
       # Handle BUILD files.
-      if (any(LegacyAddressMapper.is_declaring_file(legacy_address, f) for f in sources_set) or
-          any(self._owns_source(source, hydrated_target) for source in sources_set)):
+      if (LegacyAddressMapper.any_is_declaring_file(legacy_address, sources_set) or
+          self._owns_any_source(sources_set, hydrated_target)):
         yield legacy_address
