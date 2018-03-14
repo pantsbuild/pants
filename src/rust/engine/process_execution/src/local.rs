@@ -66,9 +66,7 @@ mod tests {
   fn stdout_and_stderr_and_exit_code() {
     let result = run_command_locally(
       ExecuteProcessRequest {
-        argv: owned_string_vec(
-          &["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"],
-        ),
+        argv: owned_string_vec(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
         env: BTreeMap::new(),
         input_files: fs::EMPTY_DIGEST,
       },

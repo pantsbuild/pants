@@ -13,13 +13,18 @@ use tasks::{Task, Tasks};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry {
-  SubjectIsProduct { subject_type: TypeId },
+  SubjectIsProduct {
+    subject_type: TypeId,
+  },
 
   Root(RootEntry),
 
   InnerEntry(InnerEntry),
 
-  Singleton { value: Key, product: TypeConstraint },
+  Singleton {
+    value: Key,
+    product: TypeConstraint,
+  },
 
   Unreachable {
     // NB: unreachable is an error type, it might be better to name it error, but currently
@@ -32,9 +37,9 @@ pub enum Entry {
 impl Entry {
   pub fn matches_subject_type(&self, actual_subject_type: TypeId) -> bool {
     match *self {
-      Entry::SubjectIsProduct { subject_type } |
-      Entry::Root(RootEntry { subject_type, .. }) |
-      Entry::InnerEntry(InnerEntry { subject_type, .. }) => subject_type == actual_subject_type,
+      Entry::SubjectIsProduct { subject_type }
+      | Entry::Root(RootEntry { subject_type, .. })
+      | Entry::InnerEntry(InnerEntry { subject_type, .. }) => subject_type == actual_subject_type,
       Entry::Singleton { .. } => true,
       Entry::Unreachable { .. } => panic!("Shouldn't compare to an unreachable entry!"),
     }
@@ -74,7 +79,9 @@ impl Entry {
   }
 
   fn new_subject_is_product(subject_type: TypeId) -> Entry {
-    Entry::SubjectIsProduct { subject_type: subject_type }
+    Entry::SubjectIsProduct {
+      subject_type: subject_type,
+    }
   }
 
   fn new_unreachable(rule: &Task) -> Entry {
@@ -271,9 +278,7 @@ impl<'t> GraphMaker<'t> {
       .all_tasks()
       .iter()
       .filter(|r| !rules_in_graph.contains(r))
-      .filter(|r| {
-        !unfulfillable_discovered_during_construction.contains(r)
-      })
+      .filter(|r| !unfulfillable_discovered_during_construction.contains(r))
       .map(|&r| r)
       .collect();
 
@@ -317,8 +322,11 @@ impl<'t> GraphMaker<'t> {
       }
       let mut was_unfulfillable = false;
       match entry {
-        Entry::InnerEntry(InnerEntry { rule: Task { ref clause, .. }, .. }) |
-        Entry::Root(RootEntry { ref clause, .. }) => {
+        Entry::InnerEntry(InnerEntry {
+          rule: Task { ref clause, .. },
+          ..
+        })
+        | Entry::Root(RootEntry { ref clause, .. }) => {
           for selector in clause {
             match selector {
               &Selector::Select(ref select) => {
@@ -346,17 +354,17 @@ impl<'t> GraphMaker<'t> {
                 );
               }
               &Selector::SelectDependencies(SelectDependencies {
-                                              ref product,
-                                              ref dep_product,
-                                              ref field_types,
-                                              ..
-                                            }) |
-              &Selector::SelectTransitive(SelectTransitive {
-                                            ref product,
-                                            ref dep_product,
-                                            ref field_types,
-                                            ..
-                                          }) => {
+                ref product,
+                ref dep_product,
+                ref field_types,
+                ..
+              })
+              | &Selector::SelectTransitive(SelectTransitive {
+                ref product,
+                ref dep_product,
+                ref field_types,
+                ..
+              }) => {
                 let initial_selector = *dep_product;
                 let initial_rules_or_literals = rhs_for_select(
                   &self.tasks,
@@ -502,12 +510,10 @@ impl<'t> GraphMaker<'t> {
             }
           }
         }
-        _ => {
-          panic!(
-            "Entry type that cannot dependencies was not filtered out {:?}",
-            entry
-          )
-        }
+        _ => panic!(
+          "Entry type that cannot dependencies was not filtered out {:?}",
+          entry
+        ),
       }
       // TODO handle snapshot rules
       if !was_unfulfillable {
@@ -568,8 +574,7 @@ impl<'t> GraphMaker<'t> {
               panic!(
                 "All referenced dependencies should have entries in the graph, but {:?} had {:?}, \
                  which is missing!",
-                root_rule,
-                d
+                root_rule, d
               )
             }
           }
@@ -604,16 +609,14 @@ impl<'t> GraphMaker<'t> {
       .tasks
       .gen_tasks(product_type)
       .and_then(|tasks| if !tasks.is_empty() { Some(tasks) } else { None })
-      .map(|_| {
-        RootEntry {
-          subject_type: subject_type.clone(),
-          clause: vec![
-            Selector::Select(Select {
-              product: product_type.clone(),
-              variant_key: None,
-            }),
-          ],
-        }
+      .map(|_| RootEntry {
+        subject_type: subject_type.clone(),
+        clause: vec![
+          Selector::Select(Select {
+            product: product_type.clone(),
+            variant_key: None,
+          }),
+        ],
       })
   }
 }
@@ -677,85 +680,73 @@ pub fn selector_str(selector: &Selector) -> String {
     &Selector::Select(ref s) => {
       format!("Select({})", type_constraint_str(s.product)).to_string() // TODO variant key
     }
-    &Selector::SelectDependencies(ref s) => {
-      format!(
-        "{}({}, {}, {}field_types=({},))",
-        "SelectDependencies",
-        type_constraint_str(s.product),
-        type_constraint_str(s.dep_product),
-        if s.field == "dependencies" {
-          "".to_string()
-        } else {
-          format!("'{}', ", s.field)
-        },
-        s.field_types
-          .iter()
-          .map(|&f| type_str(f))
-          .collect::<Vec<String>>()
-          .join(", ")
-      )
-    }
-    &Selector::SelectTransitive(ref s) => {
-      format!(
-        "{}({}, {}, {}field_types=({},))",
-        "SelectTransitive",
-        type_constraint_str(s.product),
-        type_constraint_str(s.dep_product),
-        if s.field == "dependencies" {
-          "".to_string()
-        } else {
-          format!("'{}', ", s.field)
-        },
-        s.field_types
-          .iter()
-          .map(|&f| type_str(f))
-          .collect::<Vec<String>>()
-          .join(", ")
-      )
-    }
-    &Selector::SelectProjection(ref s) => {
-      format!(
+    &Selector::SelectDependencies(ref s) => format!(
+      "{}({}, {}, {}field_types=({},))",
+      "SelectDependencies",
+      type_constraint_str(s.product),
+      type_constraint_str(s.dep_product),
+      if s.field == "dependencies" {
+        "".to_string()
+      } else {
+        format!("'{}', ", s.field)
+      },
+      s.field_types
+        .iter()
+        .map(|&f| type_str(f))
+        .collect::<Vec<String>>()
+        .join(", ")
+    ),
+    &Selector::SelectTransitive(ref s) => format!(
+      "{}({}, {}, {}field_types=({},))",
+      "SelectTransitive",
+      type_constraint_str(s.product),
+      type_constraint_str(s.dep_product),
+      if s.field == "dependencies" {
+        "".to_string()
+      } else {
+        format!("'{}', ", s.field)
+      },
+      s.field_types
+        .iter()
+        .map(|&f| type_str(f))
+        .collect::<Vec<String>>()
+        .join(", ")
+    ),
+    &Selector::SelectProjection(ref s) => format!(
       "SelectProjection({}, {}, '{}', {})",
       type_constraint_str(s.product),
       type_str(s.projected_subject),
       s.field,
       type_constraint_str(s.input_product),
-    )
-    }
+    ),
   }
 }
 
 fn entry_str(entry: &Entry) -> String {
   match entry {
-    &Entry::InnerEntry(ref inner) => {
-      format!(
-        "{} of {}",
-        task_display(&inner.rule),
-        type_str(inner.subject_type)
-      )
-    }
-    &Entry::Root(ref root) => {
-      format!(
-        "{} for {}",
-        root
-          .clause
-          .iter()
-          .map(|s| selector_str(s))
-          .collect::<Vec<_>>()
-          .join(", "),
-        type_str(root.subject_type)
-      )
-    }
+    &Entry::InnerEntry(ref inner) => format!(
+      "{} of {}",
+      task_display(&inner.rule),
+      type_str(inner.subject_type)
+    ),
+    &Entry::Root(ref root) => format!(
+      "{} for {}",
+      root
+        .clause
+        .iter()
+        .map(|s| selector_str(s))
+        .collect::<Vec<_>>()
+        .join(", "),
+      type_str(root.subject_type)
+    ),
     &Entry::SubjectIsProduct { subject_type } => {
       format!("SubjectIsProduct({})", type_str(subject_type))
     }
-    &Entry::Singleton { ref value, product } => {
-      format!(
-        "Singleton({}, {})",
-        externs::key_to_str(value),
-        type_constraint_str(product)
-      )
-    }
+    &Entry::Singleton { ref value, product } => format!(
+      "Singleton({}, {})",
+      externs::key_to_str(value),
+      type_constraint_str(product)
+    ),
     &Entry::Unreachable {
       ref rule,
       ref reason,
@@ -813,9 +804,10 @@ impl RuleGraph {
   }
 
   pub fn edges_for_inner_entry(&self, inner_entry: &InnerEntry) -> Option<RuleEdges> {
-    self.rule_dependency_edges.get(inner_entry).map(
-      |e| e.clone(),
-    )
+    self
+      .rule_dependency_edges
+      .get(inner_entry)
+      .map(|e| e.clone())
   }
 
   pub fn validate(&self) -> Result<(), String> {
@@ -837,30 +829,27 @@ impl RuleGraph {
       .collect();
     for (rule_entry, diagnostics) in &self.unfulfillable_rules {
       match rule_entry {
-        &Entry::InnerEntry(InnerEntry { ref rule, .. }) |
-        &Entry::Unreachable { ref rule, .. } => {
+        &Entry::InnerEntry(InnerEntry { ref rule, .. }) | &Entry::Unreachable { ref rule, .. } => {
           if used_rules.contains(&rule) {
             continue;
           }
           for d in diagnostics {
-            let msg_to_type = collated_errors.entry(rule.clone()).or_insert(
-              HashMap::new(),
-            );
-            let subject_set = msg_to_type.entry(d.reason.clone()).or_insert(
-              HashSet::new(),
-            );
+            let msg_to_type = collated_errors
+              .entry(rule.clone())
+              .or_insert(HashMap::new());
+            let subject_set = msg_to_type
+              .entry(d.reason.clone())
+              .or_insert(HashSet::new());
             subject_set.insert(d.subject_type.clone());
           }
         }
         _ => {} // We're only checking rule usage not entry usage generally.
-        // So we ignore entries that do not have rules.
+                // So we ignore entries that do not have rules.
       }
     }
     let mut msgs: Vec<String> = collated_errors
       .into_iter()
-      .map(|(ref rule, ref subject_types_by_reasons)| {
-        format_msgs(rule, subject_types_by_reasons)
-      })
+      .map(|(ref rule, ref subject_types_by_reasons)| format_msgs(rule, subject_types_by_reasons))
       .collect();
     msgs.sort();
 
@@ -873,16 +862,16 @@ impl RuleGraph {
       .keys()
       .map(|entry| &entry.rule)
       .collect();
-    self.unfulfillable_rules.iter().any(|(&ref entry,
-      &ref diagnostics)| {
-      match entry {
+    self
+      .unfulfillable_rules
+      .iter()
+      .any(|(&ref entry, &ref diagnostics)| match entry {
         &Entry::InnerEntry(ref inner) => {
           !used_rules.contains(&inner.rule) && !diagnostics.is_empty()
         }
         &Entry::Unreachable { .. } => true,
         _ => false,
-      }
-    })
+      })
   }
 
   // TODO instead of this, make own fmt thing that accepts externs
@@ -1002,9 +991,10 @@ impl RuleEdges {
     // Returns true if removing dep_to_eliminate makes this set of edges unfulfillable.
     if self.dependencies.len() == 1 && &self.dependencies[0] == dep_to_eliminate {
       true
-    } else if self.dependencies_by_select_key.values().any(|deps| {
-      deps.len() == 1 && &deps[0] == dep_to_eliminate
-    })
+    } else if self
+      .dependencies_by_select_key
+      .values()
+      .any(|deps| deps.len() == 1 && &deps[0] == dep_to_eliminate)
     {
       true
     } else {
@@ -1039,9 +1029,9 @@ fn update_edges_based_on_unfulfillable_entry<K>(
         let key_entry = Entry::from(o.key().clone());
 
         let entry_subject = key_entry.subject_type();
-        let diagnostics = new_unfulfillable_rules.entry(key_entry.clone()).or_insert(
-          vec![],
-        );
+        let diagnostics = new_unfulfillable_rules
+          .entry(key_entry.clone())
+          .or_insert(vec![]);
         diagnostics.push(Diagnostic {
           subject_type: entry_subject,
           reason: format!(
@@ -1068,12 +1058,10 @@ fn rhs_for_select(tasks: &Tasks, subject_type: TypeId, select: &Select) -> Entri
     vec![Entry::new_singleton(key.clone(), select.product.clone())]
   } else {
     match tasks.gen_tasks(&select.product) {
-      Some(ref matching_tasks) => {
-        matching_tasks
-          .iter()
-          .map(|t| Entry::new_inner(subject_type, t))
-          .collect()
-      }
+      Some(ref matching_tasks) => matching_tasks
+        .iter()
+        .map(|t| Entry::new_inner(subject_type, t))
+        .collect(),
       None => vec![],
     }
   }
@@ -1123,16 +1111,15 @@ fn add_rules_to_graph(
       edges.add_edges_via(select_key, &dep_rules);
     }
     &Entry::InnerEntry(ref inner_entry) => {
-      let edges = rule_dependency_edges.entry(inner_entry.clone()).or_insert(
-        RuleEdges::new(),
-      );
+      let edges = rule_dependency_edges
+        .entry(inner_entry.clone())
+        .or_insert(RuleEdges::new());
       if edges.has_edges_for(&select_key) {
         // This is an error that should only happen if there's a bug in the algorithm, but it
         // might make sense to expose it in a more friendly way.
         panic!(
           "Rule {:?} already has dependencies set for selector {:?}",
-          entry,
-          select_key
+          entry, select_key
         )
       }
       edges.add_edges_via(select_key, &dep_rules);

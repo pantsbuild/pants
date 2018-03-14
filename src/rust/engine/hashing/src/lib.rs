@@ -141,42 +141,11 @@ mod fingerprint_tests {
   #[test]
   fn from_bytes_unsafe() {
     assert_eq!(
-      Fingerprint::from_bytes_unsafe(
-        &[
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-          0xab,
-        ],
-      ),
+      Fingerprint::from_bytes_unsafe(&[
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
+        0xab, 0xab,
+      ],),
       Fingerprint([0xab; 32])
     );
   }
@@ -187,42 +156,11 @@ mod fingerprint_tests {
       Fingerprint::from_hex_string(
         "0123456789abcdefFEDCBA98765432100000000000000000ffFFfFfFFfFfFFff",
       ).unwrap(),
-      Fingerprint(
-        [
-          0x01,
-          0x23,
-          0x45,
-          0x67,
-          0x89,
-          0xab,
-          0xcd,
-          0xef,
-          0xfe,
-          0xdc,
-          0xba,
-          0x98,
-          0x76,
-          0x54,
-          0x32,
-          0x10,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-        ],
-      )
+      Fingerprint([
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
+        0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff,
+      ],)
     )
   }
 
@@ -248,42 +186,12 @@ mod fingerprint_tests {
   #[test]
   fn to_hex() {
     assert_eq!(
-      Fingerprint(
-        [
-          0x01,
-          0x23,
-          0x45,
-          0x67,
-          0x89,
-          0xab,
-          0xcd,
-          0xef,
-          0xfe,
-          0xdc,
-          0xba,
-          0x98,
-          0x76,
-          0x54,
-          0x32,
-          0x10,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-          0xff,
-        ],
-      ).to_hex(),
+      Fingerprint([
+        0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32,
+        0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff,
+      ],)
+        .to_hex(),
       "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_lowercase()
     )
   }
@@ -307,9 +215,7 @@ mod fingerprint_tests {
     );
     let converted: bazel_protos::remote_execution::Digest = our_digest.into();
     let mut want = bazel_protos::remote_execution::Digest::new();
-    want.set_hash(
-      "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned(),
-    );
+    want.set_hash("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned());
     want.set_size_bytes(10);
     assert_eq!(converted, want);
   }
@@ -317,9 +223,8 @@ mod fingerprint_tests {
   #[test]
   fn from_bazel_digest() {
     let mut bazel_digest = bazel_protos::remote_execution::Digest::new();
-    bazel_digest.set_hash(
-      "0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned(),
-    );
+    bazel_digest
+      .set_hash("0123456789abcdeffedcba98765432100000000000000000ffffffffffffffff".to_owned());
     bazel_digest.set_size_bytes(10);
     let converted: Digest = (&bazel_digest).into();
     let want = Digest(

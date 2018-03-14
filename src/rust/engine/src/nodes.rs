@@ -280,9 +280,7 @@ impl Select {
       vec![
         self
           .get_snapshot(&context)
-          .map(move |snapshot| {
-            Snapshot::store_snapshot(&context, &snapshot)
-          })
+          .map(move |snapshot| Snapshot::store_snapshot(&context, &snapshot))
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.files_content {
@@ -291,12 +289,10 @@ impl Select {
       vec![
         self
           .get_snapshot(&context)
-          .and_then(
-            move |snapshot|
+          .and_then(move |snapshot|
             // Request the file contents of the Snapshot, and then store them.
             snapshot.contents(context.core.store.clone()).map_err(|e| throw(&e))
-              .map(move |files_content| Snapshot::store_files_content(&context, &files_content))
-          )
+              .map(move |files_content| Snapshot::store_files_content(&context, &files_content)))
           .to_boxed(),
       ]
     } else if self.product() == &context.core.types.process_result {
@@ -411,11 +407,7 @@ impl Node for Select {
     let variant_value = variant_value.map(|s| s.to_string());
     deps_future
       .and_then(move |dep_results| {
-        future::result(self.choose_task_result(
-          context,
-          dep_results,
-          &variant_value,
-        ))
+        future::result(self.choose_task_result(context, dep_results, &variant_value))
       })
       .to_boxed()
   }
@@ -455,16 +447,12 @@ impl SelectDependencies {
     // filters entries by whether the subject type is the right subject type
     let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
       Selector::SelectDependencies(selector.clone()),
-      selectors::Select::without_variant(
-        selector.clone().dep_product,
-      ),
+      selectors::Select::without_variant(selector.clone().dep_product),
     ));
     let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
       Selector::SelectDependencies(selector.clone()),
       selector.field_types.clone(),
-      selectors::Select::without_variant(
-        selector.product.clone(),
-      ),
+      selectors::Select::without_variant(selector.product.clone()),
     ));
     SelectDependencies {
       subject: subject,
@@ -491,9 +479,7 @@ impl SelectDependencies {
         .product_entries
         .clone()
         .into_iter()
-        .filter(|e| {
-          e.matches_subject_type(dep_subject_key.type_id().clone())
-        })
+        .filter(|e| e.matches_subject_type(dep_subject_key.type_id().clone()))
         .collect(),
     }.run(context.clone())
   }
@@ -560,16 +546,12 @@ impl SelectTransitive {
   ) -> SelectTransitive {
     let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
       Selector::SelectTransitive(selector.clone()),
-      selectors::Select::without_variant(
-        selector.clone().dep_product,
-      ),
+      selectors::Select::without_variant(selector.clone().dep_product),
     ));
     let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedMultipleNestedSelect(
       Selector::SelectTransitive(selector.clone()),
       selector.field_types.clone(),
-      selectors::Select::without_variant(
-        selector.clone().product,
-      ),
+      selectors::Select::without_variant(selector.clone().product),
     ));
 
     SelectTransitive {
@@ -713,16 +695,12 @@ impl SelectProjection {
   ) -> SelectProjection {
     let dep_p_entries = edges.entries_for(&rule_graph::SelectKey::NestedSelect(
       Selector::SelectProjection(selector.clone()),
-      selectors::Select::without_variant(
-        selector.clone().input_product,
-      ),
+      selectors::Select::without_variant(selector.clone().input_product),
     ));
     let p_entries = edges.entries_for(&rule_graph::SelectKey::ProjectedNestedSelect(
       Selector::SelectProjection(selector.clone()),
       selector.projected_subject.clone(),
-      selectors::Select::without_variant(
-        selector.clone().product,
-      ),
+      selectors::Select::without_variant(selector.clone().product),
     ));
     SelectProjection {
       subject: subject,
@@ -805,10 +783,7 @@ impl Node for ExecuteProcess {
       .unwrap();
     // TODO: this should run off-thread, and asynchronously
     future::ok(ProcessResult(
-      process_executor::local::run_command_locally(
-        request,
-        tmpdir.path(),
-      ).unwrap(),
+      process_executor::local::run_command_locally(request, tmpdir.path()).unwrap(),
     )).to_boxed()
   }
 }
@@ -838,9 +813,7 @@ impl Node for ReadLink {
       .vfs
       .read_link(&self.0)
       .map(|dest_path| LinkDest(dest_path))
-      .map_err(move |e| {
-        throw(&format!("Failed to read_link for {:?}: {:?}", link, e))
-      })
+      .map_err(move |e| throw(&format!("Failed to read_link for {:?}: {:?}", link, e)))
       .to_boxed()
   }
 }
@@ -959,9 +932,7 @@ impl Snapshot {
     PathGlobs::create(&include, &exclude).map_err(|e| {
       format!(
         "Failed to parse PathGlobs for include({:?}), exclude({:?}): {}",
-        include,
-        exclude,
-        e
+        include, exclude, e
       )
     })
   }
@@ -1047,12 +1018,10 @@ impl Node for Snapshot {
       edges,
     ).run(context.clone())
       .then(move |path_globs_res| match path_globs_res {
-        Ok(path_globs_val) => {
-          match Self::lift_path_globs(&path_globs_val) {
-            Ok(pgs) => Snapshot::create(context, pgs),
-            Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
-          }
-        }
+        Ok(path_globs_val) => match Self::lift_path_globs(&path_globs_val) {
+          Ok(pgs) => Snapshot::create(context, pgs),
+          Err(e) => err(throw(&format!("Failed to parse PathGlobs: {}", e))),
+        },
         Err(failure) => err(failure),
       })
       .to_boxed()
@@ -1155,21 +1124,17 @@ impl NodeKey {
       &NodeKey::ExecuteProcess(ref s) => format!("ExecuteProcess({:?}", s.0),
       &NodeKey::ReadLink(ref s) => format!("ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => format!("Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => {
-        format!(
-          "Select({}, {})",
-          keystr(&s.subject),
-          typstr(&s.selector.product)
-        )
-      }
-      &NodeKey::Task(ref s) => {
-        format!(
-          "Task({}, {}, {})",
-          externs::key_to_str(&s.task.func.0),
-          keystr(&s.subject),
-          typstr(&s.product)
-        )
-      }
+      &NodeKey::Select(ref s) => format!(
+        "Select({}, {})",
+        keystr(&s.subject),
+        typstr(&s.selector.product)
+      ),
+      &NodeKey::Task(ref s) => format!(
+        "Task({}, {}, {})",
+        externs::key_to_str(&s.task.func.0),
+        keystr(&s.subject),
+        typstr(&s.product)
+      ),
       &NodeKey::Snapshot(ref s) => format!("Snapshot({})", keystr(&s.subject)),
     }
   }
@@ -1202,10 +1167,10 @@ impl NodeKey {
       // Explicitly listed so that if people add new NodeKeys they need to consider whether their
       // NodeKey represents an FS operation, and accordingly whether they need to add it to the
       // above list or the below list.
-      &NodeKey::ExecuteProcess { .. } |
-      &NodeKey::Select { .. } |
-      &NodeKey::Snapshot { .. } |
-      &NodeKey::Task { .. } => None,
+      &NodeKey::ExecuteProcess { .. }
+      | &NodeKey::Select { .. }
+      | &NodeKey::Snapshot { .. }
+      | &NodeKey::Task { .. } => None,
     }
   }
 }

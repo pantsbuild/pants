@@ -167,15 +167,15 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
       *request_count = *request_count + 1;
     }
     match self.read_internal(req) {
-      Ok(response) => {
-        self.send(
-          ctx,
-          sink,
-          futures::stream::iter_ok(response.into_iter().map(|chunk| {
-            (chunk, grpcio::WriteFlags::default())
-          })),
-        )
-      }
+      Ok(response) => self.send(
+        ctx,
+        sink,
+        futures::stream::iter_ok(
+          response
+            .into_iter()
+            .map(|chunk| (chunk, grpcio::WriteFlags::default())),
+        ),
+      ),
       Err(err) => {
         sink.fail(err);
       }
@@ -226,9 +226,10 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               )));
             }
             want_next_offset += req.get_data().len() as i64;
-            write_message_sizes.lock().unwrap().push(
-              req.get_data().len(),
-            );
+            write_message_sizes
+              .lock()
+              .unwrap()
+              .push(req.get_data().len());
             bytes.extend(req.get_data());
           }
           Ok((maybe_resource_name, bytes))
@@ -237,16 +238,16 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
           grpcio::Error::RpcFailure(status) => status,
           e => grpcio::RpcStatus::new(grpcio::RpcStatusCode::Unknown, Some(format!("{:?}", e))),
         })
-        .and_then(move |(maybe_resource_name, bytes)| {
-          match maybe_resource_name {
+        .and_then(
+          move |(maybe_resource_name, bytes)| match maybe_resource_name {
             None => Err(grpcio::RpcStatus::new(
               grpcio::RpcStatusCode::InvalidArgument,
               Some(format!("Stream saw no messages")),
             )),
             Some(resource_name) => {
               let parts: Vec<_> = resource_name.splitn(6, "/").collect();
-              if parts.len() != 6 || parts.get(1) != Some(&"uploads") ||
-                parts.get(3) != Some(&"blobs")
+              if parts.len() != 6 || parts.get(1) != Some(&"uploads")
+                || parts.get(3) != Some(&"blobs")
               {
                 return Err(
                   (grpcio::RpcStatus::new(
@@ -308,8 +309,8 @@ impl bazel_protos::bytestream_grpc::ByteStream for StubCASResponder {
               response.set_committed_size(size as i64);
               Ok(response)
             }
-          }
-        })
+          },
+        )
         .then(move |result| match result {
           Ok(resp) => sink.success(resp),
           Err(err) => sink.fail(err),

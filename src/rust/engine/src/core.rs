@@ -38,11 +38,11 @@ impl Variants {
   }
 
   pub fn find(&self, key: &String) -> Option<&str> {
-    self.0.iter().find(|&&(ref k, _)| k == key).map(
-      |&(_, ref v)| {
-        v.as_str()
-      },
-    )
+    self
+      .0
+      .iter()
+      .find(|&&(ref k, _)| k == key)
+      .map(|&(_, ref v)| v.as_str())
   }
 }
 
