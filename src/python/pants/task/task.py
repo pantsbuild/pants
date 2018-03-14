@@ -12,7 +12,6 @@ from contextlib import contextmanager
 from hashlib import sha1
 from itertools import repeat
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.worker_pool import Work
 from pants.cache.artifact_cache import UnreadableArtifact, call_insert, call_use_cached_files
