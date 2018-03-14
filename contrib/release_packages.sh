@@ -219,7 +219,10 @@ function pkg_googlejavaformat_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.googlejavaformat==${version}']" \
-    --explain gen | grep "googlejavaformat" &> /dev/null
+    --explain fmt | grep "google-java-format" &> /dev/null
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.googlejavaformat==${version}']" \
+    --explain lint | grep "google-java-format" &> /dev/null
 }
 
 # Once individual (new) package is declared above, insert it into the array below)
