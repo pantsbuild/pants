@@ -132,5 +132,6 @@ class JvmToolTaskTestBase(JvmTaskTestBase):
     :returns: The Task instance that was executed.
     """
     task = self.prepare_execute(context)
-    task.execute()
+    if not task.skip_execution:
+      task.execute()
     return task
