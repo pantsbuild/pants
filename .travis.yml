@@ -113,6 +113,7 @@ matrix:
       env:
         - SHARD="Various pants self checks and lint"
       script:
+        - rm -rf "${HOME}/.cache/pants/rust"
         - ./build-support/bin/ci.sh -x -cejlpn 'Various pants self checks and lint'
 
     - os: linux
