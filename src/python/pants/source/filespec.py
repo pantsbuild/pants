@@ -44,16 +44,28 @@ def glob_to_regex(pattern):
   return ''.join(out)
 
 
-def globs_matches(path, patterns):
-  return any(re.match(glob_to_regex(pattern), path) for pattern in patterns)
+def globs_matches(paths, patterns, exclude_patterns):
+  def excluded(path):
+    if excluded.regexes is None:
+      excluded.regexes = [re.compile(glob_to_regex(ex)) for ex in exclude_patterns]
+    return any(ex.match(path) for ex in excluded.regexes)
+  excluded.regexes = None
+  for pattern in patterns:
+    regex = re.compile(glob_to_regex(pattern))
+    for path in paths:
+      if regex.match(path) and not excluded(path):
+        return True
+  return False
 
 
 def matches_filespec(path, spec):
-  if spec is None:
+  return any_matches_filespec([path], spec)
+
+
+def any_matches_filespec(paths, spec):
+  if not paths or not spec:
     return False
-  if not globs_matches(path, spec.get('globs', [])):
-    return False
-  for spec in spec.get('exclude', []):
-    if matches_filespec(path, spec):
-      return False
-  return True
+  exclude_patterns = []
+  for exclude_spec in spec.get('exclude', []):
+    exclude_patterns.extend(exclude_spec.get('globs', []))
+  return globs_matches(paths, spec.get('globs', []), exclude_patterns)
