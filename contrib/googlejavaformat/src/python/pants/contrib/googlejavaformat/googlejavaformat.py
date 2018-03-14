@@ -16,7 +16,6 @@ from pants.task.lint_task_mixin import LintTaskMixin
 
 class GoogleJavaFormatBase(ScalaRewriteBase):
 
-  _MAIN = 'com.google.googlejavaformat.java.Main'
   _SCALA_SOURCE_EXTENSION = '.java'
   _TARGET_TYPES = ['java_library', 'junit_tests', 'java_tests']
 
@@ -39,14 +38,14 @@ class GoogleJavaFormatBase(ScalaRewriteBase):
     args = list(self.additional_args)
     args.extend([source for _, source in target_sources])
     return self.runjava(classpath=self.tool_classpath('google-java-format'),
-                        main=self._MAIN,
+                        main='com.google.googlejavaformat.java.Main',
                         args=args,
                         workunit_name='google-java-format',
                         jvm_options=self.get_options().jvm_options)
 
   @abstractproperty
   def additional_args(self):
-    return []
+    """List of additional args to supply on the tool command-line."""
 
 
 class GoogleJavaFormatCheckFormat(LintTaskMixin, GoogleJavaFormatBase):

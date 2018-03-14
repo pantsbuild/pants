@@ -5,45 +5,114 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-from pants_test.pants_run_integration_test import PantsRunIntegrationTest
+from textwrap import dedent
+
+from pants.backend.jvm.register import build_file_aliases as register_jvm
+from pants.backend.jvm.targets.java_library import JavaLibrary
+from pants.base.exceptions import TaskError
+from pants.build_graph.register import build_file_aliases as register_core
+from pants_test.jvm.nailgun_task_test_base import NailgunTaskTestBase
+
+from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
+                                                             GoogleJavaFormatCheckFormat)
 
 
-TEST_DIR = 'contrib/googlejavaformat/testprojects/src/java/org/pantsbuild/testproject'
+class BaseTest(NailgunTaskTestBase):
+
+  _BADFORMAT = dedent("""
+    package org.pantsbuild.contrib.googlejavaformat;
+    class MyClass {
+        public static void main(String[] args) {
+            System.out.println("Hello google-java-format!");
+        }
+    }
+    """)
+
+  _GOODFORMAT = dedent("""\
+    package org.pantsbuild.contrib.googlejavaformat;
+    
+    class MyClass {
+      public static void main(String[] args) {
+        System.out.println("Hello google-java-format!");
+      }
+    }
+  """)
 
 
-class GoogleJavaFormatIntegrationTests(PantsRunIntegrationTest):
-  def test_googlejavaformat_fail(self):
-    target = '{}/badgooglejavaformat'.format(TEST_DIR)
-    # test should fail because of style error.
-    failing_test = self.run_pants(['lint', target],
-      {'lint.google-java-format':{'skip':'False'}})
-    self.assert_failure(failing_test)
+class GoogleJavaFormatTests(BaseTest):
 
-  def test_disabled(self):
-    target = '{}/badgooglejavaformat'.format(TEST_DIR)
-    # test should pass because check is disabled.
-    failing_test = self.run_pants(['lint', target],
-      {'lint.google-java-format': {'skip':'True'}})
-    self.assert_success(failing_test)
+  @classmethod
+  def task_type(cls):
+    return GoogleJavaFormat
 
-  def format_file_and_verify_fmt(self, options):
-    # take a snapshot of the file which we can write out
-    # after the test finishes executing.
-    test_file_name = '{}/badscalastyle/BadGoogleJavaFormat.java'.format(TEST_DIR)
-    with open(test_file_name, 'r') as f:
-      contents = f.read()
+  @property
+  def alias_groups(self):
+    return super(GoogleJavaFormatTests, self).alias_groups.merge(
+      register_core().merge(register_jvm())
+    )
 
-    try:
-      # format an incorrectly formatted file.
-      target = '{}/badgooglejavaformat'.format(TEST_DIR)
-      fmt_result = self.run_pants(['fmt', target], {'fmt.google-java-format':options})
-      self.assert_success(fmt_result)
+  def test_googlejavaformat(self):
+    javafile = self.create_file(
+      relpath='src/java/org/pantsbuild/contrib/googlejavaformat/MyClass.java',
+      contents=self._BADFORMAT)
+    target = self.make_target(
+      spec='src/java/org/pantsbuild/contrib/googlejavaformat',
+      target_type=JavaLibrary,
+      sources=['MyClass.java'],
+    )
 
-      # verify that the lint check passes.
-      test_fmt = self.run_pants(['lint', target], {'lint.google-java-format':options})
-      self.assert_success(test_fmt)
-    finally:
-      # restore the file to its original state.
-      f = open(test_file_name, 'w')
-      f.write(contents)
-      f.close()
+    context = self.context(target_roots=[target])
+    task = self.prepare_execute(context)
+    task.execute()
+
+    with open(javafile) as fh:
+      actual = fh.read()
+
+    self.assertEqual(actual, self._GOODFORMAT)
+
+
+
+class GoogleJavaFormatCheckFormatTests(BaseTest):
+
+  @classmethod
+  def task_type(cls):
+    return GoogleJavaFormatCheckFormat
+
+  @property
+  def alias_groups(self):
+    return super(GoogleJavaFormatCheckFormatTests, self).alias_groups.merge(
+      register_core().merge(register_jvm())
+    )
+
+  def test_lint_badformat(self):
+    path = self.create_file(
+      relpath='src/java/org/pantsbuild/contrib/googlejavaformat/MyClass.java',
+      contents=self._BADFORMAT)
+    target = self.make_target(
+      spec='src/java/org/pantsbuild/contrib/googlejavaformat',
+      target_type=JavaLibrary,
+      sources=['MyClass.java'],
+    )
+    context = self.context(target_roots=[target])
+    task = self.prepare_execute(context)
+
+    with self.assertRaises(TaskError) as error:
+      task.execute()
+
+    self.assertEqual(
+      error.exception.message,
+      'google-java-format failed with exit code 1; to fix run: `./pants fmt <targets>`'
+    )
+
+  def test_lint_goodformat(self):
+    path = self.create_file(
+      relpath='src/java/org/pantsbuild/contrib/googlejavaformat/MyClass.java',
+      contents=self._GOODFORMAT)
+    target = self.make_target(
+      spec='src/java/org/pantsbuild/contrib/googlejavaformat',
+      target_type=JavaLibrary,
+      sources=['MyClass.java'],
+    )
+    context = self.context(target_roots=[target])
+    task = self.prepare_execute(context)
+    task.execute()
