@@ -629,7 +629,7 @@ python_library(
   name = 'scalafix',
   sources = ['scalafix.py'],
   dependencies = [
-    ':scala_rewrite_base',
+    ':rewrite_base',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -643,7 +643,7 @@ python_library(
   name = 'scalafmt',
   sources = ['scalafmt.py'],
   dependencies = [
-    ':scala_rewrite_base',
+    ':rewrite_base',
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
@@ -654,8 +654,8 @@ python_library(
 )
 
 python_library(
-  name = 'scala_rewrite_base',
-  sources = ['scala_rewrite_base.py'],
+  name = 'rewrite_base',
+  sources = ['rewrite_base.py'],
   dependencies = [
     'src/python/pants/backend/jvm/tasks:nailgun_task',
     'src/python/pants/base:exceptions',

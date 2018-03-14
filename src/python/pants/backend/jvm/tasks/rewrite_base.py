@@ -16,18 +16,26 @@ from pants.util.memo import memoized_property
 from pants.util.meta import AbstractClass
 
 
-class ScalaRewriteBase(NailgunTask, AbstractClass):
-  """Abstract base class for both scalafix and scalafmt: tools that check/rewrite scala sources."""
-
-  _TARGET_TYPES = ['scala_library', 'junit_tests', 'java_tests']
+class RewriteBase(NailgunTask, AbstractClass):
+  """Abstract base class for JVM-based tools that check/rewrite sources."""
 
   @classmethod
   def register_options(cls, register):
-    super(ScalaRewriteBase, cls).register_options(register)
+    super(RewriteBase, cls).register_options(register)
     register('--target-types',
-             default=cls._TARGET_TYPES,
+             default=cls.target_types(),
              advanced=True, type=list,
              help='The target types to apply formatting to.')
+
+  @classmethod
+  def target_types(cls):
+    """Returns a list of target type names (e.g.: `scala_library`) this rewriter operates on."""
+    raise NotImplementedError()
+
+  @classmethod
+  def source_extension(cls):
+    """Returns the source extension this rewriter operates on (e.g.: `.scala`)"""
+    raise NotImplementedError()
 
   @memoized_property
   def _formatted_target_types(self):
@@ -42,8 +50,8 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
     return not self.sideeffecting
 
   def execute(self):
-    """Runs the tool on all Scala source files that are located."""
-    relevant_targets = self._get_non_synthetic_scala_targets(self.get_targets())
+    """Runs the tool on all source files that are located."""
+    relevant_targets = self._get_non_synthetic_targets(self.get_targets())
 
     if self.sideeffecting:
       # Always execute sideeffecting tasks without invalidation.
@@ -90,10 +98,10 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
     with a useful error message is required.
     """
 
-  def _get_non_synthetic_scala_targets(self, targets):
+  def _get_non_synthetic_targets(self, targets):
     return filter(
       lambda target: isinstance(target, self._formatted_target_types)
-                     and target.has_sources(self._SCALA_SOURCE_EXTENSION)
+                     and target.has_sources(self.source_extension())
                      and (not target.is_synthetic),
       targets)
 
@@ -101,4 +109,4 @@ class ScalaRewriteBase(NailgunTask, AbstractClass):
     return [(target, os.path.join(get_buildroot(), source))
             for target in targets
             for source in target.sources_relative_to_buildroot()
-            if source.endswith(self._SCALA_SOURCE_EXTENSION)]
+            if source.endswith(self.source_extension())]

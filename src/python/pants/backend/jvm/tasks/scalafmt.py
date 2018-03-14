@@ -7,7 +7,7 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from abc import abstractproperty
 
-from pants.backend.jvm.tasks.scala_rewrite_base import ScalaRewriteBase
+from pants.backend.jvm.tasks.rewrite_base import RewriteBase
 from pants.base.exceptions import TaskError
 from pants.java.jar.jar_dependency import JarDependency
 from pants.option.custom_types import file_option
@@ -15,15 +15,12 @@ from pants.task.fmt_task_mixin import FmtTaskMixin
 from pants.task.lint_task_mixin import LintTaskMixin
 
 
-class ScalaFmt(ScalaRewriteBase):
+class ScalaFmt(RewriteBase):
   """Abstract class to run ScalaFmt commands.
 
   Classes that inherit from this should override additional_args and
   process_result to run different scalafmt commands.
   """
-
-  _SCALAFMT_MAIN = 'org.scalafmt.cli.Cli'
-  _SCALA_SOURCE_EXTENSION = '.scala'
 
   @classmethod
   def register_options(cls, register):
@@ -39,6 +36,14 @@ class ScalaFmt(ScalaRewriteBase):
                           ])
 
   @classmethod
+  def target_types(cls):
+    return ['scala_library', 'junit_tests', 'java_tests']
+
+  @classmethod
+  def source_extension(cls):
+    return '.scala'
+
+  @classmethod
   def implementation_version(cls):
     return super(ScalaFmt, cls).implementation_version() + [('ScalaFmt', 5)]
 
@@ -51,7 +56,7 @@ class ScalaFmt(ScalaRewriteBase):
       args.extend(['--config', config_file])
 
     return self.runjava(classpath=self.tool_classpath('scalafmt'),
-                        main=self._SCALAFMT_MAIN,
+                        main='org.scalafmt.cli.Cli',
                         args=args,
                         workunit_name='scalafmt',
                         jvm_options=self.get_options().jvm_options)
