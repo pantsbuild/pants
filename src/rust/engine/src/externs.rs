@@ -15,9 +15,7 @@ use interning::Interns;
 use log;
 
 pub fn eval(python: &str) -> Result<Value, Failure> {
-  with_externs(|e| {
-    (e.eval)(e.context, python.as_ptr(), python.len() as u64)
-  }).into()
+  with_externs(|e| (e.eval)(e.context, python.as_ptr(), python.len() as u64)).into()
 }
 
 pub fn identify(val: &Value) -> Ident {
@@ -43,23 +41,17 @@ pub fn clone_val(val: &Value) -> Value {
 }
 
 pub fn drop_handles(handles: Vec<Handle>) {
-  with_externs(|e| {
-    (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64)
-  })
+  with_externs(|e| (e.drop_handles)(e.context, handles.as_ptr(), handles.len() as u64))
 }
 
 pub fn satisfied_by(constraint: &TypeConstraint, obj: &Value) -> bool {
   let interns = INTERNS.read().unwrap();
-  with_externs(|e| {
-    (e.satisfied_by)(e.context, interns.get(&constraint.0), obj)
-  })
+  with_externs(|e| (e.satisfied_by)(e.context, interns.get(&constraint.0), obj))
 }
 
 pub fn satisfied_by_type(constraint: &TypeConstraint, cls: &TypeId) -> bool {
   let interns = INTERNS.read().unwrap();
-  with_externs(|e| {
-    (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls)
-  })
+  with_externs(|e| (e.satisfied_by_type)(e.context, interns.get(&constraint.0), cls))
 }
 
 pub fn store_list(values: Vec<&Value>, merge: bool) -> Value {
@@ -75,9 +67,7 @@ pub fn store_list(values: Vec<&Value>, merge: bool) -> Value {
 }
 
 pub fn store_bytes(bytes: &[u8]) -> Value {
-  with_externs(|e| {
-    (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64)
-  })
+  with_externs(|e| (e.store_bytes)(e.context, bytes.as_ptr(), bytes.len() as u64))
 }
 
 pub fn store_i32(val: i32) -> Value {
@@ -97,15 +87,11 @@ pub fn project(value: &Value, field: &str, type_id: &TypeId) -> Value {
 }
 
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
-  with_externs(|e| {
-    (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64)
-  })
+  with_externs(|e| (e.project_ignoring_type)(e.context, value, field.as_ptr(), field.len() as u64))
 }
 
 pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {
-  with_externs(|e| {
-    (e.project_multi)(e.context, value, field.as_ptr(), field.len() as u64).to_vec()
-  })
+  with_externs(|e| (e.project_multi)(e.context, value, field.as_ptr(), field.len() as u64).to_vec())
 }
 
 pub fn project_multi_strs(item: &Value, field: &str) -> Vec<String> {
@@ -136,26 +122,20 @@ pub fn type_to_str(type_id: TypeId) -> String {
   with_externs(|e| {
     (e.type_to_str)(e.context, type_id)
       .to_string()
-      .unwrap_or_else(|e| {
-        format!("<failed to decode unicode for {:?}: {}>", type_id, e)
-      })
+      .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", type_id, e))
   })
 }
 
 pub fn val_to_str(val: &Value) -> String {
   with_externs(|e| {
-    (e.val_to_str)(e.context, val).to_string().unwrap_or_else(
-      |e| {
-        format!("<failed to decode unicode for {:?}: {}>", val, e)
-      },
-    )
+    (e.val_to_str)(e.context, val)
+      .to_string()
+      .unwrap_or_else(|e| format!("<failed to decode unicode for {:?}: {}>", val, e))
   })
 }
 
 pub fn create_exception(msg: &str) -> Value {
-  with_externs(|e| {
-    (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64)
-  })
+  with_externs(|e| (e.create_exception)(e.context, msg.as_ptr(), msg.len() as u64))
 }
 
 pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
@@ -163,9 +143,7 @@ pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value,
 }
 
 pub fn call(func: &Value, args: &[Value]) -> Result<Value, Failure> {
-  with_externs(|e| {
-    (e.call)(e.context, func, args.as_ptr(), args.len() as u64)
-  }).into()
+  with_externs(|e| (e.call)(e.context, func, args.as_ptr(), args.len() as u64)).into()
 }
 
 ///
@@ -196,7 +174,9 @@ lazy_static! {
 // would need to be acquired for every single logging statement).
 // Please don't mutate it.
 // Please.
-static mut LOGGER: FfiLogger = FfiLogger { level_filter: log::LevelFilter::Off };
+static mut LOGGER: FfiLogger = FfiLogger {
+  level_filter: log::LevelFilter::Off,
+};
 
 ///
 /// Set the static Externs for this process. All other methods of this module will fail
@@ -216,9 +196,9 @@ where
   F: FnOnce(&Externs) -> T,
 {
   let externs_opt = EXTERNS.read().unwrap();
-  let externs = externs_opt.as_ref().unwrap_or_else(|| {
-    panic!("externs used before static initialization.")
-  });
+  let externs = externs_opt
+    .as_ref()
+    .unwrap_or_else(|| panic!("externs used before static initialization."));
   f(externs)
 }
 
@@ -308,11 +288,11 @@ pub type LogExtern = extern "C" fn(*const ExternContext, u8, str_ptr: *const u8,
 
 // TODO: Type alias used to avoid rustfmt breaking itself by rendering a 101 character line.
 pub type SatisfedBool = bool;
-pub type SatisfiedByExtern = extern "C" fn(*const ExternContext, *const Value, *const Value)
-                                           -> SatisfedBool;
+pub type SatisfiedByExtern =
+  extern "C" fn(*const ExternContext, *const Value, *const Value) -> SatisfedBool;
 
-pub type SatisfiedByTypeExtern = extern "C" fn(*const ExternContext, *const Value, *const TypeId)
-                                               -> bool;
+pub type SatisfiedByTypeExtern =
+  extern "C" fn(*const ExternContext, *const Value, *const TypeId) -> bool;
 
 pub type IdentifyExtern = extern "C" fn(*const ExternContext, *const Value) -> Ident;
 
@@ -322,19 +302,20 @@ pub type CloneValExtern = extern "C" fn(*const ExternContext, *const Value) -> V
 
 pub type DropHandlesExtern = extern "C" fn(*const ExternContext, *const Handle, u64);
 
-pub type StoreListExtern = extern "C" fn(*const ExternContext, *const *const Value, u64, bool)
-                                         -> Value;
+pub type StoreListExtern =
+  extern "C" fn(*const ExternContext, *const *const Value, u64, bool) -> Value;
 
 pub type StoreBytesExtern = extern "C" fn(*const ExternContext, *const u8, u64) -> Value;
 
 pub type StoreI32Extern = extern "C" fn(*const ExternContext, i32) -> Value;
 
-pub type ProjectExtern = extern "C" fn(*const ExternContext,
-                                       *const Value,
-                                       field_name_ptr: *const u8,
-                                       field_name_len: u64,
-                                       *const TypeId)
-                                       -> Value;
+pub type ProjectExtern = extern "C" fn(
+  *const ExternContext,
+  *const Value,
+  field_name_ptr: *const u8,
+  field_name_len: u64,
+  *const TypeId,
+) -> Value;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -412,17 +393,13 @@ impl TypeIdBuffer {
   }
 }
 
-pub type ProjectIgnoringTypeExtern = extern "C" fn(*const ExternContext,
-                                                   *const Value,
-                                                   field_name_ptr: *const u8,
-                                                   field_name_len: u64)
-                                                   -> Value;
+pub type ProjectIgnoringTypeExtern =
+  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64)
+    -> Value;
 
-pub type ProjectMultiExtern = extern "C" fn(*const ExternContext,
-                                            *const Value,
-                                            field_name_ptr: *const u8,
-                                            field_name_len: u64)
-                                            -> ValueBuffer;
+pub type ProjectMultiExtern =
+  extern "C" fn(*const ExternContext, *const Value, field_name_ptr: *const u8, field_name_len: u64)
+    -> ValueBuffer;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -484,16 +461,14 @@ pub type TypeToStrExtern = extern "C" fn(*const ExternContext, TypeId) -> Buffer
 
 pub type ValToStrExtern = extern "C" fn(*const ExternContext, *const Value) -> Buffer;
 
-pub type CreateExceptionExtern = extern "C" fn(*const ExternContext,
-                                               str_ptr: *const u8,
-                                               str_len: u64)
-                                               -> Value;
+pub type CreateExceptionExtern =
+  extern "C" fn(*const ExternContext, str_ptr: *const u8, str_len: u64) -> Value;
 
-pub type CallExtern = extern "C" fn(*const ExternContext, *const Value, *const Value, u64)
-                                    -> PyResult;
+pub type CallExtern =
+  extern "C" fn(*const ExternContext, *const Value, *const Value, u64) -> PyResult;
 
-pub type EvalExtern = extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64)
-                                    -> PyResult;
+pub type EvalExtern =
+  extern "C" fn(*const ExternContext, python_ptr: *const u8, python_len: u64) -> PyResult;
 
 pub fn with_vec<F, C, T>(c_ptr: *mut C, c_len: usize, f: F) -> T
 where
@@ -571,9 +546,8 @@ impl FfiLogger {
     };
 
     log::set_max_level(self.level_filter);
-    log::set_logger(self).expect(
-      "Failed to set logger (maybe you tried to call init multiple times?)",
-    );
+    log::set_logger(self)
+      .expect("Failed to set logger (maybe you tried to call init multiple times?)");
   }
 }
 

@@ -5,9 +5,14 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
+import logging
+
 from pants.binaries.binary_util import BinaryUtil
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
+
+
+logger = logging.getLogger(__name__)
 
 
 class BinaryToolBase(Subsystem):
@@ -88,10 +93,14 @@ class BinaryToolBase(Subsystem):
     :API: public
     """
     if self.replaces_scope and self.replaces_name:
-      # If the old option is provided explicitly, let it take precedence.
-      old_opts = context.options.for_scope(self.replaces_scope)
-      if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
-        return old_opts.get(self.replaces_name)
+      if context:
+        # If the old option is provided explicitly, let it take precedence.
+        old_opts = context.options.for_scope(self.replaces_scope)
+        if old_opts.get(self.replaces_name) and not old_opts.is_default(self.replaces_name):
+          return old_opts.get(self.replaces_name)
+      else:
+        logger.warn('Cannot resolve version of {} from deprecated option {} in scope {} without a '
+                    'context!'.format(self._get_name(), self.replaces_name, self.replaces_scope))
     return self.get_options().version
 
   @memoized_property

@@ -6,9 +6,11 @@ use std::collections::HashSet;
 pub fn verify_directory_canonical(directory: &remote_execution::Directory) -> Result<(), String> {
   verify_no_unknown_fields(directory)?;
   verify_nodes(directory.get_files(), |n| n.get_name(), |n| n.get_digest())?;
-  verify_nodes(directory.get_directories(), |n| n.get_name(), |n| {
-    n.get_digest()
-  })?;
+  verify_nodes(
+    directory.get_directories(),
+    |n| n.get_name(),
+    |n| n.get_digest(),
+  )?;
   let file_names: HashSet<&str> = directory
     .get_files()
     .iter()

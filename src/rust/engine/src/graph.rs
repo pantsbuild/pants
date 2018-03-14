@@ -87,9 +87,12 @@ impl Entry {
     res: Result<future::SharedItem<NodeResult>, future::SharedError<Failure>>,
   ) -> Result<N::Output, Failure> {
     match res {
-      Ok(nr) => Ok((*nr).clone().try_into().unwrap_or_else(|_| {
-        panic!("A Node implementation was ambiguous.")
-      })),
+      Ok(nr) => Ok(
+        (*nr)
+          .clone()
+          .try_into()
+          .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
+      ),
       Err(failure) => Err((*failure).clone()),
     }
   }
@@ -125,9 +128,10 @@ impl Entry {
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
   fn peek<N: Node>(&self) -> Option<Result<N::Output, Failure>> {
-    self.state.as_ref().and_then(|state| {
-      state.peek().map(|nr| Entry::unwrap::<N>(nr))
-    })
+    self
+      .state
+      .as_ref()
+      .and_then(|state| state.peek().map(|nr| Entry::unwrap::<N>(nr)))
   }
 
   fn format<N: Node>(&self) -> String {
@@ -166,9 +170,10 @@ impl InnerGraph {
   }
 
   fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry {
-    self.pg.node_weight(id).expect(
-      "The unsafe_entry_for_id method should only be used in read-only methods!",
-    )
+    self
+      .pg
+      .node_weight(id)
+      .expect("The unsafe_entry_for_id method should only be used in read-only methods!")
   }
 
   fn ensure_entry(&mut self, node: EntryKey) -> EntryId {
@@ -260,13 +265,13 @@ impl InnerGraph {
         .nodes
         .iter()
         .filter_map(|(node, &entry_id)| {
-          node.content().fs_subject().and_then(
-            |path| if paths.contains(path) {
+          node.content().fs_subject().and_then(|path| {
+            if paths.contains(path) {
               Some(entry_id)
             } else {
               None
-            },
-          )
+            }
+          })
         })
         .collect();
       self.walk(root_ids, true).map(|eid| eid).collect()
@@ -287,9 +292,10 @@ impl InnerGraph {
 
     for &id in &ids {
       // Validate that all dependents of the id are also scheduled for removal.
-      assert!(pg.neighbors_directed(id, Direction::Incoming).all(|dep| {
-        ids.contains(&dep)
-      }));
+      assert!(
+        pg.neighbors_directed(id, Direction::Incoming)
+          .all(|dep| ids.contains(&dep))
+      );
 
       // Remove the entry from the graph (which will also remove dependent edges).
       pg.remove_node(id);
@@ -317,8 +323,7 @@ impl InnerGraph {
     let viz_color_scheme = "set312";
     let viz_max_colors = 12;
     let mut format_color = |entry: &Entry| match entry.peek::<NodeKey>() {
-      None |
-      Some(Err(Failure::Noop(_))) => "white".to_string(),
+      None | Some(Err(Failure::Noop(_))) => "white".to_string(),
       Some(Err(Failure::Throw(..))) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
@@ -331,9 +336,7 @@ impl InnerGraph {
     };
 
     try!(f.write_all(b"digraph plans {\n"));
-    try!(f.write_fmt(
-      format_args!("  node[colorscheme={}];\n", viz_color_scheme),
-    ));
+    try!(f.write_fmt(format_args!("  node[colorscheme={}];\n", viz_color_scheme),));
     try!(f.write_all(b"  concentrate=true;\n"));
     try!(f.write_all(b"  rankdir=TB;\n"));
 
@@ -363,9 +366,7 @@ impl InnerGraph {
 
         // Write an entry per edge.
         let dep_str = dep_entry.format::<NodeKey>();
-        try!(f.write_fmt(
-          format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str),
-        ));
+        try!(f.write_fmt(format_args!("    \"{}\" -> \"{}\"\n", node_str, dep_str),));
       }
     }
 
@@ -411,17 +412,15 @@ impl InnerGraph {
         let state_str = match entry.peek::<NodeKey>() {
           None => "<None>".to_string(),
           Some(Ok(ref x)) => format!("{:?}", x),
-          Some(Err(Failure::Throw(ref x, ref traceback))) => {
-            format!(
-              "Throw({})\n{}",
-              externs::val_to_str(x),
-              traceback
-                .split("\n")
-                .map(|l| format!("{}    {}", indent, l))
-                .collect::<Vec<_>>()
-                .join("\n")
-            )
-          }
+          Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+            "Throw({})\n{}",
+            externs::val_to_str(x),
+            traceback
+              .split("\n")
+              .map(|l| format!("{}    {}", indent, l))
+              .collect::<Vec<_>>()
+              .join("\n")
+          ),
           Some(Err(Failure::Noop(ref x))) => format!("Noop({:?})", x),
           Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
         };
@@ -475,7 +474,9 @@ impl Graph {
       nodes: HashMap::default(),
       pg: StableGraph::new(),
     };
-    Graph { inner: Mutex::new(inner) }
+    Graph {
+      inner: Mutex::new(inner),
+    }
   }
 
   pub fn len(&self) -> usize {
@@ -489,9 +490,9 @@ impl Graph {
   pub fn peek<N: Node>(&self, node: N) -> Option<Result<N::Output, Failure>> {
     let node = node.into();
     let inner = self.inner.lock().unwrap();
-    inner.entry(&EntryKey::Valid(node)).and_then(
-      |e| e.peek::<N>(),
-    )
+    inner
+      .entry(&EntryKey::Valid(node))
+      .and_then(|e| e.peek::<N>())
   }
 
   ///
@@ -598,10 +599,9 @@ impl<'a> Iterator for Walk<'a> {
       }
 
       // Queue the neighbors of the entry and then return it.
-      self.deque.extend(self.graph.pg.neighbors_directed(
-        id,
-        self.direction,
-      ));
+      self
+        .deque
+        .extend(self.graph.pg.neighbors_directed(id, self.direction));
       return Some(id);
     }
 

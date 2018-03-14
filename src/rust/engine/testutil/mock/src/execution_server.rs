@@ -136,13 +136,11 @@ impl MockResponder {
   }
 
   fn log<T: protobuf::Message + Sized>(&self, message: T) {
-    self.received_messages.lock().unwrap().push((
-      message
-        .descriptor()
-        .name()
-        .to_string(),
-      Box::new(message),
-    ));
+    self
+      .received_messages
+      .lock()
+      .unwrap()
+      .push((message.descriptor().name().to_string(), Box::new(message)));
   }
 
   fn display_all<D: Debug>(items: &Vec<D>) -> String {
@@ -162,7 +160,8 @@ impl MockResponder {
       .operation_responses
       .lock()
       .unwrap()
-      .pop_front() {
+      .pop_front()
+    {
       Some(op) => {
         sink.success(op.clone());
       }

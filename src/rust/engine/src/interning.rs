@@ -64,9 +64,10 @@ impl Interns {
   }
 
   pub fn get(&self, k: &Key) -> &Value {
-    self.reverse.get(&k).unwrap_or_else(|| {
-      panic!("Previously memoized object disappeared for {:?}", k)
-    })
+    self
+      .reverse
+      .get(&k)
+      .unwrap_or_else(|| panic!("Previously memoized object disappeared for {:?}", k))
   }
 }
 

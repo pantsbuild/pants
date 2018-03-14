@@ -190,8 +190,9 @@ impl PathGlob {
     let mut prev_was_doublestar = false;
     for component in Path::new(filespec).components() {
       let part = match component {
-        Component::Prefix(..) |
-        Component::RootDir => return Err(format!("Absolute paths not supported: {:?}", filespec)),
+        Component::Prefix(..) | Component::RootDir => {
+          return Err(format!("Absolute paths not supported: {:?}", filespec))
+        }
         Component::CurDir => continue,
         c => c.as_os_str(),
       };
@@ -205,9 +206,8 @@ impl PathGlob {
 
       // NB: Because the filespec is a String input, calls to `to_str_lossy` are not lossy; the
       // use of `Path` is strictly for os-independent Path parsing.
-      parts.push(Pattern::new(&part.to_string_lossy()).map_err(|e| {
-        format!("Could not parse {:?} as a glob: {:?}", filespec, e)
-      })?);
+      parts.push(Pattern::new(&part.to_string_lossy())
+        .map_err(|e| format!("Could not parse {:?} as a glob: {:?}", filespec, e))?);
     }
 
     PathGlob::parse_globs(canonical_dir, symbolic_path, &parts)
@@ -234,13 +234,9 @@ impl PathGlob {
             canonical_dir.clone(),
             symbolic_path.clone(),
             SINGLE_STAR_GLOB.clone(),
-            vec![DOUBLE_STAR_GLOB.clone()]
+            vec![DOUBLE_STAR_GLOB.clone()],
           ),
-          PathGlob::wildcard(
-            canonical_dir,
-            symbolic_path,
-            SINGLE_STAR_GLOB.clone()
-          ),
+          PathGlob::wildcard(canonical_dir, symbolic_path, SINGLE_STAR_GLOB.clone()),
         ]);
       }
 
@@ -281,11 +277,7 @@ impl PathGlob {
     } else if parts.len() == 1 {
       // This is the path basename.
       Ok(vec![
-        PathGlob::wildcard(
-          canonical_dir,
-          symbolic_path,
-          parts[0].clone()
-        ),
+        PathGlob::wildcard(canonical_dir, symbolic_path, parts[0].clone()),
       ])
     } else {
       // This is a path dirname.
@@ -294,7 +286,7 @@ impl PathGlob {
           canonical_dir,
           symbolic_path,
           parts[0].clone(),
-          parts[1..].to_vec()
+          parts[1..].to_vec(),
         ),
       ])
     }
@@ -312,9 +304,8 @@ impl PathGlobs {
     let ignore_for_exclude = if exclude.is_empty() {
       EMPTY_IGNORE.clone()
     } else {
-      Arc::new(create_ignore(exclude).map_err(|e| {
-        format!("Could not parse glob excludes {:?}: {:?}", exclude, e)
-      })?)
+      Arc::new(create_ignore(exclude)
+        .map_err(|e| format!("Could not parse glob excludes {:?}: {:?}", exclude, e))?)
     };
     Ok(PathGlobs {
       include: PathGlob::create(include)?,
@@ -357,8 +348,7 @@ fn is_ignored(ignore: &Gitignore, stat: &Stat) -> bool {
     _ => false,
   };
   match ignore.matched(stat.path(), is_dir) {
-    ignore::Match::None |
-    ignore::Match::Whitelist(_) => false,
+    ignore::Match::None | ignore::Match::Whitelist(_) => false,
     ignore::Match::Ignore(_) => true,
   }
 }
@@ -382,26 +372,23 @@ impl PosixFS {
     let canonical_root = root
       .canonicalize()
       .and_then(|canonical| {
-        canonical.metadata().and_then(
-          |metadata| if metadata.is_dir() {
+        canonical.metadata().and_then(|metadata| {
+          if metadata.is_dir() {
             Ok(Dir(canonical))
           } else {
             Err(io::Error::new(
               io::ErrorKind::InvalidInput,
               "Not a directory.",
             ))
-          },
-        )
+          }
+        })
       })
-      .map_err(|e| {
-        format!("Could not canonicalize root {:?}: {:?}", root, e)
-      })?;
+      .map_err(|e| format!("Could not canonicalize root {:?}: {:?}", root, e))?;
 
     let ignore = create_ignore(&ignore_patterns).map_err(|e| {
       format!(
         "Could not parse build ignore inputs {:?}: {:?}",
-        ignore_patterns,
-        e
+        ignore_patterns, e
       )
     })?;
     Ok(PosixFS {
@@ -458,23 +445,23 @@ impl PosixFS {
     self
       .pool
       .spawn_fn(move || {
-        link_abs.read_link().and_then(
-          |path_buf| if path_buf.is_absolute() {
+        link_abs.read_link().and_then(|path_buf| {
+          if path_buf.is_absolute() {
             Err(io::Error::new(
               io::ErrorKind::InvalidData,
               format!("Absolute symlink: {:?}", link_abs),
             ))
           } else {
-            link_parent.map(|parent| parent.join(path_buf)).ok_or_else(
-              || {
+            link_parent
+              .map(|parent| parent.join(path_buf))
+              .ok_or_else(|| {
                 io::Error::new(
                   io::ErrorKind::InvalidData,
                   format!("Symlink without a parent?: {:?}", link_abs),
                 )
-              },
-            )
-          },
-        )
+              })
+          }
+        })
       })
       .to_boxed()
   }
@@ -525,9 +512,7 @@ impl PosixFS {
         io::ErrorKind::InvalidData,
         format!(
           "Expected File, Dir or Link, but {:?} (relative to {:?}) was a {:?}",
-          path_for_stat,
-          absolute_path_to_root,
-          file_type
+          path_for_stat, absolute_path_to_root, file_type
         ),
       ))
     }
@@ -535,12 +520,9 @@ impl PosixFS {
 
   pub fn stat(&self, relative_path: PathBuf) -> Result<Stat, io::Error> {
     let metadata = fs::symlink_metadata(self.root.0.join(&relative_path))?;
-    PosixFS::stat_internal(
-      relative_path,
-      metadata.file_type(),
-      &self.root.0,
-      || Ok(metadata),
-    )
+    PosixFS::stat_internal(relative_path, metadata.file_type(), &self.root.0, || {
+      Ok(metadata)
+    })
   }
 
   pub fn scandir(&self, dir: &Dir) -> BoxFuture<Vec<Stat>, io::Error> {
@@ -603,9 +585,7 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
           })
           .unwrap_or_else(|| vec![])
       })
-      .and_then(move |link_globs| {
-        context.expand(PathGlobs::from_globs(link_globs))
-      })
+      .and_then(move |link_globs| context.expand(PathGlobs::from_globs(link_globs)))
       .map(|mut path_stats| {
         // Since we've escaped any globs in the parsed path, expect either 0 or 1 destination.
         path_stats.pop().map(|ps| match ps {
@@ -710,9 +690,9 @@ pub trait VFS<E: Send + Sync + 'static>: Clone + Send + Sync + 'static {
         for (paths, globs) in paths_and_globs.into_iter() {
           expansion.outputs.extend(paths.into_iter().map(|p| (p, ())));
           let completed = &mut expansion.completed;
-          expansion.todo.extend(globs.into_iter().filter(|pg| {
-            completed.insert(pg.clone())
-          }));
+          expansion
+            .todo
+            .extend(globs.into_iter().filter(|pg| completed.insert(pg.clone())));
         }
 
         // If there were any new PathGlobs, continue the expansion.
@@ -821,9 +801,8 @@ pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
 }
 
 fn safe_create_dir_all(path: &Path) -> Result<(), String> {
-  safe_create_dir_all_ioerror(path).map_err(|e| {
-    format!("Failed to create dir {:?} due to {:?}", path, e)
-  })
+  safe_create_dir_all_ioerror(path)
+    .map_err(|e| format!("Failed to create dir {:?} due to {:?}", path, e))
 }
 
 #[cfg(test)]
@@ -943,18 +922,18 @@ mod posixfs_test {
 
   #[test]
   fn stat_other() {
-    new_posixfs("/dev").stat(PathBuf::from("null")).expect_err(
-      "Want error",
-    );
+    new_posixfs("/dev")
+      .stat(PathBuf::from("null"))
+      .expect_err("Want error");
   }
 
   #[test]
   fn stat_missing() {
     let dir = tempdir::TempDir::new("posixfs").unwrap();
     let posix_fs = new_posixfs(&dir.path());
-    posix_fs.stat(PathBuf::from("no_marmosets")).expect_err(
-      "Want error",
-    );
+    posix_fs
+      .stat(PathBuf::from("no_marmosets"))
+      .expect_err("Want error");
   }
 
   #[test]
@@ -984,9 +963,9 @@ mod posixfs_test {
     make_file(&dir.path().join(&sneaky_marmoset), &[], 0o600);
     std::os::unix::fs::symlink(
       &dir.path().join(&a_marmoset),
-      dir.path().join(
-        &dir.path().join(&remarkably_similar_marmoset),
-      ),
+      dir
+        .path()
+        .join(&dir.path().join(&remarkably_similar_marmoset)),
     ).unwrap();
     std::fs::create_dir(dir.path().join(&hammock)).unwrap();
     make_file(
@@ -1031,7 +1010,9 @@ mod posixfs_test {
     let stats = fs.scandir(&Dir(PathBuf::from("."))).wait().unwrap();
     assert_eq!(stats.len(), 1);
     match stats.get(0).unwrap() {
-      &super::Stat::File(File { is_executable: got, .. }) => assert_eq!(want_is_executable, got),
+      &super::Stat::File(File {
+        is_executable: got, ..
+      }) => assert_eq!(want_is_executable, got),
       other => panic!("Expected file, got {:?}", other),
     }
   }

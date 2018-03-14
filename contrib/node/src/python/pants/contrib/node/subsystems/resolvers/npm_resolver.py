@@ -72,7 +72,8 @@ class NpmResolver(Subsystem, NodeResolverBase):
           raise TaskError('Failed to resolve dependencies for {}:\n\t{} failed with exit code {}'
                           .format(target.address.reference(), yarnpkg_command, returncode))
 
-  def _emit_package_descriptor(self, node_task, target, results_dir, node_paths):
+  @staticmethod
+  def _emit_package_descriptor(node_task, target, results_dir, node_paths):
     dependencies = {
       dep.package_name: node_paths.node_path(dep) if node_task.is_node_module(dep) else dep.version
       for dep in target.dependencies
@@ -101,12 +102,12 @@ class NpmResolver(Subsystem, NodeResolverBase):
     # dependencies in package.json and BUILD, though. In the future, work to make
     # Pants more compatible with package.json to eliminate duplication if you still want your
     # project to "npm install" through NPM by itself.
-    dependenciesToRemove = [
+    dependencies_to_remove = [
       'dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'
     ]
     node_task.context.log.debug(
-      'Removing {} from package.json for {}'.format(dependenciesToRemove, package['name']))
-    for dependencyType in dependenciesToRemove:
+      'Removing {} from package.json for {}'.format(dependencies_to_remove, package['name']))
+    for dependencyType in dependencies_to_remove:
       package.pop(dependencyType, None)
 
     node_task.context.log.debug(

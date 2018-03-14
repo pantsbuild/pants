@@ -21,12 +21,12 @@ class NodeTask(Task):
 
   @classmethod
   def subsystem_dependencies(cls):
-    return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.Factory,)
+    return super(NodeTask, cls).subsystem_dependencies() + (NodeDistribution.scoped(cls),)
 
   @memoized_property
   def node_distribution(self):
     """A bootstrapped node distribution for use by node tasks."""
-    return NodeDistribution.Factory.global_instance().create()
+    return NodeDistribution.scoped_instance(self)
 
   @classmethod
   def is_node_package(cls, target):
@@ -106,7 +106,8 @@ class NodeTask(Task):
             :class:`pants.contrib.node.subsystems.node_distribution.NodeDistribution.Command`)
     """
 
-    yarnpkg_command = self.node_distribution.yarnpkg_command(args=args, node_paths=node_paths)
+    yarnpkg_command = self.node_distribution.yarnpkg_command(args=args, node_paths=node_paths,
+                                                             context=self.context)
     return self._execute_command(yarnpkg_command,
                                  workunit_name=workunit_name,
                                  workunit_labels=workunit_labels)

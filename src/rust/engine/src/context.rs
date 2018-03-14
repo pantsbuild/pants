@@ -94,7 +94,9 @@ impl Context {
   ///
   pub fn get<N: Node>(&self, node: N) -> NodeFuture<N::Output> {
     // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drain_handles().map(|handles| { externs::drop_handles(handles); });
+    maybe_drain_handles().map(|handles| {
+      externs::drop_handles(handles);
+    });
     self.core.graph.get(self.entry_id, self, node)
   }
 }

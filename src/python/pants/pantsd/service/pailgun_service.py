@@ -20,12 +20,13 @@ from pants.pantsd.service.pants_service import PantsService
 class PailgunService(PantsService):
   """A service that runs the Pailgun server."""
 
-  def __init__(self, bind_addr, exiter_class, runner_class, target_roots_class, scheduler_service):
+  def __init__(self, bind_addr, exiter_class, runner_class, target_roots_calculator, scheduler_service):
     """
     :param tuple bind_addr: The (hostname, port) tuple to bind the Pailgun server to.
     :param class exiter_class: The `Exiter` class to be used for Pailgun runs.
     :param class runner_class: The `PantsRunner` class to be used for Pailgun runs.
-    :param class target_roots_class: The `TargetRoots` class to be used for target root parsing.
+    :param class target_roots_calculator: The `TargetRootsCalculator` class to be used for target
+      root parsing.
     :param SchedulerService scheduler_service: The SchedulerService instance for access to the
                                                resident scheduler.
     """
@@ -33,7 +34,7 @@ class PailgunService(PantsService):
     self._bind_addr = bind_addr
     self._exiter_class = exiter_class
     self._runner_class = runner_class
-    self._target_roots_class = target_roots_class
+    self._target_roots_calculator = target_roots_calculator
     self._scheduler_service = scheduler_service
 
     self._logger = logging.getLogger(__name__)
@@ -63,7 +64,7 @@ class PailgunService(PantsService):
 
       self._logger.debug('execution commandline: %s', arguments)
       options, _ = OptionsInitializer(OptionsBootstrapper(args=arguments)).setup(init_logging=False)
-      target_roots = self._target_roots_class.create(
+      target_roots = self._target_roots_calculator.create(
         options,
         change_calculator=self._scheduler_service.change_calculator
       )
@@ -85,6 +86,7 @@ class PailgunService(PantsService):
         exiter,
         arguments,
         environment,
+        target_roots,
         graph_helper,
         self.fork_lock,
         preceding_graph_size,

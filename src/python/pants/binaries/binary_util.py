@@ -179,7 +179,7 @@ class BinaryUtil(object):
     # Use filename without rightmost extension as the directory name.
     unpacked_dirname, _ = os.path.splitext(downloaded_file)
     if not os.path.exists(unpacked_dirname):
-      archiver.extract(downloaded_file, unpacked_dirname)
+      archiver.extract(downloaded_file, unpacked_dirname, concurrency_safe=True)
     return unpacked_dirname
 
   def _binary_path_to_fetch(self, supportdir, version, name, platform_dependent):

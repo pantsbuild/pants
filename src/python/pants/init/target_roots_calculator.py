@@ -11,7 +11,7 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import SingleAddress
+from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.scm.subsystems.changed import ChangedRequest
 
 
@@ -22,7 +22,7 @@ class InvalidSpecConstraint(Exception):
   """Raised when invalid constraints are given via target specs and arguments like --changed*."""
 
 
-class TargetRoots(object):
+class TargetRootsCalculator(object):
   """Determines the target roots for a given pants run."""
 
   @classmethod
@@ -64,25 +64,6 @@ class TargetRoots(object):
       # alternate target roots.
       changed_addresses = change_calculator.changed_target_addresses(changed_request)
       logger.debug('changed addresses: %s', changed_addresses)
-      return ChangedTargetRoots(tuple(SingleAddress(a.spec_path, a.target_name)
-                                      for a in changed_addresses))
+      return ChangedTargetRoots(tuple(changed_addresses))
 
     return LiteralTargetRoots(spec_roots)
-
-  def __init__(self, spec_roots):
-    self._spec_roots = spec_roots
-
-  def as_specs(self):
-    """Returns the current target roots as Specs."""
-    return self._spec_roots
-
-  def __repr__(self):
-    return '{}({!r})'.format(self.__class__.__name__, self.as_specs())
-
-
-class ChangedTargetRoots(TargetRoots):
-  """Target roots that have been altered by `--changed` functionality."""
-
-
-class LiteralTargetRoots(TargetRoots):
-  """User defined target roots."""

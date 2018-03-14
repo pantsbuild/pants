@@ -18,17 +18,20 @@ from pants.util.contextutil import hard_exit_handler, maybe_profiled
 class LocalPantsRunner(object):
   """Handles a single pants invocation running in the process-local context."""
 
-  def __init__(self, exiter, args, env, daemon_build_graph=None, options_bootstrapper=None):
+  def __init__(self, exiter, args, env, target_roots=None, daemon_build_graph=None,
+               options_bootstrapper=None):
     """
     :param Exiter exiter: The Exiter instance to use for this run.
     :param list args: The arguments (e.g. sys.argv) for this run.
     :param dict env: The environment (e.g. os.environ) for this run.
+    :param TargetRoots target_roots: The `TargetRoots` for this run.
     :param BuildGraph daemon_build_graph: A BuildGraph instance for graph reuse (optional).
     :param OptionsBootstrapper options_bootstrapper: An optional existing OptionsBootstrapper.
     """
     self._exiter = exiter
     self._args = args
     self._env = env
+    self._target_roots = target_roots
     self._daemon_build_graph = daemon_build_graph
     self._options_bootstrapper = options_bootstrapper
     self._preceding_graph_size = -1
@@ -87,6 +90,7 @@ class LocalPantsRunner(object):
                                        build_config,
                                        run_tracker,
                                        reporting,
+                                       self._target_roots,
                                        self._daemon_build_graph,
                                        self._exiter).setup()
 
