@@ -7,8 +7,8 @@ from __future__ import (absolute_import, division, generators, nested_scopes, pr
 
 from pants.goal.task_registrar import TaskRegistrar as task
 
-from pants.contrib.googlejavaformat.googlejavaformat import GoogleJavaFormat
-from pants.contrib.googlejavaformat.googlejavaformat import GoogleJavaFormatCheckFormat
+from pants.contrib.googlejavaformat.googlejavaformat import (GoogleJavaFormat,
+                                                             GoogleJavaFormatCheckFormat)
 
 
 def register_goals():

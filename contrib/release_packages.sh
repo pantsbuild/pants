@@ -210,6 +210,18 @@ function pkg_thrifty_install_test() {
     --explain gen | grep "thrifty" &> /dev/null
 }
 
+PKG_GOOGLEJAVAFORMAT=(
+  "pantsbuild.pants.contrib.googlejavaformat"
+  "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin"
+  "pkg_googlejavaformat_install_test"
+)
+function pkg_googlejavaformat_install_test() {
+  local version=$1
+  execute_packaged_pants_with_internal_backends \
+    --plugins="['pantsbuild.pants.contrib.googlejavaformat==${version}']" \
+    --explain gen | grep "googlejavaformat" &> /dev/null
+}
+
 # Once individual (new) package is declared above, insert it into the array below)
 CONTRIB_PACKAGES=(
   PKG_ANDROID
@@ -228,4 +240,5 @@ CONTRIB_PACKAGES=(
   PKG_MYPY
   PKG_AVRO
   PKG_THRIFTY
+  PKG_GOOGLEJAVAFORMAT
 )
