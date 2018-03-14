@@ -43,7 +43,9 @@ pub struct Scheduler {
 
 impl Scheduler {
   pub fn new(core: Core) -> Scheduler {
-    Scheduler { core: Arc::new(core) }
+    Scheduler {
+      core: Arc::new(core),
+    }
   }
 
   pub fn visualize(&self, request: &ExecutionRequest, path: &Path) -> io::Result<()> {
@@ -65,16 +67,11 @@ impl Scheduler {
   ) -> Result<(), String> {
     let edges = self.find_root_edges_or_update_rule_graph(
       subject.type_id().clone(),
-      selectors::Selector::Select(
-        selectors::Select::without_variant(product),
-      ),
+      selectors::Selector::Select(selectors::Select::without_variant(product)),
     )?;
-    request.roots.push(Select::new(
-      product,
-      subject,
-      Default::default(),
-      &edges,
-    ));
+    request
+      .roots
+      .push(Select::new(product, subject, Default::default(), &edges));
     Ok(())
   }
 

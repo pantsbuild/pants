@@ -112,9 +112,11 @@ impl Store {
     initial_lease: bool,
   ) -> BoxFuture<Digest, String> {
     let local = self.local.clone();
-    future::result(directory.write_to_bytes().map_err(|e| {
-      format!("Error serializing directory proto {:?}: {:?}", directory, e)
-    })).and_then(move |bytes| {
+    future::result(
+      directory
+        .write_to_bytes()
+        .map_err(|e| format!("Error serializing directory proto {:?}: {:?}", directory, e)),
+    ).and_then(move |bytes| {
       let len = bytes.len();
       local
         .store_bytes(EntryType::Directory, Bytes::from(bytes), initial_lease)
@@ -142,8 +144,7 @@ impl Store {
         directory.merge_from_bytes(&bytes).map_err(|e| {
           format!(
             "LMDB corruption: Directory bytes for {:?} were not valid: {:?}",
-            digest,
-            e
+            digest, e
           )
         })?;
         Ok(directory)
@@ -155,8 +156,7 @@ impl Store {
         directory.merge_from_bytes(&bytes).map_err(|e| {
           format!(
             "CAS returned Directory proto for {:?} which was not valid: {:?}",
-            digest,
-            e
+            digest, e
           )
         })?;
         bazel_protos::verify_directory_canonical(&directory)?;
@@ -181,44 +181,38 @@ impl Store {
     self
       .local
       .load_bytes_with(entry_type, digest.0, f_local)
-      .and_then(move |maybe_local_value| match (
-        maybe_local_value,
-        maybe_remote,
-      ) {
-        (Some(value_result), _) => {
-          future::done(value_result.map(|v| Some(v))).to_boxed() as BoxFuture<_, _>
-        }
-        (None, None) => future::ok(None).to_boxed() as BoxFuture<_, _>,
-        (None, Some(remote)) => {
-          remote
+      .and_then(
+        move |maybe_local_value| match (maybe_local_value, maybe_remote) {
+          (Some(value_result), _) => {
+            future::done(value_result.map(|v| Some(v))).to_boxed() as BoxFuture<_, _>
+          }
+          (None, None) => future::ok(None).to_boxed() as BoxFuture<_, _>,
+          (None, Some(remote)) => remote
             .load_bytes_with(entry_type, digest, move |bytes: Bytes| bytes)
             .and_then(move |maybe_bytes: Option<Bytes>| match maybe_bytes {
-              Some(bytes) => {
-                future::done(f_remote(bytes.clone()))
-                  .and_then(move |value| {
-                    let len = bytes.len();
-                    local.store_bytes(entry_type, bytes, true).and_then(
-                      move |stored_fingerprint| {
-                        let stored_digest = Digest(stored_fingerprint, len);
-                        if digest == stored_digest {
-                          Ok(Some(value))
-                        } else {
-                          Err(format!(
-                            "CAS gave wrong digest: expected {:?}, got {:?}",
-                            digest,
-                            stored_digest
-                          ))
-                        }
-                      },
-                    )
-                  })
-                  .to_boxed()
-              }
+              Some(bytes) => future::done(f_remote(bytes.clone()))
+                .and_then(move |value| {
+                  let len = bytes.len();
+                  local
+                    .store_bytes(entry_type, bytes, true)
+                    .and_then(move |stored_fingerprint| {
+                      let stored_digest = Digest(stored_fingerprint, len);
+                      if digest == stored_digest {
+                        Ok(Some(value))
+                      } else {
+                        Err(format!(
+                          "CAS gave wrong digest: expected {:?}, got {:?}",
+                          digest, stored_digest
+                        ))
+                      }
+                    })
+                })
+                .to_boxed(),
               None => future::ok(None).to_boxed() as BoxFuture<_, _>,
             })
-            .to_boxed()
-        }
-      })
+            .to_boxed(),
+        },
+      )
       .to_boxed()
   }
 
@@ -250,12 +244,12 @@ impl Store {
           expanding_futures.push(self.expand_directory(digest));
         }
         Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest))
-            .to_boxed() as BoxFuture<_, _>
+          return future::err(format!("Failed to upload digest {:?}: Not found", digest)).to_boxed()
+            as BoxFuture<_, _>
         }
         Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err))
-            .to_boxed() as BoxFuture<_, _>
+          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err)).to_boxed()
+            as BoxFuture<_, _>
         }
       };
     }
@@ -305,8 +299,7 @@ impl Store {
         if size > target {
           return Err(format!(
             "Garbage collection attempted to target {} bytes but could only shrink to {} bytes",
-            target,
-            size
+            target, size
           ));
         }
       }
@@ -351,18 +344,17 @@ impl Store {
               .get_directories()
               .into_iter()
               .map(move |subdir| {
-                store.clone().expand_directory_helper(
-                  subdir.get_digest().into(),
-                  accumulator.clone(),
-                )
+                store
+                  .clone()
+                  .expand_directory_helper(subdir.get_digest().into(), accumulator.clone())
               })
               .collect::<Vec<_>>(),
           ).map(|_| ())
             .to_boxed()
         }
         None => {
-          return future::err(format!("Could not expand unknown directory: {:?}", digest))
-            .to_boxed() as BoxFuture<_, _>
+          return future::err(format!("Could not expand unknown directory: {:?}", digest)).to_boxed()
+            as BoxFuture<_, _>
         }
       })
       .to_boxed()
@@ -486,33 +478,31 @@ mod local {
     pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
       {
         let (env, directory_database, _) = self.inner.directory_dbs.get(fingerprint);
-        let txn = env.begin_ro_txn().map_err(|err| {
-          format!("Failed to begin read transaction: {:?}", err)
-        })?;
+        let txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
         match txn.get(directory_database, &fingerprint.as_ref()) {
           Ok(_) => return Ok(Some(EntryType::Directory)),
           Err(NotFound) => {}
           Err(err) => {
             return Err(format!(
               "Error reading from store when determining type of fingerprint {}: {:?}",
-              fingerprint,
-              err
+              fingerprint, err
             ))
           }
         };
       }
       let (env, file_database, _) = self.inner.file_dbs.get(fingerprint);
-      let txn = env.begin_ro_txn().map_err(|err| {
-        format!("Failed to begin read transaction: {:?}", err)
-      })?;
+      let txn = env
+        .begin_ro_txn()
+        .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
       match txn.get(file_database, &fingerprint.as_ref()) {
         Ok(_) => return Ok(Some(EntryType::File)),
         Err(NotFound) => {}
         Err(err) => {
           return Err(format!(
             "Error reading from store when determining type of fingerprint {}: {:?}",
-            fingerprint,
-            err
+            fingerprint, err
           ))
         }
       };
@@ -528,12 +518,8 @@ mod local {
         let (env, _, lease_database) = self.inner.file_dbs.get(&digest.0);
         env
           .begin_rw_txn()
-          .and_then(|mut txn| {
-            self.lease(&lease_database, &digest.0, until, &mut txn)
-          })
-          .map_err(|err| {
-            format!("Error leasing digest {:?}: {:?}", digest, err)
-          })?;
+          .and_then(|mut txn| self.lease(&lease_database, &digest.0, until, &mut txn))
+          .map_err(|err| format!("Error leasing digest {:?}: {:?}", digest, err))?;
       }
       Ok(())
     }
@@ -582,9 +568,9 @@ mod local {
         &mut fingerprints_by_expired_ago,
       )?;
       while used_bytes > target_bytes {
-        let aged_fingerprint = fingerprints_by_expired_ago.pop().expect(
-          "lmdb corruption detected, sum of size of blobs exceeded stored blobs",
-        );
+        let aged_fingerprint = fingerprints_by_expired_ago
+          .pop()
+          .expect("lmdb corruption detected, sum of size of blobs exceeded stored blobs");
         if aged_fingerprint.expired_seconds_ago == 0 {
           // Ran out of expired blobs - everything remaining is leased and cannot be collected.
           return Ok(used_bytes);
@@ -598,11 +584,7 @@ mod local {
           env
             .begin_rw_txn()
             .and_then(|mut txn| {
-              txn.del(
-                database,
-                &aged_fingerprint.fingerprint.as_ref(),
-                None,
-              )?;
+              txn.del(database, &aged_fingerprint.fingerprint.as_ref(), None)?;
 
               txn
                 .del(lease_database, &aged_fingerprint.fingerprint.as_ref(), None)
@@ -631,12 +613,12 @@ mod local {
       };
 
       for &(ref env, ref database, ref lease_database) in database.all_lmdbs().iter() {
-        let txn = env.begin_ro_txn().map_err(|err| {
-          format!("Error beginning transaction to garbage collect: {:?}", err)
-        })?;
-        let mut cursor = txn.open_ro_cursor(*database).map_err(|err| {
-          format!("Failed to open lmdb read cursor: {:?}", err)
-        })?;
+        let txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Error beginning transaction to garbage collect: {:?}", err))?;
+        let mut cursor = txn
+          .open_ro_cursor(*database)
+          .map_err(|err| format!("Failed to open lmdb read cursor: {:?}", err))?;
         for (key, bytes) in cursor.iter() {
           *used_bytes = *used_bytes + bytes.len();
 
@@ -652,8 +634,8 @@ mod local {
               e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
             });
 
-          let leased_until = time::UNIX_EPOCH +
-            time::Duration::from_secs(lease_until_unix_timestamp);
+          let leased_until =
+            time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
 
           let expired_seconds_ago = time::SystemTime::now()
               .duration_since(leased_until)
@@ -696,12 +678,7 @@ mod local {
 
           let (env, content_database, lease_database) = dbs.get(&fingerprint);
           let put_res = env.begin_rw_txn().and_then(|mut txn| {
-            txn.put(
-              content_database,
-              &fingerprint,
-              &bytes,
-              NO_OVERWRITE,
-            )?;
+            txn.put(content_database, &fingerprint, &bytes, NO_OVERWRITE)?;
             if initial_lease {
               bytestore.lease(
                 &lease_database,
@@ -718,8 +695,7 @@ mod local {
             Err(KeyExist) => Ok(fingerprint),
             Err(err) => Err(format!(
               "Error storing fingerprint {}: {:?}",
-              fingerprint,
-              err
+              fingerprint, err
             )),
           }
         })
@@ -742,9 +718,9 @@ mod local {
         .pool
         .spawn_fn(move || {
           let (env, db, _) = dbs.get(&fingerprint);
-          let ro_txn = env.begin_ro_txn().map_err(|err| {
-            format!("Failed to begin read transaction: {:?}", err)
-          });
+          let ro_txn = env
+            .begin_ro_txn()
+            .map_err(|err| format!("Failed to begin read transaction: {:?}", err));
           ro_txn.and_then(|txn| match txn.get(db, &fingerprint) {
             Ok(bytes) => Ok(Some(f(Bytes::from(bytes)))),
             Err(NotFound) => Ok(None),
@@ -782,12 +758,10 @@ mod local {
           s[0..1].to_owned()
         };
         let dir = root_path.join(dirname);
-        super::super::safe_create_dir_all(&dir).map_err(|err| {
-          format!("Error making directory for store at {:?}: {:?}", dir, err)
-        })?;
+        super::super::safe_create_dir_all(&dir)
+          .map_err(|err| format!("Error making directory for store at {:?}: {:?}", dir, err))?;
         debug!("Making ShardedLmdb env for {:?}", dir);
-        let env =
-          Environment::new()
+        let env = Environment::new()
             // NO_SYNC
             // =======
             //
@@ -831,8 +805,7 @@ mod local {
           .map_err(|e| {
             format!(
               "Error creating/opening content database at {:?}: {:?}",
-              dir,
-              e
+              dir, e
             )
           })?;
 
@@ -842,8 +815,7 @@ mod local {
           .map_err(|e| {
             format!(
               "Error creating/opening content database at {:?}: {:?}",
-              dir,
-              e
+              dir, e
             )
           })?;
 
@@ -1065,9 +1037,9 @@ mod local {
         "84d89877f0d4041efb6bf91a16f0248f2fd573e6af05c19f96bedb9f882f7882",
       ).unwrap();
       let file_digest = Digest(file_fingerprint, 10);
-      store.lease_all(vec![file_digest].iter()).expect(
-        "Error leasing",
-      );
+      store
+        .lease_all(vec![file_digest].iter())
+        .expect("Error leasing");
       store.shrink(10).expect("Error shrinking");
       assert_eq!(
         load_bytes(&store, EntryType::File, file_fingerprint),
@@ -1097,12 +1069,10 @@ mod local {
         .expect("Error storing");
       store.shrink(10).expect("Error shrinking");
       let mut entries = Vec::new();
-      entries.push(load_bytes(&store, EntryType::File, fingerprint_1).expect(
-        "Error loading bytes",
-      ));
-      entries.push(load_bytes(&store, EntryType::File, fingerprint_2).expect(
-        "Error loading bytes",
-      ));
+      entries
+        .push(load_bytes(&store, EntryType::File, fingerprint_1).expect("Error loading bytes"));
+      entries
+        .push(load_bytes(&store, EntryType::File, fingerprint_2).expect("Error loading bytes"));
       assert_eq!(
         1,
         entries.iter().filter(|maybe| maybe.is_some()).count(),
@@ -1418,35 +1388,34 @@ mod remote {
         fingerprint,
         bytes.len()
       );
-      match self.client.write_opt(
-        grpcio::CallOption::default().timeout(
-          self.upload_timeout,
-        ),
-      ) {
-        Err(err) => {
-          future::err(format!(
-            "Error attempting to connect to upload fingerprint {}: {:?}",
-            fingerprint,
-            err
-          )).to_boxed() as BoxFuture<_, _>
-        }
+      match self
+        .client
+        .write_opt(grpcio::CallOption::default().timeout(self.upload_timeout))
+      {
+        Err(err) => future::err(format!(
+          "Error attempting to connect to upload fingerprint {}: {:?}",
+          fingerprint, err
+        )).to_boxed() as BoxFuture<_, _>,
         Ok((sender, receiver)) => {
           let chunk_size_bytes = self.chunk_size_bytes;
           let stream =
             futures::stream::unfold::<_, _, futures::future::FutureResult<_, grpcio::Error>, _>(
               (0 as usize, false),
-              move |(offset, has_sent_any)| if offset >= bytes.len() && has_sent_any {
-                None
-              } else {
-                let mut req = bazel_protos::bytestream::WriteRequest::new();
-                req.set_resource_name(resource_name.clone());
-                req.set_write_offset(offset as i64);
-                let next_offset = min(offset + chunk_size_bytes, bytes.len());
-                req.set_finish_write(next_offset == bytes.len());
-                req.set_data(bytes.slice(offset, next_offset));
-                Some(future::ok(
-                  ((req, grpcio::WriteFlags::default()), (next_offset, true)),
-                ))
+              move |(offset, has_sent_any)| {
+                if offset >= bytes.len() && has_sent_any {
+                  None
+                } else {
+                  let mut req = bazel_protos::bytestream::WriteRequest::new();
+                  req.set_resource_name(resource_name.clone());
+                  req.set_write_offset(offset as i64);
+                  let next_offset = min(offset + chunk_size_bytes, bytes.len());
+                  req.set_finish_write(next_offset == bytes.len());
+                  req.set_data(bytes.slice(offset, next_offset));
+                  Some(future::ok((
+                    (req, grpcio::WriteFlags::default()),
+                    (next_offset, true),
+                  )))
+                }
               },
             );
 
@@ -1454,30 +1423,28 @@ mod remote {
             .join(sender.send_all(stream).map_err(move |e| {
               format!(
                 "Error attempting to upload fingerprint {}: {:?}",
-                fingerprint,
-                e
+                fingerprint, e
               )
             }))
             .and_then(move |_| {
               receiver.map_err(move |e| {
                 format!(
                   "Error from server when uploading fingerprint {}: {:?}",
-                  fingerprint,
-                  e
+                  fingerprint, e
                 )
               })
             })
-            .and_then(move |received| if received.get_committed_size() !=
-              len as i64
-            {
-              Err(format!(
-                "Uploading file with fingerprint {}: want commited size {} but got {}",
-                fingerprint,
-                len,
-                received.get_committed_size()
-              ))
-            } else {
-              Ok(Digest(fingerprint, len))
+            .and_then(move |received| {
+              if received.get_committed_size() != len as i64 {
+                Err(format!(
+                  "Uploading file with fingerprint {}: want commited size {} but got {}",
+                  fingerprint,
+                  len,
+                  received.get_committed_size()
+                ))
+              } else {
+                Ok(Digest(fingerprint, len))
+              }
             })
             .to_boxed()
         }
@@ -1502,18 +1469,18 @@ mod remote {
           // We shouldn't have to pass around the client here, it's a workaround for
           // https://github.com/pingcap/grpc-rs/issues/123
           future::ok(self.client.clone())
-            .join(stream.fold(
-              BytesMut::with_capacity(digest.1),
-              move |mut bytes, r| {
+            .join(
+              stream.fold(BytesMut::with_capacity(digest.1), move |mut bytes, r| {
                 bytes.extend_from_slice(&r.data);
                 future::ok::<_, grpcio::Error>(bytes)
-              },
-            ))
+              }),
+            )
             .map(|(_client, bytes)| Some(bytes.freeze()))
             .or_else(|e| match e {
               grpcio::Error::RpcFailure(grpcio::RpcStatus {
-                                          status: grpcio::RpcStatusCode::NotFound, ..
-                                        }) => Ok(None),
+                status: grpcio::RpcStatusCode::NotFound,
+                ..
+              }) => Ok(None),
               _ => Err(format!(
                 "Error from server in response to CAS read request: {:?}",
                 e
@@ -1522,13 +1489,10 @@ mod remote {
             .map(move |maybe_bytes| maybe_bytes.map(|bytes| f(bytes)))
             .to_boxed()
         }
-        Err(err) => {
-          future::err(format!(
-            "Error making CAS read request for {:?}: {:?}",
-            digest,
-            err
-          )).to_boxed() as BoxFuture<_, _>
-        }
+        Err(err) => future::err(format!(
+          "Error making CAS read request for {:?}: {:?}",
+          digest, err
+        )).to_boxed() as BoxFuture<_, _>,
       }
     }
   }
@@ -1677,9 +1641,8 @@ mod remote {
             .join("all_the_henries"),
         ).expect("Error opening all_the_henries");
         let mut bytes = Vec::new();
-        f.read_to_end(&mut bytes).expect(
-          "Error reading all_the_henries",
-        );
+        f.read_to_end(&mut bytes)
+          .expect("Error reading all_the_henries");
         Bytes::from(bytes)
       };
 
@@ -1728,9 +1691,10 @@ mod remote {
       let cas = StubCAS::always_errors();
 
       let store = new_byte_store(&cas);
-      let error = store.store_bytes(str_bytes()).wait().expect_err(
-        "Want error",
-      );
+      let error = store
+        .store_bytes(str_bytes())
+        .wait()
+        .expect_err("Want error");
       assert!(
         error.contains("Error from server"),
         format!("Bad error message, got: {}", error)
@@ -1749,9 +1713,10 @@ mod remote {
         10 * 1024 * 1024,
         Duration::from_secs(1),
       );
-      let error = store.store_bytes(str_bytes()).wait().expect_err(
-        "Want error",
-      );
+      let error = store
+        .store_bytes(str_bytes())
+        .wait()
+        .expect_err("Want error");
       assert!(
         error.contains("Error attempting to upload fingerprint"),
         format!("Bad error message, got: {}", error)
@@ -1854,9 +1819,11 @@ mod tests {
   }
 
   pub fn directory_bytes() -> Bytes {
-    Bytes::from(directory().write_to_bytes().expect(
-      "Error serializing proto",
-    ))
+    Bytes::from(
+      directory()
+        .write_to_bytes()
+        .expect("Error serializing proto"),
+    )
   }
 
   pub fn directory_fingerprint() -> Fingerprint {
@@ -1871,9 +1838,11 @@ mod tests {
   }
 
   pub fn other_directory_bytes() -> Bytes {
-    Bytes::from(other_directory().write_to_bytes().expect(
-      "Error serializing proto",
-    ))
+    Bytes::from(
+      other_directory()
+        .write_to_bytes()
+        .expect("Error serializing proto"),
+    )
   }
 
   pub fn other_directory_fingerprint() -> Fingerprint {
@@ -2074,8 +2043,8 @@ mod tests {
     let dir = TempDir::new("store").unwrap();
 
     let cas = StubCAS::always_errors();
-    let error = load_file_bytes(&new_store(dir.path(), cas.address()), digest())
-      .expect_err("Want error");
+    let error =
+      load_file_bytes(&new_store(dir.path(), cas.address()), digest()).expect_err("Want error");
     assert_eq!(1, cas.read_request_count());
     assert!(
       error.contains("StubCAS is configured to always fail"),
@@ -2129,10 +2098,11 @@ mod tests {
       });
       file
     });
-    let non_canonical_directory_bytes =
-      Bytes::from(non_canonical_directory.write_to_bytes().expect(
-        "Error serializing proto",
-      ));
+    let non_canonical_directory_bytes = Bytes::from(
+      non_canonical_directory
+        .write_to_bytes()
+        .expect("Error serializing proto"),
+    );
     let non_canonical_directory_fingerprint = {
       let mut hasher = Sha256::default();
       hasher.input(&non_canonical_directory_bytes);
@@ -2150,7 +2120,7 @@ mod tests {
       vec![
         (
           non_canonical_directory_fingerprint.clone(),
-          non_canonical_directory_bytes
+          non_canonical_directory_bytes,
         ),
       ].into_iter()
         .collect(),
@@ -2430,9 +2400,10 @@ mod tests {
 
     let store_dir = TempDir::new("store").unwrap();
     let store = new_local_store(store_dir.path());
-    store.store_file_bytes(str_bytes(), false).wait().expect(
-      "Error saving bytes",
-    );
+    store
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error saving bytes");
     store
       .materialize_file(file.clone(), digest())
       .wait()
@@ -2465,12 +2436,14 @@ mod tests {
       .record_directory(&recursive_directory(), false)
       .wait()
       .expect("Error saving recursive Directory");
-    store.record_directory(&directory(), false).wait().expect(
-      "Error saving Directory",
-    );
-    store.store_file_bytes(str_bytes(), false).wait().expect(
-      "Error saving file bytes",
-    );
+    store
+      .record_directory(&directory(), false)
+      .wait()
+      .expect("Error saving Directory");
+    store
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Error saving file bytes");
     store
       .store_file_bytes(catnip_bytes(), false)
       .wait()

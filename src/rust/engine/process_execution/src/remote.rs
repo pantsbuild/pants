@@ -150,11 +150,11 @@ impl CommandRunner {
   ) -> BoxFuture<(), String> {
     let store = self.store.clone();
     let store2 = store.clone();
-    future::done(command.write_to_bytes().map_err(|e| {
-      format!("Error serializing command {:?}", e)
-    })).and_then(move |command_bytes| {
-      store.store_file_bytes(Bytes::from(command_bytes), true)
-    })
+    future::done(
+      command
+        .write_to_bytes()
+        .map_err(|e| format!("Error serializing command {:?}", e)),
+    ).and_then(move |command_bytes| store.store_file_bytes(Bytes::from(command_bytes), true))
       .map_err(|e| format!("Error saving digest to local store: {:?}", e))
       .and_then(move |_| {
         // TODO: Tune when we upload the command.
@@ -170,8 +170,10 @@ impl CommandRunner {
 fn make_execute_request(
   req: &ExecuteProcessRequest,
 ) -> Result<
-  (bazel_protos::remote_execution::Command,
-   bazel_protos::remote_execution::ExecuteRequest),
+  (
+    bazel_protos::remote_execution::Command,
+    bazel_protos::remote_execution::ExecuteRequest,
+  ),
   String,
 > {
   let mut command = bazel_protos::remote_execution::Command::new();
@@ -212,9 +214,7 @@ fn extract_execute_response(
   let mut execute_response = bazel_protos::remote_execution::ExecuteResponse::new();
   execute_response
     .merge_from_bytes(operation.get_response().get_value())
-    .map_err(|e| {
-      ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e))
-    })?;
+    .map_err(|e| ExecutionError::Fatal(format!("Invalid ExecuteResponse: {:?}", e)))?;
   // TODO: Log less verbosely
   debug!("Got (nested) execute response: {:?}", execute_response);
 
@@ -233,12 +233,11 @@ fn extract_execute_response(
       }
       let details = execute_response.get_status().get_details().get(0).unwrap();
       let mut precondition_failure = bazel_protos::error_details::PreconditionFailure::new();
-      if details.get_type_url() !=
-        format!(
+      if details.get_type_url()
+        != format!(
           "type.googleapis.com/{}",
           precondition_failure.descriptor().full_name()
-        )
-      {
+        ) {
         return Err(ExecutionError::Fatal(format!(
           "Received FailedPrecondition, but didn't know how to resolve it: {}, \
            protobuf type {}",
@@ -272,14 +271,13 @@ fn extract_execute_response(
           )));
         }
         let digest = Digest(
-          Fingerprint::from_hex_string(parts.get(1).unwrap())
-            .map_err(|e| {
-              ExecutionError::Fatal(format!(
-                "Bad digest in missing blob: {}: {}",
-                parts.get(1).unwrap(),
-                e
-              ))
-            })?,
+          Fingerprint::from_hex_string(parts.get(1).unwrap()).map_err(|e| {
+            ExecutionError::Fatal(format!(
+              "Bad digest in missing blob: {}: {}",
+              parts.get(1).unwrap(),
+              e
+            ))
+          })?,
           parts.get(2).unwrap().parse::<usize>().map_err(|e| {
             ExecutionError::Fatal(format!(
               "Missing blob had bad size: {}: {}",
@@ -292,8 +290,7 @@ fn extract_execute_response(
       }
       if missing_digests.len() == 0 {
         return Err(ExecutionError::Fatal(
-          "Error from remote execution: FailedPrecondition, but no details"
-            .to_owned(),
+          "Error from remote execution: FailedPrecondition, but no details".to_owned(),
         ));
       }
       return Err(ExecutionError::MissingDigests(missing_digests));
@@ -429,9 +426,12 @@ mod tests {
         Vec::from_iter(
           iter::repeat(make_incomplete_operation(&op_name))
             .take(10)
-            .chain(iter::once(
-              make_successful_operation(&op_name, "foo", "", 0),
-            )),
+            .chain(iter::once(make_successful_operation(
+              &op_name,
+              "foo",
+              "",
+              0,
+            ))),
         ),
       ))
     };
@@ -623,9 +623,7 @@ mod tests {
           .1,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(
-            missing_digests.clone()
-          ),
+          make_precondition_failure_operation(missing_digests.clone()),
           make_successful_operation("cat2", STR, "", 0),
         ],
       ))
@@ -646,9 +644,10 @@ mod tests {
       10 * 1024 * 1024,
       Duration::from_secs(1),
     ).expect("Failed to make store");
-    store.store_file_bytes(str_bytes(), false).wait().expect(
-      "Saving file bytes to store",
-    );
+    store
+      .store_file_bytes(str_bytes(), false)
+      .wait()
+      .expect("Saving file bytes to store");
 
     let result = CommandRunner::new(&mock_server.address(), 1, store)
       .run_command_remote(cat_roland_request())
@@ -688,9 +687,7 @@ mod tests {
           .1,
         vec![
           make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(
-            missing_digests.clone()
-          ),
+          make_precondition_failure_operation(missing_digests.clone()),
         ],
       ))
     };
@@ -1060,9 +1057,11 @@ mod tests {
   }
 
   pub fn directory_bytes() -> Bytes {
-    Bytes::from(directory().write_to_bytes().expect(
-      "Error serializing proto",
-    ))
+    Bytes::from(
+      directory()
+        .write_to_bytes()
+        .expect("Error serializing proto"),
+    )
   }
 
   pub fn directory_fingerprint() -> Fingerprint {

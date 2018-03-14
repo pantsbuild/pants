@@ -40,18 +40,14 @@ fn main() {
         .long("input-digest")
         .takes_value(true)
         .required(true)
-        .help(
-          "Fingerprint (hex string) of the digest to use as the input file tree.",
-        ),
+        .help("Fingerprint (hex string) of the digest to use as the input file tree."),
     )
     .arg(
       Arg::with_name("input-digest-length")
         .long("input-digest-length")
         .takes_value(true)
         .required(true)
-        .help(
-          "Length of the proto-bytes whose digest to use as the input file tree.",
-        ),
+        .help("Length of the proto-bytes whose digest to use as the input file tree."),
     )
     .arg(
       Arg::with_name("server")
@@ -73,14 +69,15 @@ fn main() {
         .long("env")
         .takes_value(true)
         .multiple(true)
-        .help(
-          "Environment variables with which the process should be run.",
-        ),
+        .help("Environment variables with which the process should be run."),
     )
     .setting(AppSettings::TrailingVarArg)
-    .arg(Arg::with_name("argv").multiple(true).last(true).required(
-      true,
-    ))
+    .arg(
+      Arg::with_name("argv")
+        .multiple(true)
+        .last(true)
+        .required(true),
+    )
     .get_matches();
 
   let argv: Vec<String> = args
@@ -89,33 +86,29 @@ fn main() {
     .map(|v| v.to_string())
     .collect();
   let env: BTreeMap<String, String> = match args.values_of("env") {
-    Some(values) => {
-      values
-        .map(|v| {
-          let mut parts = v.splitn(2, "=");
-          (
-            parts.next().unwrap().to_string(),
-            parts.next().unwrap_or_default().to_string(),
-          )
-        })
-        .collect()
-    }
+    Some(values) => values
+      .map(|v| {
+        let mut parts = v.splitn(2, "=");
+        (
+          parts.next().unwrap().to_string(),
+          parts.next().unwrap_or_default().to_string(),
+        )
+      })
+      .collect(),
     None => BTreeMap::new(),
   };
   let local_store_path = args.value_of("local-store-path").unwrap();
   let pool = Arc::new(fs::ResettablePool::new("process-executor-".to_owned()));
   let server_arg = args.value_of("server");
   let store = match (server_arg, args.value_of("cas-server")) {
-    (Some(_server), Some(cas_server)) => {
-      fs::Store::with_remote(
-        local_store_path,
-        pool.clone(),
-        cas_server,
-        1,
-        10 * 1024 * 1024,
-        Duration::from_secs(30),
-      )
-    }
+    (Some(_server), Some(cas_server)) => fs::Store::with_remote(
+      local_store_path,
+      pool.clone(),
+      cas_server,
+      1,
+      10 * 1024 * 1024,
+      Duration::from_secs(30),
+    ),
     (None, None) => fs::Store::local_only(local_store_path, pool.clone()),
     _ => panic!("Must specify either both --server and --cas-server or neither."),
   }.expect("Error making store");
@@ -138,12 +131,10 @@ fn main() {
   };
 
   let result = match server_arg {
-    Some(address) => {
-      process_execution::remote::CommandRunner::new(address, 1, store)
-        .run_command_remote(request)
-        .wait()
-        .expect("Error executing remotely")
-    }
+    Some(address) => process_execution::remote::CommandRunner::new(address, 1, store)
+      .run_command_remote(request)
+      .wait()
+      .expect("Error executing remotely"),
     None => {
       let dir = TempDir::new("process-execution").expect("Error making temporary directory");
       store

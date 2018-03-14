@@ -18,42 +18,10 @@ use std::fmt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-const EMPTY_FINGERPRINT: Fingerprint = Fingerprint(
-  [
-    0xe3,
-    0xb0,
-    0xc4,
-    0x42,
-    0x98,
-    0xfc,
-    0x1c,
-    0x14,
-    0x9a,
-    0xfb,
-    0xf4,
-    0xc8,
-    0x99,
-    0x6f,
-    0xb9,
-    0x24,
-    0x27,
-    0xae,
-    0x41,
-    0xe4,
-    0x64,
-    0x9b,
-    0x93,
-    0x4c,
-    0xa4,
-    0x95,
-    0x99,
-    0x1b,
-    0x78,
-    0x52,
-    0xb8,
-    0x55,
-  ],
-);
+const EMPTY_FINGERPRINT: Fingerprint = Fingerprint([
+  0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f, 0xb9, 0x24,
+  0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b, 0x78, 0x52, 0xb8, 0x55,
+]);
 pub const EMPTY_DIGEST: Digest = Digest(EMPTY_FINGERPRINT, 0);
 
 #[derive(Clone, Eq, Hash, PartialEq)]
@@ -106,10 +74,10 @@ impl Snapshot {
     let mut dir_futures: Vec<BoxFuture<bazel_protos::remote_execution::DirectoryNode, String>> =
       Vec::new();
 
-    for (first_component, group) in
-      &path_stats.iter().cloned().group_by(|s| {
-        s.path().components().next().unwrap().as_os_str().to_owned()
-      })
+    for (first_component, group) in &path_stats
+      .iter()
+      .cloned()
+      .group_by(|s| s.path().components().next().unwrap().as_os_str().to_owned())
     {
       let mut path_group: Vec<PathStat> = group.collect();
       if path_group.len() == 1 && path_group.get(0).unwrap().path().components().count() == 1 {
@@ -191,8 +159,7 @@ impl Snapshot {
         for path in path_stats.iter().filter_map(|path_stat| match path_stat {
           &PathStat::File { ref path, .. } => Some(path.to_path_buf()),
           &PathStat::Dir { .. } => None,
-        })
-        {
+        }) {
           match contents.remove(&path) {
             Some(content) => vec.push(FileContent { path, content }),
             None => {
@@ -218,9 +185,7 @@ impl Snapshot {
     store
       .load_directory(digest)
       .and_then(move |maybe_dir| {
-        maybe_dir.ok_or_else(|| {
-          format!("Could not find directory with digest {:?}", digest)
-        })
+        maybe_dir.ok_or_else(|| format!("Could not find directory with digest {:?}", digest))
       })
       .and_then(move |dir| {
         let contents_wrapped_copy = contents_wrapped.clone();
@@ -302,9 +267,9 @@ fn paths_of_child_dir(paths: Vec<PathStat>) -> Vec<PathStat> {
 }
 
 fn osstring_as_utf8(path: OsString) -> Result<String, String> {
-  path.into_string().map_err(|p| {
-    format!("{:?}'s file_name is not representable in UTF8", p)
-  })
+  path
+    .into_string()
+    .map_err(|p| format!("{:?}'s file_name is not representable in UTF8", p))
 }
 
 #[cfg(test)]
@@ -500,9 +465,7 @@ mod tests {
         .1
         .clone()
         .read_file(&file)
-        .map_err(move |err| {
-          format!("Error reading file {:?}: {}", file_copy, err.description())
-        })
+        .map_err(move |err| format!("Error reading file {:?}: {}", file_copy, err.description()))
         .and_then(move |content| store.store_file_bytes(content.content, true))
         .to_boxed()
     }

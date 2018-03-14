@@ -77,10 +77,9 @@ impl Tasks {
         product, existing_value, value,
       );
     }
-    self.singletons.insert(product, (
-      externs::key_for(value.clone()),
-      value,
-    ));
+    self
+      .singletons
+      .insert(product, (externs::key_for(value.clone()), value));
   }
 
   ///
@@ -163,12 +162,14 @@ impl Tasks {
 
   pub fn task_end(&mut self) {
     // Move the task from `preparing` to the Tasks map
-    let mut task = self.preparing.take().expect(
-      "Must `begin()` a task creation before ending it!",
-    );
-    let tasks = self.tasks.entry(task.product.clone()).or_insert_with(
-      || Vec::new(),
-    );
+    let mut task = self
+      .preparing
+      .take()
+      .expect("Must `begin()` a task creation before ending it!");
+    let tasks = self
+      .tasks
+      .entry(task.product.clone())
+      .or_insert_with(|| Vec::new());
     assert!(
       !tasks.contains(&task),
       "{:?} was double-registered for {:?}: {:?}",

@@ -79,9 +79,7 @@ impl RawNode {
       ),
       Err(Failure::Invalidated) => (
         RawStateTag::Invalidated as u8,
-        externs::create_exception(
-          "Exhausted retries due to changed files.",
-        ),
+        externs::create_exception("Exhausted retries due to changed files."),
       ),
     };
 
@@ -105,9 +103,7 @@ impl RawNodes {
   fn create(node_states: Vec<(&Key, &TypeConstraint, RootResult)>) -> Box<RawNodes> {
     let nodes = node_states
       .into_iter()
-      .map(|(subject, product, state)| {
-        RawNode::create(subject, product, state)
-      })
+      .map(|(subject, product, state)| RawNode::create(subject, product, state))
       .collect();
     let mut raw_nodes = Box::new(RawNodes {
       nodes_ptr: Vec::new().as_ptr(),
@@ -218,9 +214,9 @@ pub extern "C" fn scheduler_create(
   root_type_ids: TypeIdBuffer,
 ) -> *const Scheduler {
   let root_type_ids = root_type_ids.to_vec();
-  let ignore_patterns = ignore_patterns_buf.to_strings().unwrap_or_else(|e| {
-    panic!("Failed to decode ignore patterns as UTF8: {:?}", e)
-  });
+  let ignore_patterns = ignore_patterns_buf
+    .to_strings()
+    .unwrap_or_else(|e| panic!("Failed to decode ignore patterns as UTF8: {:?}", e));
   let tasks = with_tasks(tasks_ptr, |tasks| tasks.clone());
   // Allocate on the heap via `Box` and return a raw pointer to the boxed value.
   Box::into_raw(Box::new(Scheduler::new(Core::new(
@@ -259,7 +255,9 @@ pub extern "C" fn scheduler_create(
 
 #[no_mangle]
 pub extern "C" fn scheduler_pre_fork(scheduler_ptr: *mut Scheduler) {
-  with_scheduler(scheduler_ptr, |scheduler| { scheduler.core.pre_fork(); })
+  with_scheduler(scheduler_ptr, |scheduler| {
+    scheduler.core.pre_fork();
+  })
 }
 
 #[no_mangle]
@@ -320,12 +318,16 @@ pub extern "C" fn tasks_task_begin(
   func: Function,
   output_type: TypeConstraint,
 ) {
-  with_tasks(tasks_ptr, |tasks| { tasks.task_begin(func, output_type); })
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.task_begin(func, output_type);
+  })
 }
 
 #[no_mangle]
 pub extern "C" fn tasks_add_select(tasks_ptr: *mut Tasks, product: TypeConstraint) {
-  with_tasks(tasks_ptr, |tasks| { tasks.add_select(product, None); })
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.add_select(product, None);
+  })
 }
 
 #[no_mangle]
@@ -334,9 +336,9 @@ pub extern "C" fn tasks_add_select_variant(
   product: TypeConstraint,
   variant_key_buf: Buffer,
 ) {
-  let variant_key = variant_key_buf.to_string().expect(
-    "Failed to decode key for select_variant",
-  );
+  let variant_key = variant_key_buf
+    .to_string()
+    .expect("Failed to decode key for select_variant");
   with_tasks(tasks_ptr, |tasks| {
     tasks.add_select(product, Some(variant_key));
   })
@@ -398,7 +400,9 @@ pub extern "C" fn tasks_add_select_projection(
 
 #[no_mangle]
 pub extern "C" fn tasks_task_end(tasks_ptr: *mut Tasks) {
-  with_tasks(tasks_ptr, |tasks| { tasks.task_end(); })
+  with_tasks(tasks_ptr, |tasks| {
+    tasks.task_end();
+  })
 }
 
 #[no_mangle]
@@ -480,12 +484,11 @@ pub extern "C" fn execution_request_destroy(ptr: *mut ExecutionRequest) {
 
 #[no_mangle]
 pub extern "C" fn validator_run(scheduler_ptr: *mut Scheduler) -> Value {
-  with_scheduler(scheduler_ptr, |scheduler| match scheduler
-    .core
-    .rule_graph
-    .validate() {
-    Result::Ok(_) => externs::store_list(vec![], false),
-    Result::Err(msg) => externs::create_exception(&msg),
+  with_scheduler(scheduler_ptr, |scheduler| {
+    match scheduler.core.rule_graph.validate() {
+      Result::Ok(_) => externs::store_list(vec![], false),
+      Result::Err(msg) => externs::create_exception(&msg),
+    }
   })
 }
 
@@ -546,12 +549,11 @@ pub extern "C" fn set_panic_handler() {
 
 #[no_mangle]
 pub extern "C" fn garbage_collect_store(scheduler_ptr: *mut Scheduler) {
-  with_scheduler(scheduler_ptr, |scheduler| match scheduler
-    .core
-    .store
-    .garbage_collect() {
-    Ok(_) => {}
-    Err(err) => error!("{}", err),
+  with_scheduler(scheduler_ptr, |scheduler| {
+    match scheduler.core.store.garbage_collect() {
+      Ok(_) => {}
+      Err(err) => error!("{}", err),
+    }
   });
 }
 
