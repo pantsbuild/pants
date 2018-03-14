@@ -19,11 +19,13 @@ from pants.util.meta import AbstractClass
 class ScalaRewriteBase(NailgunTask, AbstractClass):
   """Abstract base class for both scalafix and scalafmt: tools that check/rewrite scala sources."""
 
+  _TARGET_TYPES = ['scala_library', 'junit_tests', 'java_tests']
+
   @classmethod
   def register_options(cls, register):
     super(ScalaRewriteBase, cls).register_options(register)
     register('--target-types',
-             default=['scala_library', 'junit_tests', 'java_tests'],
+             default=cls._TARGET_TYPES,
              advanced=True, type=list,
              help='The target types to apply formatting to.')
 
