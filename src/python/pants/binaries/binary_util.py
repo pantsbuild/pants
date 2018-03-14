@@ -5,25 +5,22 @@
 from __future__ import (absolute_import, division, generators, nested_scopes, print_function,
                         unicode_literals, with_statement)
 
-import hashlib
 import logging
 import os
 import posixpath
-from collections import namedtuple
 from contextlib import contextmanager
 
 from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
+from pants.base.deprecated import deprecated
 from pants.base.exceptions import TaskError
-from pants.base.hash_utils import hash_file
 from pants.fs.archive import archiver as create_archiver
 from pants.net.http.fetcher import Fetcher
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.osutil import get_os_id
-
 
 _DEFAULT_PATH_BY_ID = {
   ('linux', 'x86_64'): ('linux', 'x86_64'),
@@ -45,11 +42,8 @@ _DEFAULT_PATH_BY_ID = {
 logger = logging.getLogger(__name__)
 
 
-class BinaryUtil(object):
-  """Wraps utility methods for finding binary executables.
-
-  :API: public
-  """
+class BinaryUtilPrivate(object):
+  """Wraps utility methods for finding binary executables."""
 
   class Factory(Subsystem):
     """
@@ -62,12 +56,13 @@ class BinaryUtil(object):
 
     @classmethod
     def create(cls):
-      """
-      :API: public
-      """
+      return cls._create_for_cls(BinaryUtilPrivate)
+
+    @classmethod
+    def _create_for_cls(cls, binary_util_cls):
       # NB: create is a class method to ~force binary fetch location to be global.
       options = cls.global_instance().get_options()
-      return BinaryUtil(
+      return binary_util_cls(
         options.binaries_baseurls,
         options.binaries_fetch_timeout_secs,
         options.pants_bootstrapdir,
@@ -88,10 +83,6 @@ class BinaryUtil(object):
   class NoBaseUrlsError(TaskError):
     """Indicates that no urls were specified in pants.ini."""
     pass
-
-  class BinaryFileSpec(namedtuple('BinaryFileSpec', ['filename', 'checksum', 'digest'])):
-    def __new__(cls, filename, checksum=None, digest=hashlib.sha1()):
-      return super(BinaryUtil.BinaryFileSpec, cls).__new__(cls, filename, checksum, digest)
 
   def _select_binary_base_path(self, supportdir, version, name, uname_func=None):
     """Calculate the base path.
@@ -249,27 +240,26 @@ class BinaryUtil(object):
                  .format(binary=name, path=bootstrapped_binary_path))
     return bootstrapped_binary_path
 
-  @staticmethod
-  def _compare_file_checksums(filepath, checksum=None, digest=None):
-    digest = digest or hashlib.sha1()
 
-    if os.path.isfile(filepath) and checksum:
-      return hash_file(filepath, digest=digest) == checksum
+class BinaryUtil(BinaryUtilPrivate):
+  """A temporary stub to express the fact that public access to BinaryUtil is now deprecated.
 
-    return os.path.isfile(filepath)
+  After deprecation is complete, the base class will be renamed BinaryUtil, and it will not
+  be considered part of the public Pants API.
 
-  def is_bin_valid(self, basepath, binary_file_specs=()):
-    """Check if this bin path is valid.
+  :API: public
+  """
 
-    :param string basepath: The absolute path where the binaries are stored under.
-    :param BinaryFileSpec[] binary_file_specs: List of filenames and checksum for validation.
+  @deprecated(removal_version='1.8.0.dev0', hint_message='Use NativeTool or Script instead.')
+  def __init__(self, *args, **kwargs):
+    super(BinaryUtil, self).__init__(*args, **kwargs)
+
+  class Factory(BinaryUtilPrivate.Factory):
     """
-    if not os.path.isdir(basepath):
-      return False
+    :API: public
+    """
 
-    for f in binary_file_specs:
-      filepath = os.path.join(basepath, f.filename)
-      if not self._compare_file_checksums(filepath, f.checksum, f.digest):
-        return False
-
-    return True
+    @classmethod
+    @deprecated(removal_version='1.8.0.dev0', hint_message='Use NativeTool or Script instead.')
+    def create(cls):
+      return cls._create_for_cls(BinaryUtilPrivate)
