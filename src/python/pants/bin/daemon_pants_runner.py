@@ -73,13 +73,14 @@ class DaemonPantsRunner(ProcessManager):
   N.B. this class is primarily used by the PailgunService in pantsd.
   """
 
-  def __init__(self, socket, exiter, args, env, graph_helper, fork_lock, preceding_graph_size,
-               deferred_exception=None):
+  def __init__(self, socket, exiter, args, env, target_roots, graph_helper, fork_lock,
+               preceding_graph_size, deferred_exception=None):
     """
     :param socket socket: A connected socket capable of speaking the nailgun protocol.
     :param Exiter exiter: The Exiter instance for this run.
     :param list args: The arguments (i.e. sys.argv) for this run.
     :param dict env: The environment (i.e. os.environ) for this run.
+    :param TargetRoots target_roots: The `TargetRoots` for this run.
     :param LegacyGraphHelper graph_helper: The LegacyGraphHelper instance to use for BuildGraph
                                            construction. In the event of an exception, this will be
                                            None.
@@ -93,6 +94,7 @@ class DaemonPantsRunner(ProcessManager):
     self._exiter = exiter
     self._args = args
     self._env = env
+    self._target_roots = target_roots
     self._graph_helper = graph_helper
     self._fork_lock = fork_lock
     self._preceding_graph_size = preceding_graph_size
@@ -238,7 +240,13 @@ class DaemonPantsRunner(ProcessManager):
         self._raise_deferred_exc()
 
         # Otherwise, conduct a normal run.
-        runner = LocalPantsRunner(self._exiter, self._args, self._env, self._graph_helper)
+        runner = LocalPantsRunner(
+          self._exiter,
+          self._args,
+          self._env,
+          target_roots=self._target_roots,
+          daemon_build_graph=self._graph_helper
+        )
         runner.set_start_time(self._maybe_get_client_start_time_from_env(self._env))
         runner.set_preceding_graph_size(self._preceding_graph_size)
         runner.run()
