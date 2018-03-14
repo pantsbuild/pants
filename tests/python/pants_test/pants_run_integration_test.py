@@ -187,7 +187,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
       cls._profile_disambiguator += 1
       return ret
 
-  def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=[]):
+  def get_cache_subdir(self, cache_dir, subdir_glob='*/', other_dirs=()):
     """Check that there is only one entry of `cache_dir` which matches the glob
     specified by `subdir_glob`, excluding `other_dirs`, and
     return it.

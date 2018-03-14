@@ -55,11 +55,11 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
 
     with self._extract_archive(self.WEB_COMPONENT_BUTTON_ARTIFACT) as temp_dir:
       actual_set = set(os.listdir(temp_dir))
-      expected_set = set(['src', 'test', 'node_modules', 'package.json', 'webpack.config.js'])
+      expected_set = {'src', 'test', 'node_modules', 'package.json', 'webpack.config.js'}
       self.assertTrue(expected_set <= actual_set)
       if expected_set < actual_set:
         # npm 5 introduced package-lock.json
-        self.assertEqual(actual_set - expected_set, set(['package-lock.json']))
+        self.assertEqual(actual_set - expected_set, {'package-lock.json'})
       # Make sure .bin symlinks remains as symlinks.
       self.assertTrue(os.path.islink(os.path.join(temp_dir, 'node_modules', '.bin', 'mocha')))
 
@@ -74,7 +74,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     with self._extract_archive(self.WEB_COMPONENT_BUTTON_PROCESSED_ARTIFACT) as temp_dir:
       self.assertEquals(
         set(os.listdir(temp_dir)),
-        set(['Button.js'])
+        {'Button.js'}
       )
 
   def test_bundle_jvm_binary_with_node_module(self):
@@ -89,7 +89,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     with self._extract_archive(self.JVM_PROJECT_ARTIFACT) as temp_dir:
       self.assertEquals(
         set(os.listdir(os.path.join(temp_dir, self.WEB_COMPONENT_BUTTON_PROCESSED_PROJECT))),
-        set(['Button.js'])
+        {'Button.js'}
       )
       # Only include node build results, not original node_modules directory
       self.assertTrue('node_modules' not in os.listdir(temp_dir))
@@ -109,7 +109,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
       print (os.listdir(temp_dir))
       self.assertEquals(
         set(os.listdir(os.path.join(temp_dir, self.WITH_DEPENDENCY_ARTIFACTS_PROJECT))),
-        set(['Button.js'])
+        {'Button.js'}
       )
       # Only include node build results, not original node_modules directory
       self.assertTrue('node_modules' not in os.listdir(temp_dir))
@@ -125,7 +125,7 @@ class NodeBundleIntegrationTest(PantsRunIntegrationTest):
     with self._extract_archive(self.PREINSTALLED_ARTIFACT) as temp_dir:
       self.assertEquals(
         set(os.listdir(temp_dir)),
-        set(['src', 'test', 'node_modules', 'package.json'])
+        {'src', 'test', 'node_modules', 'package.json'}
       )
 
   def test_no_bundle_for_node_module(self):
