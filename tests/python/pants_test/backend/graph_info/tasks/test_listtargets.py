@@ -30,8 +30,9 @@ class BaseListTargetsTest(ConsoleTaskTestBase):
 class ListTargetsTestEmpty(BaseListTargetsTest):
 
   def test_list_all_empty(self):
-    with self.assertRaises(TaskError):
-      self.assertEqual('', self.execute_task())
+    # NB: Also renders a warning to stderr, which is challenging to detect here but confirmed in:
+    #   tests/python/pants_test/engine/legacy/test_list_integration.py
+    self.assertEqual('', self.execute_task())
 
 
 class ListTargetsTest(BaseListTargetsTest):
