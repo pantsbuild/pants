@@ -60,14 +60,10 @@ class GoogleJavaFormatTests(BaseTest):
       target_type=JavaLibrary,
       sources=['MyClass.java'],
     )
-
     context = self.context(target_roots=[target])
-    task = self.prepare_execute(context)
-    task.execute()
-
+    self.execute(context)
     with open(javafile) as fh:
       actual = fh.read()
-
     self.assertEqual(actual, self._GOODFORMAT)
 
 
@@ -87,11 +83,8 @@ class GoogleJavaFormatCheckFormatTests(BaseTest):
       sources=['MyClass.java'],
     )
     context = self.context(target_roots=[target])
-    task = self.prepare_execute(context)
-
     with self.assertRaises(TaskError) as error:
-      task.execute()
-
+      self.execute(context)
     self.assertEqual(
       error.exception.message,
       'google-java-format failed with exit code 1; to fix run: `./pants fmt <targets>`'
@@ -107,5 +100,4 @@ class GoogleJavaFormatCheckFormatTests(BaseTest):
       sources=['MyClass.java'],
     )
     context = self.context(target_roots=[target])
-    task = self.prepare_execute(context)
-    task.execute()
+    self.execute(context)
