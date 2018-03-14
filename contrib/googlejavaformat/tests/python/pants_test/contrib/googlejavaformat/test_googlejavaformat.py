@@ -38,18 +38,18 @@ class BaseTest(NailgunTaskTestBase):
     }
   """)
 
+  @property
+  def alias_groups(self):
+    return super(BaseTest, self).alias_groups.merge(
+      register_core().merge(register_jvm())
+    )
+
 
 class GoogleJavaFormatTests(BaseTest):
 
   @classmethod
   def task_type(cls):
     return GoogleJavaFormat
-
-  @property
-  def alias_groups(self):
-    return super(GoogleJavaFormatTests, self).alias_groups.merge(
-      register_core().merge(register_jvm())
-    )
 
   def test_googlejavaformat(self):
     javafile = self.create_file(
@@ -71,18 +71,11 @@ class GoogleJavaFormatTests(BaseTest):
     self.assertEqual(actual, self._GOODFORMAT)
 
 
-
 class GoogleJavaFormatCheckFormatTests(BaseTest):
 
   @classmethod
   def task_type(cls):
     return GoogleJavaFormatCheckFormat
-
-  @property
-  def alias_groups(self):
-    return super(GoogleJavaFormatCheckFormatTests, self).alias_groups.merge(
-      register_core().merge(register_jvm())
-    )
 
   def test_lint_badformat(self):
     path = self.create_file(
