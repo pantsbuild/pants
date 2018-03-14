@@ -36,13 +36,14 @@ logger = logging.getLogger(__name__)
 
 class GoalRunnerFactory(object):
   def __init__(self, root_dir, options, build_config, run_tracker, reporting,
-               daemon_graph_helper=None, exiter=sys.exit):
+               target_roots=None, daemon_graph_helper=None, exiter=sys.exit):
     """
     :param str root_dir: The root directory of the pants workspace (aka the "build root").
     :param Options options: The global, pre-initialized Options instance.
     :param BuildConfiguration build_config: A pre-initialized BuildConfiguration instance.
     :param Runtracker run_tracker: The global, pre-initialized/running RunTracker instance.
     :param Reporting reporting: The global, pre-initialized Reporting instance.
+    :param TargetRoots target_roots: A pre-existing `TargetRoots` object, if available.
     :param LegacyGraphHelper daemon_graph_helper: A LegacyGraphHelper instance for graph reuse. (Optional)
     :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
     """
@@ -51,6 +52,7 @@ class GoalRunnerFactory(object):
     self._build_config = build_config
     self._run_tracker = run_tracker
     self._reporting = reporting
+    self._target_roots = target_roots
     self._daemon_graph_helper = daemon_graph_helper
     self._exiter = exiter
 
@@ -73,9 +75,15 @@ class GoalRunnerFactory(object):
       result = help_printer.print_help()
       self._exiter(result)
 
-  def _init_graph(self, pants_ignore_patterns, build_ignore_patterns,
-                  exclude_target_regexps, target_specs, workdir, graph_helper=None,
-                  subproject_build_roots=None):
+  def _init_graph(self,
+                  pants_ignore_patterns,
+                  build_ignore_patterns,
+                  exclude_target_regexps,
+                  target_specs,
+                  target_roots,
+                  workdir,
+                  graph_helper,
+                  subproject_build_roots):
     """Determine the BuildGraph, AddressMapper and spec_roots for a given run.
 
     :param list pants_ignore_patterns: The pants ignore patterns from '--pants-ignore'.
@@ -84,9 +92,10 @@ class GoalRunnerFactory(object):
     :param str workdir: The pants workdir.
     :param list exclude_target_regexps: Regular expressions for targets to be excluded.
     :param list target_specs: The original target specs.
+    :param TargetRoots target_roots: The existing `TargetRoots` object, if any.
     :param LegacyGraphHelper graph_helper: A LegacyGraphHelper to use for graph construction,
                                            if available. This would usually come from the daemon.
-    :returns: A tuple of (BuildGraph, AddressMapper, opt Scheduler, spec_roots).
+    :returns: A tuple of (BuildGraph, AddressMapper, opt Scheduler, TargetRoots).
     """
     # The daemon may provide a `graph_helper`. If that's present, use it for graph construction.
     if not graph_helper:
@@ -104,11 +113,13 @@ class GoalRunnerFactory(object):
         include_trace_on_error=self._options.for_global_scope().print_exception_stacktrace
       )
 
-    target_roots = TargetRoots.create(options=self._options,
-                                      build_root=self._root_dir,
-                                      change_calculator=graph_helper.change_calculator)
+    target_roots = target_roots or TargetRoots.create(
+      options=self._options,
+      build_root=self._root_dir,
+      change_calculator=graph_helper.change_calculator
+    )
     graph, address_mapper = graph_helper.create_build_graph(target_roots, self._root_dir)
-    return graph, address_mapper, graph_helper.scheduler, target_roots.as_specs()
+    return graph, address_mapper, graph_helper.scheduler, target_roots
 
   def _determine_goals(self, requested_goals):
     """Check and populate the requested goals for a given run."""
@@ -149,20 +160,21 @@ class GoalRunnerFactory(object):
 
   def _setup_context(self):
     with self._run_tracker.new_workunit(name='setup', labels=[WorkUnitLabel.SETUP]):
-      self._build_graph, self._address_mapper, scheduler, spec_roots = self._init_graph(
+      self._build_graph, self._address_mapper, scheduler, target_roots = self._init_graph(
         self._global_options.pants_ignore,
         self._global_options.build_ignore,
         self._global_options.exclude_target_regexp,
         self._options.target_specs,
+        self._target_roots,
         self._global_options.pants_workdir,
         self._daemon_graph_helper,
-        self._global_options.subproject_roots,
+        self._global_options.subproject_roots
       )
 
       goals = self._determine_goals(self._requested_goals)
       is_quiet = self._should_be_quiet(goals)
 
-      target_roots = self._specs_to_targets(spec_roots)
+      literal_target_roots = self._specs_to_targets(target_roots.as_specs())
 
       # Now that we've parsed the bootstrap BUILD files, and know about the SCM system.
       self._run_tracker.run_info.add_scm_info()
@@ -174,7 +186,7 @@ class GoalRunnerFactory(object):
 
       context = Context(options=self._options,
                         run_tracker=self._run_tracker,
-                        target_roots=target_roots,
+                        target_roots=literal_target_roots,
                         requested_goals=self._requested_goals,
                         build_graph=self._build_graph,
                         build_file_parser=self._build_file_parser,
