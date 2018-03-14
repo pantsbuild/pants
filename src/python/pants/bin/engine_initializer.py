@@ -10,11 +10,13 @@ from collections import namedtuple
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.file_system_project_tree import FileSystemProjectTree
-from pants.engine.build_files import create_graph_rules
+from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
+from pants.engine.build_files import BuildFileAddresses, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.isolated_process import create_process_rules
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import HydratedTargets, LegacyBuildGraph, create_legacy_graph_tasks
+from pants.engine.legacy.graph import (LegacyBuildGraph, TransitiveHydratedTargets,
+                                       create_legacy_graph_tasks)
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (GoTargetAdaptor, JavaLibraryAdaptor, JunitTestsAdaptor,
                                          JvmAppAdaptor, PythonLibraryAdaptor, PythonTargetAdaptor,
@@ -74,12 +76,18 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
   """A container for the components necessary to construct a legacy BuildGraph facade."""
 
   def warm_product_graph(self, target_roots):
-    """Warm the scheduler's `ProductGraph` with `HydratedTargets` products.
+    """Warm the scheduler's `ProductGraph` with `TransitiveHydratedTargets` products.
 
     :param TargetRoots target_roots: The targets root of the request.
     """
     logger.debug('warming target_roots for: %r', target_roots)
-    request = self.scheduler.execution_request([HydratedTargets], target_roots.as_specs())
+    if type(target_roots) is ChangedTargetRoots:
+      subjects = [BuildFileAddresses(target_roots.addresses)]
+    elif type(target_roots) is LiteralTargetRoots:
+      subjects = target_roots.specs
+    else:
+      raise ValueError('Unexpected TargetRoots type: `{}`.'.format(target_roots))
+    request = self.scheduler.execution_request([TransitiveHydratedTargets], subjects)
     result = self.scheduler.execute(request)
     if result.error:
       raise result.error
@@ -95,7 +103,7 @@ class LegacyGraphHelper(namedtuple('LegacyGraphHelper', ['scheduler', 'symbol_ta
     graph = LegacyBuildGraph.create(self.scheduler, self.symbol_table)
     logger.debug('build_graph is: %s', graph)
     # Ensure the entire generator is unrolled.
-    for _ in graph.inject_specs_closure(target_roots.as_specs()):
+    for _ in graph.inject_roots_closure(target_roots):
       pass
 
     address_mapper = LegacyAddressMapper(self.scheduler, build_root or get_buildroot())

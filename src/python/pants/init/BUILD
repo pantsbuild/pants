@@ -11,6 +11,7 @@ python_library(
     'src/python/pants:version',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
+    'src/python/pants/base:target_roots',
     'src/python/pants/binaries:binary_util',
     'src/python/pants/build_graph',
     'src/python/pants/core_tasks',

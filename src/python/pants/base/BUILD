@@ -160,6 +160,14 @@ python_library(
 )
 
 python_library(
+  name = 'target_roots',
+  sources = ['target_roots.py'],
+  dependencies = [
+    'src/python/pants/util:objects',
+  ],
+)
+
+python_library(
   name = 'worker_pool',
   sources = ['worker_pool.py'],
   dependencies = [

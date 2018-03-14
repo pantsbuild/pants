@@ -18,7 +18,7 @@ from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonExiter, DaemonPantsRunner
 from pants.bin.engine_initializer import EngineInitializer
 from pants.engine.native import Native
-from pants.init.target_roots import TargetRoots
+from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.logging.setup import setup_logging
 from pants.option.arg_splitter import GLOBAL_SCOPE
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -146,7 +146,7 @@ class PantsDaemon(FingerprintedProcessManager):
         bind_addr=(bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
         exiter_class=DaemonExiter,
         runner_class=DaemonPantsRunner,
-        target_roots_class=TargetRoots,
+        target_roots_calculator=TargetRootsCalculator,
         scheduler_service=scheduler_service
       )
 
