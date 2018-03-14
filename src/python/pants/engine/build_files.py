@@ -319,7 +319,8 @@ def _recursive_dirname(f):
 
 
 # TODO: This is a bit of a lie: `Struct` is effectively abstract, so this collection
-# will contain subclasses of `Struct` for the symbol table types.
+# will contain subclasses of `Struct` for the symbol table types. These APIs need more
+# polish before we make them public: see #4535 in particular.
 HydratedStructs = Collection.of(Struct)
 
 

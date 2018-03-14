@@ -145,13 +145,14 @@ class EngineChangeCalculator(ChangeCalculator):
       return
 
     # For dependee finding, we need to parse all build files to collect all structs. But we
-    # don't need to fully hydrate targets (ie, expand their source globs).
+    # don't need to fully hydrate targets (ie, expand their source globs), and so we use
+    # the `HydratedStructs` product. See #4535 for more info.
     adaptor_iter = (t
                     for targets in self._scheduler.product_request(HydratedStructs,
                                                                    [DescendantAddresses('')])
                     for t in targets.dependencies)
     graph = _DependentGraph.from_iterable(target_types_from_symbol_table(self._symbol_table),
-                                                        adaptor_iter)
+                                          adaptor_iter)
 
     if changed_request.include_dependees == 'direct':
       for address in graph.dependents_of_addresses(changed_addresses):

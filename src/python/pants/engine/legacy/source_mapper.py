@@ -53,7 +53,8 @@ class EngineSourceMapper(SourceMapper):
   def _match_sources(self, sources_set, fileset):
     # NB: Deleted files can only be matched against the 'filespec' (ie, `PathGlobs`) for a target,
     # so we don't actually call `fileset.matches` here.
-    # TODO: This call should be pushed down into the engine one way or another.
+    # TODO: This call should be pushed down into the engine to match directly against
+    # `PathGlobs` as we erode the `AddressMapper`/`SourceMapper` split.
     return any_matches_filespec(sources_set, fileset.filespec)
 
   def _owns_any_source(self, sources_set, legacy_target):
