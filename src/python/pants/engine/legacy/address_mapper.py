@@ -60,7 +60,7 @@ class LegacyAddressMapper(AddressMapper):
 
   @staticmethod
   def is_declaring_file(address, file_path):
-    return any_declaring_file(address, [file_path])
+    return LegacyAddressMapper.any_is_declaring_file(address, [file_path])
 
   def addresses_in_spec_path(self, spec_path):
     return self.scan_specs([SiblingAddresses(spec_path)])

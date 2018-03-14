@@ -12,13 +12,13 @@ from contextlib import contextmanager
 
 import mock
 
-from pants.base.target_roots import TargetRoots
 from pants.bin.engine_initializer import EngineInitializer
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.init.options_initializer import OptionsInitializer
+from pants.init.target_roots_calculator import TargetRootsCalculator
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
@@ -57,7 +57,7 @@ class GraphTestBase(unittest.TestCase):
   def open_scheduler(self, specs, build_file_aliases=None):
     with self.graph_helper(build_file_aliases=build_file_aliases) as graph_helper:
       graph, target_roots = self.create_graph_from_specs(graph_helper, specs)
-      addresses = tuple(graph.inject_specs_closure(target_roots.as_specs()))
+      addresses = tuple(graph.inject_roots_closure(target_roots))
       yield graph, addresses, graph_helper.scheduler
 
   def create_graph_from_specs(self, graph_helper, specs):
@@ -67,7 +67,7 @@ class GraphTestBase(unittest.TestCase):
     return graph, target_roots
 
   def create_target_roots(self, specs):
-    return TargetRoots.create(self._make_setup_args(specs))
+    return TargetRootsCalculator.create(self._make_setup_args(specs))
 
 
 class GraphTargetScanFailureTests(GraphTestBase):
