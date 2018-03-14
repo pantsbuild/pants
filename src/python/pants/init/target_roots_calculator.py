@@ -11,10 +11,8 @@ from twitter.common.collections import OrderedSet
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.specs import SingleAddress
 from pants.base.target_roots import ChangedTargetRoots, LiteralTargetRoots
 from pants.scm.subsystems.changed import ChangedRequest
-from pants.util.objects import datatype
 
 
 logger = logging.getLogger(__name__)
