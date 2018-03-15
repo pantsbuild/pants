@@ -20,7 +20,7 @@ from pants.engine.isolated_process import (ExecuteProcessRequest, ExecuteProcess
 from pants.engine.native import Function, TypeConstraint, TypeId
 from pants.engine.nodes import Return, State, Throw
 from pants.engine.rules import RuleIndex, SingletonRule, TaskRule
-from pants.engine.selectors import (Select, SelectDependencies, SelectProjection, SelectTransitive,
+from pants.engine.selectors import (Select, SelectDependencies, SelectProjection,
                                     SelectVariant, constraint_for)
 from pants.engine.struct import HasProducts, Variants
 from pants.util.contextutil import temporary_file_path
@@ -208,12 +208,6 @@ class WrappedNativeScheduler(object):
                                                        self._to_constraint(selector.dep_product),
                                                        self._to_utf8_buf(selector.field),
                                                        self._to_ids_buf(selector.field_types))
-      elif selector_type is SelectTransitive:
-        self._native.lib.tasks_add_select_transitive(self._tasks,
-                                                     product_constraint,
-                                                     self._to_constraint(selector.dep_product),
-                                                     self._to_utf8_buf(selector.field),
-                                                     self._to_ids_buf(selector.field_types))
       elif selector_type is SelectProjection:
         self._native.lib.tasks_add_select_projection(self._tasks,
                                                      self._to_constraint(selector.product),
