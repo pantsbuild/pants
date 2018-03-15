@@ -303,8 +303,8 @@ class RuleGraphMakerTest(unittest.TestCase):
       else:
         pass
 
-    self.assertEquals(41, len(all_rules))
-    self.assertEquals(78, len(root_rule_lines)) # 2 lines per entry
+    self.assertEquals(20, len(all_rules))
+    self.assertEquals(36, len(root_rule_lines)) # 2 lines per entry
 
   def test_smallest_full_test_multiple_root_subject_types(self):
     rules = [

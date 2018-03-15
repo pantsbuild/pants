@@ -13,7 +13,7 @@ from textwrap import dedent
 from pants.base.specs import DescendantAddresses, SiblingAddresses, SingleAddress
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses, Collection
-from pants.engine.build_files import UnhydratedStruct, create_graph_rules
+from pants.engine.build_files import Specs, UnhydratedStruct, create_graph_rules
 from pants.engine.fs import create_fs_rules
 from pants.engine.mapper import (AddressFamily, AddressMap, AddressMapper, DifferingFamiliesError,
                                  DuplicateNameError, UnaddressableObjectError)
@@ -167,18 +167,8 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
                              type_alias='target')
 
   def resolve(self, spec):
-    request = self.scheduler.execution_request([UnhydratedStructs], [spec])
-    result = self.scheduler.execute(request)
-    if result.error:
-      raise result.error
-
-    # Expect a single root.
-    if len(result.root_products) != 1:
-      raise Exception('Wrong number of result products: {}'.format(result.root_products))
-    state = result.root_products[0][1]
-    if type(state) is Throw:
-      raise Exception(state.exc)
-    return state.value.dependencies
+    uhs, = self.scheduler.product_request(UnhydratedStructs, [Specs(tuple([spec]))])
+    return uhs.dependencies
 
   def resolve_multi(self, spec):
     return {uhs.address: uhs.struct for uhs in self.resolve(spec)}

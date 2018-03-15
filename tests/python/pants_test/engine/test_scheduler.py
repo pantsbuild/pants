@@ -12,6 +12,7 @@ from textwrap import dedent
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.build_graph.address import Address
 from pants.engine.addressable import BuildFileAddresses
+from pants.engine.build_files import Specs
 from pants.engine.nodes import Return, Throw
 from pants.engine.rules import RootRule, TaskRule
 from pants.engine.selectors import Select, SelectVariant
@@ -48,6 +49,9 @@ class SchedulerTest(unittest.TestCase):
     self.managed_hadoop = Address.parse('3rdparty/jvm/managed:hadoop-common')
     self.managed_resolve_latest = Address.parse('3rdparty/jvm/managed:latest-hadoop')
     self.inferred_deps = Address.parse('src/scala/inferred_deps')
+
+  def parse_specs(self, *specs):
+    return Specs(tuple(self.spec_parser.parse_spec(spec) for spec in specs))
 
   def assert_select_for_subjects(self, walk, selector, subjects, variants=None):
     raise ValueError(walk)
@@ -186,12 +190,12 @@ class SchedulerTest(unittest.TestCase):
 
   def test_descendant_specs(self):
     """Test that Addresses are produced via recursive globs of the 3rdparty/jvm directory."""
-    spec = self.spec_parser.parse_spec('3rdparty/jvm::')
-    build_request = self.scheduler.execution_request([BuildFileAddresses], [spec])
+    specs = self.parse_specs('3rdparty/jvm::')
+    build_request = self.scheduler.execution_request([BuildFileAddresses], [specs])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
-    self.assertEqual(spec, subject)
+    self.assertEqual(specs, subject)
     self.assertEqual(BuildFileAddresses, type(root.value))
 
     # Confirm that a few expected addresses are in the list.
@@ -201,12 +205,12 @@ class SchedulerTest(unittest.TestCase):
 
   def test_sibling_specs(self):
     """Test that sibling Addresses are parsed in the 3rdparty/jvm directory."""
-    spec = self.spec_parser.parse_spec('3rdparty/jvm:')
-    build_request = self.scheduler.execution_request([BuildFileAddresses], [spec])
+    specs = self.parse_specs('3rdparty/jvm:')
+    build_request = self.scheduler.execution_request([BuildFileAddresses], [specs])
     ((subject, _), root), = self.build(build_request)
 
     # Validate the root.
-    self.assertEqual(spec, subject)
+    self.assertEqual(specs, subject)
     self.assertEqual(BuildFileAddresses, type(root.value))
 
     # Confirm that an expected address is in the list.
@@ -215,8 +219,8 @@ class SchedulerTest(unittest.TestCase):
     self.assertNotIn(self.managed_guava, root.value.dependencies)
 
   def test_scheduler_visualize(self):
-    spec = self.spec_parser.parse_spec('3rdparty/jvm:')
-    build_request = self.request(['list'], spec)
+    specs = self.parse_specs('3rdparty/jvm::')
+    build_request = self.request(['list'], specs)
     self.build(build_request)
 
     with temporary_dir() as td:
