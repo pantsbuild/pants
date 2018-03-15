@@ -41,7 +41,7 @@ class GoogleJavaFormatBase(RewriteBase):
 
   def invoke_tool(self, _, target_sources):
     args = list(self.additional_args)
-    args.extend([source for _, source in target_sources])
+    args.extend([source for target, source in target_sources])
     return self.runjava(classpath=self.tool_classpath('google-java-format'),
                         main='com.google.googlejavaformat.java.Main',
                         args=args,

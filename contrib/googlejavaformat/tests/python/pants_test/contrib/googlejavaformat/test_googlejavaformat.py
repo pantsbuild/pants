@@ -74,7 +74,7 @@ class GoogleJavaFormatCheckFormatTests(BaseTest):
     return GoogleJavaFormatCheckFormat
 
   def test_lint_badformat(self):
-    path = self.create_file(
+    self.create_file(
       relpath='src/java/org/pantsbuild/contrib/googlejavaformat/MyClass.java',
       contents=self._BADFORMAT)
     target = self.make_target(
@@ -91,7 +91,7 @@ class GoogleJavaFormatCheckFormatTests(BaseTest):
     )
 
   def test_lint_goodformat(self):
-    path = self.create_file(
+    self.create_file(
       relpath='src/java/org/pantsbuild/contrib/googlejavaformat/MyClass.java',
       contents=self._GOODFORMAT)
     target = self.make_target(
